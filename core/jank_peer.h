@@ -35,6 +35,8 @@ struct jank_peer {
     struct lk_node k;
     uint8_t air_mac[6], usb_mac[6];
     uint32_t ip;
+    uint32_t net_mask;                 /* a normal network's: 0 on the air of MODE JAM */
+    uint8_t on_network;
     uint32_t rnd;
     uint8_t allowed;                   /* the setting */
     uint8_t on;                        /* in the session's traffic */
@@ -50,6 +52,9 @@ struct jank_peer {
 void jp_init(struct jank_peer *p, const uint8_t usb_mac[6], const uint8_t air_mac[6], uint32_t seed, jp_out_fn out, void *ctx);
 void jp_allow(struct jank_peer *p, int allowed, int64_t now_us);          /* the setting: off leaves at once */
 void jp_set_air_mac(struct jank_peer *p, const uint8_t mac[6]);           /* the bridge adopted another M */
+/* a normal network: the address is the network's, 0 until there is one, and the peer is silent without it. Called once
+ * before anything is sent; never back to link-local */
+void jp_set_network(struct jank_peer *p, uint32_t ip, uint32_t mask, int64_t now_us);
 /* a frame seen by the bridge, from JP_TO_AIR or JP_TO_USB: 1 pass it on, 0 it was for the peer alone */
 int jp_input(struct jank_peer *p, const uint8_t *eth, size_t len, uint32_t from, int64_t now_us);
 void jp_poll(struct jank_peer *p, int64_t now_us);                        /* every few ms */

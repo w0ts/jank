@@ -12,7 +12,6 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->group = 1;
     c->filter = JK_FILTER_LINK;
     c->peer = 1;
-    c->midi = 1;
     c->transport = JK_TRANSPORT_LINK;
     c->quantum = 4;
     strcpy(c->name, "jank");
@@ -55,10 +54,16 @@ static void put_mac(struct writer *w, const char *key, const uint8_t *m, const c
 
 static const char *on_off(uint32_t v) { return v ? "on" : "off"; }
 
+static void put_ip(struct writer *w, const char *key, uint32_t ip)
+{
+    put(w, "%s=%u.%u.%u.%u\n", key, (unsigned)(ip >> 24), (unsigned)(ip >> 16 & 255u), (unsigned)(ip >> 8 & 255u), (unsigned)(ip & 255u));
+}
+
 static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct writer *w)
 {
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
-    put(w, "peer=%s\nmidi=%s\ntransport=%s\nquantum=%u\noffset=%d\n", on_off(c->peer), on_off(c->midi), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_ms);
+    put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_ms);
+    put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jam", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "version=%s\nok\n", JK_VERSION);
 }
@@ -86,6 +91,9 @@ static void cmd_status(const struct jk_snapshot *s, uint32_t now_ms, struct writ
     const struct jk_bridge *b = &s->b;
     put(w, "usb=%u\nuptime=%lu\ngroup=%u\nchannel=%u\n", s->usb_up, (unsigned long)s->uptime_s, b->group, b->channel);
     put(w, "peers=%lu\nrssi=%d\n", (unsigned long)jk_peers_heard(b, now_ms), jk_best_rssi(b, now_ms));
+    put(w, "wifi=%u\n", s->wifi_up);
+    put_ip(w, "wifi_ip", s->wifi_ip);
+    put(w, "wifi_rssi=%d\nwifi_channel=%u\n", s->wifi_rssi, s->wifi_channel);
     put_bridge_stats(&b->st, w);
     put(w, "tx_fail=%lu\nqueue_full=%lu\nscan_lost=%lu\n", (unsigned long)s->tx_fail, (unsigned long)s->queue_full, (unsigned long)s->scan_lost);
     put(w, "lat_air_us=%lu\nlat_air_max_us=%lu\nlat_usb_us=%lu\nlat_usb_max_us=%lu\n", (unsigned long)s->lat_air_us, (unsigned long)s->lat_air_max_us, (unsigned long)s->lat_usb_us, (unsigned long)s->lat_usb_max_us);
@@ -146,18 +154,39 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
     return 0;
 }
 
+static int printable(const char *s)
+{
+    for (; *s; s++)
+        if ((unsigned char)*s < 0x20u || (unsigned char)*s > 0x7Eu)
+            return 0;
+    return 1;
+}
+
+static int set_text(char *to, const char *val, size_t min, size_t max)
+{
+    size_t n = strlen(val);
+    if (n < min || n > max || !printable(val))
+        return -1;
+    memcpy(to, val, n + 1u);
+    return 0;
+}
+
 static int set_value(struct jk_cfg *c, const char *key, const char *val)
 {
     if (!strcmp(key, "name"))
         return jk_cfg_set_name(c, val);
+    if (!strcmp(key, "ssid"))
+        return set_text(c->ssid, val, 1, JK_SSID_MAX);
+    if (!strcmp(key, "pass"))
+        return set_text(c->pass, val, JK_PASS_MIN, JK_PASS_MAX);
+    if (!strcmp(key, "net"))
+        return parse_pair(val, "jam", "wifi", &c->net);
     if (!strcmp(key, "filter"))
         return parse_pair(val, "link", "all", &c->filter);
     if (!strcmp(key, "transport"))
         return parse_pair(val, "link", "auto", &c->transport);
     if (!strcmp(key, "peer"))
         return parse_on_off(val, &c->peer);
-    if (!strcmp(key, "midi"))
-        return parse_on_off(val, &c->midi);
     return set_number(c, key, val);
 }
 
@@ -167,7 +196,9 @@ static enum jk_ctl_action cmd_set(char *args, struct jk_cfg *cfg, struct writer 
     char *val = strchr(args, ' ');
     if (val)
         *val++ = 0;
-    if (!val || set_value(&next, args, val)) {
+    if (!val && !strcmp(args, "pass"))     /* an open network */
+        next.pass[0] = 0;
+    else if (!val || set_value(&next, args, val)) {
         put(w, "err bad setting\n");
         return JK_CTL_NONE;
     }
@@ -196,7 +227,7 @@ static char *trim(const char *line, char *buf, size_t cap)
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap)
 {
     struct writer w = {out, cap, 0};
-    char buf[64], *s = trim(line, buf, sizeof buf);
+    char buf[80], *s = trim(line, buf, sizeof buf);
     out[0] = 0;
     if (!s) {
         put(&w, "err line too long\n");
@@ -213,7 +244,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     else if (!strcmp(s, "scan"))
         return JK_CTL_SCAN;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nscan\nset group|name|filter|peer|midi|transport|quantum|offset <value>\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nscan\nset group|name|filter|peer|transport|quantum|offset|net|ssid|pass <value>\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

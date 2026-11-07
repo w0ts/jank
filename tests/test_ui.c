@@ -98,10 +98,22 @@ static void test_long(void)
 {
     struct jb_button b;
     reset(&b);
+    CHECK(hold(&b, 1, JB_LONG_MS + 500u) == JB_NONE);    /* said at the release, as it could still become download */
+    CHECK(hold(&b, 0, 100) == JB_LONG && events == 1);
+    CHECK(hold(&b, 0, 2000) == JB_NONE && events == 1);  /* and no click after it */
+    reset(&b);
     CHECK(hold(&b, 1, JB_LONG_MS - 100u) == JB_NONE);
-    CHECK(hold(&b, 1, 200) == JB_LONG);
-    CHECK(hold(&b, 1, 5000) == JB_NONE);                 /* one event however long */
-    CHECK(hold(&b, 0, 2000) == JB_NONE && events == 1);  /* and no click at the release */
+    CHECK(hold(&b, 0, 1000) == JB_CLICK);                 /* short of long: a click */
+}
+
+static void test_download(void)
+{
+    struct jb_button b;
+    reset(&b);
+    CHECK(hold(&b, 1, JB_DOWNLOAD_MS - 100u) == JB_NONE);
+    CHECK(hold(&b, 1, 200) == JB_DOWNLOAD);               /* while still held: the user lets go into download mode */
+    CHECK(hold(&b, 1, 5000) == JB_NONE);
+    CHECK(hold(&b, 0, 2000) == JB_NONE && events == 1);  /* no long press at the release */
 }
 
 static void test_wrapping_clock(void)
@@ -248,6 +260,7 @@ int main(void)
     test_two_slow_clicks();
     test_bounce();
     test_long();
+    test_download();
     test_wrapping_clock();
     test_group_of();
     test_plan();

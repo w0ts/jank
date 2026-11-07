@@ -271,16 +271,21 @@ uint32_t jk_next_group(uint32_t group)
     return group >= JK_GROUP_MIN && group < JK_GROUP_MAX ? group + 1u : JK_GROUP_MIN;
 }
 
-struct jk_rgb jk_led(uint32_t group, uint32_t peers, int usb_up, uint32_t t_ms)
+int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum)
 {
-    static const struct jk_rgb off = {0, 0, 0}, blue = {0, 0, 40}, green = {0, 20, 0}, amber = {20, 10, 0}, red = {20, 0, 0};
-    uint32_t phase = t_ms % JK_LED_PERIOD_MS;
-    uint32_t blinks = group * JK_LED_BLINK_MS;
-    if (phase < blinks)
-        return phase % JK_LED_BLINK_MS < JK_LED_BLINK_MS / 2u ? blue : off;
-    if (phase < blinks + JK_LED_BLINK_MS)
-        return off;
-    if (peers)
-        return green;
-    return usb_up ? amber : red;
+    const int64_t beat = 1000000;
+    int rest = net == JK_NET_WIFI;
+    int64_t at, index, flash;
+    if (!joined || mpb <= 0)
+        return rest;
+    at = beat_ub % beat;
+    if (at < 0)
+        at += beat;
+    index = (beat_ub - at) / beat;              /* floor, before the session's beat 0 too */
+    quantum = quantum ? quantum : 1u;
+    index %= (int64_t)quantum;
+    flash = (int64_t)(index == 0 ? JK_BAR_FLASH_MS : JK_BEAT_FLASH_MS) * 1000 * beat / mpb;
+    if (flash > beat / JK_FLASH_CAP_DIV)
+        flash = beat / JK_FLASH_CAP_DIV;
+    return at < flash ? !rest : rest;
 }

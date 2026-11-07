@@ -7,19 +7,21 @@
 
 #define JB_DEBOUNCE_MS 20u             /* a level holds this long before it counts */
 #define JB_DOUBLE_MS 350u              /* the second press starts within this after the first release */
-#define JB_LONG_MS 3000u               /* held this long: download mode */
+#define JB_LONG_MS 1500u               /* held this long, then released: MODE JAM <-> the Wi-Fi network */
+#define JB_DOWNLOAD_MS 10000u          /* held this long: download mode, said while still held */
 
 enum jb_event {
     JB_NONE = 0,
     JB_CLICK,                          /* said JB_DOUBLE_MS after the release, once no second press came */
     JB_DOUBLE,
-    JB_LONG
+    JB_LONG,
+    JB_DOWNLOAD
 };
 
 struct jb_button {
     uint8_t raw, level;                /* the sample last seen; the debounced state */
     uint8_t state;
-    uint32_t t_raw, t_edge;
+    uint32_t t_raw, t_edge, t_down;
 };
 
 void jb_init(struct jb_button *b);

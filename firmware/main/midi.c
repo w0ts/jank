@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* MIDI out: a 1 MHz hardware timer that doubles as Link's clock, and UART1 at 31250 baud.
+/* MIDI out: a 1 MHz hardware timer that doubles as Link's clock, and UART1 at 31250 baud, plus USB MIDI on the S3.
  * The timer's alarm interrupt runs jc_step (multiply and shift only, in IRAM) and writes the bytes straight into the UART's
  * FIFO: no task is between the alarm and the wire. It is pinned to core 1, level 3, away from the Wi-Fi task on core 0. */
 #include <string.h>
@@ -23,7 +23,6 @@ static gptimer_handle_t s_timer;
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static DRAM_ATTR struct jc_map s_map;
 static DRAM_ATTR struct jc_ticker s_tick;
-static DRAM_ATTR volatile uint8_t s_enabled;
 static uint8_t s_running;
 
 static void IRAM_ATTR arm(gptimer_handle_t timer, int64_t at, int64_t now)
@@ -36,14 +35,17 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
 {
     struct jc_fire f;
     int64_t now = (int64_t)ev->count_value;
+    bool woken = false;
     (void)ctx;
     portENTER_CRITICAL_ISR(&s_mux);
     jc_step(&s_tick, &s_map, now, &f);
     portEXIT_CRITICAL_ISR(&s_mux);
-    if (s_enabled)
-        uart_ll_write_txfifo(UART_LL_GET_HW(MIDI_UART), f.bytes, f.n);
+    uart_ll_write_txfifo(UART_LL_GET_HW(MIDI_UART), f.bytes, f.n);
+#if CONFIG_JANK_USB_NET
+    woken = usb_midi_isr(f.bytes, f.n);
+#endif
     arm(timer, f.next, now);
-    return false;
+    return woken;
 }
 
 static esp_err_t uart_up(void)
@@ -115,8 +117,6 @@ int64_t midi_now_us(void)
     ESP_ERROR_CHECK(gptimer_get_raw_count(s_timer, &c));
     return (int64_t)c;
 }
-
-void midi_enable(int on) { s_enabled = on != 0; }
 
 void midi_set_quantum(uint32_t quantum)
 {

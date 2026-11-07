@@ -1,7 +1,7 @@
 #!/bin/bash
 # Installs ESP-IDF inside the scratch folder only. Python 3.13: Homebrew's default 3.15 is too new for IDF's pinned wheels.
 set -eu
-S="$(cd "$(dirname "$0")/.." && pwd)/../worktrees/jank-scratch"; mkdir -p "$S"
+S="$(cd "$(dirname "$0")/.." && pwd)/worktrees/jank-scratch"; mkdir -p "$S"
 mkdir -p "$S/pybin" "$S/pipcache"
 ln -sf /opt/homebrew/bin/python3.13 "$S/pybin/python3"
 ln -sf /opt/homebrew/bin/python3.13 "$S/pybin/python"

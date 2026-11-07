@@ -19,6 +19,32 @@ function eq(a, b) {
   assert.deepStrictEqual(JSON.parse(JSON.stringify(a)), b);
 }
 
+// the control line in SysEx (the S3's USB MIDI port): the same frame as core/jank_sysex.c
+eq(box.textToSysex("get\n"), [[0xf0, 0x7d, 0x4a, 0x4b, 0x67, 0x65, 0x74, 0x0a, 0xf7]]);
+eq(box.textToSysex("x".repeat(31)).map((f) => f.length), [35, 6]);
+eq(box.textToSysex("\u00e9")[0][4], 0x3f);
+eq(box.sysexToText([0xf0, 0x7d, 0x4a, 0x4b, 0x6f, 0x6b, 0x0a, 0xf7]), "ok\n");
+eq(box.sysexToText([0xf0, 0x7d, 0x41, 0x42, 0x6f, 0xf7]), null);
+eq(box.sysexToText([0xf8]), null);
+eq(box.isJankPort({ name: "jank", state: "connected" }), true);
+eq(box.isJankPort({ name: "JANK MIDI", state: "connected" }), true);
+eq(box.isJankPort({ name: "jank", state: "disconnected" }), false);
+eq(box.isJankPort({ name: "FM1-E040", state: "connected" }), false);
+
+// the Network form
+eq(box.networkCommands("jam", "", "", false), ["set net jam", "reboot"]);
+eq(box.networkCommands("wifi", "Home Net", "correct horse", false), ["set ssid Home Net", "set pass correct horse", "set net wifi", "reboot"]);
+eq(box.networkCommands("wifi", "Home", "", true), ["set ssid Home", "set net wifi", "reboot"]);
+eq(box.networkCommands("wifi", "Open", "", false), ["set ssid Open", "set pass", "set net wifi", "reboot"]);
+eq(box.networkCommands("wifi", "", "correct horse", false), null);
+eq(box.networkCommands("wifi", "Home", "short", false), null);
+eq(box.networkCommands("wifi", "H\u00f6me", "correct horse", false), null);
+eq(box.networkCommands("wifi", "x".repeat(33), "correct horse", false), null);
+eq(box.networkLine({ net: "jam", group: "2" }), "MODE JAM, group 2");
+eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "0" }), "Looking for Home");
+eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "1", wifi_ip: "0.0.0.0" }), "On Home, waiting for an address");
+eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "1", wifi_ip: "192.168.1.5", wifi_rssi: "-50", wifi_channel: "6" }), "On Home, 192.168.1.5, -50 dBm, channel 6");
+
 // nothing external: no script, style, font or fetch from anywhere
 checks++;
 assert.ok(!/https?:\/\//.test(html), "the page loads nothing external");

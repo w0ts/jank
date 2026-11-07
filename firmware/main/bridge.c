@@ -10,6 +10,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "jank_net.h"
 #include "jank_peer.h"
 
 #define SLOTS 20u
@@ -19,7 +20,7 @@
 #define HOP_HOLD_US 10000000          /* after a new GROUP, keep the transport this long while looking for the session */
 #define TASK_PRIO 20                  /* above the TinyUSB task, below Wi-Fi's */
 
-enum { FROM_AIR, FROM_USB };
+enum { FROM_AIR, FROM_USB, FROM_NETWORK };
 
 struct slot {
     int64_t at;
@@ -35,6 +36,9 @@ static QueueHandle_t s_free, s_work;
 static SemaphoreHandle_t s_lock;
 static struct jk_bridge s_b;
 static struct jank_peer s_peer;
+static struct jank_net s_net;
+static uint8_t s_on_network;          /* cfg.net, from start-up on */
+static uint8_t s_net_was_up;
 static struct jk_cfg s_cfg;
 static uint8_t s_bssid[6];
 static uint8_t s_own[6];
@@ -99,6 +103,25 @@ static void on_air(const uint8_t *f, size_t len, int8_t rssi)
     xQueueSend(s_work, &v, 0);
 }
 
+/* the Wi-Fi task, on a normal network */
+static void on_network(const uint8_t *eth, size_t len)
+{
+    int i;
+    struct slot *s;
+    uint8_t v;
+    if (len > SLOT_BYTES)
+        return;
+    s = take_slot(&i);
+    if (!s)
+        return;
+    s->at = midi_now_us();
+    s->len = (uint16_t)len;
+    s->from = FROM_NETWORK;
+    memcpy(s->data, eth, len);
+    v = (uint8_t)i;
+    xQueueSend(s_work, &v, 0);
+}
+
 #if CONFIG_JANK_USB_NET
 /* the TinyUSB task */
 static void on_usb(const uint8_t *eth, size_t len)
@@ -145,7 +168,13 @@ static void to_computer(const uint8_t *eth, size_t len, int64_t at)
 static void to_air(const uint8_t *eth, size_t len, int64_t at)
 {
     uint32_t us;
-    size_t n = jk_eth_to_air(&s_b, eth, len, bridge_ms(), s_air, sizeof s_air);
+    size_t n;
+    if (s_on_network) {
+        if (radio_network_tx(eth, len) != ESP_OK)
+            s_tx_fail++;
+        return;
+    }
+    n = jk_eth_to_air(&s_b, eth, len, bridge_ms(), s_air, sizeof s_air);
     if (!n)
         return;
     if (s_away) {
@@ -173,16 +202,47 @@ static void peer_out(void *ctx, uint32_t where, const uint8_t *eth, size_t len)
 #endif
 }
 
+#if CONFIG_JANK_USB_NET
+/* a computer that overrode its MAC: on MODE JAM's air jk_eth_to_air sees it, here nothing else would */
+static void note_computer(const uint8_t *eth, size_t len)
+{
+    if (len >= 12u && !(eth[6] & 1u) && memcmp(eth + 6, s_b.mac, 6) && memcmp(eth + 6, s_peer.usb_mac, 6)) {
+        memcpy(s_b.mac, eth + 6, 6);
+        s_b.mac_pending = 1;
+    }
+}
+#endif
+
+static void net_out(void *ctx, const uint8_t *eth, size_t len)
+{
+    (void)ctx;
+    to_air(eth, len, midi_now_us());
+}
+
 static void handle(struct slot *s, int i)
 {
     static uint8_t eth[SLOT_BYTES];
+    if (s->from == FROM_NETWORK) {
+        int pass = !jn_input(&s_net, s->data, s->len, bridge_ms()) && jp_input(&s_peer, s->data, s->len, JP_TO_AIR, s->at);
+#if CONFIG_JANK_USB_NET
+        if (pass)
+            to_computer(s->data, s->len, s->at);
+#else
+        (void)pass;
+#endif
+        give_slot(i);
+        return;
+    }
 #if CONFIG_JANK_USB_NET
     if (s->from == FROM_AIR) {
         size_t n = jk_air_to_eth(&s_b, s->data, s->len, s->rssi, bridge_ms(), eth, sizeof eth);
         if (n && jp_input(&s_peer, eth, n, JP_TO_AIR, s->at))
             to_computer(eth, n, s->at);
-    } else if (jp_input(&s_peer, s->data, s->len, JP_TO_USB, s->at)) {
-        to_air(s->data, s->len, s->at);
+    } else {
+        if (s_on_network)
+            note_computer(s->data, s->len);
+        if (jp_input(&s_peer, s->data, s->len, JP_TO_USB, s->at))
+            to_air(s->data, s->len, s->at);
     }
 #else
     size_t n = jk_air_to_eth(&s_b, s->data, s->len, s->rssi, bridge_ms(), eth, sizeof eth);
@@ -199,7 +259,8 @@ static void follow_mac(void)
     s_b.mac_pending = 0;
     memcpy(s_own, s_b.mac, 6);
     jp_set_air_mac(&s_peer, s_b.mac);
-    esp_err_t e = radio_set_mac(s_b.mac, s_b.channel);
+    jn_set_mac(&s_net, s_b.mac);
+    esp_err_t e = s_on_network ? radio_network_set_mac(s_b.mac) : radio_set_mac(s_b.mac, s_b.channel);
     if (e != ESP_OK)
         ESP_LOGE(TAG, "radio to the computer's MAC: %s", esp_err_to_name(e));
 }
@@ -232,6 +293,20 @@ static void publish(int64_t now)
     midi_publish(&m);
 }
 
+/* the access point came or went, DHCP's address moved */
+static void follow_network(int64_t now)
+{
+    int up = radio_network_up();
+    if (!s_on_network)
+        return;
+    if (up != s_net_was_up) {
+        s_net_was_up = (uint8_t)up;
+        jn_link(&s_net, up, bridge_ms());
+    }
+    jn_poll(&s_net, bridge_ms());
+    jp_set_network(&s_peer, jn_ip(&s_net), jn_mask(&s_net), now);
+}
+
 static void bridge_task(void *arg)
 {
     (void)arg;
@@ -246,6 +321,7 @@ static void bridge_task(void *arg)
         follow_transport(now);
         publish(now);
         follow_mac();
+        follow_network(now);
         xSemaphoreGive(s_lock);
     }
 }
@@ -254,11 +330,10 @@ void bridge_apply(const struct jk_cfg *cfg)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     int64_t now = midi_now_us();
-    int moved = cfg->group != s_b.group;
+    int moved = cfg->group != s_b.group && !s_on_network;   /* a network's channel is the access point's */
     s_cfg = *cfg;
     s_b.filter = cfg->filter;
     jp_allow(&s_peer, cfg->peer, now);
-    midi_enable(cfg->midi);
     midi_set_quantum(cfg->quantum);
     if (moved) {
         jp_leave(&s_peer, now);       /* (a bye-bye to the old group, on the channel it is still on) */
@@ -287,6 +362,9 @@ void bridge_snapshot(struct jk_snapshot *s)
     s->lat_air_max_us = s_lat_air_max;
     s->lat_usb_us = s_lat_usb;
     s->lat_usb_max_us = s_lat_usb_max;
+    s->wifi_up = (uint8_t)radio_network_up();
+    s->wifi_ip = jn_ip(&s_net);
+    radio_network_info(&s->wifi_rssi, &s->wifi_channel);
     s->link_on = s_peer.on;
     s->link_ip = s_peer.ip;
     s->link_peers = jp_peers(&s_peer);
@@ -320,11 +398,24 @@ void bridge_table_stop(struct js_table *out)
     *out = s_table;
 }
 
+int bridge_beat(int64_t *beat_ub, int32_t *mpb)
+{
+    int joined;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    joined = jp_joined(&s_peer);
+    if (joined) {
+        *mpb = jp_mpb(&s_peer);
+        *beat_ub = jp_beat_at(&s_peer, midi_now_us());
+    }
+    xSemaphoreGive(s_lock);
+    return joined;
+}
+
 uint32_t bridge_peers_heard(void)
 {
     uint32_t n;
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    n = jk_peers_heard(&s_b, bridge_ms());
+    n = s_on_network ? jp_peers(&s_peer) : jk_peers_heard(&s_b, bridge_ms());
     xSemaphoreGive(s_lock);
     return n;
 }
@@ -344,11 +435,14 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     memcpy(s_own, mac, 6);
     js_clear(&s_scan);
     jp_init(&s_peer, peer_mac, mac, esp_random(), peer_out, NULL);
+    s_on_network = cfg->net == JK_NET_WIFI;
+    jn_init(&s_net, mac, esp_random(), cfg->name, LK_MCAST_IP, net_out, NULL);
+    if (s_on_network)
+        jp_set_network(&s_peer, 0, 0, 0);
     e = midi_start();
     if (e != ESP_OK)
         return e;
     jp_allow(&s_peer, cfg->peer, midi_now_us());
-    midi_enable(cfg->midi);
     midi_set_quantum(cfg->quantum);
 #if CONFIG_JANK_USB_NET
     e = usb_start(mac, on_usb, on_usb_tx_done, ctl_serial_rx);
@@ -357,7 +451,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
 #endif
     if (e != ESP_OK)
         return e;
-    e = radio_start(mac, s_b.channel, on_air);
+    e = s_on_network ? radio_start_network(mac, cfg->ssid, cfg->pass, on_network) : radio_start(mac, s_b.channel, on_air);
     if (e != ESP_OK)
         return e;
     return xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
