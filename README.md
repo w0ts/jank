@@ -3,11 +3,11 @@
 jank (jam + link) is a cheap USB stick that does two jobs in an FM-1 MODE JAM group.
 
 - **Bridge.** Plugged into a computer, it appears as an ordinary USB network adapter on macOS, Windows and Linux, with no driver or app. Ableton Live or any Link software sees a network with the FM-1s on it.
-- **MIDI clock.** The stick is a Link peer itself. It follows tempo, beat and start/stop, and sends MIDI clock out of a TRS or DIN jack. No computer is needed: a charger or power bank will do.
+- **MIDI clock.** The stick is a Link peer itself. It follows tempo, beat and start/stop, and sends MIDI clock out of a TRS or DIN jack, and on an ESP32-S3 also to the computer as a USB MIDI port called jank. No computer is needed: a charger or power bank will do.
 
 The on-air format is Optimist's MODE JAM, and jank carries Ableton Link unchanged. Link is Ableton's trademark, and jank is not an Ableton product.
 
-> **Nothing here has run on hardware.** No stick was available: the firmware compiles, and the host tests pass, but it has never been flashed, never been on the air and never met an FM-1. See [What must be proved](#what-must-be-proved), in order.
+> **Barely run on hardware yet.** Only the Lolin32 Lite build has run (2026-11-07: MODE JAM with an FM-1 Link peer, the beat LED). The ESP32-S3 builds compile and the host tests pass, but none has been flashed. See [What must be proved](#what-must-be-proved), in order.
 
 ## The pick
 
@@ -54,11 +54,14 @@ On the XIAO: 3V3 through 33 ohm to ring or pin 4, D6 (GPIO43) through 10 ohm to 
 
 ## The button
 
-| Action | With MIDI on | With MIDI off |
-|---|---|---|
-| One click | Resync | Next GROUP number |
-| Double click | Next group found on the air | The same |
-| Held 3 s | Download mode | The same |
+| Action | What it does |
+|---|---|
+| One click | Resync |
+| Double click | Next group found on the air (MODE JAM) |
+| Held 1.5 s, then let go | MODE JAM <-> the saved Wi-Fi network, with a restart. No network saved: 3 red pulses, nothing changes |
+| Held 10 s | Download mode |
+
+**The LED** shows the Link session's beat: in MODE JAM it rests off and flashes on each beat, on a Wi-Fi network it rests on and blinks off. The first beat of the bar (by Beats a bar, as MIDI start counts it) flashes longer, 150 ms against 80, and no flash is longer than a third of a beat. With no session it stays at rest. On an RGB LED, green in MODE JAM, blue on a network. Scans and group changes still show their own patterns over it.
 
 Debounce is 20 ms and the double-click window 350 ms (`JB_*` in `core/jank_ui.h`, host-tested).
 
@@ -112,7 +115,7 @@ On the XIAO's one-colour LED, the colours are lost and only the timing shows.
 
 **Size limit.** `esp_wifi_80211_tx` takes at most 1500 bytes, which leaves 1468 bytes of payload. Larger frames are dropped and counted. Link's are at most 512.
 
-**The Link peer** (`core/jank_peer.c`, on top of the bridge, separate from it) runs Optimist's `fm1base/link/link.c`, which builds with no FM-1 dependency.
+**The Link peer** (`core/jank_peer.c`, on top of the bridge, separate from it) runs Optimist's Link peer, `third_party/link/link.c` (copied from fm1-base, see its README), which builds with no FM-1 dependency.
 
 - On the air it shares the MAC and has its own IP address, as a computer with two addresses would.
 - Towards the computer it uses a second MAC, because a computer cannot send to its own.
@@ -141,17 +144,31 @@ scripts/build.sh atoms3u      # or: xiao, lolin32
 tests/run.sh                  # the host tests
 ```
 
-Everything big stays in `../worktrees/jank-scratch/`: ESP-IDF v5.5.6, its tools and Python environment, `managed_components`, `sdkconfig`, the build output. The build works on a copy there, because IDF would otherwise put them in the checkout. To install it, run `scripts/install_idf.sh`. It needs Python 3.13; Homebrew's default 3.15 is too new for IDF.
+Everything big stays in `worktrees/jank-scratch/` (git-ignored): ESP-IDF v5.5.6, its tools and Python environment, `managed_components`, `sdkconfig`, the build output. The build works on a copy there, because IDF would otherwise put them in the checkout. To install it, run `scripts/install_idf.sh`. It needs Python 3.13; Homebrew's default 3.15 is too new for IDF.
+
+## USB
+
+An S3 stick is one USB device with three functions: the network adapter (CDC-NCM), a MIDI port and a small read-only drive holding the control page, so there is no link to remember: open `jank.html` from the drive in Chrome or Edge. Clock goes to the TRS or DIN jack and to USB at the same moment, from the same timer interrupt; on USB it passes through a small queue and a task, as TinyUSB cannot be called from an interrupt, and the computer then reads it within a USB frame or so.
+
+There is no serial port on an S3: the chip has 5 IN endpoints with EP0 included, NCM takes 2, MIDI 1 and the drive 1, which uses them all. The control line goes as SysEx on the MIDI port instead (`core/jank_sysex.h`), and the control page uses Web MIDI there. It asks for SysEx permission on connecting. A vanilla ESP32 has no USB of its own, so it keeps its serial port.
+
+### Host mode
+
+With no computer on the USB port, the stick sends its clock to USB-MIDI gear instead: up to 4 devices, through a hub. It starts as a device, and when no computer has spoken within 3 s it restarts once as host, so a clock on a charger starts about 3 s later. The choice lasts until the next start. In host mode there is no network adapter, no drive and no control page over USB; output only.
+
+jank does not power the device. On a XIAO the 5V pin *is* the USB-C socket's VBUS, with no diode (v1.2 schematic), so 5 V on that pin reaches the device, or a powered hub does the job. A XIAO also says "device" on the CC pins, 5.1k on both: USB-A gear and hubs behind a C-to-A adapter do not care, USB-C gear plugged straight in may ignore it.
+
+**Never feed the 5V pin with a computer on the USB port**: nothing separates the two supplies. Build that needs both gets a diode or a switch.
 
 ## Flashing
 
 The first flash of a blank board needs download mode by hand.
 
-1. AtomS3U: plugged in, hold the side RESET button until the internal green LED lights, then release. (Later on: `bootloader` on the serial, the control page's button, or the main button held 3 s. These are unproven.)
+1. AtomS3U: plugged in, hold the side RESET button until the internal green LED lights, then release. (Later on: `bootloader` on the control line, the control page's button, or the main button held 10 s. These are unproven.)
 2. Flash:
 
 ```
-bash -c '. scripts/env.sh && cd ../worktrees/jank-scratch/build-atoms3u && python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'
+bash -c '. scripts/env.sh && cd worktrees/jank-scratch/build-atoms3u && python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'
 ```
 
 3. Unplug it and plug it back in.
@@ -172,7 +189,6 @@ set group 3
 set name front of house
 set filter link|all
 set peer on|off
-set midi on|off
 set transport link|auto
 set quantum 4
 set offset -12
@@ -200,15 +216,14 @@ These show that the two sides agree on bytes and logic. They say nothing about r
 
 ## Lolin32
 
-A WEMOS LOLIN32 (vanilla ESP32) can try the air today. It has no USB device, so **there is no network adapter and no bridge**: a computer cannot join through it. Everything else is there: the radio, groups and scan, the Link peer, MIDI clock and the button. Control is the same line protocol on UART0, through the board's USB-serial chip, so `page/jank.html` works too. It covers proofs 1 and 2 below, and 6 and 7 except for power bank and download mode.
+A WEMOS LOLIN32 (vanilla ESP32) can try the air today. It has no USB device, so **there is no network adapter and no bridge**: a computer cannot join through it. Everything else is there: the radio, groups and scan, the Link peer, MIDI clock, and the RST button as the mode switch. Control is the same line protocol on UART0, through the board's USB-serial chip, so `page/jank.html` works too. It covers proofs 1 and 2 below, and 6 and 7 except for power bank and download mode.
 
 Built for the ESP32 by `scripts/build.sh lolin32`: 680 KB. TinyUSB is not in it. The S3 builds are unchanged by this target: every loaded section of both is identical to before, except the compile time in the app descriptor.
 
-**Board**, from [the Arduino pin file](https://raw.githubusercontent.com/espressif/arduino-esp32/master/variants/lolin32/pins_arduino.h) and [espboards](https://www.espboards.dev/esp32/lolin32): LED on GPIO5, active low; 4 MB of flash; CP2104 USB-serial (a Wemos schematic was not found, and one source says CP2102). Sources differ on a BOOT button, and the firmware does not need one.
+**Board**, from [the Arduino pin file](https://raw.githubusercontent.com/espressif/arduino-esp32/master/variants/lolin32/pins_arduino.h) and [espboards](https://www.espboards.dev/esp32/lolin32): LED on GPIO5, active low; 4 MB of flash; but the board on hand is a Lolin32 Lite, whose LED is on GPIO22 (found with a pin test, 2026-11-07), and the firmware uses that; CP2104 USB-serial (a Wemos schematic was not found, and one source says CP2102). Sources differ on a BOOT button, and the firmware does not need one.
 
 | Function | Pin | Wiring |
 |---|---|---|
-| Button | GPIO25 | A push button to GND, no resistor |
 | MIDI data | GPIO17 | 10 ohm 0.25 W to TRS tip, or DIN pin 5 |
 | MIDI source | 3V3 | 33 ohm 0.5 W to TRS ring, or DIN pin 4 |
 | MIDI ground | GND | TRS sleeve, or DIN pin 2 |
@@ -219,9 +234,11 @@ The source here is a real 3.3 V rail, so this wiring has no deviation from CA-03
 
 **The clock** uses the same code on the same second core. Its jitter is unmeasured on both chips.
 
+**The button is RST.** The Lolin32 Lite has one button, on the chip's EN pin, so the firmware only ever sees the boot after a press. Two presses within 4 s are its long press: the second boot switches MODE JAM <-> the saved Wi-Fi network (no network saved: it stays in MODE JAM), with no further restart. The flag is kept in NVS, since RTC memory does not survive the EN reset on an ESP32. Any two resets within 4 s count, a plug-in followed by a press too. There is no click or double click: resync and the group scan come from the control page.
+
 **Differences in use:**
 
-- `bootloader` and the 3 s hold only restart the board, since an ESP32 cannot enter download mode by software. esptool does not need it here: it resets the board by DTR and RTS, if the board's auto-reset circuit is as documented.
+- `bootloader` and the 10 s hold only restart the board, since an ESP32 cannot enter download mode by software. esptool does not need it here: it resets the board by DTR and RTS, if the board's auto-reset circuit is as documented.
 - Opening the serial port may reset the board.
 - The LED's colours are lost, as on the XIAO: only the timing shows.
 

@@ -30,18 +30,23 @@ enum jb_event jb_step(struct jb_button *b, int pressed, uint32_t now_ms)
         if (edge && b->level) {
             b->state = ST_DOWN1;
             b->t_edge = now_ms;
+            b->t_down = now_ms;
         }
         break;
     case ST_DOWN1:
         if (edge) {
             b->state = ST_WAIT2;
             b->t_edge = now_ms;
-        } else if (now_ms - b->t_edge >= JB_LONG_MS) {
+        } else if (now_ms - b->t_edge >= JB_DOWNLOAD_MS) {
             b->state = ST_LONG;
-            return JB_LONG;
+            return JB_DOWNLOAD;
         }
         break;
     case ST_WAIT2:
+        if (b->t_edge - b->t_down >= JB_LONG_MS) {     /* the release of a long press */
+            b->state = ST_IDLE;
+            return JB_LONG;
+        }
         if (edge && b->level) {
             b->state = ST_DOWN2;
             return JB_DOUBLE;

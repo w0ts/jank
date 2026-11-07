@@ -80,11 +80,11 @@ static void test_set(void)
 static void test_set_music(void)
 {
     setup();
-    CHECK(cfg.peer == 1 && cfg.midi == 1 && cfg.transport == JK_TRANSPORT_LINK && cfg.quantum == 4 && cfg.offset_ms == 0);
+    CHECK(cfg.peer == 1 && cfg.transport == JK_TRANSPORT_LINK && cfg.quantum == 4 && cfg.offset_ms == 0);
     CHECK(run("set peer off") == JK_CTL_CFG_CHANGED && cfg.peer == 0);
     CHECK(run("set peer on") == JK_CTL_CFG_CHANGED && cfg.peer == 1);
     CHECK(run("set peer maybe") == JK_CTL_NONE);
-    CHECK(run("set midi off") == JK_CTL_CFG_CHANGED && cfg.midi == 0);
+    CHECK(run("set midi off") == JK_CTL_NONE);
     CHECK(run("set transport auto") == JK_CTL_CFG_CHANGED && cfg.transport == JK_TRANSPORT_AUTO);
     CHECK(run("set transport banana") == JK_CTL_NONE);
     CHECK(run("set quantum 8") == JK_CTL_CFG_CHANGED && cfg.quantum == 8);
@@ -94,8 +94,48 @@ static void test_set_music(void)
     CHECK(run("set offset 101") == JK_CTL_NONE && cfg.offset_ms == -12);
     CHECK(run("set offset -101") == JK_CTL_NONE);
     CHECK(run("get") == JK_CTL_NONE);
-    CHECK(strstr(out, "peer=on\n") && strstr(out, "midi=off\n") && strstr(out, "transport=auto\n"));
+    CHECK(strstr(out, "peer=on\n") && !strstr(out, "midi=") && strstr(out, "transport=auto\n"));
     CHECK(strstr(out, "quantum=8\n") && strstr(out, "offset=-12\n"));
+}
+
+static void test_network_settings(void)
+{
+    char long_ssid[50], long_pass[80];
+    setup();
+    CHECK(run("get") == JK_CTL_NONE);
+    CHECK(strstr(out, "net=jam\n") && strstr(out, "ssid=\n") && strstr(out, "pass=none\n"));
+    CHECK(run("set ssid My Home Net") == JK_CTL_CFG_CHANGED && !strcmp(cfg.ssid, "My Home Net"));
+    CHECK(run("set pass correct horse battery") == JK_CTL_CFG_CHANGED && !strcmp(cfg.pass, "correct horse battery"));
+    CHECK(run("set net wifi") == JK_CTL_CFG_CHANGED && cfg.net == JK_NET_WIFI);
+    CHECK(run("get") == JK_CTL_NONE);
+    CHECK(strstr(out, "net=wifi\n") && strstr(out, "ssid=My Home Net\n") && strstr(out, "pass=set\n"));
+    CHECK(!strstr(out, "horse"));                         /* the password never comes back */
+    CHECK(run("status") == JK_CTL_NONE && !strstr(out, "horse"));
+    CHECK(run("set pass short") == JK_CTL_NONE && !strcmp(cfg.pass, "correct horse battery"));
+    memset(long_pass, 'x', sizeof long_pass);
+    strcpy(long_pass, "set pass ");
+    memset(long_pass + 9, 'x', 63);
+    long_pass[72] = 0;
+    CHECK(run(long_pass) == JK_CTL_CFG_CHANGED && strlen(cfg.pass) == 63);
+    strcpy(long_ssid, "set ssid ");
+    memset(long_ssid + 9, 'y', 33);
+    long_ssid[42] = 0;
+    CHECK(run(long_ssid) == JK_CTL_NONE);
+    CHECK(run("set net cable") == JK_CTL_NONE && cfg.net == JK_NET_WIFI);
+    CHECK(run("set pass") == JK_CTL_CFG_CHANGED && cfg.pass[0] == 0);
+    CHECK(run("set net jam") == JK_CTL_CFG_CHANGED && cfg.net == JK_NET_JAM);
+}
+
+static void test_status_wifi(void)
+{
+    setup();
+    snap.wifi_up = 1;
+    snap.wifi_ip = 0xC0A80164u;
+    snap.wifi_rssi = -52;
+    snap.wifi_channel = 6;
+    CHECK(run("status") == JK_CTL_NONE);
+    CHECK(strstr(out, "wifi=1\n") && strstr(out, "wifi_ip=192.168.1.100\n"));
+    CHECK(strstr(out, "wifi_rssi=-52\n") && strstr(out, "wifi_channel=6\n"));
 }
 
 static void test_status_link(void)
@@ -185,29 +225,36 @@ static void test_cfg_name(void)
 
 static void test_led(void)
 {
-    /* GROUP 3: three blinks, the rest of the period is the state's colour */
-    int on = 0, last = 0;
-    for (uint32_t t = 0; t < JK_LED_PERIOD_MS; t += 10) {
-        struct jk_rgb c = jk_led(3, 1, 1, t);
-        int blue = c.b > 0 && !c.r && !c.g;
-        on += blue && !last;
-        last = blue;
-    }
-    CHECK(on == 3);
-    struct jk_rgb late = jk_led(3, 1, 1, JK_LED_PERIOD_MS - 1);
-    CHECK(late.g > 0 && !late.r && !late.b);            /* green: units heard */
-    late = jk_led(3, 0, 1, JK_LED_PERIOD_MS - 1);
-    CHECK(late.r > 0 && late.g > 0 && !late.b);         /* amber: alone */
-    late = jk_led(3, 0, 0, JK_LED_PERIOD_MS - 1);
-    CHECK(late.r > 0 && !late.g && !late.b);            /* red: alone with no computer */
-    late = jk_led(3, 1, 0, JK_LED_PERIOD_MS - 1);
-    CHECK(late.g > 0 && !late.r);                       /* on a power bank with units heard: green */
-    struct jk_rgb wrap = jk_led(3, 1, 1, JK_LED_PERIOD_MS * 5 + 1);
-    CHECK(wrap.b > 0);                                  /* the pattern repeats */
-    /* GROUP 9's blinks fit the period */
-    CHECK(9u * JK_LED_BLINK_MS + JK_LED_BLINK_MS < JK_LED_PERIOD_MS);
-    late = jk_led(9, 1, 1, JK_LED_PERIOD_MS - 1);
-    CHECK(late.g > 0 && !late.b);
+    enum { BEAT = 1000000 };           /* micro-beats */
+    int32_t mpb = 500000;              /* 120 BPM: a flash of JK_BEAT_FLASH_MS is 0.16 beat */
+    int64_t flash = (int64_t)JK_BEAT_FLASH_MS * 1000 * BEAT / mpb;
+    /* JAM: off, lit on each beat */
+    CHECK(jk_led_lit(JK_NET_JAM, 1, 0, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, BEAT + flash - 1, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, BEAT + flash, mpb, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, 7 * (int64_t)BEAT + 10, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, -BEAT + 10, mpb, 4) == 1);           /* before the session's beat 0 too */
+    CHECK(jk_led_lit(JK_NET_JAM, 1, -10, mpb, 4) == 0);
+    /* station: the other way round, lit and off on each beat */
+    CHECK(jk_led_lit(JK_NET_WIFI, 1, 0, mpb, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_WIFI, 1, BEAT / 2, mpb, 4) == 1);
+    /* no session: the mode's rest */
+    CHECK(jk_led_lit(JK_NET_JAM, 0, 0, mpb, 4) == 0 && jk_led_lit(JK_NET_WIFI, 0, 0, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, 0, 0, 4) == 0);
+    /* the bar's first beat flashes longer: beat 0, 4, 8 of a 4-beat bar, and -4 before the session's 0 */
+    int64_t bar = (int64_t)JK_BAR_FLASH_MS * 1000 * BEAT / mpb;
+    CHECK(JK_BAR_FLASH_MS > JK_BEAT_FLASH_MS);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, bar - 1, mpb, 4) == 1 && jk_led_lit(JK_NET_JAM, 1, bar, mpb, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, 8 * (int64_t)BEAT + bar - 1, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, -4 * (int64_t)BEAT + bar - 1, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, 1 * (int64_t)BEAT + bar - 1, mpb, 4) == 0);    /* beat 2: the short flash */
+    CHECK(jk_led_lit(JK_NET_JAM, 1, -3 * (int64_t)BEAT + bar - 1, mpb, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_JAM, 1, 3 * (int64_t)BEAT + bar - 1, mpb, 3) == 1);    /* a 3-beat bar */
+    CHECK(jk_led_lit(JK_NET_WIFI, 1, bar - 1, mpb, 4) == 0);                        /* the network's: off longer */
+    /* fast: 300 BPM, a beat is 200 ms, the downbeat's 150 ms is cut to a third of it */
+    CHECK(jk_led_lit(JK_NET_JAM, 1, BEAT / 3 - 1, 200000, 4) == 1 && jk_led_lit(JK_NET_JAM, 1, BEAT / 3, 200000, 4) == 0);
+    /* a slow session's flash is still JK_BEAT_FLASH_MS long */
+    CHECK(jk_led_lit(JK_NET_JAM, 1, (int64_t)JK_BEAT_FLASH_MS * 1000 * BEAT / 2000000 - 1, 2000000, 4) == 1);
 }
 
 static void test_button(void)
@@ -222,6 +269,8 @@ int main(void)
     test_get();
     test_set();
     test_set_music();
+    test_network_settings();
+    test_status_wifi();
     test_status_link();
     test_status();
     test_other_lines();

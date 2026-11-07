@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The button, the LED and the group scan.
  * Click: with MIDI on, the classic resync (jc_resync: stop now, start on the next bar line); with MIDI off, the next GROUP.
- * Double click: to the next GROUP heard on the air. Held 3 s: download mode, for flashing. */
+ * Double click: to the next GROUP heard on the air. Held 1.5 s and let go: MODE JAM <-> the Wi-Fi network, a restart.
+ * Held 10 s: download mode, for flashing. The LED: the session's beat, inverted on the Wi-Fi network. */
 #include <string.h>
 #include "app.h"
 #include "board.h"
@@ -16,6 +17,7 @@
 #define LED_EVERY_MS 20u
 
 void app_bootloader(void);
+void app_reboot(void);
 
 static const char *TAG = "ui";
 #if BOARD_LED_RGB_GPIO >= 0
@@ -50,7 +52,9 @@ static void led_step(uint32_t now)
     static uint32_t last;
     uint8_t c[3];
     struct jk_cfg cfg;
-    struct jk_rgb n;
+    int64_t beat = 0;
+    int32_t mpb = 0;
+    int joined;
     if (now - last < LED_EVERY_MS)
         return;
     last = now;
@@ -60,8 +64,28 @@ static void led_step(uint32_t now)
     }
     s_event = JL_NONE;
     app_cfg_get(&cfg);
-    n = jk_led(cfg.group, bridge_peers_heard(), usb_up(), now);
-    led_show(n.r, n.g, n.b);
+    joined = bridge_beat(&beat, &mpb);
+    if (!jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum))
+        led_show(0, 0, 0);
+    else if (cfg.net == JK_NET_WIFI)
+        led_show(0, 0, 40);              /* (an RGB LED: blue on a network, green in MODE JAM) */
+    else
+        led_show(0, 30, 0);
+}
+
+#if BOARD_BUTTON_GPIO >= 0
+/* MODE JAM <-> the Wi-Fi network: the radio is set up at start-up, so a restart. No network saved: red pulses */
+static void switch_network(void)
+{
+    struct jk_cfg cfg;
+    app_cfg_get(&cfg);
+    if (cfg.net == JK_NET_JAM && !cfg.ssid[0]) {
+        led_event(JL_NO_GROUP, cfg.group);
+        return;
+    }
+    cfg.net = cfg.net == JK_NET_WIFI ? JK_NET_JAM : JK_NET_WIFI;
+    app_cfg_set(&cfg);
+    app_reboot();
 }
 
 static void move_to(uint32_t group)
@@ -71,6 +95,7 @@ static void move_to(uint32_t group)
     cfg.group = (uint8_t)group;
     app_cfg_set(&cfg);
 }
+#endif
 
 /* Off the home channel for two dwells: this is all of the time the stick is away. The MIDI clock's timer is not touched */
 static void sweep(uint32_t home_group)
@@ -91,6 +116,7 @@ static void sweep(uint32_t home_group)
     bridge_away(0);
 }
 
+#if BOARD_BUTTON_GPIO >= 0
 /* The button. The home channel needs no dwell: the radio listens there all the time, so what it heard in the last
  * JS_HEARD_MS counts. */
 static void scan_groups(void)
@@ -98,8 +124,10 @@ static void scan_groups(void)
     struct jk_cfg cfg;
     struct js_scan seen;
     uint32_t next;
-    xSemaphoreTake(s_scanning, portMAX_DELAY);
     app_cfg_get(&cfg);
+    if (cfg.net == JK_NET_WIFI)
+        return;                          /* groups are MODE JAM's */
+    xSemaphoreTake(s_scanning, portMAX_DELAY);
     led_event(JL_SCANNING, cfg.group);
     led_step(bridge_ms() + LED_EVERY_MS);
     sweep(cfg.group);
@@ -113,15 +141,16 @@ static void scan_groups(void)
     }
     xSemaphoreGive(s_scanning);
 }
+#endif
 
 /* The control page. The table counts from the start of a sweep, so the home channel gets a dwell of its own, at home */
 esp_err_t ui_scan_table(struct js_table *out)
 {
     struct jk_cfg cfg;
-    if (!s_scanning)
+    app_cfg_get(&cfg);
+    if (!s_scanning || cfg.net == JK_NET_WIFI)
         return ESP_ERR_INVALID_STATE;
     xSemaphoreTake(s_scanning, portMAX_DELAY);
-    app_cfg_get(&cfg);
     led_event(JL_SCANNING, cfg.group);
     bridge_table_start();
     vTaskDelay(pdMS_TO_TICKS(JS_DWELL_MS));
@@ -132,29 +161,27 @@ esp_err_t ui_scan_table(struct js_table *out)
     return ESP_OK;
 }
 
+#if BOARD_BUTTON_GPIO >= 0
 static void on_button(enum jb_event e)
 {
-    struct jk_cfg cfg;
     switch (e) {
     case JB_CLICK:
-        app_cfg_get(&cfg);
-        if (cfg.midi)
-            midi_resync();
-        else {
-            move_to(jk_next_group(cfg.group));
-            led_event(JL_JOINED, jk_next_group(cfg.group));
-        }
+        midi_resync();
         break;
     case JB_DOUBLE:
         scan_groups();
         break;
     case JB_LONG:
+        switch_network();
+        break;
+    case JB_DOWNLOAD:
         app_bootloader();
         break;
     default:
         break;
     }
 }
+#endif
 
 static void ui_task(void *arg)
 {
@@ -163,8 +190,12 @@ static void ui_task(void *arg)
     jb_init(&b);
     for (;;) {
         uint32_t now = bridge_ms();
+#if BOARD_BUTTON_GPIO >= 0
         int level = gpio_get_level(BOARD_BUTTON_GPIO);
         on_button(jb_step(&b, BOARD_BUTTON_ACTIVE_LOW ? !level : level, now));
+#else
+        (void)b;                         /* the board's only button is RST: reset_button.c */
+#endif
         led_step(now);
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }
@@ -184,8 +215,11 @@ static esp_err_t led_up(void)
 
 esp_err_t ui_start(void)
 {
+    esp_err_t e = ESP_OK;
+#if BOARD_BUTTON_GPIO >= 0
     gpio_config_t c = {.pin_bit_mask = 1ull << BOARD_BUTTON_GPIO, .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE};
-    esp_err_t e = gpio_config(&c);
+    e = gpio_config(&c);
+#endif
     s_scanning = xSemaphoreCreateMutex();
     if (!s_scanning)
         return ESP_ERR_NO_MEM;

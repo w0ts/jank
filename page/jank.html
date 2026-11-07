@@ -96,13 +96,24 @@ th { color: var(--dim); font-weight: 500; font-size: 12px; }
   </section>
 
   <section>
+    <h2>Network</h2>
+    <p id="net-state">-</p>
+    <div class="grid">
+      <label>Join <select id="net-mode"><option value="jam">MODE JAM</option><option value="wifi">A Wi-Fi network</option></select></label>
+      <label>Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
+      <label>Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
+    </div>
+    <p>2.4 GHz only. The stick keeps the password in its flash, unencrypted, and never sends it back.</p>
+    <button id="net-apply" disabled>Save and restart</button>
+  </section>
+
+  <section>
     <h2>Settings</h2>
     <div class="grid">
       <label>Group <select id="c-group"></select></label>
       <label>Name <input id="c-name" maxlength="23"></label>
       <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
       <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
-      <label>MIDI clock <select id="c-midi"><option value="on">On</option><option value="off">Off</option></select></label>
       <label>Transport <select id="c-transport"><option value="link">Link start/stop</option><option value="auto">Run with session</option></select></label>
       <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16"></label>
       <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100"></label>
@@ -122,6 +133,46 @@ function splitLines(buffer, chunk) {
   const parts = (buffer + chunk).split("\n");
   const rest = parts.pop();
   return { lines: parts.map((l) => l.replace(/\r$/, "")), rest };
+}
+
+/* the commands for the Network form; null: not valid. An empty password leaves the stored one */
+function networkCommands(mode, ssid, pass, passStored) {
+  const printable = (s) => /^[\x20-\x7e]*$/.test(s);
+  if (mode === "jam") return ["set net jam", "reboot"];
+  if (!ssid || ssid.length > 32 || !printable(ssid) || ssid !== ssid.trim()) return null;
+  if (!printable(pass) || pass !== pass.trim() || (pass && (pass.length < 8 || pass.length > 63))) return null;
+  const commands = ["set ssid " + ssid];
+  if (pass) commands.push("set pass " + pass);
+  else if (!passStored) commands.push("set pass");
+  commands.push("set net wifi", "reboot");
+  return commands;
+}
+
+/* the line under Network, from status and get */
+function networkLine(v) {
+  if (v.net !== "wifi") return "MODE JAM, group " + v.group;
+  if (v.wifi !== "1") return "Looking for " + v.ssid;
+  if (v.wifi_ip === "0.0.0.0") return "On " + v.ssid + ", waiting for an address";
+  return "On " + v.ssid + ", " + v.wifi_ip + ", " + v.wifi_rssi + " dBm, channel " + v.wifi_channel;
+}
+
+/* the control line in SysEx on an S3's USB MIDI port, as core/jank_sysex.c: text runs across frames */
+const JX_HEAD = [0xf0, 0x7d, 0x4a, 0x4b], JX_TEXT_MAX = 30;
+function textToSysex(text) {
+  const frames = [];
+  for (let at = 0; at < text.length; at += JX_TEXT_MAX) {
+    const part = Array.from(text.slice(at, at + JX_TEXT_MAX), (c) => (c.charCodeAt(0) < 0x80 ? c.charCodeAt(0) : 0x3f));
+    frames.push([...JX_HEAD, ...part, 0xf7]);
+  }
+  return frames;
+}
+function sysexToText(data) {
+  const n = data.length;
+  if (n < JX_HEAD.length + 1 || data[n - 1] !== 0xf7 || JX_HEAD.some((b, i) => data[i] !== b)) return null;
+  return String.fromCharCode(...Array.from(data).slice(JX_HEAD.length, n - 1));
+}
+function isJankPort(p) {
+  return /jank/i.test(p.name || "") && p.state !== "disconnected";
 }
 
 /* one answer: lines up to "ok" or "err ..." */
@@ -180,7 +231,7 @@ function setCommand(key, raw) {
 <script id="ui">
 const $ = (id) => document.getElementById(id);
 const SCAN_WAIT_MS = 4000;
-const SETTINGS = ["group", "name", "filter", "peer", "midi", "transport", "quantum", "offset"];
+const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset"];
 let port = null, writer = null, poll = null, pendingEnd = null, pendingLines = [], queue = Promise.resolve();
 
 function say(text, bad) {
@@ -268,7 +319,12 @@ async function scan() {
   $("scan").disabled = !port;
 }
 
+let lastGet = {};
 function showSettings({ values: v }) {
+  lastGet = v;
+  const form = { "net-mode": v.net, "net-ssid": v.ssid };
+  for (const [id, value] of Object.entries(form))
+    if (document.activeElement !== $(id) && value !== undefined) $(id).value = value;
   for (const key of SETTINGS) {
     const el = $("c-" + key);
     if (document.activeElement !== el && v[key] !== undefined) el.value = v[key];
@@ -277,7 +333,9 @@ function showSettings({ values: v }) {
 
 async function pollOnce() {
   try {
-    showStatus(await send("status"));
+    const status = await send("status");
+    showStatus(status);
+    $("net-state").textContent = networkLine({ ...lastGet, ...status.values });
   } catch (e) {
     say(e.message, true);
   }
@@ -301,12 +359,14 @@ async function change(key) {
 function disconnected(text) {
   clearInterval(poll);
   poll = null;
+  if (port && "onmidimessage" in port) port.onmidimessage = null;
   port = writer = null;
   pendingEnd = null;
   queue = Promise.resolve();
   $("connect").textContent = "Connect";
   $("bootloader").disabled = true;
   $("scan").disabled = true;
+  $("net-apply").disabled = true;
   say(text, true);
 }
 
@@ -319,20 +379,54 @@ async function firstAnswer() {
   }
 }
 
+/* an S3: its USB MIDI port. true when one is there */
+async function openMidi() {
+  if (!navigator.requestMIDIAccess) return false;
+  const access = await navigator.requestMIDIAccess({ sysex: true });
+  const input = [...access.inputs.values()].find(isJankPort);
+  const output = [...access.outputs.values()].find(isJankPort);
+  if (!input || !output) return false;
+  let rest = "";
+  input.onmidimessage = (ev) => {
+    const text = sysexToText(ev.data);
+    if (text === null) return;
+    const r = splitLines(rest, text);
+    rest = r.rest;
+    r.lines.forEach(onLine);
+  };
+  access.onstatechange = (ev) => {
+    if (ev.port.id === input.id && ev.port.state === "disconnected" && port === input) disconnected("The stick went away.");
+  };
+  port = input;
+  writer = {
+    write: async (bytes) => textToSysex(new TextDecoder().decode(bytes)).forEach((frame) => output.send(frame)),
+  };
+  return true;
+}
+
+/* a LOLIN32: serial, through its USB chip */
+async function openSerial() {
+  port = await navigator.serial.requestPort();
+  await port.open({ baudRate: 115200 });
+  writer = port.writable.getWriter();
+  readLoop(port.readable.getReader()).catch(() => disconnected("The stick went away."));
+}
+
 async function connect() {
-  if (!("serial" in navigator)) {
-    say("This browser has no Web Serial: use Chrome or Edge on a computer.", true);
+  if (!navigator.requestMIDIAccess && !("serial" in navigator)) {
+    say("This browser has neither Web MIDI nor Web Serial: use Chrome or Edge on a computer.", true);
     return;
   }
   try {
-    port = await navigator.serial.requestPort();       /* no filter: an S3 is Espressif's USB, a LOLIN32 its CP2104 */
-    await port.open({ baudRate: 115200 });
-    writer = port.writable.getWriter();
-    readLoop(port.readable.getReader()).catch(() => disconnected("The stick went away."));
+    if (!(await openMidi())) {
+      if (!("serial" in navigator)) throw new Error("No jank USB MIDI port found. Is the stick plugged in?");
+      await openSerial();
+    }
     showSettings(await firstAnswer());
     $("connect").textContent = "Connected";
     $("bootloader").disabled = false;
     $("scan").disabled = false;
+    $("net-apply").disabled = false;
     say("Connected.");
     poll = setInterval(pollOnce, 1000);
     pollOnce();
@@ -345,6 +439,20 @@ async function connect() {
 for (let g = 1; g <= 9; g++) $("c-group").add(new Option("Group " + g + " (channel " + [1, 6, 11][(g - 1) % 3] + ")", String(g)));
 for (const key of SETTINGS) $("c-" + key).addEventListener("change", () => change(key));
 $("connect").addEventListener("click", connect);
+$("net-apply").addEventListener("click", async () => {
+  const commands = networkCommands($("net-mode").value, $("net-ssid").value, $("net-pass").value, lastGet.pass === "set");
+  if (!commands) {
+    say("Check the Wi-Fi name, and that the password is 8 to 63 characters.", true);
+    return;
+  }
+  try {
+    for (const command of commands) await send(command);
+    $("net-pass").value = "";
+    say("The stick is restarting. Give it a few seconds.");
+  } catch (e) {
+    say(e.message, true);
+  }
+});
 $("scan").addEventListener("click", scan);
 $("bootloader").addEventListener("click", async () => {
   try {

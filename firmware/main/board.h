@@ -22,11 +22,12 @@
 #define BOARD_MIDI_TX_GPIO 43
 #define BOARD_MIDI_SOURCE_GPIO (-1)
 #elif CONFIG_JANK_BOARD_LOLIN32
-/* An external button from GPIO25 to GND. GPIO17 for data; a 3V3 pin is the source. The LED is on GPIO5, active low. */
-#define BOARD_BUTTON_GPIO 25
+/* No GPIO button: the board's only button is RST, on EN, so reset_button.c reads it as two resets within 4 s. GPIO17 for
+ * data; a 3V3 pin is the source. The LED is on GPIO22, active low: the user's board is a Lolin32 Lite (found on it 2026-11-07, not GPIO5). */
+#define BOARD_BUTTON_GPIO (-1)
 #define BOARD_BUTTON_ACTIVE_LOW 1
 #define BOARD_LED_RGB_GPIO (-1)
-#define BOARD_LED_MONO_GPIO 5
+#define BOARD_LED_MONO_GPIO 22
 #define BOARD_MIDI_TX_GPIO 17
 #define BOARD_MIDI_SOURCE_GPIO (-1)
 #else

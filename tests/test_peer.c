@@ -165,6 +165,29 @@ static void test_conflict(void)
     CHECK(jp.ip != was && jp.ip_conflicts == 2);
 }
 
+static void test_on_a_network(void)
+{
+    enum { MINE = 0xC0A80164, OTHER = 0xC0A80165, FAR = 0x0A000001, MASK24 = 0xFFFFFF00 };
+    size_t l;
+    setup();
+    jp_set_network(&jp, 0, 0, 0);
+    l = arp(fr, BC, UNIT, 1, UNIT, OTHER, ZERO, MINE);
+    CHECK(jp_input(&jp, fr, l, JP_TO_AIR, 0) == 1 && nq == 0);            /* no address: silent, and everything passes */
+    jp_set_network(&jp, MINE, MASK24, 0);
+    CHECK(jp.ip == (uint32_t)MINE);
+    CHECK(jp_input(&jp, fr, l, JP_TO_AIR, 0) == 0);                       /* answers for the DHCP address */
+    CHECK(nq == 1 && !memcmp(q[0].f + 22, M, 6) && q[0].f[28] == 0xC0);
+    CHECK(jp.host[0].where == JP_TO_AIR && jp.host[0].ip == (uint32_t)OTHER);   /* learnt, off link-local */
+    l = arp(fr, BC, UNIT, 2, UNIT, FAR, ZERO, 0);
+    jp_input(&jp, fr, l, JP_TO_AIR, 0);
+    CHECK(jp.host[1].where == 0);                                         /* not on the subnet: no route to learn */
+    l = arp(fr, BC, UNIT, 2, UNIT, MINE, ZERO, 0);
+    CHECK(jp_input(&jp, fr, l, JP_TO_AIR, 0) == 1);
+    CHECK(jp.ip == (uint32_t)MINE && jp.ip_conflicts == 1);               /* the network's address: counted, never redrawn */
+    jp_set_network(&jp, 0, 0, 0);
+    CHECK(jp.host[0].where == 0 && !jp.on);
+}
+
 static void test_silent_until_link_heard(void)
 {
     static const uint8_t junk[8] = {'_', 'a', 's', 'd', 'p', '_', 'v', 1};
@@ -411,6 +434,7 @@ int main(void)
     test_arp_air();
     test_arp_other();
     test_conflict();
+    test_on_a_network();
     test_silent_until_link_heard();
     test_alone_leaves();
     test_for_the_peer_alone();

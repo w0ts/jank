@@ -97,16 +97,25 @@ enum jk_transport {
     JK_TRANSPORT_LINK = 0,            /* MIDI start/stop follows Link's Start Stop Sync */
     JK_TRANSPORT_AUTO = 1             /* start at the next bar once a session is joined, stop when it is gone */
 };
+enum jk_net {
+    JK_NET_JAM = 0,                   /* MODE JAM's air, in GROUP */
+    JK_NET_WIFI = 1                   /* a normal network: ssid and pass; read at start-up */
+};
+#define JK_SSID_MAX 32u
+#define JK_PASS_MIN 8u
+#define JK_PASS_MAX 63u
 #define JK_QUANTUM_MAX 16u
 #define JK_OFFSET_MAX_MS 100
 struct jk_cfg {
     uint8_t group, filter;
     uint8_t peer;                     /* 1: jank is a Link peer itself */
-    uint8_t midi;                     /* 1: MIDI clock out */
     uint8_t transport;                /* enum jk_transport */
+    uint8_t net;                      /* enum jk_net */
     uint8_t quantum;                  /* beats in a bar for MIDI start, 1..JK_QUANTUM_MAX */
     int16_t offset_ms;                /* MIDI clock against the session, -100..100, for the gear's own lag */
     char name[JK_NAME_MAX + 1];
+    char ssid[JK_SSID_MAX + 1];
+    char pass[JK_PASS_MAX + 1];       /* never sent back: get says only whether there is one */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
@@ -126,6 +135,10 @@ struct jk_snapshot {
     uint32_t link_peers;              /* Link peers in the session, the stick not counted */
     int32_t mpb;                      /* us a beat; 0: no session */
     int64_t beat_ub;                  /* session beat now, micro-beats */
+    uint8_t wifi_up;                  /* associated with the access point */
+    uint32_t wifi_ip;                 /* the address DHCP gave, host order; 0: none yet */
+    int8_t wifi_rssi;
+    uint8_t wifi_channel;
     uint32_t midi_ticks;              /* MIDI clocks sent */
     uint32_t midi_resync;             /* the clock had to jump to the session */
     struct jk_bridge b;
@@ -140,13 +153,12 @@ enum jk_ctl_action {
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
 
-/* LED: one RGB colour for this instant: GROUP as a blink count, then the state */
-struct jk_rgb {
-    uint8_t r, g, b;
-};
-#define JK_LED_PERIOD_MS 4000u
-#define JK_LED_BLINK_MS 300u           /* one blink, on and off */
-struct jk_rgb jk_led(uint32_t group, uint32_t peers, int usb_up, uint32_t t_ms);
+/* on the session's beat: MODE JAM rests off and flashes on, the Wi-Fi network the other way round. No session: the rest.
+ * beat_ub in micro-beats, mpb us a beat. -> 1: lit */
+#define JK_BEAT_FLASH_MS 80u
+#define JK_BAR_FLASH_MS 150u           /* the bar's first beat, by quantum, on Link's beat count as MIDI start uses */
+#define JK_FLASH_CAP_DIV 3             /* no flash is longer than a third of a beat: they stay apart at fast tempos */
+int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum);
 
 /* button: a short press is the next GROUP, 9 wraps to 1 */
 uint32_t jk_next_group(uint32_t group);

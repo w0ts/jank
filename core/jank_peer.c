@@ -48,6 +48,14 @@ void jp_init(struct jank_peer *p, const uint8_t usb_mac[6], const uint8_t air_ma
 
 void jp_set_air_mac(struct jank_peer *p, const uint8_t mac[6]) { memcpy(p->air_mac, mac, 6); }
 
+/* the addresses it learns: on MODE JAM's air all of them are link-local, on a normal network they are the subnet's */
+static int reachable(const struct jank_peer *p, uint32_t ip)
+{
+    if (p->on_network)
+        return p->net_mask && ((ip ^ p->ip) & p->net_mask) == 0u;
+    return (ip & 0xFFFF0000u) == LINK_LOCAL;
+}
+
 static const struct jp_host *find_host(const struct jank_peer *p, uint32_t ip)
 {
     for (uint32_t i = 0; i < JP_HOSTS; i++)
@@ -59,7 +67,7 @@ static const struct jp_host *find_host(const struct jank_peer *p, uint32_t ip)
 static void learn(struct jank_peer *p, uint32_t ip, const uint8_t *mac, uint32_t where)
 {
     struct jp_host *h = (struct jp_host *)find_host(p, ip);
-    if ((ip & 0xFFFF0000u) != LINK_LOCAL || ip == p->ip)
+    if (!reachable(p, ip) || ip == p->ip)
         return;
     for (uint32_t i = 0; !h && i < JP_HOSTS; i++)
         if (!p->host[i].where)
@@ -164,6 +172,21 @@ void jp_allow(struct jank_peer *p, int allowed, int64_t now_us)
         stop(p, now_us);
 }
 
+void jp_set_network(struct jank_peer *p, uint32_t ip, uint32_t mask, int64_t now_us)
+{
+    if (p->on_network && ip == p->ip && mask == p->net_mask)
+        return;
+    p->on_network = 1;
+    p->net_mask = mask;
+    p->ip = ip;
+    if (!ip) {
+        stop(p, now_us);
+        memset(p->host, 0, sizeof p->host);
+    } else if (p->on) {
+        lk_set_addr(&p->k, ip, LK_MCAST_PORT);
+    }
+}
+
 void jp_leave(struct jank_peer *p, int64_t now_us)
 {
     stop(p, now_us);
@@ -174,6 +197,8 @@ static void redraw_address(struct jank_peer *p)
 {
     uint32_t r = next_rand(p);
     p->ip_conflicts++;
+    if (p->on_network)                              /* the network's to give: only counted */
+        return;
     p->ip = link_local(r >> 8 & 255u, r & 255u);
     if (p->on)
         lk_set_addr(&p->k, p->ip, LK_MCAST_PORT);
@@ -252,7 +277,7 @@ int jp_input(struct jank_peer *p, const uint8_t *eth, size_t len, uint32_t from,
 {
     uint32_t type;
     int for_p;
-    if (!p->allowed || len < ETH_HDR)
+    if (!p->allowed || len < ETH_HDR || !p->ip)
         return 1;
     for_p = from == JP_TO_USB && !memcmp(eth, p->usb_mac, 6);
     type = rd16(eth + 12);
