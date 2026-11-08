@@ -35,10 +35,12 @@ sh hardware/box/make_stl.sh               # about 8 s
 
 ## Size
 
-**Outer: 87.8 x 83.3 x 32.0 mm** (X x Y x Z, lid included).
-- **X:** side walls 1.8 + 0.1 + board 84.0 + 0.1 + 1.8. The side walls carry jacks now: 1.8 mm so the bushings stand
-  0.1 proud, and 0.1 mm to the board's side edges (was 0.3: *the board's width tolerance must allow it*).
-- **Y:** front wall 1.8 + 0.1 + board 79.5 + 0.1 + back wall 1.8.
+**Outer: 88.2 x 83.7 x 32.0 mm** (X x Y x Z, lid included).
+- **X:** side walls 1.8 + 0.3 + board 84.0 + 0.3 + 1.8.
+- **Y:** front wall 1.8 + 0.3 + board 79.5 + 0.3 + back wall 1.8.
+- **0.3 mm all round the board** (the decision of 2026-11-08). JLCPCB's outline tolerance is ±0.2 mm, so a smaller
+  gap could pinch the board. The front and back walls had 0.1 until then and now have 0.3 as well; the same tolerance
+  applies to the 79.5 mm.
 - **Z:** floor 2.0 + 0.1 + DIN 19.6 + board 1.6 + **7.2** to the lid's inside + lid 1.5.
 
 **Standing above the lid (not counted in Z):** the knob 13.3 mm (its top), the button caps 3.0 mm, the slider caps
@@ -52,11 +54,15 @@ The board model is the board's own `../pcb/mockup-mod.stl`, top up, the DINs han
 edge, and its bushing (5.0 mm, *unverified*) stands only **2.0 mm** past it. The DIN's plate front is **1.0 mm** behind
 the edge (the v5 footprint). The two rows are handled differently:
 
-- **Above the board (the jacks):** the wall is **1.8 mm**, its inside 0.1 mm off the board's edge. The bushing stands
-  **0.1 mm proud** of the outside, so a plug seats against it.
-- **Below the board (the DINs):** **the same flat outside, and the wall 1.0 mm thicker on the inside**. Under each DIN a
-  **DIN pad** fills the 1.0 mm to the plate (its face 0.1 mm off it), from the floor up to the board's bottom. The
-  outside stays one flat face; the DIN's face is **2.9 mm behind it** (wall 1.8 + 0.1 + the 1.0 the footprint sets it in).
+- **Above the board (the jacks):** the wall is **1.8 mm**, its inside 0.3 mm off the board's edge, so the bushing (2.0
+  past the jack's front) ends **0.1 mm inside** the outer face.
+- **The jacks' mouths:** every jack slot has a **mouth on the outside, Ø10.0 mm and 0.3 mm deep** (`jack_mouth`), also
+  cut into the key's face and the lid's edge above it. A plug's shoulder up to 10 mm across (*unverified* with the
+  user's plugs) reaches the bushing's face, which stands 0.2 mm proud of the mouth's floor. The two left jacks (6.7 mm
+  apart) and the two right ones share one merged mouth.
+- **Below the board (the DINs):** **the same flat outside, and the wall 1.2 mm thicker on the inside**. Under each DIN a
+  **DIN pad** fills the gap to the plate (its face 0.1 mm off it), from the floor up to the board's bottom. The
+  outside stays one flat face; the DIN's face is **3.1 mm behind it** (wall 1.8 + 0.3 + the 1.0 the footprint sets it in).
 - **Why not a step outside:** a flat outside needs no overhang. The pad's top doubles as the ledge the board's edge
   rests on.
 
@@ -74,9 +80,10 @@ to the top of the wall. The lid's **key** closes it: 4.9 wide, with a 5.3 mm hal
 Four XKB PJ-320A used mono (CLOCK, RESET), on the top, their fronts on the side edges. Positions are y from the back
 edge: **left wall CLOCK 39.85, RESET 46.55; right wall CLOCK 53.8, RESET 60.5**. Each is built like a front jack:
 - **Slot:** a **5.2 mm U-slot** in the 1.8 mm side wall, round at the bottom round the bushing's axis 2.5 mm above the
-  board's top, open to the wall's top. The bushing (Ø5.0, *unverified*) stands 0.1 mm proud of the outside.
+  board's top, open to the wall's top, in a Ø10.0 x 0.3 mouth. The bushing (Ø5.0, *unverified*) ends 0.1 mm inside the
+  outer face.
 - **Key:** a **lid key** (4.9 wide, 5.3 half-round) closes the slot.
-- **Pull-out:** the body's front on the wall's inside (0.1 mm).
+- **Pull-out:** the body's front on the wall's inside (0.3 mm).
 - **Push-in:** onto a **cap hanging from the lid**. The two jacks of a wall are only 6.7 mm apart, so their caps are one
   block per wall with one cavity round both bodies: cheeks outside them, a back stop behind them, 1.6 mm above the board.
 - **Nearby parts:** H3 / H4's columns and spacers (y 26 and 34) are clear of the left jacks (J11's body starts at y
@@ -88,8 +95,8 @@ edge: **left wall CLOCK 39.85, RESET 46.55; right wall CLOCK 53.8, RESET 60.5**.
 | Part | Pull-out | Push-in | Down / up | Sideways |
 |---|---|---|---|---|
 | **DIN** (HOOYA: plate 20.9 x 19.6 x 1.8, body to 13.6, from the drawing rev A1 2019-07-10) | the plate's front on the **DIN pad** round the bore: about 210 mm2 | the body's back on a **lip** from the floor (1.4 mm, 20.9 wide, to 5.0 mm under the board) | the plate's far edge on the floor (0.1); the board above | the plug's shell in the bore |
-| **Jack** (XKB PJ-320A: body 6.2 x 12.2 x 5.0, from the drawing rev A1 2025-03-03) | the body's front on the wall's inside (0.1) | the body's back on the **lid's cap**: a saddle hanging from the lid round the body, back stop 1.6 mm | the board below; the cap's roof above (0.15) | the cap's cheeks; the bushing in the U-slot |
-| **The board** | | | **clamped at every connector edge** between the DIN pads' tops (below) and the lid's ribs (above, beside each jack); four M2 standoffs | the walls (0.1) |
+| **Jack** (XKB PJ-320A: body 6.2 x 12.2 x 5.0, from the drawing rev A1 2025-03-03) | the body's front on the wall's inside (0.3) | the body's back on the **lid's cap**: a saddle hanging from the lid round the body, back stop 1.6 mm | the board below; the cap's roof above (0.15) | the cap's cheeks; the bushing in the U-slot |
+| **The board** | | | **clamped at every connector edge** between the DIN pads' tops (below) and the lid's ribs (above, beside each jack); four M2 standoffs | the walls (0.3) |
 
 **Details:**
 - **Lid caps:** they stop 1.6 mm above the board, because the DINs' legs (about 1.5 mm, *estimate*) stand on the top
@@ -222,7 +229,7 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill; the lid translucent if `l
    the parts under the OLED, then its header and the module. Each jack goes first, its legs cut flush on the bottom,
    then its DIN from the bottom.
 2. **User prints** `front_test.stl` and tries a DIN plug through the 16.0 mm bore into a DIN held behind the pad (it must
-   go home with the face 2.9 mm in), and a 3.5 mm jack's bushing in the slot. If one does not fit, Claude changes
+   go home with the face 3.1 mm in), and a 3.5 mm jack's bushing in the slot. If one does not fit, Claude changes
    `din_bore` / `bush_slot` / `conn_t` and runs `make_stl.sh` again.
 3. **User puts** a 2.5 mm foam pad under the OLED's far end, **presses a button cap onto each of OK and BACK** (flange
    down) and **a slider cap onto each A/B handle**.
@@ -235,14 +242,14 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill; the lid translucent if `l
 
 ## Unverified, all in one place
 
-- **The DIN bore 16.0 mm** against the user's plugs, the face 2.9 mm in (the plug shell's length). HOOYA's opening is
+- **The DIN bore 16.0 mm** against the user's plugs, the face 3.1 mm in (the plug shell's length). HOOYA's opening is
   not on its sheet.
 - **The HOOYA's body** behind the plate: its height and width are taken as the plate's 19.6 x 20.9. Its 2-pin legs are
   assumed to stay within 5.0 mm of the board, inside the lip. Its axis of 9.7 mm is read from the plate's board-side
   edge.
 - **The PJ-320A:** the bushing's 5.0 mm (measured on the sheet); how much pull-out the 0.5 mm faces beside the slot
   take. The rest goes into the lid's cap and the board through its pegs and tabs.
-- **Modular:** the board's width against the 0.1 mm side clearance; the side jacks' bushings (5.0); the board
+- **Modular:** a plug's shoulder in the Ø10.0 mouths; the side jacks' bushings (5.0); the board
   README's modular list.
 - **Both connectors on one footprint:** the board README's dry fit, which decides whether the DIN body clears the jack's
   cut legs.
