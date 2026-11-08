@@ -192,7 +192,7 @@ static void peer_out(void *ctx, uint32_t where, const uint8_t *eth, size_t len)
         to_computer(eth, len, now);
 }
 
-/* a computer that overrode its MAC: on MODE JAM's air jk_eth_to_air sees it, here nothing else would */
+/* a computer that overrode its MAC: on MODE JANK's air jk_eth_to_air sees it, here nothing else would */
 static void note_computer(const uint8_t *eth, size_t len)
 {
     if (len >= 12u && !(eth[6] & 1u) && memcmp(eth + 6, s_b.mac, 6) && memcmp(eth + 6, s_peer.usb_mac, 6)) {

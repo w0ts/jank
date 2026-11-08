@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* jank's portable core: no ESP-IDF in here, so all of it runs in host tests.
  *
- * It turns Ethernet frames from the computer into MODE JAM air frames and back, keeps the
+ * It turns Ethernet frames from the computer into MODE JANK air frames and back, keeps the
  * table of units heard, and answers the control line protocol. Air format: see README.md.
  * The bridge is written from the format, not from Optimist's code. */
 #ifndef JANK_CORE_H
@@ -14,7 +14,7 @@
 #define JK_GROUP_MIN 1u
 #define JK_GROUP_MAX 9u
 
-#define JK_DOT11_LEN 24u              /* non-QoS data header, what MODE JAM sends */
+#define JK_DOT11_LEN 24u              /* non-QoS data header, what MODE JANK sends */
 #define JK_LLC_LEN 8u                 /* LLC/SNAP: AA AA 03 00 00 00 + EtherType */
 #define JK_AIR_MAX 1500u              /* esp_wifi_80211_tx's limit on a whole frame, in the FCS-less length */
 #define JK_ETH_HDR 14u
@@ -22,7 +22,7 @@
 #define JK_ETH_MAX (JK_ETH_HDR + JK_PAYLOAD_MAX)
 
 #define JK_PEERS 8u                   /* units kept; a bigger group still bridges, it is only not counted */
-#define JK_HEARD_MS 3000u             /* a unit not heard this long is gone (the same 3 s MODE JAM uses) */
+#define JK_HEARD_MS 3000u             /* a unit not heard this long is gone (the same 3 s MODE JANK uses) */
 #define JK_ADOPT_HOLD_MS 10000u       /* after adopting a computer's MAC, no other is adopted for this long */
 #define JK_NAME_MAX 23u
 
@@ -98,7 +98,7 @@ enum jk_transport {
     JK_TRANSPORT_AUTO = 1             /* start at the next bar once a session is joined, stop when it is gone */
 };
 enum jk_net {
-    JK_NET_JAM = 0,                   /* MODE JAM's air, in GROUP */
+    JK_NET_JANK = 0,                   /* MODE JANK's air, in GROUP */
     JK_NET_WIFI = 1                   /* a normal network: ssid and pass; read at start-up */
 };
 #define JK_SSID_MAX 32u
@@ -153,7 +153,7 @@ enum jk_ctl_action {
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
 
-/* on the session's beat: MODE JAM rests off and flashes on, the Wi-Fi network the other way round. No session: the rest.
+/* on the session's beat: MODE JANK rests off and flashes on, the Wi-Fi network the other way round. No session: the rest.
  * beat_ub in micro-beats, mpb us a beat. -> 1: lit */
 #define JK_BEAT_FLASH_MS 80u
 #define JK_BAR_FLASH_MS 150u           /* the bar's first beat, by quantum, on Link's beat count as MIDI start uses */

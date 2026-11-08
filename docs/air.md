@@ -1,6 +1,6 @@
 # On the air
 
-jank speaks the FM-1's group mode (shown as MODE JAM on FM-1 firmware from before the rename) and carries Ableton
+jank speaks the FM-1's group mode (shown as MODE JANK on FM-1 firmware from before the rename) and carries Ableton
 Link unchanged.
 
 ## The frame format
@@ -53,4 +53,4 @@ pushes 120 BPM on a group. With a computer attached, the FM-1 and Live each see 
 ## Normal Wi-Fi
 
 `set net wifi` (with `set ssid`, `set pass`) makes the stick a station on an ordinary network instead, after a restart:
-the Link peer then talks on that network. `set net jam` goes back to group mode.
+the Link peer then talks on that network. `set net jank` goes back to group mode.

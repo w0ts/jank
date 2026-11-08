@@ -7,7 +7,7 @@
 
 #define JB_DEBOUNCE_MS 20u             /* a level holds this long before it counts */
 #define JB_DOUBLE_MS 350u              /* the second press starts within this after the first release */
-#define JB_LONG_MS 1500u               /* held this long, then released: MODE JAM <-> the Wi-Fi network */
+#define JB_LONG_MS 1500u               /* held this long, then released: MODE JANK <-> the Wi-Fi network */
 #define JB_DOWNLOAD_MS 10000u          /* held this long: download mode, said while still held */
 
 enum jb_event {
@@ -38,7 +38,7 @@ struct js_scan {
 };
 
 void js_clear(struct js_scan *s);
-/* a frame's group from its jam BSSID, data frames only; 0 when it is none, own (sender mac) skipped */
+/* a frame's group from its jank BSSID, data frames only; 0 when it is none, own (sender mac) skipped */
 uint32_t js_group_of(const uint8_t *air, size_t len, const uint8_t own_mac[6]);
 void js_note(struct js_scan *s, uint32_t group, uint32_t now_ms);
 /* the channels to visit: every one but home, in order; returns how many */

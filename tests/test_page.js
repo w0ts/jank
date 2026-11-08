@@ -32,7 +32,7 @@ eq(box.isJankPort({ name: "jank", state: "disconnected" }), false);
 eq(box.isJankPort({ name: "FM1-E040", state: "connected" }), false);
 
 // the Network form
-eq(box.networkCommands("jam", "", "", false), ["set net jam", "reboot"]);
+eq(box.networkCommands("jank", "", "", false), ["set net jank", "reboot"]);
 eq(box.networkCommands("wifi", "Home Net", "correct horse", false), ["set ssid Home Net", "set pass correct horse", "set net wifi", "reboot"]);
 eq(box.networkCommands("wifi", "Home", "", true), ["set ssid Home", "set net wifi", "reboot"]);
 eq(box.networkCommands("wifi", "Open", "", false), ["set ssid Open", "set pass", "set net wifi", "reboot"]);
@@ -40,7 +40,7 @@ eq(box.networkCommands("wifi", "", "correct horse", false), null);
 eq(box.networkCommands("wifi", "Home", "short", false), null);
 eq(box.networkCommands("wifi", "H\u00f6me", "correct horse", false), null);
 eq(box.networkCommands("wifi", "x".repeat(33), "correct horse", false), null);
-eq(box.networkLine({ net: "jam", group: "2" }), "MODE JAM, group 2");
+eq(box.networkLine({ net: "jank", group: "2" }), "MODE JANK, group 2");
 eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "0" }), "Looking for Home");
 eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "1", wifi_ip: "0.0.0.0" }), "On Home, waiting for an address");
 eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "1", wifi_ip: "192.168.1.5", wifi_rssi: "-50", wifi_channel: "6" }), "On Home, 192.168.1.5, -50 dBm, channel 6");

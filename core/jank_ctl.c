@@ -63,7 +63,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
 {
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_ms);
-    put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jam", c->ssid, c->pass[0] ? "set" : "none");
+    put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "version=%s\nok\n", JK_VERSION);
 }
@@ -180,7 +180,7 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
     if (!strcmp(key, "pass"))
         return set_text(c->pass, val, JK_PASS_MIN, JK_PASS_MAX);
     if (!strcmp(key, "net"))
-        return parse_pair(val, "jam", "wifi", &c->net);
+        return parse_pair(val, "jank", "wifi", &c->net);
     if (!strcmp(key, "filter"))
         return parse_pair(val, "link", "all", &c->filter);
     if (!strcmp(key, "transport"))

@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The radio. In MODE JAM: promiscuous receive and esp_wifi_80211_tx, as a station that never associates.
+/* The radio. In MODE JANK: promiscuous receive and esp_wifi_80211_tx, as a station that never associates.
  * On a normal network: an ordinary station whose Ethernet frames go straight to the bridge, with no IP stack on top
  * (ESP-IDF's sta2eth example does the same). Its MAC is the computer's, so the access point sees one device.
  *
- * JAM's raw frames:
+ * JANK's raw frames:
  * That state matters. ieee80211_raw_frame_sanity_check (libnet80211.a, IDF 5.5.6, read in its disassembly) refuses
  * Protected and QoS frames always, but compares addr2 and the ToDS bits only when a BSS exists. Unassociated, a plain
  * data frame with ToDS = FromDS = 0 goes out. addr2 is free too, but it is kept equal to the station MAC, so that the
@@ -17,7 +17,7 @@
 #include "esp_wifi.h"
 
 #define FCS_LEN 4u
-#define RATE WIFI_PHY_RATE_1M_L      /* what the FM-1 sends in MODE JAM */
+#define RATE WIFI_PHY_RATE_1M_L      /* what the FM-1 sends in MODE JANK */
 static const char *TAG = "radio";
 static radio_rx_fn s_rx;
 static radio_eth_fn s_eth;

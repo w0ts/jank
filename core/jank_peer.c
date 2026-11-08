@@ -48,7 +48,7 @@ void jp_init(struct jank_peer *p, const uint8_t usb_mac[6], const uint8_t air_ma
 
 void jp_set_air_mac(struct jank_peer *p, const uint8_t mac[6]) { memcpy(p->air_mac, mac, 6); }
 
-/* the addresses it learns: on MODE JAM's air all of them are link-local, on a normal network they are the subnet's */
+/* the addresses it learns: on MODE JANK's air all of them are link-local, on a normal network they are the subnet's */
 static int reachable(const struct jank_peer *p, uint32_t ip)
 {
     if (p->on_network)

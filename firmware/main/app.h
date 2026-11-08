@@ -21,7 +21,7 @@ esp_err_t radio_start(const uint8_t mac[6], uint32_t channel, radio_rx_fn rx);
 esp_err_t radio_channel(uint32_t channel);
 esp_err_t radio_set_mac(const uint8_t mac[6], uint32_t channel);
 esp_err_t radio_tx(const uint8_t *frame, size_t len);
-/* a normal network instead of MODE JAM's air: Ethernet frames both ways */
+/* a normal network instead of MODE JANK's air: Ethernet frames both ways */
 typedef void (*radio_eth_fn)(const uint8_t *eth, size_t len);
 esp_err_t radio_start_network(const uint8_t mac[6], const char *ssid, const char *pass, radio_eth_fn rx);
 esp_err_t radio_network_tx(const uint8_t *eth, size_t len);
