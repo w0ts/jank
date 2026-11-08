@@ -228,9 +228,22 @@ def front_unit(k, c, H, tx_lane):
     route(f"RING{k}", [tb["B"], (tb["B"][0], GY + 2.53), (din4[0], GY + 3.53), din4])
     route(f"RING{k}", [(din4[0], s_[6][1]), s_[6]])
     route(f"RING{k}", [(c - 1.2, B), s_[1]])
-    # JT down the left of the DIN's pin 4 side to the jack's tip; JR down the right, round the jack's sleeve tab (bottom)
-    route(f"JT{k}", [s_[5], (c - 3.0, s_[5][1] + 0.8), (c - 3.4, s_[5][1] + 2.0), (c - 3.4, H - 11.0), jt], SIG, BOT)
-    route(f"JR{k}", [s_[2], (c + 3.4, s_[2][1] + 1.7), (c + 3.4, H - 4.6), (c - 1.0, H - 4.6), jr], SIG, BOT)
+    # The jack is JACK_DX to the right of the DIN (between it and the next). Both jack routes on the bottom, under the
+    # DIN's pin rows (pins 1/2/3 at H - 13.1, 4/5 at H - 15.6): JT west of the switch, down past the DIN's pin 4, east
+    # along H - 10.9 to the tip pad; JR east of the switch, down between pins 2 and 5, east along H - 11.5 through the gap
+    # between this DIN's pin 3 and the next DIN's pin 1, then down beside the jack's pads to the ring pad at the edge
+    # (the jack's pads are surface-mount on the top: each route ends in a via, JT's under the tip pad's inner side, JR's
+    # beside the ring pad, between the jack's pegs and the pad)
+    # JT: west of the switch, down past the DIN's pin 4, east along H - 10.9 to a via under the tip pad's inner side. JR:
+    # east of the switch, down between the DIN's pins 2 and 5, east along H - 11.7 (under JT's via, over the pin rows) past
+    # the jack, up beside its pads to a via by the ring pad (the next DIN's leg is 0.9 further east)
+    JTV, JRV = (jt[0], H - 10.9), (jr[0] + 2.1, jr[1])
+    route(f"JT{k}", [s_[5], (c - 2.95, s_[5][1]), (c - 2.95, H - 10.9), JTV], SIG, BOT)
+    via(f"JT{k}", *JTV)
+    route(f"JT{k}", [JTV, jt])
+    route(f"JR{k}", [s_[2], (c + 3.5, s_[2][1]), (c + 3.5, H - 11.7), (JRV[0], H - 11.7), JRV], SIG, BOT)
+    via(f"JR{k}", *JRV)
+    route(f"JR{k}", [JRV, jr])
     route("+3V3", [(tb["A"][0], H - 29.2), tb["A"]], BUS)
     v = (round(ta["A"][0] + 1.4, 4), ta["A"][1])     # (the TX via on the 10 ohm group's A line, right of the axial part)
     via("MIDI_TXB", *v)
@@ -242,6 +255,7 @@ def front_unit(k, c, H, tx_lane):
 
 
 MOD_GROW = 12.5                                   # (the modular variant's extra depth, mm)
+MOD_GROW_W = 3.0                                  # (its extra width: the right channels' parts sit 3 mm further right)
 
 
 def modular(W, H, p, o, TX_LANE):
@@ -259,23 +273,25 @@ def modular(W, H, p, o, TX_LANE):
     for j in J.values():
         solid(j, "S")
     t = {r: at(j, "T") for r, j in J.items()}
+    RBX = W - 84.0                                    # (the right channels' parts follow the board's extra width, MOD_GROW_W)
     U5 = place(K("Package_SO"), "SOIC-16W_7.5x10.3mm_P1.27mm", "U5", "PCF8574T", 44.0, 42.0, 0)
     u = {n: at(U5, n) for n in range(1, 17)}
     C12 = place(K("Capacitor_SMD"), C0805, "C12", "100nF", 44.0, 35.6, 0)
     SOT5 = "SOT-23-5_HandSoldering"
     B = {r: place(K("Package_TO_SOT_SMD"), SOT5, r, "74AHCT1G125", x, y, rot)
-         for r, x, y, rot in (("U6", 30.0, 39.3, 180), ("U7", 25.0, 44.4, 180), ("U8", 66.1, 50.2, 0), ("U9", 66.1, 57.8, 0))}
+         for r, x, y, rot in (("U6", 30.0, 39.3, 180), ("U7", 25.0, 44.4, 180), ("U8", RBX + 66.1, 50.2, 0),
+                              ("U9", RBX + 66.1, 57.8, 0))}
     b = {r: {n: at(fp, n) for n in range(1, 6)} for r, fp in B.items()}
     R = {r: place(K("Resistor_SMD"), R0805, r, "1k", x, y, rot)
-         for r, x, y, rot in (("R72", 24.5, 38.35, 180), ("R73", 19.5, 43.45, 180), ("R74", 70.3, 51.55, 270),
-                              ("R75", 70.3, 59.15, 270))}
+         for r, x, y, rot in (("R72", 24.5, 38.35, 180), ("R73", 19.5, 43.45, 180), ("R74", RBX + 70.3, 51.55, 270),
+                              ("R75", RBX + 70.3, 59.15, 270))}
     r = {k: (at(fp, 1), at(fp, 2)) for k, fp in R.items()}
     D = {k: place(K("Package_TO_SOT_SMD"), "SOT-23", k, "BAT54S", x, y, 0)
-         for k, x, y in (("D3", 19.0, 39.6), ("D4", 15.5, 44.4), ("D5", 66.1, 54.0), ("D6", 66.1, 61.6))}
+         for k, x, y in (("D3", 19.0, 39.6), ("D4", 15.5, 44.4), ("D5", RBX + 66.1, 54.0), ("D6", RBX + 66.1, 61.6))}
     d = {k: {n: at(fp, n) for n in (1, 2, 3)} for k, fp in D.items()}
     C = {k: place(K("Capacitor_SMD"), C0805, k, "100nF", x, y, rot)
-         for k, x, y, rot in (("C13", 30.6, 42.4, 0), ("C14", 25.0, 47.6, 0), ("C15", 70.3, 47.75, 270),
-                              ("C16", 70.3, 55.35, 270))}
+         for k, x, y, rot in (("C13", 30.6, 42.4, 0), ("C14", 25.0, 47.6, 0), ("C15", RBX + 70.3, 47.75, 270),
+                              ("C16", RBX + 70.3, 55.35, 270))}
     c = {k: (at(fp, 1), at(fp, 2)) for k, fp in C.items()}
     TP = {n: place(K("TestPoint"), "TestPoint_Pad_D1.0mm", n, v, x, y)
           for n, v, x, y in (("TP5", "P2", 35.0, 45.2), ("TP6", "P3", 36.9, 46.2), ("TP7", "P6", 51.0, 44.2),
@@ -302,8 +318,20 @@ def modular(W, H, p, o, TX_LANE):
     route("MOD_P3", [u[7], (38.2, u[7][1]), at(TP["TP6"], 1)])
     route("MOD_P6", [u[11], (at(TP["TP7"], 1)[0], u[11][1]), at(TP["TP7"], 1)])
     route("MOD_P7", [u[12], (52.0, u[12][1]), at(TP["TP8"], 1)])
-    route("CLKR_IN", [u[10], (63.5, u[10][1]), (63.5, b["U8"][2][1]), b["U8"][2]])
-    route("RSTR_IN", [u[9], (62.9, u[9][1]), (62.9, b["U9"][2][1]), b["U9"][2]])
+    # CLKR_IN / RSTR_IN east on the top, down just past the TX lane (bottom, y 49.2) and OUT4's 10 ohm group's A pad,
+    # then on the bottom: CLKR_IN straight to a via by U8's pin 2; RSTR_IN west of the 10 ohm group's standing part, east
+    # along y 57.0 (between the front groups and the front switches' pins) to a via by U9's pin 2
+    CV, RV = (64.8, 49.9), (62.9, 49.9)              # (CV east of the TX via's bottom stub at x 64.05)
+    route("CLKR_IN", [u[10], (CV[0], u[10][1]), CV])
+    via("CLKR_IN", *CV)
+    route("CLKR_IN", [CV, (b["U8"][2][0] - 1.45, b["U8"][2][1])], SIG, BOT)
+    via("CLKR_IN", b["U8"][2][0] - 1.45, b["U8"][2][1])
+    route("CLKR_IN", [(b["U8"][2][0] - 1.45, b["U8"][2][1]), b["U8"][2]])
+    route("RSTR_IN", [u[9], (RV[0], u[9][1]), RV])
+    via("RSTR_IN", *RV)
+    route("RSTR_IN", [RV, (61.0, 50.6), (61.0, 57.0), (b["U9"][2][0] - 1.45 - 0.8, 57.0), (b["U9"][2][0] - 1.45, b["U9"][2][1])], SIG, BOT)
+    via("RSTR_IN", b["U9"][2][0] - 1.45, b["U9"][2][1])
+    route("RSTR_IN", [(b["U9"][2][0] - 1.45, b["U9"][2][1]), b["U9"][2]])
     # ---- the left channels: buffer -> 1 k -> clamp -> the jack's tip
     route("CLKL_B", [b["U6"][4], r["R72"][0]])
     route("CLK_L", [r["R72"][1], (21.0, r["R72"][1][1]), d["D3"][3]])
@@ -312,12 +340,12 @@ def modular(W, H, p, o, TX_LANE):
     route("RST_L", [r["R73"][1], (17.2, r["R73"][1][1]), d["D4"][3]])
     route("RST_L", [d["D4"][3], (13.0, d["D4"][3][1]), t["J12"]])
     # ---- the right channels
-    route("CLKR_B", [b["U8"][4], (69.0, b["U8"][4][1]), r["R74"][0]])
-    route("CLK_R", [r["R74"][1], (71.3, r["R74"][1][1] + 0.95), (73.8, t["J13"][1] - 0.6), t["J13"]])
-    route("CLK_R", [d["D5"][3], (68.2, d["D5"][3][1] - 1.15), r["R74"][1]])
-    route("RSTR_B", [b["U9"][4], (69.0, b["U9"][4][1]), r["R75"][0]])
-    route("RST_R", [r["R75"][1], (71.3, r["R75"][1][1] + 0.95), (73.8, t["J14"][1] - 0.3), t["J14"]])
-    route("RST_R", [d["D6"][3], (68.3, d["D6"][3][1] - 1.2), r["R75"][1]])
+    route("CLKR_B", [b["U8"][4], (RBX + 69.0, b["U8"][4][1]), r["R74"][0]])
+    route("CLK_R", [r["R74"][1], (RBX + 71.3, r["R74"][1][1] + 0.95), (t["J13"][0], t["J13"][1] - 0.6), t["J13"]])
+    route("CLK_R", [d["D5"][3], (RBX + 68.2, d["D5"][3][1] - 1.15), r["R74"][1]])
+    route("RSTR_B", [b["U9"][4], (RBX + 69.0, b["U9"][4][1]), r["R75"][0]])
+    route("RST_R", [r["R75"][1], (RBX + 71.3, r["R75"][1][1] + 0.95), (t["J14"][0], t["J14"][1] - 0.3), t["J14"]])
+    route("RST_R", [d["D6"][3], (RBX + 68.3, d["D6"][3][1] - 1.2), r["R75"][1]])
     # ---- +5V: from U2's via down the right side on the bottom (x 70.6); west on the bottom (y 47.4), on top across the
     # expander's band, on the bottom again to the left channels
     route("+5V", [(72.4, p["v5y"]), (70.6, p["v5y"] + 1.25), (70.6, 63.5)], BUS, BOT)
@@ -333,8 +361,8 @@ def modular(W, H, p, o, TX_LANE):
         route("+5V", [(x, y0), top])
     route("+5V", [(28.65, 41.6), c["C13"][0]])
     route("+5V", [(23.65, 46.4), c["C14"][0]])
-    for (x, y), top in ((c["C15"][0], [(68.0, c["C15"][0][1]), (b["U8"][5][0], c["C15"][0][1] + 0.6), b["U8"][5]]),
-                        (c["C16"][0], [(68.6, c["C16"][0][1]), (b["U9"][5][0], c["C16"][0][1] + 1.6), b["U9"][5]])):
+    for (x, y), top in ((c["C15"][0], [(RBX + 68.0, c["C15"][0][1]), (b["U8"][5][0], c["C15"][0][1] + 0.6), b["U8"][5]]),
+                        (c["C16"][0], [(RBX + 68.6, c["C16"][0][1]), (b["U9"][5][0], c["C16"][0][1] + 1.6), b["U9"][5]])):
         via("+5V", x - 1.3, y)
         route("+5V", [(x - 1.3, y), (70.6, y)], SIG, BOT)
         route("+5V", [(x, y), *top])
@@ -357,12 +385,14 @@ def layout_long():
     turned to face the back; the MIDI IN one), the strip (OUT1's A/B switch, the LED), the XIAO (USB-C over the edge), J1
     and the power path. Between: the MIDI IN circuit (left), the OLED (middle, on its header at its right end), BACK and
     OK (right of the screen) and the encoder under them."""
-    W, H = 84.0, 67.0 + (MOD_GROW if MODULAR else 0.0)   # (modular: a band for the side jacks and their circuit)
+    W, H = 84.0 + (MOD_GROW_W if MODULAR else 0.0), 67.0 + (MOD_GROW if MODULAR else 0.0)   # (modular: a band for the side
+    #                                                 jacks and their circuit; 3 mm wider for the right channels beside OUT4)
     RX = 0.5 if MODULAR else 1.5                     # (the 3V3 riser up the left edge: modular, outside the side jacks' pegs)
     BUS_Y = H - 29.2                                 # (the 3V3 bus, top, behind the front groups)
     TX_LANE = H - 30.3                               # (TXB, bottom, to the three front TX vias)
-    CH = [10.45 + 21.1 * i for i in range(3)]       # (OUT2, OUT3, OUT4 left to right: lid up they read 2, 3, 4 from the front)
-    C1X, XC, JX = 10.75, 45.2, 64.5
+    CH = [10.45 + 23.0 * i for i in range(3)]       # (OUT2, OUT3, OUT4 left to right: lid up they read 2, 3, 4 from the front;
+    #                                                 23.0 pitch: 2.1 mm between the DIN plates for the jack's pegs)
+    C1X, XC, JX = 17.5, 45.2, 64.5                   # (C1X: OUT1's DIN axis; its jack JACK_DX to its LEFT, pads 1.25 off the edge)
 
     # ======== the back edge ========
     U1 = place(JANK, "XIAO-ESP32-S3-DIP_Headers", "U1", "XIAO ESP32S3", XC, 10.55, 90)
@@ -376,9 +406,14 @@ def layout_long():
     # the board), the 10 ohm one on the right (by the strip), the 33 ohm one on the left; their B sides cross to the DIN
     F1 = ((C1X, 0.0), 180)
     J6 = place(JANK, "MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom", "J6", "TRS + DIN", C1X, 0.0, 180)
-    ta1 = cluster(("R11", "JP11", "R31"), ("MIDI_TX1", "TIP1"), -6.2, -20.5, "v", AX0207, "10", 2.8, 2.9, F1, bottom=True)
-    tb1 = cluster(("R21", "JP21", "R41"), ("SRC1", "RING1"), 4.3, -20.5, "v", AX0309, "33", 3.1, 3.3, F1, bottom=True)
-    SW2 = place(JANK, "SW_Slide_DPDT_MSS22D18", "SW2", "TRS A/B", 22.6, 9.0, 90)   # (top, in the strip)
+    # (the groups keep their board positions x 16.95 and 6.45 in front of the MIDI IN circuit; the DIN's axis is C1X)
+    ta1 = cluster(("R11", "JP11", "R31"), ("MIDI_TX1", "TIP1"), C1X - 16.95, -20.5, "v", AX0207, "10", 2.8, 2.9, F1, bottom=True)
+    tb1 = cluster(("R21", "JP21", "R41"), ("SRC1", "RING1"), C1X - 6.45, -20.5, "v", AX0309, "33", 3.1, 3.3, F1, bottom=True)
+    # OUT1's A/B switch is the SURFACE-MOUNT one (SS-3235S), over the DIN's body on the top between the DIN's legs (y 3.5)
+    # and its pin row (y 13.3): a through-hole switch's pins would hit the DIN under the board, and the strip east of the
+    # DIN carries the XIAO's MIDI IN lines. Pins 1/2/3 at y SY - 3.25, 4/5/6 at SY + 3.25, 2.5 mm apart in x.
+    SX, SY = 17.5, 8.1
+    SW2 = place(JANK, "SW_Slide_DPDT_SS3235S_SMD", "SW2", "TRS A/B", SX, SY, 0)
     d5, d4 = at(J6, "5"), at(J6, "4")
     jt1, jr1 = at(J6, "T"), at(J6, "R")
     solid(J6, "S")
@@ -386,12 +421,26 @@ def layout_long():
     DBG.update(d5=d5, d4=d4, jt1=jt1, jr1=jr1, sw2=s, ta1=(ta1["A"], ta1["B"]), tb1=(tb1["A"], tb1["B"]))
     route("TIP1", [ta1["B"], (ta1["B"][0], 17.9), (d5[0], 17.9), d5])                       # (top, across)
     route("RING1", [tb1["B"], (tb1["B"][0], 17.9), (d4[0], 17.9), d4], SIG, BOT)            # (bottom, across)
-    route("JT1", [s[5], (25.0, 10.25), (14.0, 10.25), jt1])
-    route("JR1", [s[2], (16.5, s[2][1]), (14.4, 6.9), (14.4, 4.4), jr1])
-    route("RING1", [d4, (20.0, d4[1]), (22.6, 13.2), (27.6, 13.2), (27.6, s[6][1]), s[6]])
-    route("RING1", [(22.6, 13.2), s[1]])
-    route("TIP1", [ta1["B"], (19.5, 16.7), (24.3, 13.0), s[4]], SIG, BOT)
-    route("TIP1", [s[4], (24.3, s[4][1] - 1.7), (24.3, s[3][1] + 1.7), s[3]], SIG, BOT)
+    # the throws: RING1 pin 1 -> pin 6 straight under the body (top); TIP1 pin 3 -> pin 4 on the bottom through two vias
+    # (its top diagonal would cut JT1's way out); TIP1's pin 4 via on to DIN 5, RING1 pin 6 down to DIN 4 (top)
+    route("RING1", [s[1], s[6]])
+    route("RING1", [s[6], d4])
+    TV3, TV4 = (s[3][0] + 1.0, s[3][1] + 1.25), (s[4][0] - 1.0, s[4][1] + 1.15)
+    route("TIP1", [s[3], TV3])
+    via("TIP1", *TV3)
+    route("TIP1", [TV3, (TV3[0], 7.0), (TV4[0] - 0.5, 7.0), (TV4[0] - 0.5, TV4[1]), TV4], SIG, BOT)
+    via("TIP1", *TV4)
+    route("TIP1", [TV4, s[4]])
+    route("TIP1", [TV4, d5])
+    # JT1 (pin 5): west along y 9.7 (under the body, between the S pad and the rear peg) to the tip pad (top)
+    route("JT1", [s[5], (s[5][0] - 0.9, 9.7), (jt1[0] + 2.1, 9.7), jt1])
+    # JR1 (pin 2): up to a via by the edge, west on the bottom along y 5.3 (under the DIN's legs' pads), a via by the ring
+    JRV0, JRV = (s[2][0], s[2][1] - 1.15), (jr1[0] + 1.9, jr1[1])
+    route("JR1", [s[2], JRV0])
+    via("JR1", *JRV0)
+    route("JR1", [JRV0, (JRV0[0] - 1.9, 5.3), (JRV[0], 5.3), JRV], SIG, BOT)
+    via("JR1", *JRV)
+    route("JR1", [JRV, jr1])
     # TX1: the XIAO's D0 on the bottom down the strip to the 10 ohm group's A pad
     route("MIDI_TX1", [p[1], (35.2, p[1][1]), (35.2, 22.6), (ta1["A"][0] + 0.85, 22.6), ta1["A"]], SIG, BOT)
     via("MIDI_TX1", 35.2, 11.82)
@@ -640,12 +689,12 @@ def layout_long():
         route("+3V3", [(51.45, 35.6), (51.45, V3Y)], SIG, BOT)
     via("+3V3", 51.45, V3Y)
     route("+3V3", [(51.45, V3Y), (51.45, BUS_Y)])
-    route("+3V3", [(51.45, BUS_Y), (RX, BUS_Y)], BUS)
+    route("+3V3", [(CH[2] - 4.3, BUS_Y), (RX, BUS_Y)], BUS)   # (to OUT4's 33 ohm group's A line)
     if MODULAR:
         modular(W, H, p, o, TX_LANE)
 
     # ======== silk ========
-    label("OUT1 A|B", s[2][0] - 2.3, s[2][1], 0.7, rot=90)
+    label("OUT1 A|B", 17.5, 1.3, 0.7)
     label("JP=SRC!", 9.55, 23.3, 0.6)
     label("MIDI IN: OUT1", 21.0, 23.3, 0.6)
     label("jank v5 mod" if MODULAR else "jank v5", 75.0 if MODULAR else 74.0, H - 6.0 if MODULAR else 52.0, 1.0)

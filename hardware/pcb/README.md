@@ -2,23 +2,53 @@
 
 A carrier board for a **Seeed XIAO ESP32S3**: jank as one stick with a second USB-C for power, **a 0.91" OLED, an
 encoder and two buttons (OK, BACK) on the lid side**, one RGB beat LED and **four MIDI outputs**. **v5 fits both
-connectors on every output**: a right-angle 3.5 mm jack (XKB PJ-320A) on the **top** and a DIN-5 (HOOYA DIN-504B-M10)
-on the **bottom**, on the same axis and the same nets (in parallel: **plug one at a time**), and a **TRS type A / B
-slide switch** per output for the jack. **OUT1 doubles as a MIDI IN** under software control (an H11L1 behind a MOSFET
+connectors on every output**: a right-angle 3.5 mm jack (XKB PJ-320D-B-SMT, surface mount) on the **top** and a DIN-5
+(HOOYA DIN-504B-M10) on the **bottom**, **the jack beside the DIN** (v5c, 2026-11-09: between two DIN plates at a 23.0 mm
+pitch, so nothing of the jack goes through the board under a DIN body) on the same nets (in parallel: **plug one at a
+time**), and a **TRS type A / B slide switch** per output for the jack. **Both faces sit at the box wall** (the box
+brings the board edge to 1.0 mm inside its outer face). **OUT1 doubles as a MIDI IN** under software control (an H11L1 behind a MOSFET
 gate; its source cut by a second MOSFET). **Three outputs (OUT2, OUT3, OUT4) are on the front edge; OUT1 is on the back
 edge** beside the two USB-Cs. **The top of the board is the lid side**: the XIAO, the screen, the encoder, the buttons,
 the LED, the jacks and the A/B switches; the bottom carries only the DINs and the standing resistors (hand-soldered), and the
-board stands about 20 mm above the box's floor on the DINs. Everything is hand-solderable: through-hole connectors,
-switches, encoder, opto and swappable resistors, SOT-23 / SC-70 ICs, 0805 / 1206 passives, an LED with lengthened
-pads. **84.0 x 67.0 mm, 2 layers.**
+board stands about 20 mm above the box's floor on the DINs. Everything is hand-solderable: through-hole DINs,
+switches, encoder, opto and swappable resistors, the jacks' four tabs, SOT-23 / SC-70 ICs, 0805 / 1206 passives, an LED
+with lengthened pads. **The modular board (the one built): 87.0 x 79.5 mm, 2 layers.** (The plain 84 x 67 variant is
+parked since v5c: with the 23 mm pitch its OUT4 resistor group lands on the encoder; `make_fab.sh` builds `-mod` only.)
 
 > **Stage: schematic and layout, v5 (2026-11-08).** Nothing is ordered, built or measured. Every value marked
 > *unverified* below was not checked against the part or a datasheet in this session.
 
-The drawing: [`jank-pcb-schematic.pdf`](jank-pcb-schematic.pdf). The board: [`render-top.png`](render-top.png),
-[`render-bottom.png`](render-bottom.png).
+The drawing: [`jank-pcb-mod-schematic.pdf`](jank-pcb-mod-schematic.pdf). The board: [`render-top-mod.png`](render-top-mod.png),
+[`render-bottom-mod.png`](render-bottom-mod.png).
 
-![top](render-top.png)
+![top](render-top-mod.png)
+
+## v5c (2026-11-09): the jack beside the DIN, both faces at the wall
+
+The user, on seeing v5's stacked connectors: *"the jacks are not reachable from the outside of the box ... put the midi
+jack between the DIN plugs on the pcb, making sure the pins don't collide (DIN on one side, jack on the other)"*, and
+*"DIN AND jack should be at the wall"*.
+
+- **Each output's 3.5 mm jack moved 11.5 mm along the edge**, into the 2.1 mm gap between two DIN plates (the pitch
+  went from 21.1 to **23.0 mm**; the board from 84 to **87 mm** wide so OUT4's resistor group clears the right
+  channels' drivers, which moved 3 mm right with the wall jacks and the holes H1 / H2). OUT4's jack is right of the
+  last DIN; **OUT1's jack is left of its DIN at the back-left corner** (DIN axis x 17.5, jack x 6.0).
+- **The jack is now the surface-mount twin, XKB PJ-320D-B-SMT (C2884940)**: same body, bushing and pegs, four 1.5 x 2.5
+  tabs on the top instead of legs through the board (the legs would have come out under the neighbouring DIN bodies).
+  Its two 1.3 mm pegs sit in the gap, 0.4 mm from each DIN body. The side-wall jacks J11..J14 stay the through-hole
+  PJ-320A (nothing is under them).
+- **The DIN plate is 1.0 mm behind the board edge, the jack body front 0.5 mm past it.** The box puts the board edge
+  1.0 mm inside its outer face on the connector edges: **the DIN faces are flush with the outside, the jack bodies 0.5 mm
+  inside it with the bushings 1.5 mm proud**. The 1.0 mm also keeps the jack's rear tab pads 0.3 mm from the next DIN's
+  pin 1 / 3 pads (the rows interleave: DIN pins at 13.3 and 15.8 in, jack tabs at 2.5 .. 11.0 in).
+- **OUT1's A/B switch SW2 is the surface-mount XKB SS-3235S-L2 (C500056)**, over the DIN body at (17.5, 8.1): a
+  through-hole switch's pins would hit the DIN under the board, and the strip east of the DIN carries the XIAO's MIDI IN
+  lines (IN_EN, MIDI_RX, TX1). Same pinout (1-2-3 / 4-5-6, 2 and 5 the commons), knob 3.0 mm, travel 1.5 mm along x.
+  SW3..SW5 stay the through-hole MSS22D18 (their pins land behind the DIN bodies).
+- Routes: each jack's tip and ring reach their tabs through a via next to the pad (the switches' routes run on the
+  bottom); OUT1's TIP throw crosses under the switch through two vias.
+- Prices of the two new parts not read (LCSC refused the page on 2026-11-09): **0.00 in the BOM**, fill in before
+  trusting the total.
 
 ## v5 in short (what changed from round 7 / 2026-11-08)
 
@@ -105,8 +135,8 @@ v2.2. All 11 GPIO pads are used.
 The XIAO prints D4 / D5 as its SDA / SCL; on the ESP32-S3 that is only a default, the I2C pins go anywhere through the
 GPIO matrix, so the OLED uses D8 / D9 (GPIO7 / 8), where its lines leave the module's right row straight for the screen.
 
-**GPIO -> footprint -> channel:** GPIO1 -> J6 at the back, x 10.75 -> OUT1; **GPIO2 -> J7 (x 10.45, OUT2), J8 (x 31.55,
-OUT3) and J9 (x 52.65, OUT4)**. Seen from the front with the lid up the front wall reads OUT2, OUT3, OUT4 from left to
+**GPIO -> footprint -> channel:** GPIO1 -> J6 at the back, DIN axis x 17.5 -> OUT1; **GPIO2 -> J7 (DIN x 10.45, OUT2), J8
+(x 33.45, OUT3) and J9 (x 56.45, OUT4)**; each jack 11.5 to the right of its DIN (OUT1's 11.5 to the left). Seen from the front with the lid up the front wall reads OUT2, OUT3, OUT4 from left to
 right.
 
 **One pad for three loops (the coordinator's figure: 28 mA):** the ESP32-S3's IOL is given as 28 mA at VOL 0.495 V at
@@ -288,7 +318,8 @@ each swappable (below). **J(5+k)**: DIN-5 180 degree, pin 5 = TIPk, pin 4 = RING
 **J(1+k)**: 3.5 mm TRS, tip = JTk, ring = JRk, sleeve = GND, through **SW(1+k)**. **v5: both are fitted**, in parallel
 on TIPk / RINGk: plug one per channel (both at once doubles that channel's current, above).
 
-**The TRS A/B switches (SW2..SW5, one per output, top side):** a DPDT slide switch between the resistors and the jack;
+**The TRS A/B switches (SW2..SW5, one per output, top side):** a DPDT slide switch between the resistors and the jack
+(SW2 the surface-mount SS-3235S-L2, v5c above; SW3..SW5 the MSS22D18 below);
 it swaps the jack's tip and ring between TIPk (data, sink) and RINGk (source); the DIN is not switched. Pins 1 RINGk,
 2 JRk, 3 TIPk | 4 TIPk, 5 JTk, 6 RINGk; **1-2 and 4-5 closed = type A**. Which end of the travel closes 1-2 is the part's
 own (*unverified: check with a meter before writing "A" on the box*). **SHOU HAN MSS22D18G2**, LCSC C431542: 6 pins 2.5 mm
@@ -300,49 +331,50 @@ for MIDI plus the OLED's ~23 mA. **Mono plug:** ring to sleeve, 33 ohm across 3V
 0.75 W). Four mono plugs: 400 mA against Seeed's "Imax=600mA": a brownout is possible (*unverified*). **Power-up
 glitch:** GPIO1 to GPIO14 show a 60 us low glitch at power-up; a receiver may see one stray byte (*unverified*).
 
-**The jack:** **XKB PJ-320A**, LCSC **C2884926**, USD 0.1458 (min 5). From XKB's drawing (rev A1 2025-03-03): body
-12.2 deep x 6.2 wide x 5.0 high, its front on the board's edge; a round bushing 2.0 mm past it (5.0 mm across,
-measured on the sheet), plug hole 3.6 mm; **axis 2.5 mm above the board's top**. Two 1.4 mm pegs on the axis 1.6 and
-8.6 mm behind the front; tabs (plated slots 0.6 x 1.2, pads 1.2 x 1.8) at (-2.3; 3.2) ring, (-2.3; 6.2) switch "SW"
-(open), (-2.3; 10.2) tip, (+2.3; 11.4) sleeve (x across seen from the top with the edge at the front). **Which tab is
-which pin is not on the sheet** (*unverified: check with a meter*; a tip / ring swap is undone by the A/B switch, a
-sleeve or switch mix-up is not).
+**The jack:** **XKB PJ-320D-B-SMT**, LCSC **C2884940** (price not read). From XKB's drawing X-PJ-320D-B-SMT (rev A1
+2025-06-26): body 12.0 deep x 6.0 wide x 5.0 high, its front 0.5 mm past the board's edge; a round bushing 2.0 mm past
+it (5.0 across), plug hole 3.6 mm; **axis 2.5 mm above the board's top**. Two 1.3 mm pegs on the axis 1.5 and 8.5 mm
+behind the front. Four surface-mount tabs, pads 1.5 x 2.5 at 3.5 either side of the axis: terminals 2, 3, 4 on one side
+3.0, 6.0, 10.0 behind the front (4 = tip, 3 = ring, 2 = the second ring, left open), terminal 1 (sleeve) on the other
+side 11.5 behind the front. Named T, R, SW, S after the PJ-320A's pads so the nets stay. **Which side the 2/3/4 tabs
+are on, seen from the top, is read off the drawing's handedness** (*unverified: a tip / ring swap is undone by the A/B
+switch, a sleeve mix-up is not*). The PJ-320A (C2884926, USD 0.1458) is the same body with legs; it stays on the side
+walls (J11..J14).
 
 **The DIN:** **HOOYA DIN-504B-M10**, LCSC **C2939346**, USD 0.3764 (min 5). From HOOYA's drawing (rev A1 2019-07-10):
 **plate 20.9 +/-0.1 x 19.6 +/-0.1 high, 1.8 thick, body 11.8 behind it (13.6 overall); axis 9.7 mm from the plate's
-board-side edge**; seven 1.5 mm holes; no locating pegs; its pin numbers are not on the sheet (the CUI numbering taken,
+board-side edge**; seven 1.5 mm holes: two legs 2.5 behind the plate's front 10 apart, three pins 12.3 behind it 15
+apart, two pins 14.8 behind it 10 apart; no locating pegs; its pin numbers are not on the sheet (the CUI numbering taken,
 *unverified: pins 4 and 5 with a meter*).
 
-### Both connectors on one footprint (v5)
+### Both connectors on one footprint (v5c)
 
-`jank:MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom` (J6..J9). Coordinates from the edge, x across seen **from the top**:
+`jank:MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom` (J6..J9; the name kept). The origin is the DIN's axis on the board
+edge; the jack's axis is **JACK_DX = 11.5 to the right** (x across seen from the top, the edge at the front):
 
 | Part | Pin | x | mm in from the edge |
 |---|---|---|---|
-| PJ-320A (top) | pegs (1.4 NPTH) | 0 | 1.6, 8.6 |
-| | R, SW, T | -2.3 | 3.2, 6.2, 10.2 |
-| | S | +2.3 | 11.4 |
+| PJ-320D-B-SMT (top, surface mount) | pegs (1.3 NPTH) | 11.5 | 1.0, 8.0 |
+| | SW, R, T (tabs 2, 3, 4) | 15.0 | 2.5, 5.5, 9.5 |
+| | S (tab 1) | 8.0 | 11.0 |
 | DIN-504B-M10 (bottom, seen through the board: x mirrored) | E, E (shield, GND) | -5.0, +5.0 | **3.5** |
 | | 1, 2 (GND), 3 | **-7.5**, 0, **+7.5** | **13.3** |
 | | 4 (RING), 5 (TIP) | **-5.0**, **+5.0** | **15.8** |
 
 - **Mirror:** mounted from the bottom, the DIN's legs come up through the board mirrored in x: pin 5 (tip) is at **+5.0**
-  seen from the top (it was -5.0 with the DIN on the top), pin 4 at -5.0, pin 1 at -7.5. The resistor groups follow
-  (the 10 ohm group now right of each output, the 33 ohm left).
-- **Holes:** every hole is shared by both sides; **no hole of one part lands on the other's** (DRC-checked: nearest are
-  a DIN shield pin and the jack's ring tab, 2.7 mm apart centre to centre, and DIN pin 2 and the jack's sleeve tab,
-  3.0 mm). The pitch stays **21.1 mm** for the 20.9 mm plates (0.2 mm between plates).
-- **Pin 2's leg against the jack:** with the plate on the edge, DIN pin 2 (12.3 in) was 0.1 mm behind the jack's back
-  (12.2). **The DIN is moved 1.0 mm in along the depth** (plate front 1.0 mm behind the edge, all its holes 1.0 mm
-  deeper): pin 2 is now 1.1 mm behind the jack's back. Nothing on either drawing fixes the DIN's depth (no pegs), so
-  only the front wall sees it: **the DIN faces stand 1.0 mm back from the jack fronts** (the wall is 1.0 mm thicker
-  below the board, or the plates sit 1.0 mm off it). The jack stays on the edge (its pegs are 1.6 mm in; moving it
-  out would put the front peg's hole past the edge).
-- **Assembly (both sides, one hole pattern):** **the jack first**, soldered on the bottom, **its legs and pegs cut
-  flush** on the bottom (they are under the DIN's body); then the DIN from the bottom, soldered on the top (its pin 2
-  joint sits just behind the jack). The DIN's body bottom over the jack's cut legs is *unverified*: a dry fit of the
-  two parts before ordering decides it.
-- Courtyards: the jack on F.CrtYd (its body and bushing), the DIN on B.CrtYd (its plate x body, 20.9 x 14.85 mm).
+  seen from the top, pin 4 at -5.0, pin 1 at -7.5. The resistor groups follow (the 10 ohm group right of each output,
+  the 33 ohm left).
+- **Nothing of the jack goes through the board under a DIN body:** its tabs are on the top; its two pegs are in the
+  2.1 mm gap between the plates (23.0 pitch minus 20.9), 0.4 mm from each DIN body (DRC: no hole inside a DIN's
+  courtyard). The DIN's pins come up 1.8 .. 4.3 mm behind the jack's back, its legs 2.45 mm beside the jack's body.
+- **Depths:** DIN_BACK = 1.0 (the plate 1.0 behind the edge), JACK_OUT = 0.5 (the body front 0.5 past the edge). Why:
+  the box wall is the board edge plus 1.0 (both faces at the wall), and the jack's rear tab pad (S, 11.0 in) keeps 0.3 mm
+  from the next DIN's pin 3 pad (13.3 in, 7.5 off its axis = 0.75 off the tab's x).
+- **Assembly:** the four jacks' tabs soldered on the top first (nothing under them yet), then the DINs from the bottom,
+  soldered on the top. No legs to cut. The DIN's body bottom over the jack's pegs' ends: the pegs are 1.3 mm pegs in a
+  1.6 mm board (*unverified: that they do not stand out underneath*).
+- Courtyards: the jack on F.CrtYd (its body, tabs' pads and bushing), the DIN on B.CrtYd (its plate x body, 20.9 x
+  14.85 mm).
 
 ## MIDI IN on OUT1 (software-switched)
 
@@ -400,14 +432,14 @@ connectors themselves). C4 (100 uF, not fitted) moved to the bottom to free the 
 
 | Edge | What | Where (x of the axis) |
 |---|---|---|
-| Front (y = 67) | **OUT2 (J7), OUT3 (J8), OUT4 (J9)**, left to right seen from the top and from the front with the lid up; jack fronts on the edge, DIN plates 1.0 mm in; pitch 21.1 | 10.45, 31.55, 52.65 |
-| Back (y = 0) | **OUT1** (J6, the same footprint turned 180 degrees) | 10.75 |
+| Front (y = 79.5, modular) | **OUT2 (J7), OUT3 (J8), OUT4 (J9)**, left to right seen from the top and from the front with the lid up; DIN plates 1.0 mm in, jack fronts 0.5 mm out, pitch 23.0 | DINs 10.45, 33.45, 56.45; jacks 21.95, 44.95, 67.95 |
+| Back (y = 0) | **OUT1** (J6, the same footprint turned 180 degrees: its jack LEFT of the DIN) | DIN 17.5; jack 6.0 |
 | Back | The XIAO's USB-C (data; on headers, its socket 1.5 mm past the edge) | 45.2 |
 | Back | J1, USB-C power only (GCT USB4125) | 64.5 |
 
 **Placement, top (lid side):**
-- **Back:** OUT1's jack (x 7.65..13.85), OUT1's jumpers and parallel pads (y 19..22), its A/B switch SW2 in the strip
-  (pins x 22.6 / 26.0, y 6.5..11.5), the LED (33.0, 4.2) with C6, TP3, TP4; the XIAO (x 35.6..54.8, y 0..21) with U3,
+- **Back:** OUT1's jack (x 3.0..9.0, its tab pads x 1.25..3.75 and 8.25..10.75), OUT1's jumpers and parallel pads
+  (y 19..22), its A/B switch SW2 over the DIN body (surface mount, centre 17.5, 8.1), the LED (33.0, 4.2) with C6, TP3, TP4; the XIAO (x 35.6..54.8, y 0..21) with U3,
   JP8 / R9, R60, C9, R64, C10 under the module; J1 and the power path (D1, C1, Q1, R1..R4, Q2, C2, R6, U2, C3, TP1) at
   x 56..81, y 0..20.
 - **Band (y 21.5..43.6):** the MIDI IN (U4 at (17.0, 26.6), Q4, R50, D2, Q3, R53, R51, TP2) left; **the OLED** over
@@ -433,8 +465,8 @@ vias; several ground pads joined solid (no room for thermal spokes).
 **Rules** (in `jank-pcb.kicad_pro`): clearance 0.2 (0.15 minimum), track 0.15 minimum, drill 0.3 minimum, vias
 0.6 / 0.3, hole to hole 0.5, copper to edge 0.2.
 
-**The JLCPCB order (bare board):** `fab/jank-pcb-gerbers.zip`, 2 layers, **84 x 67 mm**, 1.6 mm, with **plated slots**
-(the jacks' tabs, J1's shell legs, the encoder's tabs); no internal cut-outs any more.
+**The JLCPCB order (bare board):** `fab/mod/jank-pcb-mod-gerbers.zip`, 2 layers, **87 x 79.5 mm**, 1.6 mm, with **plated
+slots** (the side jacks' tabs, J1's shell legs, the encoder's tabs); no internal cut-outs.
 
 ### Under the XIAO and under the OLED
 
@@ -467,8 +499,9 @@ of play under them); the DIN holes in the front / back wall are centred **9.7 mm
 | **OK, BACK** | **9.5** | HRO code L |
 | XIAO on 2.54 mm headers | about 7.0 (its USB-C's axis about 5) | *estimate* |
 | **OLED module** | its underside **2.5** (the header's plastic), **its glass top 5.1** (2.5 + 2.6; the glass 1.2 thick on top) | drawing + *estimate* |
-| **A/B switches SW2..SW5** | **5.0** to the knob's top | drawing (G2) |
-| **PJ-320A** | **5.0**; bushing 5.0 across, axis **2.5 above the board**, 2.0 past the edge | drawing |
+| **A/B switches SW3..SW5** | **5.0** to the knob's top | drawing (G2) |
+| **A/B switch SW2** (SS-3235S-L2, surface mount) | **6.2** to the knob's top (body 3.2, knob 3.0) | drawing |
+| **PJ-320D-B-SMT** | **5.0**; bushing 5.0 across, axis **2.5 above the board**, 2.5 past the edge (body 0.5 + bushing 2.0) | drawing |
 | U4 H11L1 (DIP-6) | about 4.5 | *estimate* |
 | J1 USB-C | 3.3 | *estimate* |
 | LED | 1.95 | datasheet |
@@ -483,15 +516,16 @@ of play under them); the DIN holes in the front / back wall are centred **9.7 mm
 | **OK** (SW1) | **78.75, 25.45** | hole 4.0 round | |
 | **Encoder shaft** (SW7) | **73.9, 38.7** | hole 7.0 round | body 12.5 x 12.5 under the lid |
 | **LED window** | **33.0, 4.2** | 3.5 x 3.7 | top-emitting, 1.95 tall |
-| OUT1 A/B slot (SW2) | 24.3, 9.0 | 2.0 x 4.5 | handle 1.5 wide, slides 2.0 along y; centre = mid-travel |
-| OUT2 A/B slot (SW3) | 10.45, 48.0 | 2.0 x 4.5 | as SW2 |
-| OUT3 A/B slot (SW4) | 31.55, 48.0 | 2.0 x 4.5 | as SW2 |
-| OUT4 A/B slot (SW5) | 52.65, 48.0 | 2.0 x 4.5 | as SW2 |
+| OUT1 A/B slot (SW2, surface mount) | 17.5, 8.1 (the switch's centre; the knob mid-travel about 0.75 left of it) | 4.0 x 2.0 (x by y) | knob 1.5 wide, slides 1.5 along x |
+| OUT2 A/B slot (SW3) | switch centre 12.15, 60.5 | 2.0 x 4.5 | handle 1.5 wide, slides 2.0 along y (modular board: y = H - 19) |
+| OUT3 A/B slot (SW4) | 35.15, 60.5 | 2.0 x 4.5 | as SW3 |
+| OUT4 A/B slot (SW5) | 58.15, 60.5 | 2.0 x 4.5 | as SW3 |
 
-**The front wall** (seen from the front, lid up: OUT2, OUT3, OUT4 left to right at x 10.45, 31.55, 52.65): **two rows**,
-**the jacks above the board** (axis 2.5 above its top, bushing 5.0 across, 2.0 out past the edge; a 5.2 mm hole) and
-**the DIN faces below it** (axis 9.7 below its bottom; plates 20.9 wide, **1.0 mm behind the jack fronts**; a hole
-about 16 mm, *the user's DIN plugs decide*). **The back wall:** OUT1 the same at x 10.75 (jack above, DIN below), the
+**The front wall** (seen from the front, lid up): **the DIN faces below the board** at x 10.45, 33.45, 56.45 (axis 9.7
+below its bottom; plates 20.9 wide, 1.0 mm behind the board edge = **flush with the outside** when the box puts the
+board edge 1.0 inside its outer face; a hole about 16 mm, *the user's DIN plugs decide*) and **the jacks above the
+board between them** at x 21.95, 44.95, 67.95 (axis 2.5 above its top, bushing 5.0 across, body front 0.5 mm inside the
+outside, bushing 1.5 mm proud; a 5.2 mm hole). **The back wall:** OUT1's jack at x 6.0 and its DIN at x 17.5, the
 XIAO's USB-C at x 45.2 and J1 at x 64.5 above the board (openings about 9.5 x 3.8 mm, *estimate*).
 
 ### Mockup (`make_mockup.py`)
@@ -524,8 +558,8 @@ pin rows, J10H on J10's pins. J10 itself is the module, which sits on the header
 C5248081) and SW1 / SW6 (K2-1102DP, C445493). They are in the full set only.
 
 **The user solders by hand (with the default set):**
-- **Through hole, on the top:** J1, OK and BACK (SW1, SW6), the encoder (SW7), the four A/B switches (SW2..SW5) and U4
-  (H11L1). Also the OLED's 1 x 4 header and the module on it (J10), and the XIAO's two 1 x 7 headers.
+- **Through hole, on the top:** J1, OK and BACK (SW1, SW6), the encoder (SW7), the A/B switches SW3..SW5 and U4
+  (H11L1); SW2 is surface mount (hand-soldered too). Also the OLED's 1 x 4 header and the module on it (J10), and the XIAO's two 1 x 7 headers.
 - **The XIAO** (U1, Seeed's, not at LCSC), onto its headers.
 - **The 9 standing resistors**, under the board: R8, R11..R14, R21..R24.
 - **The jacks and DINs**, J6..J9. Their footprints carry both parts; J2..J5 are BOM lines only.
@@ -596,8 +630,8 @@ TP2 moved to the left edge between H3 and H4, at (3.2, 30.3).
 2. **The user, on the top:** the through-hole parts (J1, the switches, the encoder, U4, the headers, the OLED).
 3. **The user, under the board:** the 9 standing resistors (from the bottom, soldered on the top).
 4. **The user: the XIAO** onto its headers.
-5. **The user: the jacks** (J6..J9, PJ-320A, top). Solder them on the bottom, **then cut their legs and pegs flush** on
-   the bottom (they are under the DIN's body).
+5. **The user: the jacks** (J6..J9, PJ-320D-B-SMT, top): their four tabs soldered on the top, their pegs in the holes
+   between the DIN plates. Nothing to cut.
 6. **The user: the DINs** (J6..J9, DIN-504B-M10, from the bottom), soldered on the top.
 
 ## Modular variant (`jank-pcb-mod`, the user's ruling 2026-11-08: to compare with the board without)
@@ -617,7 +651,7 @@ A second project from the same scripts. `MODULAR=1` makes `make_schematic.py`, `
 
 **What it adds:** four mono 3.5 mm outputs for modular gear: **CLOCK and RESET on the left side wall** (J11, J12) and
 **CLOCK and RESET on the right side wall** (J13, J14).
-- Each is the same XKB PJ-320A used mono: **tip = the signal, sleeve = GND, ring and switch unconnected**. It sits on
+- Each is the through-hole XKB PJ-320A (the MIDI outputs' jacks are the surface-mount PJ-320D-B-SMT) used mono: **tip = the signal, sleeve = GND, ring and switch unconnected**. It sits on
   the top, its front on the side edge (footprint `jank:Jack_3.5mm_XKB_PJ-320A_Horizontal`).
 - **Driver chain per output:** a **74AHCT1G125** on +5V (the same part as U3; four single gates rather than one
   74AHCT125, because the single-gate parts route better at the two ends of the board), then **1 k** in series, then a
@@ -672,7 +706,7 @@ unchanged.
 - **JLCPCB assembly** (`fab/mod/`): 55 SMD parts on 19 lines, against 37 on 17. That is two more extended lines
   (PCF8574T, BAT54S): the buffers are U3's part, the 1 k and 100 nF are already basic lines. The four jacks are hand
   work.
-- The bigger board itself (84 x 79.5 against 84 x 67) is *not priced here*.
+- The bigger board itself (87 x 79.5 against 84 x 67) is *not priced here*.
 - The prices of the PCF8574T and the BAT54S are JLCPCB's parts-list prices (2026-11-08).
 
 **Unverified (modular):**
@@ -693,10 +727,11 @@ unchanged.
   J10H: their rotation 90 taken for a header drawn along x); whether JLCPCB fits the OLED module on its header and the
   XIAO's headers; the fees for extended parts and through-hole joints; the assembly stock of J1, J10, SW1 / SW6 on the day of ordering.
 
-- **Both connectors together:** the DIN's body bottom over the jack's cut legs and pegs; DIN pin 2's leg 1.1 mm behind
-  the jack's back (its thickness unknown); the DIN faces 1.0 mm behind the jack fronts in the wall. **A dry fit of one
-  PJ-320A and one DIN-504B-M10 on a scrap of 1.6 mm board before ordering.**
-- **The PJ-320A:** which tab is which pin; its bushing's 5.0 mm; its tabs in 0.6 x 1.2 slots.
+- **Both connectors together (v5c):** two DIN plates 2.1 mm apart with the jack's pegs between them (plate tolerance
+  +/-0.1); the DIN body's bottom over the jack pegs' ends; the jack's tab pads 0.3 mm from the next DIN's pin pads.
+  **A dry fit of two DIN-504B-M10 and one PJ-320D-B-SMT on a scrap of 1.6 mm board before ordering.**
+- **The PJ-320D-B-SMT:** which side its 2/3/4 tabs are on (the drawing's handedness); its bushing's 5.0 mm; its price.
+- **The SS-3235S-L2 (SW2):** that its 1-2-3 / 4-5-6 numbering matches the schematic's (2 and 5 the commons); its price.
 - **The DIN-504B-M10:** which leg is pin 4 and which pin 5; its axis height 9.7; the body's width (taken as the plate's).
 - **The shared TX pad:** the 28 mA figure is the IOL test point at drive strength 3, not a limit read here; the receiver
   currents per loop; two connectors of one channel plugged at once (four loops).
@@ -724,9 +759,10 @@ unchanged.
 ## Next steps
 
 1. User reviews v5 (`render-top.png`, `render-bottom.png`, `jank-pcb.kicad_pcb` in KiCad), this README and `BOM.md`;
-   rules on: the control arrangement (screen, BACK / OK right of it, the encoder under them), the 84 x 67 mm size, the
+   rules on: the control arrangement (screen, BACK / OK right of it, the encoder under them), the 87 x 79.5 mm size, the
    OLED's support, the shared TX pad.
-2. User dry-fits a PJ-320A and a DIN-504B-M10 together, and prints `mockup.stl` against the real parts, before ordering.
+2. User dry-fits two DIN-504B-M10 and a PJ-320D-B-SMT side by side, and prints `mockup-mod.stl` against the real parts,
+   before ordering.
 3. The box takes `mockup.stl` and the heights and openings above.
 4. User orders the board **assembled** at JLCPCB (`fab/jank-pcb-gerbers.zip`, `fab/bom.csv`, `fab/cpl.csv`: SMD only; README
    "Assembly"), the XIAO from Seeed, the jacks and DINs from LCSC; user solders the XIAO, the jacks, then the DINs. Claude flashes

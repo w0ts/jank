@@ -39,5 +39,6 @@ build() {   # $1: "" (v5) or "mod" (MODULAR=1); files: jank-pcb[-mod].*, fab/ or
     MODULAR=$M "$KP" make_mockup.py 2>&1 | grep -v "wxApp\|stdpbase"
     echo "$D/$B-gerbers.zip $D/bom.csv $D/cpl.csv render-top$T.png render-bottom$T.png mockup$T.stl"
 }
-build ""
+# build ""   (the plain variant is parked since the 23 mm output pitch, 2026-11-09: its OUT4 groups land on the encoder;
+#             the user builds the modular one. Its files stay as last generated.)
 build mod
