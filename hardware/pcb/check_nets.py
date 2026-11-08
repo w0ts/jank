@@ -59,23 +59,46 @@ for k in range(1, 5):
         on(f"RING{k}", (f"J{1 + k}", "R"))
     src = f"SRC{k}" if f"SRC{k}" in nets else "+3V3"   # (the MIDI IN channel: its source on a GPIO)
     on(src, (f"R2{k}", "1"), (f"R4{k}", "1"), (f"JP2{k}", "1"))
-    pads = [p for (r, p) in nets.get(f"MIDI_TX{k}", set()) if r == "U1"]
+    tx = f"MIDI_TX{k}" if f"MIDI_TX{k}" in nets or "MIDI_TXB" not in nets or k == 1 else "MIDI_TXB"   # (v5: OUT2..4 share TXB)
+    on(tx, (f"R1{k}", "1"), (f"R3{k}", "1"), (f"JP1{k}", "1"))
+    pads = [p for (r, p) in nets.get(tx, set()) if r == "U1"]
     if len(pads) != 1:
-        errors.append(f"MIDI_TX{k} on XIAO pads {pads}")
+        errors.append(f"{tx} on XIAO pads {pads}")
         continue
+    if tx == "MIDI_TXB" and k > 2:
+        continue                                 # (one pad for three outputs: counted once)
     gpio = int(re.search(r"GPIO(\d+)", xiao[pads[0]]).group(1))
     tx_gpio.append(gpio)
     if gpio in STRAPPING or gpio in AVOID:
         errors.append(f"MIDI_TX{k} on GPIO{gpio}: strapping or {AVOID.get(gpio, 'avoided')}")
 if len(set(tx_gpio)) != len(tx_gpio):
     errors.append(f"MIDI TX pads not distinct: {tx_gpio}")
-on("+5V", ("U1", "14"), ("U2", "6"), ("U2", "3"), ("LED1", "3"), ("LED2", "3"), ("U3", "5"))
+on("+5V", ("U1", "14"), ("U2", "6"), ("U2", "3"), ("LED1", "3"), ("U3", "5"), *([("LED2", "3")] if ("LED2", "3") in sch else []))
 on("+3V3", ("U1", "12"))
 on("VBUS_IN", ("J1", "A9"), ("J1", "B9"), ("Q1", "2"))
 on("VIN_SW", ("Q1", "3"), ("U2", "1"))
 on("CC1", ("J1", "A5"), ("R1", "1"))
 on("CC2", ("J1", "B5"), ("R2", "1"))
-on("LED_DIN2", ("LED1", "4"), ("LED2", "2"))
+if ("LED2", "2") in sch:                         # (v4: two LEDs in a chain; v5: one, its DOUT open)
+    on("LED_DIN2", ("LED1", "4"), ("LED2", "2"))
+else:
+    on("LED_DIN1", ("LED1", "2"), ("R8", "2"))
+    on("GND", ("LED1", "1"))
+    if sch.get(("LED1", "4")):
+        errors.append("LED1.4 (DOUT) should be open: one LED")
+if "SDA" in nets:                                # (v5: the OLED on I2C, pulled up on the board)
+    on("SDA", ("J10", "4"), ("R71", "2"))
+    on("SCL", ("J10", "3"), ("R70", "2"))
+    on("+3V3", ("J10", "2"), ("R70", "1"), ("R71", "1"))
+    on("GND", ("J10", "1"))
+    for name in ("SDA", "SCL"):
+        pads = [p for (r, p) in nets.get(name, set()) if r == "U1"]
+        if len(pads) != 1:
+            errors.append(f"{name} on XIAO pads {pads}")
+            continue
+        gpio = int(re.search(r"GPIO(\d+)", xiao[pads[0]]).group(1))
+        if gpio in STRAPPING or gpio in AVOID:
+            errors.append(f"{name} on GPIO{gpio}: strapping or {AVOID.get(gpio, 'avoided')}")
 if "MIDI_RX" in nets:                           # (the long board: one output also a MIDI IN)
     k_in = [k for k in range(1, 5) if f"SRC{k}" in nets]
     if len(k_in) != 1:
@@ -107,8 +130,9 @@ if "MIDI_RX" in nets:                           # (the long board: one output al
 if "LADDER" in nets:                             # (round 7: the controls: one ADC ladder, the encoder's A / B)
     on("LADDER", ("U1", "3"), ("SW1", "1"), ("SW6", "1"), ("SW7", "S2"), ("R60", "2"), ("C9", "1"))
     on("+3V3", ("R60", "1"), ("R64", "1"), ("R65", "1"))
-    on("MODE_R", ("SW1", "2"), ("R61", "1"))
-    on("PLAY_R", ("SW6", "2"), ("R62", "1"))
+    ok, back = ("OK_R", "BACK_R") if "OK_R" in nets else ("MODE_R", "PLAY_R")   # (v5: the buttons are OK and BACK)
+    on(ok, ("SW1", "2"), ("R61", "1"))
+    on(back, ("SW6", "2"), ("R62", "1"))
     on("PUSH_R", ("SW7", "S1"), ("R63", "1"))
     on("ENC_A", ("U1", "7"), ("SW7", "A"), ("R64", "2"), ("C10", "1"))
     on("ENC_B", ("U1", "8"), ("SW7", "B"), ("R65", "2"), ("C11", "1"))

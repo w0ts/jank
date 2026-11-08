@@ -1,7 +1,7 @@
 #!/bin/sh
-# The jank board: the schematic (make_schematic.py) and its ERC, the board (make_board.py, 84 x 52 mm), its design-rule
+# The jank board: the schematic (make_schematic.py) and its ERC, the board (make_board.py, v5: 84 x 67 mm), its design-rule
 # check, the schematic's nets against the board's, the Gerbers and drill files zipped for JLCPCB (bare board, 2 layers),
-# a top and bottom render, and the printable mockups (make_mockup.py). make_board.py's square layout is unused.
+# a top and bottom render, and the printable mockup (make_mockup.py: mockup.stl). make_board.py's square layout is unused.
 #   sh make_fab.sh        (from anywhere; needs KiCad 10 (kicad-cli and its Python), python3 and OpenSCAD)
 set -eu
 cd "$(dirname "$0")"
@@ -32,7 +32,7 @@ layout() {   # $1: long | square; its files: jank-pcb[-square].kicad_pcb, fab/ o
     (cd "$D/gerbers" && zip -q -r "../$B-gerbers.zip" .)
     "$KC" pcb render --side top --width 1600 --height 1200 --quality high --zoom 0.95 -o "render-top$T.png" "$B.kicad_pcb" >/dev/null 2>&1
     "$KC" pcb render --side bottom --width 1600 --height 1200 --quality high --zoom 0.95 -o "render-bottom$T.png" "$B.kicad_pcb" >/dev/null 2>&1
-    "$KP" make_mockup.py "$1" 2>&1 | grep -v "wxApp\|stdpbase"
-    echo "$D/$B-gerbers.zip render-top$T.png render-bottom$T.png mockup$T-din.stl mockup$T-trs.stl"
+    if [ "$1" = long ]; then "$KP" make_mockup.py 2>&1 | grep -v "wxApp\|stdpbase"; fi
+    echo "$D/$B-gerbers.zip render-top$T.png render-bottom$T.png mockup.stl"
 }
 layout long

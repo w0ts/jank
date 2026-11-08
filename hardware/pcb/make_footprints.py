@@ -12,6 +12,13 @@
   MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB      the long board's output since 2026-11-08: the HOOYA DIN-504B-M10 or the XKB
                                            PJ-320A, nested, both fronts on the edge; the jack's pads T, R, S on their own
                                            nets (through the A/B switch), its switch pin (pad "SW") left open
+  MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom v5 (the board since 2026-11-08, later the same day): BOTH fitted, the PJ-320A
+                                           on the top, its front on the edge, and the DIN-504B-M10 on the BOTTOM on the
+                                           same axis, its plate 1.0 mm in (DIN_BACK) so its pin 2 clears the jack's back;
+                                           the DIN's pins mirrored in x as seen from the top; F.CrtYd the jack's, B.CrtYd
+                                           the DIN's
+  LED_SK6812MINI-HS_3.7x3.5mm_HandSolder   the beat LED (OPSCO SK6812MINI-HS), its datasheet's pads lengthened outward
+  OLED_0.91in_128x32_I2C_HS91L02W2C01      the OLED module's 4-pin header (GND VCC SCL SDA), the module drawn on F.Fab
 Origins on the board edge, on the connector's axis, the board inward towards -y. Run by make_board.py (or alone:
 python3 make_footprints.py).
 
@@ -114,9 +121,9 @@ def npth(x, y, d):
     return f'  (pad "" np_thru_hole circle (at {x:.3f} {y:.3f}) (size {d} {d}) (drill {d}) (layers "*.Cu" "*.Mask"))'
 
 
-def footprint(name, descr, body):
+def footprint(name, descr, body, attr="through_hole"):
     return "\n".join([f'(footprint "{name}" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
-                      f'  (descr "{descr}")', "  (attr through_hole)", *body, ")"]) + "\n"
+                      f'  (descr "{descr}")', f"  (attr {attr})", *body, ")"]) + "\n"
 
 
 def jack_items(cx, names):
@@ -169,6 +176,75 @@ def din_pj_items():
            (-e, 0), (-a, 0)]
     xy = " ".join(f"(xy {x:.3f} {y:.3f})" for x, y in pts)
     out.append(f"  (fp_poly (pts {xy}) {stroke(0.05, 'F.CrtYd')})")
+    return out
+
+
+DIN_BACK = 1.0           # v5: the DIN's plate 1.0 mm behind the edge (its pin 2 leg then clears the jack's back by 1.1 mm)
+
+
+def v5_din_pins():
+    """the HOOYA DIN-504B-M10 mounted on the BOTTOM, seen from the top: x mirrored, DIN_BACK further in"""
+    pins = {n: (-x, y - DIN_BACK) for n, (x, y) in HY_PINS.items()}
+    return pins, [(-x, y - DIN_BACK) for x, y in HY_E]
+
+
+def v5_items():
+    """v5 (README "v5"): the XKB PJ-320A on the top, its front on the edge, and the HOOYA DIN-504B-M10 on the BOTTOM on the
+    same axis, its plate DIN_BACK behind the edge; both fitted, on the same nets (the jack through the A/B switch)"""
+    pins, e = v5_din_pins()
+    out = [pth(n, x, y, HY_PAD, HY_HOLE) for n, (x, y) in pins.items()]
+    out += [pth("E", x, y, HY_PAD, HY_HOLE) for x, y in e]
+    out += [pth(n, x, y, PJ_PAD, PJ_SLOT) for n, (x, y) in PJ_PINS.items()]
+    out += [npth(x, y, PJ_PEG) for x, y in PJ_PEGS]
+    w, f, b = HY_W / 2, -DIN_BACK, -DIN_BACK - HY_D
+    out += [rect(-w, b, w, f, "B.Fab", 0.1), line(-w, f - HY_PLATE, w, f - HY_PLATE, "B.Fab", 0.1),
+            line(-w + 0.3, b, -w + 0.3, f, "B.SilkS", 0.12), line(w - 0.3, b, w - 0.3, f, "B.SilkS", 0.12),
+            line(-w + 0.3, b, -6.6, b, "B.SilkS", 0.12), line(6.6, b, w - 0.3, b, "B.SilkS", 0.12),
+            rect(-w, 0, w, b - CY, "B.CrtYd", 0.05),
+            rect(-PJ_W / 2, -PJ_D, PJ_W / 2, 0, "F.Fab", 0.1),
+            rect(-PJ_BUSH_D / 2, 0, PJ_BUSH_D / 2, PJ_BUSH_OUT, "F.Fab", 0.1),
+            line(-PJ_W / 2 - 0.15, -PJ_D, -PJ_W / 2 - 0.15, -1.0, "F.SilkS", 0.12),
+            line(PJ_W / 2 + 0.15, -PJ_D, PJ_W / 2 + 0.15, -1.0, "F.SilkS", 0.12)]
+    a, e_ = PJ_W / 2 + CY, PJ_BUSH_D / 2 + CY
+    pts = [(-a, -PJ_D - CY), (a, -PJ_D - CY), (a, 0), (e_, 0), (e_, PJ_BUSH_OUT + CY), (-e_, PJ_BUSH_OUT + CY), (-e_, 0), (-a, 0)]
+    xy = " ".join(f"(xy {x:.3f} {y:.3f})" for x, y in pts)
+    out.append(f"  (fp_poly (pts {xy}) {stroke(0.05, 'F.CrtYd')})")
+    return out
+
+
+# the SK6812MINI-HS (OPSCO, LCSC C2922787; its datasheet SK6812MINI-HS-012 rev B/0, read 2026-11-08, "PCB recommended pad
+# size", TOP VIEW): body 3.7 x 3.5 x 1.95, 4 pads 1.5 x 1.0, 1.8 apart across, rows 1.8 apart; 3 VDD top left, 2 DIN top
+# right, 4 DOUT bottom left, 1 GND bottom right. Here the pads 0.6 longer outward (hand soldering), their inner edges kept.
+LED_PADS = {"3": (-1.9, -0.9), "2": (1.9, -0.9), "4": (-1.9, 0.9), "1": (1.9, 0.9)}
+LED_PAD, LED_BODY = (2.1, 1.0), (3.7, 3.5)
+# the 0.91" 128 x 32 OLED module HS91L02W2C01 (HS, LCSC C5248081; its outline drawing rev A1 2020-04-11, read 2026-11-08):
+# PCB 38.00 x 12.00, 4 holes 1.00 mm at 2.54 (GND, VCC, SCL, SDA) 1.50 from one short edge, GND 2.19 from the long edge;
+# the panel 30.00 x 11.56 from 5.50, the viewing area 24.38 x 7.58 from 6.60, the active area 22.38 x 5.58 from 7.62
+# (along the length, from the pin edge); across, measured on the sheet (no figure): VA 3.2 .. 10.7, AA 4.2 .. 9.7 from the
+# GND side. 2.60 thick (glass 1.20). No mounting holes. Origin: pin 1 (GND), the module along +x, pins along +y.
+OLED_L, OLED_W, OLED_PIN_X, OLED_PIN_Y = 38.0, 12.0, 1.5, 2.19
+OLED_AA = (7.62, 4.2, 30.0, 9.7)                 # (x0, y0, x1, y1 from the module's pin edge and GND side)
+
+
+def led_items():
+    out = [f'  (pad "{n}" smd rect (at {x:.3f} {y:.3f}) (size {LED_PAD[0]} {LED_PAD[1]}) (layers "F.Cu" "F.Paste" "F.Mask"))'
+           for n, (x, y) in LED_PADS.items()]
+    bx, by = LED_BODY[0] / 2, LED_BODY[1] / 2
+    out += [rect(-bx, -by, bx, by, "F.Fab", 0.1), rect(-3.2, -by - 0.3, 3.2, by + 0.3, "F.CrtYd", 0.05),
+            line(-bx, -by - 0.2, bx, -by - 0.2, "F.SilkS", 0.12), line(-bx, by + 0.2, 0.6, by + 0.2, "F.SilkS", 0.12),
+            line(0.6, by + 0.2, bx, by - 0.5, "F.SilkS", 0.12)]   # (the GND corner cut, as on the sheet)
+    return out
+
+
+def oled_items():
+    out = [pth(str(i + 1), 0.0, 2.54 * i, 1.7, 1.0, "rect" if i == 0 else "circle") for i in range(4)]
+    x0, y0 = -OLED_PIN_X, -OLED_PIN_Y
+    a = OLED_AA
+    out += [rect(x0, y0, x0 + OLED_L, y0 + OLED_W, "F.Fab", 0.1),
+            rect(x0 + 5.5, y0 + 0.22, x0 + 35.5, y0 + 11.78, "F.Fab", 0.1),
+            rect(x0 + a[0], y0 + a[1], x0 + a[2], y0 + a[3], "F.Fab", 0.1),
+            rect(x0, y0, x0 + OLED_L, y0 + OLED_W, "F.SilkS", 0.12),
+            rect(-1.25, -1.25, 1.25, 8.87, "F.CrtYd", 0.05)]   # (the courtyard: the header only; the module floats above)
     return out
 
 
@@ -231,6 +307,21 @@ def write():
         " both fronts on the edge; the jack's pads T, R, S on their own nets, its switch pin SW open",
         [text("Reference", "REF**", 0, -HY_D - 2.5, "F.SilkS"), text("Value", "DIN or TRS", 0, -9, "F.Fab"),
          *din_pj_items()])
+    files["MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom"] = footprint(
+        "MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom",
+        "One MIDI OUT, both fitted (v5): the 3.5 mm jack XKB PJ-320A on the top, its front on the edge, and the DIN-5 HOOYA"
+        " DIN-504B-M10 on the bottom on the same axis, its plate 1.0 behind the edge; the jack's pads T, R, S on their own nets",
+        [text("Reference", "REF**", 0, -HY_D - 3.5, "F.SilkS", True), text("Value", "TRS + DIN", 0, -9, "F.Fab"),
+         *v5_items()])
+    files["LED_SK6812MINI-HS_3.7x3.5mm_HandSolder"] = footprint(
+        "LED_SK6812MINI-HS_3.7x3.5mm_HandSolder",
+        "Addressable RGB LED OPSCO SK6812MINI-HS, 3.7 x 3.5 x 1.95 mm, top emitting (datasheet rev B/0); pads lengthened outward",
+        [text("Reference", "REF**", 0, -2.8, "F.SilkS", True), text("Value", "SK6812MINI-HS", 0, 2.8, "F.Fab"), *led_items()], "smd")
+    files["OLED_0.91in_128x32_I2C_HS91L02W2C01"] = footprint(
+        "OLED_0.91in_128x32_I2C_HS91L02W2C01",
+        "0.91 inch 128 x 32 OLED module HS91L02W2C01 (SSD1306, I2C), on a 1 x 4 2.54 mm header: 1 GND, 2 VCC, 3 SCL, 4 SDA;"
+        " module 38 x 12 mm drawn on F.Fab / F.SilkS (it floats over the board on its header)",
+        [text("Reference", "REF**", 3.0, -3.2, "F.SilkS", True), text("Value", "OLED 0.91", 18.0, 3.8, "F.Fab"), *oled_items()])
     for old in ("Jack_3.5mm_Thonkiconn_PJ366ST_Vertical", "MIDI_OUT_SDS-50J_or_PJ366ST"):   # (the vertical jack, replaced)
         if os.path.exists(os.path.join(LIB, old + ".kicad_mod")):
             os.remove(os.path.join(LIB, old + ".kicad_mod"))
