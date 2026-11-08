@@ -39,8 +39,8 @@ a jack on OUT4: 3 DIN, 1 jack, 1 A/B switch).
 | LED1, LED2 | 2 | RGB LED SK6812MINI-E, 3.2 x 2.8 mm, reverse mount | OPSCO SK6812MINI-E | LCSC C5149201 | USD 0.0814 | 5 |
 | R11, R12, R13, R14 | 4 | Resistor 10 ohm 1% 0.25 W axial (6.3 x 2.4 mm), standing (RC, data) | YAGEO MFR-25FBF52-10R | LCSC C1365579 | USD 0.0205 | 50 |
 | R21, R22, R23, R24 | 4 | Resistor 33 ohm 1% 0.5 W axial (9 x 3.2 mm), standing (RA, source) | CCO MF1/2W-33R 1% T | LCSC C119401 | USD 0.0241 | 20 |
-| J2, J3, J4, J5 | 4 | 3.5 mm stereo jack, right angle, plug from the front (no switch) | CUI SJ1-3523N | LCSC C20182914 | USD 1.4889 | 1 |
-| J6, J7, J8, J9 | 4 | DIN-5 180 degree, PCB right angle | CUI SDS-50J | LCSC C6216157 | USD 4.3104 | 1 |
+| J2, J3, J4, J5 | 4 | 3.5 mm stereo jack, right angle, plug from the front, 4 pins (its switch pin left open) | XKB PJ-320A | LCSC C2884926 | USD 0.1458 | 5 |
+| J6, J7, J8, J9 | 4 | DIN-5 180 degree, PCB right angle, 7 pins, no locating pegs | HOOYA DIN-504B-M10 | LCSC C2939346 | USD 0.3764 | 5 |
 
 Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, not parts.
 
@@ -48,8 +48,8 @@ Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, n
 
 | Build | Parts at unit price | With each shop's minimum order |
 |---|---|---|
-| 4 x TRS (no DIN), 4 A/B switches | USD 18.98 | USD 31.32 |
-| 4 x DIN (no TRS), no A/B switch | USD 29.87 | USD 42.11 |
-| DDDT: DIN on OUT1..OUT3, TRS on OUT4, 1 A/B switch | USD 27.15 | USD 39.79 |
+| 4 x TRS (no DIN), 4 A/B switches | USD 13.61 | USD 26.10 |
+| 4 x DIN (no TRS), no A/B switch | USD 14.13 | USD 26.75 |
+| DDDT: DIN on OUT1..OUT3, TRS on OUT4, 1 A/B switch | USD 14.00 | USD 27.98 |
 
 USD: LCSC and Seeed (the XIAO). The bare board is ordered at JLCPCB with another board and is not in these totals.

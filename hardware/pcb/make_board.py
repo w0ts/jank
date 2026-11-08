@@ -11,9 +11,9 @@ OUT2 on the front edge, OUT3 and OUT4 on the side edges, no A/B switches, no MID
 Then make_fab.sh checks it (DRC, the schematic's nets) and writes the JLCPCB files.
 
 The long board (the user's rulings, 2026-11-08): 2 layers, 84 x 52 mm. Each output is one footprint holding a DIN-5
-(SDS-50J) and a 3.5 mm TRS (CUI SJ1-3523N, right angle) at the same place, both fronts flush with the edge, one of the
-two fitted, with a TRS A/B slide switch (MSS22D18) on the face side. The FRONT edge carries OUT2, OUT3, OUT4 at the
-20.5 mm pitch (the DIN's 20.0 face + 0.5), slid to the left edge. The BACK edge carries, left to right: OUT1 (the same
+(HOOYA DIN-504B-M10) and a 3.5 mm jack (XKB PJ-320A, right angle) at the same place, both fronts flush with the edge, one of the
+two fitted, with a TRS A/B slide switch (MSS22D18) on the face side. The FRONT edge carries OUT4, OUT3, OUT2 (seen from
+the top) at a 21.1 mm pitch (the DIN plate 20.9 wide), slid to the left edge. The BACK edge carries, left to right: OUT1 (the same
 footprint turned 180 degrees; OUT1 doubles as a MIDI IN in software: an H11L1 behind an N-FET gate, U4 / Q3 in the front
 right corner; its source from 3V3 through Q4, off in IN mode), the XIAO's own USB-C (the data port; the module on 2.54 mm
 headers, its socket 1.5 mm over the edge) and J1 (power only). The bottom is the device's FACE (the box's lid): the four
@@ -204,12 +204,13 @@ def front_unit(k, c, H):
     """one output on the front edge, as on the round-5 board: the combined footprint on the edge, its two resistor groups
     behind it, the A/B switch between them (face side); returns its TX via"""
     D = H - 51.0
-    j = place(JANK, "MIDI_OUT_SDS-50J_or_SJ1-3523N_AB", f"J{5 + k}", "DIN or TRS", c, H, 0)
+    j = place(JANK, "MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB", f"J{5 + k}", "DIN or TRS", c, H, 0)
     ta = cluster((f"R1{k}", f"JP1{k}", f"R3{k}"), (f"MIDI_TX{k}", f"TIP{k}"), c - 6.2, 25.07 + D, "v", AX0207, "10", 2.8, 2.9)
     tb = cluster((f"R2{k}", f"JP2{k}", f"R4{k}"), ("+3V3", f"RING{k}"), c + 4.3, 25.07 + D, "v", AX0309, "33", 3.1, 3.3)
     sw = place(JANK, "SW_Slide_DPDT_MSS22D18", f"SW{1 + k}", "TRS A/B", c - 1.7, 31.0 + D, 270, True)   # (face side)
     din5, din4 = at(j, "5", (c - 5, H - 15)), at(j, "4", (c + 5, H - 15))
-    jt, jr = at(j, "T", (c + 5, H - 8.5)), at(j, "R", (c - 5, H - 8.5))   # (the SJ1-3523N: tip right, ring left)
+    jt, jr = at(j, "T", (c - 2.3, H - 10.2)), at(j, "R", (c - 2.3, H - 3.2))   # (the PJ-320A: its pad column left)
+    solid(j, "S")                                  # (the jack's sleeve slot: no room for spokes)
     s_ = {n: at(sw, n) for n in range(1, 7)}
     # TIP = 10 ohm group -> DIN 5, RING = 33 ohm group -> DIN 4 (top); the switch: 1 RING, 2 JR, 3 TIP | 4 TIP, 5 JT, 6 RING
     route(f"TIP{k}", [ta["B"], (ta["B"][0], 27.6 + D), (din5[0], 28.6 + D), din5])
@@ -218,8 +219,10 @@ def front_unit(k, c, H):
     route(f"RING{k}", [tb["B"], (tb["B"][0], 27.6 + D), (din4[0], 28.6 + D), din4])
     route(f"RING{k}", [(din4[0], s_[6][1]), s_[6]])
     route(f"RING{k}", [(c + 1.2, tb["B"][1]), s_[1]])
-    route(f"JT{k}", [s_[5], (c + 3.0, s_[5][1] + 1.3), (c + 3.0, H - 11.4), (jt[0], H - 9.6), jt], SIG, BOT)
-    route(f"JR{k}", [s_[2], (c - 3.0, s_[2][1] + 1.3), (c - 3.0, H - 11.4), (jr[0], H - 9.6), jr], SIG, BOT)
+    # JT round the jack's sleeve pad (between it and DIN pin 4), JR down the left of the jack's pad column (bottom)
+    route(f"JT{k}", [s_[5], (c + 3.0, s_[5][1] + 0.8), (c + 3.4, s_[5][1] + 2.0), (c + 3.4, H - 9.8), (jt[0] + 0.6, H - 9.8),
+                     jt], SIG, BOT)
+    route(f"JR{k}", [s_[2], (c - 3.4, s_[2][1] + 1.7), (c - 3.4, H - 4.6), jr], SIG, BOT)
     route("+3V3", [(tb["A"][0], 22.3 + D), tb["A"]], BUS)
     v = (ta["A"][0] - 1.4, ta["A"][1])               # (the TX via on the 10 ohm group's A line, left of the axial part)
     via(f"MIDI_TX{k}", *v)
@@ -237,8 +240,9 @@ def layout_long():
     W, H = 84.0, 52.0
     D = H - 51.0
     BUS_Y = 22.3 + D                                 # (the 3V3 bus to the front 33 ohm groups, top)
-    CH = [10.75 + PITCH * i for i in range(3)]       # (the front DINs' axes, left to right seen from the top: OUT4, OUT3,
-                                                     #  OUT2, so that from the face they read 2, 3, 4; the faces 0.75 mm in)
+    CH = [10.45 + 21.1 * i for i in range(3)]       # (the front DINs' axes, left to right seen from the top: OUT4, OUT3,
+                                                     #  OUT2, so that from the face they read 2, 3, 4; pitch 21.1: the HOOYA DIN plate is
+                                                     #  20.9 +/-0.1 wide; OUT4's plate flush with the left edge)
     C1X = 10.75                                      # (OUT1 on the back edge, behind OUT4)
     XC = 45.2                                        # (the XIAO's axis)
     JX = 64.5                                        # (J1's axis)
@@ -254,12 +258,13 @@ def layout_long():
 
     # ---- OUT1: the combined footprint turned 180 (its faces on the back edge), its groups in front of it
     F1 = ((C1X, 0.0), 180)
-    J6 = place(JANK, "MIDI_OUT_SDS-50J_or_SJ1-3523N_AB", "J6", "DIN or TRS", C1X, 0.0, 180)
+    J6 = place(JANK, "MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB", "J6", "DIN or TRS", C1X, 0.0, 180)
     ta1 = cluster(("R11", "JP11", "R31"), ("MIDI_TX1", "TIP1"), -6.2, -19.0, "v", AX0207, "10", 2.8, 2.9, F1)
     tb1 = cluster(("R21", "JP21", "R41"), ("SRC1", "RING1"), 4.3, -19.0, "v", AX0309, "33", 3.1, 3.3, F1)
     SW2 = place(JANK, "SW_Slide_DPDT_MSS22D18", "SW2", "TRS A/B", 23.5, 10.5, 270, True)   # (face side, in the strip)
     d5, d4 = at(J6, "5", (C1X + 5, 15.0)), at(J6, "4", (C1X - 5, 15.0))
-    jt1, jr1 = at(J6, "T", (C1X - 5, 8.5)), at(J6, "R", (C1X + 5, 8.5))
+    jt1, jr1 = at(J6, "T", (C1X + 2.3, 10.2)), at(J6, "R", (C1X + 2.3, 3.2))
+    solid(J6, "S")
     s = {n: at(SW2, n) for n in range(1, 7)}
     X, Y = s[2]
     route("TIP1", [ta1["B"], d5])
@@ -268,12 +273,12 @@ def layout_long():
     route("RING1", [tb1["B"], d4])
     route("RING1", [d4, (d4[0] + 1.6, 16.6), (s[6][0], 16.6), s[6]], SIG, BOT)   # (bottom: under the groups' B side)
     route("RING1", [s[1], (X, 6.4), (X + 5.0, 6.4), (X + 5.0, s[6][1]), s[6]])   # (top: round the switch's right row)
-    route("JR1", [s[2], (16.5, s[2][1]), (jr1[0], 9.75), jr1], SIG, BOT)
-    route("JT1", [s[5], (X + 1.7, 9.25), (X - 1.5, 9.25), (X - 2.5, 10.5), (6.8, 10.5), jt1])
+    route("JR1", [s[2], (16.5, s[2][1]), (14.4, 8.4), (14.4, 4.4), jr1], SIG, BOT)
+    route("JT1", [s[5], (X + 1.7, 9.25), (X - 1.5, 9.25), (X - 2.5, 10.5), (jt1[0] + 0.6, 10.5), jt1])
     # RING1 and TIP1 on to the MIDI IN (the front right corner): down the strip's left side, then along y 22.15 / 22.65
     via("RING1", 21.6, 16.6)
     route("RING1", [(21.6, 16.6), (21.6, 22.15), (62.9, 22.15)])
-    route("TIP1", [(20.95, d5[1]), (20.95, 22.65), (61.0, 22.65)])
+    route("TIP1", [(20.95, d5[1]), (20.95, 22.65), (61.6, 22.65)])
     # TX1: the XIAO's D0 (pad 1) on the bottom down the strip's right side to the 10 ohm group's A pad
     route("MIDI_TX1", [p[1], (35.4, p[1][1]), (35.4, ta1["A"][1]), ta1["A"]], SIG, BOT)
     # OUT1's source: Q4 (face side, between OUT1's groups), 3V3 to SRC1, its gate on IN_EN: IN_EN high = source off
@@ -491,7 +496,7 @@ def layout_long():
     U4 = place(K("Package_DIP"), "DIP-6_W7.62mm", "U4", "H11L1", 65.9, 29.5, 0)
     R50 = place(K("Resistor_SMD"), R0805, "R50", "220", 65.0, 26.2, 0)
     D2 = place(K("Diode_SMD"), "D_SOD-123", "D2", "1N4148W", 63.4, 30.6, 270)
-    Q3 = place(K("Package_TO_SOT_SMD"), "SOT-23", "Q3", "AO3400A", 64.3, 38.8, 0)
+    Q3 = place(K("Package_TO_SOT_SMD"), "SOT-23", "Q3", "AO3400A", 65.4, 38.8, 0)
     R52 = place(K("Resistor_SMD"), R0805, "R52", "1k", 63.4, 35.1, 270)
     R53 = place(K("Resistor_SMD"), R0805, "R53", "100k", 69.0, 38.9, 270)
     R51 = place(K("Resistor_SMD"), R0805, "R51", "4.7k", 74.9, 25.4, 270)
@@ -502,11 +507,11 @@ def layout_long():
     route("OPTO_A", [at(D2, 1), w[1]])
     route("OPTO_K", [at(D2, 2), w[2]])
     route("OPTO_K", [w[2], (67.2, 33.0), (67.2, 38.0), at(Q3, 3)])
-    route("TIP1", [(61.0, 22.65), (61.0, at(Q3, 2)[1]), at(Q3, 2)])
+    route("TIP1", [(61.6, 22.65), (61.6, at(Q3, 2)[1]), at(Q3, 2)])
     route("IN_G", [at(R52, 2), at(Q3, 1)])
-    route("IN_EN", [(69.0, 22.5), (69.0, 33.3), (62.1, 33.3)], SIG, BOT)
-    via("IN_EN", 62.1, 33.3)
-    route("IN_EN", [(62.1, 33.3), at(R52, 1)])
+    route("IN_EN", [(69.0, 22.5), (69.0, 33.3), (62.4, 33.3)], SIG, BOT)
+    via("IN_EN", 62.4, 33.3)
+    route("IN_EN", [(62.4, 33.3), at(R52, 1)])
     route("IN_EN", [(69.0, 33.3), (69.0, 36.9)], SIG, BOT)
     via("IN_EN", 69.0, 36.9)
     route("IN_EN", [(69.0, 36.9), at(R53, 1)])
