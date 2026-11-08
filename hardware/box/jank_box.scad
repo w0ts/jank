@@ -18,17 +18,18 @@
 // Every number marked UNVERIFIED is from a drawing or an estimate, not from a part in hand (README "Unverified").
 
 /* [What to render] */
+sj = 0;                 // the side jack a brace_side_* check looks at
 part = "assembly";      // [assembly, box, lid, front_test, mock, open, front, back, lid_top, check_box, check_lid, check_lidbox, check_drop, check_board_drop, check_text, brace_pull, brace_push, brace_trs, brace_floor, brace_lid, brace_ledge]
 
 /* [Board v5: hardware/pcb/README.md "The layout (v5)", "For the box"] */
 board_l = 84.0;
-board_w = 67.0;
+board_w = 79.5;         // the modular board (jank-pcb-mod): v5 + a 12.5 mm band in front of the screen row
 board_t = 1.6;          // UNVERIFIED: JLCPCB default
 ch_x = [10.75, 10.45, 31.55, 52.65];     // OUT1..OUT4 axes, KiCad x
 ch_back = [true, false, false, false];   // OUT1 on the back edge
-holes = [[80.8, 3.2], [80.8, 63.8], [3.2, 26.0], [3.2, 34.0]];   // H1..H4 (2.2 mm), KiCad x, y from the back
+holes = [[80.8, 3.2], [80.8, 76.3], [3.2, 26.0], [3.2, 34.0]];   // H1..H4 (2.2 mm), KiCad x, y from the back
 buttons = [[69.15, 25.45], [78.75, 25.45]];   // BACK (SW6), OK (SW1): HRO K2-1102DP-L3SW-04, 9.5 mm
-enc = [73.9, 36.5];     // encoder shaft
+enc = [73.9, 38.7];     // encoder shaft (v5b: 2.2 mm forward)
 enc_hole = 7.0;
 oled_win = [45.0, 28.55, 24.4, 7.6];     // centre x, y, size x, y (the viewing area)
 oled = [25.8, 63.8, 23.5, 35.5];         // the module: x0, x1, y0, y1 (pins at the x1 end)
@@ -37,7 +38,7 @@ oled_glass_x0 = 28.3;                    // the panel starts 5.5 + 30 mm from th
 led = [33.0, 4.2];
 led_win = [3.5, 3.7];
 led_h = 1.95;
-ab = [[24.3, 9.0], [10.45, 48.0], [31.55, 48.0], [52.65, 48.0]];   // SW2..SW5 (OUT1..OUT4) slot centres
+ab = [[24.3, 9.0], [10.45, 60.5], [31.55, 60.5], [52.65, 60.5]];   // SW2..SW5 (OUT1..OUT4) slot centres
 /* the printed caps (the user's answer 2026-11-08: "we can 3D print something") */
 btn_cap = [5.4, 8.0, 1.0, 3.45, 3.0, 0.3];   // stem dia, flange dia, flange thickness, bore (plunger 3.4), proud of
                                              // the lid, flange gap under the lid at rest
@@ -83,11 +84,12 @@ cap_wall = 1.6;
 cap_stop = 1.6;         // the lid's jack cap stops this far above the board: the DINs' legs (1.5) stand there
 
 /* [Box] */
-wall = 2.0;             // side walls
+wall = 1.8;             // side walls: the side jacks' 2.0 mm bushings stand 0.1 proud, as on the front
+side_jacks = [[0, 39.85, "CLK"], [0, 46.55, "RST"], [1, 53.8, "CLK"], [1, 60.5, "RST"]];   // [0 left / 1 right, y, label]
 conn_t = 1.8;           // front and back walls above the board: the jack's 2.0 mm bushing stands 0.1 proud
 edge_gap = 0.1;
 floor_t = 2.0;
-side_clr = 0.3;
+side_clr = 0.1;         // the side jacks' fronts are on the board's side edges, as the front ones on theirs
 contact = 0.05;
 face_h = 7.2;           // the board's top to the lid's inside: the XIAO's 7.0 + 0.2
 lid_t = 1.5;
@@ -136,6 +138,13 @@ function ky(y) = Ybk - y;
 function chx(k) = kx(ch_x[k]);
 encC = [kx(enc[0]), ky(enc[1])];
 
+// a side jack's frame: origin on the side edge at its axis, +y into the board
+module at_side(j) { s = side_jacks[j];
+    if (s[0] == 0) translate([X0 - side_clr + edge_gap, ky(s[1]), 0]) rotate([0, 0, -90]) children();
+    else translate([X0 + board_l + side_clr - edge_gap, ky(s[1]), 0]) rotate([0, 0, 90]) children(); }
+module jack_cut() {     // a jack's U-slot through its wall
+    translate([0, 0, Zb + bush_z]) xz_extrude(-edge_gap - conn_t - 1, conn_t + 1 + edge_gap + 0.01) uslot2d(bush_slot, H);
+}
 module at_ch(k) { if (ch_back[k]) translate([chx(k), Ybk, 0]) mirror([0, 1, 0]) children();
                   else translate([chx(k), Y0, 0]) children(); }
 module xz_extrude(y0, len) { translate([0, y0 + len, 0]) rotate([90, 0, 0]) linear_extrude(len) children(); }
@@ -149,7 +158,7 @@ module uslot2d(d, up) { union() { circle(d = d); translate([-d / 2, 0]) square([
 // and the OLED redrawn (the mockup draws them as full-height blocks).
 module mock_m() {       // mockup frame: x 100..184, y -167 (front) .. -100 (back)
     difference() {
-        import("../pcb/mockup.stl", convexity = 10);
+        import("../pcb/mockup-mod.stl", convexity = 10);
         for (b = buttons) translate([100 + b[0] - 4.9, -100 - b[1] - 3.9, 1.5]) cube([9.8, 7.8, 10]);
         for (s = ab) translate([100 + s[0] - 2.85, -100 - s[1] - 4.9, 1.5]) cube([5.7, 9.8, 5.2]);
         translate([125.7, -135.6, 4.0]) cube([38.2, 12.2, 2.8]);
@@ -166,7 +175,7 @@ module mock_m() {       // mockup frame: x 100..184, y -167 (front) .. -100 (bac
     translate([100 + oled[0], -100 - oled[3], 1.6 + oled_z[0]]) cube([oled[1] - oled[0], oled[3] - oled[2], oled_z[1] - oled_z[0]]);
     translate([100 + oled_glass_x0, -100 - oled[3] + 0.22, 1.6 + oled_z[1] - 0.01]) cube([30.0, 11.56, oled_z[2] - oled_z[1] + 0.01]);
 }
-module mock() { translate([X0 - 100, Y0 + 167, Zbot]) mock_m(); }
+module mock() { translate([X0 - 100, Y0 + 100 + board_w, Zbot]) mock_m(); }
 
 // ---------------------------------------------------------------------------------------------------------------
 // local frame of a channel: origin on the board's edge at the axis, +y into the board
@@ -194,6 +203,14 @@ module lid_cap() {      // hangs from the lid round the jack's body: its back st
     difference() {
         translate([-w, 0, Zb + cap_stop]) cube([2 * w, yb, Zl - Zb - cap_stop + 0.01]);
         translate([-jack[0] / 2 - jack_play, -1, Zb - 1]) cube([jack[0] + 2 * jack_play, jack[1] + jack_play + 1, jack[2] + jack_play + 1]);
+    }
+}
+module side_caps() {    // the side jacks' caps, one block per wall round both its jacks (they are 6.7 apart)
+    w = jack[0] / 2 + jack_play + cap_wall; yb = jack[1] + jack_play + cap_wall;
+    for (side = [0, 1]) difference() {
+        hull() for (j = [0 : 3]) if (side_jacks[j][0] == side) at_side(j) translate([-w, 0, Zb + cap_stop]) cube([2 * w, yb, Zl - Zb - cap_stop + 0.01]);
+        hull() for (j = [0 : 3]) if (side_jacks[j][0] == side) at_side(j)
+            translate([-jack[0] / 2 - jack_play, -1, Zb - 1]) cube([jack[0] + 2 * jack_play, jack[1] + jack_play + 1, jack[2] + jack_play + 1]);
     }
 }
 module lid_ribs() {     // press the board's edge onto the DIN pad, beside the jack
@@ -229,6 +246,7 @@ module box() {
             for (h = holes) standoff(h);
         }
         for (k = [0 : 3]) at_ch(k) ch_cut();
+        for (j = [0 : 3]) at_side(j) jack_cut();
         usb_cut(usb_xiao);
         usb_cut(usb_j1);
         // J1's shell legs stand 0.55 past the back edge under the board (mockup): a relief in the wall's inside
@@ -257,9 +275,18 @@ function wall_labels() = concat(
     [for (k = [1 : 3]) [str(k + 1), chx(k) + bush_slot / 2 + mark_gap, Zb + 1.0, 0, "left"]],
     [["1 / IN", chx(0) + bush_slot / 2 + mark_gap, Zb + 1.0, 1, "right"],
      ["USB", kx(usb_xiao[0]), Zb + usb_xiao[1] - usb_open[1] / 2 - mark_gap - capH(mark_size), 1, "center"],
-     ["PWR", kx(usb_j1[0]), Zb + usb_j1[1] - usb_open[1] / 2 - mark_gap - capH(mark_size), 1, "center"]]);
+     ["PWR", kx(usb_j1[0]), Zb + usb_j1[1] - usb_open[1] / 2 - mark_gap - capH(mark_size), 1, "center"]],
+    // the side walls: each label beyond its own slot, away from the other jack of the pair. On the left wall the text
+    // runs towards the front (-Y), on the right towards the back (+Y): Y is the anchor along the wall
+    [for (j = [0 : 3]) let(s = side_jacks[j], other = side_jacks[j % 2 == 0 ? j + 1 : j - 1],
+                          away = ky(s[1]) > ky(other[1]) ? 1 : -1,          // +1: this jack is the one nearer the back
+                          y = ky(s[1]) + away * (bush_slot / 2 + mark_gap),
+                          hal = (s[0] == 0) == (away > 0) ? "right" : "left")
+        [s[2], y, Zb + 1.0, 2 + s[0], hal]]);
 module wall_label(l, depth, grow = 0) {
-    if (l[3] == 0) translate([l[1], depth, l[2]]) rotate([90, 0, 0]) linear_extrude(depth + 1)
+    if (l[3] >= 2) translate([l[3] == 2 ? depth : L - depth, l[1], l[2]]) rotate([0, 0, l[3] == 2 ? -90 : 90]) rotate([90, 0, 0])
+        linear_extrude(depth + 1) offset(r = grow) text(l[0], size = mark_size, font = mark_font, halign = l[4], valign = "baseline");
+    else if (l[3] == 0) translate([l[1], depth, l[2]]) rotate([90, 0, 0]) linear_extrude(depth + 1)
         offset(r = grow) text(l[0], size = mark_size, font = mark_font, halign = l[4], valign = "baseline");
     else translate([l[1], W - depth, l[2]]) rotate([90, 0, 180]) linear_extrude(depth + 1)
         offset(r = grow) text(l[0], size = mark_size, font = mark_font, halign = l[4], valign = "baseline");
@@ -281,6 +308,8 @@ module lid() {          // in place
         union() {
             translate([0, 0, Zl]) cube([L, W, lid_t]);
             for (k = [0 : 3]) at_ch(k) { lid_key(); lid_cap(); lid_ribs(); }
+            for (j = [0 : 3]) at_side(j) lid_key();
+            side_caps();
             usb_tongue(usb_xiao);
             usb_tongue(usb_j1);
             for (h = holes) translate([kx(h[0]), ky(h[1]), Zb + contact]) cylinder(d = spacer_d, h = Zl - Zb - contact + 0.01);
@@ -407,7 +436,16 @@ else if (part == "check_text") {
             translate([0, 0, -1]) linear_extrude(H + 2) lid_openings2d();
         }
         intersection() {
-            for (l = wall_labels()) wall_label(l, 3, mark_clear);
+            for (l = wall_labels()) if (l[3] >= 2) wall_label(l, 3, mark_clear);
+            union() {
+                for (j = [0 : 3]) at_side(j) jack_cut();
+                translate([-1, -1, Zl - 0.5]) cube([L + 2, W + 2, 20]);
+                translate([-1, -1, -1]) cube([L + 2, W + 2, 1.5]);
+                for (y = [-10, W - 0.5]) translate([-1, y, -1]) cube([L + 2, 10.5, H + 2]);
+            }
+        }
+        intersection() {
+            for (l = wall_labels()) if (l[3] < 2) wall_label(l, 3, mark_clear);
             union() {
                 for (k = [0 : 3]) at_ch(k) ch_cut();
                 usb_cut(usb_xiao); usb_cut(usb_j1);
@@ -427,11 +465,14 @@ else if (part == "lid_top") {
 else if (part == "brace_pull") intersection() { box(); for (k = [0 : 3]) at_ch(k) translate([0, -(edge_gap + 0.05), 0]) { din_model(); jack_body(); } }
 else if (part == "brace_push") intersection() { box(); for (k = [0 : 3]) at_ch(k) translate([0, din_back_gap + 0.05, 0]) din_model(); }
 else if (part == "brace_trs") intersection() { lid(); for (k = [0 : 3]) at_ch(k) translate([0, jack_play + 0.05, 0]) jack_body(); }
+// must NOT be empty, for each side jack sj (0..3): pulled out it meets its wall, pushed in the lid's cap
+else if (part == "brace_side_pull") intersection() { box(); at_side(sj) translate([0, -(edge_gap + 0.05), 0]) jack_body(); }
+else if (part == "brace_side_push") intersection() { lid(); at_side(sj) translate([0, jack_play + 0.05, 0]) jack_body(); }
 else if (part == "brace_floor") intersection() { box(); for (k = [0 : 3]) at_ch(k) translate([0, 0, -(din_floor_gap + 0.05)]) din_model(); }
 else if (part == "brace_lid") intersection() { lid(); board_slab(contact + 0.05); }
 else if (part == "brace_ledge") intersection() { box(); board_slab(-(contact + 0.05)); }
 else if (part == "open") { color("SteelBlue") box(); color("DarkGreen") mock(); color("LightSteelBlue") translate([0, 0, 30]) lid(); }
 else if (part == "front" || part == "back") { color("SteelBlue") box(); color("LightSteelBlue") lid(); color("DarkGreen") mock(); }
 else { color("SteelBlue", 0.5) box(); color("LightSteelBlue", 0.35) lid(); color("DarkGreen") mock(); }
-echo(str("jank box v5: outer ", L, " x ", W, " x ", H, " mm (X x Y x Z, lid included); board bottom at Z ", Zbot,
+echo(str("jank box (modular): outer ", L, " x ", W, " x ", H, " mm (X x Y x Z, lid included); board bottom at Z ", Zbot,
          ", top ", Zb, ", lid underside ", Zl));

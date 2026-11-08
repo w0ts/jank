@@ -33,14 +33,20 @@ for c in check_box check_lid check_lidbox check_drop check_board_drop check_text
         echo "$c FAILED ($([ $empty = 1 ] && echo empty || echo not empty)); render part=\"$c\" in OpenSCAD to see where"; tail -3 "$LOG"; fail=1
     fi
 done
-grep -o "jank box v5: outer [^\"]*" "$LOG" || true
+for c in brace_side_pull brace_side_push; do for j in 0 1 2 3; do
+    O -D "part=\"$c\"" -D "sj=$j" -o "$OUT/.check-$c.stl" "$SCAD" >"$LOG" 2>&1 || true
+    if grep -q "top level object is empty" "$LOG"; then echo "$c $j FAILED (empty)"; fail=1; else echo "$c $j ok (contact)"; fi
+done; done
+grep -o "jank box (modular): outer [^\"]*" "$LOG" || true
 R() { O --render --colorscheme=Tomorrow "$@" >/dev/null 2>&1 || fail=1; }
-R --imgsize=1400,900 --camera=44,35,14,55,0,330,220 -D 'part="open"' -o "$HERE/renders/open.png" "$SCAD"
+R --imgsize=1400,900 --camera=44,42,14,55,0,330,240 -D 'part="open"' -o "$HERE/renders/open.png" "$SCAD"
 R --imgsize=1400,800 --camera=44,0,18,90,0,0,160 -D 'part="front"' -o "$HERE/renders/front.png" "$SCAD"
-R --imgsize=1400,800 --camera=44,70,18,90,0,180,160 -D 'part="back"' -o "$HERE/renders/back.png" "$SCAD"
-R --imgsize=1400,900 --camera=44,35,14,55,0,330,220 -D 'part="box"' -o "$HERE/renders/box.png" "$SCAD"
-R --imgsize=1400,900 --camera=44,35,0,35,0,25,190 -D 'part="lid"' -o "$HERE/renders/lid_underside.png" "$SCAD"
-R --imgsize=1400,1100 --camera=44.3,35.4,0,0,0,0,190 --projection=ortho -D 'part="lid_top"' -o "$HERE/renders/lid_top.png" "$SCAD"
-R --imgsize=1400,900 --camera=44,35,20,55,0,330,200 -D 'part="caps_view"' -o "$HERE/renders/caps.png" "$SCAD"
+R --imgsize=1400,800 --camera=44,83,18,90,0,180,160 -D 'part="back"' -o "$HERE/renders/back.png" "$SCAD"
+R --imgsize=1400,800 --camera=0,42,18,90,0,270,170 -D 'part="front"' -o "$HERE/renders/left.png" "$SCAD"
+R --imgsize=1400,800 --camera=88,42,18,90,0,90,170 -D 'part="front"' -o "$HERE/renders/right.png" "$SCAD"
+R --imgsize=1400,900 --camera=44,42,14,55,0,330,240 -D 'part="box"' -o "$HERE/renders/box.png" "$SCAD"
+R --imgsize=1400,900 --camera=44,42,0,35,0,25,220 -D 'part="lid"' -o "$HERE/renders/lid_underside.png" "$SCAD"
+R --imgsize=1400,1100 --camera=43.9,41.65,0,0,0,0,230 --projection=ortho -D 'part="lid_top"' -o "$HERE/renders/lid_top.png" "$SCAD"
+R --imgsize=1400,900 --camera=44,42,20,55,0,330,230 -D 'part="caps_view"' -o "$HERE/renders/caps.png" "$SCAD"
 python3 "$HERE/../check_stl.py" "$OUT"/jank_box_*.stl || fail=1
 exit $fail
