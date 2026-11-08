@@ -232,6 +232,34 @@ for k in range(1, 5):
          x0 + 66.04, 231.14, {"5": f"TIP{k}", "4": f"RING{k}", "2": "GND"}),
     ]
 
+# ---- the modular variant (MODULAR=1: jank-pcb-mod.*, the user's ruling 2026-11-08): CLOCK and RESET 3.5 mm mono outputs on
+# both side walls, from a PCF8574 I2C expander (0x20, on the OLED's bus) through 5 V buffers, 1 k and a BAT54S clamp each
+MODULAR = os.environ.get("MODULAR") == "1"
+MOD_OUT = (("CLK_L", "CLKL_IN", "CLKL_B", "U6", "R72", "D3", "J11", "C13"), ("RST_L", "RSTL_IN", "RSTL_B", "U7", "R73", "D4", "J12", "C14"),
+           ("CLK_R", "CLKR_IN", "CLKR_B", "U8", "R74", "D5", "J13", "C15"), ("RST_R", "RSTR_IN", "RSTR_B", "U9", "R75", "D6", "J14", "C16"))
+if MODULAR:
+    NAME = "jank-pcb-mod"
+    PARTS += [
+        ("U5", "Interface_Expansion:PCF8574T", "PCF8574T", "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm", "pcf", 30.48, 396.24,
+         {"1": "GND", "2": "GND", "3": "GND", "4": "CLKL_IN", "5": "RSTL_IN", "6": "MOD_P2", "7": "MOD_P3", "8": "GND",
+          "9": "RSTR_IN", "10": "CLKR_IN", "11": "MOD_P6", "12": "MOD_P7", "14": "SCL", "15": "SDA", "16": "+3V3"}),
+        ("C12", "Device:C", "100nF", C0805, "c100n", 60.96, 396.24, {"1": "+3V3", "2": "GND"}),
+    ]
+    for i, (out, inp, buf, u, r, d, j, c) in enumerate(MOD_OUT):
+        x0 = 88.9 + 76.2 * i
+        PARTS += [
+            (u, "74xGxx:74AHCT1G125", "74AHCT1G125", "Package_TO_SOT_SMD:SOT-23-5_HandSoldering", "buf", x0, 396.24,
+             {"1": "GND", "2": inp, "3": "GND", "4": buf, "5": "+5V"}),
+            (c, "Device:C", "100nF", C0805, "c100n", x0, 411.48, {"1": "+5V", "2": "GND"}),
+            (r, "Device:R", "1k", R0805, "r1k", x0 + 17.78, 396.24, {"1": buf, "2": out}),
+            (d, "Diode:BAT54S", "BAT54S", "Package_TO_SOT_SMD:SOT-23", "bat54s", x0 + 30.48, 396.24, {"1": "GND", "2": "+5V", "3": out}),
+            (j, "Connector_Audio:AudioJack3", "3.5 mm mono " + out, "jank:Jack_3.5mm_XKB_PJ-320A_Horizontal", "trs", x0 + 45.72, 396.24,
+             {"T": out, "S": "GND"}),
+        ]
+    for k, n in enumerate(("MOD_P2", "MOD_P3", "MOD_P6", "MOD_P7")):
+        PARTS.append((f"TP{5 + k}", "Connector:TestPoint", n[4:], "TestPoint:TestPoint_Pad_D1.0mm", "", 406.4 + 12.7 * k, 411.48,
+                      {"1": n}))
+
 NOTES = [
     (20.32, 30.48, 2.0, "POWER IN: J1 power only (D+/D- not fitted). Q1 cut (on by default), U2 ideal diode onto the XIAO's 5V"),
     (20.32, 35.56, 1.27, "U2 ~CE tied to VOUT: the datasheet's ideal-diode mode (blocks current back into J1). The XIAO's 5V pin IS its USB-C VBUS (no part between,"),
@@ -260,6 +288,12 @@ NOTES.append((20.32, 264.16, 1.27, "Each MIDI resistor (and R8): axial, hand-swa
                                    " parallel, not fitted (lower the value). JP2k bridged = RING on 3V3 directly (JP21: on SRC1): a mono plug then shorts the rail."))
 NOTES.append((20.32, 194.31, 1.27, "On the board each pair is ONE footprint (J6..J9, jank:MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom: the jack's pads T, R, S"
                                    " carry J2..J5's nets, its switch pin SW open; the DIN's pins on the bottom). J2..J5 are BOM lines only."))
+
+if MODULAR:
+    NOTES.append((20.32, 383.54, 2.0, "MODULAR: CLOCK / RESET out, 3.5 mm mono, left and right side walls: PCF8574T (I2C 0x20, A0..A2 low) P0 CLK_L,"
+                                      " P1 RST_L, P5 CLK_R, P4 RST_R; P2 P3 P6 P7 spare on TP5..TP8"))
+    NOTES.append((20.32, 388.62, 1.27, "Each: 74AHCT1G125 on +5V (TTL input: the expander's 3.3 V high is enough), 1 k in series, BAT54S from the jack's"
+                                       " tip to GND and +5V; tip = signal, sleeve = GND, ring and switch open"))
 
 LABEL_ANGLE = {0: 180, 180: 0, 90: 270, 270: 90}   # (the label away from the body)
 LIB_IDS = sorted({p[1] for p in PARTS})
@@ -375,6 +409,11 @@ BOM = {
     "sw": dict(part="Tactile switch 6 x 6 mm, through hole, 9.5 mm tall, top side (OK, BACK)", mpn="HRO K2-1102DP-L3SW-04",
                shop=LCSC, code="C445493", price=0.0633, cur="USD", min=10,
                datasheet="https://datasheet.lcsc.com/datasheet/pdf/cba7e973dea59ba592ee1d81fd516f49.pdf?productCode=C445493"),
+    "pcf": dict(part="I2C GPIO expander, 8 bit, quasi-bidirectional, SOIC-16 wide (the modular variant: CLOCK / RESET; price: JLCPCB's parts list)",
+                mpn="NXP PCF8574T/3", shop=LCSC, code="C7605", price=2.0313, cur="USD", min=1,
+                datasheet="https://www.nxp.com/docs/en/data-sheet/PCF8574_PCF8574A.pdf"),
+    "bat54s": dict(part="Schottky pair in series BAT54S, SOT-23 (the modular outputs' clamp to GND and +5V; price: JLCPCB's parts list)", mpn="Nexperia BAT54S,215",
+                   shop=LCSC, code="C47546", price=0.0225, cur="USD", min=20),
     "buf": dict(part="Buffer 74AHCT1G125, SOT-23-5 (4.5 to 5.5 V)", mpn="TI SN74AHCT1G125DBVR", shop=LCSC, code="C7484",
                 price=0.1009, cur="USD", min=5),
     "swab": dict(part="Slide switch DPDT, 6 pins 2.5 mm, 9.1 x 3.5 mm, handle 1.5 mm (TRS type A / B), face side;"
@@ -416,16 +455,20 @@ def bom_md():
     for ref, _l, value, fp, key, *_ in PARTS:
         if key:
             groups.setdefault(key, []).append(ref)
-    lines = [f"# jank board: bill of materials", "",
+    lines = [f"# jank board{' (modular variant)' if MODULAR else ''}: bill of materials", "",
              f"Generated by `make_schematic.py`. One price each, read on {DATE} from the shop named, at its first price break,"
              " before VAT and shipping. LCSC prices come from LCSC's own product data (USD). Nothing here was ordered.", "",
              "v5: every output has BOTH connectors fitted, the 3.5 mm jack on the top and the DIN-5 on the bottom (in parallel,",
-             "plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B switches, the OLED, one LED.", "",
+             "plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B switches, the OLED, one LED."
+             + (" **Modular variant** (`jank-pcb-mod`): plus 4 mono jacks (CLOCK / RESET, both side walls), the PCF8574T, 4 buffers,"
+                " 4 x 1 k, 4 BAT54S, 5 x 100 nF." if MODULAR else ""), "",
              "| Refs | Qty | Part | MPN | Shop, code | Unit | Min order |", "|---|---|---|---|---|---|---|"]
     total, minspend = {}, {}
     for key, info in BOM.items():
         refs = groups.get(key, [])
         qty = info.get("qty", len(refs))
+        if not refs and "qty" not in info:      # (a part of the other variant only)
+            continue
         if key == "hdr":
             refs = ["(U1)"]
         if key == "hdr4":
@@ -441,7 +484,7 @@ def bom_md():
     b = ", ".join(f"{c} {t:.2f}" for c, t in sorted(minspend.items()))
     lines += ["", "Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, not parts.", "", "## Total, one board", "",
               "| Build | Parts at unit price | With each shop's minimum order |", "|---|---|---|",
-              f"| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED | {a} | {b} |",
+              f"| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED{' + the modular outputs' if MODULAR else ''} | {a} | {b} |",
               "", "USD: LCSC and Seeed (the XIAO). The bare board is"
               " ordered at JLCPCB with another board and is not in these totals."]
     return "\n".join(lines) + "\n"
@@ -461,12 +504,13 @@ def intended_nets():
 if __name__ == "__main__":
     check_parts()
     os.makedirs(os.path.join(HERE, "lib"), exist_ok=True)
-    os.makedirs(os.path.join(HERE, "fab"), exist_ok=True)
+    os.makedirs(os.path.join(HERE, "fab", "mod"), exist_ok=True)
     files = {f"{NAME}.kicad_sch": schematic(), "lib/jank.kicad_sym": symbol_lib(), "sym-lib-table": SYM_LIB_TABLE,
              "fp-lib-table": FP_LIB_TABLE, f"{NAME}.kicad_pro": json.dumps(PROJECT, indent=2) + "\n",
              f"{NAME}-square.kicad_pro": json.dumps({**PROJECT, "meta": {"filename": f"{NAME}-square.kicad_pro", "version": 3}},
                                                      indent=2) + "\n",   # (the square layout's board: the same rules)
-             "fab/intended-nets.json": json.dumps(intended_nets(), indent=1) + "\n", "BOM.md": bom_md()}
+             f"fab/{'mod/' if MODULAR else ''}intended-nets.json": json.dumps(intended_nets(), indent=1) + "\n",
+             "BOM-mod.md" if MODULAR else "BOM.md": bom_md()}
     for rel, text in files.items():
         with open(os.path.join(HERE, rel), "w") as f:
             f.write(text)

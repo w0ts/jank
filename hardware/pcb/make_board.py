@@ -48,11 +48,13 @@ KICAD_FP = "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints"
 JANK = os.path.join(HERE, "lib", "jank.pretty")
 SIG, PWR, BUS = 0.25, 0.5, 0.4
 TOP, BOT = pcbnew.F_Cu, pcbnew.B_Cu
-NAME = "jank-pcb"
+MODULAR = os.environ.get("MODULAR") == "1"        # (the modular variant: jank-pcb-mod.kicad_pcb, README "Modular variant")
+NAME = "jank-pcb-mod" if MODULAR else "jank-pcb"
 
 make_footprints.write()
 LAYOUT = sys.argv[1] if len(sys.argv) > 1 else "long"
-INTENT = json.load(open(os.path.join(HERE, "fab", *(["square"] if LAYOUT == "square" else []), "intended-nets.json")))
+INTENT = json.load(open(os.path.join(HERE, "fab", *(["square"] if LAYOUT == "square" else ["mod"] if MODULAR else []),
+                                      "intended-nets.json")))
 PIN_NET = {}
 for netname, pins in INTENT["nets"].items():
     for p in pins:
@@ -239,13 +241,124 @@ def front_unit(k, c, H, tx_lane):
     return v
 
 
+MOD_GROW = 12.5                                   # (the modular variant's extra depth, mm)
+
+
+def modular(W, H, p, o, TX_LANE):
+    """the modular variant (README "Modular variant"): CLOCK and RESET 3.5 mm mono jacks on the left and right side walls
+    (PJ-320A: tip = signal, sleeve = GND), driven from a PCF8574T on the OLED's I2C (U5, in the band MOD_GROW adds in
+    front of the screen) through four 74AHCT1G125 on +5V, 1 k and a BAT54S clamp each; the left channels' parts west of
+    the expander, the right channels' in the corner below the encoder; +5V from U2 down the right side on the bottom"""
+    jl = {"J11": 39.85, "J12": 46.55}                 # (left wall: CLK_L, RST_L; between H4 and the front outputs)
+    jr = {"J13": 53.8, "J14": 60.5}                   # (right wall: CLK_R, RST_R; below the encoder, above H2)
+    J = {}
+    for ref, y in jl.items():
+        J[ref] = place(JANK, "Jack_3.5mm_XKB_PJ-320A_Horizontal", ref, "PJ-320A mono", 0.0, y, 270)
+    for ref, y in jr.items():
+        J[ref] = place(JANK, "Jack_3.5mm_XKB_PJ-320A_Horizontal", ref, "PJ-320A mono", W, y, 90)
+    for j in J.values():
+        solid(j, "S")
+    t = {r: at(j, "T") for r, j in J.items()}
+    U5 = place(K("Package_SO"), "SOIC-16W_7.5x10.3mm_P1.27mm", "U5", "PCF8574T", 44.0, 42.0, 0)
+    u = {n: at(U5, n) for n in range(1, 17)}
+    C12 = place(K("Capacitor_SMD"), C0805, "C12", "100nF", 44.0, 35.6, 0)
+    SOT5 = "SOT-23-5_HandSoldering"
+    B = {r: place(K("Package_TO_SOT_SMD"), SOT5, r, "74AHCT1G125", x, y, rot)
+         for r, x, y, rot in (("U6", 30.0, 39.3, 180), ("U7", 25.0, 44.4, 180), ("U8", 66.1, 50.2, 0), ("U9", 66.1, 57.8, 0))}
+    b = {r: {n: at(fp, n) for n in range(1, 6)} for r, fp in B.items()}
+    R = {r: place(K("Resistor_SMD"), R0805, r, "1k", x, y, rot)
+         for r, x, y, rot in (("R72", 24.5, 38.35, 180), ("R73", 19.5, 43.45, 180), ("R74", 70.3, 51.55, 270),
+                              ("R75", 70.3, 59.15, 270))}
+    r = {k: (at(fp, 1), at(fp, 2)) for k, fp in R.items()}
+    D = {k: place(K("Package_TO_SOT_SMD"), "SOT-23", k, "BAT54S", x, y, 0)
+         for k, x, y in (("D3", 19.0, 39.6), ("D4", 15.5, 44.4), ("D5", 66.1, 54.0), ("D6", 66.1, 61.6))}
+    d = {k: {n: at(fp, n) for n in (1, 2, 3)} for k, fp in D.items()}
+    C = {k: place(K("Capacitor_SMD"), C0805, k, "100nF", x, y, rot)
+         for k, x, y, rot in (("C13", 30.6, 42.4, 0), ("C14", 25.0, 47.6, 0), ("C15", 70.3, 47.75, 270),
+                              ("C16", 70.3, 55.35, 270))}
+    c = {k: (at(fp, 1), at(fp, 2)) for k, fp in C.items()}
+    TP = {n: place(K("TestPoint"), "TestPoint_Pad_D1.0mm", n, v, x, y)
+          for n, v, x, y in (("TP5", "P2", 35.0, 45.2), ("TP6", "P3", 36.9, 46.2), ("TP7", "P6", 51.0, 44.2),
+                             ("TP8", "P7", 52.8, 42.0))}
+    DBG.update(mod=dict(t=t, u5=u, b=b, r=r, d=d, c=c, s={k: at(j, "S") for k, j in J.items()}))
+    for fp_, ns in ((U5, ("1", "2", "3", "8")), *((B[k], ("1", "3")) for k in B), *((D[k], ("1",)) for k in D),
+                    *((C[k], ("2",)) for k in C), (C12, ("2",))):
+        for n in ns:
+            solid(fp_, n)
+
+    # ---- I2C: SDA / SCL up from their bottom lines to the top, down to the expander; 3V3 along y 36.8 (also R51's now)
+    via("SDA", 55.5, o[4][1])
+    route("SDA", [(55.5, o[4][1]), (55.5, u[15][1]), u[15]])
+    via("SCL", 56.6, o[3][1])
+    route("SCL", [(56.6, o[3][1]), (56.6, u[14][1]), u[14]])
+    via("+3V3", 51.45, 36.8)
+    route("+3V3", [(51.45, 36.8), (27.5, 36.8)])
+    route("+3V3", [(u[16][0], 36.8), u[16]])
+    route("+3V3", [(at(C12, 1)[0], 36.8), at(C12, 1)])
+    # ---- the expander's lines: P0 CLK_L, P1 RST_L (west), P5 CLK_R, P4 RST_R (east), P2 P3 P6 P7 on test pads
+    route("CLKL_IN", [u[4], (33.2, u[4][1]), (32.2, b["U6"][2][1]), b["U6"][2]])
+    route("RSTL_IN", [u[5], (38.0, u[5][1]), (37.4, 43.6), (27.8, 43.6), (27.8, b["U7"][2][1]), b["U7"][2]])
+    route("MOD_P2", [u[6], (38.6, 44.5), (35.6, 44.5), at(TP["TP5"], 1)])
+    route("MOD_P3", [u[7], (38.2, u[7][1]), at(TP["TP6"], 1)])
+    route("MOD_P6", [u[11], (at(TP["TP7"], 1)[0], u[11][1]), at(TP["TP7"], 1)])
+    route("MOD_P7", [u[12], (52.0, u[12][1]), at(TP["TP8"], 1)])
+    route("CLKR_IN", [u[10], (63.5, u[10][1]), (63.5, b["U8"][2][1]), b["U8"][2]])
+    route("RSTR_IN", [u[9], (62.9, u[9][1]), (62.9, b["U9"][2][1]), b["U9"][2]])
+    # ---- the left channels: buffer -> 1 k -> clamp -> the jack's tip
+    route("CLKL_B", [b["U6"][4], r["R72"][0]])
+    route("CLK_L", [r["R72"][1], (21.0, r["R72"][1][1]), d["D3"][3]])
+    route("CLK_L", [d["D3"][3], (16.4, d["D3"][3][1]), (12.0, t["J11"][1]), t["J11"]])
+    route("RSTL_B", [b["U7"][4], r["R73"][0]])
+    route("RST_L", [r["R73"][1], (17.2, r["R73"][1][1]), d["D4"][3]])
+    route("RST_L", [d["D4"][3], (13.0, d["D4"][3][1]), t["J12"]])
+    # ---- the right channels
+    route("CLKR_B", [b["U8"][4], (69.0, b["U8"][4][1]), r["R74"][0]])
+    route("CLK_R", [r["R74"][1], (71.3, r["R74"][1][1] + 0.95), (73.8, t["J13"][1] - 0.6), t["J13"]])
+    route("CLK_R", [d["D5"][3], (68.2, d["D5"][3][1] - 1.15), r["R74"][1]])
+    route("RSTR_B", [b["U9"][4], (69.0, b["U9"][4][1]), r["R75"][0]])
+    route("RST_R", [r["R75"][1], (71.3, r["R75"][1][1] + 0.95), (73.8, t["J14"][1] - 0.3), t["J14"]])
+    route("RST_R", [d["D6"][3], (68.3, d["D6"][3][1] - 1.2), r["R75"][1]])
+    # ---- +5V: from U2's via down the right side on the bottom (x 70.6); west on the bottom (y 47.4), on top across the
+    # expander's band, on the bottom again to the left channels
+    route("+5V", [(72.4, p["v5y"]), (70.6, p["v5y"] + 1.25), (70.6, 63.5)], BUS, BOT)
+    route("+5V", [(70.6, 47.4), (62.2, 47.4)], 0.3, BOT)
+    via("+5V", 62.2, 47.4)
+    route("+5V", [(62.2, 47.4), (34.6, 47.4)], 0.3)
+    via("+5V", 34.6, 47.4)
+    route("+5V", [(34.6, 47.4), (14.56, 47.4)], 0.3, BOT)
+    for x, y0, top in ((28.65, 41.6, b["U6"][5]), (23.65, 46.4, b["U7"][5]), (18.06, 41.5, d["D3"][2]),
+                       (14.56, 46.3, d["D4"][2])):
+        via("+5V", x, y0)
+        route("+5V", [(x, y0), (x, 47.4)], SIG, BOT)
+        route("+5V", [(x, y0), top])
+    route("+5V", [(28.65, 41.6), c["C13"][0]])
+    route("+5V", [(23.65, 46.4), c["C14"][0]])
+    for (x, y), top in ((c["C15"][0], [(68.0, c["C15"][0][1]), (b["U8"][5][0], c["C15"][0][1] + 0.6), b["U8"][5]]),
+                        (c["C16"][0], [(68.6, c["C16"][0][1]), (b["U9"][5][0], c["C16"][0][1] + 1.6), b["U9"][5]])):
+        via("+5V", x - 1.3, y)
+        route("+5V", [(x - 1.3, y), (70.6, y)], SIG, BOT)
+        route("+5V", [(x, y), *top])
+    for k in ("D5", "D6"):
+        k5 = d[k][2]
+        via("+5V", k5[0], k5[1] + 1.0)
+        route("+5V", [k5, (k5[0], k5[1] + 1.0)])
+        route("+5V", [(k5[0], k5[1] + 1.0), (70.6, k5[1] + 1.0)], SIG, BOT)
+    # ---- silk
+    label("CLK", 13.4, jl["J11"], 0.7, rot=90)
+    label("RST", 13.4, jl["J12"], 0.7, rot=90)
+    label("CLK", W - 6.0, jr["J13"] - 4.3, 0.7)
+    label("RST", W - 6.0, jr["J14"] + 4.3, 0.7)
+    label("PCF8574 0x20", 44.0, 48.6, 0.6)
+
+
 def layout_long():
     """v5, 84 x 67 mm (README "v5"). The top is the lid side. FRONT edge, left to right seen from the top (and from the
     front, lid up): OUT2, OUT3, OUT4, each a PJ-320A on the top and a DIN-5 on the bottom. BACK edge: OUT1 (the same,
     turned to face the back; the MIDI IN one), the strip (OUT1's A/B switch, the LED), the XIAO (USB-C over the edge), J1
     and the power path. Between: the MIDI IN circuit (left), the OLED (middle, on its header at its right end), BACK and
     OK (right of the screen) and the encoder under them."""
-    W, H = 84.0, 67.0
+    W, H = 84.0, 67.0 + (MOD_GROW if MODULAR else 0.0)   # (modular: a band for the side jacks and their circuit)
+    RX = 0.5 if MODULAR else 1.5                     # (the 3V3 riser up the left edge: modular, outside the side jacks' pegs)
     BUS_Y = H - 29.2                                 # (the 3V3 bus, top, behind the front groups)
     TX_LANE = H - 30.3                               # (TXB, bottom, to the three front TX vias)
     CH = [10.45 + 21.1 * i for i in range(3)]       # (OUT2, OUT3, OUT4 left to right: lid up they read 2, 3, 4 from the front)
@@ -443,6 +556,7 @@ def layout_long():
     u = {n: at(U2, n) for n in range(1, 7)}
     route("+5V", [u[6], (77.3, u[6][1]), (77.3, u[3][1] + 1.0), (u[3][0], u[3][1] + 1.0), u[3]], SIG)
     via("+5V", 72.4, u[3][1] + 1.0)
+    p["v5y"] = u[3][1] + 1.0                         # (for the modular variant's +5V down the right side)
     route("+5V", [(u[3][0], u[3][1] + 1.0), (72.4, u[3][1] + 1.0)], 0.4)
     route("+5V", [(72.4, u[3][1] + 1.0), (72.4, 4.6), (55.6, 4.6)], BUS, BOT)
     via("+5V", 55.6, 4.6)
@@ -508,9 +622,9 @@ def layout_long():
     route("IN_EN", [(at(R52, 1)[0], 31.6), at(R52, 1)])
     route("IN_G", [at(R52, 2), (11.2, at(R52, 2)[1] + 0.6), (11.2, 34.0), (q3[1][0], 34.0), q3[1]])
     # 3V3: a riser from the bus up the left edge to Q4's source and TP2; on the bottom up to U4; C8, R51 on top
-    route("+3V3", [(1.5, BUS_Y), (1.5, 29.2), (4.6, 29.2), (q4[2][0], 28.0), q4[2]])
+    route("+3V3", [(RX, BUS_Y), (RX, 29.2), (4.6, 29.2), (q4[2][0], 28.0), q4[2]])
     route("+3V3", [(3.2, 29.2), at(TP2, 1)])
-    route("+3V3", [(27.5, BUS_Y), at(R51, 1)])
+    route("+3V3", [(27.5, 36.8 if MODULAR else BUS_Y), at(R51, 1)])   # (modular: fed along y 36.8, below)
     via("+3V3", 27.5, 35.4)
     route("+3V3", [(27.5, 35.4), (26.8, 34.7), (26.8, 27.3), w[6]], SIG, BOT)
     route("+3V3", [w[6], at(C8, 1)])
@@ -521,15 +635,20 @@ def layout_long():
     tx = {k: front_unit(k, c, H, TX_LANE) for k, c in zip((2, 3, 4), CH)}
     route("MIDI_TXB", [p[2], (35.85, p[2][1]), (35.85, TX_LANE)], SIG, BOT)
     route("MIDI_TXB", [(tx[2][0], TX_LANE), (tx[4][0], TX_LANE)], SIG, BOT)
-    via("+3V3", 51.45, 35.6)
-    route("+3V3", [(51.45, 35.6), (51.45, BUS_Y)])
-    route("+3V3", [(51.45, BUS_Y), (1.5, BUS_Y)], BUS)
+    V3Y = TX_LANE - 0.9 if MODULAR else 35.6         # (the 3V3 line comes up from the bottom here)
+    if V3Y != 35.6:
+        route("+3V3", [(51.45, 35.6), (51.45, V3Y)], SIG, BOT)
+    via("+3V3", 51.45, V3Y)
+    route("+3V3", [(51.45, V3Y), (51.45, BUS_Y)])
+    route("+3V3", [(51.45, BUS_Y), (RX, BUS_Y)], BUS)
+    if MODULAR:
+        modular(W, H, p, o, TX_LANE)
 
     # ======== silk ========
     label("OUT1 A|B", s[2][0] - 2.3, s[2][1], 0.7, rot=90)
     label("JP=SRC!", 9.55, 23.3, 0.6)
     label("MIDI IN: OUT1", 21.0, 23.3, 0.6)
-    label("jank v5", 74.0, 52.0, 1.0)
+    label("jank v5 mod" if MODULAR else "jank v5", 75.0 if MODULAR else 74.0, H - 6.0 if MODULAR else 52.0, 1.0)
     label("5V", 58.4, 2.7, 0.6)
     label("3V3", 5.3, 30.9, 0.6)
     label("GND", 29.0, 2.8, 0.6)
@@ -537,7 +656,8 @@ def layout_long():
     label("PWR", JX, 1.2, 0.6)
     label("BACK", 69.15, 21.3, 0.7)
     label("OK", 78.75, 21.3, 0.7)
-    label("jank v5", 74.0, 52.0, 1.0, pcbnew.B_SilkS)
+    label("jank v5 mod" if MODULAR else "jank v5", 75.0 if MODULAR else 74.0, H - 6.0 if MODULAR else 52.0, 1.0,
+          pcbnew.B_SilkS)
     return W, H
 
 
