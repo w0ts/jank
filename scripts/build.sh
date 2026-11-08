@@ -1,9 +1,9 @@
 #!/bin/bash
 # Builds in the scratch folder from a copy, so managed_components, sdkconfig and build/ never appear in the checkout.
-# Usage: scripts/build.sh [atoms3u|xiao]   default atoms3u
+# Usage: scripts/build.sh [xiao]   (the Seeed XIAO ESP32-S3, the only board)
 set -eu
-BOARD="${1:-atoms3u}"
-case "$BOARD" in atoms3u|xiao) ;; *) echo "unknown board $BOARD: atoms3u or xiao"; exit 2 ;; esac
+BOARD="${1:-xiao}"
+case "$BOARD" in xiao) ;; *) echo "unknown board $BOARD: xiao"; exit 2 ;; esac
 . "$(dirname "$0")/env.sh"
 SRC="$JANK_SCRATCH/src/$BOARD"
 mkdir -p "$SRC/jank"

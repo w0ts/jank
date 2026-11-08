@@ -1,10 +1,7 @@
 menu "jank"
     choice JANK_BOARD
         prompt "Board"
-        default JANK_BOARD_ATOMS3U
-        config JANK_BOARD_ATOMS3U
-            bool "M5Stack AtomS3U"
-            depends on IDF_TARGET_ESP32S3
+        default JANK_BOARD_XIAO
         config JANK_BOARD_XIAO
             bool "Seeed XIAO ESP32S3"
             depends on IDF_TARGET_ESP32S3
