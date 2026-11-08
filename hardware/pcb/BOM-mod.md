@@ -29,7 +29,9 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | U5 | 1 | I2C GPIO expander, 8 bit, quasi-bidirectional, SOIC-16 wide (the modular variant: CLOCK / RESET; price: JLCPCB's parts list) | NXP PCF8574T/3 | LCSC C7605 | USD 2.0313 | 1 |
 | D3, D4, D5, D6 | 4 | Schottky pair in series BAT54S, SOT-23 (the modular outputs' clamp to GND and +5V; price: JLCPCB's parts list) | Nexperia BAT54S,215 | LCSC C47546 | USD 0.0225 | 20 |
 | U3, U6, U7, U8, U9 | 5 | Buffer 74AHCT1G125, SOT-23-5 (4.5 to 5.5 V) | TI SN74AHCT1G125DBVR | LCSC C7484 | USD 0.1009 | 5 |
-| SW2, SW3, SW4, SW5 | 4 | Slide switch DPDT, 6 pins 2.5 mm, 9.1 x 3.5 mm, handle 1.5 mm (TRS type A / B), face side; one per output | SHOU HAN MSS22D18G2 | LCSC C431542 | USD 0.0996 | 5 |
+| J2, J3, J4, J5 | 4 | 3.5 mm stereo jack, right angle, SURFACE MOUNT (4 tabs 1.5 x 2.5, 2 pegs 1.3), plug from the front, top side: the four MIDI outputs' jacks (J2..J5 are BOM lines; the pads are in J6..J9's footprint). Surface-mount so nothing of it goes through the board under the neighbouring DIN bodies | XKB PJ-320D-B-SMT | LCSC C2884940 | USD 0.0000 | 5 |
+| SW2 | 1 | Slide switch DPDT, surface mount, 6 tabs 2.5 mm, 7.7 x 3.55 mm, knob 3.0 mm (OUT1's TRS type A / B: it sits over the DIN's body, where a through-hole switch's pins would hit it) | XKB SS-3235S-L2 | LCSC C500056 | USD 0.0000 | 5 |
+| SW3, SW4, SW5 | 3 | Slide switch DPDT, 6 pins 2.5 mm, 9.1 x 3.5 mm, handle 1.5 mm (TRS type A / B), face side; OUT2..4 | SHOU HAN MSS22D18G2 | LCSC C431542 | USD 0.0996 | 5 |
 | U4 | 1 | Optocoupler H11L1, Schmitt trigger, open collector, DIP-6 (MIDI IN on OUT1) | EVERLIGHT H11L1 | LCSC C78588 | USD 0.3507 | 5 |
 | D2 | 1 | Diode 1N4148W, SOD-123 (the opto LED's reverse protection) | Semtech 1N4148W | LCSC C81598 | USD 0.0125 | 50 |
 | R50 | 1 | Resistor 220 1% 0805 (MIDI IN, CA-033 / MIDI 1.0) | UNI-ROYAL 0805W8F2200T5E | LCSC C17557 | USD 0.0030 | 100 |
@@ -40,7 +42,7 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | (J10) | 1 | Pin header 1x4, 2.54 mm (the OLED module's legs) | XFCN PZ254V-11-04P | LCSC C2691448 | USD 0.0276 | 20 |
 | R11, R12, R13, R14 | 4 | Resistor 10 ohm 1% 0.25 W axial (6.3 x 2.4 mm), standing (RC, data) | YAGEO MFR-25FBF52-10R | LCSC C1365579 | USD 0.0205 | 50 |
 | R21, R22, R23, R24 | 4 | Resistor 33 ohm 1% 0.5 W axial (9 x 3.2 mm), standing (RA, source) | CCO MF1/2W-33R 1% T | LCSC C119401 | USD 0.0241 | 20 |
-| J2, J3, J4, J5, J11, J12, J13, J14 | 8 | 3.5 mm stereo jack, right angle, plug from the front, 4 pins (its switch pin left open), top side | XKB PJ-320A | LCSC C2884926 | USD 0.1458 | 5 |
+| J11, J12, J13, J14 | 4 | 3.5 mm stereo jack, right angle, plug from the front, 4 pins (its switch pin left open), top side | XKB PJ-320A | LCSC C2884926 | USD 0.1458 | 5 |
 | J6, J7, J8, J9 | 4 | DIN-5 180 degree, PCB right angle, 7 pins, no locating pegs, bottom side | HOOYA DIN-504B-M10 | LCSC C2939346 | USD 0.3764 | 5 |
 
 Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, not parts.
@@ -49,6 +51,6 @@ Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, n
 
 | Build | Parts at unit price | With each shop's minimum order |
 |---|---|---|
-| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 20.72 | USD 33.75 |
+| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 20.03 | USD 33.32 |
 
 USD: LCSC and Seeed (the XIAO). The bare board is ordered at JLCPCB with another board and is not in these totals.

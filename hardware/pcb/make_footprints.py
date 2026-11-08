@@ -12,11 +12,13 @@
   MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB      the long board's output since 2026-11-08: the HOOYA DIN-504B-M10 or the XKB
                                            PJ-320A, nested, both fronts on the edge; the jack's pads T, R, S on their own
                                            nets (through the A/B switch), its switch pin (pad "SW") left open
-  MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom v5 (the board since 2026-11-08, later the same day): BOTH fitted, the PJ-320A
-                                           on the top, its front on the edge, and the DIN-504B-M10 on the BOTTOM on the
-                                           same axis, its plate 1.0 mm in (DIN_BACK) so its pin 2 clears the jack's back;
-                                           the DIN's pins mirrored in x as seen from the top; F.CrtYd the jack's, B.CrtYd
-                                           the DIN's
+  MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom v5 (the board since 2026-11-08, later the same day): BOTH fitted, the
+                                           DIN-504B-M10 on the BOTTOM on the footprint's axis, its plate DIN_BACK in, and
+                                           the PJ-320A on the top BESIDE it, JACK_DX along the edge (between two DINs at
+                                           the 21.1 pitch), its front JACK_OUT past the edge (the user, 2026-11-08 night:
+                                           "put the midi jack between the DIN plugs ... DIN on one side, jack on the
+                                           other", both faces at the box wall); the DIN's pins mirrored in x as seen from
+                                           the top; F.CrtYd the jack's, B.CrtYd the DIN's
   LED_SK6812MINI-HS_3.7x3.5mm_HandSolder   the beat LED (OPSCO SK6812MINI-HS), its datasheet's pads lengthened outward
   OLED_0.91in_128x32_I2C_HS91L02W2C01      the OLED module's 4-pin header (GND VCC SCL SDA), the module drawn on F.Fab
 Origins on the board edge, on the connector's axis, the board inward towards -y. Run by make_board.py (or alone:
@@ -86,6 +88,11 @@ PJ_BUSH_D, PJ_BUSH_OUT, PJ_BUSH_Z = 5.0, 2.0, 2.5   # bushing: diameter (measure
 # rows 3.4 mm apart, 0.8 mm holes; body 9.1 x 3.5 mm, 3.5 mm tall, handle 1.5 mm, travel 2.0 mm
 SW_PINS = {"1": (-2.5, 0.0), "2": (0.0, 0.0), "3": (2.5, 0.0), "4": (-2.5, 3.4), "5": (0.0, 3.4), "6": (2.5, 3.4)}
 SW_PAD, SW_HOLE, SW_BODY = 1.6, 0.9, (9.1, 3.5)
+# the surface-mount DPDT slide switch, XKB SS-3235S-L2 (LCSC C500056; its drawing X-SS-3235S-L2 rev A1 2025-06-21, read
+# 2026-11-09, "PCB LAYOUT"): 6 tabs 0.7 x 1.2, 2.5 mm apart, the rows 6.5 mm apart; body 7.7 x 3.55 x 3.2, knob 3.0 (L2)
+# high, 1.5 wide, travel 1.5 along the body; pins 1-2-3 one row, 4-5-6 the other, 2 and 5 the commons (its schematic)
+SWS_PINS = {"1": (-2.5, -3.25), "2": (0.0, -3.25), "3": (2.5, -3.25), "4": (-2.5, 3.25), "5": (0.0, 3.25), "6": (2.5, 3.25)}
+SWS_PAD, SWS_BODY, SWS_SPAN = (0.7, 1.2), (7.7, 3.55), 3.85   # (pad across x along, body, the pads' outer edge from the axis)
 
 
 def stroke(w, layer):
@@ -179,7 +186,15 @@ def din_pj_items():
     return out
 
 
-DIN_BACK = 1.0           # v5: the DIN's plate 1.0 mm behind the edge (its pin 2 leg then clears the jack's back by 1.1 mm)
+# v5 (2026-11-08 night): the DIN under the board on the footprint's axis, the jack on the top BESIDE it. The user: both
+# faces at the box wall, which the box does by bringing the board edge to DIN_BACK inside the outside face (README "v5").
+DIN_BACK = 1.0           # the DIN's plate behind the edge: its face flush with the box's outside, the board edge 1.0 in
+JACK_DX = 11.5           # the jack's axis along the edge from the DIN's: half the 23.0 pitch, between two DINs
+JACK_OUT = 0.5           # the jack's body front past the edge: its face 0.3 mm inside the box's outside, bushing out
+# The outputs' pitch is 23.0 (make_board.py CH): the DIN plates are 20.9 wide, so the 2.1 mm between two of them takes the
+# jack's two pegs (1.4 mm holes, 0.35 mm from each DIN body) and nothing of the jack goes THROUGH the board under a DIN
+# body (its contacts are surface-mount tabs on the top: see PJ_SMD). The jack's rear pads keep >= 0.3 mm from the
+# neighbouring DINs' pin 1 / 3 pads, and the front peg's hole stays 0.4 mm inside the board edge.
 
 
 def v5_din_pins():
@@ -188,25 +203,54 @@ def v5_din_pins():
     return pins, [(-x, y - DIN_BACK) for x, y in HY_E]
 
 
+# the XKB PJ-320D-B-SMT (LCSC C2884940), the surface-mount twin of the PJ-320A: its drawing X-PJ-320D-B-SMT rev A1
+# 2025-06-26, read 2026-11-08 ("PCB Layout", top view, the opening to the left; turned 90 degrees here, the opening at the
+# edge): body 12.0 deep x 6.0 wide x 5.0 high, bushing 5.0 across and 2.0 out, plug hole 3.6, axis 2.5 above the board;
+# four tabs "1.5x2.5" on the body's sides, their centres 7.0 apart across: terminals 2, 3, 4 on one side 3.0, 6.0 and
+# 10.0 behind the body's front, terminal 1 on the other side 11.5 behind it (= 10.0 + the drawing's 1.50); two 1.3 mm
+# pegs on the axis 1.5 and 8.5 behind the front. Terminal 4 = tip (deepest), 3 = ring, 2 = the second ring (a TRS plug's
+# sleeve also touches it; left open here like the PJ-320A's switch pad), 1 = sleeve. Named here after the PJ-320A's pads so
+# the nets and routes stay: T = 4, R = 3, SW = 2, S = 1. Which side the 2/3/4 tabs sit on, seen from the top with the
+# opening at the edge, is read off the drawing's handedness: UNVERIFIED on a part.
+PJ_SMD_PADS = {"SW": (3.5, -3.0), "R": (3.5, -6.0), "T": (3.5, -10.0), "S": (-3.5, -11.5)}
+PJ_SMD_PAD = (2.5, 1.5)                          # (across, along the depth)
+PJ_SMD_PEGS, PJ_SMD_PEG = [(0.0, -1.5), (0.0, -8.5)], 1.3
+PJ_SMD_SPAN = 4.75                               # the pads' outer edges from the axis (the tabs reach 4.0)
+
+
+def v5_jack(x, y):
+    """a point of the jack (its own frame: axis x = 0, body front y = 0) in the combined footprint's frame"""
+    return x + JACK_DX, y + JACK_OUT
+
+
+def smd(num, x, y, size):
+    return (f'  (pad "{num}" smd rect (at {x:.3f} {y:.3f}) (size {size[0]} {size[1]})'
+            f' (layers "F.Cu" "F.Paste" "F.Mask"))')
+
+
 def v5_items():
-    """v5 (README "v5"): the XKB PJ-320A on the top, its front on the edge, and the HOOYA DIN-504B-M10 on the BOTTOM on the
-    same axis, its plate DIN_BACK behind the edge; both fitted, on the same nets (the jack through the A/B switch)"""
+    """v5 (README "v5"): the HOOYA DIN-504B-M10 on the BOTTOM on the footprint's axis, its plate DIN_BACK behind the edge,
+    and the XKB PJ-320A on the top, JACK_DX along the edge, its front JACK_OUT past it; both fitted, on the same nets (the
+    jack through the A/B switch)"""
     pins, e = v5_din_pins()
     out = [pth(n, x, y, HY_PAD, HY_HOLE) for n, (x, y) in pins.items()]
     out += [pth("E", x, y, HY_PAD, HY_HOLE) for x, y in e]
-    out += [pth(n, x, y, PJ_PAD, PJ_SLOT) for n, (x, y) in PJ_PINS.items()]
-    out += [npth(x, y, PJ_PEG) for x, y in PJ_PEGS]
+    out += [smd(n, *v5_jack(x, y), PJ_SMD_PAD) for n, (x, y) in PJ_SMD_PADS.items()]
+    out += [npth(*v5_jack(x, y), PJ_SMD_PEG) for x, y in PJ_SMD_PEGS]
     w, f, b = HY_W / 2, -DIN_BACK, -DIN_BACK - HY_D
+    jx0, jx1 = JACK_DX - PJ_W / 2, JACK_DX + PJ_W / 2
     out += [rect(-w, b, w, f, "B.Fab", 0.1), line(-w, f - HY_PLATE, w, f - HY_PLATE, "B.Fab", 0.1),
             line(-w + 0.3, b, -w + 0.3, f, "B.SilkS", 0.12), line(w - 0.3, b, w - 0.3, f, "B.SilkS", 0.12),
             line(-w + 0.3, b, -6.6, b, "B.SilkS", 0.12), line(6.6, b, w - 0.3, b, "B.SilkS", 0.12),
             rect(-w, 0, w, b - CY, "B.CrtYd", 0.05),
-            rect(-PJ_W / 2, -PJ_D, PJ_W / 2, 0, "F.Fab", 0.1),
-            rect(-PJ_BUSH_D / 2, 0, PJ_BUSH_D / 2, PJ_BUSH_OUT, "F.Fab", 0.1),
-            line(-PJ_W / 2 - 0.15, -PJ_D, -PJ_W / 2 - 0.15, -1.0, "F.SilkS", 0.12),
-            line(PJ_W / 2 + 0.15, -PJ_D, PJ_W / 2 + 0.15, -1.0, "F.SilkS", 0.12)]
-    a, e_ = PJ_W / 2 + CY, PJ_BUSH_D / 2 + CY
-    pts = [(-a, -PJ_D - CY), (a, -PJ_D - CY), (a, 0), (e_, 0), (e_, PJ_BUSH_OUT + CY), (-e_, PJ_BUSH_OUT + CY), (-e_, 0), (-a, 0)]
+            rect(jx0, JACK_OUT - PJ_D, jx1, JACK_OUT, "F.Fab", 0.1),
+            rect(JACK_DX - PJ_BUSH_D / 2, JACK_OUT, JACK_DX + PJ_BUSH_D / 2, JACK_OUT + PJ_BUSH_OUT, "F.Fab", 0.1),
+            line(jx0 - 0.15, JACK_OUT - PJ_D, jx0 - 0.15, JACK_OUT - PJ_D + 1.0, "F.SilkS", 0.12),
+            line(jx1 + 0.15, JACK_OUT - PJ_D, jx1 + 0.15, JACK_OUT - PJ_D + 1.0, "F.SilkS", 0.12),
+            line(jx0 - 0.15, -1.6, jx0 - 0.15, -1.0, "F.SilkS", 0.12), line(jx1 + 0.15, -1.6, jx1 + 0.15, -1.0, "F.SilkS", 0.12)]
+    a, e_ = PJ_SMD_SPAN + CY, PJ_BUSH_D / 2 + CY   # (the courtyard takes the tabs' pads, wider than the body)
+    pts = [v5_jack(x, y) for x, y in ((-a, -PJ_D - CY), (a, -PJ_D - CY), (a, 0), (e_, 0), (e_, PJ_BUSH_OUT + CY),
+                                      (-e_, PJ_BUSH_OUT + CY), (-e_, 0), (-a, 0))]
     xy = " ".join(f"(xy {x:.3f} {y:.3f})" for x, y in pts)
     out.append(f"  (fp_poly (pts {xy}) {stroke(0.05, 'F.CrtYd')})")
     return out
@@ -304,6 +348,17 @@ def write():
             " on the edge; the jack's pads T, R, S on their own nets (through the A/B switch)",
             [text("Reference", "REF**", 0, -DIN_D - 1.5, "F.SilkS"), text("Value", "DIN or TRS", 0, -9, "F.Fab"),
              *din_items(), *jack_items(NEST[0], {p: p for p in JACK_PINS}), courtyard(w, DIN_D, NEST[0])]),
+        "SW_Slide_DPDT_SS3235S_SMD": footprint(
+            "SW_Slide_DPDT_SS3235S_SMD",
+            "DPDT slide switch, surface mount, XKB SS-3235S-L2 (drawing rev A1 2025-06-21): 6 tabs 0.7 x 1.2 at 2.5 mm, rows"
+            " 6.5 mm apart; body 7.7 x 3.55 x 3.2 mm, knob 3.0 mm, travel 1.5 mm along the body",
+            [text("Reference", "REF**", 0, -4.9, "F.SilkS"), text("Value", "SS-3235S-L2", 0, 4.9, "F.Fab"),
+             *[smd(n, x, y, SWS_PAD) for n, (x, y) in SWS_PINS.items()],
+             rect(-SWS_BODY[0] / 2, -SWS_BODY[1] / 2, SWS_BODY[0] / 2, SWS_BODY[1] / 2, "F.Fab", 0.1),
+             rect(-1.5, -0.75, 0.0, 0.75, "F.Fab", 0.1),                         # (the knob, at one end of its 1.5 mm travel)
+             line(-SWS_BODY[0] / 2 - 0.15, -2.4, -SWS_BODY[0] / 2 - 0.15, 2.4, "F.SilkS", 0.12),
+             line(SWS_BODY[0] / 2 + 0.15, -2.4, SWS_BODY[0] / 2 + 0.15, 2.4, "F.SilkS", 0.12),
+             rect(-SWS_BODY[0] / 2 - CY, -SWS_SPAN - CY, SWS_BODY[0] / 2 + CY, SWS_SPAN + CY, "F.CrtYd", 0.05)], "smd"),
         "SW_Slide_DPDT_MSS22D18": footprint(
             "SW_Slide_DPDT_MSS22D18",
             "DPDT slide switch, SHOU HAN MSS-22D18 (drawing 2020-07-13): 6 pins 2.5 mm apart, rows 3.4 mm, holes 0.8 mm; body"

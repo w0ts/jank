@@ -224,9 +224,10 @@ for k in range(1, 5):
         (f"R4{k}", "Device:R", "DNP parallel", R1206, "rpar", x0 + 17.78, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
         (f"JP1{k}", "Jumper:SolderJumper_2_Open", "bypass", JP, "", x0 + 2.54, 241.3, {"1": TX[k], "2": f"TIP{k}"}),
         (f"JP2{k}", "Jumper:SolderJumper_2_Open", "bypass: 3V3 direct" if k > 1 else "bypass: SRC1 direct", JP, "", x0 + 25.4, 241.3, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
-        (f"J{1 + k}", "Connector_Audio:AudioJack3", "TRS PJ-320A", "", "trs",
+        (f"J{1 + k}", "Connector_Audio:AudioJack3", "TRS PJ-320D-B-SMT", "", "trs_smd",
          x0 + 35.56, 231.14, {"T": f"JT{k}", "R": f"JR{k}", "S": "GND"}),
-        (f"SW{1 + k}", "jank:SW_DPDT_Slide", "TRS A/B", "jank:SW_Slide_DPDT_MSS22D18", "swab", x0 + 45.72, 271.78,
+        (f"SW{1 + k}", "jank:SW_DPDT_Slide", "TRS A/B", "jank:SW_Slide_DPDT_SS3235S_SMD" if k == 1 else "jank:SW_Slide_DPDT_MSS22D18",
+         "swab_smd" if k == 1 else "swab", x0 + 45.72, 271.78,
          {"1": f"RING{k}", "2": f"JR{k}", "3": f"TIP{k}", "4": f"TIP{k}", "5": f"JT{k}", "6": f"RING{k}"}),
         (f"J{5 + k}", "Connector:DIN-5_180degree", "DIN-5 DIN-504B-M10", "jank:MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom", "din",
          x0 + 66.04, 231.14, {"5": f"TIP{k}", "4": f"RING{k}", "2": "GND"}),
@@ -378,6 +379,9 @@ SYM_LIB_TABLE = '(sym_lib_table\n  (version 7)\n  (lib (name "jank")(type "KiCad
 FP_LIB_TABLE = '(fp_lib_table\n  (version 7)\n  (lib (name "jank")(type "KiCad")(uri "${KIPRJMOD}/lib/jank.pretty")(options "")(descr "XIAO-ESP32-S3-DIP from Seeed (CC BY-SA 4.0); the jacks come with the layout"))\n)\n'
 
 # ---- the BOM: one price each, as read on DATE (LCSC: its own product API, the first price break, USD excl. VAT) ----
+# Prices not read on 2026-11-09 (LCSC refused the page): 0.0 here, the BOM says so. Fill in from LCSC before trusting the total.
+SWS_PRICE = 0.0        # XKB SS-3235S-L2 (C500056), the surface-mount A/B switch
+PJD_PRICE = 0.0        # XKB PJ-320D-B-SMT (C2884940), the surface-mount output jack
 LCSC = "LCSC"
 BOM = {
     "xiao": dict(part="Seeed XIAO ESP32S3 (plain, not Sense), no headers included", mpn="113991114", shop="Seeed Studio",
@@ -416,8 +420,17 @@ BOM = {
                    shop=LCSC, code="C47546", price=0.0225, cur="USD", min=20),
     "buf": dict(part="Buffer 74AHCT1G125, SOT-23-5 (4.5 to 5.5 V)", mpn="TI SN74AHCT1G125DBVR", shop=LCSC, code="C7484",
                 price=0.1009, cur="USD", min=5),
+    "trs_smd": dict(part="3.5 mm stereo jack, right angle, SURFACE MOUNT (4 tabs 1.5 x 2.5, 2 pegs 1.3), plug from the front,"
+                         " top side: the four MIDI outputs' jacks (J2..J5 are BOM lines; the pads are in J6..J9's footprint)."
+                         " Surface-mount so nothing of it goes through the board under the neighbouring DIN bodies",
+                    mpn="XKB PJ-320D-B-SMT", shop=LCSC, code="C2884940", price=PJD_PRICE, cur="USD", min=5,
+                    datasheet="https://lcsc.com/datasheet/lcsc_datasheet_2110100930_XKB-Connection-PJ-320D-B-SMT_C2884940.pdf"),
+    "swab_smd": dict(part="Slide switch DPDT, surface mount, 6 tabs 2.5 mm, 7.7 x 3.55 mm, knob 3.0 mm (OUT1's TRS type A / B:"
+                          " it sits over the DIN's body, where a through-hole switch's pins would hit it)",
+                     mpn="XKB SS-3235S-L2", shop=LCSC, code="C500056", price=SWS_PRICE, cur="USD", min=5,
+                     datasheet="https://www.lcsc.com/datasheet/lcsc_datasheet_2110111230_XKB-Connection-SS-3235S-L2_C500056.pdf"),
     "swab": dict(part="Slide switch DPDT, 6 pins 2.5 mm, 9.1 x 3.5 mm, handle 1.5 mm (TRS type A / B), face side;"
-                      " one per output",
+                      " OUT2..4",
                  mpn="SHOU HAN MSS22D18G2", shop=LCSC, code="C431542", price=0.0996, cur="USD", min=5,
                  datasheet="https://datasheet.lcsc.com/datasheet/pdf/257b9c94564ec11493db9cf754f9732e.pdf?productCode=C431542"),
     "opto": dict(part="Optocoupler H11L1, Schmitt trigger, open collector, DIP-6 (MIDI IN on OUT1)", mpn="EVERLIGHT H11L1",

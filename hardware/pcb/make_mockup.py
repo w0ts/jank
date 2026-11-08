@@ -72,14 +72,18 @@ def frame_box(frame, x0, y0, x1, y1, z0, z1, note):
 
 
 def output(fp, ref):
-    """the jack on the top (body, bushing past the edge) and the DIN on the bottom (plate + body, 1.0 behind the edge)"""
+    """the jack on the top (body, bushing past the edge; in the combined footprint JACK_DX along the edge and JACK_OUT
+    out) and the DIN on the bottom (plate + body, DIN_BACK behind the edge)"""
     fr = ((mm(fp.GetPosition().x), mm(fp.GetPosition().y)), fp.GetOrientationDegrees() % 360)
-    out = [frame_box(fr, -F.PJ_W / 2, -F.PJ_D, F.PJ_W / 2, 0, THICK - 0.01, THICK + F.PJ_H, ref + " jack body")]
-    bx, by = T(fr, 0.0, -0.01)
+    side = ref in ("J11", "J12", "J13", "J14")   # (the modular variant's side jacks: the jack alone, on its own axis)
+    jx, jy = (0.0, 0.0) if side else (F.JACK_DX, F.JACK_OUT)
+    out = [frame_box(fr, jx - F.PJ_W / 2, jy - F.PJ_D, jx + F.PJ_W / 2, jy, THICK - 0.01, THICK + F.PJ_H, ref + " jack body")]
+    bx, by = T(fr, jx, jy - 0.01)
     out.append(f"  translate([{bx:.3f}, {-by:.3f}, {THICK + F.PJ_BUSH_Z:.3f}]) rotate([0, 0, {fr[1]:.0f}])"
                f" rotate([90, 0, 0]) cylinder(d={F.PJ_BUSH_D}, h={F.PJ_BUSH_OUT + 0.01:.3f}, $fn=48);  // {ref} bushing")
-    if ref in ("J11", "J12", "J13", "J14"):     # (the modular variant's side jacks: the jack alone)
+    if side:
         return out + [frame_box(fr, -F.PJ_W / 2, -F.PJ_D, F.PJ_W / 2, -1.0, -LEADS_UP, 0.01, ref + " leads")]
+    out.append(frame_box(fr, jx - F.PJ_W / 2, jy - F.PJ_D, jx + F.PJ_W / 2, -1.0, -LEADS_UP, 0.01, ref + " jack leads"))
     f0 = -F.DIN_BACK
     out.append(frame_box(fr, -F.HY_W / 2, f0 - F.HY_D, F.HY_W / 2, f0, -F.HY_H, 0.01, ref + " DIN (plate and body)"))
     out.append(frame_box(fr, -8.6, -16.9, 8.6, -1.5, THICK - 0.01, THICK + LEADS_UP, ref + " DIN leads"))
