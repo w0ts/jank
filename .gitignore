@@ -6,3 +6,4 @@ managed_components/
 worktrees/
 .ruff_cache/
 .DS_Store
+.idea/

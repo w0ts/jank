@@ -68,9 +68,6 @@ eq(a.units.length, 2);
 const g = box.parseAnswer(["peer=on"]);
 eq(g.units.length, 0);
 eq(g.values.peer, "on");
-// the LOLIN32's log line is not part of an answer
-const l = box.parseAnswer(["# up=3 group=1 heard=1,0,0,0,0,0,0,0,0", "group=1"]);
-eq(Object.keys(l.values), ["group"]);
 
 // a scan's answer: group,channel,frames,units,janks,rssi
 const s = box.parseAnswer(["scan=3,11,4,3,1,-50", "scan=7,1,1,1,1,-65"]);

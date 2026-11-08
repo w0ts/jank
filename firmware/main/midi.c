@@ -43,9 +43,7 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
     jc_step(&s_tick, &s_map, now, &f);
     portEXIT_CRITICAL_ISR(&s_mux);
     uart_ll_write_txfifo(UART_LL_GET_HW(MIDI_UART), f.bytes, f.n);
-#if CONFIG_JANK_USB_NET
     woken = usb_midi_isr(f.bytes, f.n);
-#endif
     arm(timer, f.next, now);
     return woken;
 }

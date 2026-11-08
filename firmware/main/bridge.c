@@ -51,9 +51,6 @@ static uint8_t s_want;
 static int64_t s_hop_until;
 static struct js_table s_table;
 static volatile uint8_t s_table_on;
-#if !CONFIG_JANK_USB_NET
-static uint32_t s_group_frames[JK_GROUP_MAX + 1u];
-#endif
 
 uint32_t bridge_ms(void) { return (uint32_t)(esp_timer_get_time() / 1000); }
 
@@ -86,9 +83,6 @@ static void on_air(const uint8_t *f, size_t len, int8_t rssi)
     js_note(&s_scan, g, bridge_ms());
     if (s_table_on)
         js_table_note(&s_table, g, f + 10, rssi);
-#if !CONFIG_JANK_USB_NET
-    s_group_frames[g]++;
-#endif
     if (s_away || len > SLOT_BYTES || !jk_air_is_group(s_bssid, f, len))
         return;
     s = take_slot(&i);
@@ -122,7 +116,6 @@ static void on_network(const uint8_t *eth, size_t len)
     xQueueSend(s_work, &v, 0);
 }
 
-#if CONFIG_JANK_USB_NET
 /* the TinyUSB task */
 static void on_usb(const uint8_t *eth, size_t len)
 {
@@ -163,7 +156,6 @@ static void to_computer(const uint8_t *eth, size_t len, int64_t at)
     s_lat_air = us;
     s_lat_air_max = us > s_lat_air_max ? us : s_lat_air_max;
 }
-#endif
 
 static void to_air(const uint8_t *eth, size_t len, int64_t at)
 {
@@ -196,13 +188,10 @@ static void peer_out(void *ctx, uint32_t where, const uint8_t *eth, size_t len)
     (void)ctx;
     if (where == JP_TO_AIR)
         to_air(eth, len, now);
-#if CONFIG_JANK_USB_NET
     else
         to_computer(eth, len, now);
-#endif
 }
 
-#if CONFIG_JANK_USB_NET
 /* a computer that overrode its MAC: on MODE JAM's air jk_eth_to_air sees it, here nothing else would */
 static void note_computer(const uint8_t *eth, size_t len)
 {
@@ -211,7 +200,6 @@ static void note_computer(const uint8_t *eth, size_t len)
         s_b.mac_pending = 1;
     }
 }
-#endif
 
 static void net_out(void *ctx, const uint8_t *eth, size_t len)
 {
@@ -224,16 +212,11 @@ static void handle(struct slot *s, int i)
     static uint8_t eth[SLOT_BYTES];
     if (s->from == FROM_NETWORK) {
         int pass = !jn_input(&s_net, s->data, s->len, bridge_ms()) && jp_input(&s_peer, s->data, s->len, JP_TO_AIR, s->at);
-#if CONFIG_JANK_USB_NET
         if (pass)
             to_computer(s->data, s->len, s->at);
-#else
-        (void)pass;
-#endif
         give_slot(i);
         return;
     }
-#if CONFIG_JANK_USB_NET
     if (s->from == FROM_AIR) {
         size_t n = jk_air_to_eth(&s_b, s->data, s->len, s->rssi, bridge_ms(), eth, sizeof eth);
         if (n && jp_input(&s_peer, eth, n, JP_TO_AIR, s->at))
@@ -244,11 +227,6 @@ static void handle(struct slot *s, int i)
         if (jp_input(&s_peer, s->data, s->len, JP_TO_USB, s->at))
             to_air(s->data, s->len, s->at);
     }
-#else
-    size_t n = jk_air_to_eth(&s_b, s->data, s->len, s->rssi, bridge_ms(), eth, sizeof eth);
-    if (n)
-        jp_input(&s_peer, eth, n, JP_TO_AIR, s->at);
-#endif
     give_slot(i);
 }
 
@@ -378,9 +356,6 @@ void bridge_snapshot(struct jk_snapshot *s)
     s->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
 }
 
-#if !CONFIG_JANK_USB_NET
-void bridge_group_frames(uint32_t out[JK_GROUP_MAX + 1u]) { memcpy(out, s_group_frames, sizeof s_group_frames); }
-#endif
 
 void bridge_away(int away) { s_away = away != 0; }
 
@@ -444,11 +419,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
         return e;
     jp_allow(&s_peer, cfg->peer, midi_now_us());
     midi_set_quantum(cfg->quantum);
-#if CONFIG_JANK_USB_NET
     e = usb_start(mac, on_usb, on_usb_tx_done, ctl_serial_rx);
-#else
-    e = serial_start();
-#endif
     if (e != ESP_OK)
         return e;
     e = s_on_network ? radio_start_network(mac, cfg->ssid, cfg->pass, on_network) : radio_start(mac, s_b.channel, on_air);

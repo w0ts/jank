@@ -1,8 +1,7 @@
 #!/bin/sh
-# The jank board: the schematic (make_schematic.py) and its ERC, then for each layout (long: 84 x 52 mm, square:
-# 67 x 58 mm) the board (make_board.py LAYOUT), its design-rule check, the schematic's nets against the board's, the
-# Gerbers and drill files zipped for JLCPCB (bare board, 2 layers), a top and bottom render, and the printable mockups
-# (make_mockup.py LAYOUT).
+# The jank board: the schematic (make_schematic.py) and its ERC, the board (make_board.py, 84 x 52 mm), its design-rule
+# check, the schematic's nets against the board's, the Gerbers and drill files zipped for JLCPCB (bare board, 2 layers),
+# a top and bottom render, and the printable mockups (make_mockup.py). make_board.py's square layout is unused.
 #   sh make_fab.sh        (from anywhere; needs KiCad 10 (kicad-cli and its Python), python3 and OpenSCAD)
 set -eu
 cd "$(dirname "$0")"
@@ -37,4 +36,3 @@ layout() {   # $1: long | square; its files: jank-pcb[-square].kicad_pcb, fab/ o
     echo "$D/$B-gerbers.zip render-top$T.png render-bottom$T.png mockup$T-din.stl mockup$T-trs.stl"
 }
 layout long
-layout square

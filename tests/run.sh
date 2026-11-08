@@ -14,8 +14,6 @@ for t in core ctl ui; do
     "$CC" $FLAGS "$HERE/tests/test_$t.c" $CORE -o "$OUT/test_$t"
     "$OUT/test_$t"
 done
-"$CC" $FLAGS "$HERE/tests/test_log.c" "$HERE/core/jank_log.c" $CORE -o "$OUT/test_log"
-"$OUT/test_log"
 "$CC" $FLAGS "$HERE/tests/test_clock.c" "$HERE/core/jank_clock.c" -o "$OUT/test_clock"
 "$CC" $FLAGS "$HERE/tests/test_sysex.c" "$HERE/core/jank_sysex.c" -o "$OUT/test_sysex"
 "$CC" $FLAGS "$HERE/tests/test_net.c" "$HERE/core/jank_net.c" -o "$OUT/test_net"

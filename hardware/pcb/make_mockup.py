@@ -135,5 +135,5 @@ for variant in ("din", "trs"):
     stl = os.path.join(HERE, f"mockup{TAG}-{variant}.stl")
     subprocess.run(["openscad", "--backend", "manifold", "-o", stl, scad], check=True, capture_output=True)
     print("wrote", stl)
-subprocess.run(["python3", os.path.join(HERE, "check_stl.py"), *[os.path.join(HERE, f"mockup{TAG}-{v}.stl") for v in ("din", "trs")]],
+subprocess.run(["python3", os.path.join(HERE, "..", "check_stl.py"), *[os.path.join(HERE, f"mockup{TAG}-{v}.stl") for v in ("din", "trs")]],
                check=True)

@@ -182,7 +182,7 @@ function parseAnswer(lines) {
   const scans = [];
   for (const line of lines) {
     const at = line.indexOf("=");
-    if (at < 0 || line.startsWith("#")) continue;     /* the LOLIN32's test log shares the line */
+    if (at < 0) continue;
     const key = line.slice(0, at);
     const value = line.slice(at + 1);
     if (key === "scan") {
@@ -253,18 +253,6 @@ function send(command, waitMs = 2000) {
 function onLine(line) {
   if (!pendingEnd) return;
   if (isEnd(line)) pendingEnd(line); else pendingLines.push(line);
-}
-
-async function readLoop(reader) {
-  const decoder = new TextDecoder();
-  let rest = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) return;
-    const r = splitLines(rest, decoder.decode(value, { stream: true }));
-    rest = r.rest;
-    r.lines.forEach(onLine);
-  }
 }
 
 function showStatus({ values: v, units }) {
@@ -370,7 +358,7 @@ function disconnected(text) {
   say(text, true);
 }
 
-/* opening a port can reset a board with an auto-reset circuit: it answers once it has booted */
+/* the first answer after connecting, tried twice */
 async function firstAnswer() {
   try {
     return await send("get");
@@ -404,24 +392,13 @@ async function openMidi() {
   return true;
 }
 
-/* a LOLIN32: serial, through its USB chip */
-async function openSerial() {
-  port = await navigator.serial.requestPort();
-  await port.open({ baudRate: 115200 });
-  writer = port.writable.getWriter();
-  readLoop(port.readable.getReader()).catch(() => disconnected("The stick went away."));
-}
-
 async function connect() {
-  if (!navigator.requestMIDIAccess && !("serial" in navigator)) {
-    say("This browser has neither Web MIDI nor Web Serial: use Chrome or Edge on a computer.", true);
+  if (!navigator.requestMIDIAccess) {
+    say("This browser has no Web MIDI: use Chrome or Edge on a computer.", true);
     return;
   }
   try {
-    if (!(await openMidi())) {
-      if (!("serial" in navigator)) throw new Error("No jank USB MIDI port found. Is the stick plugged in?");
-      await openSerial();
-    }
+    if (!(await openMidi())) throw new Error("No jank USB MIDI port found. Is the stick plugged in?");
     showSettings(await firstAnswer());
     $("connect").textContent = "Connected";
     $("bootloader").disabled = false;

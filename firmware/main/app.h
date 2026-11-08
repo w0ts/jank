@@ -15,10 +15,6 @@
 void store_load(struct jk_cfg *c);
 esp_err_t store_save(const struct jk_cfg *c);
 
-/* reset_button.c: a board whose only button is RST. 1 at the second reset within the window: switch the network */
-int reset_button_double(void);
-esp_err_t reset_button_arm(void);
-
 /* radio.c: raw 802.11 on one channel */
 typedef void (*radio_rx_fn)(const uint8_t *frame, size_t len, int8_t rssi);
 esp_err_t radio_start(const uint8_t mac[6], uint32_t channel, radio_rx_fn rx);
@@ -33,7 +29,6 @@ esp_err_t radio_network_set_mac(const uint8_t mac[6]);
 int radio_network_up(void);
 void radio_network_info(int8_t *rssi, uint8_t *channel);
 
-#if CONFIG_JANK_USB_NET
 /* usb.c: CDC-NCM + USB MIDI, whose SysEx carries the control line */
 typedef void (*usb_frame_fn)(const uint8_t *eth, size_t len);
 typedef void (*usb_free_fn)(void *token);
@@ -45,14 +40,7 @@ esp_err_t usb_send(const uint8_t *eth, size_t len, void *token);   /* tx_done(to
 esp_err_t usb_midi_host_start(void);
 void usb_midi_host_send(const uint8_t *packets, size_t n);
 bool usb_midi_isr(const uint8_t *bytes, size_t n);                  /* from the timer interrupt -> a task was woken */
-#else
-/* serial.c: control and the test log on UART0, at the board's USB-serial chip. No computer is ever on the bridge */
-esp_err_t serial_start(void);
-static inline int usb_up(void) { return 0; }
-void bridge_group_frames(uint32_t out[JK_GROUP_MAX + 1u]);
-void radio_unicast_results(uint32_t *ok, uint32_t *fail);
-#endif
-void usb_serial_write(const char *text, size_t n);                 /* the control line, on either transport */
+void usb_serial_write(const char *text, size_t n);                 /* the control line, as SysEx on the MIDI port */
 
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);

@@ -19,8 +19,7 @@ from the PCB.* Plugging and unplugging a DIN or a TRS plug loads the box, not th
 | File | What |
 |---|---|
 | `jank_box.scad` | The box, the lid, the wall test strip, the checks. `outs` picks the connectors, `part` the output |
-| `make_stl.sh` | Exports every set's STLs, runs the collision, drop and brace checks, renders the PNGs, runs `check_stl.py` |
-| `check_stl.py` | One body, 0 open edges, 0 non-manifold, 0 misoriented (identical to `../pcb/check_stl.py` and the mini branch's) |
+| `make_stl.sh` | Exports every set's STLs, runs the collision, drop and brace checks, renders the PNGs, runs `../check_stl.py` (one body, 0 open edges, 0 non-manifold, 0 misoriented) |
 | `stl/jank_box_<set>_box.stl`, `stl/jank_box_<set>_lid.stl` | The printable parts, already in print orientation |
 | `stl/jank_box_front_test.stl` | A 41 x 26 mm strip of the connector wall with one DIN bore and one jack U-slot: try the plugs first |
 | `renders/open_<set>.png`, `box_`, `front_`, `back_`, `lid_` | Box with the board in it (lid lifted), the empty box, the front wall, the back wall, the lid as printed |

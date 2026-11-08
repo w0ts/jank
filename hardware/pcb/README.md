@@ -25,10 +25,10 @@ The drawing: [`jank-pcb-schematic.pdf`](jank-pcb-schematic.pdf). The board: [`re
 |---|---|
 | `make_schematic.py` | The schematic, the project (with the board's rules), the XIAO and switch symbols, the intended nets and `BOM.md`, from one parts table |
 | `make_footprints.py` | The CUI SJ1-3523N, the CUI SDS-50J, the combined output footprints (`_AB`: the jack on its own nets, through the switch), the A/B slide switch, the XIAO on headers (`lib/jank.pretty/`) |
-| `make_board.py [long|square]` | `jank-pcb.kicad_pcb` (long, 84 x 52) or `jank-pcb-square.kicad_pcb` (67 x 58): placement, routes, pours, stitching vias, silk (KiCad's Python) |
-| `make_mockup.py`, `check_stl.py` | `mockup-din.stl`, `mockup-trs.stl` (and their `.scad`): the board and its parts as one solid, checked (`check_stl.py` from the `mini` branch) |
+| `make_board.py` | `jank-pcb.kicad_pcb`: placement, routes, pours, stitching vias, silk (KiCad's Python). Its `square` layout (an older 67 x 58 board) is unused and not built |
+| `make_mockup.py` | `mockup-din.stl`, `mockup-trs.stl` (and their `.scad`): the board and its parts as one solid, checked by `../check_stl.py` |
 | `check_nets.py` | The netlist against the intent and the design rules (the A/B switches, the MIDI IN, the controls), and the board's pads against the schematic |
-| `make_fab.sh` | All of it in order: schematic, ERC, PDF, then for each layout the board, DRC, nets, Gerbers + drill, renders, mockups |
+| `make_fab.sh` | All of it in order: schematic, ERC, PDF, the board, DRC, nets, Gerbers + drill, renders, mockups |
 | `jank-pcb.kicad_sch`, `jank-pcb.kicad_pcb`, `jank-pcb.kicad_pro`, `sym-lib-table`, `fp-lib-table` | The KiCad 10 project (generated) |
 | `lib/jank.kicad_sym` | The XIAO ESP32S3 and DPDT slide switch symbols (drawn by `make_schematic.py`) |
 | `lib/jank.pretty/XIAO-ESP32-S3-DIP.kicad_mod` | Seeed's footprint, unchanged (source below) |
@@ -48,8 +48,7 @@ sh hardware/pcb/make_fab.sh        # needs KiCad 10 (kicad-cli and its Python), 
 - DRC (long): **0 errors, 0 unconnected, 21 warnings**, all from Seeed's XIAO footprint as published: 14 "silkscreen
   over copper" (its outline over its own pads) and 7 "silkscreen clipped by the board edge" (its USB-C lip drawn past
   the back edge, where the socket really overhangs).
-- `check_nets.py`: 241 schematic pins, 46 nets, 0 problems; **272 board pads against the schematic, 0 differences**
-  (the square board: 195 pads, 0 differences).
+- `check_nets.py`: 241 schematic pins, 46 nets, 0 problems; **272 board pads against the schematic, 0 differences**.
 - Mockups: all four STLs one body, **0 open edges**, 0 non-manifold, 0 misoriented.
 
 **XIAO footprint source:** `XIAO-ESP32-S3-DIP.kicad_mod` from Seeed's
@@ -59,7 +58,7 @@ and an SMD pad at each of the 14 positions, rows 15.24 mm apart, 2.54 mm pitch, 
 product page gives both "21 x 17.8" and "21 x 17.5 mm". **The long board uses `XIAO-ESP32-S3-DIP_Headers`**: the same
 pads and outline, the courtyard only on the two pin rows (each 3.35 mm wide), because MODE, the LEDs and some 0805s sit
 between the rows: **the XIAO must stand on 2.54 mm headers there, not flat on its castellations.** The schematic's
-footprint field still names the plain one (one schematic for both boards).
+footprint field still names the plain one.
 
 ## The pin table (what the firmware must say)
 
@@ -94,19 +93,19 @@ On the module and not on a pad: the user LED (GPIO21, yellow, active low through
 #define BOARD_LED_RGB_GPIO 6           /* 2 x SK6812MINI-E, GRB; ui.c drives one pixel today */
 #define BOARD_LED_MONO_GPIO (-1)
 #define BOARD_MIDI_TX_GPIO 1
-#define BOARD_MIDI_TX_MORE_GPIOS {2, 5, 4}   /* as the mini branch's tx_more_up(): the UART TX signal through the GPIO matrix */
+#define BOARD_MIDI_TX_MORE_GPIOS {2, 5, 4}   /* midi.c's tx_more_up(): the UART TX signal through the GPIO matrix */
 #define BOARD_MIDI_SOURCE_GPIO (-1)    /* the sources are the 3V3 rail (OUT1's through Q4) */
 #define BOARD_MIDI_IN_EN_GPIO 7        /* new: high = OUT1 is a MIDI IN */
 #define BOARD_MIDI_RX_GPIO 8           /* new: UART RX in MIDI IN mode */
 #define BOARD_PWR_CUT_GPIO 9           /* new: drive low once a computer has mounted the device; never in host mode */
 ```
 
-`BOARD_MIDI_TX_MORE_GPIOS` and `tx_more_up()` exist only on the `mini` branch (Lolin32) so far. `BOARD_PWR_CUT_GPIO` is
+`BOARD_MIDI_TX_MORE_GPIOS` and `tx_more_up()` are in `firmware/main/midi.c`, used by no board yet. `BOARD_PWR_CUT_GPIO` is
 new: the USB code drives it low when TinyUSB reports a mount in device mode, and leaves it an input otherwise. The
 ladder, the encoder and **MIDI IN mode** (the steps below in "MIDI IN on OUT1") are new firmware too; today's
 `BOARD_BUTTON_GPIO` (a plain button) has no place on this board any more.
 
-**A finding for today's XIAO wiring:** the main README wires MIDI data to D6 (GPIO43) through 10 ohm. The module has
+**Why not D6 for MIDI:** the bare-XIAO build (`docs/boards.md`) wires MIDI data to D6 (GPIO43) through 10 ohm. The module has
 499 ohm between U0TXD and the D6 pad (v1.2 schematic, R6). The loop becomes 33 + 10 + 499 + 220 + 17.7 ohm, about
 **2.3 mA** instead of 6.4 mA (same assumptions as below): below CA-033 and likely too little for some receivers
 (*unverified per receiver*). The ROM also prints its boot log on GPIO43. This board puts the encoder there instead.
@@ -159,7 +158,7 @@ diode adds one more: with ~CE on VOUT it switches off only once VOUT exceeds VIN
 **0.5 A can flow back into J1** before it blocks (the datasheet's IRCB, 0.5 A typical, 1 A max). Two sources are
 therefore not hard-shorted, but they are not isolated within 80 mV either. Alternatives the user may prefer: a
 slide switch "charger / computer" in place of Q1 (simple, can be forgotten), or leaving Q1/Q2 out and bridging Q1
-(the README rule "never feed the 5V pin with a computer on the USB port" then stays the user's to keep).
+(the rule "never feed the 5V pin with a computer on the USB port", `docs/usb.md`, then stays the user's to keep).
 
 **The cut circuit:** Q1 source on VBUS_IN, R3 100 k gate to source (off by default); Q2 pulls Q1's gate to GND.
 Q2's gate (NG) sits on R4/R5 100 k / 100 k from VBUS_IN, so 2.5 V with a 5 V charger (above the AO3400A's 1.45 V
@@ -178,20 +177,17 @@ J1 has Rd only, so the board cannot read what the charger offers.
 XIAO's 1 uF and C3 10 uF. C4 (100 uF, 5 x 5.4 mm electrolytic) is drawn but **not fitted**: fit it if hot-plugging
 gear in host mode resets the stick (*unverified either way*); a computer then sees more than the device limit at plug-in.
 
-
-
 ## Controls (face side): MODE, PLAY/STOP, the encoder
 
 **One row on the face**, centres at y = 13.8 mm from the back edge (the encoder's shaft at 14.5): **MODE** (SW1) under
 the XIAO with the two LEDs right behind it, **PLAY/STOP** (SW6) and the **encoder** (SW7) right of the XIAO, under the
 power path (the power parts sit on the floor side round their legs). Coordinates and lid holes: "The box" below.
 
-**The buttons:** SW1 and SW6, 6 x 6 mm through hole, **HRO K2-1102DP-L3SW-04, 9.5 mm tall** (LCSC C445493, USD 0.0633,
-min 10). Its datasheet (HRO K2-1102DP, read 2026-11-08) gives the 4 legs on 6.5 x 4.5 mm with 1.0 mm holes, as
+**The buttons:** SW1 and SW6, 6 x 6 mm through hole, **HRO K2-1102DP-L3SW-04, 9.5 mm tall** (LCSC C445493). Its datasheet (HRO K2-1102DP, read 2026-11-08) gives the 4 legs on 6.5 x 4.5 mm with 1.0 mm holes, as
 KiCad's `SW_PUSH_6mm` (1.1 mm holes), and the heights by code: L = 9.5 mm, S = 13, X = 17, 5 = 23 mm. Mounted from the
 face side; their legs come through to the floor side, **MODE's under the module: trim them to 1.5 mm or less.**
 
-**The encoder:** **ALPS EC11E09244BS**, LCSC **C470742**, **USD 2.3275** (min 1, 4690 in stock on 2026-11-08):
+**The encoder:** **ALPS EC11E09244BS**, LCSC **C470742** (read 2026-11-08):
 EC11, vertical, **18 detents / 9 pulses**, push switch (0.5 mm travel), **flat (D) metal shaft, actuator length
 20 mm** (Alps EC11 catalog table, read via LCSC 2026-11-08; the length taken as measured from the mounting surface,
 *unverified on the drawing*). Body 11.7 x 12.5 mm, **about 6.5 mm tall** (*the drawing's figure as read from the PDF's
@@ -200,7 +196,7 @@ switch 14.5 mm across, two mounting tabs), mounted on the face side: **the body 
 With the lid's inside about 7 mm above the face (the user's figure) the body has about 0.5 mm to spare and the shaft
 stands **about 11.5 mm out of a 1.5 mm lid** (room for a knob). **"20-detent class":** the EC11E types with a push
 switch that LCSC stocks come with 18, 30 or 36 detents; 18 is the nearest. Considered and not used: Bourns
-PEC11R-4220F-S0024 (24 detents, LCSC C143797, USD 2.78): an M7 bushing (it could be nutted to the lid) but another
+PEC11R-4220F-S0024 (24 detents, LCSC C143797): an M7 bushing (it could be nutted to the lid) but another
 footprint (*the user's call*).
 
 **The encoder's A / B** go to **GPIO43 (ENC_A) and GPIO44 (ENC_B)**, each with **10 k to 3V3 (R64, R65) and 100 nF to
@@ -225,9 +221,8 @@ The thresholds are the midpoints; the levels are 0.7 to 1.0 V apart, far beyond 
 (with 12 dB attenuation it reads up to about 3.1 V, so idle simply reads full scale; *the ADC figures unverified*).
 **The ladder reads one switch at a time:** two pressed together read as the lower one (MODE + PLAY = 0.47 V reads as
 MODE), so chords are not possible. C9 with the 10 k settles in a few ms; sample at 100 Hz or faster and debounce in
-firmware. A switch held at power-up only pulls GPIO3 low, which the default eFuses ignore. Parts: R60 10 k (C17414,
-USD 0.0034), R61 2.2 k (C17520, USD 0.0050), R62 6.8 k (C17772, USD 0.0028), R63 22 k (C17560, USD 0.0048), all
-UNI-ROYAL 0805 1 %, min 100.
+firmware. A switch held at power-up only pulls GPIO3 low, which the default eFuses ignore. Parts: R60 10 k (C17414), R61 2.2 k (C17520), R62 6.8 k (C17772), R63 22 k (C17560), all
+UNI-ROYAL 0805 1 %.
 
 GPIO0 in parallel with the XIAO's BOOT button is **not possible**: GPIO0 is on no XIAO pad. With the XIAO on the floor
 side, its BOOT and RESET buttons and its own LED are **inside the box**: download mode is then only the firmware's 10 s
@@ -262,11 +257,11 @@ parallel pads (below). **J(5+k)**: DIN-5 180 degree, pin 5 = TIPk, pin 4 = RINGk
 jack. It swaps the jack's tip and ring between TIPk (data, the sink) and RINGk (the source); the DIN is not switched.
 Pins 1 RINGk, 2 JRk, 3 TIPk | 4 TIPk, 5 JTk, 6 RINGk; **1-2 and 4-5 closed = type A** (tip = data, ring = source).
 Which end of the travel closes 1-2 is the part's own (*unverified: check with a meter before writing "A" on the box*).
-Part: **SHOU HAN MSS22D18G2**, LCSC C431542, USD 0.0996 (min 5): 6 pins 2.5 mm apart, rows 3.4 mm, 0.8 mm holes; body
+Part: **SHOU HAN MSS22D18G2**, LCSC C431542: 6 pins 2.5 mm apart, rows 3.4 mm, 0.8 mm holes; body
 9.1 x 3.5 x 3.5 mm, handle 1.5 mm (the knob's top 5.0 mm above the face), travel 2.0 mm along the body. The G4
 version (C431543) has a taller handle (*length unverified*). Silk "OUTk A|B" by each switch on the face side.
 
-**Currents** (the mini README's numbers apply: CA-033 at 3.3 V, receiver 220 ohm, opto LED 1.5 V given, pad about
+**Currents** (CA-033 at 3.3 V, receiver 220 ohm, opto LED 1.5 V given, pad about
 17.7 ohm from IOL 28 mA at 0.495 V, datasheet v2.2 Table 5-4, at drive strength 3): **6.4 mA** typical per output,
 8.6 mA at most, 5.1 mA at least (OUT1: Q4's 0.06 to 0.1 ohm more, nothing); the 3V3 rail carries 4 x 6.4 = 26 mA, at
 most 34 mA. The opto LED voltage and the pad's resistance are *unverified*.
@@ -277,10 +272,10 @@ most 34 mA. The opto LED voltage and the pad's resistance are *unverified*.
 - **The pads** are GPIO1, 2, 5, 4 (OUT1 to OUT4), none strapping (strapping: 0, 3, 45, 46).
 - **Power-up glitch:** the datasheet gives GPIO1 to GPIO14 a 60 us low glitch at power-up; a receiver may see one stray
   byte when the stick powers up (*unverified*).
-- **One UART, four pads:** `uart_set_pin` puts UART TX on GPIO1, `tx_more_up()` (mini branch) connects the same TX
+- **One UART, four pads:** `uart_set_pin` puts UART TX on GPIO1, `tx_more_up()` (midi.c) connects the same TX
   signal to GPIO2, 5, 4 through the GPIO matrix.
 
-**The TRS part:** **CUI SJ1-3523N**, 3.5 mm stereo, right angle, no switch, LCSC C20182914, USD 1.4889. Datasheet
+**The TRS part:** **CUI SJ1-3523N**, 3.5 mm stereo, right angle, no switch, LCSC C20182914 Datasheet
 SJ1-352XN, 10/05/2022: pin 1 sleeve, 2 tip, 3 ring; body 12.0 x 11.0 x 5.0 mm; bushing 6.0 mm, 3.3 mm out past the
 body's front, its axis 2.5 mm above the board, so it **must stand past the board's edge**. In the schematic J2..J5 (the
 TRS) are BOM lines only; on the board their pads are part of J6..J9's footprint.
@@ -300,8 +295,7 @@ board, 15.8 mm deep, seven 1.3 mm holes (pins 1 to 5 and two "E" shield pins on 
 - **One pin, IN_EN (GPIO7), switches both:** low = **OUT mode**: Q4 on (its gate 3.3 V below its source: OUT1's 33 ohm
   sees 3V3 like the others), Q3 off (and its body diode points against the loop's forward current: the opto's loop is
   open). High = **IN mode**: Q4 off (no source), Q3 on. **At reset GPIO7 floats and R53 (100 k) pulls it low: OUT mode**
-  (Q4's gate pulled down = on; no separate pull-up is needed on Q4, whose gate sits on the same line). There is **no
-  source pin any more** (the round-6 SRC1 GPIO): GPIO44 went to the encoder.
+  (Q4's gate pulled down = on; no separate pull-up is needed on Q4, whose gate sits on the same line).
 - **IN mode, the firmware's steps:** (1) set **TX1 (GPIO1) to input, no pull**, off the UART's TX matrix (**the TX pad
   must be Hi-Z**, or it and the sender fight through 10 ohm); (2) set **IN_EN high** (Q4 cuts the source, Q3 closes
   the loop); (3) route **UART RX to GPIO8** through the GPIO matrix, 31250 baud, 8N1, no inversion (the H11L1's output
@@ -311,14 +305,13 @@ board, 15.8 mm deep, seven 1.3 mm holes (pins 1 to 5 and two "E" shield pins on 
   TRS in IN mode:** the switch must match the sender's TRS type. In the wrong position the sender's current runs
   backwards: **D2 conducts, the opto's LED sees at most a diode's drop in reverse, no data, nothing harmed**. A DIN
   needs no setting.
-- **D2 sits across the opto's LED** (OPTO_A to OPTO_K), not across DIN pins 4/5 (a deviation from the round-5 brief):
-  either way a reversed sender's current goes round the LED; across the LED is where the MIDI 1.0 IN circuit draws it
+- **D2 sits across the opto's LED** (OPTO_A to OPTO_K), not across DIN pins 4/5: either way a reversed sender's current goes round the LED; across the LED is where the MIDI 1.0 IN circuit draws it
   (*from memory, the spec not re-read*).
 - **Risk, unmeasured:** with a 5 V sender, RING1 can rise above 3V3; Q4's body diode (drain to source) then feeds the
   3V3 rail through R21 33 ohm, and TIP1 reaches the Hi-Z TX1 pad's protection through 10 ohm: roughly a few mA taken
   from the opto's share (*estimate*). A 3.3 V sender stays below that.
 - **The DIN's shield (pin 2) is on GND** on OUT1 as on the outputs; a spec MIDI IN leaves it open (*the user's call*).
-- **Parts:** U4 **EVERLIGHT H11L1** (DIP-6, LCSC C78588, USD 0.3507, min 5); D2 1N4148W (C81598); R50 220 ohm (C17557),
+- **Parts:** U4 **EVERLIGHT H11L1** (DIP-6, LCSC C78588); D2 1N4148W (C81598); R50 220 ohm (C17557),
   R51 4.7 k (C17673), R52 1 k, R53 100 k; Q3 AO3400A, **Q4 AO3401A** (as Q1, C15127); C8 100 nF.
 
 ### The swappable resistors (the user's ruling, as on the SD board)
@@ -346,10 +339,9 @@ SRC1 line (3V3 through Q4) drives the ring directly. A 1206 in parallel with a 3
 - **Test points** (1.5 mm pads, floor side, labelled): TP1 +5V by J1, TP2 +3V3 in the MIDI IN corner, TP3 GND and TP4
   TX (MIDI_TX1) left of the XIAO.
 
-
 ## The layout
 
-**Outline: 84.0 x 52.0 mm** (4368 mm²; round 6 without PLAY/STOP and the encoder was 76 x 52), a plain rectangle,
+**Outline: 84.0 x 52.0 mm**, a plain rectangle,
 2 layers, 1.6 mm (*JLCPCB's default thickness, assumed*). In the Gerbers the origin is the lower left of the top view.
 Two **M2 holes** (2.2 mm, not plated), both on the right: H1 at (80.8, 25.0), H2 at (80.8, 48.8); the left corners
 belong to OUT1's and OUT2's connectors (the DIN / jack bodies are held by the box's walls).
@@ -480,72 +472,6 @@ face-side parts below (MODE and PLAY/STOP 9.5 mm, the A/B switches 5.0 mm, **the
 and a 6 mm shaft to 20 mm**), the leads as blocks (the XIAO's as its two header rows), one solid each. The parallel
 pads and jumpers are not parts. C4 (not fitted) is left out.
 
-## The square variant (`make_board.py square`)
-
-The schematic **before the A/B switches and the MIDI IN** (frozen for it as `fab/square/intended-nets.json` and
-`fab/square/jank-pcb.net.xml`; the user's ruling: the square board stays as it is, regenerated by the script, not
-redesigned) on a squarer board: **OUT1 and OUT2 on the front edge, OUT3 on the left edge, OUT4
-on the right edge**, both USB-Cs on the back edge. Files: `jank-pcb-square.kicad_pcb` (its rules in
-`jank-pcb-square.kicad_pro`), `fab/square/jank-pcb-square-gerbers.zip` (+ `fab/square/gerbers/`, `fab/square/drc.rpt`),
-`render-top-square.png`, `render-bottom-square.png`, `mockup-square-din.stl`, `mockup-square-trs.stl`. The long board
-(84 x 52, above) is the default (`make_board.py` with no argument, or `long`). The BOM's A/B switches, U4 and its parts, SW6, the encoder and the ladder
-are not on the square board.
-
-**Last run (2026-11-08):** DRC **0 errors, 0 unconnected, 21 warnings** (the same 21 as the long board, all Seeed's XIAO
-footprint); `check_nets.py`: **195 board pads against the schematic, 0 differences**; both mockups one body, **0 open
-edges**.
-
-![square, top](render-top-square.png)
-
-**Outline: 67.0 x 58.0 mm** (3886 mm²; the long board, with its A/B switches, the MIDI IN and the controls, is 84 x 52 = 4368 mm²). **Not 50 x 50, and why:** each output is a
-DIN-5 footprint 20.5 x 16 mm plus its two resistor groups (about 19 x 4.5 mm), four of them take about 1800 mm²; the
-XIAO with its two side lanes is 21 x 22 mm and its socket must be on the back edge, J1 beside it, and the power path
-(15 parts) beside J1. Two outputs on the front edge set the width to at least 41 mm plus the side outputs' depth
-(16 mm DIN + 6 mm groups each, the XIAO between them): **67 mm**. The height is the back corner (the power path and the
-LED / button cluster, 20 mm), one side DIN (20.5 mm) and the front band (17.5 mm): **58 mm**. A tighter pass could reach
-about **67 x 52** by moving the button-transistor network (Q2, R4-R6, C2) into the empty area below the XIAO and
-re-packing both back corners to 14 mm (*not done*: it reroutes PWR_CUT, PG and NG across the right lane).
-
-**Edges** (x from the left edge, y from the back edge, seen from the floor side; seen from the face, x becomes 67.0 - x):
-
-| Edge | What | Where |
-|---|---|---|
-| Front | OUT1, OUT2 (DIN / jack), pitch 20.5 mm | axes at x = 23.25 and 43.75 |
-| Left | OUT3, face on the edge | axis at y = 30.5 |
-| Right | OUT4, face on the edge | axis at y = 30.5 |
-| Back | XIAO socket (1.5 mm past the edge), J1 power USB-C | x = 33.5 and x = 60.0 |
-
-The DIN faces and the jacks' bushings stand as on the long board (DIN face centre 10.0 mm above the floor-side
-surface; jack bushing axis 2.5 mm above it, 3.3 mm past the edge), on all four outputs.
-
-**Placement:** the side outputs carry their resistor groups behind them, as on the long board; the front outputs'
-groups sit in the front corners (OUT1's left, OUT2's right), stacked. Back right corner: J1 and the power path. Back
-left corner: SW1 (face side) with the two LEDs in their cut-outs, U3, R7, C5-C7 and the R8 group. The 3V3 bus runs
-across the board between the side outputs and the front ones; the test points TP2 (3V3), TP3 (GND) and TP4 (TX) are
-in the middle, below the XIAO, with **M2 holes** H1 at (2.6, 16.8) and H2 at (40.0, 36.0) (the corners belong to the
-connectors).
-
-**Two differences from the long board's routing, to note:**
-- **OUT4's TX line runs on the top layer under the XIAO module** (from D3 between the right row's pads 10 and 11):
-  in the square variant **the XIAO must sit on 2.54 mm headers**, not flat on its castellations (its bottom pads would
-  sit on that line, only the solder mask between).
-- **LED2's ground pad is connected solid to the pour** (no thermal relief: the board edge and its cut-out leave room for
-  one spoke only): it takes a little more heat to solder.
-
-**Lid (face side) openings, square board** (top-view coordinates; face-view x in brackets; heights as on the long board):
-
-| Opening | Centre x, y (mm) | Size |
-|---|---|---|
-| Button (SW1, 9.5 mm) | 15.75 (51.25), 5.45 | hole 4.0 mm round |
-| LED1 window | 5.0 (62.0), 6.6 | 3.6 x 3.2 mm |
-| LED2 window | 5.0 (62.0), 2.2 | 3.6 x 3.2 mm |
-
-**Heights per edge** for the box: front, left and right walls each carry outputs (DIN face 20 x 21.1 mm, centre 10.0 mm
-up; or the jack's 6 mm bushing, axis 2.5 mm up, 3.3 mm out); the back wall carries the two USB-Cs (the XIAO's socket at
-the module's top, about 5 mm up on headers, *estimate*; J1 about 1.6 mm up, *estimate*). Floor side tallest: the DIN,
-21.1 mm; face side tallest but SW1: the leads, 3.5 mm untrimmed.
-
-
 ## Unverified, all in one place
 
 - **The SJ1-3523N:** its holes against a real part (the drawing only); that the 1.2 mm holes are plastic pegs; that its
@@ -573,8 +499,6 @@ the module's top, about 5 mm up on headers, *estimate*; J1 about 1.6 mm up, *est
 - USB4125's 0.3 mm gap between A5 and B5 is hand-solderable with care (*the user's call*).
 - JLCPCB: 0.2 mm copper to a routed edge, plated slots and internal cut-outs at no extra cost.
 - Every height marked *estimate* above; every price (one reading on 2026-11-08, `BOM.md`).
-- **Square variant:** OUT4's TX line under the XIAO module on top (the XIAO on headers, not flat); LED2's solid ground
-  connection; the 67 x 52 estimate for a tighter pass (not laid out). It has no A/B switches, no MIDI IN, no encoder.
 
 ## Next steps
 
