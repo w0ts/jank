@@ -26,7 +26,7 @@ if [ -f "$HERE/core/jank_peer.c" ]; then
 fi
 
 FM1BASE="${FM1BASE:-$HERE/../optimist/fm1base}"
-if [ ! -f "$FM1BASE/wifi/wifi_jam.c" ]; then echo "crosscheck: no fm1-base Wi-Fi sources at $FM1BASE (set FM1BASE to an Optimist checkout's fm1base)"; exit 1; fi
+if [ ! -f "$FM1BASE/wifi/wifi_jank.c" ]; then echo "crosscheck: no fm1-base Wi-Fi sources at $FM1BASE (set FM1BASE to an Optimist checkout's fm1base)"; exit 1; fi
 OPT="$FM1BASE/wifi"
 # The harness pulls in Optimist's FM-1 side of the air format at test time only: nothing of it is copied here or shipped.
 "$CC" -std=gnu11 -g -O1 -Wall -fsanitize=address,undefined -fno-sanitize-recover=all -I"$HERE/core" -I"$OPT" -I"$HERE/third_party/link" "$HERE/tests/crosscheck_optimist.c" "$HERE/core/jank_peer.c" $CORE "$LINK" -o "$OUT/crosscheck"

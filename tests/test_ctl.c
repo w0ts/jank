@@ -103,7 +103,7 @@ static void test_network_settings(void)
     char long_ssid[50], long_pass[80];
     setup();
     CHECK(run("get") == JK_CTL_NONE);
-    CHECK(strstr(out, "net=jam\n") && strstr(out, "ssid=\n") && strstr(out, "pass=none\n"));
+    CHECK(strstr(out, "net=jank\n") && strstr(out, "ssid=\n") && strstr(out, "pass=none\n"));
     CHECK(run("set ssid My Home Net") == JK_CTL_CFG_CHANGED && !strcmp(cfg.ssid, "My Home Net"));
     CHECK(run("set pass correct horse battery") == JK_CTL_CFG_CHANGED && !strcmp(cfg.pass, "correct horse battery"));
     CHECK(run("set net wifi") == JK_CTL_CFG_CHANGED && cfg.net == JK_NET_WIFI);
@@ -123,7 +123,7 @@ static void test_network_settings(void)
     CHECK(run(long_ssid) == JK_CTL_NONE);
     CHECK(run("set net cable") == JK_CTL_NONE && cfg.net == JK_NET_WIFI);
     CHECK(run("set pass") == JK_CTL_CFG_CHANGED && cfg.pass[0] == 0);
-    CHECK(run("set net jam") == JK_CTL_CFG_CHANGED && cfg.net == JK_NET_JAM);
+    CHECK(run("set net jank") == JK_CTL_CFG_CHANGED && cfg.net == JK_NET_JANK);
 }
 
 static void test_status_wifi(void)
@@ -228,33 +228,33 @@ static void test_led(void)
     enum { BEAT = 1000000 };           /* micro-beats */
     int32_t mpb = 500000;              /* 120 BPM: a flash of JK_BEAT_FLASH_MS is 0.16 beat */
     int64_t flash = (int64_t)JK_BEAT_FLASH_MS * 1000 * BEAT / mpb;
-    /* JAM: off, lit on each beat */
-    CHECK(jk_led_lit(JK_NET_JAM, 1, 0, mpb, 4) == 1);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, BEAT + flash - 1, mpb, 4) == 1);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, BEAT + flash, mpb, 4) == 0);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, 7 * (int64_t)BEAT + 10, mpb, 4) == 1);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, -BEAT + 10, mpb, 4) == 1);           /* before the session's beat 0 too */
-    CHECK(jk_led_lit(JK_NET_JAM, 1, -10, mpb, 4) == 0);
+    /* JANK: off, lit on each beat */
+    CHECK(jk_led_lit(JK_NET_JANK, 1, 0, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, BEAT + flash - 1, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, BEAT + flash, mpb, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, 7 * (int64_t)BEAT + 10, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, -BEAT + 10, mpb, 4) == 1);           /* before the session's beat 0 too */
+    CHECK(jk_led_lit(JK_NET_JANK, 1, -10, mpb, 4) == 0);
     /* station: the other way round, lit and off on each beat */
     CHECK(jk_led_lit(JK_NET_WIFI, 1, 0, mpb, 4) == 0);
     CHECK(jk_led_lit(JK_NET_WIFI, 1, BEAT / 2, mpb, 4) == 1);
     /* no session: the mode's rest */
-    CHECK(jk_led_lit(JK_NET_JAM, 0, 0, mpb, 4) == 0 && jk_led_lit(JK_NET_WIFI, 0, 0, mpb, 4) == 1);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, 0, 0, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_JANK, 0, 0, mpb, 4) == 0 && jk_led_lit(JK_NET_WIFI, 0, 0, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, 0, 0, 4) == 0);
     /* the bar's first beat flashes longer: beat 0, 4, 8 of a 4-beat bar, and -4 before the session's 0 */
     int64_t bar = (int64_t)JK_BAR_FLASH_MS * 1000 * BEAT / mpb;
     CHECK(JK_BAR_FLASH_MS > JK_BEAT_FLASH_MS);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, bar - 1, mpb, 4) == 1 && jk_led_lit(JK_NET_JAM, 1, bar, mpb, 4) == 0);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, 8 * (int64_t)BEAT + bar - 1, mpb, 4) == 1);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, -4 * (int64_t)BEAT + bar - 1, mpb, 4) == 1);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, 1 * (int64_t)BEAT + bar - 1, mpb, 4) == 0);    /* beat 2: the short flash */
-    CHECK(jk_led_lit(JK_NET_JAM, 1, -3 * (int64_t)BEAT + bar - 1, mpb, 4) == 0);
-    CHECK(jk_led_lit(JK_NET_JAM, 1, 3 * (int64_t)BEAT + bar - 1, mpb, 3) == 1);    /* a 3-beat bar */
+    CHECK(jk_led_lit(JK_NET_JANK, 1, bar - 1, mpb, 4) == 1 && jk_led_lit(JK_NET_JANK, 1, bar, mpb, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, 8 * (int64_t)BEAT + bar - 1, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, -4 * (int64_t)BEAT + bar - 1, mpb, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, 1 * (int64_t)BEAT + bar - 1, mpb, 4) == 0);    /* beat 2: the short flash */
+    CHECK(jk_led_lit(JK_NET_JANK, 1, -3 * (int64_t)BEAT + bar - 1, mpb, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, 3 * (int64_t)BEAT + bar - 1, mpb, 3) == 1);    /* a 3-beat bar */
     CHECK(jk_led_lit(JK_NET_WIFI, 1, bar - 1, mpb, 4) == 0);                        /* the network's: off longer */
     /* fast: 300 BPM, a beat is 200 ms, the downbeat's 150 ms is cut to a third of it */
-    CHECK(jk_led_lit(JK_NET_JAM, 1, BEAT / 3 - 1, 200000, 4) == 1 && jk_led_lit(JK_NET_JAM, 1, BEAT / 3, 200000, 4) == 0);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, BEAT / 3 - 1, 200000, 4) == 1 && jk_led_lit(JK_NET_JANK, 1, BEAT / 3, 200000, 4) == 0);
     /* a slow session's flash is still JK_BEAT_FLASH_MS long */
-    CHECK(jk_led_lit(JK_NET_JAM, 1, (int64_t)JK_BEAT_FLASH_MS * 1000 * BEAT / 2000000 - 1, 2000000, 4) == 1);
+    CHECK(jk_led_lit(JK_NET_JANK, 1, (int64_t)JK_BEAT_FLASH_MS * 1000 * BEAT / 2000000 - 1, 2000000, 4) == 1);
 }
 
 static void test_button(void)

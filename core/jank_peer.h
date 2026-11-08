@@ -35,7 +35,7 @@ struct jank_peer {
     struct lk_node k;
     uint8_t air_mac[6], usb_mac[6];
     uint32_t ip;
-    uint32_t net_mask;                 /* a normal network's: 0 on the air of MODE JAM */
+    uint32_t net_mask;                 /* a normal network's: 0 on the air of MODE JANK */
     uint8_t on_network;
     uint32_t rnd;
     uint8_t allowed;                   /* the setting */

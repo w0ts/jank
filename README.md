@@ -4,7 +4,7 @@ jank is an ESP32-S3 device that joins the FM-1 synth's Wi-Fi group mode as an Ab
 (with start/stop and tempo) for MIDI gear, a USB network adapter that puts a computer running Link on the group, a
 USB-MIDI host for gear with a USB port, and, on the PCB, a MIDI thru box (OUT1 becomes a MIDI IN in software; that
 firmware is not written yet). The mode is called
-**jank** (MODE JANK); FM-1 firmware from before the rename shows it as MODE JAM.
+**jank** (MODE JANK); FM-1 firmware from before the rename shows it as MODE JANK.
 
 Link is Ableton's trademark; jank is not an Ableton product.
 
@@ -72,11 +72,11 @@ One command a line; each answer ends with `ok` or `err <why>`:
 ```
 get | status | scan | help | reboot | bootloader
 set group 1..9 | name <text> | filter link|all | peer on|off | transport link|auto
-set quantum 1..16 | offset -100..100 | net jam|wifi | ssid <name> | pass <8..63 chars>
+set quantum 1..16 | offset -100..100 | net jank|wifi | ssid <name> | pass <8..63 chars>
 ```
 
 `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
-nothing. `net jam` is the protocol's name for jank mode.
+nothing. `net jank` is the protocol's name for jank mode.
 
 ## Tests
 
@@ -87,7 +87,7 @@ FM1BASE=../optimist/fm1base tests/run.sh
 Host tests, built with address and undefined-behaviour sanitizers into `$JANK_SCRATCH/hosttest`: frame vectors, the
 filter and MAC handling, the control protocol, button and scan logic, the clock maths (no drift over an hour at any
 tempo), the Link peer, SysEx framing and the control page's logic (needs node). `tests/crosscheck_optimist.c` compiles
-the FM-1's own `wifi_jam.c`, `wifi_ip.c` and `link.c` from `FM1BASE` and swaps frames with jank. These prove that both
+the FM-1's own `wifi_jank.c`, `wifi_ip.c` and `link.c` from `FM1BASE` and swaps frames with jank. These prove that both
 sides agree on bytes and logic, nothing about radios: delays in the models are made up.
 
 ## On the air

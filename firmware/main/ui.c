@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The button, the LED and the group scan.
- * Click: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air. Held 1.5 s and let go: MODE JAM <-> the Wi-Fi network, a restart.
+ * Click: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air. Held 1.5 s and let go: MODE JANK <-> the Wi-Fi network, a restart.
  * Held 10 s: download mode, for flashing. The LED: the session's beat, inverted on the Wi-Fi network. */
 #include <string.h>
 #include "app.h"
@@ -67,21 +67,21 @@ static void led_step(uint32_t now)
     if (!jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum))
         led_show(0, 0, 0);
     else if (cfg.net == JK_NET_WIFI)
-        led_show(0, 0, 40);              /* (an RGB LED: blue on a network, green in MODE JAM) */
+        led_show(0, 0, 40);              /* (an RGB LED: blue on a network, green in MODE JANK) */
     else
         led_show(0, 30, 0);
 }
 
-/* MODE JAM <-> the Wi-Fi network: the radio is set up at start-up, so a restart. No network saved: red pulses */
+/* MODE JANK <-> the Wi-Fi network: the radio is set up at start-up, so a restart. No network saved: red pulses */
 static void switch_network(void)
 {
     struct jk_cfg cfg;
     app_cfg_get(&cfg);
-    if (cfg.net == JK_NET_JAM && !cfg.ssid[0]) {
+    if (cfg.net == JK_NET_JANK && !cfg.ssid[0]) {
         led_event(JL_NO_GROUP, cfg.group);
         return;
     }
-    cfg.net = cfg.net == JK_NET_WIFI ? JK_NET_JAM : JK_NET_WIFI;
+    cfg.net = cfg.net == JK_NET_WIFI ? JK_NET_JANK : JK_NET_WIFI;
     app_cfg_set(&cfg);
     app_reboot();
 }
@@ -122,7 +122,7 @@ static void scan_groups(void)
     uint32_t next;
     app_cfg_get(&cfg);
     if (cfg.net == JK_NET_WIFI)
-        return;                          /* groups are MODE JAM's */
+        return;                          /* groups are MODE JANK's */
     xSemaphoreTake(s_scanning, portMAX_DELAY);
     led_event(JL_SCANNING, cfg.group);
     led_step(bridge_ms() + LED_EVERY_MS);

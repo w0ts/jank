@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Test harness, never shipped: jank against the FM-1's own code. It compiles Optimist's wifi/wifi_jam.c and wifi/wifi_ip.c
- * here, with a model of device/wifi_own.c's ja_rx around them, and swaps real air frames with jank's bridge and peer.
+/* Test harness, never shipped: jank against the FM-1's own code. It compiles Optimist's wifi/wifi_jank.c and wifi/wifi_ip.c
+ * here, with a model of device/wifi_own.c's jn_rx around them, and swaps real air frames with jank's bridge and peer.
  * What it proves: the two sides agree on the format, in both directions. What it does not: anything about radios.
  * Air delay and time steps are this model's. Exit status: the number of failed checks. */
 #include <stdio.h>
@@ -9,7 +9,7 @@
 #include "jank_core.h"
 #include "jank_peer.h"
 #include "wifi_ip.c"
-#include "wifi_jam.c"
+#include "wifi_jank.c"
 
 static int fails, checks;
 #define CHECK(c)                                                  \
@@ -59,7 +59,7 @@ static void push(struct frame *q, uint32_t *n, const uint8_t *f, uint32_t len)
 }
 
 /* the FM-1 */
-static struct ja_net fm_n;
+static struct jn_net fm_n;
 static struct wifi_ip fm_ip;
 static struct lk_node fm_k;
 static uint8_t fm_tx[1600];
@@ -80,13 +80,13 @@ static int fm_send(void *ctx, uint32_t ip, uint16_t port, const uint8_t *p, uint
     return len ? 0 : -1;
 }
 
-/* device/wifi_own.c's ja_rx, step for step */
+/* device/wifi_own.c's jn_rx, step for step */
 static void fm_rx(const uint8_t *f, uint32_t len)
 {
     uint32_t tx_len = 0, ip;
-    if (!ja_heard(&fm_n, f, len, -40, (uint32_t)(now_us / 1000)))
+    if (!jn_heard(&fm_n, f, len, -40, (uint32_t)(now_us / 1000)))
         return;
-    ip = ja_sender_ip(f, len);
+    ip = jn_sender_ip(f, len);
     CHECK(ip != fm_ip.ip);                      /* no address clash with anything jank sent */
     if (ip)
         wifi_ip_arp_learn(&fm_ip, ip, f + 10);
@@ -159,9 +159,9 @@ static void run_for(int64_t us)
 static void test_group_table(void)
 {
     for (uint32_t g = 1; g <= 9; g++) {
-        struct ja_net n;
+        struct jn_net n;
         uint8_t b[6];
-        ja_init(&n, FM_MAC, g);
+        jn_init(&n, FM_MAC, g);
         CHECK(jk_channel(g) == n.ch);
         CHECK(!jk_bssid(g, b) && !memcmp(b, n.bssid, 6));
     }
@@ -174,7 +174,7 @@ static void boot(int32_t mpb)
     now_us = 1000000;
     n_to_fm = n_to_stick = 0;
     pc_frames = 0;
-    ja_init(&fm_n, FM_MAC, GROUP);
+    jn_init(&fm_n, FM_MAC, GROUP);
     wifi_ip_ibss_init(&fm_ip, FM_MAC, fm_n.bssid, FM_IP, fm_rand);
     fm_ip.udp_rx = fm_udp_rx;
     CHECK(wifi_ip_bind(&fm_ip, LK_MCAST_PORT) == 0);
@@ -235,10 +235,10 @@ static void test_computer_frames_pass_fm1_filters(void)
     e[34] = 0x51, e[35] = 0x48, e[36] = 0x51, e[37] = 0x48, e[39] = 20;
     size_t n = jk_eth_to_air(&br, e, 54, 0, air, sizeof air);
     CHECK(n == 24 + 8 + 40);
-    CHECK(ja_heard(&fm_n, air, (uint32_t)n, -40, 0) == 1);
-    CHECK(ja_sender_ip(air, (uint32_t)n) == PC_IP);
+    CHECK(jn_heard(&fm_n, air, (uint32_t)n, -40, 0) == 1);
+    CHECK(jn_sender_ip(air, (uint32_t)n) == PC_IP);
     CHECK(wifi_ip_early_filter(&fm_ip, air, (uint32_t)n) == 1);
-    CHECK(ja_count(&fm_n, 0) == 1);
+    CHECK(jn_count(&fm_n, 0) == 1);
 }
 
 /* the FM-1's session, with no computer at all: jank joins it and is a peer in the FM-1's own Link */
@@ -255,7 +255,7 @@ static void test_jank_joins_an_fm1(void)
     int64_t a = lk_beat_at(&fm_k, now_us), b = jp_beat_at(&jp, now_us);
     int64_t d = a > b ? a - b : b - a;
     CHECK(d < 4000);
-    CHECK(ja_count(&fm_n, (uint32_t)(now_us / 1000)) == 1);
+    CHECK(jn_count(&fm_n, (uint32_t)(now_us / 1000)) == 1);
     CHECK(br.st.drop_bad == 0 && br.st.drop_own == 0);
     printf("crosscheck: jank in an FM-1's session, phase error %lld micro-beats in this model\n", (long long)d);
     lk_set_tempo(&fm_k, 400000, now_us);

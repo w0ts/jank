@@ -99,7 +99,7 @@ th { color: var(--dim); font-weight: 500; font-size: 12px; }
     <h2>Network</h2>
     <p id="net-state">-</p>
     <div class="grid">
-      <label>Join <select id="net-mode"><option value="jam">MODE JAM</option><option value="wifi">A Wi-Fi network</option></select></label>
+      <label>Join <select id="net-mode"><option value="jank">MODE JANK</option><option value="wifi">A Wi-Fi network</option></select></label>
       <label>Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
       <label>Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
     </div>
@@ -138,7 +138,7 @@ function splitLines(buffer, chunk) {
 /* the commands for the Network form; null: not valid. An empty password leaves the stored one */
 function networkCommands(mode, ssid, pass, passStored) {
   const printable = (s) => /^[\x20-\x7e]*$/.test(s);
-  if (mode === "jam") return ["set net jam", "reboot"];
+  if (mode === "jank") return ["set net jank", "reboot"];
   if (!ssid || ssid.length > 32 || !printable(ssid) || ssid !== ssid.trim()) return null;
   if (!printable(pass) || pass !== pass.trim() || (pass && (pass.length < 8 || pass.length > 63))) return null;
   const commands = ["set ssid " + ssid];
@@ -150,7 +150,7 @@ function networkCommands(mode, ssid, pass, passStored) {
 
 /* the line under Network, from status and get */
 function networkLine(v) {
-  if (v.net !== "wifi") return "MODE JAM, group " + v.group;
+  if (v.net !== "wifi") return "MODE JANK, group " + v.group;
   if (v.wifi !== "1") return "Looking for " + v.ssid;
   if (v.wifi_ip === "0.0.0.0") return "On " + v.ssid + ", waiting for an address";
   return "On " + v.ssid + ", " + v.wifi_ip + ", " + v.wifi_rssi + " dBm, channel " + v.wifi_channel;

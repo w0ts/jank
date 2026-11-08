@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The bridge: Ethernet <-> MODE JAM air frames (jank_core.h). Written from the air format, not from Optimist's code. */
+/* The bridge: Ethernet <-> MODE JANK air frames (jank_core.h). Written from the air format, not from Optimist's code. */
 #include "jank_core.h"
 #include <string.h>
 
