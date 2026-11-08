@@ -1,295 +1,198 @@
-# jank box: the printed box of the jank board (round 7 / v4)
+# jank box: the printed box of the jank board (v5)
 
-The box for the board in [`../pcb`](../pcb/README.md), **v4: 84.0 x 52.0 mm**, OUT2..OUT4 on the front edge, OUT1 (MIDI
-IN capable) on the back edge beside the two USB-Cs, and on the face: MODE and PLAY/STOP (9.5 mm buttons), a push
-encoder (ALPS EC11E09244BS), two LEDs and an A/B switch on each jack channel. OpenSCAD, parametric, one STL per printed part, each one
-closed manifold solid.
+The box for the board in [`../pcb`](../pcb/README.md), **v5: 84.0 x 67.0 mm**. The board's **top is the lid side**:
+the XIAO, the 0.91" OLED, OK, BACK, the encoder, the beat LED, the four jacks (XKB PJ-320A) and the four A/B switches.
+Its **bottom** carries the four DINs (HOOYA DIN-504B-M10), 19.6 mm deep, so **the board stands about 20 mm above the
+floor on them**. **Every output has both connectors**: the jack above the board line, the DIN below it. OUT2, OUT3 and
+OUT4 are on the front wall, left to right seen from the front with the lid up; OUT1 is on the back wall, beside the
+XIAO's USB-C and the power USB-C. There is one build now: one box, one lid, and a test strip. OpenSCAD, parametric;
+every STL is one closed manifold solid.
 
 > **Stage: designed and checked in OpenSCAD only (2026-11-08).** Nothing printed, no part measured. Every number marked
-> *unverified* comes from a datasheet drawing or an estimate.
+> *unverified* comes from a drawing or an estimate.
 
 **First requirement (the user's ruling, 2026-11-08):** *the 3D print must brace the DIN sockets to relieve the stress
-from the PCB.* Plugging and unplugging a DIN or a TRS plug loads the box, not the solder joints, on every channel.
-**Second (2026-11-08):** the A/B knobs stay reachable by finger: the lid stays at 3.6 mm above the face where they are.
-**A/B switches only on jack channels (2026-11-08):** "we don't need the A/B switch when we have the DIN plug". The switch
-swaps a jack's tip and ring only, so a DIN channel leaves it unfitted. The lid has a slot (and its A / B letters) only
-for a TRS channel: `DDDT` has one, for OUT4 (SW5).
-**Third (2026-11-08):** every wall opening is a U open to the top, so the board with its connectors goes straight in,
-and the lid's tongues close the upper part of each. Every bore and slot is round at its bottom in the wall and completed
-by a half-round in the lid's tongue or key (the jack's way, the user's choice for the DIN too).
+from the PCB.* Plugging and unplugging loads the box, not the solder joints, on every jack and every DIN.
 
-**The set the user builds: `DDDT`** (DIN on OUT1, OUT2, OUT3, a TRS jack on OUT4).
-
-![open](renders/open_DDDT.png)
+![open](renders/open.png)
 
 ## Files
 
 | File | What |
 |---|---|
-| `jank_box.scad` | The box, the lid, the wall test strip, the checks. `outs` picks the connectors, `part` the output |
-| `make_stl.sh` | Exports every set's STLs, runs the collision, drop and brace checks, renders the PNGs, runs `../check_stl.py` (one body, 0 open edges, 0 non-manifold, 0 misoriented) |
-| `stl/jank_box_<set>_box.stl`, `stl/jank_box_<set>_lid.stl` | The printable parts, already in print orientation |
-| `stl/jank_box_front_test.stl` | A 42.2 x 26 mm strip of the 1.8 mm connector wall with one whole 16.0 mm DIN bore and one jack U-slot: try the plugs first |
-| `renders/open_<set>.png`, `box_`, `front_`, `back_`, `lid_`, `lid_top_` | Box with the board in it (lid lifted), the empty box, the front wall, the back wall, the lid as printed (its underside: tongues, keys, ribs), the lid's top with its labels |
+| `jank_box.scad` | The box, the lid, the wall test strip, the checks (`part` picks the output) |
+| `make_stl.sh` | Exports the STLs, runs the collision, drop, brace and label checks, renders the PNGs, runs `../check_stl.py` |
+| `stl/jank_box_box.stl`, `stl/jank_box_lid.stl` | The printable parts, in print orientation |
+| `stl/jank_box_front_test.stl` | A 21.1 mm strip of the front wall: one jack U-slot over one DIN bore with its pad behind; try the plugs first |
+| `renders/open.png`, `box.png`, `front.png`, `back.png`, `lid_underside.png`, `lid_top.png` | The box with the board in it (lid lifted), the empty box, the walls, the lid as printed (its underside), the lid's top with its labels |
 
 ```
-sh hardware/box/make_stl.sh               # the five sets below (about 15 s)
-SETS="TDDD" sh hardware/box/make_stl.sh   # any other combination
+sh hardware/box/make_stl.sh               # about 7 s
 ```
 
-## The sets
+## Size
 
-`outs` lists **OUT1..OUT4**: `D` = DIN (HOOYA DIN-504B-M10), `T` = TRS (XKB PJ-320A). **OUT1 is the back one.** Seen from
-the front with the lid up, the front wall carries **OUT2, OUT3, OUT4 from left to right**; OUT1 is at the back, behind OUT4
-(the board lies face up, so KiCad's x is mirrored: face x = 84 - x). The encoder is in the back left corner (seen from
-the front), the buttons right of it.
+**Outer: 88.6 x 70.8 x 32.0 mm** (X x Y x Z, lid included).
+- **X:** side walls 2.0 + 0.3 + board 84.0 + 0.3 + 2.0.
+- **Y:** front wall 1.8 + 0.1 + board 67.0 + 0.1 + back wall 1.8.
+- **Z:** floor 2.0 + 0.1 + DIN 19.6 + board 1.6 + **7.2** to the lid's inside + lid 1.5.
 
-| Set | Outer size X x Y x Z (lid included) | Note |
-|---|---|---|
-| **`DDDT` OUT1-3 DIN, OUT4 TRS (the user's)** | **90.6 x 55.8 x 28.4 mm** | |
-| `DDDD` all DIN | **90.6 x 55.8 x 28.4 mm** | the DIN's 19.6 mm sets the depth |
-| `TTTT` all TRS | **90.6 x 55.8 x 21.2 mm** | the standing 33 ohm resistors (11.5 mm, *estimate*) set the depth |
-| `DDTT` OUT1-2 DIN, OUT3-4 TRS | **90.6 x 55.8 x 28.4 mm** | any set with one DIN is as deep as `DDDD` |
-| `DTTT` OUT1 DIN (MIDI IN), the rest TRS | **90.6 x 55.8 x 28.4 mm** | |
+**Standing above the lid (not counted in Z):** the encoder's shaft 11.3 mm, OK and BACK 0.8 mm.
 
-Not counted in Z: the encoder's body stands 1.4 mm and its shaft 14.9 mm above the lid; the buttons 4.4 mm.
-X: -X wall 2.0 + 0.3 + board 84.0 + 0.3 + **+X wall 4.0** (it takes two lid screws). Y: front wall 1.8 + 0.1 + board
-52.0 + 0.1 + back wall 1.8 (flat, OUT1 and the USB-Cs alike). Z: floor 2.0 +
-floor-side parts + board 1.6 + **3.6** to the lid + lid **1.5**.
+## The walls: two rows, and the wall decision
 
-## How the board lies
+The board model is the board's own `../pcb/mockup.stl`, top up, the DINs hanging. The jack's front is on the board's
+edge, and its bushing (5.0 mm, *unverified*) stands only **2.0 mm** past it. The DIN's plate front is **1.0 mm** behind
+the edge (the v5 footprint). The two rows are handled differently:
 
-Upside down, as the board README asks: **the face side (KiCad bottom: the buttons, the encoder, the LEDs, the A/B
-switches) looks up at the lid; the XIAO, the resistors and the connectors' bodies hang towards the floor.** The DIN's
-far edge (19.6 mm from the board) is the part closest to the floor, so the floor itself carries it.
+- **Above the board (the jacks):** the wall is **1.8 mm**, its inside 0.1 mm off the board's edge. The bushing stands
+  **0.1 mm proud** of the outside, so a plug seats against it.
+- **Below the board (the DINs):** **the same flat outside, and the wall 1.0 mm thicker on the inside**. Under each DIN a
+  **DIN pad** fills the 1.0 mm to the plate (its face 0.1 mm off it), from the floor up to the board's bottom. The
+  outside stays one flat face; the DIN's face is **2.9 mm behind it** (wall 1.8 + 0.1 + the 1.0 the footprint sets it in).
+- **Why not a step outside:** a flat outside needs no overhang. The pad's top doubles as the ledge the board's edge
+  rests on.
 
-## Bracing (the first requirement): the same on every channel, front or back
+**The DIN's bore is closed now.** Its top is 1.7 mm below the board's bottom, and the plate slides down behind the pad
+when the board goes in. It is a round **16.0 mm** bore (`din_bore`, *unverified* against the user's plugs; HOOYA's own
+opening is not on its sheet) centred **9.7 mm below the board** (`din_axis`). It prints as a teardrop cut flat 0.8 mm
+above the circle (a 5 mm bridge). **Between two neighbouring bores** (pitch 21.1) the wall is 5.1 mm. The plates
+themselves are 0.2 mm apart behind the pads (0 at the worst tolerance).
 
-Every channel is built in its own frame (origin on the board edge, +y into the board) and placed on the front wall
-(OUT2..OUT4) or mirrored onto the back wall (OUT1). Only the cradle lip's height differs (below).
+**The jack's U-slot** is **5.2 mm**, round at the bottom around the bushing's axis 2.5 mm above the board's top, and open
+to the top of the wall. The lid's **key** closes it: 4.9 wide, with a 5.3 mm half-round end.
 
-**The connectors since 2026-11-08 (`d2f4700`): the HOOYA DIN-504B-M10 and the XKB PJ-320A**, the user's cheaper
-choice. The numbers below come from their drawings. The CUI SDS-50J and SJ1-3523N of the earlier rounds no longer fit
-the board's footprint, and this box no longer fits them.
+## Bracing
 
-### DIN: HOOYA DIN-504B-M10
+| Part | Pull-out | Push-in | Down / up | Sideways |
+|---|---|---|---|---|
+| **DIN** (HOOYA: plate 20.9 x 19.6 x 1.8, body to 13.6, from the drawing rev A1 2019-07-10) | the plate's front on the **DIN pad** round the bore: about 210 mm2 | the body's back on a **lip** from the floor (1.4 mm, 20.9 wide, to 5.0 mm under the board) | the plate's far edge on the floor (0.1); the board above | the plug's shell in the bore |
+| **Jack** (XKB PJ-320A: body 6.2 x 12.2 x 5.0, from the drawing rev A1 2025-03-03) | the body's front on the wall's inside (0.1) | the body's back on the **lid's cap**: a saddle hanging from the lid round the body, back stop 1.6 mm | the board below; the cap's roof above (0.15) | the cap's cheeks; the bushing in the U-slot |
+| **The board** | | | **clamped at every connector edge** between the DIN pads' tops (below) and the lid's ribs (above, beside each jack); four M2 standoffs | the walls (0.1 / 0.3) |
 
-From HOOYA's drawing ("DIN JACK, MODEL DIN-504B-M10", rev A1 2019-07-10, LCSC C2939346, read 2026-11-08, tolerance
-+/-0.1 up to 5 mm, +/-0.2 above):
-- **Front plate:** 20.9 wide x 19.6 high x 1.8 thick.
-- **Body:** 11.8 deep behind the plate, 13.6 overall.
-- **Socket axis:** 9.7 mm above the board (`din_axis`; the CUI's was 10.0).
-- **No locating pegs.**
-- **Height behind the plate is not dimensioned:** taken as the plate's 19.6, the conservative assumption.
-- **The plates are 0.2 mm apart** at the 21.1 mm pitch (0 at the worst tolerance). They sit side by side behind the
-  wall with no wall between them, so none is needed.
-
-**The plate sits behind the wall; the plug's bore is split between the wall and the lid.**
-- **Wall:** 1.8 mm. It is thinner than the earlier 2.5 because the jack's bushing stands only 2.0 mm past its body (below).
-- **Bore:** round, **16.0 mm** (`din_bore`, for the plug's shell), on the 9.7 mm axis. Its lower half is in the wall;
-  its upper half is open to the wall's top as a U.
-- **Tongue:** the lid's tongue (15.7 wide, 0.15 a side, 1.8 thick, flush with the outside) fills the U. Its half-round
-  16.0 mm end completes the bore.
-- **Wall between neighbours:** 21.1 - 16.0 = **5.1 mm** between two bores, and between two U's above them.
-- **Plate rim around the bore:** 1.9 mm below it (floor side), 1.7 mm above it (board side), 2.45 mm at each side.
-- **Insertion:** the plate slides down behind the wall when the board is lowered in. `check_board_drop` lowers the
-  board with every part straight into the box and finds nothing in the way.
-- **Face position:** the DIN face is **1.9 mm behind the wall's outside** (wall 1.8 + 0.1). The plug's metal shell
-  must reach that much further than on a bare socket (*unverified* with the user's plugs: print `front_test.stl`).
-- **HOOYA's own plug opening** is not dimensioned on its sheet; the bore stays 16.0.
-
-| Force | Path | Play (design) |
-|---|---|---|
-| **Pull-out** | the plate's front on the wall round the bore's lower half and on the tongue round its upper half: about 210 mm2 (20.9 x 19.6 minus the 16 mm bore) | 0.1 mm |
-| **Push-in** | the body's back on the cradle's **lip** (1.4 mm, from the floor to 5.0 mm above the board): 20.9 x 14.6 mm | 0.15 mm |
-| **Towards the floor** | the plate's and the body's far edge on the floor | 0.1 mm |
-| **Towards the lid** | the body on the board, the board on the lid's rib over that connector | 0.05 mm |
-| **Sideways** | the plug's shell in the bore | the plug decides |
-
-**The lip stops 5.0 mm above the board on every channel.** The HOOYA's 2-pin row goes down to the board 14.8 mm
-behind the edge, inside the lip (13.75 to 15.15). The lip is safe only if those legs stay below 5.0 mm
-(*unverified*). OUT1's resistors start 16.6 mm behind its edge and are now clear of it. There is no band on the
-plate's back for a cradle face (the body is taken as tall as the plate).
-
-### TRS: XKB PJ-320A
-
-From XKB's drawing ("3.5 PHONE JACK, PJ-320A", rev A1 2025-03-03, LCSC C2884926, read 2026-11-08):
-- **Body:** 12.2 deep x 6.2 wide x 5.0 high, centred on the axis, its front on the board's edge.
-- **Bushing:** round, about **5.0 mm** (measured on the sheet, no figure given), 2.0 mm past the body, axis 2.5 mm
-  above the board (its lowest point at the board's surface).
-- **Plug hole:** 3.6 mm.
-- **Plug force:** 3 to 20 N.
-
-| Force | Path | Play |
-|---|---|---|
-| **Pull-out** | the body's front face on the wall's inside beside the slot (2 x 0.5 x 5 mm, plus the bushing's root) | 0.1 mm |
-| **Push-in** | the body's back on the **cap's back stop** (1.6 mm) | 0.15 mm |
-| **Down / sideways** | the bushing in the wall's **U-slot** (5.2 mm, round at the bottom); the body in the **cap** (a saddle from the floor with two cheeks, 6.5 mm inside) | 0.1 a side / 0.15 mm |
-| **Up** | the body on the board, the board on the lid's rib; the **lid's key** (4.9 wide, a 5.3 mm half-round) closes the U-slot over the bushing | 0.05 / 0.15 mm |
-
-**The wall is 1.8 mm because of this jack.** Its bushing stands only 2.0 mm past the body, so with 1.8 + 0.1 the
-bushing is **0.1 mm proud** of the outside and a plug seats against it. Through the earlier 2.5 mm wall it would stop
-0.5 mm short. The jack's body front is 1.9 mm behind the outside. The pull-out face beside the 5.2 slot is narrow:
-the 6.2 mm body leaves 0.5 mm a side. Most of the pull-out goes into the cap's cheeks by friction, and into the board
-through the jack's pegs and tabs (*not computed*; jack plug forces are small, 3 to 20 N).
-
-### OUT1 and the USB-Cs on the back wall
-
-The back wall stands 0.1 mm behind the board's back edge and is **1.8 mm thick all along** (flat outside):
-- **OUT1:** the same bore and tongue, or U-slot and key, as the front channels.
-- **The XIAO's socket overhangs the board by 1.5 mm and sits in the wall's own thickness**, in its U-opening, its face
-  0.4 mm short of the outside. A plug's overmold enters the 12.5 x 7.0 opening; J1 (no overhang) is 1.9 mm in. It works
-  because the openings are U's open to the top: the socket drops into its U as the board goes in.
-- **Each USB opening** is a U **12.5 mm wide** from its rounded bottom (r 1.5) to the wall's top. The lid's **tongue**
-  (12.2 wide) closes it down to **7.0 mm** height. The tongue stays 0.55 mm behind the board's edge (J1's shell legs,
-  0.545 past the edge in the mockup).
-
-### The board itself
-
-- **Connector edges:** clamped between the lid's **ribs** (0.2 to 1.3 mm from the edge, over each connector's 20.5 mm,
-  front and back) and the connectors' housings (the DIN plate stands on the board along its first 1.8 mm; the jack
-  body's front on the edge), which stand on the floor (DIN) or on their cap (TRS): plastic on board, never a solder joint.
-- **H1 (80.8, 25.0) and H2 (80.8, 48.8)**, the only holes, both on the -X side: **standoffs** (5.5 mm, webbed to the
-  -X wall).
-- **The +X corners** (no holes: OUT4 at the front and OUT1 at the back own them): a **ledge** on the +X wall (under the
-  board's last 0.5 mm, 4.0 mm deep) only where that corner's channel is a jack; a HOOYA plate reaches the board's edge
-  (OUT4's flush with it) and holds the corner itself.
-- **Design gaps:** every bearing surface stops **0.05 mm** short of the board (`contact`) so the checks stay clean;
-  in print that is contact.
+**Details:**
+- **Lid caps:** they stop 1.6 mm above the board, because the DINs' legs (about 1.5 mm, *estimate*) stand on the top
+  there. Their back stops end 0.2 mm before the A/B switches.
+- **DIN lip:** it stops 5.0 mm under the board. The DIN's 2-pin row goes up into the board 15.8 mm behind the edge,
+  inside the lip; it is *unverified* that those legs stay within 5.0 mm of the board.
+- **Design gaps:** every bearing surface is 0.05 mm off (`contact`), so the checks stay clean; in print that is contact.
 
 ## Lid
 
-**Height:** the inside **3.6 mm above the face** everywhere, **1.5 mm thick** (outside at 5.1): the A/B knobs (5.0 mm)
-end 0.1 mm under the lid's top, in their slots, finger-reachable as in the board README's sum.
+**Height:** the inside is **7.2 mm above the board's top**, 1.5 mm thick. The tallest top part, apart from the encoder's
+body and the buttons, is the XIAO on its headers (7.0, *estimate*).
+- **OLED:** the glass top (5.1) is 2.1 mm under the lid.
+- **Encoder:** its body (6.5, *unverified*) is 0.7 mm under the lid.
+- **A/B knobs (5.0):** they end 2.2 mm under the lid's inside, reachable with a pen tip through their slots.
+- **Buttons:** OK and BACK (9.5) stand **0.8 mm** out of the lid. The 13 mm HRO code (S) would stand 4.3 mm out (*the
+  user's call*).
 
-**The encoder: a window, not a raised boss.** The lid has a **13.3 x 13.3 mm opening** round the encoder's body (the
-mockup's 12.5 x 12.5 body + 0.4 a side); the body (6.5 mm, *unverified*) stands **1.4 mm through the lid**, the shaft's
-top (20 mm from the face, *unverified*) **14.9 mm above it**. Why not a boss (the lid raised to 7.0 inside over the
-encoder, its top 3.4 mm above the lid, a 7.0 mm shaft hole):
-- **A boss cannot be printed without supports.** The lid must print top face down (its keys, ribs, LED shroud and
-  spacers grow from the underside); a boss on the top would sit on the bed and leave the whole 90 x 58 mm plate hanging
-  3.4 mm above it. A separate cap would be one more part to print and hold.
-- **The window does not depend on the encoder's height**, the one number the board README could not verify (6.5 mm,
-  "as read from the PDF's text"): a taller body just stands further out; a boss built for 6.5 would collide.
-- What the window gives up: the encoder's body shows (0.4 mm gap round it) and does not get a 7 mm collar round its
-  shaft. A knob on a D shaft sits 13.5 mm of shaft above the body: a push-on knob's skirt clears the body's 1.4 mm.
-- The window is 1.35 mm from H1's spacer (H1's screw head, 3.8 mm, 1.95 mm from it) and far from every rib.
-
-**Fixing: four M2 screws, the lid comes straight down** (no hinge: the encoder's 16.4 mm of shaft above the lid's
-underside would sweep 1.7 mm sideways under a hinged lid, more than any clean hole allows):
-- **-X side:** **2 x M2 x 12 self-tapping (pan head)** through the lid, a 5.0 mm spacer, the board's H1 / H2 and into
-  the standoffs (pilot 1.7 mm, 8 mm deep). They hold the lid and clamp the board.
-- **+X side (no board holes there):** **2 x M2 x 6 self-tapping** into the **4.0 mm +X wall** (pilot 1.7 mm, 8 mm deep,
-  1.15 mm of wall each side of it), 10 and 42 mm from the board's front edge.
-
-**Openings** (KiCad coordinates, face x = 84 - x in brackets):
+**Openings** (KiCad coordinates, y from the back):
 
 | Opening | Centre | Size | Note |
 |---|---|---|---|
-| MODE (SW1) | 47.75 (36.25), 13.8 | 4.0 mm round | plunger 3.4 (HRO); stands 4.4 mm out; its body (3.5, *unverified*) under a 0.4 mm recess |
-| PLAY/STOP (SW6) | 58.55 (25.45), 13.8 | 4.0 mm round | as MODE |
-| Encoder (SW7) | 75.5 (8.5), 14.5 | 13.3 x 13.3 window | the body through it (above) |
-| LED1, LED2 | 45.5 (38.5) and 49.85 (34.15), 4.0 | 3.2 x 3.6 | one light shroud (0.5 mm walls, 1.15 between the windows, down to 0.3 above the face), cut back where the XIAO's header pins stand; the lid's top **skin of 0.6 mm stays over the windows** (`led_skin`): print the lid translucent, or set `led_skin = 0` |
-| A/B, jack channels only | SW2 (25.2, 10.75) for OUT1, SW3 / SW4 / SW5 (51.75 / 31.25 / 10.75, 32.25) for OUT2 / OUT3 / OUT4 | 2.0 x 4.5 | only where the channel is a TRS (in `DDDT`: SW5, OUT4); the board README's slot: handle 1.5 x 2.0 + 2.0 travel along y + 0.25 round; body (3.5) under a 0.4 mm recess |
-| USB-C | XIAO (45.2), J1 (64.5), back wall | 12.5 x 7.0 | U-openings closed by the lid's tongues; for a plug's overmold (*unverified* against the cables) |
+| OLED window | 45.0, 28.55 | 24.4 x 7.6 | the viewing area; the glass 2.1 under the lid, untouched |
+| BACK (SW6), OK (SW1) | 69.15 / 78.75, 25.45 | 4.0 round | plunger 3.4 |
+| Encoder shaft | 73.9, 36.5 | 7.0 round | body under the lid |
+| LED window | 33.0, 4.2 | 3.5 x 3.7 | a light shroud from the lid down to 0.3 mm over the LED (cut back at the XIAO), the lid's top **skin of 0.6 mm over it** (`led_skin`): print the lid translucent, or set `led_skin = 0` |
+| A/B slots | (24.3, 9.0) OUT1, (10.45 / 31.55 / 52.65, 48.0) OUT2..OUT4 | 2.0 x 4.5 | all four: every channel has its jack |
+| XIAO's USB-C | 45.2, back edge | 12.5 wide notch | its 7.0 mm opening reaches above the walls (the socket's top is 7.0 up), so the lid's back edge is notched over it |
+| Screws H1..H4 | (80.8, 3.2), (80.8, 63.8), (3.2, 26.0), (3.2, 34.0) | 2.4 | **4 x M2 x 20 self-tapping**: through the lid, a 5.0 mm spacer to the board, the board, 9.7 mm into a webbed column from the floor (pilot 1.7, 11 deep) |
+
+**Under the lid:**
+- **OLED rib:** over the module's far end (x 26.0..27.6, no glass there), 0.2 mm above the module's board (taken as
+  3.9 above the board's top, *unverified*). It stops the free end from rising. The module has nothing under its far
+  end: **User puts a 2.5 mm foam pad under it** (the board README's suggestion).
+- **USB-C tongues:** the power USB-C (J1) is a U from its rounded bottom to the top of the wall. A tongue of the lid
+  closes it down to the 12.5 x 7.0 opening. The tongue stays 0.55 mm behind the board's edge.
+- **J1's shell legs:** they stand 0.55 mm past the board's edge under it (mockup). The back wall has a 0.7 mm relief
+  there.
 
 ## Markings
 
-`markings = true` cuts labels 0.4 mm deep in Liberation Sans Bold. The capitals are 4.0 mm tall (`mark_size` 4.2) and
-the stems 0.84 mm wide, so a 0.4 mm nozzle leaves them open.
-The user's rule (2026-11-08): the controls are labelled on the lid's top, the plugs on the sides, each once; the LEDs
-carry no label (a lid label must not repeat a side's).
-- **Lid top:** MODE right of its button, PLAY under its button, BPM over the encoder's window, an A and a B at the two ends of each A/B slot (jack channels only), and "jank" (6.0 mm capitals) in the front right
-  corner.
-- **Lid tongues** (flush with the walls, over the bore): the channel number of each DIN ("1 / IN" on OUT1's; in
-  `DDDT` "1 / IN", "2", "3").
-- **Walls:** a jack's channel number under its bushing (in `DDDT` "4"). On the back: "USB" beside the
-  XIAO's socket and "PWR" under J1, because there is no room above them under the lid.
-- **The lid prints top face down**, so its labels are the first layers. Where a label lies over a switch recess, 0.7 mm
-  of lid remains; `check_text` checks that the labels stay 0.3 mm above every recess, 0.6 mm from every opening, and on
-  their tongues.
-- **A/B caveat:** which end of a slot is A is not verified (`ab_a_end`, default "back"). Check one switch with a meter
-  before trusting the letters.
+0.4 mm deep, Liberation Sans Bold, capitals 4.0 mm, stems 0.84 mm. **Controls on the lid's top, plugs on the walls, each
+once.**
+- **Lid:** BACK and OK above their buttons, BPM under the encoder's shaft, an A and a B at the two ends of each A/B slot,
+  and "jank" (6.0 mm capitals) at the left.
+- **Front wall:** "2", "3", "4" right of each jack's slot.
+- **Back wall:** "1 / IN" beside OUT1's jack slot, "USB" under the XIAO's opening, "PWR" under J1's.
+- **A/B caveat:** which end of a slot is A is not verified (`ab_a_end`, default "back"). Check one switch with a meter.
 
 ## Checks (`make_stl.sh`, last run 2026-11-08, OpenSCAD 2026.10.11, manifold)
 
-The board model is the board's v4 `../pcb/mockup-din.stl` turned over into the box. The connectors, the buttons and the
-A/B switches are redrawn from the datasheets: the DIN as the HOOYA's plate and body (both 19.6 high), the jack as the
-PJ-320A's body and Ø5.0 bushing, the buttons and A/B switches without the mockup's full-height blocks. The buttons here are a 3.5 mm body plus a 3.4 mm plunger to 9.5. The A/B switches
-are modelled only on the jack channels, where they are fitted. Each A/B switch
-is a 3.5 mm body plus its knob swept over the whole travel. Each jack is its body plus the bushing past the edge. The
-encoder is the mockup's own (12.5 x 12.5 x 6.5 body, 6 mm shaft to 20).
+The model is `../pcb/mockup.stl`, with the buttons (a 3.5 mm body and a 3.4 mm plunger to 9.5), the A/B switches (a
+3.5 mm body and the knob swept over its travel) and the OLED (its board to 3.9, the glass panel to 5.1) redrawn. The
+mockup draws all three as full-height blocks.
 
-| Check | Must be | DDDT | DDDD | TTTT | DDTT | DTTT |
-|---|---|---|---|---|---|---|
-| `check_box`: box against the board and every part | empty | empty | empty | empty | empty | empty |
-| `check_lid`: lid against the board and every part (buttons, encoder, knobs, leads, LEDs) | empty | empty | empty | empty | empty | empty |
-| `check_lidbox`: lid against box (lifted 0.01: it rests on the walls) | empty | empty | empty | empty | empty | empty |
-| `check_drop`: the lid, with its tongues and keys, lowered straight down from 22 mm, every 0.25 mm, against box and board | empty | empty | empty | empty | empty | empty |
-| `check_board_drop`: the board with every part lowered straight in from 24 mm, every 0.5 mm, against the box (the plates behind the walls, the bushings and the XIAO's socket into their U's) | empty | empty | empty | empty | empty | empty |
-| `check_text`: every label 0.6 mm clear of the openings, inside the lid's / wall's edges, 0.3 mm above the lid's recesses, the tongue labels on their tongue | empty | empty | empty | empty | empty | empty |
-| `brace_pull`: plates and jack bodies moved 0.15 mm outwards (both walls): they meet the wall and the tongue | contact | contact | contact | contact | contact | contact |
-| `brace_push`: plates moved 0.25 mm inwards | contact | contact | contact | (no DIN) | contact | contact |
-| `brace_trs`: jack bodies moved 0.2 mm inwards | contact | contact | (no TRS) | contact | contact | contact |
-| `brace_floor`: plates moved 0.15 mm to the floor | contact | contact | contact | (no DIN) | contact | contact |
-| `brace_lid`: board lifted 0.1 mm meets the lid's ribs and spacers | contact | contact | contact | contact | contact | contact |
-| `brace_ledge`: board lowered 0.1 mm meets the ledges and standoffs | contact | contact | contact | contact | contact | contact |
-| `check_stl.py` (box, lid) | OK | OK | OK | OK | OK | OK |
+| Check | Must be | Result |
+|---|---|---|
+| `check_box`: box against the board and every part | empty | empty |
+| `check_lid`: lid against the board and every part (XIAO, OLED, encoder, buttons, knobs, LED, jacks, DIN legs) | empty | empty |
+| `check_lidbox`: lid against box (lifted 0.01) | empty | empty |
+| `check_drop`: the lid with its keys, caps, ribs and tongues lowered straight down from 22 mm | empty | empty |
+| `check_board_drop`: the board with every part lowered straight in from 26 mm (the DIN plates behind the pads, the bushings into their U-slots) | empty | empty |
+| `check_text`: every label 0.6 mm clear of the openings, inside the edges, 0.3 mm above the lid's underside | empty | empty |
+| `brace_pull`: DINs and jacks moved 0.15 mm outwards meet the pads / walls | contact | contact |
+| `brace_push`: DINs moved 0.2 mm inwards meet the lip | contact | contact |
+| `brace_trs`: jacks moved 0.2 mm inwards meet the lid's caps | contact | contact |
+| `brace_floor`: DINs moved 0.15 mm down meet the floor | contact | contact |
+| `brace_lid`: the board lifted 0.1 mm meets the lid's ribs and spacers | contact | contact |
+| `brace_ledge`: the board lowered 0.1 mm meets the pads and the columns | contact | contact |
+| `check_stl.py` (box, lid, front_test) | OK | OK: one body, 0 open edges, 0 non-manifold, 0 misoriented each |
 
-All 60 checks give the required result. All 11 STLs are one body with 0 open edges, 0 non-manifold edges and 0
-misoriented edges (`front_test` included). **Negative controls** show that the checks can fail. Each of these
-collides: `enc_clr = -0.1` (the window on the encoder body), `button_hole = 3.2`, `face_h = 3.4` (the lid on the DIN
-leads), `ab_slot = [1.4, 4.5]` (a slot on its knob), `din_lip_stop = [2, 10]` (OUT1's lip on its resistors), `lid_play = -0.1`
-(a tongue in its U), `usb_tongue_y = 0.3` (the USB tongue on J1's legs), `mark_depth = 1.2` (a label into a recess);
-`check_board_drop` fails with `usb_open = [8, 7]` (the XIAO's socket on its U) and `bush_slot = 5.9` (a bushing on its
-slot).
+**Negative controls collide as they should:**
+- `bush_slot = 4.9` (`check_board_drop`).
+- `face_h = 6.8` (the lid on the XIAO).
+- `din_in = 0.85` (a pad into its plate).
+- `oled_rib_gap = -0.3`.
+- `cap_stop = 1.0` (a cap on the DIN legs).
+- `standoff_d = 5.5` (H3's column on R21).
+- `j1_legs = [1.5, 0.7]` (the back wall on J1's legs).
 
 ## Print
 
-| Part | Orientation (as exported) | Supports | Notes |
+| Part | Orientation | Supports | Notes |
 |---|---|---|---|
-| box | **floor on the bed**, open top up | none | every wall opening is a U open to the top: no bridge, no overhang |
-| lid | **top face on the bed** | none | flat top; labels, LED skin and switch recesses are the first layers; tongues, keys, ribs, shroud and spacers grow up; no overhang |
-| front_test | standing, as the walls print, on a foot | none | |
+| box | floor on the bed | none | the jack slots and USB U's are open upwards; the DIN bores are flat-topped teardrops (5 mm bridge) |
+| lid | top face on the bed | none | labels and the LED skin are the first layers; keys, caps, ribs, tongues, spacers, the shroud and the OLED rib grow up |
+| front_test | standing, the pad behind, on a foot | none | |
 
-PETG or PLA, 0.2 mm layers, **4 perimeters** (cradles, caps, connector walls and the +X wall's screws), 25 % infill;
-the lid translucent if `led_skin > 0`. Printed holes come out 0.1 to 0.2 mm small (*printer dependent*): ream the
-5.2 mm U-slots to a slip fit on the bushing if tight.
+PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill; the lid translucent if `led_skin > 0`. Printed holes come out
+0.1 to 0.2 mm small: ream the 5.2 mm U-slots to a slip fit on the bushings if tight.
 
-## Assembly order (who does what)
+## Assembly (who does what)
 
-1. **User solders the board** in the board README's order: **the LEDs, C6, C7 and MODE (legs trimmed to 1.5 mm or
-   less) first, then the XIAO's headers, then the XIAO**, then the rest; DIN and header leads 3.5 mm or less on the
-   face side (the lid's inside is 3.6 mm above the face).
-2. **User prints** `front_test.stl` and tries a MIDI DIN plug through its 16.0 mm bore into a socket held behind it
-   (it must go fully home through the 1.8 mm wall) and a 3.5 mm jack's bushing in its slot. If one does not fit, Claude
-   changes `din_bore` / `bush_slot` / `conn_t` and runs `make_stl.sh` again.
-3. **User prints** the box and the lid of the chosen set (`outs`, OUT1 first).
-4. **User lowers** the board, face side up, straight down into the box, OUT1's edge to the back wall: the DIN plates
-   slide down behind the walls (housings onto the cradles), the bushings drop into the U-slots, the XIAO's
-   socket into its U, the board onto the standoffs (and any ledge).
-5. **User lowers** the lid straight down: the tongues complete the DIN bores and close the USB U's, the keys the jack slots,
-   the encoder body comes through its window, the buttons and knobs through their openings.
-6. **User screws** 2 x M2 x 12 at H1 / H2 and 2 x M2 x 6 into the +X wall, snug only (PLA strips). Then the knob on
-   the encoder's shaft.
+1. **User solders the board** in the board README's order: the parts under the XIAO, then its headers and the XIAO;
+   the parts under the OLED, then its header and the module. Each jack goes first, its legs cut flush on the bottom,
+   then its DIN from the bottom.
+2. **User prints** `front_test.stl` and tries a DIN plug through the 16.0 mm bore into a DIN held behind the pad (it must
+   go home with the face 2.9 mm in), and a 3.5 mm jack's bushing in the slot. If one does not fit, Claude changes
+   `din_bore` / `bush_slot` / `conn_t` and runs `make_stl.sh` again.
+3. **User puts** a 2.5 mm foam pad under the OLED's far end.
+4. **User lowers** the board, top up, straight into the box, OUT1 to the back. The DIN plates slide down behind the
+   pads and stand on the floor, the bushings drop into their U-slots, the XIAO's socket into its notch, and the board
+   comes to rest on the pads and the four columns.
+5. **User lowers** the lid straight down. The keys close the jack slots, the caps come down over the jacks, the tongue
+   closes J1's U, and the shaft, the buttons and the knobs come through their openings.
+6. **User screws** 4 x M2 x 20 self-tapping at H1..H4, snug only. Then the knob on the encoder.
 
 ## Unverified, all in one place
 
-- **The DIN bore 16.0 mm** for the user's plugs' shells (the HOOYA's own opening is not on its sheet), and a plug going
-  fully home with the socket's face 1.9 mm behind the outside (the shell's length).
-- **The markings:** which end of an A/B slot is A (`ab_a_end`, default "back", not checked against the switch); the font is the one OpenSCAD reports as
-  Liberation Sans Bold (it substitutes silently if a font is missing).
-- **The HOOYA DIN-504B-M10:** the body's height behind the plate (taken as 19.6) and width (taken as 20.9); the axis
-  read as measured from the plate's board-side edge; its 2-pin legs below 5.0 mm behind the body (the cradle's lip);
-  no part measured.
-- **The XKB PJ-320A:** the bushing's diameter (5.0, measured on the sheet); how much of a pull-out the 0.5 mm faces
-  beside the slot take.
-- **The encoder:** body 12.5 x 12.5 (README 11.7 x 12.5) x 6.5 mm, shaft top 20 mm from the face (from the mounting
-  surface?): the window works for any height; only how far it stands out changes.
-- **The buttons' body height** (3.5 mm taken; 0.1 + 0.4 mm recess under the lid) and **the A/B switch's** body 3.5 /
-  knob 5.0 / handle 1.5 x 2.0 / travel 2.0 (the board README's reading of the MSS22D18G2 drawing).
-- Everything the board README marks *estimate*: the resistors' 11.5 mm (sets the TTTT depth and OUT1's lip), the XIAO's
-  socket height and 1.5 mm overhang, J1's 3.3 mm, the face-side leads (DIN 3.5 untrimmed: 0.1 mm under the lid), the
-  board's 1.6 mm.
-- M2 self-tapping in PLA/PETG at 1.7 mm (in a 4.0 mm wall on the +X side); the USB-C plugs' overmold size; the LEDs'
-  brightness through the 0.6 mm skin; printer hole shrink. None of it printed or fitted.
+- **The DIN bore 16.0 mm** against the user's plugs, the face 2.9 mm in (the plug shell's length). HOOYA's opening is
+  not on its sheet.
+- **The HOOYA's body** behind the plate: its height and width are taken as the plate's 19.6 x 20.9. Its 2-pin legs are
+  assumed to stay within 5.0 mm of the board, inside the lip. Its axis of 9.7 mm is read from the plate's board-side
+  edge.
+- **The PJ-320A:** the bushing's 5.0 mm (measured on the sheet); how much pull-out the 0.5 mm faces beside the slot
+  take. The rest goes into the lid's cap and the board through its pegs and tabs.
+- **Both connectors on one footprint:** the board README's dry fit, which decides whether the DIN body clears the jack's
+  cut legs.
+- **The OLED:** its board's top at 3.9 (where the rib is) and the glass panel's position (30 x 11.56 from 5.5 mm off the
+  pin end); its header's 2.5 mm plastic.
+- **Heights:** the XIAO's 7.0 (sets the lid), the encoder's 6.5 and 20, the buttons' body 3.5, the A/B knob 5.0, the
+  DINs' and the standing resistors' legs (1.5), the board's 1.6.
+- **C4** (100 µF, not fitted, on the bottom): not in the mockup. If fitted, check it against H1's column.
+- **The markings:** which end of a slot is A; the font OpenSCAD reports as Liberation Sans Bold (it substitutes
+  silently).
+- **Other:** M2 self-tapping into PLA/PETG; the USB-C plugs' overmold size; the LED through the 0.6 mm skin; printer
+  hole shrink. None of it printed or fitted.
