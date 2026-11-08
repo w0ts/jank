@@ -2,12 +2,13 @@
 
 A carrier board for a **Seeed XIAO ESP32S3**: jank as one stick with a second USB-C for power, **three controls on the
 face (MODE, PLAY/STOP and a push encoder)**, two RGB LEDs and **four MIDI outputs**, each one footprint holding a DIN-5
-and a right-angle 3.5 mm TRS at the same place, one of the two fitted, each with a **TRS type A / B slide switch**.
+and a right-angle 3.5 mm TRS at the same place, one of the two fitted; a jack channel also gets a **TRS type A / B slide
+switch**.
 **OUT1 doubles as a MIDI IN** under software control (an H11L1 behind a MOSFET gate; its source cut by a second
 MOSFET). **Three outputs (OUT2, OUT3, OUT4) are on the front edge; OUT1 is on the back edge** beside the two USB-Cs. The
 **bottom of the board is the device's face** (the box's lid): the controls stand in one row there (MODE under the XIAO,
-which stands on 2.54 mm headers, with the LEDs behind it; PLAY/STOP and the encoder right of it), and the four A/B
-switches reach through it; the XIAO, the power path, the MIDI IN and the resistors face the box's floor. Everything is
+which stands on 2.54 mm headers, with the LEDs behind it; PLAY/STOP and the encoder right of it), and the A/B
+switches of the jack channels reach through it; the XIAO, the power path, the MIDI IN and the resistors face the box's floor. Everything is
 hand-solderable: through-hole connectors, switches, encoder, opto and swappable resistors, SOT-23 / SC-70 ICs,
 0805 / 1206 passives. **84.0 x 52.0 mm, 2 layers.**
 
@@ -260,6 +261,10 @@ Which end of the travel closes 1-2 is the part's own (*unverified: check with a 
 Part: **SHOU HAN MSS22D18G2**, LCSC C431542: 6 pins 2.5 mm apart, rows 3.4 mm, 0.8 mm holes; body
 9.1 x 3.5 x 3.5 mm, handle 1.5 mm (the knob's top 5.0 mm above the face), travel 2.0 mm along the body. The G4
 version (C431543) has a taller handle (*length unverified*). Silk "OUTk A|B" by each switch on the face side.
+**Fitted only on a TRS channel** (the user's ruling, 2026-11-08: "we don't need the A/B switch when we have the DIN
+plug"): the switch only swaps the jack's tip and ring, and the DIN's pins sit on TIPk / RINGk, before the switch. A DIN
+channel leaves its switch's pads empty and works as before. The user's set **DDDT** (DIN on OUT1..OUT3, a jack on OUT4)
+fits **one** switch, SW5. No schematic or layout change: the footprints stay for either choice.
 
 **Currents** (CA-033 at 3.3 V, receiver 220 ohm, opto LED 1.5 V given, pad about
 17.7 ohm from IOL 28 mA at 0.495 V, datasheet v2.2 Table 5-4, at drive strength 3): **6.4 mA** typical per output,
