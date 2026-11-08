@@ -26,7 +26,7 @@ FACE = {"SW1": 9.5, "SW6": 9.5, **{f"SW{k}": 5.0 for k in range(2, 6)}}   # belo
 DOWN = {"U1": 3.0, "J1": 1.9, "R8": 1.5, "U4": 1.5, **{f"R{a}{k}": 1.5 for a in (1, 2) for k in range(1, 5)}}   # leads below
 LEADS_UP = {"SW1": 1.5, "SW6": 1.5, "SW7": 1.5, **{f"SW{k}": 1.5 for k in range(2, 6)}}   # the face-side parts' legs on the floor side (SW1's trimmed: under the XIAO)
 SMD_UP = 0.8                                     # (0805 / 1206 / 2010: about 0.6 to 0.8)
-DIN_UP, DOWN_OUT = 21.1, 3.5                     # (the jack's sizes: make_footprints.py, from CUI's drawing)
+DIN_UP, DOWN_OUT = 19.6, 3.5                     # (the HOOYA DIN-504B-M10: 19.6 high; leads under; sizes in make_footprints.py)
 XIAO_USB = (9.0, 1.5, 3.3)
 ENC_BODY, ENC_SHAFT, ENC_D = (12.5, 6.5), 20.0, 6.0   # (the EC11: body 11.7 x 12.5 x 6.5, its shaft 20 mm from the board; drawing, unverified)                       # its socket overhanging the back edge: width, overhang, height
 
@@ -81,15 +81,15 @@ def blocks(variant):
         if ref.startswith("J") and ref != "J1":  # the outputs: the DIN or the jack, at their own sizes
             fr = ((mm(fp.GetPosition().x), mm(fp.GetPosition().y)), fp.GetOrientationDegrees() % 360)
             if variant == "din":
-                out.append(frame_box(fr, -F.DIN_W / 2, -F.DIN_D, F.DIN_W / 2, 0, THICK - 0.01, THICK + DIN_UP, ref))
+                out.append(frame_box(fr, -F.HY_W / 2, -F.HY_D, F.HY_W / 2, 0, THICK - 0.01, THICK + DIN_UP, ref))
             else:
-                jx = F.NEST[0]                       # (the SJ1-3523N: body on the board, its bushing out past the edge)
-                out.append(frame_box(fr, jx - F.JACK_W / 2, -F.JACK_D, jx + F.JACK_W / 2, 0, THICK - 0.01,
-                                     THICK + F.JACK_H, ref + " body"))
+                jx = 0.0                             # (the PJ-320A: body on the board, its bushing out past the edge)
+                out.append(frame_box(fr, jx - F.PJ_W / 2, -F.PJ_D, jx + F.PJ_W / 2, 0, THICK - 0.01,
+                                     THICK + F.PJ_H, ref + " body"))
                 bx, by = T(fr, jx, -0.01)
-                out.append(f"  translate([{bx:.3f}, {-by:.3f}, {THICK + F.BUSH_Z:.3f}]) rotate([0, 0, {fr[1]:.0f}])"
-                           f" rotate([90, 0, 0]) cylinder(d={F.BUSH_D}, h={F.BUSH_OUT + 0.01:.3f}, $fn=48);  // {ref} bushing")
-            out.append(frame_box(fr, -8.5, -16.0, 10.0, -1.5, -DOWN_OUT, 0.01, ref + " leads"))
+                out.append(f"  translate([{bx:.3f}, {-by:.3f}, {THICK + F.PJ_BUSH_Z:.3f}]) rotate([0, 0, {fr[1]:.0f}])"
+                           f" rotate([90, 0, 0]) cylinder(d={F.PJ_BUSH_D}, h={F.PJ_BUSH_OUT + 0.01:.3f}, $fn=48);  // {ref} bushing")
+            out.append(frame_box(fr, -8.6, -15.6, 8.6, -1.5, -DOWN_OUT, 0.01, ref + " leads"))
             continue
         if ref == "SW7":                       # (the encoder, face side: its body and its shaft through the lid)
             mp = [p for p in fp.Pads() if p.GetNumber() == "MP"]

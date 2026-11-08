@@ -9,6 +9,9 @@
                                            through the A/B switch)
   SW_Slide_DPDT_MSS22D18                   the TRS A/B slide switch (SHOU HAN MSS-22D18, LCSC C431542)
   XIAO-ESP32-S3-DIP_Headers                Seeed's XIAO footprint with the courtyard on its pin rows only (on headers)
+  MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB      the long board's output since 2026-11-08: the HOOYA DIN-504B-M10 or the XKB
+                                           PJ-320A, nested, both fronts on the edge; the jack's pads T, R, S on their own
+                                           nets (through the A/B switch), its switch pin (pad "SW") left open
 Origins on the board edge, on the connector's axis, the board inward towards -y. Run by make_board.py (or alone:
 python3 make_footprints.py).
 
@@ -24,6 +27,22 @@ Sources (both read 2026-11-08):
   front (the drawing's view turned; KiCad's own Jack_3.5mm_CUI_SJ1-3523N_Horizontal agrees: T +5, R -5). The 1.2 mm
   holes are taken as plastic pegs, not plated (UNVERIFIED); KiCad's footprint uses 0.4 x 1.4 slots, here CUI's
   1.5 x 0.8 (JLCPCB's plated slots start at 0.5 mm wide).
+- DIN-504B-M10 (HOOYA, LCSC C2939346): its drawing "DIN JACK, MODEL DIN-504B-M10", rev A1 2019-07-10, read
+  2026-11-08: plate 20.9 +/-0.1 along the edge x 19.6 +/-0.1 high, 1.8 thick; 7 holes 1.5 mm ("7-o1.5"): the 3-hole row
+  (15 mm span, centre pin) 12.3 +/-0.3 behind the plate front, the 2-hole row (10 mm span) 14.8 +/-0.3 behind, two
+  shield pins 2.5 +/-0.3 behind and 10 mm apart (x +/-5.0); no locating pegs; the body 11.8 deep behind the plate (so
+  13.6 overall); the socket's axis 9.7 above the plate's board-side edge. Its pin numbers are not on the sheet: the
+  leg pattern is the SDS-50J's (pins 1-3 in the 12.3 row, 4-5 in the 14.8 row), the same numbering is taken
+  (UNVERIFIED: check pins 4 / 5 with a meter before soldering; the A/B switch does not swap the DIN).
+- PJ-320A (XKB, LCSC C2884926): its drawing "3.5 PHONE JACK, PJ-320A", rev A1 2025-03-03, read 2026-11-08 (its
+  "PCB LAYOUT" view, top view, the opening up; turned 180 degrees here, the opening at the edge): body 12.2 deep x
+  6.2 wide x 5.0 high, its front on the edge, a round bushing (5.0 mm across, measured on the sheet, no figure) 2.0 mm
+  out past it, plug hole 3.6, axis 2.5 above the board; two 1.4 mm pegs on the axis 1.6 and 8.6 behind the body's
+  front; one column of three tabs 4.6 mm beside the lone tab: 3.2, 6.2, 10.2 behind the front, the lone one 11.4
+  behind (the tabs drawn 0.6 x 1.2: plated slots that size here). Pin 1 sleeve, 2 ring, 3 tip, 4 the switch (the
+  sheet's schematic); which tab is which pin is NOT on the sheet: taken as the lone tab = 1 (sleeve, the "contact
+  piece"), the column 2 (ring), 4 (switch), 3 (tip) from the front (UNVERIFIED: check with a meter; a tip / ring swap
+  is undone by the A/B switch, a sleeve or switch mix-up is not).
 """
 import os
 
@@ -44,7 +63,18 @@ DIN_HOLE, DIN_PAD, PEG = 1.3, 2.0, 2.4
 NEST = (0.0, 0.0)         # the jack in the combined footprint: on the DIN's axis, its body's front on the same edge
 CY = 0.25                 # courtyard margin
 SILK_BACK = 16.3          # (the silk's back line behind pins 4 and 5: their pads reach 16.0)
-NUM = {"T": "5", "R": "4", "S": "2"}   # (the jack's pads named after the DIN pin on the same net)
+NUM = {"T": "5", "R": "4", "S": "2"}
+# the HOOYA DIN-504B-M10 (the board's frame, as above)
+HY_PINS = {"1": (7.5, -12.3), "2": (0.0, -12.3), "3": (-7.5, -12.3), "4": (5.0, -14.8), "5": (-5.0, -14.8)}
+HY_E = [(-5.0, -2.5), (5.0, -2.5)]
+HY_HOLE, HY_PAD = 1.5, 2.2
+HY_W, HY_D, HY_H, HY_AXIS, HY_PLATE = 20.9, 13.6, 19.6, 9.7, 1.8   # plate width, depth with the body, height, axis, plate
+# the XKB PJ-320A (the board's frame: its body's front on the edge, turned 180 degrees from the sheet's layout view)
+PJ_PINS = {"R": (-2.3, -3.2), "SW": (-2.3, -6.2), "T": (-2.3, -10.2), "S": (2.3, -11.4)}
+PJ_PEGS = [(0.0, -1.6), (0.0, -8.6)]
+PJ_SLOT, PJ_PAD, PJ_PEG = (0.6, 1.2), (1.2, 1.8), 1.4
+PJ_W, PJ_D, PJ_H = 6.2, 12.2, 5.0                # body: width, depth behind the edge, height
+PJ_BUSH_D, PJ_BUSH_OUT, PJ_BUSH_Z = 5.0, 2.0, 2.5   # bushing: diameter (measured), out past the body's front, axis   # (the jack's pads named after the DIN pin on the same net)
 # the A/B slide switch, SHOU HAN MSS-22D18G2 (LCSC C431542; its drawing, read 2026-11-08): pins 1-2-3 and 4-5-6, 2.5 mm apart,
 # rows 3.4 mm apart, 0.8 mm holes; body 9.1 x 3.5 mm, 3.5 mm tall, handle 1.5 mm, travel 2.0 mm
 SW_PINS = {"1": (-2.5, 0.0), "2": (0.0, 0.0), "3": (2.5, 0.0), "4": (-2.5, 3.4), "5": (0.0, 3.4), "6": (2.5, 3.4)}
@@ -121,6 +151,27 @@ def din_items():
     return out
 
 
+def din_pj_items():
+    """the HOOYA DIN-504B-M10 and, nested on its axis, the XKB PJ-320A (README "MIDI out")"""
+    out = [pth(n, x, y, HY_PAD, HY_HOLE) for n, (x, y) in HY_PINS.items()]
+    out += [pth("E", x, y, HY_PAD, HY_HOLE) for x, y in HY_E]
+    out += [pth(n, x, y, PJ_PAD, PJ_SLOT) for n, (x, y) in PJ_PINS.items()]
+    out += [npth(x, y, PJ_PEG) for x, y in PJ_PEGS]
+    w = HY_W / 2
+    out += [rect(-w, -HY_D, w, 0, "F.Fab", 0.1), line(-w, -HY_PLATE, w, -HY_PLATE, "F.Fab", 0.1),
+            rect(-PJ_W / 2, -PJ_D, PJ_W / 2, 0, "F.Fab", 0.1),
+            rect(-PJ_BUSH_D / 2, 0, PJ_BUSH_D / 2, PJ_BUSH_OUT, "F.Fab", 0.1),
+            line(-w + 0.3, -HY_D, -w + 0.3, -1.0, "F.SilkS", 0.12), line(w - 0.3, -HY_D, w - 0.3, -1.0, "F.SilkS", 0.12),
+            line(-w + 0.3, -HY_D, -6.6, -HY_D, "F.SilkS", 0.12), line(6.6, -HY_D, w - 0.3, -HY_D, "F.SilkS", 0.12)]
+    a, b, c = w, -HY_D - CY, 5.0 + HY_PAD / 2 + CY        # (the sides on the plate itself: the pitch is 21.1)
+    d, e = -14.8 - HY_PAD / 2 - CY, PJ_BUSH_D / 2 + CY
+    pts = [(-a, b), (-c, b), (-c, d), (c, d), (c, b), (a, b), (a, 0), (e, 0), (e, PJ_BUSH_OUT + CY), (-e, PJ_BUSH_OUT + CY),
+           (-e, 0), (-a, 0)]
+    xy = " ".join(f"(xy {x:.3f} {y:.3f})" for x, y in pts)
+    out.append(f"  (fp_poly (pts {xy}) {stroke(0.05, 'F.CrtYd')})")
+    return out
+
+
 def xiao_on_headers():
     """the Seeed XIAO footprint (XIAO-ESP32-S3-DIP) with its courtyard on the two pin rows only: on 2.54 mm headers the
     module stands 2.5 mm above the board, so low parts fit under it (the long board: the button, the LEDs; README)"""
@@ -174,6 +225,12 @@ def write():
              rect(-SW_BODY[0] / 2 - CY, -0.8 - CY, SW_BODY[0] / 2 + CY, 4.2 + CY, "F.CrtYd", 0.05)]),
     }
     files["XIAO-ESP32-S3-DIP_Headers"] = xiao_on_headers()
+    files["MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB"] = footprint(
+        "MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB",
+        "One MIDI OUT with a TRS A/B switch: the DIN-5 (HOOYA DIN-504B-M10) OR the 3.5 mm jack (XKB PJ-320A, right angle),"
+        " both fronts on the edge; the jack's pads T, R, S on their own nets, its switch pin SW open",
+        [text("Reference", "REF**", 0, -HY_D - 2.5, "F.SilkS"), text("Value", "DIN or TRS", 0, -9, "F.Fab"),
+         *din_pj_items()])
     for old in ("Jack_3.5mm_Thonkiconn_PJ366ST_Vertical", "MIDI_OUT_SDS-50J_or_PJ366ST"):   # (the vertical jack, replaced)
         if os.path.exists(os.path.join(LIB, old + ".kicad_mod")):
             os.remove(os.path.join(LIB, old + ".kicad_mod"))

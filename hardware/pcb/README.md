@@ -25,7 +25,7 @@ The drawing: [`jank-pcb-schematic.pdf`](jank-pcb-schematic.pdf). The board: [`re
 | File | What |
 |---|---|
 | `make_schematic.py` | The schematic, the project (with the board's rules), the XIAO and switch symbols, the intended nets and `BOM.md`, from one parts table |
-| `make_footprints.py` | The CUI SJ1-3523N, the CUI SDS-50J, the combined output footprints (`_AB`: the jack on its own nets, through the switch), the A/B slide switch, the XIAO on headers (`lib/jank.pretty/`) |
+| `make_footprints.py` | The output footprint `MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB` (the long board), the older CUI ones, the combined output footprints (`_AB`: the jack on its own nets, through the switch), the A/B slide switch, the XIAO on headers (`lib/jank.pretty/`) |
 | `make_board.py` | `jank-pcb.kicad_pcb`: placement, routes, pours, stitching vias, silk (KiCad's Python). Its `square` layout (an older 67 x 58 board) is unused and not built |
 | `make_mockup.py` | `mockup-din.stl`, `mockup-trs.stl` (and their `.scad`): the board and its parts as one solid, checked by `../check_stl.py` |
 | `check_nets.py` | The netlist against the intent and the design rules (the A/B switches, the MIDI IN, the controls), and the board's pads against the schematic |
@@ -68,10 +68,10 @@ From the XIAO ESP32S3 v1.2 schematic (`XIAO_ESP32S3_SCH_v1.2.pdf`, Seeed, read 2
 | XIAO pad | GPIO | Net | Function | Why this pin |
 |---|---|---|---|---|
 | 1 D0 | 1 | MIDI_TX1 | OUT1 data (UART TX); **input (Hi-Z) in MIDI IN mode** | Free, not strapping |
-| 2 D1 | 2 | MIDI_TX2 | OUT2 data (the same TX signal, GPIO matrix): the front footprint at x 51.75 | Free, not strapping |
+| 2 D1 | 2 | MIDI_TX2 | OUT2 data (the same TX signal, GPIO matrix): the front footprint at x 52.65 | Free, not strapping |
 | 3 D2 | 3 | **LADDER** | MODE, PLAY/STOP and the encoder's push on one resistor ladder: **ADC1 channel 2** | An ADC1 pin (usable with Wi-Fi on). GPIO3 straps the JTAG source only once EFUSE_STRAP_JTAG_SEL is burned; by default it is ignored (datasheet v2.2 Table 3-5) |
-| 4 D3 | 4 | MIDI_TX4 | OUT4 data: the front footprint at x 10.75 | Free, not strapping |
-| 5 D4 | 5 | MIDI_TX3 | OUT3 data: the front footprint at x 31.25 | Free, not strapping |
+| 4 D3 | 4 | MIDI_TX4 | OUT4 data: the front footprint at x 10.45 | Free, not strapping |
+| 5 D4 | 5 | MIDI_TX3 | OUT3 data: the front footprint at x 31.55 | Free, not strapping |
 | 6 D5 | 6 | LED_DATA | Two SK6812MINI-E, through U3 | Free |
 | 7 D6 | 43 | **ENC_A** | Encoder A (10 k pull-up, 100 nF) | U0TXD, **499 ohm in series on the module**: harmless for a switch input (below) |
 | 8 D7 | 44 | **ENC_B** | Encoder B (10 k pull-up, 100 nF) | U0RXD: an input at boot (below) |
@@ -82,7 +82,7 @@ From the XIAO ESP32S3 v1.2 schematic (`XIAO_ESP32S3_SCH_v1.2.pdf`, Seeed, read 2
 | 13 GND | | GND | | |
 | 14 5V | | +5V | = the XIAO's USB-C VBUS | |
 
-**GPIO -> footprint -> channel (front edge, x seen from the top):** GPIO1 -> J6 at the back, x 10.75 -> OUT1; GPIO4 -> J9 at x 10.75 -> OUT4; GPIO5 -> J8 at x 31.25 -> OUT3; GPIO2 -> J7 at x 51.75 -> OUT2. Seen from the front with the board face up, the front wall reads OUT2, OUT3, OUT4 from left to right. (The 2026-11-08 swap re-routed TX2 and TX4, so the GPIO of each channel number did not change.)
+**GPIO -> footprint -> channel (front edge, x seen from the top):** GPIO1 -> J6 at the back, x 10.75 -> OUT1; GPIO4 -> J9 at x 10.45 -> OUT4; GPIO5 -> J8 at x 31.55 -> OUT3; GPIO2 -> J7 at x 52.65 -> OUT2. Seen from the front with the board face up, the front wall reads OUT2, OUT3, OUT4 from left to right. (The 2026-11-08 swap re-routed TX2 and TX4, so the GPIO of each channel number did not change.)
 
 On the module and not on a pad: the user LED (GPIO21, yellow, active low through 1.5 k), the BOOT button (GPIO0).
 
@@ -282,13 +282,30 @@ most 34 mA. The opto LED voltage and the pad's resistance are *unverified*.
 - **One UART, four pads:** `uart_set_pin` puts UART TX on GPIO1, `tx_more_up()` (midi.c) connects the same TX
   signal to GPIO2, 5, 4 through the GPIO matrix.
 
-**The TRS part:** **CUI SJ1-3523N**, 3.5 mm stereo, right angle, no switch, LCSC C20182914 Datasheet
-SJ1-352XN, 10/05/2022: pin 1 sleeve, 2 tip, 3 ring; body 12.0 x 11.0 x 5.0 mm; bushing 6.0 mm, 3.3 mm out past the
-body's front, its axis 2.5 mm above the board, so it **must stand past the board's edge**. In the schematic J2..J5 (the
-TRS) are BOM lines only; on the board their pads are part of J6..J9's footprint.
+**The jack (since 2026-11-08, the user's choice: cheaper):** **XKB PJ-320A**, 3.5 mm phone jack, right angle,
+LCSC **C2884926**, **USD 0.1458** (min 5; USD 0.1164 from 50), 7545 in stock (LCSC's product data, 2026-11-08). The
+CUI SJ1-3523N (USD 1.49) is gone from the board. From XKB's drawing ("3.5 PHONE JACK, PJ-320A", rev A1 2025-03-03,
+read 2026-11-08): **body 12.2 deep x 6.2 wide x 5.0 high, its front on the board's edge; a round bushing 2.0 mm out
+past it (5.0 mm across: measured on the sheet, no figure given), plug hole 3.6 mm; axis 2.5 mm above the board** (the
+bushing's lowest point at the board's top, past the edge). PCB layout (the sheet's top view, the opening up; turned
+here with the opening at the edge): two 1.4 mm pegs on the axis 1.6 and 8.6 mm behind the body's front; three tabs in
+a column 2.3 mm to one side of the axis at 3.2, 6.2 and 10.2 mm, one tab 2.3 mm to the other side at 11.4 mm (the
+column 4.6 mm from it); tabs drawn 0.6 x 1.2 mm, plated slots that size here, pads 1.2 x 1.8 mm. **Pins:** 1 sleeve,
+2 ring, 3 tip, 4 a switch contact (the sheet's schematic). **Which tab is which pin is not on the sheet**: taken as
+the lone tab = 1 (sleeve, GND; the part list's "contact piece"), the column from the front 2 (ring), 4 (switch), 3
+(tip) (*unverified: check with a meter before ordering*; a tip / ring swap is undone by the A/B switch, a sleeve or
+switch mix-up is not). **Pin 4 (pad "SW") is left unconnected.** In the schematic J2..J5 are BOM lines only; on the
+board their pads are part of J6..J9's footprint.
 
-**The DIN part:** CUI **SDS-50J** (datasheet SDS-J, 08/05/2022): face 20.0 x 21.1 mm, its centre 10.0 mm above the
-board, 15.8 mm deep, seven 1.3 mm holes (pins 1 to 5 and two "E" shield pins on GND), two 2.4 mm locating holes.
+**The DIN (since 2026-11-08, the user's choice: cheaper):** **HOOYA DIN-504B-M10**, LCSC **C2939346**, **USD 0.3764**
+(min 5; 0.3057 from 50), 2805 in stock. The CUI SDS-50J (USD 4.31) is gone from the board. From HOOYA's drawing ("DIN
+JACK, MODEL DIN-504B-M10", rev A1 2019-07-10, read 2026-11-08): **plate 20.9 +/-0.1 along the edge x 19.6 +/-0.1
+high, 1.8 thick, body 11.8 deep behind it (13.6 overall); the socket's axis 9.7 mm above the plate's board-side edge**
+(the CUI's was 10.0); seven 1.5 mm holes: the 3-pin row (15 mm span, the centre pin = pin 2, GND) 12.3 +/-0.3 behind
+the plate's front, the 2-pin row (10 mm span: pins 4 and 5) 14.8 +/-0.3 behind, two shield pins (on GND) 2.5 +/-0.3
+behind and **10 mm apart** (the CUI's were 5 mm apart); **no locating pegs**. Its pin numbers are not on the sheet:
+the leg pattern is the standard 180-degree one, the CUI's numbering is taken (*unverified: check which leg is pin 4
+and which is pin 5 with a meter; the A/B switch does not swap the DIN*).
 
 ## MIDI IN on OUT1 (software-switched)
 
@@ -358,7 +375,7 @@ the face (the board turned over about its front-back axis), **x becomes 84.0 - x
 
 | Edge | What | Where |
 |---|---|---|
-| Front (y = 52) | **OUT4 (J9), OUT3 (J8), OUT2 (J7)** left to right seen from the top, so **2, 3, 4 left to right seen from the front with the board face up**; faces on the edge, pitch 20.5 mm | OUT4 at x = 10.75, OUT3 at 31.25, OUT2 at 51.75 |
+| Front (y = 52) | **OUT4 (J9), OUT3 (J8), OUT2 (J7)** left to right seen from the top, so **2, 3, 4 left to right seen from the front with the board face up**; faces on the edge, pitch 21.1 mm | OUT4 at x = 10.45, OUT3 at 31.55, OUT2 at 52.65 |
 | Back (y = 0) | **OUT1** (J6, the same footprint turned 180 degrees), behind OUT4 | axis at x = 10.75 |
 | Back | The XIAO's USB-C (the data port; on headers, its socket 1.5 mm past the edge) | axis at x = 45.2 |
 | Back | J1, USB-C power only (GCT USB4125), its front on the edge | axis at x = 64.5 |
@@ -368,12 +385,16 @@ the encoder with its switch legs (17.6) = 84 mm; the front edge only needs 62. T
 front outputs (DIN, switch, groups: 29 mm), with a band of lines between them. The encoder and PLAY/STOP sit under the
 power path (its parts on the floor side round their legs), not beside it.
 
-**One footprint per output** (`jank:MIDI_OUT_SDS-50J_or_SJ1-3523N_AB`, J6..J9): the DIN's face on the edge (E pins
-2.5 mm in, pegs 7.5, pins 1-3 12.5, pins 4-5 15.0); the SJ1-3523N's body front on the same edge, on the DIN's axis
-(1.2 mm pegs at (+/-5.0, 1.0) and (+/-5.0, 3.5), sleeve slot (0, 3.5), tip (+5.0, 8.5), ring (-5.0, 8.5), centre peg
-(0, 8.5); slots 1.5 x 0.8 plated, pads 2.2 x 1.5); the jack's pads T, R, S on J2..J5's nets. Inside it copper to a
-hole is 0.55 mm at least, drill to drill 0.9 mm (DRC-checked). The minimum channel pitch stays 20.5 mm (the DIN's 20.0
-face + 0.5).
+**One footprint per output** (`jank:MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB`, J6..J9; coordinates from the edge, x across,
+seen from the top with the edge at the front): the DIN's plate front on the edge, its pins 1, 2, 3 at (+7.5, 0, -7.5;
+12.3 in), 4 and 5 at (+5.0, -5.0; 14.8 in), its shield pins at (+/-5.0; 2.5 in), all 1.5 mm plated, pads 2.2 mm; the
+PJ-320A's body front on the same edge, on the DIN's axis: pegs (0; 1.6 and 8.6 in, 1.4 mm, not plated), ring (-2.3;
+3.2), switch "SW" (-2.3; 6.2, open), tip (-2.3; 10.2), sleeve (+2.3; 11.4), plated slots 0.6 x 1.2 mm. Nothing of
+the one touches the other's holes (DRC-checked). **Neither the CUI SDS-50J nor the CUI SJ1-3523N fits it any more**,
+and they cannot share one footprint with the new pair: the SDS-50J's shield pins (+/-2.5; 2.5) fall on the PJ-320A's
+first tab (-2.3; 3.2), and the SJ1-3523N's pegs (+/-5.0; 1.0 and 3.5) on the HOOYA's shield pins (+/-5.0; 2.5).
+**The pitch is 21.1 mm** (was 20.5): the HOOYA's plate is 20.9 +/-0.1 wide, so two side by side at 20.5 would
+overlap by 0.4 mm; at 21.1 they have 0.2 mm (0 at the worst tolerance). OUT4's plate is flush with the left edge.
 
 **Placement (floor side = top, face side = bottom):**
 
@@ -430,11 +451,11 @@ The rules ask 0.2 mm; DRC passes. **Height under the module** (the XIAO's unders
 
 | Side | Part | Height from that side's surface | Source |
 |---|---|---|---|
-| Floor (top) | DIN-5 (if fitted) | 21.1 | datasheet |
+| Floor (top) | DIN-5 HOOYA (if fitted) | 19.6 (plate); axis 9.7 | drawing |
 | Floor | R2k, 33 ohm 0.5 W standing | about 11.5 | *estimate* |
 | Floor | R1k, R8, 0.25 W standing | about 9.0 | *estimate* |
 | Floor | XIAO on 2.54 mm headers | about 7.0 (its socket's axis about 5) | *estimate* |
-| Floor | SJ1-3523N (if fitted) | 5.0; bushing 6.0 mm, axis 2.5 up, 3.3 mm past the edge | datasheet |
+| Floor | PJ-320A (if fitted) | 5.0; bushing 5.0 mm (measured), axis 2.5 up, 2.0 mm past the edge | drawing |
 | Floor | U4 H11L1 (DIP-6) | about 4.5 | *estimate* |
 | Floor | J1 USB-C | 3.3 | *estimate* |
 | Floor | the face-side parts' legs (switches, encoder) | about 1.5 (trimmed; MODE's must be) | *estimate* |
@@ -462,18 +483,19 @@ recessed over them, or the taller G4 handle fits (*the user's call*).
 | LED1 window | 45.5 (38.5), 4.0 | 3.2 x 3.6 | over its 3.0 x 3.4 cut-out; a light pipe or a clear insert helps (*untried*) |
 | LED2 window | 49.85 (34.15), 4.0 | 3.2 x 3.6 | as LED1 |
 | OUT1 A/B slot (SW2) | 25.2 (58.8), 10.75 | 2.0 x 4.5 | the handle (1.5 wide, 2.0 long) slides 2.0 mm along y; centre = mid-travel |
-| OUT2 A/B slot (SW3) | 51.75 (32.25), 32.25 | 2.0 x 4.5 | as SW2 |
-| OUT3 A/B slot (SW4) | 31.25 (52.75), 32.25 | 2.0 x 4.5 | as SW2 |
-| OUT4 A/B slot (SW5) | 10.75 (73.25), 32.25 | 2.0 x 4.5 | as SW2 |
+| OUT2 A/B slot (SW3) | 52.65 (31.35), 32.25 | 2.0 x 4.5 | as SW2 |
+| OUT3 A/B slot (SW4) | 31.55 (52.45), 32.25 | 2.0 x 4.5 | as SW2 |
+| OUT4 A/B slot (SW5) | 10.45 (73.55), 32.25 | 2.0 x 4.5 | as SW2 |
 
-**The front wall** (seen from the front, face up: OUT2, OUT3, OUT4 left to right): the DIN faces on the board's edge (centres 10.0 mm above the floor-side surface), the
-jacks' bushings on the same axes, 2.5 mm above that surface and 3.3 mm out past the edge (jack hole about 6.2 mm; DIN
-hole about 16 mm, *the user's DIN plugs decide*). **The back wall, left to right:** OUT1's DIN / jack at x 10.75, the
+**The front wall** (seen from the front, face up: OUT2, OUT3, OUT4 left to right): the DIN plates on the board's edge
+(**their axes 9.7 mm above the floor-side surface**, the CUI's were 10.0), the jacks' bushings on the same axes, **2.5 mm
+above that surface, 5.0 mm across and 2.0 mm out past the edge** (the jack hole about 5.2 mm; the DIN hole about 16 mm,
+*the user's DIN plugs decide*). **The back wall, left to right:** OUT1's DIN / jack at x 10.75, the
 XIAO's socket at x 45.2 and J1's at x 64.5 (USB-C openings about 9.5 x 3.8 mm, *estimate*).
 
 ### Mockup (`make_mockup.py`)
 
-`mockup-din.stl` (four DINs) and `mockup-trs.stl` (four SJ1-3523N): the board with its holes and cut-outs, each fitted
+`mockup-din.stl` (four HOOYA DINs) and `mockup-trs.stl` (four PJ-320A): the board with its holes and cut-outs, each fitted
 part a block of its courtyard and the heights above (the jack with its bushing as a cylinder past the edge), the
 face-side parts below (MODE and PLAY/STOP 9.5 mm, the A/B switches 5.0 mm, **the encoder as a 12.5 x 12.5 x 6.5 mm body
 and a 6 mm shaft to 20 mm**), the leads as blocks (the XIAO's as its two header rows), one solid each. The parallel
@@ -481,9 +503,11 @@ pads and jumpers are not parts. C4 (not fitted) is left out.
 
 ## Unverified, all in one place
 
-- **The SJ1-3523N:** its holes against a real part (the drawing only); that the 1.2 mm holes are plastic pegs; that its
-  blades fit 1.5 x 0.8 mm slots.
-- **The SDS-50J:** its holes against the drawing (no part measured), its E pins' function (taken as shield).
+- **The PJ-320A:** which tab is which pin (taken: the lone tab = sleeve; the column ring, switch, tip from the front);
+  its bushing's diameter (5.0, measured on the sheet); that its tabs fit 0.6 x 1.2 mm slots.
+- **The DIN-504B-M10:** which leg is pin 4 and which pin 5 (the CUI's numbering taken); its axis height (9.7, read as
+  measured from the plate's board-side edge); the body's width behind the plate (taken as the plate's 20.9); no part
+  measured.
 - **The MSS22D18G2 A/B switches:** which end of the travel closes 1-2 / 4-5 (type A); the G4 handle's length; how the
   knobs are reached under a lid 7 mm up.
 - **The encoder EC11E09244BS:** its body height (about 6.5 mm read from the drawing's text), the 20 mm actuator length

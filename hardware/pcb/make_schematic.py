@@ -221,11 +221,11 @@ for k in range(1, 5):
         (f"R4{k}", "Device:R", "DNP parallel", R1206, "rpar", x0 + 17.78, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
         (f"JP1{k}", "Jumper:SolderJumper_2_Open", "bypass", JP, "", x0 + 2.54, 241.3, {"1": f"MIDI_TX{k}", "2": f"TIP{k}"}),
         (f"JP2{k}", "Jumper:SolderJumper_2_Open", "bypass: 3V3 direct" if k > 1 else "bypass: SRC1 direct", JP, "", x0 + 25.4, 241.3, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
-        (f"J{1 + k}", "Connector_Audio:AudioJack3", "TRS SJ1-3523N", "", "trs",
+        (f"J{1 + k}", "Connector_Audio:AudioJack3", "TRS PJ-320A", "", "trs",
          x0 + 35.56, 231.14, {"T": f"JT{k}", "R": f"JR{k}", "S": "GND"}),
         (f"SW{1 + k}", "jank:SW_DPDT_Slide", "TRS A/B", "jank:SW_Slide_DPDT_MSS22D18", "swab", x0 + 45.72, 271.78,
          {"1": f"RING{k}", "2": f"JR{k}", "3": f"TIP{k}", "4": f"TIP{k}", "5": f"JT{k}", "6": f"RING{k}"}),
-        (f"J{5 + k}", "Connector:DIN-5_180degree", "DIN-5 SDS-50J", "jank:MIDI_OUT_SDS-50J_or_SJ1-3523N_AB", "din",
+        (f"J{5 + k}", "Connector:DIN-5_180degree", "DIN-5 DIN-504B-M10", "jank:MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB", "din",
          x0 + 66.04, 231.14, {"5": f"TIP{k}", "4": f"RING{k}", "2": "GND"}),
     ]
 
@@ -255,8 +255,8 @@ NOTES.append((140.0, 304.8, 2.0, "CONTROLS (face side): one ADC ladder on GPIO3:
 NOTES.append((140.0, 309.88, 1.27, "Idle 3.30 V, MODE 0.60 V, PLAY 1.34 V, PUSH 2.27 V (one switch at a time). Encoder A / B: 10k to 3V3, 100 nF to GND each."))
 NOTES.append((20.32, 264.16, 1.27, "Each MIDI resistor (and R8): axial, hand-swappable; JP across it = bypass (0 ohm, open by default); R3k / R4k / R9 in"
                                    " parallel, not fitted (lower the value). JP2k bridged = RING on 3V3 directly (JP21: on SRC1): a mono plug then shorts the rail."))
-NOTES.append((20.32, 194.31, 1.27, "On the board each pair is ONE footprint (J6..J9; long board jank:MIDI_OUT_SDS-50J_or_SJ1-3523N_AB: the jack's pads T, R, S"
-                                   " carry J2..J5's nets; square board: numbered 5, 4, 2 inside the DIN's). J2..J5 are BOM lines only (not on the board)."))
+NOTES.append((20.32, 194.31, 1.27, "On the board each pair is ONE footprint (J6..J9; long board jank:MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB: the jack's pads T, R, S"
+                                   " carry J2..J5's nets, its switch pin SW open; square board: numbered 5, 4, 2 inside the DIN's). J2..J5 are BOM lines only."))
 
 LABEL_ANGLE = {0: 180, 180: 0, 90: 270, 270: 90}   # (the label away from the body)
 LIB_IDS = sorted({p[1] for p in PARTS})
@@ -397,11 +397,10 @@ BOM = {
                 shop=LCSC, code="C1365579", price=0.0205, cur="USD", min=50),
     "r33": dict(part="Resistor 33 ohm 1% 0.5 W axial (9 x 3.2 mm), standing (RA, source)", mpn="CCO MF1/2W-33R 1% T",
                 shop=LCSC, code="C119401", price=0.0241, cur="USD", min=20),
-    "trs": dict(part="3.5 mm stereo jack, right angle, plug from the front (no switch)", mpn="CUI SJ1-3523N", shop=LCSC,
-                code="C20182914", price=1.4889, cur="USD", min=1, variant="trs",
-                datasheet="https://datasheet.lcsc.com/datasheet/pdf/cae5fc6b3d3999d1c6ccd4b6dc65db1d.pdf?productCode=C20182914"),
-    "din": dict(part="DIN-5 180 degree, PCB right angle", mpn="CUI SDS-50J", shop=LCSC, code="C6216157", price=4.3104,
-                cur="USD", min=1, variant="din", datasheet="https://datasheet.lcsc.com/datasheet/pdf/39eaa9575b3a5e3b72c3ccb70a225b56.pdf?productCode=C6216157"),
+    "trs": dict(part="3.5 mm stereo jack, right angle, plug from the front, 4 pins (its switch pin left open)",
+                mpn="XKB PJ-320A", shop=LCSC, code="C2884926", price=0.1458, cur="USD", min=5, variant="trs"),
+    "din": dict(part="DIN-5 180 degree, PCB right angle, 7 pins, no locating pegs", mpn="HOOYA DIN-504B-M10", shop=LCSC,
+                code="C2939346", price=0.3764, cur="USD", min=5, variant="din"),
 }
 
 
