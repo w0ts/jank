@@ -87,9 +87,12 @@ cap_stop = 1.6;         // the lid's jack cap stops this far above the board: th
 wall = 1.8;             // side walls: the side jacks' 2.0 mm bushings stand 0.1 proud, as on the front
 side_jacks = [[0, 39.85, "CLK"], [0, 46.55, "RST"], [1, 53.8, "CLK"], [1, 60.5, "RST"]];   // [0 left / 1 right, y, label]
 conn_t = 1.8;           // front and back walls above the board: the jack's 2.0 mm bushing stands 0.1 proud
-edge_gap = 0.1;
+edge_gap = 0.3;         // board edge to the wall's inside, all four sides: JLCPCB's outline tolerance is +/-0.2 mm
+                        // (the coordinator's decision 2026-11-08); the jacks' bushings end 0.1 inside the outer face
+jack_mouth = [10.0, 0.3];   // a shallow mouth round each jack's slot on the outside (dia, depth), so a plug's shoulder
+                            // (taken as up to 10 mm across, UNVERIFIED) still meets the bushing's face
 floor_t = 2.0;
-side_clr = 0.1;         // the side jacks' fronts are on the board's side edges, as the front ones on theirs
+side_clr = edge_gap;    // the side jacks' fronts are on the board's side edges, as the front ones on theirs
 contact = 0.05;
 face_h = 7.2;           // the board's top to the lid's inside: the XIAO's 7.0 + 0.2
 lid_t = 1.5;
@@ -142,8 +145,12 @@ encC = [kx(enc[0]), ky(enc[1])];
 module at_side(j) { s = side_jacks[j];
     if (s[0] == 0) translate([X0 - side_clr + edge_gap, ky(s[1]), 0]) rotate([0, 0, -90]) children();
     else translate([X0 + board_l + side_clr - edge_gap, ky(s[1]), 0]) rotate([0, 0, 90]) children(); }
-module jack_cut() {     // a jack's U-slot through its wall
+module jack_mouth() {   // local frame: the mouth, cut into the wall's outer face (and the key's / the lid's edge)
+    translate([0, 0, Zb + bush_z]) xz_extrude(-edge_gap - conn_t - 1, 1 + jack_mouth[1]) uslot2d(jack_mouth[0], H);
+}
+module jack_cut() {     // a jack's U-slot through its wall, and its mouth
     translate([0, 0, Zb + bush_z]) xz_extrude(-edge_gap - conn_t - 1, conn_t + 1 + edge_gap + 0.01) uslot2d(bush_slot, H);
+    jack_mouth();
 }
 module at_ch(k) { if (ch_back[k]) translate([chx(k), Ybk, 0]) mirror([0, 1, 0]) children();
                   else translate([chx(k), Y0, 0]) children(); }
@@ -190,6 +197,7 @@ module din_lip() {
 module ch_cut() {       // the jack's U-slot (above the board) and the DIN's closed bore (below), through wall and pad
     y0 = -edge_gap - conn_t - 1;
     translate([0, 0, Zb + bush_z]) xz_extrude(y0, conn_t + 1 + edge_gap + 0.01) uslot2d(bush_slot, H);
+    jack_mouth();
     translate([0, 0, Zbot - din_axis]) xz_extrude(y0, conn_t + 1 + din_in + 0.01) teardrop2d(din_bore);
 }
 module lid_key() {
@@ -272,15 +280,15 @@ module label2d(l) { translate([l[1], l[2]]) text(l[0], size = l[5], font = mark_
 module lid_text_cut() { if (markings) translate([0, 0, H - mark_depth]) linear_extrude(mark_depth + 1) for (l = lid_labels()) label2d(l); }
 // wall labels: [text, x, z (baseline), wall (0 front, 1 back), halign]; on the back, "right" runs towards +X
 function wall_labels() = concat(
-    [for (k = [1 : 3]) [str(k + 1), chx(k) + bush_slot / 2 + mark_gap, Zb + 1.0, 0, "left"]],
-    [["1 / IN", chx(0) + bush_slot / 2 + mark_gap, Zb + 1.0, 1, "right"],
+    [for (k = [1 : 3]) [str(k + 1), chx(k) + jack_mouth[0] / 2 + mark_gap, Zb + 1.0, 0, "left"]],
+    [["1 / IN", chx(0) + jack_mouth[0] / 2 + mark_gap, Zb + 1.0, 1, "right"],
      ["USB", kx(usb_xiao[0]), Zb + usb_xiao[1] - usb_open[1] / 2 - mark_gap - capH(mark_size), 1, "center"],
      ["PWR", kx(usb_j1[0]), Zb + usb_j1[1] - usb_open[1] / 2 - mark_gap - capH(mark_size), 1, "center"]],
     // the side walls: each label beyond its own slot, away from the other jack of the pair. On the left wall the text
     // runs towards the front (-Y), on the right towards the back (+Y): Y is the anchor along the wall
     [for (j = [0 : 3]) let(s = side_jacks[j], other = side_jacks[j % 2 == 0 ? j + 1 : j - 1],
                           away = ky(s[1]) > ky(other[1]) ? 1 : -1,          // +1: this jack is the one nearer the back
-                          y = ky(s[1]) + away * (bush_slot / 2 + mark_gap),
+                          y = ky(s[1]) + away * (jack_mouth[0] / 2 + mark_gap),
                           hal = (s[0] == 0) == (away > 0) ? "right" : "left")
         [s[2], y, Zb + 1.0, 2 + s[0], hal]]);
 module wall_label(l, depth, grow = 0) {
@@ -331,6 +339,8 @@ module lid() {          // in place
         // the XIAO's opening reaches above the walls (its socket's top is 7.0 up): a notch in the lid's back edge
         translate([kx(usb_xiao[0]) - usb_open[0] / 2, Ybk + edge_gap - 0.01, Zl - 1]) cube([usb_open[0], W, lid_t + 2]);
         lid_text_cut();
+        for (k = [0 : 3]) at_ch(k) jack_mouth();     // the keys' outer faces and the lid's edge follow the mouths
+        for (j = [0 : 3]) at_side(j) jack_mouth();
     }
 }
 // ---------------------------------------------------------------------------------------------------------------
@@ -393,6 +403,7 @@ module front_test() {
         }
         translate([w / 2, 0, zb - board_t - din_axis]) xz_extrude(-1, t + din_in + 2) teardrop2d(din_bore);
         translate([w / 2, 0, zb + bush_z]) xz_extrude(-1, t + 2) uslot2d(bush_slot, 30);
+        translate([w / 2, 0, zb + bush_z]) xz_extrude(-1, 1 + jack_mouth[1]) uslot2d(jack_mouth[0], 30);   // its mouth
     }
 }
 
