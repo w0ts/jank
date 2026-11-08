@@ -40,7 +40,7 @@ SETS="TDDD" sh hardware/box/make_stl.sh   # any other combination
 ## The sets
 
 `outs` lists **OUT1..OUT4**: `D` = DIN (CUI SDS-50J), `T` = TRS (CUI SJ1-3523N). **OUT1 is the back one.** Seen from
-the front with the lid up, the front wall carries OUT4, OUT3, OUT2 from left to right; OUT1 is at the back, behind OUT2
+the front with the lid up, the front wall carries **OUT2, OUT3, OUT4 from left to right**; OUT1 is at the back, behind OUT4
 (the board lies face up, so KiCad's x is mirrored: face x = 84 - x). The encoder is in the back left corner (seen from
 the front), the buttons right of it.
 
@@ -171,17 +171,16 @@ underside would sweep 1.7 mm sideways under a hinged lid, more than any clean ho
 | PLAY/STOP (SW6) | 58.55 (25.45), 13.8 | 4.0 mm round | as MODE |
 | Encoder (SW7) | 75.5 (8.5), 14.5 | 13.3 x 13.3 window | the body through it (above) |
 | LED1, LED2 | 45.5 (38.5) and 49.85 (34.15), 4.0 | 3.2 x 3.6 | one light shroud (0.5 mm walls, 1.15 between the windows, down to 0.3 above the face), cut back where the XIAO's header pins stand; the lid's top **skin of 0.6 mm stays over the windows** (`led_skin`): print the lid translucent, or set `led_skin = 0` |
-| A/B, jack channels only | SW2 (25.2, 10.75) for OUT1, SW3 / SW4 / SW5 (10.75 / 31.25 / 51.75, 32.25) for OUT2..OUT4 | 2.0 x 4.5 | only where the channel is a TRS (in `DDDT`: SW5, OUT4); the board README's slot: handle 1.5 x 2.0 + 2.0 travel along y + 0.25 round; body (3.5) under a 0.4 mm recess |
+| A/B, jack channels only | SW2 (25.2, 10.75) for OUT1, SW3 / SW4 / SW5 (51.75 / 31.25 / 10.75, 32.25) for OUT2 / OUT3 / OUT4 | 2.0 x 4.5 | only where the channel is a TRS (in `DDDT`: SW5, OUT4); the board README's slot: handle 1.5 x 2.0 + 2.0 travel along y + 0.25 round; body (3.5) under a 0.4 mm recess |
 | USB-C | XIAO (45.2), J1 (64.5), back wall | 12.5 x 7.0 | U-openings closed by the lid's tongues; for a plug's overmold (*unverified* against the cables) |
 
 ## Markings
 
 `markings = true` cuts labels 0.4 mm deep in Liberation Sans Bold. The capitals are 4.0 mm tall (`mark_size` 4.2) and
 the stems 0.84 mm wide, so a 0.4 mm nozzle leaves them open.
-The user's rule (2026-11-08): the controls are labelled on the lid's top, the plugs on the sides, each once. The two
-"USB" are different things: the lid's names LED2, the back wall's names the XIAO's socket.
-- **Lid top:** MODE right of its button, PLAY under its button, BPM over the encoder's window, LINK right of LED1 and
-  USB left of LED2, an A and a B at the two ends of each A/B slot (jack channels only), and "jank" (6.0 mm capitals) in the front right
+The user's rule (2026-11-08): the controls are labelled on the lid's top, the plugs on the sides, each once; the LEDs
+carry no label (a lid label must not repeat a side's).
+- **Lid top:** MODE right of its button, PLAY under its button, BPM over the encoder's window, an A and a B at the two ends of each A/B slot (jack channels only), and "jank" (6.0 mm capitals) in the front right
   corner.
 - **Lid tongues** (flush with the walls, over the bore): the channel number of each DIN ("1 / IN" on OUT1's; in
   `DDDT` "1 / IN", "2", "3").
@@ -192,7 +191,6 @@ The user's rule (2026-11-08): the controls are labelled on the lid's top, the pl
   their tongues.
 - **A/B caveat:** which end of a slot is A is not verified (`ab_a_end`, default "back"). Check one switch with a meter
   before trusting the letters.
-- **The LED names are assumptions** from the firmware's use (`led_names`): LED1 = Link (network) state, LED2 = USB state.
 
 ## Checks (`make_stl.sh`, last run 2026-11-08, OpenSCAD 2026.10.11, manifold)
 
@@ -260,8 +258,7 @@ the lid translucent if `led_skin > 0`. Printed holes come out 0.1 to 0.2 mm smal
 
 - **The DIN bore 16.0 mm** for the user's plugs' shells, and a plug going fully home with the socket's face 2.6 mm
   behind the outside (the shell's length).
-- **The markings:** which end of an A/B slot is A (`ab_a_end`, default "back", not checked against the switch); LED1 =
-  "LINK" and LED2 = "USB" are assumed from the firmware's use, not checked; the font is the one OpenSCAD reports as
+- **The markings:** which end of an A/B slot is A (`ab_a_end`, default "back", not checked against the switch); the font is the one OpenSCAD reports as
   Liberation Sans Bold (it substitutes silently if a font is missing).
 - **The SDS-50J housing:** 18.0 mm over its whole depth and width (the side view gives 18.0, the width behind the plate
   is not dimensioned, so the cradle bears only above the housing); its back flat where the lip bears; the plate 1.8 mm
