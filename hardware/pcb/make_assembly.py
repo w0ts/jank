@@ -16,7 +16,7 @@ Mid X / Mid Y: mm from the board's lower left corner (the Gerbers' and the drill
 middle is its footprint's origin (KiCad's SMD footprints are drawn round their middle); a through-hole part's is the
 middle of its pads (KiCad's origin is its pin 1). Rotation: KiCad's, plus the correction of the community table that
 Bouni's kicad-jlcpcb-tools downloads (matthewlai/JLCKicadTools cpl_rotations_db.csv, read 2026-11-08) where a
-footprint matches it (SOT-23*: -90, SOT-363: +180); every other part as KiCad has it. Nothing on the bottom is placed
+footprint matches it (SOT-23*: -90, SOT-363: +180, SOIC-*: +270); every other part as KiCad has it. Nothing on the bottom is placed
 (the DINs and the 9 standing resistors R8, R11..R14, R21..R24: by hand). All of it is UNVERIFIED against JLCPCB's
 placement preview.
 """
@@ -35,8 +35,8 @@ import make_schematic as S                      # (the parts table and the BOM c
 
 MOD = os.environ.get("MODULAR") == "1"         # (the modular variant: jank-pcb-mod.kicad_pcb, its files in fab/mod/)
 FAB = os.path.join(HERE, "fab", *(["mod"] if MOD else []))
-SKIP = re.compile(r"^(H\d|JP|TP|J[6-9]$|U1$|C4$|R8$|R1[1-4]$|R2[1-4]$)")   # (the standing resistors: by hand, under the board)
-ROT_FIX = [(r"^SOT-23", -90), (r"^SOT-363", 180)]   # (the community table's rows that match a footprint here)
+SKIP = re.compile(r"^(H\d|JP|TP|J[6-9]$|J1[1-4]$|U1$|C4$|R8$|R1[1-4]$|R2[1-4]$)")   # (the standing resistors: by hand, under the board)
+ROT_FIX = [(r"^SOT-23", -90), (r"^SOT-363", 180), (r"^SOIC-", 270)]   # (the community table's rows that match a footprint here)
 
 board = pcbnew.LoadBoard(os.path.join(HERE, "jank-pcb-mod.kicad_pcb" if MOD else "jank-pcb.kicad_pcb"))
 ox, oy = (pcbnew.ToMM(v) for v in (board.GetDesignSettings().GetAuxOrigin().x, board.GetDesignSettings().GetAuxOrigin().y))

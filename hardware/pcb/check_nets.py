@@ -127,6 +127,23 @@ if "MIDI_RX" in nets:                           # (the long board: one output al
             if gpio in STRAPPING or (gpio in AVOID and name != f"SRC{k}"):   # (SRC on U0RXD: an output, said in README)
                 errors.append(f"{name} on GPIO{gpio}: strapping or {AVOID.get(gpio, 'avoided')}")
 
+if "CLK_L" in nets:                              # (the modular variant: CLOCK / RESET on both side walls, README "Modular variant")
+    on("SDA", ("U5", "15"))
+    on("SCL", ("U5", "14"))
+    on("+3V3", ("U5", "16"), ("C12", "1"))
+    on("GND", ("U5", "1"), ("U5", "2"), ("U5", "3"), ("U5", "8"))   # (A0..A2 low: address 0x20)
+    for out, inp, buf, u_, r_, d_, j_, c_, pin in (("CLK_L", "CLKL_IN", "CLKL_B", "U6", "R72", "D3", "J11", "C13", "4"),
+                                                   ("RST_L", "RSTL_IN", "RSTL_B", "U7", "R73", "D4", "J12", "C14", "5"),
+                                                   ("CLK_R", "CLKR_IN", "CLKR_B", "U8", "R74", "D5", "J13", "C15", "10"),
+                                                   ("RST_R", "RSTR_IN", "RSTR_B", "U9", "R75", "D6", "J14", "C16", "9")):
+        on(inp, ("U5", pin), (u_, "2"))
+        on(buf, (u_, "4"), (r_, "1"))
+        on(out, (r_, "2"), (d_, "3"), (j_, "T"))
+        on("+5V", (u_, "5"), (d_, "2"), (c_, "1"))
+        on("GND", (u_, "1"), (u_, "3"), (d_, "1"), (j_, "S"), (c_, "2"))
+        if sch.get((j_, "R")):
+            errors.append(f"{j_}.R should be open (mono)")
+
 if "LADDER" in nets:                             # (round 7: the controls: one ADC ladder, the encoder's A / B)
     on("LADDER", ("U1", "3"), ("SW1", "1"), ("SW6", "1"), ("SW7", "S2"), ("R60", "2"), ("C9", "1"))
     on("+3V3", ("R60", "1"), ("R64", "1"), ("R65", "1"))

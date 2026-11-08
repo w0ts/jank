@@ -248,6 +248,21 @@ def oled_items():
     return out
 
 
+def pj_items():
+    """the XKB PJ-320A alone (the modular variant's side-wall jacks): its pads, pegs, body and bushing, F side"""
+    out = [pth(n, x, y, PJ_PAD, PJ_SLOT) for n, (x, y) in PJ_PINS.items()]
+    out += [npth(x, y, PJ_PEG) for x, y in PJ_PEGS]
+    out += [rect(-PJ_W / 2, -PJ_D, PJ_W / 2, 0, "F.Fab", 0.1),
+            rect(-PJ_BUSH_D / 2, 0, PJ_BUSH_D / 2, PJ_BUSH_OUT, "F.Fab", 0.1),
+            line(-PJ_W / 2 - 0.15, -PJ_D, -PJ_W / 2 - 0.15, -1.0, "F.SilkS", 0.12),
+            line(PJ_W / 2 + 0.15, -PJ_D, PJ_W / 2 + 0.15, -1.0, "F.SilkS", 0.12)]
+    a, e_ = PJ_W / 2 + CY, PJ_BUSH_D / 2 + CY
+    pts = [(-a, -PJ_D - CY), (a, -PJ_D - CY), (a, 0), (e_, 0), (e_, PJ_BUSH_OUT + CY), (-e_, PJ_BUSH_OUT + CY), (-e_, 0), (-a, 0)]
+    xy = " ".join(f"(xy {x:.3f} {y:.3f})" for x, y in pts)
+    out.append(f"  (fp_poly (pts {xy}) {stroke(0.05, 'F.CrtYd')})")
+    return out
+
+
 def xiao_on_headers():
     """the Seeed XIAO footprint (XIAO-ESP32-S3-DIP) with its courtyard on the two pin rows only: on 2.54 mm headers the
     module stands 2.5 mm above the board, so low parts fit under it (the long board: the button, the LEDs; README)"""
@@ -322,6 +337,11 @@ def write():
         "0.91 inch 128 x 32 OLED module HS91L02W2C01 (SSD1306, I2C), on a 1 x 4 2.54 mm header: 1 GND, 2 VCC, 3 SCL, 4 SDA;"
         " module 38 x 12 mm drawn on F.Fab / F.SilkS (it floats over the board on its header)",
         [text("Reference", "REF**", 3.0, -3.2, "F.SilkS", True), text("Value", "OLED 0.91", 18.0, 3.8, "F.Fab"), *oled_items()])
+    files["Jack_3.5mm_XKB_PJ-320A_Horizontal"] = footprint(
+        "Jack_3.5mm_XKB_PJ-320A_Horizontal",
+        "3.5 mm jack XKB PJ-320A alone (the modular variant's mono outputs: tip = signal, sleeve = GND, ring and switch open);"
+        " its front on the board edge, the bushing 2.0 mm past it",
+        [text("Reference", "REF**", 0, -PJ_D - 1.5, "F.SilkS", True), text("Value", "PJ-320A", 0, -6, "F.Fab"), *pj_items()])
     for old in ("Jack_3.5mm_Thonkiconn_PJ366ST_Vertical", "MIDI_OUT_SDS-50J_or_PJ366ST"):   # (the vertical jack, replaced)
         if os.path.exists(os.path.join(LIB, old + ".kicad_mod")):
             os.remove(os.path.join(LIB, old + ".kicad_mod"))

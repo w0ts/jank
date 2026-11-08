@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "filename": "jank-pcb-mod.kicad_pro",
+    "version": 3
+  },
+  "schematic": {
+    "legacy_lib_dir": "",
+    "legacy_lib_list": []
+  },
+  "sheets": [
+    [
+      "5d36403b-4976-52ae-9bd6-556f83ed8949",
+      "Root"
+    ]
+  ],
+  "text_variables": {},
+  "board": {
+    "design_settings": {
+      "rules": {
+        "min_clearance": 0.15,
+        "min_copper_edge_clearance": 0.2,
+        "min_hole_clearance": 0.2,
+        "min_hole_to_hole": 0.5,
+        "min_through_hole_diameter": 0.3,
+        "min_track_width": 0.15,
+        "min_via_annular_width": 0.1,
+        "min_via_diameter": 0.5,
+        "min_text_height": 0.6,
+        "min_text_thickness": 0.08,
+        "min_silk_clearance": 0.0
+      }
+    }
+  },
+  "net_settings": {
+    "classes": [
+      {
+        "name": "Default",
+        "clearance": 0.2,
+        "track_width": 0.25,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "priority": 2147483647
+      }
+    ],
+    "meta": {
+      "version": 5
+    }
+  }
+}
