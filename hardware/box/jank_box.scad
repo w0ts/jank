@@ -30,7 +30,7 @@ part = "assembly";      // [assembly, box, lid, front_test, mock, open, front, b
 board_l = 84.0;
 board_w = 52.0;
 board_t = 1.6;          // UNVERIFIED: JLCPCB default, assumed in the board README
-ch_x = [10.75, 51.75, 31.25, 10.75];     // OUT1..OUT4 axes, KiCad x (OUT1 at the back, behind OUT4)
+ch_x = [10.75, 52.65, 31.55, 10.45];     // OUT1..OUT4 axes, KiCad x (OUT1 at the back, behind OUT4)
 ch_back = [true, false, false, false];   // OUT1 on the back edge, OUT2..4 on the front edge
 holes = [[80.8, 25.0], [80.8, 48.8]];    // H1, H2 (2.2 mm), KiCad x, y from the back
 buttons = [[47.75, 13.8], [58.55, 13.8]];   // MODE (SW1), PLAY/STOP (SW6): HRO K2-1102DP-L3SW-04, 9.5 mm
@@ -40,7 +40,7 @@ enc_body = [12.5, 12.5, 6.5];  // the mockup's block (README: 11.7 x 12.5); 6.5 
 enc_shaft = [6.0, 20.0];       // D shaft, top 20 mm above the face (UNVERIFIED: "from the mounting surface")
 leds = [[45.5, 4.0], [49.85, 4.0]];      // LED1, LED2 windows, KiCad
 led_win = [3.2, 3.6];                    // x by y, over the 3.0 x 3.4 cut-outs
-ab = [[25.2, 10.75], [51.75, 32.25], [31.25, 32.25], [10.75, 32.25]];  // SW2..SW5 (OUT1..OUT4) slot centres (= travel middle)
+ab = [[25.2, 10.75], [52.65, 32.25], [31.55, 32.25], [10.45, 32.25]];  // SW2..SW5 (OUT1..OUT4) slot centres (= travel middle)
 ab_slot = [2.0, 4.5];                    // handle 1.5 x 2.0 + 2.0 travel along y + 0.25 round
 ab_handle = [1.5, 2.0, 2.0];             // width, length, travel (MSS22D18G2 drawing via the board README)
 ab_body_h = 3.5;
@@ -55,11 +55,11 @@ usb_overhang = 1.5;         // XIAO socket past the back edge (Seeed footprint, 
 usb_open = [12.5, 7.0];     // back-wall opening per socket, for a USB-C plug's overmold (UNVERIFIED, typical <= 12 x 6.5)
 header_keepout = [[151.755, -121.02, 3.44, 21.065], [135.255, -120.97, 3.34, 20.965]];  // XIAO header pins, face side (mockup)
 
-/* [DIN: CUI SDS-50J, datasheet SDS-J rev 1.08, drawing page 3, tolerance +/-0.3] */
-din_plate = [20.0, 21.1, 1.8];
-din_body_h = 18.0;
-din_depth = 15.8;
-din_axis = 10.0;
+/* [DIN: HOOYA DIN-504B-M10, LCSC C2939346, drawing "DIN JACK" rev A1 2019-07-10, tolerance +/-0.1 (< 5 mm) / 0.2] */
+din_plate = [20.9, 19.6, 1.8];  // front plate: width along the edge, height from the board, thickness
+din_body_h = 19.6;      // UNVERIFIED: the body's height behind the plate is not dimensioned; taken as the plate's
+din_depth = 13.6;       // plate front to the body's back (1.8 + 11.8)
+din_axis = 9.7;         // socket axis above the board (read as measured from the plate's board-side edge)
 din_bore = 16.0;        // round bore for the PLUG's shell, centred on the socket axis: its lower half in the wall, its
                         // upper half in the lid's tongue. UNVERIFIED: the user's plugs decide (print front_test)
 edge_gap = 0.1;
@@ -68,24 +68,27 @@ din_floor_gap = 0.1;
 din_top_gap = 0.1;
 din_back_gap = 0.15;
 din_lip_t = 1.4;
-din_lip_stop = [2.0, 12.5];  // lip stops this far above the board: [front channels, back channel (its resistors)]
+din_lip_stop = [5.0, 5.0];   // lip stops this far above the board: [front channels, back channel]: the 2-pin row's legs
+                             // leave the body's back and go down at 14.8, inside the lip (13.75..15.15); UNVERIFIED that
+                             // they stay below 5.0. OUT1's resistors (from 16.6 behind its edge) are clear of the lip now
 
-/* [TRS: CUI SJ1-3523N, datasheet SJ1-352XN rev 09/12/2024, page 2] */
-jack = [12.0, 11.0, 5.0];
-bush_d = 6.0;
-bush_out = 3.3;
-bush_z = 2.5;
-bush_slot = 6.2;
+/* [TRS: XKB PJ-320A, LCSC C2884926, drawing "3.5 PHONE JACK" rev A1 2025-03-03] */
+jack = [6.2, 12.2, 5.0];    // body: width, depth behind the board edge, height (centred on the axis)
+bush_d = 5.0;           // UNVERIFIED: round bushing, 5.0 measured on the sheet (no figure given)
+bush_out = 2.0;         // past the body's front
+bush_z = 2.5;           // axis above the board: the bushing's lowest point at the board's surface
+bush_slot = 5.2;        // U-slot: 0.1 a side (ream to fit if the print is tight)
 jack_play = 0.15;
 cap_wall = 1.6;
 cap_stop = 0.5;
 
 /* [Box] */
 wall = 2.0;             // the -X wall and the back wall's USB section
-conn_t = 2.5;           // the walls a connector sits behind (front; OUT1's section of the back wall): the DIN plate's
-                        // face 2.6 mm behind the outside (wall + 0.1), the jack's bushing 0.8 proud
-usb_t = 2.5;            // the back wall's USB section, 0.1 behind the board's edge as well: the back is flat; the XIAO
-                        // socket's 1.5 overhang sits in its U-opening, 1.1 short of the outside
+conn_t = 1.8;           // the walls a connector sits behind (front; OUT1's section of the back wall): the PJ-320A's
+                        // bushing stands only 2.0 past its body, so the wall is 1.8 (+ 0.1 gap) and the bushing 0.1
+                        // proud; the DIN plate's face 1.9 mm behind the outside
+usb_t = 1.8;            // the back wall's USB section, 0.1 behind the board's edge as well: the back is flat; the XIAO
+                        // socket's 1.5 overhang sits in its U-opening, 0.4 short of the outside
 usb_tongue_y = 0.55;    // the USB tongues keep this far behind the board's back edge (J1's shell legs, mockup 0.545)
 side_t = 4.0;           // +X wall: thick enough for two M2 pilots (the board has no holes on that side)
 side_screws_y = [10, 42];   // mm from the board's front edge
@@ -188,7 +191,7 @@ module mock_m() {       // mockup frame: x 100..184, y -152 (front) .. -100 (bac
 module mock() {
     difference() {
         translate([X0 + 184, Y0 + 152, Zb]) rotate([0, 180, 0]) mock_m();
-        for (k = [0 : 3]) at_ch(k) translate([-10.249, -4, -50]) cube([20.498, 4 + din_depth + 0.01, Zt + 50]);
+        for (k = [0 : 3]) at_ch(k) translate([-10.5, -4, -50]) cube([21.0, 4 + din_depth + 0.01, Zt + 50]);   // (half the 21.1 pitch, past the 20.9 plate)
     }
     for (k = [0 : 3]) at_ch(k) if (is_din(k)) din_model(); else jack_model();
 }
@@ -199,7 +202,8 @@ module din_cradle(k) {
     yb = din_depth + din_back_gap;
     ztop = Zt - din_body_h - din_top_gap;
     stop = din_lip_stop[ch_back[k] ? 1 : 0];
-    translate([-din_plate[0] / 2, yf, floor_t - 0.01]) cube([din_plate[0], yb + din_lip_t - yf, ztop - floor_t + 0.01]);
+    if (ztop - floor_t > 0.3)   // a block on the body's top, if the body is lower than the plate (not the HOOYA's, as taken)
+        translate([-din_plate[0] / 2, yf, floor_t - 0.01]) cube([din_plate[0], yb + din_lip_t - yf, ztop - floor_t + 0.01]);
     translate([-din_plate[0] / 2, yb, floor_t - 0.01]) cube([din_plate[0], din_lip_t, Zt - stop - floor_t + 0.01]);
 }
 module jack_cap() {
@@ -249,7 +253,7 @@ module box() {
             }
             for (k = [0 : 3]) at_ch(k) if (is_din(k)) din_cradle(k); else jack_cap();
             for (h = holes) standoff(h);
-            for (y = [Y0 - edge_gap - 0.01, Ybk - ledge[1]])
+            for (c = [[Y0 - edge_gap - 0.01, 3], [Ybk - ledge[1], 0]]) let(y = c[0]) if (!is_din(c[1]))   // (a DIN's plate holds that corner)
                 translate([Xh - side_clr - ledge[0], y, floor_t - 0.01])
                     cube([side_clr + ledge[0] + 0.01, ledge[1] + edge_gap + 0.01, Zt - contact - floor_t + 0.01]);
         }
@@ -350,7 +354,7 @@ module lid_print() { translate([0, W, H]) rotate([180, 0, 0]) lid(); }   // top 
 // a strip of the connector wall with one DIN bore (whole: as wall + tongue make it) and one jack U-slot, printed
 // standing as the walls print, on a foot: try the plugs in it, a real SDS-50J plate behind it
 module front_test() {
-    w = 20.5;
+    w = 21.1;
     difference() {
         union() { cube([2 * w, conn_t, 26]); translate([0, conn_t - 0.01, 0]) cube([2 * w, 10, 1.5]); }
         translate([w / 2, 0, 13]) xz_extrude(-1, conn_t + 2) circle(d = din_bore);
@@ -407,7 +411,7 @@ else if (part == "check_board_drop")           // must be EMPTY: the board with 
 else if (part == "check_drop")                 // must be EMPTY: the lid lowered straight down from 22 mm up
     intersection() { union() { for (dz = [0.25 : 0.25 : 22]) translate([0, 0, dz]) lid(); } union() { box(); mock(); } }
 else if (part == "brace_pull") intersection() { box(); union() { plates_moved(-(edge_gap + 0.05)); bodies_moved(-(edge_gap + 0.05)); } }
-else if (part == "brace_push") intersection() { box(); plates_moved(din_slot_play + 0.05); }
+else if (part == "brace_push") intersection() { box(); for (k = [0 : 3]) if (is_din(k)) at_ch(k) translate([0, din_back_gap + 0.05, 0]) din_model(); }
 else if (part == "brace_trs") intersection() { box(); bodies_moved(jack_play + 0.05); }
 else if (part == "brace_floor") intersection() { box(); translate([0, 0, -(din_floor_gap + 0.05)]) plates(); }
 else if (part == "brace_lid") intersection() { lid(); board_slab(contact + 0.05); }
