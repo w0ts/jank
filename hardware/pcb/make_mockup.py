@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """A mockup to 3D-print, to design and try the box (v5): the board's outline 1.6 mm thick (its M2 holes open), every
 fitted part as a solid block of its courtyard and its height, the top side's parts (the lid side: z up) and the bottom
-side's (the DINs, the standing resistors, a few 0805: z down), the leads as blocks too, all ONE closed manifold solid
+side's (the DINs and the standing resistors: z down), the leads as blocks too, all ONE closed manifold solid
 (the user's STL rule; check_stl.py checks it): mockup.stl. Both connectors of every output are in it (v5 fits both).
 Not fitted parts (C4, the 1206 pads, the jumpers, the test points) are left out. Heights are estimates (README "v5:
 heights"), most UNVERIFIED. z = 0 is the board's bottom face, z = 1.6 its top.
