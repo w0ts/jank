@@ -4,32 +4,28 @@ intended nets (fab/intended-nets.json, written by make_schematic.py) and the foo
 
   /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3.9 make_board.py [long|square]
 
-long (the default): jank-pcb.kicad_pcb, 84 x 52 mm, as below. square: jank-pcb-square.kicad_pcb, 67 x 58 mm, OUT1 and
-OUT2 on the front edge, OUT3 and OUT4 on the side edges, no A/B switches, no MIDI IN, no encoder (layout_square(); README
-"The square variant"; it is built from the frozen intent fab/square/intended-nets.json).
+long (the default): jank-pcb.kicad_pcb, v5, 84 x 67 mm, as below. square: jank-pcb-square.kicad_pcb, 67 x 58 mm, an older
+layout (layout_square(); README "The square variant"), built from the frozen intent fab/square/intended-nets.json; unused.
 
 Then make_fab.sh checks it (DRC, the schematic's nets) and writes the JLCPCB files.
 
-The long board (the user's rulings, 2026-11-08): 2 layers, 84 x 52 mm. Each output is one footprint holding a DIN-5
-(HOOYA DIN-504B-M10) and a 3.5 mm jack (XKB PJ-320A, right angle) at the same place, both fronts flush with the edge, one of the
-two fitted, with a TRS A/B slide switch (MSS22D18) on the face side. The FRONT edge carries OUT4, OUT3, OUT2 (seen from
-the top) at a 21.1 mm pitch (the DIN plate 20.9 wide), slid to the left edge. The BACK edge carries, left to right: OUT1 (the same
-footprint turned 180 degrees; OUT1 doubles as a MIDI IN in software: an H11L1 behind an N-FET gate, U4 / Q3 in the front
-right corner; its source from 3V3 through Q4, off in IN mode), the XIAO's own USB-C (the data port; the module on 2.54 mm
-headers, its socket 1.5 mm over the edge) and J1 (power only). The bottom is the device's FACE (the box's lid): the four
-A/B switches and a row of controls (centres at y 13.8): MODE (SW1) under the XIAO with the two SK6812MINI-E behind it
-(reverse mount, soldered on top in their cut-outs), PLAY/STOP (SW6) and the EC11 encoder (SW7) right of the XIAO, under
-the power path (whose parts sit on top round their legs). The MIDI resistors and R8 are swappable groups: an axial part
-standing, a bypass solder jumper, 1206 pads in parallel (not fitted). Page coordinates: board (x, y) from the back-left
-corner, y towards the front; KiCad's page = (100 + x, 100 + y).
+v5 (the user's rulings, 2026-11-08): 2 layers, 84 x 67 mm, the TOP is the lid side. Every output has both connectors
+fitted on one footprint: the XKB PJ-320A jack on the top, its front on the edge, and the HOOYA DIN-504B-M10 on the
+bottom on the same axis (its plate 1.0 mm in), with a TRS A/B slide switch (MSS22D18) on the top. The FRONT edge carries
+OUT2, OUT3, OUT4 left to right (lid up, from the front too) at a 21.1 mm pitch; the BACK edge OUT1 (the same footprint
+turned 180 degrees; also the MIDI IN: an H11L1 behind an N-FET gate, its source from 3V3 through Q4), the XIAO's own
+USB-C (the module on 2.54 mm headers) and J1 (power only). Between them a band: the MIDI IN (left), the 0.91" OLED on
+its header (middle), BACK and OK right of it and the EC11 encoder under them. The beat LED (SK6812MINI-HS) is left of
+the XIAO, its driver under the module. The MIDI resistors and R8 are swappable groups: an axial part standing UNDER the
+board, a bypass solder jumper and 1206 pads in parallel (not fitted) on the top. Page coordinates: board (x, y) from the
+back-left corner, y towards the front; KiCad's page = (100 + x, 100 + y).
 
-Routing, in short: TX1..TX3 run on the bottom down the strip left of the XIAO (TX1 to OUT1's 10 ohm group, TX2 / TX3
-along the band in front of the XIAO to a via on their groups), TX4 under the module; ENC_A runs under the module's
-front end and ENC_B from the right row to the encoder; IN_EN runs back along the band to Q4 (between OUT1's groups) and
-on the bottom to the MIDI IN corner with MIDI_RX; the ladder runs from D2 to MODE, under the module to PLAY/STOP and on
-the bottom to the encoder's push; RING1 / TIP1 run along the band to the corner; the 3V3 bus feeds the front 33 ohm
-groups from a line down inside the XIAO's right row; +5V comes from U2 (over the encoder) on the bottom along the back
-edge to the XIAO's 5V pad and the LEDs; ground is both pours.
+Routing, in short: TX1 (D0) on the bottom down the strip to OUT1's 10 ohm group; TXB (D1, OUT2..OUT4 on one pad) down the
+strip to a bottom lane under the front groups; IN_EN / MIDI_RX (D4 / D5) on top west to the MIDI IN; the ladder, ENC_A
+and ENC_B along the band in front of the XIAO to the buttons and the encoder; SCL / SDA (D8 / D9) on the bottom to the
+OLED's header; 3V3 from a bottom line inside the right row to the OLED and the bus (top) to the front groups and, up the
+left edge, to Q4; +5V from U2 on the bottom to the XIAO's 5V pad and along the back edge to U3 and the LED; ground is
+both pours.
 """
 import json
 import math
@@ -65,6 +61,7 @@ for netname, pins in INTENT["nets"].items():
 
 board = pcbnew.BOARD()
 nets = {}
+DBG = {}                                        # (pad places for the checks while laying out)
 
 
 def net(name):
@@ -176,246 +173,223 @@ def T(frame, lx, ly):
     return (round(ex + lx * c + ly * s_, 4), round(ey - lx * s_ + ly * c, 4))
 
 
-def cluster(refs, nets, cx, cy, orient, axial, value, dj=3.0, ds=3.2, frame=None):
+def cluster(refs, nets, cx, cy, orient, axial, value, dj=3.0, ds=3.2, frame=None, mirror=False, bottom=False):
+    """mirror: the jumper on the other side of the axial part (and the 1206 pads); bottom: the axial part on the bottom side
+    (v5: the standing parts hang under the board, beside the DINs), the jumper and the 1206 pads stay on the top"""
     rmain, jp, rpar = refs
     a, b = nets
     th = frame[1] if frame else 0.0
+    xj, xs = (cx + dj, cx - ds) if mirror else (cx - dj, cx + ds)
     if orient == "v":
-        r = place(K("Resistor_THT"), axial, rmain, value, *T(frame, cx, cy - 1.27), (270 + th) % 360)
-        j = place(K("Jumper"), JPFP, jp, "bypass", *T(frame, cx - dj, cy), (270 + th) % 360)
-        s = place(K("Resistor_SMD"), R1206, rpar, "DNP", *T(frame, cx + ds, cy), (270 + th) % 360)
-    else:
-        r = place(K("Resistor_THT"), axial, rmain, value, *T(frame, cx + 1.27, cy), 180 + th)
+        r = place(K("Resistor_THT"), axial, rmain, value, *T(frame, cx, cy - 1.27), (270 + th) % 360, bottom)
+        j = place(K("Jumper"), JPFP, jp, "bypass", *T(frame, xj, cy), (270 + th) % 360)
+        s = place(K("Resistor_SMD"), R1206, rpar, "DNP", *T(frame, xs, cy), (270 + th) % 360)
+    else:                                            # (bottom: the flip mirrors the part, so it turns the other way)
+        r = place(K("Resistor_THT"), axial, rmain, value, *T(frame, cx + 1.27, cy), (th if bottom else 180 + th) % 360, bottom)
         j = place(K("Jumper"), JPFP, jp, "bypass", *T(frame, cx, cy - dj), 180 + th)
         s = place(K("Resistor_SMD"), R1206, rpar, "DNP", *T(frame, cx, cy + ds), 180 + th)
     for node, n in ((a, "1"), (b, "2")):
         j1, s1 = at(j, n), at(s, n)
         if orient == "v":
             line = cy - 1.27 if n == "1" else cy + 1.27
-            route(node, [j1, T(frame, cx - dj, line), T(frame, cx + ds, line), s1])
+            route(node, [j1, T(frame, xj, line), T(frame, xs, line), s1])
         else:
             line = cx + 1.27 if n == "1" else cx - 1.27
             route(node, [j1, T(frame, line, cy - dj), T(frame, line, cy + ds), s1])
-    return {"A": at(r, 1), "B": at(r, 2), "jp": j, "par": s}
+    out = {"A": at(r, 1), "B": at(r, 2), "jp": j, "par": s}
+    want_a = T(frame, cx, cy - 1.27) if orient == "v" else T(frame, cx + 1.27, cy)
+    assert abs(out["A"][0] - want_a[0]) < 0.01 and abs(out["A"][1] - want_a[1]) < 0.01, (rmain, out["A"], want_a)
+    return out
 
 
-
-def front_unit(k, c, H):
-    """one output on the front edge, as on the round-5 board: the combined footprint on the edge, its two resistor groups
-    behind it, the A/B switch between them (face side); returns its TX via"""
-    D = H - 51.0
-    j = place(JANK, "MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB", f"J{5 + k}", "DIN or TRS", c, H, 0)
-    ta = cluster((f"R1{k}", f"JP1{k}", f"R3{k}"), (f"MIDI_TX{k}", f"TIP{k}"), c - 6.2, 25.07 + D, "v", AX0207, "10", 2.8, 2.9)
-    tb = cluster((f"R2{k}", f"JP2{k}", f"R4{k}"), ("+3V3", f"RING{k}"), c + 4.3, 25.07 + D, "v", AX0309, "33", 3.1, 3.3)
-    sw = place(JANK, "SW_Slide_DPDT_MSS22D18", f"SW{1 + k}", "TRS A/B", c - 1.7, 31.0 + D, 270, True)   # (face side)
-    din5, din4 = at(j, "5", (c - 5, H - 15)), at(j, "4", (c + 5, H - 15))
-    jt, jr = at(j, "T", (c - 2.3, H - 10.2)), at(j, "R", (c - 2.3, H - 3.2))   # (the PJ-320A: its pad column left)
-    solid(j, "S")                                  # (the jack's sleeve slot: no room for spokes)
+def front_unit(k, c, H, tx_lane):
+    """v5: one output on the front edge: the jack on the top and the DIN on the bottom (one footprint), the two resistor
+    groups behind it (the standing parts under the board), the A/B switch on the top between them; the 10 ohm group on
+    the right (the DIN's pin 5, mirrored on the bottom), the 33 ohm group on the left"""
+    GY = H - 26.43                                   # (the groups' centre line)
+    j = place(JANK, "MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom", f"J{5 + k}", "TRS + DIN", c, H, 0)
+    ta = cluster((f"R1{k}", f"JP1{k}", f"R3{k}"), ("MIDI_TXB", f"TIP{k}"), c + 6.2, GY, "v", AX0207, "10", 2.8, 2.9,
+                 mirror=True, bottom=True)
+    tb = cluster((f"R2{k}", f"JP2{k}", f"R4{k}"), ("+3V3", f"RING{k}"), c - 4.3, GY, "v", AX0309, "33", 3.1, 3.3,
+                 mirror=True, bottom=True)
+    sw = place(JANK, "SW_Slide_DPDT_MSS22D18", f"SW{1 + k}", "TRS A/B", c + 1.7, H - 19.0, 270)   # (top)
+    din5, din4 = at(j, "5"), at(j, "4")
+    jt, jr = at(j, "T"), at(j, "R")
+    solid(j, "S")
     s_ = {n: at(sw, n) for n in range(1, 7)}
-    # TIP = 10 ohm group -> DIN 5, RING = 33 ohm group -> DIN 4 (top); the switch: 1 RING, 2 JR, 3 TIP | 4 TIP, 5 JT, 6 RING
-    route(f"TIP{k}", [ta["B"], (ta["B"][0], 27.6 + D), (din5[0], 28.6 + D), din5])
+    B = GY + 1.27
+    # TIP = 10 ohm group -> DIN 5 (right), RING = 33 ohm group -> DIN 4 (left), top; the switch: 1 RING, 2 JR, 3 TIP |
+    # 4 TIP, 5 JT, 6 RING
+    route(f"TIP{k}", [ta["B"], (ta["B"][0], GY + 2.53), (din5[0], GY + 3.53), din5])
     route(f"TIP{k}", [(din5[0], s_[3][1]), s_[3]])
     route(f"TIP{k}", [s_[3], (c, s_[3][1] - 1.5), (c, s_[4][1] + 1.5), s_[4]], SIG, BOT)
-    route(f"RING{k}", [tb["B"], (tb["B"][0], 27.6 + D), (din4[0], 28.6 + D), din4])
+    route(f"RING{k}", [tb["B"], (tb["B"][0], GY + 2.53), (din4[0], GY + 3.53), din4])
     route(f"RING{k}", [(din4[0], s_[6][1]), s_[6]])
-    route(f"RING{k}", [(c + 1.2, tb["B"][1]), s_[1]])
-    # JT round the jack's sleeve pad (between it and DIN pin 4), JR down the left of the jack's pad column (bottom)
-    route(f"JT{k}", [s_[5], (c + 3.0, s_[5][1] + 0.8), (c + 3.4, s_[5][1] + 2.0), (c + 3.4, H - 9.8), (jt[0] + 0.6, H - 9.8),
-                     jt], SIG, BOT)
-    route(f"JR{k}", [s_[2], (c - 3.4, s_[2][1] + 1.7), (c - 3.4, H - 4.6), jr], SIG, BOT)
-    route("+3V3", [(tb["A"][0], 22.3 + D), tb["A"]], BUS)
-    v = (ta["A"][0] - 1.4, ta["A"][1])               # (the TX via on the 10 ohm group's A line, left of the axial part)
-    via(f"MIDI_TX{k}", *v)
-    route(f"MIDI_TX{k}", [v, at(ta["jp"], 1, v)])
-    label(f"OUT{k} A|B", c - 4.3, 31.0 + D, 0.7, pcbnew.B_SilkS, rot=90)   # (the face side, by the A/B switch)
-    label("JP=3V3!", c - 1.0, 25.1 + D, 0.6, rot=90)    # (the ring's bypass: 3V3 straight on the ring)
+    route(f"RING{k}", [(c - 1.2, B), s_[1]])
+    # JT down the left of the DIN's pin 4 side to the jack's tip; JR down the right, round the jack's sleeve tab (bottom)
+    route(f"JT{k}", [s_[5], (c - 3.0, s_[5][1] + 0.8), (c - 3.4, s_[5][1] + 2.0), (c - 3.4, H - 11.0), jt], SIG, BOT)
+    route(f"JR{k}", [s_[2], (c + 3.4, s_[2][1] + 1.7), (c + 3.4, H - 4.6), (c - 1.0, H - 4.6), jr], SIG, BOT)
+    route("+3V3", [(tb["A"][0], H - 29.2), tb["A"]], BUS)
+    v = (round(ta["A"][0] + 1.4, 4), ta["A"][1])     # (the TX via on the 10 ohm group's A line, right of the axial part)
+    via("MIDI_TXB", *v)
+    route("MIDI_TXB", [v, at(ta["jp"], 1, v)])
+    route("MIDI_TXB", [v, (v[0], tx_lane)], SIG, BOT)
+    label(f"OUT{k} A|B", c - 4.1, H - 19.0, 0.7, rot=90)
+    label("JP=3V3!", c + 1.0, GY, 0.6, rot=90)       # (the ring's bypass: 3V3 straight on the ring)
     return v
 
 
 def layout_long():
-    """84 x 52 mm. FRONT edge: OUT2, OUT3, OUT4. BACK edge, left to right: OUT1 (the MIDI IN one, the same footprint turned
-    to face the back), a strip (OUT1's A/B switch, R8, the LED driver), the XIAO (its USB-C over the edge), J1 and the
-    power path. The face side's row of controls (centres at y 13.8): MODE under the XIAO (the two LEDs behind it),
-    PLAY/STOP and the encoder under the power path. The front right corner: the MIDI IN (U4 and its parts)."""
-    W, H = 84.0, 52.0
-    D = H - 51.0
-    BUS_Y = 22.3 + D                                 # (the 3V3 bus to the front 33 ohm groups, top)
-    CH = [10.45 + 21.1 * i for i in range(3)]       # (the front DINs' axes, left to right seen from the top: OUT4, OUT3,
-                                                     #  OUT2, so that from the face they read 2, 3, 4; pitch 21.1: the HOOYA DIN plate is
-                                                     #  20.9 +/-0.1 wide; OUT4's plate flush with the left edge)
-    C1X = 10.75                                      # (OUT1 on the back edge, behind OUT4)
-    XC = 45.2                                        # (the XIAO's axis)
-    JX = 64.5                                        # (J1's axis)
-    ROW = 13.8                                       # (the controls' row: their centres' y)
+    """v5, 84 x 67 mm (README "v5"). The top is the lid side. FRONT edge, left to right seen from the top (and from the
+    front, lid up): OUT2, OUT3, OUT4, each a PJ-320A on the top and a DIN-5 on the bottom. BACK edge: OUT1 (the same,
+    turned to face the back; the MIDI IN one), the strip (OUT1's A/B switch, the LED), the XIAO (USB-C over the edge), J1
+    and the power path. Between: the MIDI IN circuit (left), the OLED (middle, on its header at its right end), BACK and
+    OK (right of the screen) and the encoder under them."""
+    W, H = 84.0, 67.0
+    BUS_Y = H - 29.2                                 # (the 3V3 bus, top, behind the front groups)
+    TX_LANE = H - 30.3                               # (TXB, bottom, to the three front TX vias)
+    CH = [10.45 + 21.1 * i for i in range(3)]       # (OUT2, OUT3, OUT4 left to right: lid up they read 2, 3, 4 from the front)
+    C1X, XC, JX = 10.75, 45.2, 64.5
 
     # ======== the back edge ========
-    U1 = place(JANK, "XIAO-ESP32-S3-DIP_Headers", "U1", "XIAO ESP32S3", XC, 10.55, 90)   # (on 2.54 mm headers, USB-C over the edge)
+    U1 = place(JANK, "XIAO-ESP32-S3-DIP_Headers", "U1", "XIAO ESP32S3", XC, 10.55, 90)
     p = {n: at(U1, n) for n in range(1, 15)}
     J1 = place(K("Connector_USB"), "USB_C_Receptacle_GCT_USB4125-xx-x-0190_6P_TopMnt_Horizontal", "J1", "USB-C power",
-               JX, 3.4, 180)                         # (its "PCB Edge" line, 3.4 mm in front of its origin, on the edge)
-    H1 = place(K("MountingHole"), "MountingHole_2.2mm_M2", "H1", "M2", W - 3.2, 25.0)
-    H2 = place(K("MountingHole"), "MountingHole_2.2mm_M2", "H2", "M2", W - 3.2, H - 3.2)
+               JX, 3.4, 180)
+    for ref, x, y in (("H1", W - 3.2, 3.2), ("H2", W - 3.2, H - 3.2), ("H3", 3.2, 26.0), ("H4", 3.2, 34.0)):
+        place(K("MountingHole"), "MountingHole_2.2mm_M2", ref, "M2", x, y)
 
-    # ---- OUT1: the combined footprint turned 180 (its faces on the back edge), its groups in front of it
+    # ---- OUT1: the footprint turned 180 (both faces on the back edge), its groups in front of it (standing parts under
+    # the board), the 10 ohm one on the right (by the strip), the 33 ohm one on the left; their B sides cross to the DIN
     F1 = ((C1X, 0.0), 180)
-    J6 = place(JANK, "MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB", "J6", "DIN or TRS", C1X, 0.0, 180)
-    ta1 = cluster(("R11", "JP11", "R31"), ("MIDI_TX1", "TIP1"), -6.2, -19.0, "v", AX0207, "10", 2.8, 2.9, F1)
-    tb1 = cluster(("R21", "JP21", "R41"), ("SRC1", "RING1"), 4.3, -19.0, "v", AX0309, "33", 3.1, 3.3, F1)
-    SW2 = place(JANK, "SW_Slide_DPDT_MSS22D18", "SW2", "TRS A/B", 23.5, 10.5, 270, True)   # (face side, in the strip)
-    d5, d4 = at(J6, "5", (C1X + 5, 15.0)), at(J6, "4", (C1X - 5, 15.0))
-    jt1, jr1 = at(J6, "T", (C1X + 2.3, 10.2)), at(J6, "R", (C1X + 2.3, 3.2))
+    J6 = place(JANK, "MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom", "J6", "TRS + DIN", C1X, 0.0, 180)
+    ta1 = cluster(("R11", "JP11", "R31"), ("MIDI_TX1", "TIP1"), -6.2, -20.5, "v", AX0207, "10", 2.8, 2.9, F1, bottom=True)
+    tb1 = cluster(("R21", "JP21", "R41"), ("SRC1", "RING1"), 4.3, -20.5, "v", AX0309, "33", 3.1, 3.3, F1, bottom=True)
+    SW2 = place(JANK, "SW_Slide_DPDT_MSS22D18", "SW2", "TRS A/B", 22.6, 9.0, 90)   # (top, in the strip)
+    d5, d4 = at(J6, "5"), at(J6, "4")
+    jt1, jr1 = at(J6, "T"), at(J6, "R")
     solid(J6, "S")
     s = {n: at(SW2, n) for n in range(1, 7)}
-    X, Y = s[2]
-    route("TIP1", [ta1["B"], d5])
-    route("TIP1", [d5, (20.95, d5[1]), s[3]])                                   # (top: to the switch)
-    route("TIP1", [s[3], (X + 1.7, s[3][1] - 1.25), (X + 1.7, s[4][1] + 1.25), s[4]], SIG, BOT)
-    route("RING1", [tb1["B"], d4])
-    route("RING1", [d4, (d4[0] + 1.6, 16.6), (s[6][0], 16.6), s[6]], SIG, BOT)   # (bottom: under the groups' B side)
-    route("RING1", [s[1], (X, 6.4), (X + 5.0, 6.4), (X + 5.0, s[6][1]), s[6]])   # (top: round the switch's right row)
-    route("JR1", [s[2], (16.5, s[2][1]), (14.4, 8.4), (14.4, 4.4), jr1], SIG, BOT)
-    route("JT1", [s[5], (X + 1.7, 9.25), (X - 1.5, 9.25), (X - 2.5, 10.5), (jt1[0] + 0.6, 10.5), jt1])
-    # RING1 and TIP1 on to the MIDI IN (the front right corner): down the strip's left side, then along y 22.15 / 22.65
-    via("RING1", 21.6, 16.6)
-    route("RING1", [(21.6, 16.6), (21.6, 22.15), (62.9, 22.15)])
-    route("TIP1", [(20.95, d5[1]), (20.95, 22.65), (61.6, 22.65)])
-    # TX1: the XIAO's D0 (pad 1) on the bottom down the strip's right side to the 10 ohm group's A pad
-    route("MIDI_TX1", [p[1], (35.4, p[1][1]), (35.4, ta1["A"][1]), ta1["A"]], SIG, BOT)
-    # OUT1's source: Q4 (face side, between OUT1's groups), 3V3 to SRC1, its gate on IN_EN: IN_EN high = source off
-    Q4 = place(K("Package_TO_SOT_SMD"), "SOT-23", "Q4", "AO3401A", 11.9, 19.3, 90, True)
-    q4 = {n: at(Q4, n) for n in (1, 2, 3)}
-    route("SRC1", [q4[3], (9.6, q4[3][1]), (8.0, 19.6), tb1["A"]], SIG, BOT)
-    route("IN_EN", [(54.0, 21.3), (53.65, 21.65), (23.0, 21.65), (22.5, 21.2)])       # (top, from the XIAO's D8 line)
-    via("IN_EN", 22.5, 21.2)
-    route("IN_EN", [(22.5, 21.2), (22.05, 21.65), (q4[1][0] + 1.2, 21.65), q4[1]], SIG, BOT)
-    route("+3V3", [(CH[0] + 4.3, BUS_Y), (2.0, BUS_Y)], BUS)                         # (the bus on to the left edge)
-    via("+3V3", 2.0, BUS_Y)
-    route("+3V3", [(2.0, BUS_Y), (2.0, 22.1), (q4[2][0], 22.1), q4[2]], SIG, BOT)
+    DBG.update(d5=d5, d4=d4, jt1=jt1, jr1=jr1, sw2=s, ta1=(ta1["A"], ta1["B"]), tb1=(tb1["A"], tb1["B"]))
+    route("TIP1", [ta1["B"], (ta1["B"][0], 17.9), (d5[0], 17.9), d5])                       # (top, across)
+    route("RING1", [tb1["B"], (tb1["B"][0], 17.9), (d4[0], 17.9), d4], SIG, BOT)            # (bottom, across)
+    route("JT1", [s[5], (25.0, 10.25), (14.0, 10.25), jt1])
+    route("JR1", [s[2], (16.5, s[2][1]), (14.4, 6.9), (14.4, 4.4), jr1])
+    route("RING1", [d4, (20.0, d4[1]), (22.6, 13.2), (27.6, 13.2), (27.6, s[6][1]), s[6]])
+    route("RING1", [(22.6, 13.2), s[1]])
+    route("TIP1", [ta1["B"], (19.5, 16.7), (24.3, 13.0), s[4]], SIG, BOT)
+    route("TIP1", [s[4], (24.3, s[4][1] - 1.7), (24.3, s[3][1] + 1.7), s[3]], SIG, BOT)
+    # TX1: the XIAO's D0 on the bottom down the strip to the 10 ohm group's A pad
+    route("MIDI_TX1", [p[1], (35.2, p[1][1]), (35.2, 22.6), (ta1["A"][0] + 0.85, 22.6), ta1["A"]], SIG, BOT)
+    via("MIDI_TX1", 35.2, 11.82)
+    TP4 = place(K("TestPoint"), "TestPoint_Pad_D1.5mm", "TP4", "TX", 33.2, 11.0)
+    route("MIDI_TX1", [(35.2, 11.82), (34.0, 11.82), at(TP4, 1)])
 
-    # ---- the strip's right side (top): R8's group at the back (its B side towards the LEDs), the LED driver U3 in front
-    U3 = place(K("Package_TO_SOT_SMD"), "SOT-23-5_HandSoldering", "U3", "74AHCT1G125", 31.9, 13.0, 90)
-    R7 = place(K("Resistor_SMD"), R0805, "R7", "100k", 34.3, 17.4, 270)
-    C5 = place(K("Capacitor_SMD"), C0805, "C5", "100nF", 29.4, 17.4, 270)
-    R8C = cluster(("R8", "JP8", "R9"), ("LED_BUF", "LED_DIN1"), 31.6, 16.4, "h", AX0207, "330", 3.0, 3.2,
-                  ((63.2, 21.9), 180))
-    TP = {n: place(K("TestPoint"), "TestPoint_Pad_D1.5mm", n, v, x, y)
-          for n, v, x, y in (("TP1", "5V", 57.0, 1.6), ("TP2", "3V3", 78.4, 21.4), ("TP3", "GND", 23.6, 3.6),
-                             ("TP4", "TX", 32.0, 19.7))}
-    via("MIDI_TX1", 32.0, ta1["A"][1])
-    route("MIDI_TX1", [(32.0, ta1["A"][1]), at(TP["TP4"], 1)])
+    # ---- the beat LED in the strip (top), its driver under the XIAO (top, under the module; R8 standing underneath)
+    LED1 = place(JANK, "LED_SK6812MINI-HS_3.7x3.5mm_HandSolder", "LED1", "SK6812MINI-HS", 33.0, 4.2, 90)
+    C6 = place(K("Capacitor_SMD"), C0805, "C6", "100nF", 29.8, 5.6, 270)
+    U3 = place(K("Package_TO_SOT_SMD"), "SOT-23-5_HandSoldering", "U3", "74AHCT1G125", 47.6, 3.9, 0)
+    C5 = place(K("Capacitor_SMD"), C0805, "C5", "100nF", 50.4, 2.9, 270, True)   # (bottom)
+    R7 = place(K("Resistor_SMD"), R0805, "R7", "100k", 45.8, 9.4, 180, True)    # (bottom, on the data line)
+    R8C = cluster(("R8", "JP8", "R9"), ("LED_BUF", "LED_DIN1"), 42.0, 4.3, "h", AX0207, "330", 2.4, 2.4, None, bottom=True)
+    TP3 = place(K("TestPoint"), "TestPoint_Pad_D1.5mm", "TP3", "GND", 29.0, 1.4)
+    l = {n: at(LED1, str(n)) for n in range(1, 5)}
     u3 = {n: at(U3, n) for n in range(1, 6)}
-    route("LED_DATA", [p[6], (u3[2][0], p[6][1]), u3[2]])
-    route("LED_DATA", [(at(R7, 1)[0], p[6][1]), at(R7, 1)])
-    route("GND", [at(R7, 2), (34.3, 19.5)])
-    via("GND", 34.3, 19.5)
-    jp8a = at(R8C["jp"], 1)
-    route("LED_BUF", [u3[4], (u3[4][0], 10.2), (jp8a[0], 10.2), jp8a])
-    route("LED_DIN1", [R8C["B"], (34.4, 6.74), (43.85, 6.74)])
-    via("+5V", 29.5, 12.6)
-    route("+5V", [(29.5, 12.6), u3[5]])
-    route("+5V", [(29.5, 12.6), at(C5, 1)])
+    DBG.update(led=l, u3=u3, c6=(at(C6, 1), at(C6, 2)), c5=(at(C5, 1), at(C5, 2)), r7=(at(R7, 1), at(R7, 2)),
+               r8=(R8C["A"], R8C["B"]))
+    route("LED_DIN1", [(R8C["B"][0], 4.2), (33.0, 4.2), l[2]])
+    route("+5V", [at(C6, 1), (l[3][0], at(C6, 1)[1]), l[3]])
+    via("+5V", 29.8, 3.6)
+    route("+5V", [(29.8, 3.6), at(C6, 1)])
+    route("+5V", [(29.8, 3.6), (29.8, 1.0)], SIG, BOT)
+    for g in (l[1], at(C6, 2)):
+        solid(LED1, "1")
+    solid(C6, "2")
+    # LED_DATA: the XIAO's D3 on the bottom, under the ladder, up again by U3's input
+    route("LED_DATA", [p[4], (39.4, p[4][1]), (39.4, 9.4), (44.8, 9.4), (44.8, u3[2][1])], SIG, BOT)
+    via("LED_DATA", 44.8, u3[2][1])
+    route("LED_DATA", [(44.8, u3[2][1]), u3[2]])
+    route("LED_BUF", [u3[4], (u3[4][0], 6.0), (R8C["A"][0], 6.0)])
+    route("+5V", [u3[5], (u3[5][0], 1.0)])
+    via("+5V", u3[5][0], 1.0)
+    route("+5V", [at(C5, 1), (at(C5, 1)[0], 1.0)], SIG, BOT)
     solid(C5, "2")
-    # +5V from the XIAO's 5V pad (pad 14) on the bottom along the back edge: to U3 and, by vias, to the LEDs
-    route("+5V", [p[14], (51.9, 1.0), (28.9, 1.0), (28.9, 12.0), (29.5, 12.6)], BUS, BOT)
+    solid(R7, "2")
+    for n in (1, 3):
+        solid(U3, str(n))
+    # +5V on the bottom along the back edge, from the XIAO's 5V pad to the driver and the LED
+    route("+5V", [p[14], (51.9, 1.0), (29.8, 1.0)], BUS, BOT)
 
-    # ---- under the XIAO, face side: MODE (THT, from the bottom) and behind it the two LEDs (reverse mount, cut-outs)
-    SW1 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW1", "MODE 9.5 mm", 45.5, ROW - 3.25, 270, True)
-    LED1 = place(K("LED_SMD"), "LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount", "LED1", "SK6812MINI-E", 45.5, 4.0, 90)
-    LED2 = place(K("LED_SMD"), "LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount", "LED2", "SK6812MINI-E", 49.85, 4.0, 90)
-    C6 = place(K("Capacitor_SMD"), C0805, "C6", "100nF", 42.4, 3.0, 270)
-    C7 = place(K("Capacitor_SMD"), C0805, "C7", "100nF", 40.4, 3.0, 270)
-    l1 = {n: at(LED1, n) for n in range(1, 5)}
-    l2 = {n: at(LED2, n) for n in range(1, 5)}
-    m1b, m1f = at(SW1, 1, (45.5, ROW - 3.25)), at(SW1, 1, (45.5, ROW + 3.25))
-    m2b, m2f = at(SW1, 2, (50.0, ROW - 3.25)), at(SW1, 2, (50.0, ROW + 3.25))
-    route("LED_DIN1", [(43.85, 6.74), l1[2]])
-    route("LED_DIN2", [l1[4], (47.5, l1[4][1]), (47.5, 6.3), l2[2]])
-    via("+5V", 43.6, 1.0)
-    route("+5V", [(43.6, 1.0), l1[3]], 0.3)
-    route("+5V", [(43.6, 1.0), (43.0, 1.6), (at(C6, 1)[0], 1.6), at(C6, 1)], 0.3)
-    route("+5V", [(at(C6, 1)[0], 1.6), (at(C7, 1)[0], 1.6), at(C7, 1)], 0.3)
-    via("+5V", 48.3, 0.8)
-    route("+5V", [(48.3, 0.8), l2[3]], 0.3)
-    for g in (l1[1], l2[1]):                         # (a via in front of each LED's ground pad)
-        route("GND", [g, (g[0], 8.0)])
-        via("GND", g[0], 8.0)
-    for c in (C6, C7):
-        g = at(c, 2)
-        route("GND", [g, (g[0], 5.2)])
-        via("GND", g[0], 5.2)
-    # the ladder: the XIAO's D2 (pad 3) to MODE's pin-1 pair, on under the module (y 9.15) to PLAY/STOP and the encoder
-    route("LADDER", [p[3], (44.3, p[3][1]), m1b])
-    route("LADDER", [m1b, m1f], SIG, BOT)
-    route("LADDER", [m1b, (46.7, 9.15), (55.0, 9.15)])
-    route("MODE_R", [m2b, m2f], SIG, BOT)
-    R61 = place(K("Resistor_SMD"), R0805, "R61", "2.2k", 47.75, ROW, 270)       # (between MODE's legs, under the module)
-    route("MODE_R", [m2b, (48.6, 11.6), at(R61, 1)])
-    route("GND", [at(R61, 2), (47.75, 16.1)])
-    via("GND", 47.75, 16.1)
-    # the ladder's pull-up R60 and filter C9, the encoder lines' pull-ups R64 / R65 and filters C10 / C11 (top, under
-    # the module); their 3V3 from the module's 3V3 line by a bottom lane along y 19.15
+    # ---- under the XIAO (top): the ladder's pull-up and filter, ENC_A's pull-up and filter
     R60 = place(K("Resistor_SMD"), R0805, "R60", "10k", 41.2, 12.6, 90)
     C9 = place(K("Capacitor_SMD"), C0805, "C9", "100nF", 43.3, 12.6, 270)
     R64 = place(K("Resistor_SMD"), R0805, "R64", "10k", 40.5, 17.6, 0)
     C10 = place(K("Capacitor_SMD"), C0805, "C10", "100nF", 43.55, 16.6, 90)
-    R65 = place(K("Resistor_SMD"), R0805, "R65", "10k", 48.8, 19.15, 0)
-    C11 = place(K("Capacitor_SMD"), C0805, "C11", "100nF", 64.4, 12.6, 90, True)    # (face side, by the encoder)
+    route("LADDER", [p[3], (50.8, p[3][1]), (50.8, 19.6), (75.5, 19.6), (75.5, 23.2)])
     route("LADDER", [(41.2, p[3][1]), at(R60, 2)])
     route("LADDER", [(at(C9, 1)[0], p[3][1]), at(C9, 1)])
+    solid(C9, "2")
     route("GND", [at(C9, 2), (44.2, 13.9)])
     via("GND", 44.2, 13.9)
-    route("+3V3", [p[12], (51.45, p[12][1] + 0.8), (51.45, 21.6), (52.6, 22.8), (52.6, BUS_Y)], SIG, BOT)
+    route("+3V3", [p[12], (51.45, p[12][1] + 0.8), (51.45, 35.6)], SIG, BOT)
     route("+3V3", [(51.45, 19.15), (50.8, 19.8), (40.9, 19.8), (40.2, 19.3)], SIG, BOT)
-    route("+3V3", [(47.1, 19.8), (46.9, 19.6)], SIG, BOT)
     via("+3V3", 40.2, 19.3)
     route("+3V3", [(40.2, 19.3), at(R64, 1)])
     route("+3V3", [at(R64, 1), (39.9, 14.5), at(R60, 1)])
-    via("+3V3", 46.9, 19.6)
-    route("+3V3", [(46.9, 19.6), at(R65, 1)])
     route("ENC_A", [at(R64, 2), at(C10, 1)])
     route("GND", [at(C10, 2), (44.4, 15.3)])
     via("GND", 44.4, 15.3)
-    route("ENC_B", [p[8], (50.9, 19.15), at(R65, 2)])
-
-    # ---- the XIAO's front-row lines: TX4 (D3) and TX3 (D4) on the bottom down the strip's right side to OUT4 (left)
-    # and OUT3; TX2 (D1) under the module to OUT2 (right)
-    tx = {k: front_unit(k, c, H) for k, c in zip((4, 3, 2), CH)}
-    route("MIDI_TX4", [p[4], (35.85, p[4][1]), (35.85, 22.6), (tx[4][0], 22.6), tx[4]], SIG, BOT)
-    route("MIDI_TX3", [p[5], (36.3, p[5][1]), (36.3, 23.1), (tx[3][0], 23.1), tx[3]], SIG, BOT)
-    route("MIDI_TX2", [p[2], (39.3, p[2][1]), (39.3, 21.8), (41.6, 23.6), (tx[2][0], 23.6), tx[2]], SIG, BOT)
-    via("+3V3", 52.6, BUS_Y)
-    route("+3V3", [(CH[0] + 4.3, BUS_Y), (57.5, BUS_Y)], BUS)
-    # ENC_A: the XIAO's D6 (pad 7) along y 20.4 under the module's front to the encoder; ENC_B: D7 (pad 8) along 18.6
-    route("ENC_A", [p[7], (39.0, 20.4), (60.8, 20.4), (61.0, 20.2)])
+    # ENC_A, ENC_B, the ladder on top along the band in front of the XIAO (north to south: LADDER, ENC_A, ENC_B)
+    route("ENC_A", [p[7], (38.6, 20.4), (64.35, 20.4), (64.35, 34.0)])
     route("ENC_A", [(42.4, 20.4), (42.4, 18.2), at(R64, 2)])
-    via("ENC_A", 61.0, 20.2)
-    route("ENC_B", [p[8], (54.6, 18.6), (61.5, 18.6)])
-    via("ENC_B", 61.5, 18.6)
-    # IN_EN, MIDI_RX: the XIAO's D8, D9 (pads 9, 10) on the bottom, right, down to y 21.5 / 22.0, on to the corner
-    route("IN_EN", [p[9], (54.0, p[9][1]), (54.0, 22.5), (69.0, 22.5)], SIG, BOT)
-    via("IN_EN", 54.0, 21.3)
-    route("MIDI_RX", [p[10], (54.75, p[10][1]), (54.75, 22.0), (75.0, 22.0)], SIG, BOT)
+    route("ENC_B", [p[8], (53.5, 18.9), (53.5, 25.6)], SIG, BOT)
+    via("ENC_B", 53.5, 21.2)
+    route("ENC_B", [(53.5, 21.2), (63.65, 21.2), (63.65, 39.0)])
+    R65 = place(K("Resistor_SMD"), R0805, "R65", "10k", 52.5, 23.0, 180, True)
+    C11 = place(K("Capacitor_SMD"), C0805, "C11", "100nF", 53.5, 26.6, 270, True)
+    DBG.update(r65=(at(R65, 1), at(R65, 2)), c11=(at(C11, 1), at(C11, 2)))
+    solid(C11, "2")
+    # the screen's I2C on the bottom (SDA = D9, SCL = D8) to its header (J10, at the module's right end)
+    J10 = place(JANK, "OLED_0.91in_128x32_I2C_HS91L02W2C01", "J10", "OLED 0.91in 128x32", 62.3, 33.31, 180)
+    o = {n: at(J10, n) for n in range(1, 5)}
+    DBG.update(oled=o)
+    route("SCL", [p[9], (54.8, p[9][1]), (54.8, o[3][1]), o[3]], SIG, BOT)
+    route("SDA", [p[10], (55.5, p[10][1]), (55.5, o[4][1]), o[4]], SIG, BOT)
+    R70 = place(K("Resistor_SMD"), R0805, "R70", "4.7k", 59.2, o[3][1], 0)
+    R71 = place(K("Resistor_SMD"), R0805, "R71", "4.7k", 59.2, o[4][1], 0)
+    route("SCL", [at(R70, 2), o[3]])
+    route("SDA", [at(R71, 2), o[4]])
+    route("+3V3", [(51.45, 31.5), (57.6, 31.5)], SIG, BOT)
+    via("+3V3", 57.6, 31.5)
+    route("+3V3", [(57.6, 31.5), (57.8, o[2][1]), o[2]])
+    route("+3V3", [(57.8, o[2][1]), (57.8, o[4][1]), at(R71, 1)])
+    route("+3V3", [(57.8, o[3][1]), at(R70, 1)])
+    solid(J10, "1")
 
-    # ======== the controls right of the XIAO (face side): PLAY/STOP and the encoder, on the row ========
-    SW6 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW6", "PLAY/STOP 9.5 mm", 56.3, ROW - 3.25, 270, True)
-    SW7 = place(K("Rotary_Encoder"), "RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm", "SW7", "EC11E09244BS",
-                68.0, ROW + 3.2, 180, True)
+    # ======== the controls right of the screen (top): BACK, OK on a row, the encoder under them ========
+    SW6 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW6", "BACK 9.5 mm", 65.9, 23.2, 0)
+    SW1 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW1", "OK 9.5 mm", 75.5, 23.2, 0)
+    SW7 = place(K("Rotary_Encoder"), "RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm", "SW7", "EC11E09244BS", 66.4, 34.0, 0)
     e = {n: at(SW7, n) for n in ("A", "B", "C", "S1", "S2")}
-    p1b, p1f = at(SW6, 1, (56.3, ROW - 3.25)), at(SW6, 1, (56.3, ROW + 3.25))
-    p2b, p2f = at(SW6, 2, (60.8, ROW - 3.25)), at(SW6, 2, (60.8, ROW + 3.25))
-    route("LADDER", [(55.0, 9.15), p1b])
-    route("LADDER", [p1b, p1f], SIG, BOT)
-    route("LADDER", [p1f, (p1f[0], 21.5), (e["S2"][0], 21.5), e["S2"]], SIG, BOT)
-    route("PLAY_R", [p2b, p2f], SIG, BOT)
-    R62 = place(K("Resistor_SMD"), R0805, "R62", "6.8k", 58.55, 19.8, 0, True)
-    route("PLAY_R", [p2f, at(R62, 1, (59.55, 19.8))], SIG, BOT)
-    R63 = place(K("Resistor_SMD"), R0805, "R63", "22k", e["S1"][0], 4.3, 90, True)
-    route("PUSH_R", [e["S1"], at(R63, 1, (e["S1"][0], 5.3))], SIG, BOT)
-    route("ENC_A", [(61.0, 20.2), (64.9, 20.2), (e["A"][0] - 1.0, e["A"][1] + 1.0), e["A"]], SIG, BOT)
-    route("ENC_B", [(61.5, 18.6), (e["B"][0] - 1.4, e["B"][1] + 1.0), e["B"]], SIG, BOT)
-    route("ENC_B", [at(C11, 1), (e["B"][0] - 1.4, e["B"][1] + 1.0)], SIG, BOT)
+    DBG.update(enc=e)
+    route("ENC_A", [(64.35, e["A"][1]), e["A"]])
+    route("ENC_B", [(63.65, e["B"][1]), e["B"]])
+    route("LADDER", [(82.0, 23.2), (65.9, 23.2)])
+    route("LADDER", [(82.0, 23.2), (83.45, 24.65), (83.45, 32.9), e["S2"]])
+    route("BACK_R", [(65.9, 27.7), (72.4, 27.7)])
+    route("OK_R", [(75.5, 27.7), (82.0, 27.7)])
+    R62 = place(K("Resistor_SMD"), R0805, "R62", "6.8k", 69.15, 25.45, 180, True)
+    R61 = place(K("Resistor_SMD"), R0805, "R61", "2.2k", 78.75, 25.45, 180, True)
+    R63 = place(K("Resistor_SMD"), R0805, "R63", "22k", 80.9, 41.8, 270, True)
+    route("BACK_R", [(65.9, 27.7), (67.3, 26.3), at(R62, 1)], SIG, BOT)
+    route("OK_R", [(75.5, 27.7), (76.9, 26.3), at(R61, 1)], SIG, BOT)
+    route("PUSH_R", [e["S1"], at(R63, 1)], SIG, BOT)
+    for fp_ in (R61, R62, R63):
+        solid(fp_, "2")
+    solid(SW7, "C")
+    DBG.update(r61=(at(R61, 1), at(R61, 2)), r63=(at(R63, 1), at(R63, 2)))
 
-    # ======== the power path (top): J1 -> D1, C1 -> Q1 -> U2 -> +5V over the encoder; the cut network beside it ========
+    # ======== the power path (top): as in v4 ========
     D1 = place(K("Diode_SMD"), "D_SOD-123F", "D1", "SMF5.0A", 70.1, 12.7, 270)
     C1 = place(K("Capacitor_SMD"), C0805, "C1", "10uF", 72.45, 12.4, 270)
     R1 = place(K("Resistor_SMD"), R0805, "R1", "5.1k", 73.0, 4.0, 90)
@@ -424,13 +398,13 @@ def layout_long():
     R3 = place(K("Resistor_SMD"), R0805, "R3", "100k", 79.5, 12.3, 270)
     Q2 = place(K("Package_TO_SOT_SMD"), "SOT-23", "Q2", "AO3400A", 64.6, 15.2, 0)
     R4 = place(K("Resistor_SMD"), R0805, "R4", "100k", 63.7, 11.6, 270)
-    R5 = place(K("Resistor_SMD"), R0805, "R5", "100k", 64.3, 18.0, 0)
-    C2 = place(K("Capacitor_SMD"), C0805, "C2", "100nF", 64.3, 20.2, 0)
-    R6 = place(K("Resistor_SMD"), R0805, "R6", "1k", 58.55, ROW, 270)           # (between PLAY/STOP's legs)
+    R5 = place(K("Resistor_SMD"), R0805, "R5", "100k", 61.4, 16.3, 0, True)   # (bottom)
+    C2 = place(K("Capacitor_SMD"), C0805, "C2", "100nF", 60.4, 18.5, 180)
+    R6 = place(K("Resistor_SMD"), R0805, "R6", "1k", 58.55, 13.8, 270)
     U2 = place(K("Package_TO_SOT_SMD"), "SOT-363_SC-70-6", "U2", "LM66100", 75.3, 15.7, 0)
     C3 = place(K("Capacitor_SMD"), C0805, "C3", "10uF", 57.15, 4.7, 0)
-    C4 = place(K("Capacitor_SMD"), "CP_Elec_5x5.4", "C4", "100uF DNP", 79.0, 3.6, 0)
-    # J1: CC on the bottom to R1/R2 right of it; VBUS both pads joined below them and on across the encoder
+    C4 = place(K("Capacitor_SMD"), "CP_Elec_5x5.4", "C4", "100uF DNP", 77.0, 7.4, 180, True)   # (bottom)
+    TP1 = place(K("TestPoint"), "TestPoint_Pad_D1.5mm", "TP1", "5V", 57.0, 1.6)
     a5, b5, a9, b9 = at(J1, "A5"), at(J1, "B5"), at(J1, "A9"), at(J1, "B9")
     via("CC2", b5[0], 7.75)
     via("CC1", a5[0], 8.45)
@@ -442,9 +416,8 @@ def layout_long():
     via("CC1", 71.6, 8.45)
     route("CC2", [(71.0, 7.75), at(R2, 1)])
     route("CC1", [(71.6, 8.45), (73.0, 7.0), at(R1, 1)])
-    NODE = 9.8                                       # (the VBUS_IN line under J1, on over the encoder)
-    route("VBUS_IN", [a9, (a9[0], NODE), (b9[0], NODE), b9], PWR)
-    NODE = 10.45                                     # (over the encoder: between its B pad and its rear mounting tab)
+    route("VBUS_IN", [a9, (a9[0], 9.8), (b9[0], 9.8), b9], PWR)
+    NODE = 10.45
     route("VBUS_IN", [(b9[0], 9.8), (b9[0] + 0.65, NODE)], PWR)
     q1s, q1g, q1d = at(Q1, 2), at(Q1, 1), at(Q1, 3)
     route("VBUS_IN", [(b9[0] + 0.65, NODE), (at(R3, 1)[0], NODE), at(R3, 1)], PWR)
@@ -457,11 +430,12 @@ def layout_long():
     route("PG", [q2d, (66.6, 16.0), (66.6, 18.6), (80.4, 18.6), (80.4, 13.7), at(R3, 2)])
     route("NG", [at(R4, 2), q2g])
     route("NG", [at(R6, 2), (59.6, 14.0), (62.3, 14.0), q2g])
-    route("NG", [(62.3, 14.0), (62.3, 19.9), at(C2, 1)])
-    route("NG", [(62.3, at(R5, 1)[1]), at(R5, 1)])
-    # PWR_CUT: the XIAO's D10 (pad 11) right to R6, top
+    route("NG", [(62.3, 14.0), (62.3, 18.5), at(C2, 1)])
+    via("NG", 62.3, 16.3)
+    route("NG", [(62.3, 16.3), at(R5, 1)], SIG, BOT)
+    solid(R5, "2")
+    solid(C2, "2")
     route("PWR_CUT", [p[11], (54.9, 11.9), (57.7, 11.9), at(R6, 1)])
-    # U2: VIN from Q1, CE onto VOUT; +5V by a via onto the bottom lane (y 4.6) back to the XIAO's 5V pad, C3, TP1, C4
     u = {n: at(U2, n) for n in range(1, 7)}
     route("+5V", [u[6], (77.3, u[6][1]), (77.3, u[3][1] + 1.0), (u[3][0], u[3][1] + 1.0), u[3]], SIG)
     via("+5V", 72.4, u[3][1] + 1.0)
@@ -469,84 +443,97 @@ def layout_long():
     route("+5V", [(72.4, u[3][1] + 1.0), (72.4, 4.6), (55.6, 4.6)], BUS, BOT)
     via("+5V", 55.6, 4.6)
     route("+5V", [(55.6, 4.6), (55.6, p[14][1]), (54.6, p[14][1])], PWR)
-    route("+5V", [(55.6, p[14][1]), (55.6, 1.6), at(TP["TP1"], 1)], 0.3)
+    route("+5V", [(55.6, p[14][1]), (55.6, 1.6), at(TP1, 1)], 0.3)
     route("+5V", [(55.6, at(C3, 1)[1]), at(C3, 1)], PWR)
-    solid(C3, "2")
-    solid(J1, "SH")
-    solid(R62, "2")
-    solid(C9, "2")
-    solid(R5, "2")
-    solid(C1, "2")
+    c4p = at(C4, 1)
+    DBG.update(c4=(c4p, at(C4, 2)))
+    route("+5V", [(72.4, c4p[1]), c4p], BUS, BOT)
+    for fp_, n in ((C3, "2"), (J1, "SH"), (R5, "2"), (C1, "2")):
+        solid(fp_, n)
     sh = at(J1, "SH", (JX - 4.3, 6.4))
     route("GND", [at(C3, 2), (sh[0] - 0.55, sh[1] - 0.8), sh])
     route("GND", [u[2], (73.4, u[2][1])])
     via("GND", 73.4, u[2][1])
-    c4p = at(C4, 1)
-    route("+5V", [(72.4, 4.6), (c4p[0] - 1.6, 4.6)], BUS, BOT)
-    via("+5V", c4p[0] - 1.6, 4.6)
-    route("+5V", [(c4p[0] - 1.6, 4.6), c4p], BUS)
-    for fp_, n in ((D1, 2),):
-        g = at(fp_, n)
-        via("GND", g[0], g[1] + 1.1)
-        route("GND", [g, (g[0], g[1] + 1.1)])
+    g = at(D1, 2)
+    via("GND", g[0], g[1] + 1.1)
+    route("GND", [g, (g[0], g[1] + 1.1)])
     route("GND", [at(Q2, 2), (64.9, 16.75)])
     via("GND", 64.9, 16.75)
 
-    # ======== OUT1 as MIDI IN (front right corner): RING1 -> R50 -> U4's LED -> Q3 -> TIP1; D2 across the LED ========
-    U4 = place(K("Package_DIP"), "DIP-6_W7.62mm", "U4", "H11L1", 65.9, 29.5, 0)
-    R50 = place(K("Resistor_SMD"), R0805, "R50", "220", 65.0, 26.2, 0)
-    D2 = place(K("Diode_SMD"), "D_SOD-123", "D2", "1N4148W", 63.4, 30.6, 270)
-    Q3 = place(K("Package_TO_SOT_SMD"), "SOT-23", "Q3", "AO3400A", 65.4, 38.8, 0)
-    R52 = place(K("Resistor_SMD"), R0805, "R52", "1k", 63.4, 35.1, 270)
-    R53 = place(K("Resistor_SMD"), R0805, "R53", "100k", 69.0, 38.9, 270)
-    R51 = place(K("Resistor_SMD"), R0805, "R51", "4.7k", 74.9, 25.4, 270)
-    C8 = place(K("Capacitor_SMD"), C0805, "C8", "100nF", 71.4, 26.3, 180)
+    # ======== the MIDI IN (left, in front of OUT1): RING1 -> R50 -> U4's LED -> Q3 -> TIP1; D2 across the LED; Q4 ========
+    U4 = place(K("Package_DIP"), "DIP-6_W7.62mm", "U4", "H11L1", 17.0, 26.6, 0)
     w = {n: at(U4, n) for n in (1, 2, 4, 5, 6)}
-    route("RING1", [(62.9, 22.15), (at(R50, 1)[0], 23.6), at(R50, 1)])
-    route("OPTO_A", [at(R50, 2), w[1]])
-    route("OPTO_A", [at(D2, 1), w[1]])
+    Q4 = place(K("Package_TO_SOT_SMD"), "SOT-23", "Q4", "AO3401A", 8.0, 26.2, 0)
+    R50 = place(K("Resistor_SMD"), R0805, "R50", "220", 12.3, 27.1, 90)
+    D2 = place(K("Diode_SMD"), "D_SOD-123", "D2", "1N4148W", 14.6, 28.2, 270)
+    Q3 = place(K("Package_TO_SOT_SMD"), "SOT-23", "Q3", "AO3400A", 21.0, 35.0, 0)
+    R52 = place(K("Resistor_SMD"), R0805, "R52", "1k", 9.0, 30.6, 180, True)    # (bottom)
+    R53 = place(K("Resistor_SMD"), R0805, "R53", "100k", 27.0, 25.6, 270)
+    R51 = place(K("Resistor_SMD"), R0805, "R51", "4.7k", 27.5, 33.2, 90)
+    C8 = place(K("Capacitor_SMD"), C0805, "C8", "100nF", 22.6, 28.0, 90, True)
+    TP2 = place(K("TestPoint"), "TestPoint_Pad_D1.5mm", "TP2", "3V3", 6.8, 31.6)
+    q4 = {n: at(Q4, n) for n in (1, 2, 3)}
+    q3 = {n: at(Q3, n) for n in (1, 2, 3)}
+    DBG.update(u4=w, q4=q4, q3=q3, d2=(at(D2, 1), at(D2, 2)), r50=(at(R50, 1), at(R50, 2)), r52=(at(R52, 1), at(R52, 2)),
+               r53=(at(R53, 1), at(R53, 2)), r51=(at(R51, 1), at(R51, 2)), c8=(at(C8, 1), at(C8, 2)))
+    # IN_EN (D4) and MIDI_RX (D5) on top west across the strip, then south
+    route("IN_EN", [p[5], (28.6, p[5][1]), (28.6, 24.0), (q4[1][0], 24.0), q4[1]])
+    route("IN_EN", [(at(R53, 1)[0], 24.0), at(R53, 1)])
+    route("MIDI_RX", [p[6], (29.4, p[6][1]), (29.4, w[4][1]), w[4]])
+    route("MIDI_RX", [(at(R51, 2)[0], w[4][1]), at(R51, 2)])
+    solid(R53, "2")
+    # SRC1 from the 33 ohm group's A pad (bottom) to Q4's drain; RING1 from its B pad (bottom) to R50
+    route("SRC1", [tb1["A"], (10.0, 23.6), (10.0, 26.2)], SIG, BOT)
+    via("SRC1", 10.0, 26.2)
+    route("SRC1", [(10.0, 26.2), q4[3]])
+    route("RING1", [tb1["B"], (10.8, 19.9), (10.8, at(R50, 1)[1])], SIG, BOT)
+    via("RING1", 10.8, at(R50, 1)[1])
+    route("RING1", [(10.8, at(R50, 1)[1]), at(R50, 1)])
+    route("OPTO_A", [at(R50, 2), at(D2, 1), w[1]])
     route("OPTO_K", [at(D2, 2), w[2]])
-    route("OPTO_K", [w[2], (67.2, 33.0), (67.2, 38.0), at(Q3, 3)])
-    route("TIP1", [(61.6, 22.65), (61.6, at(Q3, 2)[1]), at(Q3, 2)])
-    route("IN_G", [at(R52, 2), at(Q3, 1)])
-    route("IN_EN", [(69.0, 22.5), (69.0, 33.3), (62.4, 33.3)], SIG, BOT)
-    via("IN_EN", 62.4, 33.3)
-    route("IN_EN", [(62.4, 33.3), at(R52, 1)])
-    route("IN_EN", [(69.0, 33.3), (69.0, 36.9)], SIG, BOT)
-    via("IN_EN", 69.0, 36.9)
-    route("IN_EN", [(69.0, 36.9), at(R53, 1)])
-    route("MIDI_RX", [(75.0, 22.0), (75.0, w[4][1]), w[4]], SIG, BOT)
-    via("MIDI_RX", 75.0, 27.3)
-    route("MIDI_RX", [at(R51, 2), (75.0, 27.3)])
-    route("GND", [at(R53, 2), (69.0, 40.9)])
-    via("GND", 69.0, 40.9)
-    route("GND", [w[5], (72.2, 32.04)])
-    via("GND", 72.2, 32.04)
-    c8g = at(C8, 2)
-    route("GND", [c8g, (c8g[0], 27.6)])
-    via("GND", c8g[0], 27.6)
-    # 3V3: the bus on into the corner on the bottom (under RING1 / TIP1), up again before IN_EN
-    via("+3V3", 57.5, BUS_Y)
-    route("+3V3", [(57.5, BUS_Y), (67.5, BUS_Y)], SIG, BOT)
-    via("+3V3", 67.5, BUS_Y)
-    c8p = at(C8, 1)
-    route("+3V3", [(67.5, BUS_Y), (at(TP["TP2"], 1)[0], BUS_Y), at(TP["TP2"], 1)])
-    route("+3V3", [(at(R51, 1)[0], BUS_Y), at(R51, 1)])
-    route("+3V3", [(c8p[0], BUS_Y), c8p, (w[6][0], c8p[1] + 1.1), w[6]])
+    route("OPTO_K", [q3[3], (22.6, 31.0), (18.4, 29.6), w[2]])
+    # TIP1 from the 10 ohm group's B pad (bottom, west of the TX1 pad) to Q3's source
+    route("TIP1", [ta1["B"], (15.0, 20.8), (15.0, 36.0), (q3[2][0] - 1.0, 36.0)], SIG, BOT)
+    via("TIP1", q3[2][0] - 1.0, 36.0)
+    route("TIP1", [(q3[2][0] - 1.0, 36.0), q3[2]])
+    # IN_G: R52 (IN_EN -> Q3's gate)
+    route("IN_EN", [(q4[1][0], 24.0), (5.4, 24.6)])
+    via("IN_EN", 5.4, 24.6)
+    route("IN_EN", [(5.4, 24.6), (5.4, 30.6), at(R52, 1)], SIG, BOT)
+    route("IN_G", [at(R52, 2), (11.2, 30.6), (11.2, 34.0)], SIG, BOT)
+    via("IN_G", 11.2, 34.0)
+    route("IN_G", [(11.2, 34.0), (q3[1][0], 34.0), q3[1]])
+    # 3V3: a riser from the bus up the left edge to Q4's source and TP2; on the bottom up to U4 and C8; R51
+    route("+3V3", [(1.5, BUS_Y), (1.5, 29.2), (4.6, 29.2), (q4[2][0], 28.0), q4[2]])
+    route("+3V3", [(4.6, 29.2), at(TP2, 1)])
+    route("+3V3", [(27.5, BUS_Y), at(R51, 1)])
+    via("+3V3", 27.5, 35.4)
+    route("+3V3", [(27.5, 35.4), (26.8, 34.7), (26.8, 27.3), w[6]], SIG, BOT)
+    route("+3V3", [w[6], at(C8, 1)], SIG, BOT)
+    solid(C8, "2")
+    solid(U4, "5")
+
+    # ======== the front: OUT2, OUT3, OUT4; TXB along the bottom lane, the 3V3 bus on top ========
+    tx = {k: front_unit(k, c, H, TX_LANE) for k, c in zip((2, 3, 4), CH)}
+    route("MIDI_TXB", [p[2], (35.85, p[2][1]), (35.85, TX_LANE)], SIG, BOT)
+    route("MIDI_TXB", [(tx[2][0], TX_LANE), (tx[4][0], TX_LANE)], SIG, BOT)
+    via("+3V3", 51.45, 35.6)
+    route("+3V3", [(51.45, 35.6), (51.45, BUS_Y)])
+    route("+3V3", [(51.45, BUS_Y), (1.5, BUS_Y)], BUS)
 
     # ======== silk ========
-    label("OUT1 A|B", X - 2.4, Y, 0.7, pcbnew.B_SilkS, rot=90)
-    label("JP=SRC!", 12.4, 19.0, 0.6, rot=90)
-    label("MIDI IN: OUT1", 69.5, 42.5, 0.6)
-    label("jank", 74.0, 46.0, 1.0)
+    label("OUT1 A|B", s[2][0] - 2.3, s[2][1], 0.7, rot=90)
+    label("JP=SRC!", 9.55, 23.3, 0.6)
+    label("MIDI IN: OUT1", 21.0, 23.3, 0.6)
+    label("jank v5", 74.0, 52.0, 1.0)
     label("5V", 58.4, 2.7, 0.6)
-    label("3V3", 78.4, 19.9, 0.6)
-    label("GND", 23.6, 2.0, 0.6)
-    label("TX", 32.0, 18.3, 0.6)
+    label("3V3", 9.0, 32.4, 0.6)
+    label("GND", 29.0, 2.8, 0.6)
+    label("TX", 31.4, 11.0, 0.6)
     label("PWR", JX, 1.2, 0.6)
-    label("MODE", 47.75, ROW - 4.3, 0.7, pcbnew.B_SilkS)
-    label("PLAY", 58.55, ROW - 4.3, 0.7, pcbnew.B_SilkS)
-    label("jank", 74.0, 46.0, 1.0, pcbnew.B_SilkS)
+    label("BACK", 69.15, 21.3, 0.7)
+    label("OK", 78.75, 21.3, 0.7)
+    label("jank v5", 74.0, 52.0, 1.0, pcbnew.B_SilkS)
     return W, H
 
 
@@ -801,3 +788,6 @@ pcbnew.ZONE_FILLER(board).Fill(board.Zones())
 out = os.path.join(HERE, f"{NAME}{'' if LAYOUT == 'long' else '-' + LAYOUT}.kicad_pcb")
 board.Save(out)
 print("saved", out, f"{W} x {H} mm")
+DEBUG_OUT = os.environ.get("JANK_DEBUG")
+if DEBUG_OUT:
+    json.dump(DBG, open(DEBUG_OUT, "w"), indent=0, default=str)

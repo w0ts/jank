@@ -159,9 +159,9 @@ PARTS = [
     ("C4", "Device:C_Polarized", "100uF DNP", "Capacitor_SMD:CP_Elec_5x5.4", "cbulk", 193.04, 63.5, {"1": "+5V", "2": "GND"}),
     # the module, the button, the test points
     ("U1", "jank:XIAO_ESP32S3", "XIAO ESP32S3", "jank:XIAO-ESP32-S3-DIP", "xiao", 289.56, 63.5,
-     {"1": "MIDI_TX1", "2": "MIDI_TX2", "4": "MIDI_TX4", "5": "MIDI_TX3", "6": "LED_DATA", "3": "LADDER", "7": "ENC_A", "8": "ENC_B", "9": "IN_EN", "10": "MIDI_RX", "11": "PWR_CUT",
+     {"1": "MIDI_TX1", "2": "MIDI_TXB", "4": "LED_DATA", "5": "IN_EN", "6": "MIDI_RX", "3": "LADDER", "7": "ENC_A", "8": "ENC_B", "9": "SCL", "10": "SDA", "11": "PWR_CUT",
       "12": "+3V3", "13": "GND", "14": "+5V"}),
-    ("SW1", "Switch:SW_Push", "MODE 9.5 mm", "Button_Switch_THT:SW_PUSH_6mm", "sw", 360.68, 60.96, {"1": "LADDER", "2": "MODE_R"}),
+    ("SW1", "Switch:SW_Push", "OK 9.5 mm", "Button_Switch_THT:SW_PUSH_6mm", "sw", 360.68, 60.96, {"1": "LADDER", "2": "OK_R"}),
     ("TP1", "Connector:TestPoint", "5V", "TestPoint:TestPoint_Pad_D1.5mm", "", 337.82, 88.9, {"1": "+5V"}),
     ("TP2", "Connector:TestPoint", "3V3", "TestPoint:TestPoint_Pad_D1.5mm", "", 350.52, 88.9, {"1": "+3V3"}),
     ("TP3", "Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.5mm", "", 363.22, 88.9, {"1": "GND"}),
@@ -174,12 +174,14 @@ PARTS = [
     ("R8", "Device:R", "330", AX0207, "r330", 104.14, 154.94, {"1": "LED_BUF", "2": "LED_DIN1"}),
     ("JP8", "Jumper:SolderJumper_2_Open", "bypass", JP, "", 106.68, 175.26, {"1": "LED_BUF", "2": "LED_DIN1"}),
     ("R9", "Device:R", "DNP parallel", R1206, "rpar", 116.84, 154.94, {"1": "LED_BUF", "2": "LED_DIN1"}),
-    ("LED1", "LED:SK6812", "SK6812MINI-E", "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount", "led", 132.08, 154.94,
-     {"1": "GND", "2": "LED_DIN1", "3": "+5V", "4": "LED_DIN2"}),
+    ("LED1", "LED:SK6812", "SK6812MINI-HS", "jank:LED_SK6812MINI-HS_3.7x3.5mm_HandSolder", "led", 132.08, 154.94,
+     {"1": "GND", "2": "LED_DIN1", "3": "+5V"}),
     ("C6", "Device:C", "100nF", C0805, "c100n", 147.32, 154.94, {"1": "+5V", "2": "GND"}),
-    ("LED2", "LED:SK6812", "SK6812MINI-E", "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount", "led", 175.26, 154.94,
-     {"1": "GND", "2": "LED_DIN2", "3": "+5V"}),
-    ("C7", "Device:C", "100nF", C0805, "c100n", 190.5, 154.94, {"1": "+5V", "2": "GND"}),
+    # the screen (v5): a 0.91 inch 128 x 32 OLED module (SSD1306, I2C 0x3C) on a 4-pin header, 3V3; SDA / SCL pulled up here
+    ("J10", "Connector_Generic:Conn_01x04", "OLED 0.91in 128x32", "jank:OLED_0.91in_128x32_I2C_HS91L02W2C01", "oled",
+     175.26, 154.94, {"1": "GND", "2": "+3V3", "3": "SCL", "4": "SDA"}),
+    ("R70", "Device:R", "4.7k", R0805, "r4k7", 195.58, 147.32, {"1": "+3V3", "2": "SCL"}),
+    ("R71", "Device:R", "4.7k", R0805, "r4k7", 205.74, 147.32, {"1": "+3V3", "2": "SDA"}),
     ("#FLG01", "power:PWR_FLAG", "PWR_FLAG", "", "", 220.98, 132.08, {"1": "GND"}),
     # OUT1 as MIDI IN (the user's ruling, 2026-11-08): an H11L1 across DIN pins 4/5, gated by Q3 (on only in IN mode)
     ("R50", "Device:R", "220", R0805, "r220", 30.48, 320.04, {"1": "RING1", "2": "OPTO_A"}),
@@ -197,10 +199,10 @@ PARTS = [
     # A / B on GPIO43 / GPIO44 with 10k pull-ups and 100 nF
     ("R60", "Device:R", "10k", R0805, "r10k", 160.02, 320.04, {"1": "+3V3", "2": "LADDER"}),
     ("C9", "Device:C", "100nF", C0805, "c100n", 172.72, 320.04, {"1": "LADDER", "2": "GND"}),
-    ("R61", "Device:R", "2.2k", R0805, "r2k2", 185.42, 342.9, {"1": "MODE_R", "2": "GND"}),
-    ("SW6", "Switch:SW_Push", "PLAY/STOP 9.5 mm", "Button_Switch_THT:SW_PUSH_6mm", "sw", 203.2, 320.04,
-     {"1": "LADDER", "2": "PLAY_R"}),
-    ("R62", "Device:R", "6.8k", R0805, "r6k8", 215.9, 342.9, {"1": "PLAY_R", "2": "GND"}),
+    ("R61", "Device:R", "2.2k", R0805, "r2k2", 185.42, 342.9, {"1": "OK_R", "2": "GND"}),
+    ("SW6", "Switch:SW_Push", "BACK 9.5 mm", "Button_Switch_THT:SW_PUSH_6mm", "sw", 203.2, 320.04,
+     {"1": "LADDER", "2": "BACK_R"}),
+    ("R62", "Device:R", "6.8k", R0805, "r6k8", 215.9, 342.9, {"1": "BACK_R", "2": "GND"}),
     ("SW7", "Device:RotaryEncoder_Switch", "EC11E09244BS", "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm",
      "enc", 254.0, 325.12, {"A": "ENC_A", "B": "ENC_B", "C": "GND", "S1": "PUSH_R", "S2": "LADDER"}),
     ("R63", "Device:R", "22k", R0805, "r22k", 279.4, 342.9, {"1": "PUSH_R", "2": "GND"}),
@@ -212,20 +214,21 @@ PARTS = [
     ("#FLG03", "power:PWR_FLAG", "PWR_FLAG", "", "", 251.46, 132.08, {"1": "VIN_SW"}),
 ]
 # four MIDI outputs, each with both footprints: a 3.5 mm TRS type A (CUI SJ1-3523N, right angle) and a 180 degree DIN-5
+TX = {1: "MIDI_TX1", 2: "MIDI_TXB", 3: "MIDI_TXB", 4: "MIDI_TXB"}   # (v5: OUT2..OUT4 share one TX pad)
 for k in range(1, 5):
     x0 = 25.4 + 96.52 * (k - 1)
     PARTS += [
-        (f"R1{k}", "Device:R", "10", AX0207, "r10", x0, 231.14, {"1": f"MIDI_TX{k}", "2": f"TIP{k}"}),
-        (f"R3{k}", "Device:R", "DNP parallel", R1206, "rpar", x0 + 5.08, 231.14, {"1": f"MIDI_TX{k}", "2": f"TIP{k}"}),
+        (f"R1{k}", "Device:R", "10", AX0207, "r10", x0, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
+        (f"R3{k}", "Device:R", "DNP parallel", R1206, "rpar", x0 + 5.08, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
         (f"R2{k}", "Device:R", "33 0.5W", AX0309, "r33", x0 + 12.7, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
         (f"R4{k}", "Device:R", "DNP parallel", R1206, "rpar", x0 + 17.78, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
-        (f"JP1{k}", "Jumper:SolderJumper_2_Open", "bypass", JP, "", x0 + 2.54, 241.3, {"1": f"MIDI_TX{k}", "2": f"TIP{k}"}),
+        (f"JP1{k}", "Jumper:SolderJumper_2_Open", "bypass", JP, "", x0 + 2.54, 241.3, {"1": TX[k], "2": f"TIP{k}"}),
         (f"JP2{k}", "Jumper:SolderJumper_2_Open", "bypass: 3V3 direct" if k > 1 else "bypass: SRC1 direct", JP, "", x0 + 25.4, 241.3, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
         (f"J{1 + k}", "Connector_Audio:AudioJack3", "TRS PJ-320A", "", "trs",
          x0 + 35.56, 231.14, {"T": f"JT{k}", "R": f"JR{k}", "S": "GND"}),
         (f"SW{1 + k}", "jank:SW_DPDT_Slide", "TRS A/B", "jank:SW_Slide_DPDT_MSS22D18", "swab", x0 + 45.72, 271.78,
          {"1": f"RING{k}", "2": f"JR{k}", "3": f"TIP{k}", "4": f"TIP{k}", "5": f"JT{k}", "6": f"RING{k}"}),
-        (f"J{5 + k}", "Connector:DIN-5_180degree", "DIN-5 DIN-504B-M10", "jank:MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB", "din",
+        (f"J{5 + k}", "Connector:DIN-5_180degree", "DIN-5 DIN-504B-M10", "jank:MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom", "din",
          x0 + 66.04, 231.14, {"5": f"TIP{k}", "4": f"RING{k}", "2": "GND"}),
     ]
 
@@ -236,27 +239,27 @@ NOTES = [
     (20.32, 40.64, 1.27, "enumerated it (device mode): Q2 off, Q1 off, J1 cut. At reset PWR_CUT floats: R4/R5 hold Q2 on, so a charger alone always starts it."),
     (20.32, 43.18, 1.27, "C4 (100 uF) not fitted: host-mode hot-plug reserve, against USB's 10 uF limit for a device."),
     (238.76, 30.48, 2.0, "XIAO ESP32S3 (Seeed footprint, 2 x 7 headers or castellations)"),
-    (238.76, 35.56, 1.27, "D6 = GPIO43 has 499 ohm on the module (U0TXD). D2 = GPIO3 strapping, ignored by default eFuses. ENC_A = D6 = GPIO43, ENC_B = D7 = GPIO44 (U0TXD / U0RXD), IN_EN = D8 = GPIO7, MIDI_RX = D9 = GPIO8."),
-    (238.76, 38.1, 1.27, "MIDI_TX1..4 = D0 D1 D4 D3 = GPIO1 2 5 4: UART TX routed to all four by the GPIO matrix (firmware)."),
-    (238.76, 40.64, 1.27, "LADDER = D2 = GPIO3 (ADC1): MODE / PLAY / PUSH on one resistor ladder. LED_DATA = D5 = GPIO6. PWR_CUT = D10 = GPIO9, low = J1 cut."),
-    (20.32, 129.54, 2.0, "LEDS: SK6812MINI-E x 2 on +5V; U3 lifts the 3.3 V data to 5 V (VIH = 0.65 x VDD = 3.25 V at 5 V)"),
-    (20.32, 200.66, 2.0, "MIDI OUT 1-4 (CA-033 at 3.3 V): per output fit ONE of the two, the TRS (type A) OR the DIN-5"),
+    (238.76, 35.56, 1.27, "D6 = GPIO43 has 499 ohm on the module (U0TXD). D2 = GPIO3 strapping, ignored by default eFuses. ENC_A = D6 = GPIO43, ENC_B = D7 = GPIO44 (U0TXD / U0RXD), IN_EN = D4 = GPIO5, MIDI_RX = D5 = GPIO6 (v5)."),
+    (238.76, 38.1, 1.27, "v5: MIDI_TX1 = D0 = GPIO1 (OUT1 alone: Hi-Z in IN mode); MIDI_TXB = D1 = GPIO2 drives OUT2, OUT3 and OUT4 together (3 loops on one pad)."),
+    (238.76, 40.64, 1.27, "LADDER = D2 = GPIO3 (ADC1): OK / BACK / PUSH on one resistor ladder. LED_DATA = D3 = GPIO4. SCL = D8 = GPIO7, SDA = D9 = GPIO8 (the OLED, I2C by the GPIO matrix). PWR_CUT = D10 = GPIO9, low = J1 cut."),
+    (20.32, 129.54, 2.0, "LED: one SK6812MINI-HS on +5V (top); U3 lifts the 3.3 V data to 5 V (VIH = 0.7 x VDD = 3.5 V at 5 V). SCREEN: J10, a 0.91 in 128 x 32 OLED (SSD1306, I2C 0x3C, 3V3)"),
+    (20.32, 200.66, 2.0, "MIDI OUT 1-4 (CA-033 at 3.3 V), v5: BOTH fitted on every output, the TRS (type A, top) AND the DIN-5 (bottom), in parallel; plug one at a time"),
     (20.32, 205.74, 1.27, "TRS type A: tip = data (10 ohm to the TX pad), ring = source (33 ohm 0.5 W to 3V3), sleeve = GND."
                           "  DIN-5: pin 5 = tip net, pin 4 = ring net, pin 2 = GND, pins 1 and 3 open."),
 ]
 for k in range(1, 5):
-    NOTES.append((25.4 + 96.52 * (k - 1), 210.82, 1.5, f"OUT{k}: J{1 + k} TRS  or  J{5 + k} DIN"))
-NOTES.append((20.32, 289.56, 1.27, "SW2..SW5: TRS type A / B per output (face side): they swap the jack's T and R between TIPk (data, sink) and RINGk"
+    NOTES.append((25.4 + 96.52 * (k - 1), 210.82, 1.5, f"OUT{k}: J{1 + k} TRS  and  J{5 + k} DIN"))
+NOTES.append((20.32, 289.56, 1.27, "SW2..SW5: TRS type A / B per output (top side): they swap the jack's T and R between TIPk (data, sink) and RINGk"
                                    " (source) after the resistors; the DIN keeps pin 5 = TIPk, pin 4 = RINGk. 1-2 / 4-5 closed = type A."))
 NOTES.append((20.32, 304.8, 2.0, "OUT1 AS MIDI IN (software): TX1 to input (Hi-Z), IN_EN high (Q4 off: no source; Q3 on), MIDI_RX as UART RX"))
 NOTES.append((20.32, 309.88, 1.27, "OUT mode: IN_EN low (R53 at reset): Q4 on (3V3 to the 33 ohm), Q3 off, the opto's loop open (its body diode blocks), OUT1 drives as before."
                                    " D2 across the opto's LED (reverse protection). OUT1 sits on the BACK edge (long board)."))
-NOTES.append((140.0, 304.8, 2.0, "CONTROLS (face side): one ADC ladder on GPIO3: R60 10k to 3V3; MODE 2.2k, PLAY 6.8k, PUSH 22k to GND"))
-NOTES.append((140.0, 309.88, 1.27, "Idle 3.30 V, MODE 0.60 V, PLAY 1.34 V, PUSH 2.27 V (one switch at a time). Encoder A / B: 10k to 3V3, 100 nF to GND each."))
+NOTES.append((140.0, 304.8, 2.0, "CONTROLS (top side, by the screen): one ADC ladder on GPIO3: R60 10k to 3V3; OK 2.2k, BACK 6.8k, PUSH 22k to GND"))
+NOTES.append((140.0, 309.88, 1.27, "Idle 3.30 V, OK 0.60 V, BACK 1.34 V, PUSH 2.27 V (one switch at a time). Encoder A / B: 10k to 3V3, 100 nF to GND each."))
 NOTES.append((20.32, 264.16, 1.27, "Each MIDI resistor (and R8): axial, hand-swappable; JP across it = bypass (0 ohm, open by default); R3k / R4k / R9 in"
                                    " parallel, not fitted (lower the value). JP2k bridged = RING on 3V3 directly (JP21: on SRC1): a mono plug then shorts the rail."))
-NOTES.append((20.32, 194.31, 1.27, "On the board each pair is ONE footprint (J6..J9; long board jank:MIDI_OUT_DIN-504B-M10_or_PJ-320A_AB: the jack's pads T, R, S"
-                                   " carry J2..J5's nets, its switch pin SW open; square board: numbered 5, 4, 2 inside the DIN's). J2..J5 are BOM lines only."))
+NOTES.append((20.32, 194.31, 1.27, "On the board each pair is ONE footprint (J6..J9, jank:MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom: the jack's pads T, R, S"
+                                   " carry J2..J5's nets, its switch pin SW open; the DIN's pins on the bottom). J2..J5 are BOM lines only."))
 
 LABEL_ANGLE = {0: 180, 180: 0, 90: 270, 270: 90}   # (the label away from the body)
 LIB_IDS = sorted({p[1] for p in PARTS})
@@ -346,7 +349,7 @@ BOM = {
     "xiao": dict(part="Seeed XIAO ESP32S3 (plain, not Sense), no headers included", mpn="113991114", shop="Seeed Studio",
                  code="seeedstudio.com XIAO-ESP32S3-p-5627", price=7.49, cur="USD", min=1,
                  datasheet="https://files.seeedstudio.com/wiki/SeeedStudio-XIAO-ESP32S3/res/XIAO_ESP32S3_SCH_v1.2.pdf"),
-    "hdr": dict(part="Pin header 1x7, 2.54 mm (the XIAO's legs; the long board needs them: the button and the LEDs sit under the module)", mpn="PZ254V-11-07P",
+    "hdr": dict(part="Pin header 1x7, 2.54 mm (the XIAO's legs: parts sit under the module)", mpn="PZ254V-11-07P",
                 shop=LCSC, code="C492406", price=0.0467, cur="USD", min=10, qty=2),
     "usbc": dict(part="USB-C receptacle, power only, 6 pins + 4 through-hole shell legs", mpn="GCT USB4125-GF-A-0190",
                  shop=LCSC, code="C5246813", price=0.9178, cur="USD", min=1, datasheet="https://gct.co/files/drawings/usb4125.pdf"),
@@ -361,22 +364,22 @@ BOM = {
     "idiode": dict(part="Ideal diode 1.5 A, SC-70-6 (0.65 mm pitch)", mpn="TI LM66100DCKR", shop=LCSC, code="C2869734",
                    price=0.2089, cur="USD", min=5, datasheet="https://www.ti.com/lit/ds/symlink/lm66100.pdf"),
     "r10k": dict(part="Resistor 10k 1% 0805", mpn="UNI-ROYAL 0805W8F1002T5E", shop=LCSC, code="C17414", price=0.0034, cur="USD", min=100),
-    "r2k2": dict(part="Resistor 2.2k 1% 0805 (ladder: MODE)", mpn="UNI-ROYAL 0805W8F2201T5E", shop=LCSC, code="C17520", price=0.0050, cur="USD", min=100),
-    "r6k8": dict(part="Resistor 6.8k 1% 0805 (ladder: PLAY/STOP)", mpn="UNI-ROYAL 0805W8F6801T5E", shop=LCSC, code="C17772", price=0.0028, cur="USD", min=100),
+    "r2k2": dict(part="Resistor 2.2k 1% 0805 (ladder: OK)", mpn="UNI-ROYAL 0805W8F2201T5E", shop=LCSC, code="C17520", price=0.0050, cur="USD", min=100),
+    "r6k8": dict(part="Resistor 6.8k 1% 0805 (ladder: BACK)", mpn="UNI-ROYAL 0805W8F6801T5E", shop=LCSC, code="C17772", price=0.0028, cur="USD", min=100),
     "r22k": dict(part="Resistor 22k 1% 0805 (ladder: the encoder's push)", mpn="UNI-ROYAL 0805W8F2202T5E", shop=LCSC, code="C17560", price=0.0048, cur="USD", min=100),
-    "enc": dict(part="Rotary encoder EC11, vertical, 18 detents / 9 pulses, push switch, 20 mm flat (D) shaft, through hole, face side",
+    "enc": dict(part="Rotary encoder EC11, vertical, 18 detents / 9 pulses, push switch, 20 mm flat (D) shaft, through hole, top side",
                 mpn="ALPS EC11E09244BS", shop=LCSC, code="C470742", price=2.3275, cur="USD", min=1,
                 datasheet="https://datasheet.lcsc.com/datasheet/pdf/df84d275ff713f93a7d93396fef04ce5.pdf"),
     "cbulk": dict(part="Electrolytic 100uF 16V 5 x 5.4 mm (not fitted by default)", mpn="ROQANG RVT1C101M0505", shop=LCSC,
                   code="C2977550", price=0.0356, cur="USD", min=20, dnp=True),
-    "sw": dict(part="Tactile switch 6 x 6 mm, through hole, 9.5 mm tall, mounted on the face side (README)", mpn="HRO K2-1102DP-L3SW-04",
+    "sw": dict(part="Tactile switch 6 x 6 mm, through hole, 9.5 mm tall, top side (OK, BACK)", mpn="HRO K2-1102DP-L3SW-04",
                shop=LCSC, code="C445493", price=0.0633, cur="USD", min=10,
                datasheet="https://datasheet.lcsc.com/datasheet/pdf/cba7e973dea59ba592ee1d81fd516f49.pdf?productCode=C445493"),
     "buf": dict(part="Buffer 74AHCT1G125, SOT-23-5 (4.5 to 5.5 V)", mpn="TI SN74AHCT1G125DBVR", shop=LCSC, code="C7484",
                 price=0.1009, cur="USD", min=5),
     "swab": dict(part="Slide switch DPDT, 6 pins 2.5 mm, 9.1 x 3.5 mm, handle 1.5 mm (TRS type A / B), face side;"
-                      " fitted only on a TRS channel",
-                 mpn="SHOU HAN MSS22D18G2", shop=LCSC, code="C431542", price=0.0996, cur="USD", min=5, variant="trs",
+                      " one per output",
+                 mpn="SHOU HAN MSS22D18G2", shop=LCSC, code="C431542", price=0.0996, cur="USD", min=5,
                  datasheet="https://datasheet.lcsc.com/datasheet/pdf/257b9c94564ec11493db9cf754f9732e.pdf?productCode=C431542"),
     "opto": dict(part="Optocoupler H11L1, Schmitt trigger, open collector, DIP-6 (MIDI IN on OUT1)", mpn="EVERLIGHT H11L1",
                  shop=LCSC, code="C78588", price=0.3507, cur="USD", min=5,
@@ -385,22 +388,28 @@ BOM = {
                   code="C81598", price=0.0125, cur="USD", min=50),
     "r220": dict(part="Resistor 220 1% 0805 (MIDI IN, CA-033 / MIDI 1.0)", mpn="UNI-ROYAL 0805W8F2200T5E", shop=LCSC,
                  code="C17557", price=0.0030, cur="USD", min=100),
-    "r4k7": dict(part="Resistor 4.7k 1% 0805 (the opto output's pull-up)", mpn="UNI-ROYAL 0805W8F4701T5E", shop=LCSC,
+    "r4k7": dict(part="Resistor 4.7k 1% 0805 (the opto output's pull-up; the I2C pull-ups)", mpn="UNI-ROYAL 0805W8F4701T5E", shop=LCSC,
                  code="C17673", price=0.0033, cur="USD", min=100),
     "r330": dict(part="Resistor 330 1% 0.25 W axial (6.3 x 2.4 mm), standing", mpn="YAGEO MFR-25FBF52-330R", shop=LCSC,
                  code="C1369900", price=0.0205, cur="USD", min=50),
     "rpar": dict(part="1206 pads in parallel, not fitted (to lower a value on the bench)", mpn="-", shop="-", code="-",
                  price=0.0, cur="USD", min=0, dnp=True),
-    "led": dict(part="RGB LED SK6812MINI-E, 3.2 x 2.8 mm, reverse mount", mpn="OPSCO SK6812MINI-E", shop=LCSC, code="C5149201",
-                price=0.0814, cur="USD", min=5, datasheet="https://www.lcsc.com/datasheet/C5149201.pdf"),
+    "led": dict(part="RGB LED, addressable, 3.7 x 3.5 x 1.95 mm, top emitting (the beat LED)", mpn="OPSCO SK6812MINI-HS",
+                shop=LCSC, code="C2922787", price=0.1085, cur="USD", min=5,
+                datasheet="https://datasheet.lcsc.com/datasheet/pdf/d15550987339dcd676f3ed17cb498c41.pdf?productCode=C2922787"),
+    "oled": dict(part="OLED module 0.91 in 128 x 32, SSD1306, I2C, 38 x 12 mm, 4 holes 2.54 mm (GND VCC SCL SDA)",
+                 mpn="HS HS91L02W2C01", shop=LCSC, code="C5248081", price=2.367, cur="USD", min=1,
+                 datasheet="https://datasheet.lcsc.com/datasheet/pdf/8953314a04a56b0774ba6ab8fe698503.pdf?productCode=C5248081"),
+    "hdr4": dict(part="Pin header 1x4, 2.54 mm (the OLED module's legs)", mpn="XFCN PZ254V-11-04P", shop=LCSC,
+                 code="C2691448", price=0.0276, cur="USD", min=20, qty=1),
     "r10": dict(part="Resistor 10 ohm 1% 0.25 W axial (6.3 x 2.4 mm), standing (RC, data)", mpn="YAGEO MFR-25FBF52-10R",
                 shop=LCSC, code="C1365579", price=0.0205, cur="USD", min=50),
     "r33": dict(part="Resistor 33 ohm 1% 0.5 W axial (9 x 3.2 mm), standing (RA, source)", mpn="CCO MF1/2W-33R 1% T",
                 shop=LCSC, code="C119401", price=0.0241, cur="USD", min=20),
-    "trs": dict(part="3.5 mm stereo jack, right angle, plug from the front, 4 pins (its switch pin left open)",
-                mpn="XKB PJ-320A", shop=LCSC, code="C2884926", price=0.1458, cur="USD", min=5, variant="trs"),
-    "din": dict(part="DIN-5 180 degree, PCB right angle, 7 pins, no locating pegs", mpn="HOOYA DIN-504B-M10", shop=LCSC,
-                code="C2939346", price=0.3764, cur="USD", min=5, variant="din"),
+    "trs": dict(part="3.5 mm stereo jack, right angle, plug from the front, 4 pins (its switch pin left open), top side",
+                mpn="XKB PJ-320A", shop=LCSC, code="C2884926", price=0.1458, cur="USD", min=5),
+    "din": dict(part="DIN-5 180 degree, PCB right angle, 7 pins, no locating pegs, bottom side", mpn="HOOYA DIN-504B-M10", shop=LCSC,
+                code="C2939346", price=0.3764, cur="USD", min=5),
 }
 
 
@@ -412,36 +421,30 @@ def bom_md():
     lines = [f"# jank board: bill of materials", "",
              f"Generated by `make_schematic.py`. One price each, read on {DATE} from the shop named, at its first price break,"
              " before VAT and shipping. LCSC prices come from LCSC's own product data (USD). Nothing here was ordered.", "",
-             "Every output is fitted with ONE of its two connectors (TRS or DIN), so the table counts both. The A/B switch",
-             "(SW2..SW5) only swaps a jack's tip and ring and is fitted only on a TRS channel (the DIN's pins sit on the nets",
-             "before the switch). The totals are given for all four TRS, all four DIN, and the user's set DDDT (DIN on OUT1..OUT3,",
-             "a jack on OUT4: 3 DIN, 1 jack, 1 A/B switch).", "",
+             "v5: every output has BOTH connectors fitted, the 3.5 mm jack on the top and the DIN-5 on the bottom (in parallel,",
+             "plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B switches, the OLED, one LED.", "",
              "| Refs | Qty | Part | MPN | Shop, code | Unit | Min order |", "|---|---|---|---|---|---|---|"]
-    builds = (("TTTT", "4 x TRS (no DIN), 4 A/B switches"), ("DDDD", "4 x DIN (no TRS), no A/B switch"),
-              ("DDDT", "DDDT: DIN on OUT1..OUT3, TRS on OUT4, 1 A/B switch"))
-    totals = {b: {} for b, _ in builds}
-    minspend = {b: {} for b, _ in builds}
+    total, minspend = {}, {}
     for key, info in BOM.items():
         refs = groups.get(key, [])
         qty = info.get("qty", len(refs))
         if key == "hdr":
             refs = ["(U1)"]
+        if key == "hdr4":
+            refs = ["(J10)"]
         dnp = bool(info.get("dnp"))
         lines.append(f"| {', '.join(refs)} | {qty}{' (not fitted)' if dnp else ''} | {info['part']} | {info['mpn']} |"
                      f" {info['shop']} {info['code']} | {info['cur']} {info['price']:.4f} | {info['min']} |")
-        for b in totals:
-            n = qty if "variant" not in info else b.count("T" if info["variant"] == "trs" else "D")   # per channel
-            if dnp or n == 0:
-                continue
-            totals[b][info["cur"]] = totals[b].get(info["cur"], 0) + n * info["price"]
-            minspend[b][info["cur"]] = minspend[b].get(info["cur"], 0) + max(n, info["min"]) * info["price"]
-    lines += ["", "Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, not parts.", "", "## Totals, one board", "",
-              "| Build | Parts at unit price | With each shop's minimum order |", "|---|---|---|"]
-    for v, label in builds:
-        a = ", ".join(f"{c} {t:.2f}" for c, t in sorted(totals[v].items()))
-        b = ", ".join(f"{c} {t:.2f}" for c, t in sorted(minspend[v].items()))
-        lines.append(f"| {label} | {a} | {b} |")
-    lines += ["", "USD: LCSC and Seeed (the XIAO). The bare board is"
+        if dnp or qty == 0:
+            continue
+        total[info["cur"]] = total.get(info["cur"], 0) + qty * info["price"]
+        minspend[info["cur"]] = minspend.get(info["cur"], 0) + max(qty, info["min"]) * info["price"]
+    a = ", ".join(f"{c} {t:.2f}" for c, t in sorted(total.items()))
+    b = ", ".join(f"{c} {t:.2f}" for c, t in sorted(minspend.items()))
+    lines += ["", "Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, not parts.", "", "## Total, one board", "",
+              "| Build | Parts at unit price | With each shop's minimum order |", "|---|---|---|",
+              f"| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED | {a} | {b} |",
+              "", "USD: LCSC and Seeed (the XIAO). The bare board is"
               " ordered at JLCPCB with another board and is not in these totals."]
     return "\n".join(lines) + "\n"
 
