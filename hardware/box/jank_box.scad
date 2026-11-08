@@ -38,8 +38,20 @@ led = [33.0, 4.2];
 led_win = [3.5, 3.7];
 led_h = 1.95;
 ab = [[24.3, 9.0], [10.45, 48.0], [31.55, 48.0], [52.65, 48.0]];   // SW2..SW5 (OUT1..OUT4) slot centres
-ab_slot = [2.0, 4.5];
+/* the printed caps (the user's answer 2026-11-08: "we can 3D print something") */
+btn_cap = [5.4, 8.0, 1.0, 3.45, 3.0, 0.3];   // stem dia, flange dia, flange thickness, bore (plunger 3.4), proud of
+                                             // the lid, flange gap under the lid at rest
+slider_fit = 0.05;      // the slider cap's pocket over the 1.5 x 2.0 handle: + 0.05 each way (printed small: press)
+slider_wall = 0.8;
+slider_proud = 1.0;     // the slider cap's top above the lid
+slider_lift = 0.2;      // its bottom above the switch body
+knob = [14.0, 12.0, 6.1, 4.6, 10.0];   // dia, height, D bore dia, across the flat, bore depth
+enc_flat = 4.5;         // UNVERIFIED: the EC11's D shaft, 4.5 across the flat over its top 10 mm
+slider_cap = [ab_handle_w() + slider_fit + 2 * slider_wall, ab_handle_l() + slider_fit + 2 * slider_wall];
+ab_slot = [slider_cap[0] + 0.35, slider_cap[1] + 2.0 + 0.35];   // the cap and its 2.0 travel, 0.175 round it
 ab_handle = [1.5, 2.0, 2.0];
+function ab_handle_w() = 1.5;
+function ab_handle_l() = 2.0;
 ab_body_h = 3.5;
 ab_knob_h = 5.0;
 sw_body_h = 3.5;        // UNVERIFIED: the buttons' body height
@@ -92,7 +104,7 @@ j1_legs = [2.2, 0.7];   // the relief for J1's legs under the board: height, dep
 led_tube = 0.6;
 led_skin = 0.6;
 led_tube_gap = 0.3;
-button_hole = 4.0;
+button_hole = btn_cap[0] + 0.6;   // the cap's stem through it, 0.3 a side
 oled_rib = [26.0, 27.6];  // a rib in the lid over the module's far end (no glass there): x from / to
 oled_rib_gap = 0.2;
 teardrop_cap = 0.8;
@@ -234,7 +246,7 @@ function abA(c) = ab_a_end == "back" ? [c[1] + ab_slot[1] / 2 + mark_gap, c[1] -
 function lid_labels() = concat([
         ["BACK", kx(73.5), ky(buttons[0][1]) + button_hole / 2 + mark_gap, "right", "baseline", mark_size],
         ["OK", kx(74.5), ky(buttons[1][1]) + button_hole / 2 + mark_gap, "left", "baseline", mark_size],
-        ["BPM", encC[0], encC[1] - enc_hole / 2 - mark_gap - capH(mark_size), "center", "baseline", mark_size],
+        ["BPM", encC[0], encC[1] - knob[0] / 2 - mark_gap - capH(mark_size), "center", "baseline", mark_size],   // under the knob's edge
         ["jank", kx(15.5), ky(31.5), "center", "baseline", mark_logo_size]],
         [for (c0 = ab) let(c = [kx(c0[0]), ky(c0[1])], y = abA(c)) each [
             ["A", c[0], y[0], "center", "baseline", mark_size], ["B", c[0], y[1], "center", "baseline", mark_size]]]);
@@ -256,7 +268,7 @@ module wall_text_cut() { if (markings) for (l = wall_labels()) wall_label(l, mar
 
 module lid_openings2d() {
     for (p = buttons) translate([kx(p[0]), ky(p[1])]) circle(d = button_hole);
-    translate(encC) circle(d = enc_hole);
+    translate(encC) circle(d = knob[0]);   // the knob's footprint (over the 7.0 hole)
     translate([kx(oled_win[0]) - oled_win[2] / 2, ky(oled_win[1]) - oled_win[3] / 2]) square([oled_win[2], oled_win[3]]);
     translate([kx(led[0]) - led_win[0] / 2, ky(led[1]) - led_win[1] / 2]) square(led_win);
     for (c = ab) translate([kx(c[0]) - ab_slot[0] / 2, ky(c[1]) - ab_slot[1] / 2]) square(ab_slot);
@@ -292,6 +304,53 @@ module lid() {          // in place
         lid_text_cut();
     }
 }
+// ---------------------------------------------------------------------------------------------------------------
+// The printed caps, in place (box frame). Button cap: the bore's floor on the plunger's top (Zb + 9.5).
+module button_cap(p, press = 0) {
+    top = H + btn_cap[4];                                    // stands btn_cap[4] above the lid's top
+    fz = Zl - btn_cap[5] - btn_cap[2];                       // flange bottom
+    translate([kx(p[0]), ky(p[1]), -press]) difference() {
+        union() {
+            translate([0, 0, fz]) cylinder(d = btn_cap[1], h = btn_cap[2]);
+            translate([0, 0, fz]) cylinder(d = btn_cap[0], h = top - fz - 0.5);
+            translate([0, 0, top - 0.5]) cylinder(d1 = btn_cap[0], d2 = btn_cap[0] - 1.0, h = 0.5);
+        }
+        translate([0, 0, fz - 1]) cylinder(d = btn_cap[3], h = Zb + 9.5 - fz + 1);
+    }
+}
+function btn_cap_top() = H + btn_cap[4];
+module slider_cap(c, pos = 0) {   // pos: -1 / 0 / +1 = one end of the travel, the middle, the other end
+    x = kx(c[0]); y = ky(c[1]) + pos * ab_handle[2] / 2;
+    z0 = Zb + ab_body_h + slider_lift;
+    translate([x, y, 0]) difference() {
+        translate([-slider_cap[0] / 2, -slider_cap[1] / 2, z0]) cube([slider_cap[0], slider_cap[1], H + slider_proud - z0]);
+        translate([-(ab_handle_w() + slider_fit) / 2, -(ab_handle_l() + slider_fit) / 2, z0 - 1])
+            cube([ab_handle_w() + slider_fit, ab_handle_l() + slider_fit, Zb + ab_knob_h - z0 + 1]);
+    }
+}
+module enc_knob() {     // pushed on the D shaft until the bore's floor meets the shaft's top
+    z0 = Zb + 20 - knob[4];
+    translate([encC[0], encC[1], z0]) difference() {
+        cylinder(d = knob[0], h = knob[1], $fn = 96);
+        translate([0, 0, -1]) intersection() {
+            cylinder(d = knob[2], h = knob[4] + 1);
+            translate([-knob[2], -knob[2], 0]) cube([2 * knob[2], knob[2] + knob[3] - knob[2] / 2, knob[4] + 1]);   // the flat at +y
+        }
+        translate([-0.5, 0, knob[1] - 0.6]) cube([1.0, knob[0], 1]);   // the pointer: a groove on top, on the flat's side
+    }
+}
+module enc_shaft_d() {  // the shaft with its flat, for the knob's check
+    translate([encC[0], encC[1], Zb + 6.5]) intersection() {
+        cylinder(d = 6.0, h = 20 - 6.5);
+        translate([-3.5, -3.5, 0]) cube([7, 3.5 + enc_flat - 3.0, 20]);   // the flat at +y
+    }
+}
+module caps(press = 0, pos = 0) {
+    for (b = buttons) button_cap(b, press);
+    for (c = ab) slider_cap(c, pos);
+    enc_knob();
+}
+
 module lid_print() { translate([0, W, H]) rotate([180, 0, 0]) lid(); }   // top face on the bed
 
 // a strip of the front wall: one jack U-slot over one DIN bore, the DIN pad behind the lower part; printed standing
@@ -314,13 +373,31 @@ module jack_body() { translate([-jack[0] / 2, 0, Zb]) cube([jack[0], jack[1], ja
 module board_slab(dz) { translate([X0, Y0, Zbot + dz]) cube([board_l, board_w, board_t]); }
 
 if (part == "box") box();
+else if (part == "button_cap") translate([0, 0, -(Zl - btn_cap[5] - btn_cap[2])]) translate([-kx(buttons[0][0]), -ky(buttons[0][1]), 0]) button_cap(buttons[0]);   // flange on the bed
+else if (part == "slider_cap") translate([0, 0, H + slider_proud]) rotate([180, 0, 0]) translate([-kx(ab[0][0]), -ky(ab[0][1]), 0]) slider_cap(ab[0]);   // top on the bed
+else if (part == "knob") translate([0, 0, Zb + 20 - knob[4] + knob[1]]) rotate([180, 0, 0]) translate([-encC[0], -encC[1], 0]) enc_knob();   // top on the bed
+else if (part == "check_caps") {   // must be EMPTY: the caps against the lid at rest, pressed 0.3, the sliders at both ends;
+    // against the board (the sliders' pockets round their handle, the knob's bore round the D shaft)
+    intersection() { lid(); union() { caps(0, 0); caps(0.3, -1); caps(0.3, 1); } }
+    intersection() { union() { for (b = buttons) { button_cap(b); button_cap(b, 0.3); } }
+                     difference() { mock(); for (b = buttons) translate([kx(b[0]), ky(b[1]), Zb + 3]) cylinder(d = 3.41, h = 7); } }
+    intersection() { union() { for (c = ab) for (q = [-1, 1]) slider_cap(c, q); }
+                     difference() { mock(); for (c = ab) translate([kx(c[0]) - 1, ky(c[1]) - 3.1, Zb + ab_body_h - 0.01]) cube([2, 6.2, 2]); } }
+    intersection() { enc_knob(); union() { difference() { mock(); translate([encC[0], encC[1], Zb + 6.4]) cylinder(d = 6.2, h = 15); } enc_shaft_d(); box(); } }
+    for (c = ab) for (q = [-1, 1]) intersection() {   // the handle in its pocket at each end
+        slider_cap(c, q);
+        translate([kx(c[0]) - ab_handle[0] / 2, ky(c[1]) + q * ab_handle[2] / 2 - ab_handle[1] / 2, Zb + ab_body_h]) cube([ab_handle[0], ab_handle[1], ab_knob_h - ab_body_h]);
+    }
+}
+else if (part == "brace_caps")   // must NOT be empty: a button cap pulled up 0.35 meets the lid (the flange keeps it)
+    intersection() { lid(); translate([0, 0, btn_cap[5] + 0.05]) for (b = buttons) button_cap(b); }
 else if (part == "lid") lid_print();
 else if (part == "front_test") front_test();
 else if (part == "mock") mock();
 else if (part == "check_box") intersection() { box(); mock(); }
 else if (part == "check_lid") intersection() { lid(); mock(); }
 else if (part == "check_lidbox") intersection() { translate([0, 0, 0.01]) lid(); box(); }
-else if (part == "check_drop") intersection() { union() { for (dz = [0.25 : 0.25 : 22]) translate([0, 0, dz]) lid(); } union() { box(); mock(); } }
+else if (part == "check_drop") intersection() { union() { for (dz = [0.25 : 0.25 : 22]) translate([0, 0, dz]) lid(); } union() { box(); mock(); for (b = buttons) button_cap(b); for (c = ab) slider_cap(c); } }
 else if (part == "check_board_drop") intersection() { union() { for (dz = [0.5 : 0.5 : 26]) translate([0, 0, dz]) mock(); } box(); }
 else if (part == "check_text") {
     if (markings) {
@@ -341,8 +418,10 @@ else if (part == "check_text") {
         }
     }
 }
+else if (part == "caps_view") { color("LightSteelBlue") lid(); color("Orange") caps(); color("SteelBlue") box(); }
 else if (part == "lid_top") {
     color("LightSteelBlue") lid();
+    color("Orange") caps();
     if (markings) color("DimGray") translate([0, 0, H - mark_depth]) linear_extrude(0.05) for (l = lid_labels()) label2d(l);
 }
 else if (part == "brace_pull") intersection() { box(); for (k = [0 : 3]) at_ch(k) translate([0, -(edge_gap + 0.05), 0]) { din_model(); jack_body(); } }
