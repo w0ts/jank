@@ -24,7 +24,7 @@
 
 /* [What to render] */
 outs = "DDDD";          // OUT1..OUT4: D = DIN (SDS-50J), T = TRS (SJ1-3523N). OUT1 is the back one (MIDI IN capable)
-part = "assembly";      // [assembly, box, lid, front_test, mock, open, front, back, check_box, check_lid, check_lidbox, check_drop, brace_pull, brace_push, brace_trs, brace_floor, brace_lid, brace_ledge]
+part = "assembly";      // [assembly, box, lid, front_test, mock, open, front, back, check_box, check_lid, check_lidbox, check_drop, check_board_drop, brace_pull, brace_push, brace_trs, brace_floor, brace_lid, brace_ledge]
 
 /* [Board: hardware/pcb/README.md, round 7 "The box"] */
 board_l = 84.0;
@@ -60,8 +60,8 @@ din_plate = [20.0, 21.1, 1.8];
 din_body_h = 18.0;
 din_depth = 15.8;
 din_axis = 10.0;
-din_overlap = 1.0;      // the wall's lip (and the lid's tongue) lies 1.0 mm over the plate's edge, in front of it:
-                        // the plate's face shows through an 18.0 x 19.1 window, its own socket opening is the plug's way in
+din_bore = 16.0;        // round bore for the PLUG's shell, centred on the socket axis: its lower half in the wall, its
+                        // upper half in the lid's tongue. UNVERIFIED: the user's plugs decide (print front_test)
 edge_gap = 0.1;
 din_slot_play = 0.2;
 din_floor_gap = 0.1;
@@ -82,10 +82,10 @@ cap_stop = 0.5;
 
 /* [Box] */
 wall = 2.0;             // the -X wall and the back wall's USB section
-conn_t = 1.2;           // the skin in front of the connectors (front wall, OUT1's section of the back wall): the
-                        // DIN plate's face sits 1.3 mm in, behind a 1.2 mm lip; the jack's bushing stands 2.0 proud
-usb_t = 2.0;            // the back wall's USB section, 0.1 behind the board's edge: the XIAO socket's 1.5 overhang
-                        // sits in its U-opening, 0.6 short of the outside
+conn_t = 2.5;           // the walls a connector sits behind (front; OUT1's section of the back wall): the DIN plate's
+                        // face 2.6 mm behind the outside (wall + 0.1), the jack's bushing 0.8 proud
+usb_t = 2.5;            // the back wall's USB section, 0.1 behind the board's edge as well: the back is flat; the XIAO
+                        // socket's 1.5 overhang sits in its U-opening, 1.1 short of the outside
 usb_tongue_y = 0.55;    // the USB tongues keep this far behind the board's back edge (J1's shell legs, mockup 0.545)
 side_t = 4.0;           // +X wall: thick enough for two M2 pilots (the board has no holes on that side)
 side_screws_y = [10, 42];   // mm from the board's front edge
@@ -210,14 +210,15 @@ module jack_cap() {
     }
 }
 // every wall opening is a U open to the top of the wall; the lid's tongue or key closes its upper part
-din_win = [din_plate[0] - 2 * din_overlap, din_plate[1] - din_overlap];   // x, from the plate's far edge + overlap upwards
-module wall_cut(k) {    // local frame: the skin is y in [-edge_gap - conn_t, -edge_gap]
+module wall_cut(k) {    // local frame: the wall is y in [-edge_gap - conn_t, -edge_gap]
     y0 = -edge_gap - conn_t - 1;
-    if (is_din(k)) translate([-din_win[0] / 2, y0, Zt - din_plate[1] + din_overlap]) cube([din_win[0], conn_t + 1 + 0.01, H]);
+    if (is_din(k)) translate([0, 0, Zt - din_axis]) xz_extrude(y0, conn_t + 1 + 0.01) uslot2d(din_bore, H);
     else translate([0, 0, Zt - bush_z]) xz_extrude(y0, conn_t + 1 + edge_gap + 0.2) uslot2d(bush_slot, H);
 }
-module din_tongue() {   // local frame: closes the window's top, its lower 1.0 mm in front of the plate's board-side edge
-    translate([-din_win[0] / 2 + lid_play, -edge_gap - conn_t, Zt - din_overlap]) cube([din_win[0] - 2 * lid_play, conn_t, Zl - Zt + din_overlap + 0.01]);
+module din_tongue() {   // local frame: fills the U above the bore, its half-round end completing the 16.0 bore
+    kw = din_bore / 2 - key_play;
+    translate([0, 0, Zt - din_axis]) xz_extrude(-edge_gap - conn_t, conn_t)
+        difference() { translate([-kw, 0]) square([2 * kw, H - (Zt - din_axis)]); circle(d = din_bore); }
 }
 module standoff(h) {
     c = [fx(h[0]), by(h[1])];
@@ -289,7 +290,7 @@ module lid_text_cut() { if (markings) translate([0, 0, H - mark_depth]) linear_e
 // 2 = back, USB section (Y = W); on = "box" (cut into the wall) or "lid" (cut into the lid's tongue, flush with the wall).
 // halign is the text's own: on the back walls, read from behind, "right" runs towards +X of the box.
 function ch_label(k, t, w) = is_din(k)
-    ? [t, chx(k), Zt - din_overlap + mark_clear + 0.3, w, "lid", "center"]                                     // on the DIN tongue
+    ? [t, chx(k), Zt - din_axis + din_bore / 2 + mark_gap, w, "lid", "center"]                     // on the DIN tongue, over the bore
     : [t, chx(k), Zt - bush_z - bush_slot / 2 - mark_gap - capH(mark_size), w, "box", "center"];   // under the jack
 function wall_labels() = concat(
     [for (k = [1 : 3]) ch_label(k, str(k + 1), 0)],
@@ -347,13 +348,13 @@ module lid() {          // in place
 }
 module lid_print() { translate([0, W, H]) rotate([180, 0, 0]) lid(); }   // top face on the bed
 
-// a strip of the connector skin with one DIN window (its top closed as the lid's tongue closes it) and one jack
-// U-slot, printed standing as the walls print, on a foot: try a real SDS-50J plate behind it and the plugs
+// a strip of the connector wall with one DIN bore (whole: as wall + tongue make it) and one jack U-slot, printed
+// standing as the walls print, on a foot: try the plugs in it, a real SDS-50J plate behind it
 module front_test() {
     w = 20.5;
     difference() {
         union() { cube([2 * w, conn_t, 26]); translate([0, conn_t - 0.01, 0]) cube([2 * w, 10, 1.5]); }
-        translate([w / 2 - din_win[0] / 2, -1, 2.5]) cube([din_win[0], conn_t + 2, din_win[1] - din_overlap]);
+        translate([w / 2, 0, 13]) xz_extrude(-1, conn_t + 2) circle(d = din_bore);
         translate([1.5 * w, 0, 8]) xz_extrude(-1, conn_t + 2) uslot2d(bush_slot, 30);
     }
 }
@@ -391,8 +392,10 @@ else if (part == "check_text") {              // must be EMPTY (with markings = 
         }
         difference() {      // the tongue labels must stay on their tongue, 0.6 mm in from its sides and bottom
             for (l = wall_labels()) if (l[4] == "lid") wall_label(l, mark_depth);
-            for (k = [0 : 3]) if (is_din(k)) at_ch(k)
-                translate([-din_win[0] / 2 + lid_play + mark_clear, -edge_gap - conn_t - 2, Zt - din_overlap + mark_clear]) cube([din_win[0] - 2 * lid_play - 2 * mark_clear, conn_t + 4, H]);
+            for (k = [0 : 3]) if (is_din(k)) at_ch(k) difference() {
+                translate([-din_bore / 2 + key_play + mark_clear, -edge_gap - conn_t - 2, Zt - din_axis]) cube([din_bore - 2 * key_play - 2 * mark_clear, conn_t + 4, H]);
+                translate([0, 0, Zt - din_axis]) xz_extrude(-edge_gap - conn_t - 3, conn_t + 6) circle(d = din_bore + 2 * mark_clear);
+            }
         }
     }
 }
@@ -400,6 +403,8 @@ else if (part == "lid_top") {                 // the lid seen from above, the re
     color("LightSteelBlue") lid();
     if (markings) color("DimGray") translate([0, 0, H - mark_depth]) linear_extrude(0.05) for (l = lid_labels()) label2d(l);
 }
+else if (part == "check_board_drop")           // must be EMPTY: the board with its parts lowered straight into the box
+    intersection() { union() { for (dz = [0.5 : 0.5 : 24]) translate([0, 0, dz]) mock(); } box(); }
 else if (part == "check_drop")                 // must be EMPTY: the lid lowered straight down from 22 mm up
     intersection() { union() { for (dz = [0.25 : 0.25 : 22]) translate([0, 0, dz]) lid(); } union() { box(); mock(); } }
 else if (part == "brace_pull") intersection() { box(); union() { plates_moved(-(edge_gap + 0.05)); bodies_moved(-(edge_gap + 0.05)); } }

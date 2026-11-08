@@ -11,7 +11,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 SCAD="$HERE/jank_box.scad"
 OUT="$HERE/stl"
 OPENSCAD="${OPENSCAD:-openscad}"
-SETS="${SETS:-DDDD TTTT DDTT DTTT}"
+SETS="${SETS:-DDDT DDDD TTTT DDTT DTTT}"
 command -v "$OPENSCAD" >/dev/null || { echo "openscad not found: install OpenSCAD, or set OPENSCAD=/path/to/openscad"; exit 2; }
 "$OPENSCAD" --help 2>&1 | grep -q -- "--backend" || { echo "this OpenSCAD has no --backend: use a 2024+ build (manifold)"; exit 2; }
 O() { "$OPENSCAD" --backend=manifold "$@"; }
@@ -24,7 +24,7 @@ for s in $SETS; do
         O -q -D "outs=\"$s\"" -D "part=\"$p\"" -o "$OUT/jank_box_${s}_${p}.stl" "$SCAD" 2>"$LOG" || { cat "$LOG"; exit 1; }
         if grep -qi "warning" "$LOG"; then cat "$LOG"; fail=1; fi
     done
-    for c in check_box check_lid check_lidbox check_drop check_text brace_pull brace_push brace_trs brace_floor brace_lid brace_ledge; do
+    for c in check_box check_lid check_lidbox check_drop check_board_drop check_text brace_pull brace_push brace_trs brace_floor brace_lid brace_ledge; do
         O -D "outs=\"$s\"" -D "part=\"$c\"" -o "$OUT/.check-$c.stl" "$SCAD" >"$LOG" 2>&1 || true
         empty=0; grep -q "top level object is empty" "$LOG" && empty=1
         case "$c" in
