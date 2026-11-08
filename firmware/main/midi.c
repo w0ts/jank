@@ -10,9 +10,11 @@
 #include "driver/uart.h"
 #include "esp_attr.h"
 #include "esp_log.h"
+#include "esp_rom_gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/uart_ll.h"
+#include "soc/uart_periph.h"
 
 #define MIDI_UART UART_NUM_1
 #define MIDI_BAUD 31250
@@ -48,12 +50,49 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
     return woken;
 }
 
+#ifdef BOARD_MIDI_TX_DRIVE
+static esp_err_t tx_drive(int pin)
+{
+    return gpio_set_drive_capability(pin, BOARD_MIDI_TX_DRIVE);
+}
+#endif
+
+#ifdef BOARD_MIDI_TX_MORE_GPIOS
+/* More MIDI outs: the same UART TX signal on more pads, through the GPIO matrix, exactly as uart_set_pin routes the first
+ * (pad to its GPIO function, then the signal; the ROM patch enables the output after the signal is in place, no glitch).
+ * The hardware copies each bit to every pad at once: nothing in the clock path changes. */
+static esp_err_t tx_more_up(void)
+{
+    static const int pins[] = BOARD_MIDI_TX_MORE_GPIOS;
+    esp_err_t e = ESP_OK;
+    for (size_t i = 0; i < sizeof pins / sizeof pins[0] && e == ESP_OK; i++) {
+        if (!GPIO_IS_VALID_OUTPUT_GPIO(pins[i]) || pins[i] == BOARD_MIDI_TX_GPIO)
+            return ESP_ERR_INVALID_ARG;
+        esp_rom_gpio_pad_select_gpio((uint32_t)pins[i]);
+#ifdef BOARD_MIDI_TX_DRIVE
+        e = tx_drive(pins[i]);
+#endif
+        if (e == ESP_OK)
+            esp_rom_gpio_connect_out_signal((uint32_t)pins[i], UART_PERIPH_SIGNAL(MIDI_UART, SOC_UART_TX_PIN_IDX), false, false);
+    }
+    return e;
+}
+#endif
+
 static esp_err_t uart_up(void)
 {
     uart_config_t c = {.baud_rate = MIDI_BAUD, .data_bits = UART_DATA_8_BITS, .parity = UART_PARITY_DISABLE, .stop_bits = UART_STOP_BITS_1, .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, .source_clk = UART_SCLK_DEFAULT};
     esp_err_t e = uart_param_config(MIDI_UART, &c);
     if (e == ESP_OK)
         e = uart_set_pin(MIDI_UART, BOARD_MIDI_TX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+#ifdef BOARD_MIDI_TX_DRIVE
+    if (e == ESP_OK)
+        e = tx_drive(BOARD_MIDI_TX_GPIO);
+#endif
+#ifdef BOARD_MIDI_TX_MORE_GPIOS
+    if (e == ESP_OK && (e = tx_more_up()) != ESP_OK)
+        ESP_LOGE(TAG, "more MIDI outs: %s", esp_err_to_name(e));
+#endif
     return e;
 }
 
