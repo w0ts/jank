@@ -23,11 +23,12 @@ from the PCB.* Plugging and unplugging loads the box, not the solder joints, on 
 | `jank_box.scad` | The box, the lid, the wall test strip, the checks (`part` picks the output) |
 | `make_stl.sh` | Exports the STLs, runs the collision, drop, brace and label checks, renders the PNGs, runs `../check_stl.py` |
 | `stl/jank_box_box.stl`, `stl/jank_box_lid.stl` | The printable parts, in print orientation |
+| `stl/jank_box_button_cap.stl` (print 2), `stl/jank_box_slider_cap.stl` (print 4), `stl/jank_box_knob.stl` (print 1) | The printed caps for OK / BACK, the A/B slider caps, the encoder knob |
 | `stl/jank_box_front_test.stl` | A 21.1 mm strip of the front wall: one jack U-slot over one DIN bore with its pad behind; try the plugs first |
-| `renders/open.png`, `box.png`, `front.png`, `back.png`, `lid_underside.png`, `lid_top.png` | The box with the board in it (lid lifted), the empty box, the walls, the lid as printed (its underside), the lid's top with its labels |
+| `renders/open.png`, `box.png`, `front.png`, `back.png`, `lid_underside.png`, `lid_top.png`, `caps.png` | The box with the board in it (lid lifted), the empty box, the walls, the lid as printed (its underside), the lid's top with its labels and the caps in place, the closed box with its caps and knob |
 
 ```
-sh hardware/box/make_stl.sh               # about 7 s
+sh hardware/box/make_stl.sh               # about 8 s
 ```
 
 ## Size
@@ -37,7 +38,10 @@ sh hardware/box/make_stl.sh               # about 7 s
 - **Y:** front wall 1.8 + 0.1 + board 67.0 + 0.1 + back wall 1.8.
 - **Z:** floor 2.0 + 0.1 + DIN 19.6 + board 1.6 + **7.2** to the lid's inside + lid 1.5.
 
-**Standing above the lid (not counted in Z):** the encoder's shaft 11.3 mm, OK and BACK 0.8 mm.
+**Standing above the lid (not counted in Z):** the knob 13.3 mm (its top), the button caps 3.0 mm, the slider caps
+1.0 mm.
+
+**Parts to print:** box, lid, 2 button caps, 4 slider caps, 1 encoder knob (and `front_test` first).
 
 ## The walls: two rows, and the wall decision
 
@@ -83,19 +87,20 @@ to the top of the wall. The lid's **key** closes it: 4.9 wide, with a 5.3 mm hal
 body and the buttons, is the XIAO on its headers (7.0, *estimate*).
 - **OLED:** the glass top (5.1) is 2.1 mm under the lid.
 - **Encoder:** its body (6.5, *unverified*) is 0.7 mm under the lid.
-- **A/B knobs (5.0):** they end 2.2 mm under the lid's inside, reachable with a pen tip through their slots.
-- **Buttons:** OK and BACK (9.5) stand **0.8 mm** out of the lid. The 13 mm HRO code (S) would stand 4.3 mm out (*the
-  user's call*).
+- **A/B knobs (5.0):** they end 2.2 mm under the lid's inside; **printed slider caps** bring them 1.0 mm above the lid
+  (below).
+- **Buttons:** OK and BACK (9.5) would stand only 0.8 mm out of the lid; **printed button caps** bring them 3.0 mm out
+  (below). The user's answer (2026-11-08): "we can 3D print something".
 
 **Openings** (KiCad coordinates, y from the back):
 
 | Opening | Centre | Size | Note |
 |---|---|---|---|
 | OLED window | 45.0, 28.55 | 24.4 x 7.6 | the viewing area; the glass 2.1 under the lid, untouched |
-| BACK (SW6), OK (SW1) | 69.15 / 78.75, 25.45 | 4.0 round | plunger 3.4 |
+| BACK (SW6), OK (SW1) | 69.15 / 78.75, 25.45 | **6.0** round | the button cap's 5.4 stem, 0.3 a side |
 | Encoder shaft | 73.9, 36.5 | 7.0 round | body under the lid |
 | LED window | 33.0, 4.2 | 3.5 x 3.7 | a light shroud from the lid down to 0.3 mm over the LED (cut back at the XIAO), the lid's top **skin of 0.6 mm over it** (`led_skin`): print the lid translucent, or set `led_skin = 0` |
-| A/B slots | (24.3, 9.0) OUT1, (10.45 / 31.55 / 52.65, 48.0) OUT2..OUT4 | 2.0 x 4.5 | all four: every channel has its jack |
+| A/B slots | (24.3, 9.0) OUT1, (10.45 / 31.55 / 52.65, 48.0) OUT2..OUT4 | **3.5 x 6.0** | all four; the slider cap (3.15 x 3.65) and its 2.0 travel, 0.175 round it |
 | XIAO's USB-C | 45.2, back edge | 12.5 wide notch | its 7.0 mm opening reaches above the walls (the socket's top is 7.0 up), so the lid's back edge is notched over it |
 | Screws H1..H4 | (80.8, 3.2), (80.8, 63.8), (3.2, 26.0), (3.2, 34.0) | 2.4 | **4 x M2 x 20 self-tapping**: through the lid, a 5.0 mm spacer to the board, the board, 9.7 mm into a webbed column from the floor (pilot 1.7, 11 deep) |
 
@@ -108,11 +113,36 @@ body and the buttons, is the XIAO on its headers (7.0, *estimate*).
 - **J1's shell legs:** they stand 0.55 mm past the board's edge under it (mockup). The back wall has a 0.7 mm relief
   there.
 
+## Printed caps and knob
+
+| Part | Shape | Fit | Print |
+|---|---|---|---|
+| **Button cap** (2) | a 5.4 mm stem, chamfered 0.5 on top, 3.0 mm above the lid; an **8.0 mm flange, 1.0 thick, 0.3 under the lid** at rest (it cannot come out through the 6.0 hole); a **blind bore 3.45 mm**, 3.6 deep, its floor on the plunger's top | on the HRO's 3.4 mm plunger: **+0.05 nominal**; printed small holes come out 0.1 to 0.2 under, so it is a light press. Ream or reprint at 3.5 if too tight | flange on the bed: the bore's ceiling bridges 3.45 mm |
+| **Slider cap** (4) | a 3.15 x 3.65 mm block from 0.2 above the switch body to 1.0 above the lid (6.0 tall), a **pocket 1.55 x 2.05 x 1.3** over the handle | on the 1.5 x 2.0 handle: **+0.05 each way** (`slider_fit`); printed, a press | top on the bed, the pocket up |
+| **Encoder knob** (1) | 14 mm across, 12 tall, a **D bore 6.1 mm with its flat at 4.6** (the shaft's 6.0 / 4.5, *unverified*), 10 deep, a pointer groove (1.0 wide, 0.6 deep) on the flat's side | **0.1 mm play** both ways; pushed on until the shaft's top meets the bore's floor: the knob's bottom is then 1.3 mm over the lid | top on the bed (the groove is the first layers) |
+
+**Checks** (`check_caps`, must be empty):
+- the caps against the lid at rest, with the buttons pressed 0.3 mm, and with the sliders at both ends of the 2.0 mm
+  travel;
+- the button caps (at rest and pressed) against the board model, the plunger excepted;
+- the slider caps at both ends against the board, the handle excepted;
+- the handle inside its pocket at each end;
+- the knob against the D shaft (modelled with its 4.5 flat over the top 10 mm), the encoder's body, the board and the
+  box.
+
+**`brace_caps`** (must touch): a button cap lifted 0.35 meets the lid, so the flange keeps it in.
+
+**Negative controls fail as they should:**
+- a flange 0.1 into the lid (`btn_cap` gap -0.1);
+- `slider_fit = -0.1`;
+- a knob flat of 4.4;
+- a knob bore of 5.9.
+
 ## Markings
 
 0.4 mm deep, Liberation Sans Bold, capitals 4.0 mm, stems 0.84 mm. **Controls on the lid's top, plugs on the walls, each
 once.**
-- **Lid:** BACK and OK above their buttons, BPM under the encoder's shaft, an A and a B at the two ends of each A/B slot,
+- **Lid:** BACK and OK above their buttons, BPM under the knob's edge, an A and a B at the two ends of each A/B slot,
   and "jank" (6.0 mm capitals) at the left.
 - **Front wall:** "2", "3", "4" right of each jack's slot.
 - **Back wall:** "1 / IN" beside OUT1's jack slot, "USB" under the XIAO's opening, "PWR" under J1's.
@@ -138,7 +168,9 @@ mockup draws all three as full-height blocks.
 | `brace_floor`: DINs moved 0.15 mm down meet the floor | contact | contact |
 | `brace_lid`: the board lifted 0.1 mm meets the lid's ribs and spacers | contact | contact |
 | `brace_ledge`: the board lowered 0.1 mm meets the pads and the columns | contact | contact |
-| `check_stl.py` (box, lid, front_test) | OK | OK: one body, 0 open edges, 0 non-manifold, 0 misoriented each |
+| `check_caps`: button caps (rest, pressed 0.3), slider caps (both ends), knob, against the lid, the board, the shaft | empty | empty |
+| `brace_caps`: a button cap lifted 0.35 meets the lid | contact | contact |
+| `check_stl.py` (box, lid, the caps, the knob, front_test) | OK | OK: one body, 0 open edges, 0 non-manifold, 0 misoriented each |
 
 **Negative controls collide as they should:**
 - `bush_slot = 4.9` (`check_board_drop`).
@@ -155,6 +187,9 @@ mockup draws all three as full-height blocks.
 |---|---|---|---|
 | box | floor on the bed | none | the jack slots and USB U's are open upwards; the DIN bores are flat-topped teardrops (5 mm bridge) |
 | lid | top face on the bed | none | labels and the LED skin are the first layers; keys, caps, ribs, tongues, spacers, the shroud and the OLED rib grow up |
+| button cap | flange on the bed | none | the bore's ceiling bridges 3.45 mm |
+| slider cap | top on the bed | none | |
+| knob | top on the bed | none | the pointer groove is the first layers |
 | front_test | standing, the pad behind, on a foot | none | |
 
 PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill; the lid translucent if `led_skin > 0`. Printed holes come out
@@ -168,13 +203,14 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill; the lid translucent if `l
 2. **User prints** `front_test.stl` and tries a DIN plug through the 16.0 mm bore into a DIN held behind the pad (it must
    go home with the face 2.9 mm in), and a 3.5 mm jack's bushing in the slot. If one does not fit, Claude changes
    `din_bore` / `bush_slot` / `conn_t` and runs `make_stl.sh` again.
-3. **User puts** a 2.5 mm foam pad under the OLED's far end.
+3. **User puts** a 2.5 mm foam pad under the OLED's far end, **presses a button cap onto each of OK and BACK** (flange
+   down) and **a slider cap onto each A/B handle**.
 4. **User lowers** the board, top up, straight into the box, OUT1 to the back. The DIN plates slide down behind the
    pads and stand on the floor, the bushings drop into their U-slots, the XIAO's socket into its notch, and the board
    comes to rest on the pads and the four columns.
 5. **User lowers** the lid straight down. The keys close the jack slots, the caps come down over the jacks, the tongue
-   closes J1's U, and the shaft, the buttons and the knobs come through their openings.
-6. **User screws** 4 x M2 x 20 self-tapping at H1..H4, snug only. Then the knob on the encoder.
+   closes J1's U, and the shaft, the button caps and the slider caps come through their openings.
+6. **User screws** 4 x M2 x 20 self-tapping at H1..H4, snug only. Then the knob onto the encoder's shaft, its groove on the flat's side.
 
 ## Unverified, all in one place
 
@@ -194,5 +230,7 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill; the lid translucent if `l
 - **C4** (100 µF, not fitted, on the bottom): not in the mockup. If fitted, check it against H1's column.
 - **The markings:** which end of a slot is A; the font OpenSCAD reports as Liberation Sans Bold (it substitutes
   silently).
+- **The caps:** the press fits (+0.05 nominal) depend on the printer; the EC11's D shaft (4.5 across the flat over its
+  top 10 mm) is not read from a drawing.
 - **Other:** M2 self-tapping into PLA/PETG; the USB-C plugs' overmold size; the LED through the 0.6 mm skin; printer
   hole shrink. None of it printed or fitted.
