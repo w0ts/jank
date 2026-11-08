@@ -30,7 +30,7 @@ part = "assembly";      // [assembly, box, lid, front_test, mock, open, front, b
 board_l = 84.0;
 board_w = 52.0;
 board_t = 1.6;          // UNVERIFIED: JLCPCB default, assumed in the board README
-ch_x = [10.75, 10.75, 31.25, 51.75];     // OUT1..OUT4 axes, KiCad x
+ch_x = [10.75, 51.75, 31.25, 10.75];     // OUT1..OUT4 axes, KiCad x (OUT1 at the back, behind OUT4)
 ch_back = [true, false, false, false];   // OUT1 on the back edge, OUT2..4 on the front edge
 holes = [[80.8, 25.0], [80.8, 48.8]];    // H1, H2 (2.2 mm), KiCad x, y from the back
 buttons = [[47.75, 13.8], [58.55, 13.8]];   // MODE (SW1), PLAY/STOP (SW6): HRO K2-1102DP-L3SW-04, 9.5 mm
@@ -40,7 +40,7 @@ enc_body = [12.5, 12.5, 6.5];  // the mockup's block (README: 11.7 x 12.5); 6.5 
 enc_shaft = [6.0, 20.0];       // D shaft, top 20 mm above the face (UNVERIFIED: "from the mounting surface")
 leds = [[45.5, 4.0], [49.85, 4.0]];      // LED1, LED2 windows, KiCad
 led_win = [3.2, 3.6];                    // x by y, over the 3.0 x 3.4 cut-outs
-ab = [[25.2, 10.75], [10.75, 32.25], [31.25, 32.25], [51.75, 32.25]];  // SW2..SW5 slot centres (= travel middle)
+ab = [[25.2, 10.75], [51.75, 32.25], [31.25, 32.25], [10.75, 32.25]];  // SW2..SW5 (OUT1..OUT4) slot centres (= travel middle)
 ab_slot = [2.0, 4.5];                    // handle 1.5 x 2.0 + 2.0 travel along y + 0.25 round
 ab_handle = [1.5, 2.0, 2.0];             // width, length, travel (MSS22D18G2 drawing via the board README)
 ab_body_h = 3.5;
@@ -117,7 +117,6 @@ mark_depth = 0.4;       // recess; the lid (1.5) keeps 1.1, 0.7 over a switch re
 mark_gap = 1.0;         // text to the opening it labels
 mark_clear = 0.6;       // the least text-to-opening distance the check accepts
 ab_a_end = "back";      // UNVERIFIED which end of an A/B slot is A: "back" (towards the back edge) or "front"
-led_names = ["LINK", "USB"];   // LED1, LED2: ASSUMED from the firmware (LED1 = Link / network, LED2 = USB), not checked
 
 $fn = 64;
 
@@ -276,14 +275,11 @@ function abA(c) = ab_a_end == "back" ? [c[1] + ab_slot[1] / 2 + mark_gap, c[1] -
                                      : [c[1] - ab_slot[1] / 2 - mark_gap - capH(mark_size), c[1] + ab_slot[1] / 2 + mark_gap];
 function capH(sz) = sz * 0.955;          // Liberation Sans Bold capital height / size (measured: 4.01 at 4.2)
 function lid_labels() = let(
-    mode = [fx(buttons[0][0]), by(buttons[0][1])], play = [fx(buttons[1][0]), by(buttons[1][1])],
-    l1 = [fx(leds[0][0]), by(leds[0][1])], l2 = [fx(leds[1][0]), by(leds[1][1])])
+    mode = [fx(buttons[0][0]), by(buttons[0][1])], play = [fx(buttons[1][0]), by(buttons[1][1])])
     concat([
         ["MODE", mode[0] + button_hole / 2 + 0.7, mode[1], "left", "center", mark_size],
         ["PLAY", play[0], play[1] - button_hole / 2 - 1.5 - capH(mark_size), "center", "baseline", mark_size],
         ["BPM", encC[0], encC[1] + enc_win[1] / 2 + mark_gap, "center", "baseline", mark_size],
-        [led_names[0], l1[0] + led_win[0] / 2 + 1.2, l1[1], "left", "center", mark_size],
-        [led_names[1], l2[0] - led_win[0] / 2 - 1.2, l2[1], "right", "center", mark_size],
         ["jank", fx(12.0), Y0 + 4.5, "center", "baseline", mark_logo_size]],
         [for (c0 = ab_on) let(c = [fx(c0[0]), by(c0[1])], y = abA(c)) each [
             ["A", c[0], y[0], "center", "baseline", mark_size], ["B", c[0], y[1], "center", "baseline", mark_size]]]);
