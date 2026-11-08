@@ -180,8 +180,8 @@ PARTS = [
     # the screen (v5): a 0.91 inch 128 x 32 OLED module (SSD1306, I2C 0x3C) on a 4-pin header, 3V3; SDA / SCL pulled up here
     ("J10", "Connector_Generic:Conn_01x04", "OLED 0.91in 128x32", "jank:OLED_0.91in_128x32_I2C_HS91L02W2C01", "oled",
      175.26, 154.94, {"1": "GND", "2": "+3V3", "3": "SCL", "4": "SDA"}),
-    ("R70", "Device:R", "4.7k", R0805, "r4k7", 195.58, 147.32, {"1": "+3V3", "2": "SCL"}),
-    ("R71", "Device:R", "4.7k", R0805, "r4k7", 205.74, 147.32, {"1": "+3V3", "2": "SDA"}),
+    ("R70", "Device:R", "10k", R0805, "r10k", 195.58, 147.32, {"1": "+3V3", "2": "SCL"}),
+    ("R71", "Device:R", "10k", R0805, "r10k", 205.74, 147.32, {"1": "+3V3", "2": "SDA"}),
     ("#FLG01", "power:PWR_FLAG", "PWR_FLAG", "", "", 220.98, 132.08, {"1": "GND"}),
     # OUT1 as MIDI IN (the user's ruling, 2026-11-08): an H11L1 across DIN pins 4/5, gated by Q3 (on only in IN mode)
     ("R50", "Device:R", "220", R0805, "r220", 30.48, 320.04, {"1": "RING1", "2": "OPTO_A"}),
@@ -191,7 +191,7 @@ PARTS = [
     ("Q3", "Transistor_FET:AO3400A", "AO3400A", SOT23, "nfet", 50.8, 360.68, {"1": "IN_G", "2": "TIP1", "3": "OPTO_K"}),
     ("R52", "Device:R", "1k", R0805, "r1k", 30.48, 360.68, {"1": "IN_EN", "2": "IN_G"}),
     ("R53", "Device:R", "100k", R0805, "r100k", 17.78, 360.68, {"1": "IN_EN", "2": "GND"}),
-    ("R51", "Device:R", "4.7k", R0805, "r4k7", 101.6, 320.04, {"1": "+3V3", "2": "MIDI_RX"}),
+    ("R51", "Device:R", "10k", R0805, "r10k", 101.6, 320.04, {"1": "+3V3", "2": "MIDI_RX"}),
     ("C8", "Device:C", "100nF", C0805, "c100n", 114.3, 320.04, {"1": "+3V3", "2": "GND"}),
     # OUT1's source (the user's ruling, round 7): 3V3 through Q4, off while IN_EN is high (MIDI IN); R53 holds IN_EN low
     ("Q4", "Transistor_FET:AO3401A", "AO3401A", SOT23, "pfet", 139.7, 360.68, {"1": "IN_EN", "2": "+3V3", "3": "SRC1"}),
@@ -363,7 +363,7 @@ BOM = {
     "c100n": dict(part="Capacitor 100nF 50V X7R 0805 (JLCPCB basic part; price: JLCPCB's parts list)", mpn="YAGEO CC0805KRX7R9BB104", shop=LCSC, code="C49678", price=0.0205, cur="USD", min=20),
     "idiode": dict(part="Ideal diode 1.5 A, SC-70-6 (0.65 mm pitch)", mpn="TI LM66100DCKR", shop=LCSC, code="C2869734",
                    price=0.2089, cur="USD", min=5, datasheet="https://www.ti.com/lit/ds/symlink/lm66100.pdf"),
-    "r10k": dict(part="Resistor 10k 1% 0805", mpn="UNI-ROYAL 0805W8F1002T5E", shop=LCSC, code="C17414", price=0.0034, cur="USD", min=100),
+    "r10k": dict(part="Resistor 10k 1% 0805 (pull-ups: the ladder, the encoder, I2C, the opto output)", mpn="UNI-ROYAL 0805W8F1002T5E", shop=LCSC, code="C17414", price=0.0034, cur="USD", min=100),
     "r2k2": dict(part="Resistor 2.2k 1% 0805 (ladder: OK)", mpn="UNI-ROYAL 0805W8F2201T5E", shop=LCSC, code="C17520", price=0.0050, cur="USD", min=100),
     "r6k8": dict(part="Resistor 6.8k 1% 0805 (ladder: BACK)", mpn="UNI-ROYAL 0805W8F6801T5E", shop=LCSC, code="C17772", price=0.0028, cur="USD", min=100),
     "r22k": dict(part="Resistor 22k 1% 0805 (ladder: the encoder's push)", mpn="UNI-ROYAL 0805W8F2202T5E", shop=LCSC, code="C17560", price=0.0048, cur="USD", min=100),
@@ -388,8 +388,6 @@ BOM = {
                   code="C81598", price=0.0125, cur="USD", min=50),
     "r220": dict(part="Resistor 220 1% 0805 (MIDI IN, CA-033 / MIDI 1.0)", mpn="UNI-ROYAL 0805W8F2200T5E", shop=LCSC,
                  code="C17557", price=0.0030, cur="USD", min=100),
-    "r4k7": dict(part="Resistor 4.7k 1% 0805 (the opto output's pull-up; the I2C pull-ups)", mpn="UNI-ROYAL 0805W8F4701T5E", shop=LCSC,
-                 code="C17673", price=0.0033, cur="USD", min=100),
     "r330": dict(part="Resistor 330 1% 0.25 W axial (6.3 x 2.4 mm), standing", mpn="YAGEO MFR-25FBF52-330R", shop=LCSC,
                  code="C1369900", price=0.0205, cur="USD", min=50),
     "rpar": dict(part="1206 pads in parallel, not fitted (to lower a value on the bench)", mpn="-", shop="-", code="-",

@@ -1,7 +1,7 @@
 #!/bin/sh
 # The jank board: the schematic (make_schematic.py) and its ERC, the board (make_board.py, v5: 84 x 67 mm), its design-rule
 # check, the schematic's nets against the board's, the Gerbers and drill files zipped for JLCPCB (bare board, 2 layers),
-# the JLCPCB assembly files (make_assembly.py: fab/bom.csv, fab/cpl.csv), a top and bottom render, and the printable mockup (make_mockup.py: mockup.stl). make_board.py's square layout is unused.
+# the JLCPCB assembly files (make_assembly.py: fab/bom.csv, fab/cpl.csv SMD only; fab/full/ with the through-hole parts), a top and bottom render, and the printable mockup (make_mockup.py: mockup.stl). make_board.py's square layout is unused.
 #   sh make_fab.sh        (from anywhere; needs KiCad 10 (kicad-cli and its Python), python3 and OpenSCAD)
 set -eu
 cd "$(dirname "$0")"

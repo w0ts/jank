@@ -19,7 +19,7 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | R6, R52 | 2 | Resistor 1k 1% 0805 | UNI-ROYAL 0805W8F1001T5E | LCSC C17513 | USD 0.0035 | 100 |
 | C2, C5, C6, C8, C9, C10, C11 | 7 | Capacitor 100nF 50V X7R 0805 (JLCPCB basic part; price: JLCPCB's parts list) | YAGEO CC0805KRX7R9BB104 | LCSC C49678 | USD 0.0205 | 20 |
 | U2 | 1 | Ideal diode 1.5 A, SC-70-6 (0.65 mm pitch) | TI LM66100DCKR | LCSC C2869734 | USD 0.2089 | 5 |
-| R60, R64, R65 | 3 | Resistor 10k 1% 0805 | UNI-ROYAL 0805W8F1002T5E | LCSC C17414 | USD 0.0034 | 100 |
+| R70, R71, R51, R60, R64, R65 | 6 | Resistor 10k 1% 0805 (pull-ups: the ladder, the encoder, I2C, the opto output) | UNI-ROYAL 0805W8F1002T5E | LCSC C17414 | USD 0.0034 | 100 |
 | R61 | 1 | Resistor 2.2k 1% 0805 (ladder: OK) | UNI-ROYAL 0805W8F2201T5E | LCSC C17520 | USD 0.0050 | 100 |
 | R62 | 1 | Resistor 6.8k 1% 0805 (ladder: BACK) | UNI-ROYAL 0805W8F6801T5E | LCSC C17772 | USD 0.0028 | 100 |
 | R63 | 1 | Resistor 22k 1% 0805 (ladder: the encoder's push) | UNI-ROYAL 0805W8F2202T5E | LCSC C17560 | USD 0.0048 | 100 |
@@ -31,7 +31,6 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | U4 | 1 | Optocoupler H11L1, Schmitt trigger, open collector, DIP-6 (MIDI IN on OUT1) | EVERLIGHT H11L1 | LCSC C78588 | USD 0.3507 | 5 |
 | D2 | 1 | Diode 1N4148W, SOD-123 (the opto LED's reverse protection) | Semtech 1N4148W | LCSC C81598 | USD 0.0125 | 50 |
 | R50 | 1 | Resistor 220 1% 0805 (MIDI IN, CA-033 / MIDI 1.0) | UNI-ROYAL 0805W8F2200T5E | LCSC C17557 | USD 0.0030 | 100 |
-| R70, R71, R51 | 3 | Resistor 4.7k 1% 0805 (the opto output's pull-up; the I2C pull-ups) | UNI-ROYAL 0805W8F4701T5E | LCSC C17673 | USD 0.0033 | 100 |
 | R8 | 1 | Resistor 330 1% 0.25 W axial (6.3 x 2.4 mm), standing | YAGEO MFR-25FBF52-330R | LCSC C1369900 | USD 0.0205 | 50 |
 | R9, R31, R41, R32, R42, R33, R43, R34, R44 | 9 (not fitted) | 1206 pads in parallel, not fitted (to lower a value on the bench) | - | - - | USD 0.0000 | 0 |
 | LED1 | 1 | RGB LED, addressable, 3.7 x 3.5 x 1.95 mm, top emitting (the beat LED) | OPSCO SK6812MINI-HS | LCSC C2922787 | USD 0.1085 | 5 |
@@ -48,6 +47,6 @@ Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, n
 
 | Build | Parts at unit price | With each shop's minimum order |
 |---|---|---|
-| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED | USD 17.49 | USD 31.17 |
+| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED | USD 17.49 | USD 30.84 |
 
 USD: LCSC and Seeed (the XIAO). The bare board is ordered at JLCPCB with another board and is not in these totals.
