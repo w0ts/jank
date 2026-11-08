@@ -237,8 +237,9 @@ def layout_long():
     W, H = 84.0, 52.0
     D = H - 51.0
     BUS_Y = 22.3 + D                                 # (the 3V3 bus to the front 33 ohm groups, top)
-    CH = [10.75 + PITCH * i for i in range(3)]       # (OUT2..4: the DINs' faces 0.75 mm in from the left edge)
-    C1X = 10.75                                      # (OUT1 on the back edge, above OUT2)
+    CH = [10.75 + PITCH * i for i in range(3)]       # (the front DINs' axes, left to right seen from the top: OUT4, OUT3,
+                                                     #  OUT2, so that from the face they read 2, 3, 4; the faces 0.75 mm in)
+    C1X = 10.75                                      # (OUT1 on the back edge, behind OUT4)
     XC = 45.2                                        # (the XIAO's axis)
     JX = 64.5                                        # (J1's axis)
     ROW = 13.8                                       # (the controls' row: their centres' y)
@@ -371,11 +372,12 @@ def layout_long():
     via("GND", 44.4, 15.3)
     route("ENC_B", [p[8], (50.9, 19.15), at(R65, 2)])
 
-    # ---- the XIAO's front-row lines: TX2, TX3 on the bottom down the strip's right side; TX4 under the module
-    tx = {k: front_unit(k, c, H) for k, c in zip((2, 3, 4), CH)}
-    route("MIDI_TX2", [p[2], (35.85, p[2][1]), (35.85, 22.6), (tx[2][0], 22.6), tx[2]], SIG, BOT)
+    # ---- the XIAO's front-row lines: TX4 (D3) and TX3 (D4) on the bottom down the strip's right side to OUT4 (left)
+    # and OUT3; TX2 (D1) under the module to OUT2 (right)
+    tx = {k: front_unit(k, c, H) for k, c in zip((4, 3, 2), CH)}
+    route("MIDI_TX4", [p[4], (35.85, p[4][1]), (35.85, 22.6), (tx[4][0], 22.6), tx[4]], SIG, BOT)
     route("MIDI_TX3", [p[5], (36.3, p[5][1]), (36.3, 23.1), (tx[3][0], 23.1), tx[3]], SIG, BOT)
-    route("MIDI_TX4", [p[4], (39.3, p[4][1]), (39.3, 21.8), (41.6, 23.6), (tx[4][0], 23.6), tx[4]], SIG, BOT)
+    route("MIDI_TX2", [p[2], (39.3, p[2][1]), (39.3, 21.8), (41.6, 23.6), (tx[2][0], 23.6), tx[2]], SIG, BOT)
     via("+3V3", 52.6, BUS_Y)
     route("+3V3", [(CH[0] + 4.3, BUS_Y), (57.5, BUS_Y)], BUS)
     # ENC_A: the XIAO's D6 (pad 7) along y 20.4 under the module's front to the encoder; ENC_B: D7 (pad 8) along 18.6

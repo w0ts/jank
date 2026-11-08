@@ -68,10 +68,10 @@ From the XIAO ESP32S3 v1.2 schematic (`XIAO_ESP32S3_SCH_v1.2.pdf`, Seeed, read 2
 | XIAO pad | GPIO | Net | Function | Why this pin |
 |---|---|---|---|---|
 | 1 D0 | 1 | MIDI_TX1 | OUT1 data (UART TX); **input (Hi-Z) in MIDI IN mode** | Free, not strapping |
-| 2 D1 | 2 | MIDI_TX2 | OUT2 data (the same TX signal, GPIO matrix) | Free, not strapping |
+| 2 D1 | 2 | MIDI_TX2 | OUT2 data (the same TX signal, GPIO matrix): the front footprint at x 51.75 | Free, not strapping |
 | 3 D2 | 3 | **LADDER** | MODE, PLAY/STOP and the encoder's push on one resistor ladder: **ADC1 channel 2** | An ADC1 pin (usable with Wi-Fi on). GPIO3 straps the JTAG source only once EFUSE_STRAP_JTAG_SEL is burned; by default it is ignored (datasheet v2.2 Table 3-5) |
-| 4 D3 | 4 | MIDI_TX4 | OUT4 data | Free, not strapping |
-| 5 D4 | 5 | MIDI_TX3 | OUT3 data | Free, not strapping |
+| 4 D3 | 4 | MIDI_TX4 | OUT4 data: the front footprint at x 10.75 | Free, not strapping |
+| 5 D4 | 5 | MIDI_TX3 | OUT3 data: the front footprint at x 31.25 | Free, not strapping |
 | 6 D5 | 6 | LED_DATA | Two SK6812MINI-E, through U3 | Free |
 | 7 D6 | 43 | **ENC_A** | Encoder A (10 k pull-up, 100 nF) | U0TXD, **499 ohm in series on the module**: harmless for a switch input (below) |
 | 8 D7 | 44 | **ENC_B** | Encoder B (10 k pull-up, 100 nF) | U0RXD: an input at boot (below) |
@@ -81,6 +81,8 @@ From the XIAO ESP32S3 v1.2 schematic (`XIAO_ESP32S3_SCH_v1.2.pdf`, Seeed, read 2
 | 12 3V3 | | +3V3 | The MIDI sources (OUT1's through Q4), the opto, the pull-ups | Module's regulator |
 | 13 GND | | GND | | |
 | 14 5V | | +5V | = the XIAO's USB-C VBUS | |
+
+**GPIO -> footprint -> channel (front edge, x seen from the top):** GPIO1 -> J6 at the back, x 10.75 -> OUT1; GPIO4 -> J9 at x 10.75 -> OUT4; GPIO5 -> J8 at x 31.25 -> OUT3; GPIO2 -> J7 at x 51.75 -> OUT2. Seen from the front with the board face up, the front wall reads OUT2, OUT3, OUT4 from left to right. (The 2026-11-08 swap re-routed TX2 and TX4, so the GPIO of each channel number did not change.)
 
 On the module and not on a pad: the user LED (GPIO21, yellow, active low through 1.5 k), the BOOT button (GPIO0).
 
@@ -349,15 +351,15 @@ SRC1 line (3V3 through Q4) drives the ring directly. A 1206 in parallel with a 3
 **Outline: 84.0 x 52.0 mm**, a plain rectangle,
 2 layers, 1.6 mm (*JLCPCB's default thickness, assumed*). In the Gerbers the origin is the lower left of the top view.
 Two **M2 holes** (2.2 mm, not plated), both on the right: H1 at (80.8, 25.0), H2 at (80.8, 48.8); the left corners
-belong to OUT1's and OUT2's connectors (the DIN / jack bodies are held by the box's walls).
+belong to OUT1's and OUT4's connectors (the DIN / jack bodies are held by the box's walls).
 
 **Coordinates below:** x from the left edge and y from the back edge, **seen from the top (the floor side)**. Seen from
 the face (the board turned over about its front-back axis), **x becomes 84.0 - x**; y stays.
 
 | Edge | What | Where |
 |---|---|---|
-| Front (y = 52) | OUT2, OUT3, OUT4 (J7..J9), faces on the edge, pitch 20.5 mm, slid left | axes at x = 10.75, 31.25, 51.75 |
-| Back (y = 0) | **OUT1** (J6, the same footprint turned 180 degrees) | axis at x = 10.75 |
+| Front (y = 52) | **OUT4 (J9), OUT3 (J8), OUT2 (J7)** left to right seen from the top, so **2, 3, 4 left to right seen from the front with the board face up**; faces on the edge, pitch 20.5 mm | OUT4 at x = 10.75, OUT3 at 31.25, OUT2 at 51.75 |
+| Back (y = 0) | **OUT1** (J6, the same footprint turned 180 degrees), behind OUT4 | axis at x = 10.75 |
 | Back | The XIAO's USB-C (the data port; on headers, its socket 1.5 mm past the edge) | axis at x = 45.2 |
 | Back | J1, USB-C power only (GCT USB4125), its front on the edge | axis at x = 64.5 |
 
@@ -390,7 +392,7 @@ face + 0.5).
   / R5 / C2 between PLAY/STOP and the encoder, D1, C1, Q1, U2, R3 over the encoder.
 - **Front right corner:** the MIDI IN (U4 with its pin 1 at (65.9, 29.5), R50, D2, Q3, R52, R53, R51, C8, TP2).
 
-**Routing:** TX1..TX3 leave the XIAO's left row on the bottom down the strip; TX4 runs on the bottom under the module.
+**Routing:** TX1, TX4 and TX3 leave the XIAO's left row on the bottom down the strip (TX4 to OUT4 at the left, TX3 to OUT3); TX2 runs on the bottom under the module to OUT2 at the right.
 ENC_A runs on top under the module's front (y 20.4) and ENC_B from the right row (y 18.6), both down to the encoder on
 the bottom. IN_EN goes on the bottom right and down to the MIDI IN corner, and on top back along y 21.65 to Q4; MIDI_RX
 on the bottom to the corner. The ladder runs from D2 to MODE, under the module (y 9.15) to PLAY/STOP and on the bottom
@@ -460,11 +462,11 @@ recessed over them, or the taller G4 handle fits (*the user's call*).
 | LED1 window | 45.5 (38.5), 4.0 | 3.2 x 3.6 | over its 3.0 x 3.4 cut-out; a light pipe or a clear insert helps (*untried*) |
 | LED2 window | 49.85 (34.15), 4.0 | 3.2 x 3.6 | as LED1 |
 | OUT1 A/B slot (SW2) | 25.2 (58.8), 10.75 | 2.0 x 4.5 | the handle (1.5 wide, 2.0 long) slides 2.0 mm along y; centre = mid-travel |
-| OUT2 A/B slot (SW3) | 10.75 (73.25), 32.25 | 2.0 x 4.5 | as SW2 |
+| OUT2 A/B slot (SW3) | 51.75 (32.25), 32.25 | 2.0 x 4.5 | as SW2 |
 | OUT3 A/B slot (SW4) | 31.25 (52.75), 32.25 | 2.0 x 4.5 | as SW2 |
-| OUT4 A/B slot (SW5) | 51.75 (32.25), 32.25 | 2.0 x 4.5 | as SW2 |
+| OUT4 A/B slot (SW5) | 10.75 (73.25), 32.25 | 2.0 x 4.5 | as SW2 |
 
-**The front wall:** OUT2..OUT4's DIN faces on the board's edge (centres 10.0 mm above the floor-side surface), the
+**The front wall** (seen from the front, face up: OUT2, OUT3, OUT4 left to right): the DIN faces on the board's edge (centres 10.0 mm above the floor-side surface), the
 jacks' bushings on the same axes, 2.5 mm above that surface and 3.3 mm out past the edge (jack hole about 6.2 mm; DIN
 hole about 16 mm, *the user's DIN plugs decide*). **The back wall, left to right:** OUT1's DIN / jack at x 10.75, the
 XIAO's socket at x 45.2 and J1's at x 64.5 (USB-C openings about 9.5 x 3.8 mm, *estimate*).
