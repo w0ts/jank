@@ -37,7 +37,7 @@ No routing, NAT or DHCP: the computer gives itself a 169.254.x.y address.
 Runs `third_party/link/link.c`, Optimist's Link peer (see its README). On the air it shares the MAC with its own IP
 address; towards the computer it uses a second MAC, since a computer cannot send to its own. It stays silent until it
 hears Link and leaves after 8 s alone (`JP_ALONE_MS`), so its session is always the younger one: it joins and never
-pushes 120 BPM on a group. With a computer attached, the FM-1 and Live each see the stick as one more peer.
+pushes 120 BPM on a group. With a computer attached, the FM-1 and Live each see the stick as one more peer. The peer measures its clock against the member heard last that has not failed a measurement (Optimist's rule for the air, 2026-11-08, not the session's first peer as in Ableton's library): a founder at the edge of range no longer stalls the join or lets the clock drift; the stick's scan, which loses 0.7 s of frames, at worst moves the FM-1s to measure with each other.
 
 ## Group scan
 
