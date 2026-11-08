@@ -123,6 +123,9 @@ $fn = 64;
 
 // ---------------------------------------------------------------------------------------------------------------
 function is_din(k) = outs[k] == "D";
+// the A/B switch swaps a jack's tip and ring only: it is fitted (and gets a slot) only on a TRS channel
+// (the user's ruling 2026-11-08: "we don't need the A/B switch when we have the DIN plug"); ab[k] is OUT(k+1)'s
+ab_on = [for (k = [0 : 3]) if (!is_din(k)) ab[k]];
 any_din = len(search("D", outs)) > 0;
 floor_side = any_din ? din_plate[1] + din_floor_gap : res_h + 1.0;
 
@@ -177,7 +180,7 @@ module mock_m() {       // mockup frame: x 100..184, y -152 (front) .. -100 (bac
         translate([button_body[i][0], button_body[i][1], -sw_body_h]) cube([7.59, 9.59, sw_body_h + 0.01]);
         translate([100 + buttons[i][0], -100 - buttons[i][1], -9.5]) cylinder(d = 3.4, h = 9.51);   // plunger 3.4 (HRO)
     }
-    for (s = ab) {
+    for (s = ab_on) {
         translate([100 + s[0] - 2.795, -100 - s[1] + 0.25 - 4.845, -ab_body_h]) cube([5.59, 9.69, ab_body_h + 0.01]);   // (body 0.25 off the slot centre)
         translate([100 + s[0] - ab_handle[0] / 2, -100 - s[1] - (ab_handle[1] + ab_handle[2]) / 2, -ab_knob_h])
             cube([ab_handle[0], ab_handle[1] + ab_handle[2], ab_knob_h - ab_body_h + 0.01]);   // the knob over its whole travel
@@ -282,7 +285,7 @@ function lid_labels() = let(
         [led_names[0], l1[0] + led_win[0] / 2 + 1.2, l1[1], "left", "center", mark_size],
         [led_names[1], l2[0] - led_win[0] / 2 - 1.2, l2[1], "right", "center", mark_size],
         ["jank", fx(12.0), Y0 + 4.5, "center", "baseline", mark_logo_size]],
-        [for (c0 = ab) let(c = [fx(c0[0]), by(c0[1])], y = abA(c)) each [
+        [for (c0 = ab_on) let(c = [fx(c0[0]), by(c0[1])], y = abA(c)) each [
             ["A", c[0], y[0], "center", "baseline", mark_size], ["B", c[0], y[1], "center", "baseline", mark_size]]]);
 module label2d(l) { translate([l[1], l[2]]) text(l[0], size = l[5], font = mark_font, halign = l[3], valign = l[4]); }
 module lid_text_cut() { if (markings) translate([0, 0, H - mark_depth]) linear_extrude(mark_depth + 1) for (l = lid_labels()) label2d(l); }
@@ -311,7 +314,7 @@ module lid_openings2d() {   // what goes through the lid, and the band along its
     for (p = buttons) translate([fx(p[0]), by(p[1])]) circle(d = button_hole);
     translate([encC[0] - enc_win[0] / 2, encC[1] - enc_win[1] / 2]) square(enc_win);
     for (p = leds) translate([fx(p[0]) - led_win[0] / 2, by(p[1]) - led_win[1] / 2]) square(led_win);
-    for (c = ab) translate([fx(c[0]) - ab_slot[0] / 2, by(c[1]) - ab_slot[1] / 2]) square(ab_slot);
+    for (c = ab_on) translate([fx(c[0]) - ab_slot[0] / 2, by(c[1]) - ab_slot[1] / 2]) square(ab_slot);
     for (h = holes) translate([fx(h[0]), by(h[1])]) circle(d = 4.0);            // the screw heads (pan head ~3.8)
     for (i = [0 : 1]) translate(side_screw(i)) circle(d = 4.0);
     difference() { translate([-5, -5]) square([L + 10, W + 10]); offset(delta = -0.8) outline2d(); }
@@ -338,8 +341,8 @@ module lid() {          // in place
         for (b = button_body) translate([X0 + 184 - b[0] - 7.59 - 0.3, Y0 + 152 + b[1] - 0.3, Zl - 1]) cube([8.19, 10.19, 1 + recess]);
         for (p = leds) translate([fx(p[0]) - led_win[0] / 2, by(p[1]) - led_win[1] / 2, Zb])
             cube([led_win[0], led_win[1], Zl + lid_t - Zb - led_skin + (led_skin > 0 ? 0 : 1)]);
-        for (s = ab) translate([fx(s[0]) - ab_slot[0] / 2, by(s[1]) - ab_slot[1] / 2, Zl - 1]) cube([ab_slot[0], ab_slot[1], lid_t + 2]);
-        for (s = ab) translate([fx(s[0]) - 3.1, by(s[1]) - 5.35, Zl - 1]) cube([6.2, 10.7, 1 + recess]);
+        for (s = ab_on) translate([fx(s[0]) - ab_slot[0] / 2, by(s[1]) - ab_slot[1] / 2, Zl - 1]) cube([ab_slot[0], ab_slot[1], lid_t + 2]);
+        for (s = ab_on) translate([fx(s[0]) - 3.1, by(s[1]) - 5.35, Zl - 1]) cube([6.2, 10.7, 1 + recess]);
         for (h = holes) translate([fx(h[0]), by(h[1]), Zb]) cylinder(d = screw_d, h = H);
         for (i = [0 : 1]) translate([side_screw(i)[0], side_screw(i)[1], Zl - 1]) cylinder(d = screw_d, h = lid_t + 2);
         lid_text_cut();

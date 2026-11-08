@@ -2,7 +2,7 @@
 
 The box for the board in [`../pcb`](../pcb/README.md), **v4: 84.0 x 52.0 mm**, OUT2..OUT4 on the front edge, OUT1 (MIDI
 IN capable) on the back edge beside the two USB-Cs, and on the face: MODE and PLAY/STOP (9.5 mm buttons), a push
-encoder (ALPS EC11E09244BS), two LEDs and four A/B switches. OpenSCAD, parametric, one STL per printed part, each one
+encoder (ALPS EC11E09244BS), two LEDs and an A/B switch on each jack channel. OpenSCAD, parametric, one STL per printed part, each one
 closed manifold solid.
 
 > **Stage: designed and checked in OpenSCAD only (2026-11-08).** Nothing printed, no part measured. Every number marked
@@ -11,6 +11,9 @@ closed manifold solid.
 **First requirement (the user's ruling, 2026-11-08):** *the 3D print must brace the DIN sockets to relieve the stress
 from the PCB.* Plugging and unplugging a DIN or a TRS plug loads the box, not the solder joints, on every channel.
 **Second (2026-11-08):** the A/B knobs stay reachable by finger: the lid stays at 3.6 mm above the face where they are.
+**A/B switches only on jack channels (2026-11-08):** "we don't need the A/B switch when we have the DIN plug". The switch
+swaps a jack's tip and ring only, so a DIN channel leaves it unfitted. The lid has a slot (and its A / B letters) only
+for a TRS channel: `DDDT` has one, for OUT4 (SW5).
 **Third (2026-11-08):** every wall opening is a U open to the top, so the board with its connectors goes straight in,
 and the lid's tongues close the upper part of each. Every bore and slot is round at its bottom in the wall and completed
 by a half-round in the lid's tongue or key (the jack's way, the user's choice for the DIN too).
@@ -168,15 +171,17 @@ underside would sweep 1.7 mm sideways under a hinged lid, more than any clean ho
 | PLAY/STOP (SW6) | 58.55 (25.45), 13.8 | 4.0 mm round | as MODE |
 | Encoder (SW7) | 75.5 (8.5), 14.5 | 13.3 x 13.3 window | the body through it (above) |
 | LED1, LED2 | 45.5 (38.5) and 49.85 (34.15), 4.0 | 3.2 x 3.6 | one light shroud (0.5 mm walls, 1.15 between the windows, down to 0.3 above the face), cut back where the XIAO's header pins stand; the lid's top **skin of 0.6 mm stays over the windows** (`led_skin`): print the lid translucent, or set `led_skin = 0` |
-| A/B SW2..SW5 | (25.2, 10.75), (10.75 / 31.25 / 51.75, 32.25) | 2.0 x 4.5 | the board README's slot: handle 1.5 x 2.0 + 2.0 travel along y + 0.25 round; bodies (3.5) under 0.4 mm recesses |
+| A/B, jack channels only | SW2 (25.2, 10.75) for OUT1, SW3 / SW4 / SW5 (10.75 / 31.25 / 51.75, 32.25) for OUT2..OUT4 | 2.0 x 4.5 | only where the channel is a TRS (in `DDDT`: SW5, OUT4); the board README's slot: handle 1.5 x 2.0 + 2.0 travel along y + 0.25 round; body (3.5) under a 0.4 mm recess |
 | USB-C | XIAO (45.2), J1 (64.5), back wall | 12.5 x 7.0 | U-openings closed by the lid's tongues; for a plug's overmold (*unverified* against the cables) |
 
 ## Markings
 
 `markings = true` cuts labels 0.4 mm deep in Liberation Sans Bold. The capitals are 4.0 mm tall (`mark_size` 4.2) and
 the stems 0.84 mm wide, so a 0.4 mm nozzle leaves them open.
+The user's rule (2026-11-08): the controls are labelled on the lid's top, the plugs on the sides, each once. The two
+"USB" are different things: the lid's names LED2, the back wall's names the XIAO's socket.
 - **Lid top:** MODE right of its button, PLAY under its button, BPM over the encoder's window, LINK right of LED1 and
-  USB left of LED2, an A and a B at the two ends of each A/B slot, and "jank" (6.0 mm capitals) in the front right
+  USB left of LED2, an A and a B at the two ends of each A/B slot (jack channels only), and "jank" (6.0 mm capitals) in the front right
   corner.
 - **Lid tongues** (flush with the walls, over the bore): the channel number of each DIN ("1 / IN" on OUT1's; in
   `DDDT` "1 / IN", "2", "3").
@@ -193,7 +198,8 @@ the stems 0.84 mm wide, so a 0.4 mm nozzle leaves them open.
 
 The board model is the board's v4 `../pcb/mockup-din.stl` turned over into the box. The connectors, the buttons and the
 A/B switches are redrawn from the datasheets: the mockup draws the DIN as a full 21.1 mm block and the buttons and
-A/B switches as full-height blocks. The buttons here are a 3.5 mm body plus a 3.4 mm plunger to 9.5. Each A/B switch
+A/B switches as full-height blocks. The buttons here are a 3.5 mm body plus a 3.4 mm plunger to 9.5. The A/B switches
+are modelled only on the jack channels, where they are fitted. Each A/B switch
 is a 3.5 mm body plus its knob swept over the whole travel. Each jack is its body plus the bushing past the edge. The
 encoder is the mockup's own (12.5 x 12.5 x 6.5 body, 6 mm shaft to 20).
 
