@@ -23,9 +23,8 @@ Link is Ableton's trademark; jank is not an Ableton product.
 
 | Board | Build | Notes |
 |---|---|---|
-| M5Stack AtomS3U | `scripts/build.sh atoms3u` | Cased USB-A stick, RGB LED, MIDI on the Grove port |
-| Seeed XIAO ESP32-S3 | `scripts/build.sh xiao` | Bare module, one-colour LED; MIDI on D6, which is weak (see below) |
-| jank PCB | not written yet | Pins in [`hardware/pcb/README.md`](hardware/pcb/README.md) |
+| Seeed XIAO ESP32-S3, bare | `scripts/build.sh xiao` | The module alone: BOOT button, yellow LED; MIDI on D6, which is weak (see below) |
+| jank PCB | not written yet | The XIAO on the board: pins in [`hardware/pcb/README.md`](hardware/pcb/README.md) |
 
 Wiring and pins: [docs/boards.md](docs/boards.md).
 
@@ -33,7 +32,7 @@ Wiring and pins: [docs/boards.md](docs/boards.md).
 
 ```
 scripts/install_idf.sh              # once: ESP-IDF v5.5.6 into the scratch folder (needs Python 3.13)
-scripts/build.sh atoms3u            # or xiao
+scripts/build.sh xiao
 ```
 
 Everything big stays in `$JANK_SCRATCH` (default `worktrees/jank-scratch/`, git-ignored): ESP-IDF, its tools,
@@ -41,7 +40,7 @@ Everything big stays in `$JANK_SCRATCH` (default `worktrees/jank-scratch/`, git-
 first, see [docs/boards.md](docs/boards.md)):
 
 ```
-bash -c '. scripts/env.sh && cd "$JANK_SCRATCH/build-atoms3u" && python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'
+bash -c '. scripts/env.sh && cd "$JANK_SCRATCH/build-xiao" && python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'
 ```
 
 ## Button and LED (as the firmware does it today)
