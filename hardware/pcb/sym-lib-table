@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "jank")(type "KiCad")(uri "${KIPRJMOD}/lib/jank.kicad_sym")(options "")(descr "the XIAO ESP32S3, drawn for this board"))
+)
