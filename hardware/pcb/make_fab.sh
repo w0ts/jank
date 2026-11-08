@@ -1,7 +1,7 @@
 #!/bin/sh
 # The jank board: the schematic (make_schematic.py) and its ERC, the board (make_board.py, v5: 84 x 67 mm), its design-rule
 # check, the schematic's nets against the board's, the Gerbers and drill files zipped for JLCPCB (bare board, 2 layers),
-# a top and bottom render, and the printable mockup (make_mockup.py: mockup.stl). make_board.py's square layout is unused.
+# the JLCPCB assembly files (make_assembly.py: fab/bom.csv, fab/cpl.csv), a top and bottom render, and the printable mockup (make_mockup.py: mockup.stl). make_board.py's square layout is unused.
 #   sh make_fab.sh        (from anywhere; needs KiCad 10 (kicad-cli and its Python), python3 and OpenSCAD)
 set -eu
 cd "$(dirname "$0")"
@@ -25,6 +25,7 @@ layout() {   # $1: long | square; its files: jank-pcb[-square].kicad_pcb, fab/ o
     grep -E "^\[" "$D/drc.rpt" | sed 's/:.*//' | sort | uniq -c || true          # (by kind; the errors stop the run)
     if grep -q "; error" "$D/drc.rpt"; then grep -B1 -A3 "; error" "$D/drc.rpt" | head -40; exit 1; fi
     "$KP" check_nets.py "$D/jank-pcb.net.xml" "$D/intended-nets.json" "$B.kicad_pcb" 2>&1 | grep -v "wxApp\|stdpbase\|^  pad"
+    if [ "$1" = long ]; then "$KP" make_assembly.py 2>&1 | grep -v "wxApp\|stdpbase"; fi   # (JLCPCB assembly: fab/bom.csv, fab/cpl.csv)
     rm -rf "$D/gerbers" "$D/$B-gerbers.zip" && mkdir -p "$D/gerbers"
     "$KC" pcb export gerbers --layers F.Cu,B.Cu,F.Mask,B.Mask,F.Paste,B.Paste,F.Silkscreen,B.Silkscreen,Edge.Cuts \
         --no-protel-ext --use-drill-file-origin -o "$D/gerbers/" "$B.kicad_pcb" >/dev/null 2>&1
@@ -33,6 +34,6 @@ layout() {   # $1: long | square; its files: jank-pcb[-square].kicad_pcb, fab/ o
     "$KC" pcb render --side top --width 1600 --height 1200 --quality high --zoom 0.95 -o "render-top$T.png" "$B.kicad_pcb" >/dev/null 2>&1
     "$KC" pcb render --side bottom --width 1600 --height 1200 --quality high --zoom 0.95 -o "render-bottom$T.png" "$B.kicad_pcb" >/dev/null 2>&1
     if [ "$1" = long ]; then "$KP" make_mockup.py 2>&1 | grep -v "wxApp\|stdpbase"; fi
-    echo "$D/$B-gerbers.zip render-top$T.png render-bottom$T.png mockup.stl"
+    echo "$D/$B-gerbers.zip render-top$T.png render-bottom$T.png mockup.stl fab/bom.csv fab/cpl.csv"
 }
 layout long
