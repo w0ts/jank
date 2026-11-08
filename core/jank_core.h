@@ -120,7 +120,7 @@ struct jk_cfg {
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
 
-/* the control line protocol over the CDC serial. Each answer is lines of text ending in "ok" or "err <why>". */
+/* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
 struct jk_snapshot {
     uint8_t usb_up;
     uint32_t uptime_s;
@@ -160,6 +160,6 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
 #define JK_FLASH_CAP_DIV 3             /* no flash is longer than a third of a beat: they stay apart at fast tempos */
 int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum);
 
-/* button: a short press is the next GROUP, 9 wraps to 1 */
+/* the GROUP after this one, 9 wraps to 1 */
 uint32_t jk_next_group(uint32_t group);
 #endif

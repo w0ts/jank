@@ -3,7 +3,7 @@ jank: licences
 The firmware is GPL-3.0-only, as a whole.
   firmware/, core/, tests/ and scripts/ are licensed under the GNU General Public
   License, version 3 only. This is because the firmware links Optimist's
-  fm1base/link/link.c (GPL-3.0-only), a C port of the protocol of Ableton's Link
+  link.c (third_party/link, from fm1-base; GPL-3.0-only), a C port of the protocol of Ableton's Link
   library. The whole of the firmware binary is therefore GPL-3.0-only. The full licence
   text is at https://www.gnu.org/licenses/gpl-3.0.txt and in Optimist's LICENSES folder.
 
@@ -13,7 +13,7 @@ The firmware is GPL-3.0-only, as a whole.
 
 The control page is separate and MIT.
   page/jank.html and tests/test_page.js are under the MIT licence below. The page only
-  talks to the stick over a serial port, and contains no code of the firmware.
+  talks to the stick over Web MIDI (SysEx), and contains no code of the firmware.
 
 Copyright (c) 2026 Henri David
 

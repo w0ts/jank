@@ -52,5 +52,5 @@ for s in $SETS; do
         -D "outs=\"$s\"" -D 'part="lid"' -o "$HERE/renders/lid_${s}.png" "$SCAD" >/dev/null 2>&1 || fail=1
 done
 O -q -D 'part="front_test"' -o "$OUT/jank_box_front_test.stl" "$SCAD" 2>"$LOG" || { cat "$LOG"; exit 1; }
-python3 "$HERE/check_stl.py" "$OUT"/jank_box_*.stl || fail=1
+python3 "$HERE/../check_stl.py" "$OUT"/jank_box_*.stl || fail=1
 exit $fail

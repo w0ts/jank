@@ -1,23 +1,12 @@
 menu "jank"
     choice JANK_BOARD
         prompt "Board"
-        default JANK_BOARD_ATOMS3U if IDF_TARGET_ESP32S3
-        default JANK_BOARD_LOLIN32 if IDF_TARGET_ESP32
+        default JANK_BOARD_ATOMS3U
         config JANK_BOARD_ATOMS3U
             bool "M5Stack AtomS3U"
             depends on IDF_TARGET_ESP32S3
         config JANK_BOARD_XIAO
             bool "Seeed XIAO ESP32S3"
             depends on IDF_TARGET_ESP32S3
-        config JANK_BOARD_LOLIN32
-            bool "WEMOS LOLIN32 (no USB network, control on UART0)"
-            depends on IDF_TARGET_ESP32
     endchoice
-
-    config JANK_USB_NET
-        bool
-        default y if IDF_TARGET_ESP32S3
-        help
-            The CDC-NCM adapter and the bridge to a computer. A chip with no USB device has neither:
-            it is a peer on the air, with control and a log on its UART0.
 endmenu

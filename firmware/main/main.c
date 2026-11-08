@@ -59,12 +59,6 @@ void app_main(void)
     ESP_ERROR_CHECK(s_cfg_lock ? ESP_OK : ESP_ERR_NO_MEM);
     ESP_ERROR_CHECK(nvs_up());
     store_load(&s_cfg);
-#if BOARD_BUTTON_GPIO < 0
-    if (reset_button_double()) {        /* RST twice: the board's only button, as the long press on the others */
-        s_cfg.net = s_cfg.net == JK_NET_WIFI || !s_cfg.ssid[0] ? JK_NET_JAM : JK_NET_WIFI;
-        ESP_ERROR_CHECK(store_save(&s_cfg));
-    }
-#endif
     ESP_ERROR_CHECK(esp_efuse_mac_get_default(efuse));
     jk_mac_from_efuse(efuse, mac);
     memcpy(peer_mac, mac, 6);
@@ -72,7 +66,4 @@ void app_main(void)
     ESP_ERROR_CHECK(ctl_start());
     ESP_ERROR_CHECK(bridge_start(&s_cfg, mac, peer_mac));
     ESP_ERROR_CHECK(ui_start());
-#if BOARD_BUTTON_GPIO < 0
-    ESP_ERROR_CHECK(reset_button_arm());
-#endif
 }

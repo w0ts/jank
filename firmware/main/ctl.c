@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The control protocol's task: lines from the CDC serial to jk_ctl_line and back. */
+/* The control protocol's task: lines from the USB MIDI port's SysEx to jk_ctl_line and back. */
 #include <stdio.h>
 #include <string.h>
 #include "app.h"

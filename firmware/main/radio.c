@@ -52,26 +52,6 @@ static esp_err_t bring_up(const uint8_t mac[6], uint32_t channel)
     return e;
 }
 
-#if !CONFIG_JANK_USB_NET
-/* what the driver says of each unicast sent: test 2's evidence */
-static volatile uint32_t s_unicast_ok, s_unicast_fail;
-
-static void on_sent(const esp_80211_tx_info_t *t)
-{
-    if (t->des_addr[0] & 1u)
-        return;
-    if (t->tx_status == WIFI_SEND_SUCCESS)
-        s_unicast_ok++;
-    else
-        s_unicast_fail++;
-}
-
-void radio_unicast_results(uint32_t *ok, uint32_t *fail)
-{
-    *ok = s_unicast_ok;
-    *fail = s_unicast_fail;
-}
-#endif
 
 esp_err_t radio_start(const uint8_t mac[6], uint32_t channel, radio_rx_fn rx)
 {
@@ -87,10 +67,6 @@ esp_err_t radio_start(const uint8_t mac[6], uint32_t channel, radio_rx_fn rx)
         e = esp_wifi_set_storage(WIFI_STORAGE_RAM);
     if (e == ESP_OK)
         e = esp_wifi_set_mode(WIFI_MODE_STA);
-#if !CONFIG_JANK_USB_NET
-    if (e == ESP_OK)
-        e = esp_wifi_register_80211_tx_cb(on_sent);
-#endif
     return e == ESP_OK ? bring_up(mac, channel) : e;
 }
 
