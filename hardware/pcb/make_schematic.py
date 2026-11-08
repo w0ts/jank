@@ -360,7 +360,7 @@ BOM = {
     "nfet": dict(part="N-MOSFET 30 V, Vgs(th) max 1.45 V (listing), SOT-23", mpn="AOS AO3400A", shop=LCSC, code="C20917", price=0.0899, cur="USD", min=5),
     "r100k": dict(part="Resistor 100k 1% 0805", mpn="UNI-ROYAL 0805W8F1003T5E", shop=LCSC, code="C149504", price=0.0060, cur="USD", min=100),
     "r1k": dict(part="Resistor 1k 1% 0805", mpn="UNI-ROYAL 0805W8F1001T5E", shop=LCSC, code="C17513", price=0.0035, cur="USD", min=100),
-    "c100n": dict(part="Capacitor 100nF 50V X7R 0805", mpn="Samsung CL21B104KBCNNNC", shop=LCSC, code="C1711", price=0.0139, cur="USD", min=20),
+    "c100n": dict(part="Capacitor 100nF 50V X7R 0805 (JLCPCB basic part; price: JLCPCB's parts list)", mpn="YAGEO CC0805KRX7R9BB104", shop=LCSC, code="C49678", price=0.0205, cur="USD", min=20),
     "idiode": dict(part="Ideal diode 1.5 A, SC-70-6 (0.65 mm pitch)", mpn="TI LM66100DCKR", shop=LCSC, code="C2869734",
                    price=0.2089, cur="USD", min=5, datasheet="https://www.ti.com/lit/ds/symlink/lm66100.pdf"),
     "r10k": dict(part="Resistor 10k 1% 0805", mpn="UNI-ROYAL 0805W8F1002T5E", shop=LCSC, code="C17414", price=0.0034, cur="USD", min=100),

@@ -17,7 +17,7 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | Q2, Q3 | 2 | N-MOSFET 30 V, Vgs(th) max 1.45 V (listing), SOT-23 | AOS AO3400A | LCSC C20917 | USD 0.0899 | 5 |
 | R3, R4, R5, R7, R53 | 5 | Resistor 100k 1% 0805 | UNI-ROYAL 0805W8F1003T5E | LCSC C149504 | USD 0.0060 | 100 |
 | R6, R52 | 2 | Resistor 1k 1% 0805 | UNI-ROYAL 0805W8F1001T5E | LCSC C17513 | USD 0.0035 | 100 |
-| C2, C5, C6, C8, C9, C10, C11 | 7 | Capacitor 100nF 50V X7R 0805 | Samsung CL21B104KBCNNNC | LCSC C1711 | USD 0.0139 | 20 |
+| C2, C5, C6, C8, C9, C10, C11 | 7 | Capacitor 100nF 50V X7R 0805 (JLCPCB basic part; price: JLCPCB's parts list) | YAGEO CC0805KRX7R9BB104 | LCSC C49678 | USD 0.0205 | 20 |
 | U2 | 1 | Ideal diode 1.5 A, SC-70-6 (0.65 mm pitch) | TI LM66100DCKR | LCSC C2869734 | USD 0.2089 | 5 |
 | R60, R64, R65 | 3 | Resistor 10k 1% 0805 | UNI-ROYAL 0805W8F1002T5E | LCSC C17414 | USD 0.0034 | 100 |
 | R61 | 1 | Resistor 2.2k 1% 0805 (ladder: OK) | UNI-ROYAL 0805W8F2201T5E | LCSC C17520 | USD 0.0050 | 100 |
@@ -48,6 +48,6 @@ Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, n
 
 | Build | Parts at unit price | With each shop's minimum order |
 |---|---|---|
-| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED | USD 17.45 | USD 31.03 |
+| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED | USD 17.49 | USD 31.17 |
 
 USD: LCSC and Seeed (the XIAO). The bare board is ordered at JLCPCB with another board and is not in these totals.
