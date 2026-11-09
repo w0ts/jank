@@ -1,9 +1,12 @@
 # The jank device
 
 A standalone box built round a Seeed **XIAO ESP32-S3**. It joins a **jank** session, the group mode of
-[Optimist](https://github.com/w0ts/optimist) on the FM-1 synth (**MODE JANK**: the FM-1s of a GROUP 1..9 talk to each
-other directly over Wi-Fi, no access point and nobody hosting, and share tempo and phase through Ableton Link), and lets
-something that is not an FM-1 take part:
+[Optimist](https://github.com/w0ts/optimist) on the FM-1 synth (**MODE JANK**), and lets something that is not an FM-1
+take part.
+
+jank's point is that it needs **no router**: Link usually runs over a shared Wi-Fi network that someone has to set up;
+in jank the units send open Wi-Fi frames directly to each other (no access point, no association, no password, no
+host), and those on the same GROUP 1..9 form one Link session. The device speaks that air format, so through it:
 
 - **a computer**, over the network: plugged into the device's USB port it sees a USB network adapter on the group, so
   any app with Ableton Link (Live, Bitwig, a phone app on a laptop…) joins the same Link session as the FM-1s;

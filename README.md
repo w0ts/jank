@@ -1,8 +1,13 @@
 # jank
 
 **jank** is the group mode of [Optimist](https://github.com/w0ts/optimist), the open firmware for the FM-1 synth
-(**MODE JANK**): the FM-1s of a GROUP 1..9 talk to each other directly over Wi-Fi, with no access point and nobody
-hosting, and share tempo and phase through Ableton Link.
+(**MODE JANK**, first called jam): FM-1s share tempo and phase through Ableton Link **with no router**.
+
+That is the new part. Link normally needs every player on the same network: a Wi-Fi router or access point that
+somebody sets up, joins and keeps running. In jank there is none. The units send open Wi-Fi frames straight to each
+other on the group's channel, with no association, no password and no host; the ones set to the same GROUP (1..9) hear each
+other and form one Link session. Switch on, pick the group, play: on a stage, outdoors, wherever there is no network.
+How the frames look: [docs/air.md](docs/air.md).
 
 **This repo is the jank device**: a standalone ESP32-S3 box (a Seeed XIAO ESP32-S3 on its own board) that lets
 something that is not an FM-1 join a jank session:
