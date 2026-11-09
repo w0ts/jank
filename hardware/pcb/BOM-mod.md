@@ -9,7 +9,7 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 |---|---|---|---|---|---|---|
 | U1 | 1 | Seeed XIAO ESP32S3 (plain, not Sense), no headers included | 113991114 | Seeed Studio seeedstudio.com XIAO-ESP32S3-p-5627 | USD 7.4900 | 1 |
 | (U1) | 2 | Pin header 1x7, 2.54 mm (the XIAO's legs: parts sit under the module) | PZ254V-11-07P | LCSC C492406 | USD 0.0467 | 10 |
-| J1 | 1 | USB-C receptacle, power only, 6 pins + 4 through-hole shell legs | GCT USB4125-GF-A-0190 | LCSC C5246813 | USD 0.9178 | 1 |
+| J1 | 1 | USB-C receptacle, power only, 6 pins + 4 through-hole shell legs (v5c 2026-11-09: in JLC stock; the GCT USB4125 had none) | SHOU HAN TYPE-C 6P | LCSC C456012 | USD 0.0390 | 1 |
 | R1, R2 | 2 | Resistor 5.1k 1% 0805 | UNI-ROYAL 0805W8F5101T5E | LCSC C27834 | USD 0.0055 | 100 |
 | D1 | 1 | TVS 5.0 V unidirectional, SOD-123F | MDD SMF5.0A | LCSC C193402 | USD 0.0285 | 20 |
 | C1, C3 | 2 | Capacitor 10uF 25V X5R 0805 | Samsung CL21A106KAYNNNE | LCSC C15850 | USD 0.0362 | 20 |
@@ -25,9 +25,9 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | R63 | 1 | Resistor 22k 1% 0805 (ladder: the encoder's push) | UNI-ROYAL 0805W8F2202T5E | LCSC C17560 | USD 0.0048 | 100 |
 | SW7 | 1 | Rotary encoder EC11, vertical, 18 detents / 9 pulses, push switch, 20 mm flat (D) shaft, through hole, top side | ALPS EC11E09244BS | LCSC C470742 | USD 2.3275 | 1 |
 | C4 | 1 (not fitted) | Electrolytic 100uF 16V 5 x 5.4 mm (not fitted by default) | ROQANG RVT1C101M0505 | LCSC C2977550 | USD 0.0356 | 20 |
-| SW1, SW6 | 2 | Tactile switch 6 x 6 mm, through hole, 9.5 mm tall, top side (OK, BACK) | HRO K2-1102DP-L3SW-04 | LCSC C445493 | USD 0.0633 | 10 |
+| SW1, SW6 | 2 | Tactile switch 6 x 6 mm, through hole, 9.0 mm tall, top side (OK, BACK), soldered by the user (JLC refused the whole HRO K2-1102DP family for assembly on 2026-11-09); 9.0 mm: the lid's button caps 0.5 mm longer than for 9.5 | HRO K2-1102DP-K4SW-04 | LCSC C111992 | USD 0.0653 | 1 |
 | U5 | 1 | I2C GPIO expander, 8 bit, quasi-bidirectional, SOIC-16 wide (the modular variant: CLOCK / RESET; price: JLCPCB's parts list) | NXP PCF8574T/3 | LCSC C7605 | USD 2.0313 | 1 |
-| D3, D4, D5, D6 | 4 | Schottky pair in series BAT54S, SOT-23 (the modular outputs' clamp to GND and +5V; price: JLCPCB's parts list) | Nexperia BAT54S,215 | LCSC C47546 | USD 0.0225 | 20 |
+| D3, D4, D5, D6 | 4 | Diode pair in series BAV99, SOT-23, same pinout as the BAT54S (1 = A1, 2 = K2, 3 = K1/A2): the modular outputs' clamp to GND and +5V; v5c 2026-11-09: a JLC basic part instead of the extended BAT54S (silicon, clamps at ~0.7 V instead of ~0.35 V past the rails: fine behind the 1 k) | BAV99 | LCSC C2500 | USD 0.0000 | 20 |
 | U3, U6, U7, U8, U9 | 5 | Buffer 74AHCT1G125, SOT-23-5 (4.5 to 5.5 V) | TI SN74AHCT1G125DBVR | LCSC C7484 | USD 0.1009 | 5 |
 | J2, J3, J4, J5 | 4 | 3.5 mm stereo jack, right angle, SURFACE MOUNT (4 tabs 1.5 x 2.5, 2 pegs 1.3), plug from the front, top side: the four MIDI outputs' jacks (J2..J5 are BOM lines; the pads are in J6..J9's footprint). Surface-mount so nothing of it goes through the board under the neighbouring DIN bodies | XKB PJ-320D-B-SMT | LCSC C2884940 | USD 0.0000 | 5 |
 | SW2 | 1 | Slide switch DPDT, surface mount, 6 tabs 2.5 mm, 7.7 x 3.55 mm, knob 3.0 mm (OUT1's TRS type A / B: it sits over the DIN's body, where a through-hole switch's pins would hit it) | XKB SS-3235S-L2 | LCSC C500056 | USD 0.0000 | 5 |
@@ -37,8 +37,8 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | R50 | 1 | Resistor 220 1% 0805 (MIDI IN, CA-033 / MIDI 1.0) | UNI-ROYAL 0805W8F2200T5E | LCSC C17557 | USD 0.0030 | 100 |
 | R8, R11, R21, R12, R22, R13, R23, R14, R24 | 9 (not fitted) | Axial pads, not fitted (a bench fix: an axial resistor in place of the 1206s, with them removed) | - | - - | USD 0.0000 | 0 |
 | R31, R32, R33, R34 | 4 | Resistor 10 ohm 1% 0.25 W 1206 (RC, data) | UNI-ROYAL 1206W4F100JT5E | LCSC C17903 | USD 0.0027 | 100 |
-| R41, R81, R42, R82, R43, R83, R44, R84 | 8 | Resistor 68 ohm 1% 0.25 W 1206, two in parallel = the 34 ohm source RA (0.5 W together) | UNI-ROYAL 1206W4F680JT5E | LCSC C17976 | USD 0.0031 | 100 |
-| R9 | 1 | Resistor 330 ohm 1% 0.25 W 1206 (the LED's data) | UNI-ROYAL 1206W4F3300T5E | LCSC C17930 | USD 0.0028 | 100 |
+| R41, R81, R42, R82, R43, R83, R44, R84 | 8 | Resistor 100 ohm 1% 0.25 W 1206, two in parallel = the 50 ohm source RA (0.5 W together; v5c 2026-11-09: 100 ohm is a JLC basic part, 68 is not; the loop current ~5.9 mA instead of ~6.8 mA) | UNI-ROYAL 1206W4F1000T5E | LCSC C17901 | USD 0.0000 | 100 |
+| R9 | 1 | Resistor 300 ohm 1% 0.25 W 1206 (the LED's data; 300 is a JLC basic part, 330 is not) | UNI-ROYAL 1206W4F3000T5E | LCSC C17887 | USD 0.0000 | 100 |
 | LED1 | 1 | RGB LED, addressable, 3.7 x 3.5 x 1.95 mm, top emitting (the beat LED) | OPSCO SK6812MINI-HS | LCSC C2922787 | USD 0.1085 | 5 |
 | J10 | 1 | OLED module 0.96 in 128 x 64, white, SSD1315 (SSD1306 commands), I2C, 27.3 x 27.8 mm, 4 holes 2.54 mm (GND VCC SCL SDA) | HS HS96L03W2C03 | LCSC C5248080 | USD 0.0000 | 1 |
 | (J10) | 1 | Pin header 1x4, 2.54 mm (the OLED module's legs) | XFCN PZ254V-11-04P | LCSC C2691448 | USD 0.0276 | 20 |
@@ -51,6 +51,6 @@ Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, n
 
 | Build | Parts at unit price | With each shop's minimum order |
 |---|---|---|
-| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 17.51 | USD 29.28 |
+| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 16.51 | USD 26.86 |
 
 USD: LCSC and Seeed (the XIAO). The bare board is ordered at JLCPCB with another board and is not in these totals.

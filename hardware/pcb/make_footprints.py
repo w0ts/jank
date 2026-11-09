@@ -210,9 +210,11 @@ def v5_din_pins():
 # 10.0 behind the body's front, terminal 1 on the other side 11.5 behind it (= 10.0 + the drawing's 1.50); two 1.3 mm
 # pegs on the axis 1.5 and 8.5 behind the front. Terminal 4 = tip (deepest), 3 = ring, 2 = the second ring (a TRS plug's
 # sleeve also touches it; left open here like the PJ-320A's switch pad), 1 = sleeve. Named here after the PJ-320A's pads so
-# the nets and routes stay: T = 4, R = 3, SW = 2, S = 1. Which side the 2/3/4 tabs sit on, seen from the top with the
-# opening at the edge, is read off the drawing's handedness: UNVERIFIED on a part.
-PJ_SMD_PADS = {"SW": (3.5, -3.0), "R": (3.5, -6.0), "T": (3.5, -10.0), "S": (-3.5, -11.5)}
+# the nets and routes stay: T = 4, R = 3, SW = 2, S = 1. Seen from the top with the opening at the edge (+y), tabs 2/3/4
+# sit on -x and tab 1 on +x: the drawing's "PCB Layout" is a top view (opening left, 2/3/4 at the top), turned 90
+# degrees without mirroring. (v5c had them mirrored; found 2026-11-09 by the review against JLC's own footprint for
+# C2884940, which fits these pads at rotation 90 with 0.00 mm error.)
+PJ_SMD_PADS = {"SW": (-3.5, -3.0), "R": (-3.5, -6.0), "T": (-3.5, -10.0), "S": (3.5, -11.5)}
 PJ_SMD_PAD = (2.5, 1.5)                          # (across, along the depth)
 PJ_SMD_PEGS, PJ_SMD_PEG = [(0.0, -1.5), (0.0, -8.5)], 1.3
 PJ_SMD_SPAN = 4.75                               # the pads' outer edges from the axis (the tabs reach 4.0)
@@ -410,6 +412,12 @@ def write():
         "LED_SK6812MINI-HS_3.7x3.5mm_HandSolder",
         "Addressable RGB LED OPSCO SK6812MINI-HS, 3.7 x 3.5 x 1.95 mm, top emitting (datasheet rev B/0); pads lengthened outward",
         [text("Reference", "REF**", 0, -2.8, "F.SilkS", True), text("Value", "SK6812MINI-HS", 0, 2.8, "F.Fab"), *led_items()], "smd")
+    # the power USB-C (v5c, 2026-11-09: the GCT USB4125 had no JLC stock): SHOU HAN TYPE-C 6P, LCSC C456012, JLC's own
+    # footprint (EasyEDA, via easyeda2kicad 1.0.1, kept in lib/easyeda/), its shell pad "7" renamed "SH" (the symbol's).
+    # Its origin is JLC's placement origin; the mouth is 4.63 in front of it, the pins 2.03 behind.
+    src = open(os.path.join(HERE, "lib", "easyeda", "TYPE-C-SMD_TYPE-C-6P_1.kicad_mod")).read()
+    src = src.replace("(module easyeda2kicad:TYPE-C-SMD_TYPE-C-6P_1", '(module "USB_C_SHOUHAN_TYPE-C-6P"', 1).replace("(pad 7 thru_hole", '(pad "SH" thru_hole')
+    files["USB_C_SHOUHAN_TYPE-C-6P"] = src
     files["OLED_0.96in_128x64_I2C_HS96L03W2C03"] = footprint(
         "OLED_0.96in_128x64_I2C_HS96L03W2C03",
         "OLED module 0.96 in 128 x 64 (HS96L03W2C03, SSD1315, I2C) on a 1 x 4 2.54 mm header: GND VCC SCL SDA; the module"

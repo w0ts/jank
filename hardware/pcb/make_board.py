@@ -185,9 +185,9 @@ def cluster(refs, nets, cx, cy, orient, axial, value, dj=3.0, ds=3.2, frame=None
     xj, xs = (cx + dj, cx - ds) if mirror else (cx - dj, cx + ds)
     if orient == "v":
         r = place(K("Resistor_THT"), axial, rmain, "DNP fix", *T(frame, cx, cy - 1.27), (270 + th) % 360, bottom)
-        j = (place(K("Resistor_SMD"), R1206, par2, "68", *T(frame, xj, cy), (270 + th) % 360) if par2 else
+        j = (place(K("Resistor_SMD"), R1206, par2, "100", *T(frame, xj, cy), (270 + th) % 360) if par2 else
              place(K("Jumper"), JPFP, jp, "bypass", *T(frame, xj, cy), (270 + th) % 360))
-        s = place(K("Resistor_SMD"), R1206, rpar, "68" if par2 else value, *T(frame, xs, cy), (270 + th) % 360)
+        s = place(K("Resistor_SMD"), R1206, rpar, "100" if par2 else value, *T(frame, xs, cy), (270 + th) % 360)
     else:                                            # (bottom: the flip mirrors the part, so it turns the other way)
         r = place(K("Resistor_THT"), axial, rmain, "DNP fix", *T(frame, cx + 1.27, cy), (th if bottom else 180 + th) % 360, bottom)
         j = place(K("Jumper"), JPFP, jp, "bypass", *T(frame, cx, cy - dj), 180 + th)
@@ -290,7 +290,7 @@ def modular(W, H, p, o, TX_LANE):
          for r, x, y, rot in (("R72", 24.5, 38.35, 180), ("R73", 19.5, 43.45, 180), ("R74", RBX + 70.3, 51.55, 270),
                               ("R75", RBX + 70.3, 59.15, 270))}
     r = {k: (at(fp, 1), at(fp, 2)) for k, fp in R.items()}
-    D = {k: place(K("Package_TO_SOT_SMD"), "SOT-23", k, "BAT54S", x, y, 0)
+    D = {k: place(K("Package_TO_SOT_SMD"), "SOT-23", k, "BAV99", x, y, 0)
          for k, x, y in (("D3", 19.0, 39.6), ("D4", 15.5, 44.4), ("D5", RBX + 66.1, 54.0), ("D6", RBX + 66.1, 61.6))}
     d = {k: {n: at(fp, n) for n in (1, 2, 3)} for k, fp in D.items()}
     C = {k: place(K("Capacitor_SMD"), C0805, k, "100nF", x, y, rot)
@@ -402,8 +402,7 @@ def layout_long():
     # ======== the back edge ========
     U1 = place(JANK, "XIAO-ESP32-S3-DIP_Headers", "U1", "XIAO ESP32S3", XC, 10.55, 90)
     p = {n: at(U1, n) for n in range(1, 15)}
-    J1 = place(K("Connector_USB"), "USB_C_Receptacle_GCT_USB4125-xx-x-0190_6P_TopMnt_Horizontal", "J1", "USB-C power",
-               JX, 3.4, 180)
+    J1 = place(JANK, "USB_C_SHOUHAN_TYPE-C-6P", "J1", "USB-C power", JX, 4.63, 180)   # (its mouth on the back edge)
     for ref, x, y in (("H1", W - 3.2, 3.2), ("H2", W - 3.2, H - 3.2), ("H3", 3.2, 26.0), ("H4", 3.2, 34.0)):
         place(K("MountingHole"), "MountingHole_2.2mm_M2", ref, "M2", x, y)
 
@@ -459,7 +458,7 @@ def layout_long():
     U3 = place(K("Package_TO_SOT_SMD"), "SOT-23-5_HandSoldering", "U3", "74AHCT1G125", 47.6, 3.9, 0)
     C5 = place(K("Capacitor_SMD"), C0805, "C5", "100nF", 49.9, 1.0, 180)   # (top, by the XIAO's 5V pad)
     R7 = place(K("Resistor_SMD"), R0805, "R7", "100k", 46.8, 9.6, 0)    # (top, under the module, by the data line's via)
-    R8C = cluster(("R8", "JP8", "R9"), ("LED_BUF", "LED_DIN1"), 42.0, 4.3, "h", AX0207, "330", 2.4, 2.4, None, bottom=True)
+    R8C = cluster(("R8", "JP8", "R9"), ("LED_BUF", "LED_DIN1"), 42.0, 4.3, "h", AX0207, "300", 2.4, 2.4, None, bottom=True)
     TP3 = place(K("TestPoint"), "TestPoint_Pad_D1.5mm", "TP3", "GND", 29.0, 1.4)
     l = {n: at(LED1, str(n)) for n in range(1, 5)}
     u3 = {n: at(U3, n) for n in range(1, 6)}
@@ -553,8 +552,8 @@ def layout_long():
         route("+3V3", [(51.45, 36.8), (o[2][0], 36.8)])
 
     # ======== the controls right of the screen (top): BACK, OK on a row, the encoder under them ========
-    SW6 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW6", "BACK 9.5 mm", 65.9, 23.2, 0)
-    SW1 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW1", "OK 9.5 mm", 75.5, 23.2, 0)
+    SW6 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW6", "BACK 9.0 mm", 65.9, 23.2, 0)
+    SW1 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW1", "OK 9.0 mm", 75.5, 23.2, 0)
     SW7 = place(K("Rotary_Encoder"), "RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm", "SW7", "EC11E09244BS", 66.4, 36.2, 0)
     e = {n: at(SW7, n) for n in ("A", "B", "C", "S1", "S2")}
     DBG.update(enc=e)
