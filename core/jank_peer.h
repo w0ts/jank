@@ -66,4 +66,7 @@ int32_t jp_mpb(const struct jank_peer *p);
 int64_t jp_beat_at(const struct jank_peer *p, int64_t now_us);
 int jp_playing(const struct jank_peer *p);
 uint32_t jp_peers(const struct jank_peer *p);
+/* the stick changes the session, as any Link app may: 0 done, -1 not in a session (alone it has none to change) */
+int jp_set_tempo(struct jank_peer *p, int32_t mpb, int64_t now_us);
+int jp_set_playing(struct jank_peer *p, int play, int64_t now_us);      /* from the session's beat now */
 #endif

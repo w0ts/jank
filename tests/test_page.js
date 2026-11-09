@@ -74,8 +74,33 @@ const s = box.parseAnswer(["scan=3,11,4,3,1,-50", "scan=7,1,1,1,1,-65"]);
 eq(s.scans[0], { group: 3, channel: 11, frames: 4, units: 3, janks: 1, rssi: -50 });
 eq(s.scans.length, 2);
 eq(box.parseAnswer(["scan=none"]).scans, []);
-eq(box.unitText({ units: 3, janks: 1 }), "3, of which 1 jank");
-eq(box.unitText({ units: 2, janks: 0 }), "2");
+eq(box.peerText({ units: 3, janks: 1 }), "3, of which 1 jank");
+eq(box.peerText({ units: 2, janks: 0 }), "2");
+
+// the tempo box: what the stick takes (Link's 20..999 BPM, two decimals at most)
+eq(box.tempoCommand("120"), "tempo 120");
+eq(box.tempoCommand(" 128.5 "), "tempo 128.5");
+eq(box.tempoCommand("99,25"), "tempo 99.25");
+eq(box.tempoCommand("20"), "tempo 20");
+eq(box.tempoCommand("999"), "tempo 999");
+eq(box.tempoCommand("19.99"), null);
+eq(box.tempoCommand("1000"), null);
+eq(box.tempoCommand("120.125"), null);
+eq(box.tempoCommand(""), null);
+eq(box.tempoCommand("fast"), null);
+eq(box.tempoCommand("1e2"), null);
+
+// the beat in the bar, from status's beat and the beats a bar
+eq(box.beatInBar("0.000", "4"), "1 / 4");
+eq(box.beatInBar("6.750", "4"), "3 / 4");
+eq(box.beatInBar("-1.500", "4"), "3 / 4");
+eq(box.beatInBar("5.000", "3"), "3 / 3");
+eq(box.beatInBar(undefined, "4"), "-");
+
+// the session's word: a BPM of 0 is no session
+eq(box.inSession({ bpm: "0.00" }), false);
+eq(box.inSession({ bpm: "120.00" }), true);
+eq(box.inSession({}), false);
 
 eq(box.isEnd("ok"), true);
 eq(box.isEnd("err bad setting"), true);
