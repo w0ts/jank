@@ -36,7 +36,8 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | D2 | 1 | Diode 1N4148W, SOD-123 (the opto LED's reverse protection) | Semtech 1N4148W | LCSC C81598 | USD 0.0125 | 50 |
 | R50 | 1 | Resistor 220 1% 0805 (MIDI IN, CA-033 / MIDI 1.0) | UNI-ROYAL 0805W8F2200T5E | LCSC C17557 | USD 0.0030 | 100 |
 | R8, R11, R21, R12, R22, R13, R23, R14, R24 | 9 (not fitted) | Axial pads, not fitted (a bench fix: an axial resistor in place of the 1206s, with them removed) | - | - - | USD 0.0000 | 0 |
-| R31, R32, R33, R34 | 4 | Resistor 10 ohm 1% 0.25 W 1206 (RC, data) | UNI-ROYAL 1206W4F100JT5E | LCSC C17903 | USD 0.0027 | 100 |
+| R31 | 1 | Resistor 47 ohm 1% 0.25 W 1206 (OUT1's RC: OUT1 doubles as MIDI IN) | UNI-ROYAL 1206W4F470JT5E | LCSC C17969 | USD 0.0053 | 1 |
+| R32, R33, R34 | 3 | Resistor 10 ohm 1% 0.25 W 1206 (RC, data) | UNI-ROYAL 1206W4F100JT5E | LCSC C17903 | USD 0.0027 | 100 |
 | R41, R81, R42, R82, R43, R83, R44, R84 | 8 | Resistor 100 ohm 1% 0.25 W 1206, two in parallel = the 50 ohm source RA (0.5 W together; v5c 2026-11-09: 100 ohm is a JLC basic part, 68 is not; the loop current ~5.9 mA instead of ~6.8 mA) | UNI-ROYAL 1206W4F1000T5E | LCSC C17901 | USD 0.0000 | 100 |
 | R9 | 1 | Resistor 300 ohm 1% 0.25 W 1206 (the LED's data; 300 is a JLC basic part, 330 is not) | UNI-ROYAL 1206W4F3000T5E | LCSC C17887 | USD 0.0000 | 100 |
 | LED1 | 1 | RGB LED, addressable, 3.7 x 3.5 x 1.95 mm, top emitting (the beat LED) | OPSCO SK6812MINI-HS | LCSC C2922787 | USD 0.1085 | 5 |
@@ -51,6 +52,6 @@ Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, n
 
 | Build | Parts at unit price | With each shop's minimum order |
 |---|---|---|
-| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 16.51 | USD 26.86 |
+| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 16.52 | USD 26.86 |
 
 USD: LCSC and Seeed (the XIAO). The bare board is ordered at JLCPCB with another board and is not in these totals.
