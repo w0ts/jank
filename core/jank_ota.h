@@ -67,4 +67,10 @@ enum jo_err jo_idle(struct jo *j, uint32_t now_ms);                            /
 /* the answer line for e and the offset to go on from -> its length */
 size_t jo_reply(enum jo_err e, uint32_t offset, char *out, size_t cap);
 
+/* UPDATE.TXT at a start, from the note kept in flash across the install's restart: the slot written, its text. -> 1 forget
+ * the note now; 0 keep it until this image is confirmed, so that if it crashes first the old image, back by rollback,
+ * reports that instead */
+#define JO_ROLLED_BACK "jank.bin was installed but did not start: the firmware before it is back (rolled back)"
+int jo_note_at_start(const char *saved_slot, const char *running_slot, int pending, const char *text, char *out, size_t cap);
+
 #endif

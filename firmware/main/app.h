@@ -83,6 +83,8 @@ void ota_mark_valid(void);
 
 /* drive.c: the JANK drive: wiped at every start, jank.html on it, a jank.bin copied onto it and ejected is installed */
 esp_err_t drive_start(void);
+void drive_note(const char *slot, const char *text);         /* UPDATE.TXT at the next start, if slot runs (else: rolled back) */
+void drive_note_forget(void);                                /* the image is confirmed: the note is said */
 
 /* download.c: the ROM's download mode, with USB */
 void usb_to_rom_download(void);                              /* does not return */

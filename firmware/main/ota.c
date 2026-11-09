@@ -108,6 +108,7 @@ static void do_end(void)
     }
     say(JO_OK, s_jo.offset);
     ESP_LOGI(TAG, "update accepted, restarting");
+    drive_note(s_slot->label, "jank.bin installed over MIDI, restarted");
     vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));      /* the answer goes out first */
     esp_restart();
 }
@@ -154,6 +155,7 @@ void ota_mark_valid(void)
         ESP_LOGE(TAG, "mark valid: %s", esp_err_to_name(r));
     else
         ESP_LOGI(TAG, "this image is confirmed");
+    drive_note_forget();
 }
 
 /* A new image starts "pending verify": the next reset of any kind, a crash included, puts the old image back. It is

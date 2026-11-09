@@ -162,6 +162,23 @@ static void test_reply(void)
     assert(jo_reply(JO_E_ARG, 0, out, 4) == 0);
 }
 
+/* UPDATE.TXT at a start, from the note kept in flash across the restart */
+static void test_note(void)
+{
+    char out[160];
+    /* the new image runs, not confirmed yet: say it, keep the note (a crash would roll back) */
+    assert(jo_note_at_start("ota_1", "ota_1", 1, "installed, restarted", out, sizeof out) == 0);
+    assert(!strcmp(out, "installed, restarted"));
+    /* confirmed (or a refusal on the same image): say it and forget */
+    assert(jo_note_at_start("ota_1", "ota_1", 0, "jank.bin not installed: too big", out, sizeof out) == 1);
+    assert(!strcmp(out, "jank.bin not installed: too big"));
+    /* the old image after a rollback */
+    assert(jo_note_at_start("ota_1", "ota_0", 0, "installed, restarted", out, sizeof out) == 1);
+    assert(strstr(out, "did not start") && strstr(out, "rolled back"));
+    /* a short buffer still ends in a NUL */
+    assert(jo_note_at_start("ota_1", "ota_0", 0, "x", out, 8) == 1 && strlen(out) == 7);
+}
+
 int main(void)
 {
     test_crc();
@@ -171,6 +188,7 @@ int main(void)
     test_transfer();
     test_failures();
     test_reply();
+    test_note();
     puts("ota: ok");
     return 0;
 }
