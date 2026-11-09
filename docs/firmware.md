@@ -16,6 +16,12 @@ scripts/install_idf.sh              # once: ESP-IDF v5.5.6 into the scratch fold
 scripts/build.sh xiao
 ```
 
+The first install of the build with two app slots (partition table, bootloader with rollback) needs download mode once;
+after that updates are copy-and-eject or `scripts/ota.py`: see [usb.md](usb.md), "Updating". Partition table
+(`firmware/partitions_usb.csv`, 8 MB flash): nvs 0x9000, otadata 0xf000, phy 0x11000, `ota_0` 0x20000 (2 MB), `ota_1` 0x220000
+(2 MB), `storage` 0x420000 (2 MB, the drive). The saved `sdkconfig.<board>` in the scratch folder overrides the defaults:
+after a change of the partition table or `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, move it aside so the defaults apply.
+
 Everything big stays in `$JANK_SCRATCH` (default `worktrees/jank-scratch/`, git-ignored): ESP-IDF, its tools,
 `managed_components`, the `sdkconfig`s and `build-<board>/`. The build works on a copy there. Flash (download mode
 first, see [boards.md](boards.md)):
@@ -33,7 +39,7 @@ One button (`BOARD_BUTTON_GPIO`; debounce 20 ms, double-click window 350 ms, `co
 | Click | Resync: stop now, start on the next bar line ([docs/midi.md](midi.md)) |
 | Double click | Scan the other channels and join the next group heard; none heard: stay (jank mode only) |
 | Held 1.5 s, let go | Switch between jank mode and the saved Wi-Fi network, with a restart. None saved: 3 red pulses |
-| Held 10 s | Restart into download mode (unproven) |
+| Held 10 s | Restart into download mode (`bootloader`, see below; unproven) |
 
 The LED shows the Link session's beat: in jank mode it rests off and flashes on each beat (green on an RGB LED), on a
 Wi-Fi network it rests on and blinks off (blue). The bar's first beat flashes 150 ms, the others 80 ms, never more than
@@ -59,6 +65,17 @@ set quantum 1..16 | offset -100..100 | net jank|wifi | ssid <name> | pass <8..63
 `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
 nothing. `net jank` is the protocol's name for jank mode.
 
+## The `bootloader` command
+
+Fallback for a stick that cannot be updated by the drive: it restarts into the ROM's download mode, over USB, for esptool.
+`main/download.c` explains the sequence in its header: the S3's one internal USB PHY belongs to the USB-OTG controller
+(TinyUSB) or to USB-Serial-JTAG (the ROM's "USB JTAG/serial debug unit") according to RTC_CNTL_USB_CONF, which a software
+restart does not reset. So the app soft-disconnects, resets and clock-gates the OTG controller, clears
+`SW_HW_USB_PHY_SEL`, `SW_USB_PHY_SEL` and `USB_PAD_ENABLE`, clears `USB_SERIAL_JTAG_CONF0.PHY_SEL`, sets the pad and the D+
+pull-up of Serial-JTAG, then sets `FORCE_DOWNLOAD_BOOT` and restarts. It does not drive D+/D- through the GPIO matrix (that
+kept the chip off the bus until a power cycle). Modelled on arduino-esp32's `usb_switch_to_cdc_jtag`. **Not verified on
+hardware.**
+
 ## Tests
 
 ```
@@ -67,7 +84,7 @@ FM1BASE=../optimist/fm1base tests/run.sh
 
 Host tests, built with address and undefined-behaviour sanitizers into `$JANK_SCRATCH/hosttest`: frame vectors, the
 filter and MAC handling, the control protocol, button and scan logic, the clock maths (no drift over an hour at any
-tempo), the Link peer, SysEx framing and the control page's logic (needs node). `tests/crosscheck_optimist.c` compiles
+tempo), the Link peer, SysEx framing, the update protocol (C logic and `scripts/ota.py` against it, over a line that loses, damages and repeats lines; needs python3) and the control page's logic (needs node). `tests/crosscheck_optimist.c` compiles
 the FM-1's own `wifi_jank.c`, `wifi_ip.c` and `link.c` from `FM1BASE` and swaps frames with jank. These prove that both
 sides agree on bytes and logic, nothing about radios: delays in the models are made up.
 

@@ -20,7 +20,7 @@ a power cut. Its pin table and the board.h block it needs are in `hardware/pcb/R
 ## Flashing
 
 The first flash of a blank XIAO needs download mode by hand: hold BOOT while plugging in (Seeed's usual way, not tried
-here). Later, `bootloader` on the control line, the page's button or the button held 10 s should do it (unproven). Then:
+here). Later, `bootloader` on the control line, the page's button or the button held 10 s should do it (unproven; [firmware.md](firmware.md)). Updates of a running stick need none of it: copy `jank.bin` onto the drive and eject ([usb.md](usb.md)). Then:
 
 ```
 bash -c '. scripts/env.sh && cd "$JANK_SCRATCH/build-xiao" && python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'

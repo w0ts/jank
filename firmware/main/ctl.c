@@ -8,13 +8,15 @@
 #include "freertos/stream_buffer.h"
 #include "freertos/task.h"
 
-#define CTL_LINE_MAX 96u
+#define CTL_LINE_MAX 256u                /* an update chunk is a line of about 190 (core/jank_ota.h) */
+#define CTL_TICK_MS 1000
 #define OUT_MAX 1400u
 
 void app_bootloader(void);
 void app_reboot(void);
 
 static StreamBufferHandle_t s_in;
+static volatile uint32_t s_beats;      /* passes of the task: it is alive and taking lines */
 static struct jk_snapshot s_snap;
 static char s_out[OUT_MAX];
 
@@ -39,6 +41,8 @@ static void run_line(const char *line)
 {
     struct jk_cfg cfg;
     enum jk_ctl_action a;
+    if (ota_line(line))
+        return;
     app_cfg_get(&cfg);
     bridge_snapshot(&s_snap);
     a = jk_ctl_line(line, &cfg, &s_snap, bridge_ms(), s_out, sizeof s_out);
@@ -66,8 +70,11 @@ static void ctl_task(void *arg)
     (void)arg;
     for (;;) {
         uint8_t c;
-        if (!xStreamBufferReceive(s_in, &c, 1, portMAX_DELAY))
+        ++s_beats;
+        if (!xStreamBufferReceive(s_in, &c, 1, pdMS_TO_TICKS(CTL_TICK_MS))) {
+            ota_idle();
             continue;
+        }
         if (c == '\n' || c == '\r') {
             line[n] = 0;
             if (too_long)
@@ -84,10 +91,12 @@ static void ctl_task(void *arg)
     }
 }
 
+uint32_t ctl_beats(void) { return s_beats; }
+
 esp_err_t ctl_start(void)
 {
-    s_in = xStreamBufferCreate(512, 1);
+    s_in = xStreamBufferCreate(1024, 1);        /* room for a few update lines: the sender waits for answers, but a flash write stalls this task */
     if (!s_in)
         return ESP_ERR_NO_MEM;
-    return xTaskCreatePinnedToCore(ctl_task, "ctl", 5120, NULL, 4, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    return xTaskCreatePinnedToCore(ctl_task, "ctl", 6144, NULL, 4, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
