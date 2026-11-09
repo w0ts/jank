@@ -25,6 +25,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "jank_ota.h"
+#include "nvs.h"
 #include "tinyusb_msc.h"
 #include "wear_levelling.h"
 
@@ -32,8 +33,8 @@
 #define PATH_MAX_LEN 128
 #define WIPE_DEPTH 4
 #define COPY_BLOCK 4096u
-#define NOTE_MAX 80
-#define NOTE_MAGIC 0x4A4E4F54u
+#define NOTE_MAX 160
+#define NOTE_NS "jank_upd"                /* the install's note, kept in NVS across the restart (and a rollback) */
 #define ERASED_MAGIC 0x4A455241u
 
 extern const char page_start[] asm("_binary_jank_html_start");
@@ -43,15 +44,54 @@ static const char *TAG = "drive";
 static tinyusb_msc_storage_handle_t s_storage;
 static TaskHandle_t s_task;
 static volatile int s_ready;                 /* the start is over: an app mount from now on is an eject (or an unplug) */
-static RTC_NOINIT_ATTR uint32_t s_note_magic;
-static RTC_NOINIT_ATTR char s_note[NOTE_MAX];
 static RTC_NOINIT_ATTR uint32_t s_erased;
 static uint8_t s_block[COPY_BLOCK];
 
-static void note(const char *fmt, const char *arg)
+/* the note for UPDATE.TXT at the next start: the slot that should run then, and what to say. In NVS, not RTC memory:
+ * another image's start (one that crashes and is rolled back) may reuse RTC memory, NVS it leaves alone */
+void drive_note(const char *slot, const char *text)
 {
-    snprintf(s_note, sizeof s_note, fmt, arg);
-    s_note_magic = NOTE_MAGIC;
+    nvs_handle_t h;
+    esp_err_t e = nvs_open(NOTE_NS, NVS_READWRITE, &h);
+    if (e == ESP_OK) {
+        e = nvs_set_str(h, "slot", slot);
+        if (e == ESP_OK)
+            e = nvs_set_str(h, "text", text);
+        if (e == ESP_OK)
+            e = nvs_commit(h);
+        nvs_close(h);
+    }
+    if (e != ESP_OK)
+        ESP_LOGE(TAG, "note: %s", esp_err_to_name(e));
+}
+
+void drive_note_forget(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(NOTE_NS, NVS_READWRITE, &h) != ESP_OK)
+        return;
+    if (nvs_erase_all(h) == ESP_OK)
+        nvs_commit(h);
+    nvs_close(h);
+}
+
+/* the note's text for this start in out ("" none) -> 1 forget it now (jo_note_at_start) */
+static int note_for_start(char *out, size_t cap)
+{
+    char slot[17] = "", text[NOTE_MAX] = "";
+    size_t ns = sizeof slot, nt = sizeof text;
+    nvs_handle_t h;
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    esp_ota_img_states_t st = ESP_OTA_IMG_VALID;
+    out[0] = 0;
+    if (nvs_open(NOTE_NS, NVS_READONLY, &h) != ESP_OK)
+        return 0;
+    int got = nvs_get_str(h, "slot", slot, &ns) == ESP_OK && nvs_get_str(h, "text", text, &nt) == ESP_OK;
+    nvs_close(h);
+    if (!got || !run)
+        return 0;
+    esp_ota_get_state_partition(run, &st);
+    return jo_note_at_start(slot, run->label, st == ESP_OTA_IMG_PENDING_VERIFY, text, out, cap);
 }
 
 /* removes everything below dir (not dir itself): the macOS and Windows litter as well as the user's files */
@@ -93,12 +133,15 @@ static esp_err_t write_file(const char *path, const void *data, size_t n)
 
 static esp_err_t restore(void)
 {
+    char text[NOTE_MAX];
     esp_err_t r = write_file(MOUNT "/jank.html", page_start, (size_t)(page_end - page_start - 1));   /* a text blob ends in a NUL */
-    if (r == ESP_OK && s_note_magic == NOTE_MAGIC) {
-        s_note[NOTE_MAX - 1] = 0;
-        r = write_file(MOUNT "/UPDATE.TXT", s_note, strlen(s_note));
+    int forget = note_for_start(text, sizeof text);
+    if (r == ESP_OK && text[0]) {
+        strlcat(text, "\n", sizeof text);
+        r = write_file(MOUNT "/UPDATE.TXT", text, strlen(text));
     }
-    s_note_magic = 0;
+    if (forget)
+        drive_note_forget();
     return r;
 }
 
@@ -176,6 +219,7 @@ static const char *install(const char *path, size_t size)
 static void install_task(void *arg)
 {
     char path[PATH_MAX_LEN], text[NOTE_MAX];
+    const esp_partition_t *run = esp_ota_get_running_partition(), *next = esp_ota_get_next_update_partition(NULL);
     size_t size;
     (void)arg;
     for (;;) {
@@ -185,9 +229,12 @@ static void install_task(void *arg)
             continue;                     /* an eject or an unplug with no update on the drive */
         ESP_LOGI(TAG, "installing %s, %u bytes", path, (unsigned)size);
         why = install(path, size);
-        snprintf(text, sizeof text, "%s", why ? why : "installed, restarted");
-        note(why ? "jank.bin not installed: %s" : "%s", text);
-        ESP_LOGW(TAG, "%s", s_note);
+        if (why)
+            snprintf(text, sizeof text, "jank.bin not installed: %s", why);
+        else
+            snprintf(text, sizeof text, "%s", "jank.bin installed from the drive, restarted");
+        drive_note(why || !next ? (run ? run->label : "") : next->label, text);
+        ESP_LOGW(TAG, "%s", text);
         vTaskDelay(pdMS_TO_TICKS(200));
         esp_restart();                    /* the start wipes the drive and writes the note */
     }

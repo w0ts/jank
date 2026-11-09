@@ -257,3 +257,11 @@ size_t jo_reply(enum jo_err e, uint32_t offset, char *out, size_t cap)
         r = snprintf(out, cap, "err %s %lu\n", NAMES[e], (unsigned long)offset);
     return r > 0 && (size_t)r < cap ? (size_t)r : 0;
 }
+
+int jo_note_at_start(const char *saved_slot, const char *running_slot, int pending, const char *text, char *out, size_t cap)
+{
+    int same = !strcmp(saved_slot, running_slot);
+    if (cap)
+        snprintf(out, cap, "%s", same ? text : JO_ROLLED_BACK);
+    return !same || !pending;
+}
