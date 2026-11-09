@@ -109,7 +109,7 @@ the side walls 0.9 under it). It is screwed at H1..H4.
 | **MIDI jack body** (front, back) | 0.5 past the board's edge | **0.5 mm inside the lid's face**, the bushing **1.5 mm proud** | the skirt's 0.4 mm web in front of the body takes the pull-out |
 | CLOCK / RESET jack body (sides) | on the board's edge | 1.0 mm inside, the bushing 1.0 mm proud | a 0.9 mm web |
 | XIAO USB-C | 1.5 past the board's edge | 0.5 mm proud | |
-| Power USB-C (J1) | on the board's edge | 1.0 mm inside the lid's face; its legs in a notch of the base's back wall | |
+| Power USB-C (J1, SHOU HAN TYPE-C 6P, C456012, 8.94 x 6.81 x 3.2) | on the board's edge | 1.0 mm inside the lid's face; its legs in a notch of the base's back wall | its mouth (8.94 x 3.2) inside the 12.5 x 7.0 opening, 1.8 clear a side and 1.9 above / below |
 
 **Why the step:** the jack's front is 1.5 mm in front of the DIN plate's face on the footprint. One flat face would
 leave either the jacks with no web in front of them, or the DINs 2.0 mm in. The skirt (jacks) and the base (DINs)
@@ -125,7 +125,7 @@ The back cheek's rims depend on these numbers. The checks use them for the DIN's
 
 **Print and fit:**
 - **The skirt's jack slots** are open downwards: round at the bushing's axis, 5.2 mm, 2.5 mm above the board.
-- **The XIAO's opening** is open full height through the lid's edge. **J1's opening** is 12.5 x 5.15, open downwards.
+- **The XIAO's opening** is open full height through the lid's edge. **J1's opening** is 12.5 wide, 5.1 high above the board's top, open downwards.
 - **The DIN slots** are open at the top, so the base prints without supports.
 
 ## Bracing
@@ -171,7 +171,7 @@ The back cheek's rims depend on these numbers. The checks use them for the DIN's
 
 | Part | Shape | Fit | Print |
 |---|---|---|---|
-| **Button cap** (2) | a 5.4 mm stem 3.0 above the lid; an **8.0 mm flange, 1.0 thick, 0.3 under the lid**; a **blind bore 3.45 mm**, 3.6 deep, on the plunger | +0.05 on the 3.4 plunger: a light press once printed | flange on the bed |
+| **Button cap** (2) | a 5.4 mm stem 3.0 above the lid; an **8.0 mm flange, 1.0 thick, 0.3 under the lid**; a **blind bore 3.45 mm**, 3.1 deep, its floor on the plunger's top (the 9.0 mm HRO K2-1102DP-K4SW-04 since 2026-11-09: the cap is 0.5 mm more solid above the plunger, the same outside and travel) | +0.05 on the 3.4 plunger: a light press once printed | flange on the bed |
 | **Slider cap** (3, SW3..SW5) | 3.15 x 3.65 block, 1.0 above the lid, a **pocket 1.55 x 2.05 x 1.3** | +0.05 on the 1.5 x 2.0 handle | top on the bed |
 | **Slider cap, SMD** (1, SW2) | 3.15 x 3.15 block, 1.0 above the lid, a **pocket 1.55 x 1.55** to the knob's top (3.2 + 3.0) | +0.05 on the 1.5 knob; **the knob's length along its travel taken as 1.5: unverified** | top on the bed |
 | **Encoder knob** (1) | 14 x 12, a **D bore 6.1 / 4.6** (the shaft's 6.0 / 4.5, *unverified*), 10 deep, a pointer groove | 0.1 play | top on the bed |
