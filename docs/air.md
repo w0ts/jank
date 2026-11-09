@@ -41,6 +41,10 @@ pushes 120 BPM on a group. With a computer attached, the FM-1 and Live each see 
 
 ## Group scan
 
+- **Automatic (2026-11-11):** in jank mode, once nobody has been heard on the home channel for 5 s (`JS_ALONE_MS`),
+  the stick sweeps the other channels every 5 s (`JS_AUTO_EVERY_MS`) until it hears a group, then joins it and keeps it
+  (the same pick as the button). The LED flashes magenta for each sweep, nothing else; a sweep costs nothing while alone.
+  The logic is `js_auto_step` (core/jank_ui.c), host-tested. Untested on hardware.
 - The home channel needs no dwell: anything heard there in the last 3 s counts (`JS_HEARD_MS`).
 - The scan visits the two other channels for 350 ms each (`JS_DWELL_MS`, longer than Link's 250 ms announce), about
   0.7 s plus channel switching (unmeasured). The button's scan joins the next group heard after the current one,
