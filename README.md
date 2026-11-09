@@ -1,12 +1,12 @@
 # jank
 
-**Ableton Link with no router.** jank is a small box that brings computers, MIDI gear and modular gear into a
+**Ableton Link with no router.** jank protocol brings computers, MIDI gear and modular gear into a
 **jank** session: the group mode of [Optimist](https://github.com/w0ts/optimist), the open firmware for the FM-1 synth
 (**MODE JANK**, first called jam).
 
 ![the jank device](docs/img/hero.png)
 
-## No router: the new part
+## No router
 
 Link normally needs every player on the same network: a Wi-Fi router or access point that somebody sets up, joins and
 keeps running. In jank there is none. The units send open Wi-Fi frames straight to each other on the group's channel,
