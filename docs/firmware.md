@@ -1,6 +1,6 @@
 # jank firmware
 
-The firmware of the [jank device](device.md), for the ESP32-S3 (ESP-IDF). Boards and pins: [boards.md](boards.md).
+The firmware of the [jank device](../README.md), for the ESP32-S3 (ESP-IDF). Boards and pins: [boards.md](boards.md).
 
 ## Firmware boards
 
