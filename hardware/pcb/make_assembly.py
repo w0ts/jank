@@ -35,8 +35,15 @@ import make_schematic as S                      # (the parts table and the BOM c
 
 MOD = os.environ.get("MODULAR") == "1"         # (the modular variant: jank-pcb-mod.kicad_pcb, its files in fab/mod/)
 FAB = os.path.join(HERE, "fab", *(["mod"] if MOD else []))
-SKIP = re.compile(r"^(H\d|JP|TP|J[6-9]$|U1$|C4$|R8$|R1[1-4]$|R2[1-4]$)")   # (J6..J9: the DINs, by hand; the axial pads: empty)
-ROT_FIX = [(r"^SOT-23", -90), (r"^SOT-363", 180), (r"^SOIC-", 270)]   # (the community table's rows that match a footprint here)
+SKIP = re.compile(r"^(H\d|JP|TP|J[6-9]$|J10$|SW1$|SW6$|U1$|C4$|R8$|R1[1-4]$|R2[1-4]$)")   # (J10 the OLED module, SW1/SW6 the buttons: the user (2026-11-09; JLC refused the buttons))   # (J6..J9: the DINs, by hand; the axial pads: empty)
+# JLC rotation = KiCad's + the correction for the footprint. Measured 2026-11-09 (the review) by placing JLC's own EasyEDA
+# footprint of each LCSC code at the CPL position and matching pads by number: SOT-23 / SOT-23-5 +180 (the community
+# table's -90 is wrong for C47546, C15127, C20917, C7484), SOT-363 +270, SOIC +270, DIP-6 +270 (the wrong way round
+# reverses the opto), the EC11 encoder +270, the PJ-320A side jacks +90; the slide switches and 0805/1206 as KiCad has
+# them. STILL check JLC's placement preview before paying.
+JLC_ORIGIN = {"USB_C_SHOUHAN_TYPE-C-6P"}           # (footprints taken from JLC / EasyEDA: origin and rotation are JLC's)
+ROT_FIX = [(r"^SOT-23", 180), (r"^SOT-363", 270), (r"^SOIC-", 270), (r"^DIP-6", 270), (r"^RotaryEncoder_Alps_EC11E", 270),
+           (r"^Jack_3.5mm_XKB_PJ-320A", 90)]
 
 board = pcbnew.LoadBoard(os.path.join(HERE, "jank-pcb-mod.kicad_pcb" if MOD else "jank-pcb.kicad_pcb"))
 ox, oy = (pcbnew.ToMM(v) for v in (board.GetDesignSettings().GetAuxOrigin().x, board.GetDesignSettings().GetAuxOrigin().y))
@@ -45,9 +52,18 @@ dnp = {p[0] for p in S.PARTS if "DNP" in p[2]}
 
 
 def mid(fp):
-    """an SMD part's origin; a through-hole part's middle of its pads (board mm, KiCad's page frame)"""
-    if not fp.GetAttributes() & pcbnew.FP_THROUGH_HOLE:
+    """an SMD part's origin; a through-hole part's middle of its pads (board mm, KiCad's page frame); a part with SMD
+    pins and through-hole shell legs (the USB-C): the middle of its SMD pads only (the legs shifted it 1.14 mm)"""
+    if fp.GetFPID().GetLibItemName().wx_str() in JLC_ORIGIN:     # (JLC's own footprint: its origin is JLC's)
         return pcbnew.ToMM(fp.GetPosition().x), pcbnew.ToMM(fp.GetPosition().y)
+    smd = [p for p in fp.Pads() if p.GetNumber() and p.GetAttribute() == pcbnew.PAD_ATTRIB_SMD]
+    mixed = smd and any(p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH for p in fp.Pads())
+    if not mixed and not fp.GetAttributes() & pcbnew.FP_THROUGH_HOLE:
+        return pcbnew.ToMM(fp.GetPosition().x), pcbnew.ToMM(fp.GetPosition().y)
+    if mixed:
+        xs = [pcbnew.ToMM(p.GetPosition().x) for p in smd]
+        ys = [pcbnew.ToMM(p.GetPosition().y) for p in smd]
+        return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
     xs = [pcbnew.ToMM(p.GetPosition().x) for p in fp.Pads() if p.GetNumber()]
     ys = [pcbnew.ToMM(p.GetPosition().y) for p in fp.Pads() if p.GetNumber()]
     return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
@@ -99,7 +115,9 @@ for k, fp in enumerate(sorted((f for f in board.GetFootprints() if re.match(r"^J
     pts = [(pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)) for p in fp.Pads() if p.GetNumber() in ("T", "R", "SW", "S")]
     ref = f"J{2 + k}"
     rows.append((S.BOM["trs_smd"]["mpn"].split()[-1], ref, "PJ-320D-B-SMT", S.BOM["trs_smd"]["code"], True))
-    places.append((ref, sum(p[0] for p in pts) / 4, sum(p[1] for p in pts) / 4, "Top", round(fp.GetOrientationDegrees()) % 360))
+    # JLC's origin for C2884940: the middle of its pads' bounding box (on the jack's axis); rotation KiCad + 90
+    xs, ys = [q[0] for q in pts], [q[1] for q in pts]
+    places.append((ref, (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, "Top", (round(fp.GetOrientationDegrees()) + 90) % 360))
 
 assert all(p[3] == "Top" for p in places), [p[0] for p in places if p[3] != "Top"]   # (Economic: one side)
 # the checks JLCPCB's upload makes: one row per designator, every row with a code, the two files on the same set

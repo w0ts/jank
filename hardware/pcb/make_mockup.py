@@ -23,7 +23,7 @@ import make_footprints as F
 THICK = 1.6
 # above the board (top, the lid side), mm from its top face
 UP = {"U1": 7.0, "J1": 3.3, "D1": 1.1, "U2": 1.1, "U3": 1.2, "Q1": 1.1, "Q2": 1.1, "Q3": 1.1, "Q4": 1.1, "D2": 1.2,
-      "U4": 4.5, "LED1": 1.95, "SW1": 9.5, "SW6": 9.5, **{f"SW{k}": 5.0 for k in range(2, 6)}}
+      "U4": 4.5, "LED1": 1.95, "SW1": 9.0, "SW6": 9.0, **{f"SW{k}": 5.0 for k in range(2, 6)}}
 # below the board (bottom), mm from its bottom face: the standing resistors (body + bent lead), the bottom 0805s
 DOWN = {"R8": 9.0, **{f"R1{k}": 9.0 for k in range(1, 5)}, **{f"R2{k}": 11.5 for k in range(1, 5)}}
 LEADS = {"U1": 3.0, "J1": 1.9, "U4": 1.5, "SW1": 1.5, "SW6": 1.5, "SW7": 1.5, "J10": 1.5,
