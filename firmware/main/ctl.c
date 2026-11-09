@@ -52,6 +52,11 @@ static void run_line(const char *line)
         run_scan();
         return;
     }
+    if (a == JK_CTL_TEMPO || a == JK_CTL_PLAY || a == JK_CTL_STOP) {
+        int32_t mpb = 0;
+        int r = a == JK_CTL_TEMPO ? (jk_ctl_tempo(line, &mpb) ? -1 : bridge_tempo(mpb)) : bridge_play(a == JK_CTL_PLAY);
+        strcpy(s_out, r ? "err no session\n" : "ok\n");
+    }
     usb_serial_write(s_out, strlen(s_out));
     if (a == JK_CTL_REBOOT || a == JK_CTL_BOOTLOADER) {
         vTaskDelay(pdMS_TO_TICKS(100));        /* the answer goes out first */

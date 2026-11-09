@@ -198,6 +198,26 @@ static void test_other_lines(void)
     CHECK(run("get\r") == JK_CTL_NONE && ends(out, "ok\n"));
 }
 
+static void test_session_commands(void)
+{
+    int32_t mpb = 0;
+    setup();
+    CHECK(run("tempo 120") == JK_CTL_TEMPO && out[0] == 0);       /* the caller answers: ok, or err no session */
+    CHECK(jk_ctl_tempo("tempo 120", &mpb) == 0 && mpb == 500000);
+    CHECK(jk_ctl_tempo("  tempo 128.5 ", &mpb) == 0 && mpb == 466926);
+    CHECK(jk_ctl_tempo("tempo 20", &mpb) == 0 && mpb == 3000000);
+    CHECK(jk_ctl_tempo("tempo 999", &mpb) == 0 && mpb == 60060);
+    CHECK(run("tempo 19.99") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("tempo 1000") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("tempo 120.123") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("tempo fast") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("tempo") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(jk_ctl_tempo("tempo -5", &mpb) == -1);
+    CHECK(run("play") == JK_CTL_PLAY && out[0] == 0);
+    CHECK(run("stop") == JK_CTL_STOP && out[0] == 0);
+    CHECK(run("play now") == JK_CTL_NONE && strstr(out, "err ") == out);
+}
+
 static void test_scan_command(void)
 {
     setup();
@@ -274,6 +294,7 @@ int main(void)
     test_status_link();
     test_status();
     test_other_lines();
+    test_session_commands();
     test_scan_command();
     test_short_buffer();
     test_cfg_name();

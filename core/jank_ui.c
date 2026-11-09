@@ -108,6 +108,36 @@ uint32_t js_pick(const struct js_scan *s, uint32_t current, uint32_t now_ms)
     return 0;
 }
 
+void js_auto_init(struct js_auto *a, uint32_t now_ms)
+{
+    memset(a, 0, sizeof *a);
+    a->alone_since = now_ms;
+    a->alone = 1;
+}
+
+int js_auto_step(struct js_auto *a, uint32_t peers_heard, uint32_t now_ms)
+{
+    if (peers_heard) {
+        a->alone = 0;
+        return 0;
+    }
+    if (!a->alone) {                   /* just went quiet: start counting */
+        a->alone = 1;
+        a->swept = 0;
+        a->alone_since = now_ms;
+        return 0;
+    }
+    if ((uint32_t)(now_ms - a->alone_since) < JS_ALONE_MS)
+        return 0;
+    return !a->swept || (uint32_t)(now_ms - a->last_sweep) >= JS_AUTO_EVERY_MS;
+}
+
+void js_auto_swept(struct js_auto *a, uint32_t now_ms)
+{
+    a->swept = 1;
+    a->last_sweep = now_ms;
+}
+
 void js_table_clear(struct js_table *t) { memset(t, 0, sizeof *t); }
 
 static int row_knows(const struct js_row *r, const uint8_t sender[6])

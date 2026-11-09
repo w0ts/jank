@@ -138,6 +138,38 @@ static void scan_groups(void)
     xSemaphoreGive(s_scanning);
 }
 
+/* The automatic scan: alone at home for JS_ALONE_MS, a sweep every JS_AUTO_EVERY_MS until a group is heard (core/jank_ui.c
+ * js_auto_step). Quiet on the LED but for the sweep's magenta: no red "none found" every five seconds. Skipped while the
+ * button's or the page's sweep holds the radio. */
+#define AUTO_CHECK_MS 250u
+static struct js_auto s_auto;
+
+static void auto_scan(uint32_t now)
+{
+    struct jk_cfg cfg;
+    struct js_scan seen;
+    uint32_t next;
+    app_cfg_get(&cfg);
+    if (cfg.net != JK_NET_JANK || !js_auto_step(&s_auto, bridge_peers_heard(), now))
+        return;
+    if (xSemaphoreTake(s_scanning, 0) != pdTRUE)
+        return;
+    led_event(JL_SCANNING, cfg.group);
+    led_step(bridge_ms() + LED_EVERY_MS);
+    sweep(cfg.group);
+    bridge_note_scan_groups(&seen);
+    next = js_pick(&seen, cfg.group, bridge_ms());
+    if (next) {
+        ESP_LOGI(TAG, "alone on group %u: joining group %lu", cfg.group, (unsigned long)next);
+        move_to(next);
+        led_event(JL_JOINED, next);
+    } else {
+        led_event(JL_NONE, cfg.group);
+    }
+    js_auto_swept(&s_auto, bridge_ms());
+    xSemaphoreGive(s_scanning);
+}
+
 /* The control page. The table counts from the start of a sweep, so the home channel gets a dwell of its own, at home */
 esp_err_t ui_scan_table(struct js_table *out)
 {
@@ -179,13 +211,20 @@ static void on_button(enum jb_event e)
 static void ui_task(void *arg)
 {
     struct jb_button b;
+    uint32_t last_auto;
     (void)arg;
     jb_init(&b);
+    js_auto_init(&s_auto, bridge_ms());
+    last_auto = bridge_ms();
     for (;;) {
         uint32_t now = bridge_ms();
         int level = gpio_get_level(BOARD_BUTTON_GPIO);
         on_button(jb_step(&b, BOARD_BUTTON_ACTIVE_LOW ? !level : level, now));
         led_step(now);
+        if ((uint32_t)(now - last_auto) >= AUTO_CHECK_MS) {
+            last_auto = now;
+            auto_scan(now);
+        }
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }
 }

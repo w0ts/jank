@@ -384,6 +384,25 @@ static void test_follows(void)
 }
 
 /* the whole way: the session -> a map every 5 ms -> ticks; every tick lands on the computer's own beat */
+/* the stick sets the session's tempo and plays / stops it; the computer follows. Alone: refused */
+static void test_leads(void)
+{
+    jp_init(&jp, P, M, 0x1234, stick_out, NULL);
+    CHECK(jp_set_tempo(&jp, 400000, 0) == -1);
+    CHECK(jp_set_playing(&jp, 1, 0) == -1);
+    pc_start(100000, 500000);
+    run_for(6000000);
+    CHECK(jp_set_tempo(&jp, 400000, sim_now) == 0);
+    run_for(1000000);
+    CHECK(lk_mpb(&pc) == 400000);
+    CHECK(jp_set_playing(&jp, 1, sim_now) == 0);
+    run_for(1000000);
+    CHECK(lk_playing(&pc) == 1 && jp_playing(&jp) == 1);
+    CHECK(jp_set_playing(&jp, 0, sim_now) == 0);
+    run_for(1000000);
+    CHECK(lk_playing(&pc) == 0);
+}
+
 static void test_ticks_on_the_session(void)
 {
     struct jc_map m = {0};
@@ -440,6 +459,7 @@ int main(void)
     test_for_the_peer_alone();
     test_joins_session();
     test_follows();
+    test_leads();
     test_ticks_on_the_session();
     test_leave();
     printf("peer: %d checks, %d failed\n", checks, fails);
