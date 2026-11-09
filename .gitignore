@@ -7,3 +7,11 @@ worktrees/
 .ruff_cache/
 .DS_Store
 .idea/
+
+# board build outputs (hardware/pcb/make_fab.sh recreates them; the zip, bom.csv and cpl.csv are committed)
+hardware/pcb/fab/**/drc.rpt
+hardware/pcb/fab/**/erc.rpt
+hardware/pcb/fab/**/intended-nets.json
+hardware/pcb/fab/**/*.net.xml
+hardware/pcb/fab/**/gerbers/
+hardware/pcb/mockup*.scad
