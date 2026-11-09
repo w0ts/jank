@@ -75,10 +75,14 @@ din_floor_gap = 0.1;
 // THE SLOTS (the user's ruling 2026-11-09: "slots in the wall"): the front and back walls carry, round each DIN, a
 // cheek in front of the plate, a 2.0 slot (the plate's 1.8 + 0.1 a face) and a cheek behind it; the plate slides down
 // into the slot as the board goes in. No lip or wall behind the body.
-din_face_in = 0.8;      // the plate's face behind the base's outer face: the front cheek 0.7 + 0.1
+din_face_in = 1.3;      // the plate's face behind the base's outer face: the front cheek 1.2 + 0.1 (the user, 2026-11-09:
+                        // "make the wall thicker"; the base's face 0.3 proud of the board's edge)
 slot_play = 0.1;        // a face, and at the plate's side edges
 din_rim = [1.3, 2.2];   // how much of the plate's edge the cheeks hold: [each side, the far edge] (body overhang - 0.2)
-back_cheek = 1.0;       // the cheek behind the plate
+back_cheek = 2.0;       // the cheek behind the plate
+post_clear = 0.3;       // the posts behind the cheeks, beside the DIN bodies: this far from a body
+post_stop = 1.7;        // the posts stop this far below the board (the jacks' pegs and leads, mockup)
+chamfer = 1.0;          // 45-degree fillets where the back cheeks and the posts meet the floor
 
 /* [Jacks] */
 // MIDI: XKB PJ-320D-B-SMT (the mockup's block 6.2 x 12.2 x 5.0), its front 0.5 PAST the board's edge
@@ -212,6 +216,22 @@ module din_slot() {     // round one DIN, in the front / back wall: the window, 
     translate([-din_plate[0] / 2 + din_rim[0], -edge_in - 1, zp + din_rim[1]]) cube([din_plate[0] - 2 * din_rim[0], edge_in + wall_d + 2, din_plate[1]]);
     translate([-din_plate[0] / 2 - slot_play, din_in - slot_play, floor_t]) cube([din_plate[0] + 2 * slot_play, din_plate[2] + 2 * slot_play, din_plate[1] + 1]);
 }
+module din_posts() {    // local frame: beside the body, behind the back cheek, back to the body's back; and the fillets
+    pw = 23.0 - din_body[0] - 2 * post_clear;      // between two bodies at the 23.0 pitch
+    yw = din_in + din_plate[2] + slot_play + back_cheek;   // the back cheek's back face
+    y1 = din_in + din_body[2];
+    for (sd = [-1, 1]) {
+        x0 = sd > 0 ? din_body[0] / 2 + post_clear : -din_body[0] / 2 - post_clear - pw;
+        translate([x0, yw - 0.01, floor_t - 0.01]) cube([pw, y1 - yw + 0.01, Zbot - post_stop - floor_t + 0.01]);
+        // fillet along the post's side at the floor, under the body (its far edge 2.4 above the floor)
+        xe = sd > 0 ? x0 : x0 + pw;
+        hull() { translate([xe - (sd > 0 ? 0 : 0.01), yw - 0.01, floor_t - 0.01]) cube([0.01, y1 - yw + 0.01, chamfer]);
+                 translate([sd > 0 ? xe - chamfer : xe, yw - 0.01, floor_t - 0.01]) cube([chamfer, y1 - yw + 0.01, 0.01]); }
+    }
+    // fillet along the back cheek's back face at the floor, under the body
+    hull() { translate([-din_plate[0] / 2, yw - 0.01, floor_t - 0.01]) cube([din_plate[0], 0.01, chamfer]);
+             translate([-din_plate[0] / 2, yw - 0.01, floor_t - 0.01]) cube([din_plate[0], chamfer, 0.01]); }
+}
 // a jack in its frame, its front at -f (f = jack_out for the MIDI jacks, 0 for the side ones)
 module jack_slot(f) {   // through the lid's skirt, open downwards: the skirt comes down over the bushing
     translate([0, 0, Zb + bush_z]) xz_extrude(-edge_in - 1, edge_in + band_in + 1.01) dslot2d(bush_slot, bush_z + 1);
@@ -255,6 +275,10 @@ module box() {          // the base: the floor, the side walls, the front and ba
             translate([0, yf, floor_t - 0.01]) cube([L, wall_d - base_off, Zbot - contact - floor_t + 0.01]);             // front wall
             translate([0, Ybk - wall_d, floor_t - 0.01]) cube([L, wall_d - base_off, Zbot - contact - floor_t + 0.01]);  // back wall
             for (h = holes) standoff(h);
+            intersection() {    // the posts behind the cheeks, between the DIN bodies (5.2 apart: 4.6 posts), tied to the floor
+                translate([0, yf, 0]) cube([L, yb - yf, Zbot]);
+                for (k = [0 : 3]) at_din(k) din_posts();
+            }
         }
         for (k = [0 : 3]) at_din(k) din_slot();
         for (k = [0 : 3]) at_jack(k)     // the jacks' pegs and leads under the board (mockup), over the rib between plates
@@ -411,6 +435,7 @@ module front_test() {
     difference() {
         union() {
             translate([p, yf, 0]) cube([w, wall_d - base_off, zb0]);               // the front wall
+            intersection() { translate([p, 0, 0]) cube([w, 40, zb0]); translate([p + dx, e, -floor_t]) din_posts_at(zb0); }
             translate([p, 0, zt0]) cube([w, ts, face_h]);                         // the skirt
             for (x = [0, w + p]) cube([p, e + wall_d, zt0 + face_h]);             // the end posts
             translate([0, yf, 0]) cube([w + 2 * p, 12, 1.5]);                      // the foot
@@ -419,6 +444,11 @@ module front_test() {
         translate([p + jx, 0, zt0 + bush_z]) xz_extrude(-1, ts + 2) dslot2d(bush_slot, bush_z + 1);
         translate([p + jx - jack[0] / 2 - jack_play, e - jack_out - gap_out, zt0 - 1]) cube([jack[0] + 2 * jack_play, ts, jack[2] + jack_play + 1]);
     }
+}
+module din_posts_at(zb0) {   // din_posts() in the strip (the floor at 0, the board's bottom at zb0)
+    pw = 23.0 - din_body[0] - 2 * post_clear; yw = din_in + din_plate[2] + slot_play + back_cheek; y1 = din_in + din_body[2];
+    for (sd = [-1, 1]) translate([sd > 0 ? din_body[0] / 2 + post_clear : -din_body[0] / 2 - post_clear - pw, yw - 0.01, floor_t])
+        cube([pw, y1 - yw + 0.01, zb0 - post_stop]);
 }
 module din_slot_at(zb0) {   // the same cut as din_slot(), with the board's bottom at zb0 and the floor at 0
     zp = 0.6;
@@ -489,6 +519,10 @@ else if (part == "check_text") {
             }
         }
     }
+}
+else if (part == "show_slot") {   // the base cut to OUT3's DIN (x 17..52, y < 16), the plate in red in its slot
+    color("SteelBlue") intersection() { box(); translate([17, -1, -1]) cube([35, 17, H]); }
+    color("Red") at_din(2) din_plate_m();
 }
 else if (part == "caps_view") { color("LightSteelBlue") lid(); color("Orange") caps(); color("SteelBlue") box(); }
 else if (part == "lid_top") {
