@@ -27,8 +27,8 @@
 #define RING_SIZE 64u                  /* a power of two; a clock tick is one byte */
 #define TEXT_OUT_SIZE 2048u
 #define WRITE_TRIES 50                 /* milliseconds a full MIDI buffer may hold us up */
-#define MIDI_TASK_CORE 1
-#define MIDI_TASK_PRIO 6
+#define MIDI_TASK_CORE 0              /* core 1 is the MIDI clock's alone (midi.c) */
+#define MIDI_TASK_PRIO 24             /* above Wi-Fi (23) on core 0: it runs a few us a tick, straight into the endpoint (measured 2026-11-09: at 6, USB clock sd 220 us) */
 #define HOST_WAIT_MS 3000
 #define HOST_NEXT 0x4A4B484Fu          /* in RTC memory, for one restart: garbage after power-on is not this */
 
@@ -199,6 +199,7 @@ static int start_as_host(void)
 esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, usb_line_fn line_rx)
 {
     tinyusb_config_t cfg = TINYUSB_DEFAULT_CONFIG();
+    cfg.task.xCoreID = 0;             /* TinyUSB's task and the USB interrupt it installs: off the clock's core 1 */
     tinyusb_net_config_t net = {.on_recv_callback = on_frame, .free_tx_buffer = on_tx_done};
     esp_err_t e;
     s_host = (uint8_t)start_as_host();
@@ -230,7 +231,7 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
         e = tinyusb_net_init(&net);
     if (e == ESP_OK && xTaskCreatePinnedToCore(midi_task, "usb_midi", 4096, NULL, MIDI_TASK_PRIO, &s_task, MIDI_TASK_CORE) != pdPASS)
         e = ESP_ERR_NO_MEM;
-    if (e == ESP_OK && xTaskCreate(wait_for_a_computer, "usb_wait", 2048, NULL, 2, NULL) != pdPASS)
+    if (e == ESP_OK && xTaskCreatePinnedToCore(wait_for_a_computer, "usb_wait", 2048, NULL, 2, NULL, 0) != pdPASS)
         e = ESP_ERR_NO_MEM;
     if (e != ESP_OK)
         ESP_LOGE(TAG, "start: %s", esp_err_to_name(e));
