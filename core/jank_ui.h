@@ -46,6 +46,21 @@ uint32_t js_plan(uint32_t home_group, uint8_t out[2]);
 /* the next group heard after current, wrapping; 0: no other */
 uint32_t js_pick(const struct js_scan *s, uint32_t current, uint32_t now_ms);
 
+/* the automatic scan (the user, 2026-11-11: "it should scan all the time, when not connected"): alone on the home
+ * channel for JS_ALONE_MS, the stick sweeps the other channels every JS_AUTO_EVERY_MS until it hears a group */
+#define JS_ALONE_MS 5000u              /* nobody heard at home this long: alone (Link itself forgets peers after 5 s) */
+#define JS_AUTO_EVERY_MS 5000u         /* from the end of one automatic sweep to the start of the next */
+struct js_auto {
+    uint32_t alone_since;              /* ms; when the home channel last went quiet */
+    uint32_t last_sweep;               /* ms; when the last automatic sweep ended */
+    uint8_t alone;                     /* 1 while nobody is heard at home */
+    uint8_t swept;                     /* 1 once a sweep has run since going alone */
+};
+void js_auto_init(struct js_auto *a, uint32_t now_ms);
+/* call often with how many units the home channel hears; 1: sweep now (then call js_auto_swept) */
+int js_auto_step(struct js_auto *a, uint32_t peers_heard, uint32_t now_ms);
+void js_auto_swept(struct js_auto *a, uint32_t now_ms);
+
 /* the control page's scan: what each group sounded like during one sweep. Senders are told apart by addr2 only:
  * an FM-1 and a jank send the same frames, and a jank shows only by its MAC prefix (jk_mac_is_jank) */
 #define JS_UNITS 8u                    /* senders counted a group; more are not, their frames are */

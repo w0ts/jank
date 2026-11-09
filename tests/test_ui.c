@@ -163,6 +163,25 @@ static void test_plan(void)
     CHECK(js_plan(9, ch) == 2 && ch[0] == 1 && ch[1] == 6);
 }
 
+/* the automatic scan: not before JS_ALONE_MS alone, then every JS_AUTO_EVERY_MS, never while anyone is heard */
+static void test_auto(void)
+{
+    struct js_auto a;
+    uint32_t t = 100000;
+    js_auto_init(&a, t);
+    CHECK(!js_auto_step(&a, 0, t + JS_ALONE_MS - 1));             /* alone, but not long enough */
+    CHECK(js_auto_step(&a, 0, t + JS_ALONE_MS));                  /* alone long enough: sweep */
+    js_auto_swept(&a, t + JS_ALONE_MS + 700);
+    CHECK(!js_auto_step(&a, 0, t + JS_ALONE_MS + 700 + JS_AUTO_EVERY_MS - 1));
+    CHECK(js_auto_step(&a, 0, t + JS_ALONE_MS + 700 + JS_AUTO_EVERY_MS));   /* and again */
+    CHECK(!js_auto_step(&a, 2, t + 20000));                       /* someone heard: no sweep */
+    CHECK(!js_auto_step(&a, 0, t + 20001));                       /* quiet again: the count restarts */
+    CHECK(!js_auto_step(&a, 0, t + 20001 + JS_ALONE_MS - 1));
+    CHECK(js_auto_step(&a, 0, t + 20001 + JS_ALONE_MS));          /* first sweep of this quiet spell, at once */
+    js_auto_init(&a, 0xFFFFF000u);                                /* the ms counter wraps */
+    CHECK(js_auto_step(&a, 0, 0xFFFFF000u + JS_ALONE_MS));
+}
+
 static void test_pick(void)
 {
     struct js_scan s;
@@ -265,6 +284,7 @@ int main(void)
     test_group_of();
     test_plan();
     test_pick();
+    test_auto();
     test_table();
     test_led_events();
     printf("ui: %d checks, %d failed\n", checks, fails);
