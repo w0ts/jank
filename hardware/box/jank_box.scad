@@ -24,7 +24,7 @@
 
 /* [What to render] */
 sj = 0;                 // the side jack a brace_side_* check looks at
-part = "assembly";      // [assembly, box, lid, button_cap, slider_cap, slider_cap_smd, knob, front_test, mock, open, front, back, joint, lid_top, caps_view, check_box, check_lid, check_lidbox, check_drop, check_board_drop, check_text, check_caps, check_usb, brace_caps, brace_pull, brace_pull_jack, brace_push, brace_trs, brace_side_pull, brace_side_push, brace_floor, brace_lid, brace_ledge, brace_reg, brace_snap]
+part = "assembly";      // [assembly, box, lid, button_cap, ab_tab, ab_tab_smd, ab_grip, knob, tab_view, tab_print, front_test, mock, open, front, back, joint, lid_top, caps_view, check_box, check_lid, check_lidbox, check_drop, check_board_drop, check_text, check_caps, check_usb, brace_caps, brace_pull, brace_pull_jack, brace_push, brace_trs, brace_side_pull, brace_side_push, brace_floor, brace_lid, brace_ledge, brace_reg, brace_snap]
 
 /* [Board v5c, modular: hardware/pcb (jank-pcb-mod.kicad_pcb, mockup-mod.stl)] */
 board_l = 87.0;
@@ -57,14 +57,25 @@ ab = [[17.5, 8.1, "x", 1.5, 1.5, 1.5, 3.2, 6.2, 7.7, 3.55],
 /* the printed caps (the user's answer 2026-11-08: "we can 3D print something") */
 btn_cap = [5.4, 8.0, 1.0, 3.45, 3.0, 0.3];   // stem dia, flange dia, flange thickness, bore (plunger 3.4), proud of
                                              // the lid, flange gap under the lid at rest
-slider_fit = 0.05;      // the slider cap's pocket over the knob: + 0.05 each way (printed small: press)
-slider_wall = 0.8;
-slider_proud = 1.0;     // the slider cap's top above the lid
-slider_lift = 0.2;      // its bottom above the switch body
+// THE A/B TABS (the user, 2026-11-09: "the current option is just not working"): a captured sliding tab per switch, in
+// two printed parts. The TAB: a block under the lid (the flange: wider than the lid's slot on every side, so it cannot
+// come out upwards) with the pocket over the switch's handle, a neck through the slot, a post above the lid. The GRIP
+// (6 x 4, ridged) is pressed onto the post after the lid is on: a one-piece tab cannot pass a slot narrower than both
+// its ends. Vertically the tab rests on the handle's top (the pocket's roof), 0.2 under the lid and 0.2 over the body.
+tab_neck = [4.0, 2.4];  // the neck in the slot: across, along the travel
+tab_slot_clear = [0.15, 0.2];   // the slot round the neck: a side across (it guides), at each end of the travel
+tab_overlap = 1.0;      // the flange past the slot's edges, at every position of the travel
+tab_lift = 0.2;         // the tab's bottom above the switch's body
+tab_top_gap = 0.2;      // the flange's top under the lid
+tab_fit = [0.3, 0.1];   // the pocket over the handle, in all: across (loose: the slot and the flange guide), along (drives)
+grip = [6.0, 4.0, 1.8, 0.4];       // across, along, height, top chamfer (bottom chamfer 0.3)
+grip_gap = 0.2;         // the grip's bottom (the neck's shoulder) above the lid
+grip_post = [3.0, 1.8, 1.4];       // the post on the neck, under the grip: across, along, height (the grip's socket the same: press)
+grip_ridge = [3, 0.5, 0.35, 1.2];  // ridges across the travel on the grip's top: count, width, height, pitch
 knob = [14.0, 12.0, 6.1, 4.6, 10.0];   // dia, height, D bore dia, across the flat, bore depth
 enc_flat = 4.5;         // UNVERIFIED: the EC11's D shaft, 4.5 across the flat over its top 10 mm
-function cap_size(c) = [c[3] + slider_fit + 2 * slider_wall, c[4] + slider_fit + 2 * slider_wall];   // across, along
-function slot_size(c) = [cap_size(c)[0] + 0.35, cap_size(c)[1] + c[5] + 0.35];                     // across, along
+function slot_size(c) = [tab_neck[0] + 2 * tab_slot_clear[0], tab_neck[1] + c[5] + 2 * tab_slot_clear[1]];   // across, along
+function flange_size(c) = [slot_size(c)[0] + 2 * tab_overlap, slot_size(c)[1] + c[5] + 2 * tab_overlap];
 sw_body_h = 3.5;        // UNVERIFIED: the buttons' body height
 // USB-C (2026-11-09, the user: "one hole per USB connector"): each socket gets ONE opening of its own.
 //   XIAO (U1): the module's PCB ends at the board's back edge (footprint F.Fab 0.0 to 21.0 in from it); only its USB-C
@@ -485,12 +496,35 @@ module button_cap(p, press = 0) {
         translate([0, 0, fz - 1]) cylinder(d = btn_cap[3], h = Zb + sw_h - fz + 1);
     }
 }
-module slider_cap(c, pos = 0) {   // pos: -1 / 0 / +1 = one end of the travel, the middle, the other end
-    cs = cap_size(c);
-    z0 = Zb + c[6] + slider_lift;
-    translate([kx(c[0]), ky(c[1]), 0]) rotate([0, 0, ab_rot(c)]) translate([0, pos * c[5] / 2, 0]) difference() {
-        translate([-cs[0] / 2, -cs[1] / 2, z0]) cube([cs[0], cs[1], H + slider_proud - z0]);
-        translate([-(c[3] + slider_fit) / 2, -(c[4] + slider_fit) / 2, z0 - 1]) cube([c[3] + slider_fit, c[4] + slider_fit, Zb + c[7] - z0 + 1]);
+module tab_cut(c) { intersection() { children(); translate([kx(c[0]), ky(c[1]) - 8, Zb - 3]) cube([10, 16, 16]); } }   // tab_view
+module at_tab(c, pos) { translate([kx(c[0]), ky(c[1]), 0]) rotate([0, 0, ab_rot(c)]) translate([0, pos * c[5] / 2, 0]) children(); }
+function tab_z0(c) = Zb + c[6] + tab_lift;
+module ab_tab(c, pos = 0) {   // pos: -1 / 0 / +1 = one end of the travel, the middle, the other end (local y: the travel)
+    f = flange_size(c); z0 = tab_z0(c); z1 = Zl - tab_top_gap; zs = H + grip_gap;
+    at_tab(c, pos) difference() {
+        union() {
+            translate([-f[0] / 2, -f[1] / 2, z0]) cube([f[0], f[1], z1 - z0]);                                     // the flange
+            translate([-tab_neck[0] / 2, -tab_neck[1] / 2, z1 - 0.01]) cube([tab_neck[0], tab_neck[1], zs - z1 + 0.01]);   // the neck
+            translate([-grip_post[0] / 2, -grip_post[1] / 2, zs - 0.01]) cube([grip_post[0], grip_post[1], grip_post[2] + 0.01]);
+        }
+        translate([-(c[3] + tab_fit[0]) / 2, -(c[4] + tab_fit[1]) / 2, z0 - 1]) cube([c[3] + tab_fit[0], c[4] + tab_fit[1], Zb + c[7] - z0 + 1]);
+    }
+}
+module ab_grip(c, pos = 0) {  // on the post, its bottom on the neck's shoulder
+    g = grip; b = 0.3;
+    at_tab(c, pos) translate([0, 0, H + grip_gap]) difference() {
+        union() {
+            hull() {
+                translate([-(g[0] - 2 * b) / 2, -(g[1] - 2 * b) / 2, 0]) cube([g[0] - 2 * b, g[1] - 2 * b, 0.01]);
+                translate([-g[0] / 2, -g[1] / 2, b]) cube([g[0], g[1], g[2] - b - g[3]]);
+                translate([-(g[0] - 2 * g[3]) / 2, -(g[1] - 2 * g[3]) / 2, g[2] - 0.01]) cube([g[0] - 2 * g[3], g[1] - 2 * g[3], 0.01]);
+            }
+            for (i = [0 : grip_ridge[0] - 1]) translate([0, (i - (grip_ridge[0] - 1) / 2) * grip_ridge[3], g[2] - 0.01]) hull() {
+                translate([-(g[0] - 2 * g[3] - 0.4) / 2, -grip_ridge[1] / 2, 0]) cube([g[0] - 2 * g[3] - 0.4, grip_ridge[1], 0.01]);
+                translate([-(g[0] - 2 * g[3] - 0.8) / 2, -grip_ridge[1] / 2 + 0.1, grip_ridge[2]]) cube([g[0] - 2 * g[3] - 0.8, grip_ridge[1] - 0.2, 0.01]);
+            }
+        }
+        translate([-grip_post[0] / 2, -grip_post[1] / 2, -1]) cube([grip_post[0], grip_post[1], grip_post[2] + 1]);
     }
 }
 module knob_at(c, pos) {          // the switch's knob at one end of its travel (for the checks)
@@ -515,7 +549,7 @@ module enc_shaft_d() {  // the shaft with its flat, for the knob's check
 }
 module caps(press = 0, pos = 0) {
     for (b = buttons) button_cap(b, press);
-    for (c = ab) slider_cap(c, pos);
+    for (c = ab) { ab_tab(c, pos); ab_grip(c, pos); }
     enc_knob();
 }
 
@@ -538,29 +572,44 @@ module board_slab(dz) { translate([X0, Y0, Zbot + dz]) cube([board_l, board_w, b
 
 if (part == "box") box();
 else if (part == "button_cap") translate([0, 0, -(Zl - btn_cap[5] - btn_cap[2])]) translate([-kx(buttons[0][0]), -ky(buttons[0][1]), 0]) button_cap(buttons[0]);   // flange on the bed
-else if (part == "slider_cap") translate([0, 0, H + slider_proud]) rotate([180, 0, 0]) translate([-kx(ab[1][0]), -ky(ab[1][1]), 0]) slider_cap(ab[1]);   // top on the bed
-else if (part == "slider_cap_smd") translate([0, 0, H + slider_proud]) rotate([180, 0, 0]) translate([-kx(ab[0][0]), -ky(ab[0][1]), 0]) slider_cap(ab[0]);
+else if (part == "ab_tab") translate([-kx(ab[1][0]), -ky(ab[1][1]), -tab_z0(ab[1])]) ab_tab(ab[1]);   // the pocket side on the bed
+else if (part == "ab_tab_smd") translate([-kx(ab[0][0]), -ky(ab[0][1]), -tab_z0(ab[0])]) ab_tab(ab[0]);
+else if (part == "ab_grip") translate([-kx(ab[1][0]), -ky(ab[1][1]), -(H + grip_gap)]) ab_grip(ab[1]);   // the socket side on the bed
+else if (part == "tab_print") {   // the printed parts, as on the bed: tab, SMD tab, grip
+    color("Orange") translate([-kx(ab[1][0]), -ky(ab[1][1]), -tab_z0(ab[1])]) ab_tab(ab[1]);
+    color("Orange") translate([12 - kx(ab[0][0]), -ky(ab[0][1]), -tab_z0(ab[0])]) ab_tab(ab[0]);
+    color("DarkOrange") translate([24 - kx(ab[1][0]), -ky(ab[1][1]), -(H + grip_gap)]) ab_grip(ab[1]);
+}
+else if (part == "tab_view") {   // OUT3's tab (SW4) cut through its middle along the travel, at both ends (the second 16 mm on)
+    c = ab[2];
+    for (q = [-1, 1]) translate([0, q > 0 ? 16 : 0, 0]) {
+        color("LightSteelBlue") tab_cut(c) lid(); color("DarkGreen") tab_cut(c) mock();
+        color("Orange") tab_cut(c) ab_tab(c, q); color("Chocolate") tab_cut(c) ab_grip(c, q);
+    }
+}
 else if (part == "knob") translate([0, 0, Zb + 20 - knob[4] + knob[1]]) rotate([180, 0, 0]) translate([-encC[0], -encC[1], 0]) enc_knob();   // top on the bed
-else if (part == "check_caps") {   // must be EMPTY: the caps against the lid at rest, pressed 0.3, the sliders at both ends;
-    // against the board (the sliders' pockets round their knob, the knob's bore round the D shaft)
+else if (part == "check_caps") {   // must be EMPTY: the caps against the lid at rest, pressed 0.3, the tabs at both ends;
+    // against the board (the tabs' pockets round their handle, the knob's bore round the D shaft)
     intersection() { lid(); union() { caps(0, 0); caps(0.3, -1); caps(0.3, 1); } }
     intersection() { union() { for (b = buttons) { button_cap(b); button_cap(b, 0.3); } }
                      difference() { mock(); for (b = buttons) translate([kx(b[0]), ky(b[1]), Zb + 3]) cylinder(d = 3.41, h = 7); } }
-    intersection() { union() { for (c = ab) for (q = [-1, 1]) slider_cap(c, q); }
+    intersection() { union() { for (c = ab) for (q = [-1, 1]) { ab_tab(c, q); ab_grip(c, q); } }
                      difference() { mock(); for (c = ab) translate([kx(c[0]), ky(c[1]), 0]) rotate([0, 0, ab_rot(c)])
                          translate([-c[3] / 2 - 0.05, -(c[4] + c[5]) / 2 - 0.05, Zb + c[6] - 0.01]) cube([c[3] + 0.1, c[4] + c[5] + 0.1, 5]); } }
     intersection() { enc_knob(); union() { difference() { mock(); translate([encC[0], encC[1], Zb + 6.4]) cylinder(d = 6.2, h = 15); } enc_shaft_d(); box(); } }
-    for (c = ab) for (q = [-1, 1]) intersection() { slider_cap(c, q); knob_at(c, q); }   // the knob in its pocket at each end
+    for (c = ab) for (q = [-1, 1]) intersection() { ab_tab(c, q); knob_at(c, q); }   // the knob in its pocket at each end
 }
 else if (part == "brace_caps")   // must NOT be empty: a button cap pulled up 0.35 meets the lid (the flange keeps it)
     intersection() { lid(); translate([0, 0, btn_cap[5] + 0.05]) for (b = buttons) button_cap(b); }
+else if (part == "brace_tabs")   // must NOT be empty, each tab sj (0..3): pulled up 0.25 its flange meets the lid's underside
+    intersection() { lid(); translate([0, 0, tab_top_gap + 0.05]) ab_tab(ab[sj], 0); }
 else if (part == "lid") lid_print();
 else if (part == "front_test") front_test();
 else if (part == "mock") mock();
 else if (part == "check_box") intersection() { box(); mock(); }
 else if (part == "check_lid") intersection() { lid(); mock(); }
 else if (part == "check_lidbox") intersection() { lid(); box(); }   // they never touch: the board is between them
-else if (part == "check_drop") intersection() { union() { for (dz = [0.25 : 0.25 : 22]) translate([0, 0, dz]) lid(false); } union() { box(); mock(); for (b = buttons) button_cap(b); for (c = ab) slider_cap(c); } }
+else if (part == "check_drop") intersection() { union() { for (dz = [0.25 : 0.25 : 22]) translate([0, 0, dz]) lid(false); } union() { box(); mock(); for (b = buttons) button_cap(b); for (c = ab) for (q = [-1, 0, 1]) ab_tab(c, q); } }   // the tabs on, the grips not yet
 else if (part == "check_board_drop") intersection() { union() { for (dz = [0.5 : 0.5 : 26]) translate([0, 0, dz]) mock(); } box(); }
 else if (part == "check_text") {
     if (markings) {
