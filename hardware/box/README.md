@@ -1,5 +1,7 @@
 # jank box: the printed box of the jank board (modular v5c)
 
+Part of the **[jank device](../../docs/device.md)** · the other half: [the PCB](../pcb/README.md)
+
 The box for the **modular** board in [`../pcb`](../pcb/README.md) (`jank-pcb-mod`, v5c), **87.0 x 79.5 mm**.
 
 **The board's top (the lid side):**
