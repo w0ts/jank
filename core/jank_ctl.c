@@ -224,6 +224,35 @@ static char *trim(const char *line, char *buf, size_t cap)
     return buf;
 }
 
+/* hundredths of a BPM from "120", "128.5", "99.25" -> 0; -1 not a number like that */
+static int parse_bpm_x100(const char *s, uint32_t *out)
+{
+    uint32_t v = 0, frac = 0, digits = 0, fd = 0;
+    for (; *s >= '0' && *s <= '9'; s++, digits++)
+        if (digits < 4u)
+            v = v * 10u + (uint32_t)(*s - '0');
+    if (!digits || digits > 3u)
+        return -1;
+    if (*s == '.')
+        for (s++; *s >= '0' && *s <= '9'; s++, fd++)
+            if (fd < 2u)
+                frac = frac * 10u + (uint32_t)(*s - '0');
+    if (*s || fd > 2u)
+        return -1;
+    *out = v * 100u + (fd == 1u ? frac * 10u : frac);
+    return 0;
+}
+
+int jk_ctl_tempo(const char *line, int32_t *mpb)
+{
+    char buf[32], *s = trim(line, buf, sizeof buf);
+    uint32_t x100;
+    if (!s || strncmp(s, "tempo ", 6) || parse_bpm_x100(s + 6, &x100) || x100 < JK_BPM_MIN_X100 || x100 > JK_BPM_MAX_X100)
+        return -1;
+    *mpb = (int32_t)((6000000000ull + x100 / 2u) / x100);
+    return 0;
+}
+
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap)
 {
     struct writer w = {out, cap, 0};
@@ -243,8 +272,16 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         return cmd_set(s + 4, cfg, &w);
     else if (!strcmp(s, "scan"))
         return JK_CTL_SCAN;
+    else if (!strcmp(s, "play") || !strcmp(s, "stop"))
+        return s[1] == 'l' ? JK_CTL_PLAY : JK_CTL_STOP;
+    else if (!strncmp(s, "tempo", 5) && (!s[5] || s[5] == ' ')) {
+        int32_t mpb;
+        if (!jk_ctl_tempo(s, &mpb))
+            return JK_CTL_TEMPO;
+        put(&w, "err tempo is 20 to 999 BPM\n");
+    }
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nscan\nset group|name|filter|peer|transport|quantum|offset|net|ssid|pass <value>\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nscan\nset group|name|filter|peer|transport|quantum|offset|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

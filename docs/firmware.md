@@ -52,18 +52,24 @@ The PCB's ladder, encoder, second LED, MIDI IN mode and power cut have no firmwa
 
 The stick's USB drive (label JANK) holds `page/jank.html`; open it in Chrome or Edge and press Connect. It talks Web
 MIDI to the stick's MIDI port, with the control line as SysEx (`core/jank_sysex.h`), and asks for SysEx permission. It
-shows status, units heard, settings, a group scan with Join buttons and a download-mode button. It does not flash.
+shows what a player uses on top: the groups heard with a Join button each, the group, the tempo with a new-tempo box,
+the beat in the bar, Play / Stop, beats a bar, clock offset, MIDI start / stop and the network (MODE JANK or a Wi-Fi
+network). Under Details, folded: the air, Link and frame counters, the peers heard, name, air filter, Link peer and
+download mode. It does not flash.
 
 One command a line; each answer ends with `ok` or `err <why>`:
 
 ```
 get | status | scan | help | reboot | bootloader
+tempo 20..999 (BPM, up to two decimals) | play | stop
 set group 1..9 | name <text> | filter link|all | peer on|off | transport link|auto
 set quantum 1..16 | offset -100..100 | net jank|wifi | ssid <name> | pass <8..63 chars>
 ```
 
 `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
-nothing. `net jank` is the protocol's name for jank mode.
+nothing. `net jank` is the protocol's name for jank mode. `tempo`, `play` and `stop` change the whole Link session, as
+any Link app may (play and stop from the session's beat now); with no session they answer `err no session`: alone, the
+stick has no session of its own.
 
 ## The `bootloader` command
 

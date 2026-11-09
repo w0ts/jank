@@ -149,9 +149,16 @@ enum jk_ctl_action {
     JK_CTL_CFG_CHANGED,               /* the caller stores cfg and applies it */
     JK_CTL_REBOOT,
     JK_CTL_BOOTLOADER,                /* restart into the ROM's download mode, for flashing with no button */
-    JK_CTL_SCAN                       /* out is empty: the caller scans and answers with js_table_report */
+    JK_CTL_SCAN,                      /* out is empty: the caller scans and answers with js_table_report */
+    JK_CTL_TEMPO,                     /* out is empty: the caller sets the session's tempo (jk_ctl_tempo), answers ok or err */
+    JK_CTL_PLAY,                      /* out is empty: the caller starts the session, answers ok or err */
+    JK_CTL_STOP                       /* out is empty: the caller stops the session, answers ok or err */
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
+#define JK_BPM_MIN_X100 2000u          /* the BPM the tempo command takes, hundredths: Link's own clamp, 20..999 */
+#define JK_BPM_MAX_X100 99900u
+/* "tempo <bpm>", BPM 20..999 with up to two decimals -> 0 and us a beat; -1 not one */
+int jk_ctl_tempo(const char *line, int32_t *mpb);
 
 /* on the session's beat: MODE JANK rests off and flashes on, the Wi-Fi network the other way round. No session: the rest.
  * beat_ub in micro-beats, mpb us a beat. -> 1: lit */

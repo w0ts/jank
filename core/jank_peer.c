@@ -304,3 +304,19 @@ int32_t jp_mpb(const struct jank_peer *p) { return lk_mpb(&p->k); }
 int64_t jp_beat_at(const struct jank_peer *p, int64_t now_us) { return lk_beat_at(&p->k, now_us); }
 int jp_playing(const struct jank_peer *p) { return p->on && lk_playing(&p->k); }
 uint32_t jp_peers(const struct jank_peer *p) { return p->on ? lk_peers(&p->k) : 0u; }
+
+int jp_set_tempo(struct jank_peer *p, int32_t mpb, int64_t now_us)
+{
+    if (!jp_joined(p))
+        return -1;
+    lk_set_tempo(&p->k, mpb, now_us);
+    return 0;
+}
+
+int jp_set_playing(struct jank_peer *p, int play, int64_t now_us)
+{
+    if (!jp_joined(p))
+        return -1;
+    lk_set_playing(&p->k, play, lk_beat_at(&p->k, now_us), now_us);
+    return 0;
+}

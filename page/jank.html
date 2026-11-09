@@ -31,6 +31,15 @@ button:disabled { opacity: .45; cursor: default; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
 th, td { text-align: left; padding: 3px 8px 3px 0; }
 th { color: var(--dim); font-weight: 500; font-size: 12px; }
+details.more { margin-bottom: 12px; }
+details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 2px; }
+details.more[open] > summary { margin-bottom: 8px; }
+.tempo { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 18px; margin-bottom: 12px; }
+.big { font-size: 40px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
+.tempo input { width: 7.5em; font-size: 20px; }
+.row { display: flex; gap: 8px; align-items: end; }
+td button { padding: 4px 12px; }
+.tempo label button { font-size: 15px; padding: 9px 14px; }
 #msg { color: var(--dim); min-height: 1.4em; margin: 0 0 12px; }
 #msg.bad { color: var(--warn); }
 </style>
@@ -44,55 +53,33 @@ th { color: var(--dim); font-weight: 500; font-size: 12px; }
   <p id="msg">Chrome or Edge on a computer: plug the stick in, then Connect.</p>
 
   <section>
-    <h2>Active groups</h2>
+    <h2>Group</h2>
     <table class="groups">
-      <thead><tr><th>Group</th><th>Channel</th><th>Units</th><th>Signal, dBm</th><th></th></tr></thead>
+      <thead><tr><th>Group</th><th>Channel</th><th>Peers</th><th>Signal, dBm</th><th></th></tr></thead>
       <tbody id="groups"></tbody>
     </table>
     <p id="scan-result"></p>
-    <p><button id="scan" class="quiet" disabled>Scan again</button></p>
-    <p class="note">Click a group to join it. A scan takes about 1 s: the stick is away from its own channel for about 0.7 s, its frames are lost for that time, and the MIDI clock runs on. Units are FM-1s and jank sticks together: a jank is counted by its address, unless a computer changed it.</p>
-  </section>
-
-  <section>
-    <h2>Air</h2>
     <div class="grid">
-      <div class="stat"><b id="s-peers">-</b><span>units heard</span></div>
-      <div class="stat"><b id="s-rssi">-</b><span>best signal, dBm</span></div>
-      <div class="stat"><b id="s-channel">-</b><span>channel</span></div>
-      <div class="stat"><b id="s-usb">-</b><span>computer</span></div>
+      <label>Group <select id="c-group"></select></label>
+      <div class="row"><button id="scan" class="quiet" disabled>Scan</button></div>
     </div>
+    <p class="note">Join a group heard nearby, or pick one. While no peer is heard the stick scans by itself every 5 s.</p>
   </section>
 
   <section>
-    <h2>Link and MIDI</h2>
+    <h2>Tempo and transport</h2>
+    <div class="tempo">
+      <div><div class="big" id="t-bpm">-</div><span class="note">BPM</span></div>
+      <div><div class="big" id="t-beat">-</div><span class="note">beat</span></div>
+      <label>New tempo <span class="row"><input id="t-tempo" inputmode="decimal" placeholder="120"><button id="t-set" disabled>Set</button></span></label>
+      <div class="row"><button id="t-play" disabled>Play</button></div>
+    </div>
+    <p class="note" id="t-state">-</p>
     <div class="grid">
-      <div class="stat"><b id="s-link_peers">-</b><span>Link peers</span></div>
-      <div class="stat"><b id="s-bpm">-</b><span>BPM</span></div>
-      <div class="stat"><b id="s-beat">-</b><span>beat</span></div>
-      <div class="stat"><b id="s-playing">-</b><span>transport</span></div>
-      <div class="stat"><b id="s-midi_ticks">-</b><span>MIDI clocks sent</span></div>
+      <label>MIDI start / stop <select id="c-transport"><option value="link">Link play / stop</option><option value="auto">Always in a session</option></select></label>
+      <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16"></label>
+      <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100"></label>
     </div>
-  </section>
-
-  <section>
-    <h2>Frames</h2>
-    <div class="grid">
-      <div class="stat"><b id="s-air_in">-</b><span>from the air</span></div>
-      <div class="stat"><b id="s-usb_out">-</b><span>to the computer</span></div>
-      <div class="stat"><b id="s-usb_in">-</b><span>from the computer</span></div>
-      <div class="stat"><b id="s-air_out">-</b><span>to the air</span></div>
-      <div class="stat"><b id="s-drops">-</b><span>dropped by faults</span></div>
-      <div class="stat"><b id="s-drop_filter">-</b><span>chatter kept off the air</span></div>
-    </div>
-  </section>
-
-  <section>
-    <h2>Units</h2>
-    <table>
-      <thead><tr><th>Address</th><th>dBm</th><th>Last heard, ms</th><th>Frames</th></tr></thead>
-      <tbody id="units"></tbody>
-    </table>
   </section>
 
   <section>
@@ -103,28 +90,72 @@ th { color: var(--dim); font-weight: 500; font-size: 12px; }
       <label>Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
       <label>Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
     </div>
-    <p>2.4 GHz only. The stick keeps the password in its flash, unencrypted, and never sends it back.</p>
+    <p class="note">2.4 GHz only. The stick keeps the password in its flash, unencrypted, and never sends it back.</p>
     <button id="net-apply" disabled>Save and restart</button>
   </section>
 
-  <section>
-    <h2>Settings</h2>
-    <div class="grid">
-      <label>Group <select id="c-group"></select></label>
-      <label>Name <input id="c-name" maxlength="23"></label>
-      <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
-      <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
-      <label>Transport <select id="c-transport"><option value="link">Link start/stop</option><option value="auto">Run with session</option></select></label>
-      <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16"></label>
-      <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100"></label>
-    </div>
-  </section>
+  <details class="more">
+    <summary>Details</summary>
 
-  <section>
-    <h2>Firmware</h2>
-    <p>This page does not flash. Download mode restarts the stick so esptool can reach it; the README has the command.</p>
-    <button id="bootloader" class="quiet" disabled>Download mode</button>
-  </section>
+    <section>
+      <h2>Air</h2>
+      <div class="grid">
+        <div class="stat"><b id="s-peers">-</b><span>peers heard</span></div>
+        <div class="stat"><b id="s-rssi">-</b><span>best signal, dBm</span></div>
+        <div class="stat"><b id="s-channel">-</b><span>channel</span></div>
+        <div class="stat"><b id="s-usb">-</b><span>computer</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Link and MIDI</h2>
+      <div class="grid">
+        <div class="stat"><b id="s-link_peers">-</b><span>Link peers</span></div>
+        <div class="stat"><b id="s-link_ip">-</b><span>the stick's Link address</span></div>
+        <div class="stat"><b id="s-midi_ticks">-</b><span>MIDI clocks sent</span></div>
+        <div class="stat"><b id="s-midi_resync">-</b><span>clock jumps to the session</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Frames</h2>
+      <div class="grid">
+        <div class="stat"><b id="s-air_in">-</b><span>from the air</span></div>
+        <div class="stat"><b id="s-usb_out">-</b><span>to the computer</span></div>
+        <div class="stat"><b id="s-usb_in">-</b><span>from the computer</span></div>
+        <div class="stat"><b id="s-air_out">-</b><span>to the air</span></div>
+        <div class="stat"><b id="s-drops">-</b><span>dropped by faults</span></div>
+        <div class="stat"><b id="s-drop_filter">-</b><span>chatter kept off the air</span></div>
+        <div class="stat"><b id="s-lat_air_us">-</b><span>air to USB, us</span></div>
+        <div class="stat"><b id="s-lat_usb_us">-</b><span>USB to air, us</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Peers heard</h2>
+      <table>
+        <thead><tr><th>Address</th><th>dBm</th><th>Last heard, ms</th><th>Frames</th></tr></thead>
+        <tbody id="units"></tbody>
+      </table>
+      <p class="note">FM-1s and jank sticks send the same frames: a jank shows only by its address, unless a computer changed it. A scan takes about 1 s, with the stick off its own channel for about 0.7 s; the MIDI clock runs on.</p>
+    </section>
+
+    <section>
+      <h2>More settings</h2>
+      <div class="grid">
+        <label>Name <input id="c-name" maxlength="23"></label>
+        <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
+        <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Firmware</h2>
+      <p id="s-version" class="note">-</p>
+      <p>This page does not flash. Download mode restarts the stick so esptool can reach it; the README has the command.</p>
+      <button id="bootloader" class="quiet" disabled>Download mode</button>
+    </section>
+  </details>
 </main>
 
 <script id="logic">
@@ -201,8 +232,29 @@ function parseAnswer(lines) {
 }
 
 /* FM-1s and janks send the same frames: a jank shows only by its MAC prefix */
-function unitText(row) {
+function peerText(row) {
   return row.janks ? row.units + ", of which " + row.janks + " jank" : String(row.units);
+}
+
+/* the tempo box's command, or null: Link's 20..999 BPM, two decimals at most; a comma as the decimal point too */
+function tempoCommand(raw) {
+  const value = String(raw).trim().replace(",", ".");
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(value)) return null;
+  const bpm = Number(value);
+  return bpm >= 20 && bpm <= 999 ? "tempo " + value : null;
+}
+
+/* "3 / 4": the beat in the bar, Link's beat count as MIDI start uses it */
+function beatInBar(beat, quantum) {
+  const q = Number(quantum) || 4;
+  if (beat === undefined || !Number.isFinite(Number(beat))) return "-";
+  const b = Math.floor(Number(beat));
+  return (((b % q) + q) % q + 1) + " / " + q;
+}
+
+/* status's bpm is 0 with no session */
+function inSession(v) {
+  return Number(v.bpm || 0) > 0;
 }
 
 function isEnd(line) {
@@ -232,7 +284,9 @@ function setCommand(key, raw) {
 const $ = (id) => document.getElementById(id);
 const SCAN_WAIT_MS = 4000;
 const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset"];
+const STATS = ["peers", "rssi", "channel", "link_peers", "link_ip", "midi_ticks", "midi_resync", "air_in", "usb_out", "usb_in", "air_out", "drop_filter", "lat_air_us", "lat_usb_us"];
 let port = null, writer = null, poll = null, pendingEnd = null, pendingLines = [], queue = Promise.resolve();
+let lastGet = {}, lastStatus = {}, lastScans = [];
 
 function say(text, bad) {
   $("msg").textContent = text;
@@ -255,42 +309,55 @@ function onLine(line) {
   if (isEnd(line)) pendingEnd(line); else pendingLines.push(line);
 }
 
-function showStatus({ values: v, units }) {
-  for (const key of ["peers", "rssi", "channel", "link_peers", "bpm", "beat", "midi_ticks", "air_in", "usb_out", "usb_in", "air_out", "drop_filter"]) {
-    $("s-" + key).textContent = v[key] ?? "-";
+function cells(row, values) {
+  for (const value of values) {
+    const td = document.createElement("td");
+    if (value instanceof Node) td.append(value); else td.textContent = value;
+    row.append(td);
   }
+  return row;
+}
+
+function showTransport(v) {
+  const on = inSession(v);
+  $("t-bpm").textContent = on ? Number(v.bpm).toFixed(Number.isInteger(Number(v.bpm)) ? 0 : 2) : "-";
+  $("t-beat").textContent = on ? beatInBar(v.beat, lastGet.quantum) : "-";
+  $("t-set").disabled = !port || !on;
+  $("t-play").disabled = !port || !on;
+  $("t-play").textContent = v.playing === "1" ? "Stop" : "Play";
+  $("t-state").textContent = !port ? "-"
+    : on ? (v.playing === "1" ? "Playing" : "Stopped") + " with " + v.link_peers + " Link peer" + (v.link_peers === "1" ? "" : "s") + ". Tempo and play / stop change the whole session."
+    : "No Link session yet: the tempo and play / stop come from the group once a peer is heard.";
+}
+
+function showStatus({ values: v, units }) {
+  lastStatus = v;
+  for (const key of STATS) $("s-" + key).textContent = v[key] ?? "-";
   $("s-usb").textContent = v.usb === "1" ? "connected" : "none";
-  $("s-playing").textContent = v.playing === "1" ? "playing" : "stopped";
   $("s-drops").textContent = faultDrops(v);
-  const body = $("units");
-  body.replaceChildren(...units.map((u) => {
-    const row = document.createElement("tr");
-    for (const cell of [u.mac, u.rssi, u.age, u.frames]) {
-      const td = document.createElement("td");
-      td.textContent = cell;
-      row.append(td);
-    }
-    return row;
-  }));
+  $("units").replaceChildren(...units.map((u) => cells(document.createElement("tr"), [u.mac, u.rssi, u.age, u.frames])));
+  showTransport(v);
 }
 
 function showGroups(scans) {
+  lastScans = scans;
   const home = $("c-group").value;
   $("groups").replaceChildren(...scans.map((g) => {
-    const row = document.createElement("tr");
     const on = String(g.group) === home;
+    const row = document.createElement("tr");
     row.classList.toggle("on", on);
-    for (const cell of [g.group, g.channel, unitText(g), g.rssi, on ? "Joined" : "Join"]) {
-      const td = document.createElement("td");
-      td.textContent = cell;
-      row.append(td);
+    let action = "Joined";
+    if (!on) {
+      action = document.createElement("button");
+      action.textContent = "Join";
+      action.disabled = !port;
+      action.addEventListener("click", () => {
+        $("c-group").value = String(g.group);
+        change("group");
+        showGroups(lastScans);
+      });
     }
-    row.addEventListener("click", () => {
-      $("c-group").value = String(g.group);
-      change("group");
-      showGroups(scans);
-    });
-    return row;
+    return cells(row, [g.group, g.channel, peerText(g), g.rssi, action]);
   }));
   $("scan-result").textContent = scans.length ? "" : "No group heard.";
 }
@@ -307,7 +374,6 @@ async function scan() {
   $("scan").disabled = !port;
 }
 
-let lastGet = {};
 function showSettings({ values: v }) {
   lastGet = v;
   const form = { "net-mode": v.net, "net-ssid": v.ssid };
@@ -317,6 +383,7 @@ function showSettings({ values: v }) {
     const el = $("c-" + key);
     if (document.activeElement !== el && v[key] !== undefined) el.value = v[key];
   }
+  $("s-version").textContent = v.version ? "Version " + v.version + ", address " + v.mac : "-";
 }
 
 async function pollOnce() {
@@ -344,6 +411,25 @@ async function change(key) {
   }
 }
 
+async function session(command, done) {
+  try {
+    await send(command);
+    say(done);
+    pollOnce();
+  } catch (e) {
+    say(e.message === "err no session" ? "No Link session to change yet." : e.message, true);
+  }
+}
+
+function setTempo() {
+  const command = tempoCommand($("t-tempo").value);
+  if (!command) {
+    say("A tempo is 20 to 999 BPM.", true);
+    return;
+  }
+  session(command, "Tempo sent to the session.").then(() => { $("t-tempo").value = ""; });
+}
+
 function disconnected(text) {
   clearInterval(poll);
   poll = null;
@@ -352,9 +438,9 @@ function disconnected(text) {
   pendingEnd = null;
   queue = Promise.resolve();
   $("connect").textContent = "Connect";
-  $("bootloader").disabled = true;
-  $("scan").disabled = true;
-  $("net-apply").disabled = true;
+  for (const id of ["bootloader", "scan", "net-apply"]) $(id).disabled = true;
+  showTransport({});
+  showGroups(lastScans);
   say(text, true);
 }
 
@@ -401,9 +487,7 @@ async function connect() {
     if (!(await openMidi())) throw new Error("No jank USB MIDI port found. Is the stick plugged in?");
     showSettings(await firstAnswer());
     $("connect").textContent = "Connected";
-    $("bootloader").disabled = false;
-    $("scan").disabled = false;
-    $("net-apply").disabled = false;
+    for (const id of ["bootloader", "scan", "net-apply"]) $(id).disabled = false;
     say("Connected.");
     poll = setInterval(pollOnce, 1000);
     pollOnce();
@@ -431,6 +515,12 @@ $("net-apply").addEventListener("click", async () => {
   }
 });
 $("scan").addEventListener("click", scan);
+$("t-set").addEventListener("click", setTempo);
+$("t-tempo").addEventListener("keydown", (e) => { if (e.key === "Enter") setTempo(); });
+$("t-play").addEventListener("click", () => {
+  const play = lastStatus.playing !== "1";
+  session(play ? "play" : "stop", play ? "Session started." : "Session stopped.");
+});
 $("bootloader").addEventListener("click", async () => {
   try {
     await send("bootloader");
