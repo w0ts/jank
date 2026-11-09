@@ -1,7 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only
 # v5 (one build: every output has both its jack and its DIN): exports the box, the lid, the printed caps (2 x
-# button_cap, 3 x slider_cap, 1 x slider_cap_smd: print that many), the encoder knob and the wall test strip into
+# button_cap, 3 x ab_tab, 1 x ab_tab_smd, 4 x ab_grip: print that many), the encoder knob and the wall test strip into
 # stl/, runs the collision checks (must be EMPTY) and the brace checks (must NOT be empty: a connector moved by its
 # play meets the box or the lid), checks that every STL is one closed, manifold solid, and renders the PNGs.
 # Needs OpenSCAD (a build with --backend=manifold) and python3.
@@ -19,7 +19,7 @@ mkdir -p "$OUT" "$HERE/renders"
 LOG="$(mktemp "$OUT/.log.XXXXXX")"
 trap 'rm -f "${LOG:?}" "${OUT:?}"/.check-*.stl' EXIT
 fail=0
-for p in box lid button_cap slider_cap slider_cap_smd knob front_test; do
+for p in box lid button_cap ab_tab ab_tab_smd ab_grip knob front_test; do
     O -q -D "part=\"$p\"" -o "$OUT/jank_box_${p}.stl" "$SCAD" 2>"$LOG" || { cat "$LOG"; exit 1; }
     if grep -qi "warning" "$LOG"; then cat "$LOG"; fail=1; fi
 done
@@ -33,7 +33,7 @@ for c in check_box check_lid check_lidbox check_drop check_board_drop check_text
         echo "$c FAILED ($([ $empty = 1 ] && echo empty || echo not empty)); render part=\"$c\" in OpenSCAD to see where"; tail -3 "$LOG"; fail=1
     fi
 done
-for c in brace_side_pull brace_side_push brace_reg; do for j in 0 1 2 3; do
+for c in brace_side_pull brace_side_push brace_reg brace_tabs; do for j in 0 1 2 3; do
     O -D "part=\"$c\"" -D "sj=$j" -o "$OUT/.check-$c.stl" "$SCAD" >"$LOG" 2>&1 || true
     if grep -q "top level object is empty" "$LOG"; then echo "$c $j FAILED (empty)"; fail=1; else echo "$c $j ok (contact)"; fi
 done; done
@@ -48,6 +48,8 @@ R --imgsize=1400,900 --camera=44,42,14,55,0,330,240 -D 'part="box"' -o "$HERE/re
 R --imgsize=1400,900 --camera=44,42,0,35,0,25,220 -D 'part="lid"' -o "$HERE/renders/lid_underside.png" "$SCAD"
 R --imgsize=1400,1100 --camera=44.5,40.75,0,0,0,0,230 --projection=ortho -D 'part="lid_top"' -o "$HERE/renders/lid_top.png" "$SCAD"
 R --imgsize=1400,900 --camera=42,3,26,65,0,20,60 -D 'part="joint"' -o "$HERE/renders/joint.png" "$SCAD"
+R --imgsize=1400,900 --camera=34,28,29,75,0,290,58 -D 'part="tab_view"' -o "$HERE/renders/tab.png" "$SCAD"
+R --imgsize=1400,900 --camera=12,0,3,50,0,340,70 -D 'part="tab_print"' -o "$HERE/renders/tab_print.png" "$SCAD"
 R --imgsize=1400,900 --camera=44,42,20,55,0,330,230 -D 'part="caps_view"' -o "$HERE/renders/caps.png" "$SCAD"
 python3 "$HERE/../check_stl.py" "$OUT"/jank_box_*.stl || fail=1
 exit $fail

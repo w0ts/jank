@@ -34,9 +34,9 @@ below.
 | `jank_box.scad` | The box, the lid, the caps, the knob, the wall test strip, the checks (`part` picks the output) |
 | `make_stl.sh` | Exports the STLs, runs the checks, renders the PNGs, runs `../check_stl.py` |
 | `stl/jank_box_box.stl`, `stl/jank_box_lid.stl` | The base and the lid, in print orientation |
-| `stl/jank_box_button_cap.stl` (print 2), `stl/jank_box_slider_cap.stl` (print 3), `stl/jank_box_slider_cap_smd.stl` (print 1), `stl/jank_box_knob.stl` (print 1) | OK / BACK caps, the A/B slider caps (SW3..SW5, SW2), the encoder knob |
+| `stl/jank_box_button_cap.stl` (print 2), `stl/jank_box_ab_tab.stl` (print 3), `stl/jank_box_ab_tab_smd.stl` (print 1), `stl/jank_box_ab_grip.stl` (print 4), `stl/jank_box_knob.stl` (print 1) | OK / BACK caps, the A/B tabs (SW3..SW5, SW2) and their grips, the encoder knob |
 | `stl/jank_box_front_test.stl` | A strip of the front edge cut from the real base and lid round OUT3: its DIN in its slot (front cheek, slot, back cheek), its jack's round hole (half in the base's tongue, half in the skirt), the joint with the front catch; the two halves joined by end posts. Try the parts first |
-| `renders/open.png`, `box.png`, `front.png`, `back.png`, `left.png`, `right.png`, `lid_underside.png`, `lid_top.png`, `joint.png`, `caps.png` | The box with the board (lid lifted), the empty base, the four sides, the lid as printed, the lid's top with its labels and caps, the joint (cut at the front catch and OUT3's jack, the lid lifted 6 mm), the closed box |
+| `renders/open.png`, `box.png`, `front.png`, `back.png`, `left.png`, `right.png`, `lid_underside.png`, `lid_top.png`, `joint.png`, `tab.png`, `tab_print.png`, `caps.png` | The box with the board (lid lifted), the empty base, the four sides, the lid as printed, the lid's top with its labels and caps, the joint (cut at the front catch and OUT3's jack, the lid lifted 6 mm), OUT3's A/B tab cut along its travel at both ends, the tab parts as printed, the closed box |
 
 ```
 sh hardware/box/make_stl.sh               # about 15 s
@@ -55,9 +55,9 @@ and back faces were 0.7 mm inside the lid's):
 **Standing out (not counted):**
 - the MIDI jacks' bushings 1.5 mm (front and back), the side jacks' bushings 1.0 mm;
 - the XIAO's USB-C socket 0.5 mm (back);
-- the knob 13.3 mm, the button caps 3.0 mm, the slider caps 1.0 mm above the lid.
+- the knob 13.3 mm, the button caps 3.0 mm, the A/B grips 2.0 mm (2.35 to the ridges' tops) above the lid.
 
-**Parts to print:** box, lid, 2 button caps, 3 + 1 slider caps, 1 knob (and `front_test` first).
+**Parts to print:** box, lid, 2 button caps, 3 + 1 A/B tabs, 4 A/B grips, 1 knob (and `front_test` first).
 
 ## Connectors at the wall, the DINs in slots
 
@@ -211,8 +211,8 @@ lower part (to 0.55 below the board's bottom) and the lid its upper part. It ass
 | BACK, OK | 69.15 / 78.75, 25.45 | 6.0 round | the button caps' 5.4 stems |
 | Encoder | 73.9, 38.7 | 7.0 round | under the 14 mm knob |
 | LED | 33.0, 4.2 | 3.5 x 3.7 | a shroud to 0.3 over the LED, a 0.6 mm skin over it (`led_skin`): print the lid translucent |
-| SW2 (OUT1, surface-mount) | 17.5, 8.1 | **6.0 x 3.5**, along x | the cap (3.15 square) and its 1.5 travel along x, 0.175 round |
-| SW3..SW5 (OUT2..OUT4) | 10.45 / 33.45 / 56.45, 60.5 | 3.5 x 6.0, along y | the cap (3.15 x 3.65) and its 2.0 travel |
+| SW2 (OUT1, surface-mount) | 17.5, 8.1 | **4.3 x 4.3** (along x 4.3) | the tab's 4.0 x 2.4 neck: 0.15 a side across (it guides), its 1.5 travel along x + 0.2 at each end |
+| SW3..SW5 (OUT2..OUT4) | 10.45 / 33.45 / 56.45, 60.5 | **4.3 x 4.8**, along y | the neck, 0.15 a side across, its 2.0 travel + 0.2 at each end |
 | Screws H1..H4 | (83.8, 3.2), (83.8, 76.3), (3.2, 26.0), (3.2, 34.0) | 2.4 | **4 x M2 x 20 self-tapping** through the lid, a 5.0 spacer, the board, 9.7 into a column |
 
 **Under the lid:** the skirt, the jack caps, the spacers, the LED shroud, and **four posts onto the OLED module**.
@@ -228,9 +228,23 @@ lower part (to 0.55 below the board's bottom) and the lid its upper part. It ass
 | Part | Shape | Fit | Print |
 |---|---|---|---|
 | **Button cap** (2) | a 5.4 mm stem 3.0 above the lid; an **8.0 mm flange, 1.0 thick, 0.3 under the lid**; a **blind bore 3.45 mm**, 3.1 deep, its floor on the plunger's top (the 9.0 mm HRO K2-1102DP-K4SW-04 since 2026-11-09: the cap is 0.5 mm more solid above the plunger, the same outside and travel) | +0.05 on the 3.4 plunger: a light press once printed | flange on the bed |
-| **Slider cap** (3, SW3..SW5) | 3.15 x 3.65 block, 1.0 above the lid, a **pocket 1.55 x 2.05 x 1.3** | +0.05 on the 1.5 x 2.0 handle | top on the bed |
-| **Slider cap, SMD** (1, SW2) | 3.15 x 3.15 block, 1.0 above the lid, a **pocket 1.55 x 1.55** to the knob's top (3.2 + 3.0) | +0.05 on the 1.5 knob; **the knob's length along its travel taken as 1.5: unverified** | top on the bed |
+| **A/B tab** (3, SW3..SW5) | under the lid a **flange 6.3 x 8.8 x 3.3** (across x along the travel; 0.2 over the switch's body to 0.2 under the lid), wider than the 4.3 x 4.8 slot by 1.0 on every side at every point of the travel; a **neck 4.0 x 2.4** through the slot to 0.2 above the lid; a **post 3.0 x 1.8 x 1.4** for the grip; a **pocket 1.8 x 2.1, 1.3 deep** over the 1.5 x 2.0 handle, its roof on the handle's top | pocket +0.3 across, +0.1 along the travel (see below) | pocket side on the bed (its roof a 1.8 mm bridge) |
+| **A/B tab, SMD** (1, SW2) | the same, flange **6.3 x 7.8 x 3.6** (travel 1.5), the pocket **1.8 x 1.6, 2.8 deep** to the knob's top (3.2 + 3.0) | as above; **the knob's length along its travel taken as 1.5: unverified** | pocket side on the bed |
+| **A/B grip** (4) | **6.0 across x 4.0 along the travel, 1.8 high**, its bottom 0.2 above the lid (on the neck's shoulder), top 2.0 above the lid; edges chamfered 0.4 (top) and 0.3 (bottom); **3 ridges across the travel** on top, 0.5 wide, 0.35 high, 1.2 apart; a socket 3.0 x 1.8 x 1.4 | the socket = the post: a press fit (an FDM hole prints about 0.1 small); a drop of CA glue if it is loose | socket side on the bed (its roof a 1.8 mm bridge) |
 | **Encoder knob** (1) | 14 x 12, a **D bore 6.1 / 4.6** (the shaft's 6.0 / 4.5, *unverified*), 10 deep, a pointer groove | 0.1 play | top on the bed |
+
+**The A/B tabs** (the user, 2026-11-09: "the current option is just not working, I am sure"; the old caps were
+pressed onto the handles and stood loose in a slot). Now each tab is **captured**: its flange lies under the lid, wider
+than the slot on every side, so it cannot be pulled off or fall out (`brace_tabs`: lifted 0.25 it meets the lid). It
+rests on the handle's top, 0.2 under the lid and 0.2 over the switch's body, and slides on its handle.
+- **Two parts.** A one-piece tab cannot go into a slot narrower than both its ends: the tab goes onto the switch before
+  the lid is lowered, and the grip is pressed onto its post after.
+- **The pocket's fit:** +0.1 along the travel, so the handle follows the tab with 0.1 of lost motion; +0.3 across, loose
+  on purpose. The tab is guided by its neck in the slot (0.15 a side) and by its flange under the lid, so the pocket
+  only has to push. A tight pocket would fight the lid's slot wherever the board and the lid are 0.1 out of line.
+- **The slot** is the neck + the travel + 0.2 at each end, so the switch's own end stops end the travel, not the lid.
+- **The A / B labels** stay where they were, 1.0 past the slot's ends. A grip at the end of its travel stops 0.4 short
+  of the label's edge.
 
 ## Markings
 
@@ -252,16 +266,17 @@ travel) and the OLED redrawn.
 | `check_box`: the base against the board and every part | empty | empty |
 | `check_lid`: the lid (skirt, caps, shroud, spacers) against the board and every part | empty | empty |
 | `check_lidbox`: lid against base, seated, with the catches | empty | empty (0.2 at the rim, 0.1 over it, the bumps in their grooves) |
-| `check_drop`: the lid (without its bumps) lowered straight down over the base, the board and the caps | empty | empty |
+| `check_drop`: the lid (without its bumps) lowered straight down over the base, the board, the button caps and the A/B tabs (no grips yet), each tab at either end and the middle | empty | empty |
 | `check_usb`: the USB-C plugs' overmolds (12.5 x 7.0, r 1.5), seated, against the base and the lid | empty | empty |
 | `check_board_drop`: the board lowered straight into the base, every DIN plate sliding down its slot | empty | empty |
 | `check_text`: labels clear of every opening, slot, cavity and keep-out, inside the edges | empty | empty |
-| `check_caps`: caps at rest / pressed / both ends of travel against the lid, the board, the shaft; each knob in its pocket | empty | empty |
+| `check_caps`: caps at rest / pressed / the A/B tabs and grips at both ends of travel, against the lid, the board (SW2's MIDI IN parts, the screen's posts), the shaft; each handle in its pocket | empty | empty |
 | `brace_caps`, `brace_pull` (each DIN plate moved 0.15 out meets the front cheek), `brace_push` (0.15 in meets the back cheek), `brace_pull_jack` (MIDI jacks on the webs), `brace_push`, `brace_trs`, `brace_floor`, `brace_lid`, `brace_ledge` | contact | contact |
 | `brace_side_pull` / `brace_side_push`, each side jack | contact | 8 of 8 |
 | `brace_reg`: the lid (no bumps) moved 0.25 in -X, +X, -Y, +Y meets the base's rim | contact | 4 of 4 |
 | `brace_snap`: the lid lifted 0.3 meets the base at the catches | contact | contact |
-| `check_stl.py` (box, lid, button cap, both slider caps, knob, front_test) | OK | OK: one body, 0 open edges, 0 non-manifold each |
+| `brace_tabs`: each A/B tab lifted 0.25 meets the lid's underside with its flange | contact | 4 of 4 |
+| `check_stl.py` (box, lid, button cap, both A/B tabs, the grip, knob, front_test) | OK | OK: one body, 0 open edges, 0 non-manifold each |
 
 **Negative controls collide as they should:**
 - `gap_out = -0.05` (a jack body into its web);
@@ -269,6 +284,8 @@ travel) and the OLED redrawn.
 - `slot_play = -0.05` (a slot narrower than the plate);
 - `din_rim = [1.6, 2.6]` (the back cheek onto the DIN's body, in `check_board_drop`);
 - `standoff_d = 6.0`;
+- 2026-11-09, the tabs (`check_caps`): `tab_top_gap = -0.05`, the slot's end clearance -0.05, the pocket 0.1 short
+  along the travel, `tab_overlap = 4`;
 - 2026-11-09, the joint: `catch_groove = 0.1` and `tongue_clear = -0.05` (`check_lidbox`), `jack_hole = 4.9` (`check_box`,
   `check_lid`), `plug_clear = -0.1` (`check_usb`).
 
@@ -289,14 +306,15 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
 2. **User prints** `front_test.stl`. Check that a DIN plate slides down its slot (snug, not tight) and does not move in
    or out, and that a plug seats with the plate's face 2.0 mm in. Check that a jack's bushing sits in the round hole with
    its body against the web, and that a 3.5 mm plug goes in.
-3. **User puts** a 2.5 mm foam pad under the OLED module's front edge (the edge away from its header), and presses the button caps onto OK and BACK and the slider
-   caps onto the four A/B knobs.
+3. **User puts** a 2.5 mm foam pad under the OLED module's front edge (the edge away from its header), and presses the button caps onto OK and BACK.
 4. **User lowers** the board straight into the base. The DIN plates slide down their slots onto the floor, the jacks'
    bushings and the XIAO's socket into their cradles, and the board's edge comes to rest on the base's wall and the four
-   columns, inside the rim.
-5. **User lowers** the lid straight down. Its band goes inside the rim, the notches over the tongues, and the catches
+   columns, inside the rim. **User puts** the four A/B tabs (no grips) onto the switches' handles, pocket down, the
+   SMD one on SW2.
+5. **User lowers** the lid straight down, its slots over the tabs' necks. Its band goes inside the rim, the notches over the tongues, and the catches
    click (four). The caps come through their openings.
-6. **User screws** 4 x M2 x 20 self-tapping at H1..H4, snug only. Then the knob on the encoder.
+6. **User screws** 4 x M2 x 20 self-tapping at H1..H4, snug only. Then the knob on the encoder, and **presses the four
+   grips onto the tabs' posts** (ridges up; a drop of CA glue if one is loose).
 
 ## Unverified, all in one place
 
@@ -310,6 +328,9 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
   - the PJ-320D-B-SMT's body (the mockup's 6.2 x 12.2 x 5.0) and its 5.0 bushing (the Ø5.4 holes rest on it);
   - the 0.4 mm web's strength.
 - **SW2:** its knob's length (1.5 taken), its travel direction, which end is A.
+- **The A/B tabs:** the handles' sizes (1.5 x 2.0, 1.5 x 1.5) and heights (MSS22D18 body 3.5, handle top 5.0; SW2
+  3.2 / 6.2) from the datasheets and the mockup, not parts in hand; the grip's press fit on its post (printer-dependent);
+  how freely the flange slides on the lid's underside (0.2, first layers of the lid: sand if it drags).
 - **The board:**
   - its outline against the 0.1 mm gaps at the connectors (JLCPCB ±0.2: the board's edges are clamped, not fitted
     between walls, so the gap only limits how far the board can shift before a connector bears);
