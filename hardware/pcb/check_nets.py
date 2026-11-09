@@ -134,8 +134,8 @@ if "CLK_L" in nets:                              # (the modular variant: CLOCK /
     on("GND", ("U5", "1"), ("U5", "2"), ("U5", "3"), ("U5", "8"))   # (A0..A2 low: address 0x20)
     for out, inp, buf, u_, r_, d_, j_, c_, pin in (("CLK_L", "CLKL_IN", "CLKL_B", "U6", "R72", "D3", "J11", "C13", "4"),
                                                    ("RST_L", "RSTL_IN", "RSTL_B", "U7", "R73", "D4", "J12", "C14", "5"),
-                                                   ("CLK_R", "CLKR_IN", "CLKR_B", "U8", "R74", "D5", "J13", "C15", "10"),
-                                                   ("RST_R", "RSTR_IN", "RSTR_B", "U9", "R75", "D6", "J14", "C16", "9")):
+                                                   ("CLK_R", "CLKR_IN", "CLKR_B", "U8", "R74", "D5", "J13", "C15", "7"),   # (P3; v5c: the south row, see make_board.py),
+                                                   ("RST_R", "RSTR_IN", "RSTR_B", "U9", "R75", "D6", "J14", "C16", "6")):
         on(inp, ("U5", pin), (u_, "2"))
         on(buf, (u_, "4"), (r_, "1"))
         on(out, (r_, "2"), (d_, "3"), (j_, "T"))

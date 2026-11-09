@@ -80,10 +80,10 @@ for fp in board.GetFootprints():
     if ref == "J10":                             # (the module on its header: the header at the pins, the module at its middle)
         hdr = S.BOM["hdr4"]["code"]
         rows.append(("Pin header 1x4", "J10H", "PinHeader_1x04_P2.54mm_Vertical", hdr, False))
-        places.append(("J10H", x, y, side, 90))
+        places.append(("J10H", x, y, side, 0))       # (the 0.96in module's pins along x)
         pos = (pcbnew.ToMM(fp.GetPosition().x), pcbnew.ToMM(fp.GetPosition().y))
-        mx = pos[0] + F.OLED_PIN_X - F.OLED_L / 2       # (J10 turned 180: the module along -x from its pins)
-        my = pos[1] + F.OLED_PIN_Y - F.OLED_W / 2
+        mx = pos[0] + F.O96_X0 + F.O96_W / 2            # (the module along +y from its pin row)
+        my = pos[1] - F.O96_ROW + F.O96_L / 2
         places[-2] = (ref, mx, my, side, round(fp.GetOrientationDegrees()) % 360)
 u1 = next(fp for fp in board.GetFootprints() if fp.GetReference() == "U1")
 for n, pads in (("U1H1", range(1, 8)), ("U1H2", range(8, 15))):   # (the XIAO's two pin rows: its headers)
