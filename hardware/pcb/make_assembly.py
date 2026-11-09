@@ -5,9 +5,9 @@ make_schematic.py (its BOM codes), as optimist's hardware/long-both-sides does i
 
   /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3.9 make_assembly.py
 
-What JLCPCB places (Economic, the TOP side only): every top part with an LCSC code, SMD and through hole, but NOT the
-jacks and the DINs
-(J6..J9: the user solders them), NOT the XIAO module (U1: Seeed, not at LCSC; the user solders it on the two headers
+What JLCPCB places (Economic, the TOP side only; the user, 2026-11-09: only the DINs by hand): every top part with an
+LCSC code, SMD and through hole, the MIDI jacks J2..J5 (surface mount, inside J6..J9's footprint) and the side jacks,
+but NOT the DINs (J6..J9: the user solders them), NOT the XIAO module (U1: Seeed, not at LCSC; the user solders it on the two headers
 JLCPCB fits), NOT C4 and the 1206 pads in parallel (not fitted), and no jumper, test point or hole. Three parts have no
 footprint of their own and are added at their place: the XIAO's two 1 x 7 headers (U1H1, U1H2, on its pin rows) and
 the OLED's 1 x 4 header (J10H, J10's pins; J10 itself is the module, placed on it).
@@ -35,7 +35,7 @@ import make_schematic as S                      # (the parts table and the BOM c
 
 MOD = os.environ.get("MODULAR") == "1"         # (the modular variant: jank-pcb-mod.kicad_pcb, its files in fab/mod/)
 FAB = os.path.join(HERE, "fab", *(["mod"] if MOD else []))
-SKIP = re.compile(r"^(H\d|JP|TP|J[6-9]$|J1[1-4]$|U1$|C4$|R8$|R1[1-4]$|R2[1-4]$)")   # (the standing resistors: by hand, under the board)
+SKIP = re.compile(r"^(H\d|JP|TP|J[6-9]$|U1$|C4$|R8$|R1[1-4]$|R2[1-4]$)")   # (J6..J9: the DINs, by hand; the axial pads: empty)
 ROT_FIX = [(r"^SOT-23", -90), (r"^SOT-363", 180), (r"^SOIC-", 270)]   # (the community table's rows that match a footprint here)
 
 board = pcbnew.LoadBoard(os.path.join(HERE, "jank-pcb-mod.kicad_pcb" if MOD else "jank-pcb.kicad_pcb"))
@@ -92,6 +92,15 @@ for n, pads in (("U1H1", range(1, 8)), ("U1H2", range(8, 15))):   # (the XIAO's 
     rows.append(("Pin header 1x7", n, "PinHeader_1x07_P2.54mm_Vertical", S.BOM["hdr"]["code"], False))
     places.append((n, sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts), "Top", 90))
 
+# the MIDI outputs' surface-mount jacks J2..J5: no footprint of their own (their pads are in J6..J9's, beside the DIN):
+# placed at the middle of those pads, turned as the footprint (v5c)
+for k, fp in enumerate(sorted((f for f in board.GetFootprints() if re.match(r"^J[6-9]$", f.GetReference())),
+                              key=lambda f: f.GetReference())):
+    pts = [(pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)) for p in fp.Pads() if p.GetNumber() in ("T", "R", "SW", "S")]
+    ref = f"J{2 + k}"
+    rows.append((S.BOM["trs_smd"]["mpn"].split()[-1], ref, "PJ-320D-B-SMT", S.BOM["trs_smd"]["code"], True))
+    places.append((ref, sum(p[0] for p in pts) / 4, sum(p[1] for p in pts) / 4, "Top", round(fp.GetOrientationDegrees()) % 360))
+
 assert all(p[3] == "Top" for p in places), [p[0] for p in places if p[3] != "Top"]   # (Economic: one side)
 # the checks JLCPCB's upload makes: one row per designator, every row with a code, the two files on the same set
 refs = [p[0] for p in places]
@@ -125,7 +134,8 @@ def write(folder, keep):
     print(f"wrote {os.path.relpath(folder, HERE)}/bom.csv ({len(groups)} lines), cpl.csv ({len(names)} parts, all top)")
 
 
-# the default set: the SMD parts only (the user's ruling: JLCPCB's through-hole lines are hand work at a fee, and four
-# of those parts had no stock); the full set, every part JLCPCB could place, for later
-write(FAB, lambda r: r[4])
-write(os.path.join(FAB, "full"), lambda r: True)
+# the default set (the user, 2026-11-09: "only keep the DINs hand soldered"): every part JLCPCB can place, SMD and
+# through hole (the jacks, switches, encoder, buttons, opto, headers, the screen); the user solders the DINs and the XIAO.
+# smd-only/: the SMD parts alone (the earlier choice), for comparison
+write(FAB, lambda r: True)
+write(os.path.join(FAB, "smd-only"), lambda r: r[4])
