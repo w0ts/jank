@@ -58,7 +58,7 @@ for k in range(1, 5):
         on(f"TIP{k}", (f"J{1 + k}", "T"))
         on(f"RING{k}", (f"J{1 + k}", "R"))
     src = f"SRC{k}" if f"SRC{k}" in nets else "+3V3"   # (the MIDI IN channel: its source on a GPIO)
-    on(src, (f"R2{k}", "1"), (f"R4{k}", "1"), (f"JP2{k}", "1"))
+    on(src, (f"R2{k}", "1"), (f"R4{k}", "1"), (f"R8{k}", "1"))   # (v5c: R8k, the second 68 ohm, in JP2k's place)
     tx = f"MIDI_TX{k}" if f"MIDI_TX{k}" in nets or "MIDI_TXB" not in nets or k == 1 else "MIDI_TXB"   # (v5: OUT2..4 share TXB)
     on(tx, (f"R1{k}", "1"), (f"R3{k}", "1"), (f"JP1{k}", "1"))
     pads = [p for (r, p) in nets.get(tx, set()) if r == "U1"]

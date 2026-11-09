@@ -35,13 +35,13 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | U4 | 1 | Optocoupler H11L1, Schmitt trigger, open collector, DIP-6 (MIDI IN on OUT1) | EVERLIGHT H11L1 | LCSC C78588 | USD 0.3507 | 5 |
 | D2 | 1 | Diode 1N4148W, SOD-123 (the opto LED's reverse protection) | Semtech 1N4148W | LCSC C81598 | USD 0.0125 | 50 |
 | R50 | 1 | Resistor 220 1% 0805 (MIDI IN, CA-033 / MIDI 1.0) | UNI-ROYAL 0805W8F2200T5E | LCSC C17557 | USD 0.0030 | 100 |
-| R8 | 1 | Resistor 330 1% 0.25 W axial (6.3 x 2.4 mm), standing | YAGEO MFR-25FBF52-330R | LCSC C1369900 | USD 0.0205 | 50 |
-| R9, R31, R41, R32, R42, R33, R43, R34, R44 | 9 (not fitted) | 1206 pads in parallel, not fitted (to lower a value on the bench) | - | - - | USD 0.0000 | 0 |
+| R8, R11, R21, R12, R22, R13, R23, R14, R24 | 9 (not fitted) | Axial pads, not fitted (a bench fix: an axial resistor in place of the 1206s, with them removed) | - | - - | USD 0.0000 | 0 |
+| R31, R32, R33, R34 | 4 | Resistor 10 ohm 1% 0.25 W 1206 (RC, data) | UNI-ROYAL 1206W4F100JT5E | LCSC C17903 | USD 0.0027 | 100 |
+| R41, R81, R42, R82, R43, R83, R44, R84 | 8 | Resistor 68 ohm 1% 0.25 W 1206, two in parallel = the 34 ohm source RA (0.5 W together) | UNI-ROYAL 1206W4F680JT5E | LCSC C17976 | USD 0.0031 | 100 |
+| R9 | 1 | Resistor 330 ohm 1% 0.25 W 1206 (the LED's data) | UNI-ROYAL 1206W4F3300T5E | LCSC C17930 | USD 0.0028 | 100 |
 | LED1 | 1 | RGB LED, addressable, 3.7 x 3.5 x 1.95 mm, top emitting (the beat LED) | OPSCO SK6812MINI-HS | LCSC C2922787 | USD 0.1085 | 5 |
 | J10 | 1 | OLED module 0.96 in 128 x 64, white, SSD1315 (SSD1306 commands), I2C, 27.3 x 27.8 mm, 4 holes 2.54 mm (GND VCC SCL SDA) | HS HS96L03W2C03 | LCSC C5248080 | USD 0.0000 | 1 |
 | (J10) | 1 | Pin header 1x4, 2.54 mm (the OLED module's legs) | XFCN PZ254V-11-04P | LCSC C2691448 | USD 0.0276 | 20 |
-| R11, R12, R13, R14 | 4 | Resistor 10 ohm 1% 0.25 W axial (6.3 x 2.4 mm), standing (RC, data) | YAGEO MFR-25FBF52-10R | LCSC C1365579 | USD 0.0205 | 50 |
-| R21, R22, R23, R24 | 4 | Resistor 33 ohm 1% 0.5 W axial (9 x 3.2 mm), standing (RA, source) | CCO MF1/2W-33R 1% T | LCSC C119401 | USD 0.0241 | 20 |
 | J11, J12, J13, J14 | 4 | 3.5 mm stereo jack, right angle, plug from the front, 4 pins (its switch pin left open), top side | XKB PJ-320A | LCSC C2884926 | USD 0.1458 | 5 |
 | J6, J7, J8, J9 | 4 | DIN-5 180 degree, PCB right angle, 7 pins, no locating pegs, bottom side | HOOYA DIN-504B-M10 | LCSC C2939346 | USD 0.3764 | 5 |
 
@@ -51,6 +51,6 @@ Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, n
 
 | Build | Parts at unit price | With each shop's minimum order |
 |---|---|---|
-| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 17.67 | USD 30.95 |
+| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 17.51 | USD 29.28 |
 
 USD: LCSC and Seeed (the XIAO). The bare board is ordered at JLCPCB with another board and is not in these totals.

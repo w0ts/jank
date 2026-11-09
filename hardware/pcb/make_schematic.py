@@ -171,9 +171,9 @@ PARTS = [
     ("U3", "74xGxx:74AHCT1G125", "74AHCT1G125", "Package_TO_SOT_SMD:SOT-23-5_HandSoldering", "buf", 66.04, 154.94,
      {"1": "GND", "2": "LED_DATA", "3": "GND", "4": "LED_BUF", "5": "+5V"}),
     ("C5", "Device:C", "100nF", C0805, "c100n", 91.44, 154.94, {"1": "+5V", "2": "GND"}),
-    ("R8", "Device:R", "330", AX0207, "r330", 104.14, 154.94, {"1": "LED_BUF", "2": "LED_DIN1"}),
+    ("R8", "Device:R", "DNP fix", AX0207, "rfix", 104.14, 154.94, {"1": "LED_BUF", "2": "LED_DIN1"}),
     ("JP8", "Jumper:SolderJumper_2_Open", "bypass", JP, "", 106.68, 175.26, {"1": "LED_BUF", "2": "LED_DIN1"}),
-    ("R9", "Device:R", "DNP parallel", R1206, "rpar", 116.84, 154.94, {"1": "LED_BUF", "2": "LED_DIN1"}),
+    ("R9", "Device:R", "330", R1206, "r330s", 116.84, 154.94, {"1": "LED_BUF", "2": "LED_DIN1"}),
     ("LED1", "LED:SK6812", "SK6812MINI-HS", "jank:LED_SK6812MINI-HS_3.7x3.5mm_HandSolder", "led", 132.08, 154.94,
      {"1": "GND", "2": "LED_DIN1", "3": "+5V"}),
     ("C6", "Device:C", "100nF", C0805, "c100n", 147.32, 154.94, {"1": "+5V", "2": "GND"}),
@@ -220,12 +220,16 @@ TX = {1: "MIDI_TX1", 2: "MIDI_TXB", 3: "MIDI_TXB", 4: "MIDI_TXB"}   # (v5: OUT2.
 for k in range(1, 5):
     x0 = 25.4 + 96.52 * (k - 1)
     PARTS += [
-        (f"R1{k}", "Device:R", "10", AX0207, "r10", x0, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
-        (f"R3{k}", "Device:R", "DNP parallel", R1206, "rpar", x0 + 5.08, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
-        (f"R2{k}", "Device:R", "33 0.5W", AX0309, "r33", x0 + 12.7, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
-        (f"R4{k}", "Device:R", "DNP parallel", R1206, "rpar", x0 + 17.78, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
+        # v5c (the user 2026-11-09: "the upright resistors are just post fixes"): the 1206s are fitted (JLC places them),
+        # the axial pads are left empty for bench fixes; the 33 ohm source is two 68 ohm 1206s in parallel (34 ohm, 0.5 W
+        # together: a mono plug on a TRS output puts 0.33 W in it)
+        (f"R1{k}", "Device:R", "DNP fix", AX0207, "rfix", x0, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
+        (f"R3{k}", "Device:R", "10", R1206, "r10s", x0 + 5.08, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
+        (f"R2{k}", "Device:R", "DNP fix", AX0309, "rfix", x0 + 12.7, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
+        (f"R4{k}", "Device:R", "68", R1206, "r68s", x0 + 17.78, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
+        (f"R8{k}", "Device:R", "68", R1206, "r68s", x0 + 20.32, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
         (f"JP1{k}", "Jumper:SolderJumper_2_Open", "bypass", JP, "", x0 + 2.54, 241.3, {"1": TX[k], "2": f"TIP{k}"}),
-        (f"JP2{k}", "Jumper:SolderJumper_2_Open", "bypass: 3V3 direct" if k > 1 else "bypass: SRC1 direct", JP, "", x0 + 25.4, 241.3, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
+        # (JP2k, the 33 ohm group's bypass jumper, gone in v5c: R8k sits in its place)
         (f"J{1 + k}", "Connector_Audio:AudioJack3", "TRS PJ-320D-B-SMT", "", "trs_smd",
          x0 + 35.56, 231.14, {"T": f"JT{k}", "R": f"JR{k}", "S": "GND"}),
         (f"SW{1 + k}", "jank:SW_DPDT_Slide", "TRS A/B", "jank:SW_Slide_DPDT_SS3235S_SMD" if k == 1 else "jank:SW_Slide_DPDT_MSS22D18",
@@ -445,6 +449,14 @@ BOM = {
                  code="C17557", price=0.0030, cur="USD", min=100),
     "r330": dict(part="Resistor 330 1% 0.25 W axial (6.3 x 2.4 mm), standing", mpn="YAGEO MFR-25FBF52-330R", shop=LCSC,
                  code="C1369900", price=0.0205, cur="USD", min=50),
+    "rfix": dict(part="Axial pads, not fitted (a bench fix: an axial resistor in place of the 1206s, with them removed)",
+                 mpn="-", shop="-", code="-", price=0.0, cur="USD", min=0, dnp=True),
+    "r10s": dict(part="Resistor 10 ohm 1% 0.25 W 1206 (RC, data)", mpn="UNI-ROYAL 1206W4F100JT5E", shop=LCSC, code="C17903",
+                 price=0.0027, cur="USD", min=100),
+    "r68s": dict(part="Resistor 68 ohm 1% 0.25 W 1206, two in parallel = the 34 ohm source RA (0.5 W together)",
+                 mpn="UNI-ROYAL 1206W4F680JT5E", shop=LCSC, code="C17976", price=0.0031, cur="USD", min=100),
+    "r330s": dict(part="Resistor 330 ohm 1% 0.25 W 1206 (the LED's data)", mpn="UNI-ROYAL 1206W4F3300T5E", shop=LCSC, code="C17930",
+                  price=0.0028, cur="USD", min=100),
     "rpar": dict(part="1206 pads in parallel, not fitted (to lower a value on the bench)", mpn="-", shop="-", code="-",
                  price=0.0, cur="USD", min=0, dnp=True),
     "led": dict(part="RGB LED, addressable, 3.7 x 3.5 x 1.95 mm, top emitting (the beat LED)", mpn="OPSCO SK6812MINI-HS",
