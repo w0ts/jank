@@ -411,7 +411,7 @@ def layout_long():
     F1 = ((C1X, 0.0), 180)
     J6 = place(JANK, "MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom", "J6", "TRS + DIN", C1X, 0.0, 180)
     # (the groups keep their board positions x 16.95 and 6.45 in front of the MIDI IN circuit; the DIN's axis is C1X)
-    ta1 = cluster(("R11", "JP11", "R31"), ("MIDI_TX1", "TIP1"), C1X - 16.95, -20.5, "v", AX0207, "10", 2.8, 2.9, F1, bottom=True)
+    ta1 = cluster(("R11", "JP11", "R31"), ("MIDI_TX1", "TIP1"), C1X - 16.95, -20.5, "v", AX0207, "47", 2.8, 2.9, F1, bottom=True)
     tb1 = cluster(("R21", "JP21", "R41"), ("SRC1", "RING1"), C1X - 6.45, -20.5, "v", AX0309, "33", 3.1, 3.3, F1, bottom=True,
                   par2="R81")
     # OUT1's A/B switch is the SURFACE-MOUNT one (SS-3235S), over the DIN's body on the top between the DIN's legs (y 3.5)

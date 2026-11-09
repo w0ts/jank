@@ -224,7 +224,9 @@ for k in range(1, 5):
         # the axial pads are left empty for bench fixes; the 33 ohm source is two 68 ohm 1206s in parallel (34 ohm, 0.5 W
         # together: a mono plug on a TRS output puts 0.33 W in it)
         (f"R1{k}", "Device:R", "DNP fix", AX0207, "rfix", x0, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
-        (f"R3{k}", "Device:R", "10", R1206, "r10s", x0 + 5.08, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
+        # (OUT1's data resistor 47 ohm: OUT1 doubles as MIDI IN, where a 5 V sender pushes ~(5 - 3.3 - 0.5) / (220 + R31)
+        # into GPIO1's protection diode; 47 ohm instead of 10 lowers it, OUT1's loop current ~5.4 mA instead of 5.9)
+        (f"R3{k}", "Device:R", "47" if k == 1 else "10", R1206, "r47s" if k == 1 else "r10s", x0 + 5.08, 231.14, {"1": TX[k], "2": f"TIP{k}"}),
         (f"R2{k}", "Device:R", "DNP fix", AX0309, "rfix", x0 + 12.7, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
         (f"R4{k}", "Device:R", "100", R1206, "r68s", x0 + 17.78, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
         (f"R8{k}", "Device:R", "100", R1206, "r68s", x0 + 20.32, 231.14, {"1": "+3V3" if k > 1 else "SRC1", "2": f"RING{k}"}),
@@ -276,7 +278,7 @@ NOTES = [
     (238.76, 30.48, 2.0, "XIAO ESP32S3 (Seeed footprint, 2 x 7 headers or castellations)"),
     (238.76, 35.56, 1.27, "D6 = GPIO43 has 499 ohm on the module (U0TXD). D2 = GPIO3 strapping, ignored by default eFuses. ENC_A = D6 = GPIO43, ENC_B = D7 = GPIO44 (U0TXD / U0RXD), IN_EN = D4 = GPIO5, MIDI_RX = D5 = GPIO6 (v5)."),
     (238.76, 38.1, 1.27, "v5: MIDI_TX1 = D0 = GPIO1 (OUT1 alone: Hi-Z in IN mode); MIDI_TXB = D1 = GPIO2 drives OUT2, OUT3 and OUT4 together (3 loops on one pad)."),
-    (238.76, 40.64, 1.27, "LADDER = D2 = GPIO3 (ADC1): OK / BACK / PUSH on one resistor ladder. LED_DATA = D3 = GPIO4. SCL = D8 = GPIO7, SDA = D9 = GPIO8 (the OLED, I2C by the GPIO matrix). PWR_CUT = D10 = GPIO9, low = J1 cut."),
+    (238.76, 40.64, 1.27, "LADDER = D2 = GPIO3 (ADC1): OK / BACK / PUSH on one resistor ladder. LED_DATA = D3 = GPIO4. SDA = D8 = GPIO7, SCL = D9 = GPIO8 (the OLED and the PCF8574, I2C by the GPIO matrix, 100 kHz max for the PCF8574). PWR_CUT = D10 = GPIO9, low = J1 cut."),
     (20.32, 129.54, 2.0, "LED: one SK6812MINI-HS on +5V (top); U3 lifts the 3.3 V data to 5 V (VIH = 0.7 x VDD = 3.5 V at 5 V). SCREEN: J10, a 0.96 in 128 x 64 OLED (SSD1315, I2C 0x3C, 3V3)"),
     (20.32, 200.66, 2.0, "MIDI OUT 1-4 (CA-033 at 3.3 V), v5: BOTH fitted on every output, the TRS (type A, top) AND the DIN-5 (bottom), in parallel; plug one at a time"),
     (20.32, 205.74, 1.27, "TRS type A: tip = data (10 ohm to the TX pad), ring = source (33 ohm 0.5 W to 3V3), sleeve = GND."
@@ -298,7 +300,7 @@ NOTES.append((20.32, 194.31, 1.27, "On the board each pair is ONE footprint (J6.
 
 if MODULAR:
     NOTES.append((20.32, 383.54, 2.0, "MODULAR: CLOCK / RESET out, 3.5 mm mono, left and right side walls: PCF8574T (I2C 0x20, A0..A2 low) P0 CLK_L,"
-                                      " P1 RST_L, P5 CLK_R, P4 RST_R; P2 P3 P6 P7 spare on TP5..TP8"))
+                                      " P1 RST_L, P3 CLK_R, P2 RST_R; P4..P7 spare on TP5..TP8 (outputs high at power-on)"))
     NOTES.append((20.32, 388.62, 1.27, "Each: 74AHCT1G125 on +5V (TTL input: the expander's 3.3 V high is enough), 1 k in series, BAT54S from the jack's"
                                        " tip to GND and +5V; tip = signal, sleeve = GND, ring and switch open"))
 
@@ -453,6 +455,8 @@ BOM = {
                  code="C1369900", price=0.0205, cur="USD", min=50),
     "rfix": dict(part="Axial pads, not fitted (a bench fix: an axial resistor in place of the 1206s, with them removed)",
                  mpn="-", shop="-", code="-", price=0.0, cur="USD", min=0, dnp=True),
+    "r47s": dict(part="Resistor 47 ohm 1% 0.25 W 1206 (OUT1's RC: OUT1 doubles as MIDI IN)", mpn="UNI-ROYAL 1206W4F470JT5E",
+                 shop=LCSC, code="C17969", price=0.0053, cur="USD", min=1),
     "r10s": dict(part="Resistor 10 ohm 1% 0.25 W 1206 (RC, data)", mpn="UNI-ROYAL 1206W4F100JT5E", shop=LCSC, code="C17903",
                  price=0.0027, cur="USD", min=100),
     "r68s": dict(part="Resistor 100 ohm 1% 0.25 W 1206, two in parallel = the 50 ohm source RA (0.5 W together; v5c 2026-11-09:"

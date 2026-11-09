@@ -81,7 +81,7 @@ HY_W, HY_D, HY_H, HY_AXIS, HY_PLATE = 20.9, 13.6, 19.6, 9.7, 1.8   # plate width
 # the XKB PJ-320A (the board's frame: its body's front on the edge, turned 180 degrees from the sheet's layout view)
 PJ_PINS = {"R": (-2.3, -3.2), "SW": (-2.3, -6.2), "T": (-2.3, -10.2), "S": (2.3, -11.4)}
 PJ_PEGS = [(0.0, -1.6), (0.0, -8.6)]
-PJ_SLOT, PJ_PAD, PJ_PEG = (0.6, 1.2), (1.2, 1.8), 1.4
+PJ_SLOT, PJ_PAD, PJ_PEG = (0.6, 1.5), (1.2, 2.1), 1.4   # (slots 1.5 long: JLC's own footprint for C2884926; the review 2026-11-09)
 PJ_W, PJ_D, PJ_H = 6.2, 12.2, 5.0                # body: width, depth behind the edge, height
 PJ_BUSH_D, PJ_BUSH_OUT, PJ_BUSH_Z = 5.0, 2.0, 2.5   # bushing: diameter (measured), out past the body's front, axis   # (the jack's pads named after the DIN pin on the same net)
 # the A/B slide switch, SHOU HAN MSS-22D18G2 (LCSC C431542; its drawing, read 2026-11-08): pins 1-2-3 and 4-5-6, 2.5 mm apart,
@@ -341,6 +341,7 @@ def xiao_on_headers():
     b = src.index("\n\t)", i) + 3
     rows = "\n".join(rect(-10.425, y0, 10.55, y1, "F.CrtYd", 0.05) for y0, y1 in ((-9.95, -6.6), (6.6, 9.95)))
     body = src[:a] + rows.strip() + src[b:]
+    body = body.replace("(drill 0.889)", "(drill 1.0)")   # (0.64 mm square header pins are 0.905 across: 1.0 mm holes, the review 2026-11-09)
     return body.replace('(footprint "XIAO-ESP32-S3-DIP"', '(footprint "XIAO-ESP32-S3-DIP_Headers"', 1)
 
 
