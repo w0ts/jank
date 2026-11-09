@@ -32,7 +32,8 @@ din_x = [17.5, 10.45, 33.45, 56.45];      // OUT1..OUT4 DIN axes, KiCad x (OUT1 
 jack_x = [6.0, 21.95, 44.95, 67.95];      // OUT1..OUT4 jack axes, beside the DINs (pitch 23.0)
 ch_back = [true, false, false, false];
 holes = [[83.8, 3.2], [83.8, 76.3], [3.2, 26.0], [3.2, 34.0]];   // H1..H4 (2.2 mm), KiCad x, y from the back
-buttons = [[69.15, 25.45], [78.75, 25.45]];   // BACK (SW6), OK (SW1): HRO K2-1102DP-L3SW-04, 9.5 mm
+buttons = [[69.15, 25.45], [78.75, 25.45]];   // BACK (SW6), OK (SW1): HRO K2-1102DP-K4SW-04, 9.0 mm (was the 9.5 L3)
+sw_h = 9.0;             // the buttons' plunger top above the board
 enc = [73.9, 38.7];     // encoder shaft
 enc_hole = 7.0;
 // the 0.96" 128 x 64 OLED module HS96L03W2C03 (the board's commit 0172784): 27.3 x 27.8, on a 1 x 4 header 2.5 up
@@ -64,7 +65,7 @@ function cap_size(c) = [c[3] + slider_fit + 2 * slider_wall, c[4] + slider_fit +
 function slot_size(c) = [cap_size(c)[0] + 0.35, cap_size(c)[1] + c[5] + 0.35];                     // across, along
 sw_body_h = 3.5;        // UNVERIFIED: the buttons' body height
 usb_xiao = [45.2, 5.35];    // XIAO socket: KiCad x, centre above the board's top (UNVERIFIED estimate)
-usb_j1 = [64.5, 1.65];      // J1 USB4125: KiCad x, centre above the board's top (UNVERIFIED estimate)
+usb_j1 = [64.5, 1.6];       // J1 SHOU HAN TYPE-C 6P (C456012), 8.94 x 6.81 x 3.2: KiCad x, its mouth's centre above the board's top
 usb_open = [12.5, 7.0];
 
 /* [DIN: HOOYA DIN-504B-M10, drawing rev A1 2019-07-10] */
@@ -200,7 +201,7 @@ module mock_m() {       // mockup frame: x 100..187, y -179.5 (front) .. -100 (b
         translate([-jack[0] / 2, 1.0, -1.5]) cube([jack[0], jack[1] - 1.5, 1.51]);   // the jacks' leads under the board (mockup)
     for (b = buttons) {
         translate([100 + b[0] - 4.795, -100 - b[1] - 3.795, 1.59]) cube([9.59, 7.59, sw_body_h + 0.01]);
-        translate([100 + b[0], -100 - b[1], 1.59]) cylinder(d = 3.4, h = 9.51);
+        translate([100 + b[0], -100 - b[1], 1.59]) cylinder(d = 3.4, h = sw_h + 0.01);
     }
     for (s = ab) translate([100 + s[0], -100 - s[1], 0]) {
         translate([-s[8] / 2, -s[9] / 2, 1.59]) cube([s[8], s[9], s[6] + 0.01]);                 // the body
@@ -383,7 +384,7 @@ module lid() {          // in place: the plate, the skirt down to the board's to
     }
 }
 // ---------------------------------------------------------------------------------------------------------------
-// The printed caps, in place (box frame). Button cap: the bore's floor on the plunger's top (Zb + 9.5).
+// The printed caps, in place (box frame). Button cap: the bore's floor on the plunger's top (Zb + sw_h).
 module button_cap(p, press = 0) {
     top = H + btn_cap[4];
     fz = Zl - btn_cap[5] - btn_cap[2];                       // flange bottom
@@ -393,7 +394,7 @@ module button_cap(p, press = 0) {
             translate([0, 0, fz]) cylinder(d = btn_cap[0], h = top - fz - 0.5);
             translate([0, 0, top - 0.5]) cylinder(d1 = btn_cap[0], d2 = btn_cap[0] - 1.0, h = 0.5);
         }
-        translate([0, 0, fz - 1]) cylinder(d = btn_cap[3], h = Zb + 9.5 - fz + 1);
+        translate([0, 0, fz - 1]) cylinder(d = btn_cap[3], h = Zb + sw_h - fz + 1);
     }
 }
 module slider_cap(c, pos = 0) {   // pos: -1 / 0 / +1 = one end of the travel, the middle, the other end
