@@ -33,7 +33,7 @@ below.
 | `make_stl.sh` | Exports the STLs, runs the checks, renders the PNGs, runs `../check_stl.py` |
 | `stl/jank_box_box.stl`, `stl/jank_box_lid.stl` | The base and the lid, in print orientation |
 | `stl/jank_box_button_cap.stl` (print 2), `stl/jank_box_slider_cap.stl` (print 3), `stl/jank_box_slider_cap_smd.stl` (print 1), `stl/jank_box_knob.stl` (print 1) | OK / BACK caps, the A/B slider caps (SW3..SW5, SW2), the encoder knob |
-| `stl/jank_box_front_test.stl` | A 23.0 mm strip of the front edge as built: one DIN window and one jack slot; try the parts first |
+| `stl/jank_box_front_test.stl` | A strip of the front edge as built: one DIN in its slot (front cheek, slot, back cheek) and the jack beside it in the skirt; try the parts first |
 | `renders/open.png`, `box.png`, `front.png`, `back.png`, `left.png`, `right.png`, `lid_underside.png`, `lid_top.png`, `caps.png` | The box with the board (lid lifted), the empty base, the four sides, the lid as printed, the lid's top with its labels and caps, the closed box |
 
 ```
@@ -42,9 +42,11 @@ sh hardware/box/make_stl.sh               # about 15 s
 
 ## Size
 
-**Outer: 89.0 x 81.5 x 32.0 mm** (X x Y x Z, lid included).
-- **X:** 1.0 + board 87.0 + 1.0.
-- **Y:** 1.0 + board 79.5 + 1.0.
+**Outer: 89.0 x 81.5 x 32.0 mm** (X x Y x Z, lid included). The box is stepped at the board's line on the front and
+back:
+- **Lid (skirt):** 89.0 x 81.5, i.e. 1.0 + board 87.0 + 1.0 and 1.0 + board 79.5 + 1.0.
+- **Base:** 89.0 x **79.1**. Its front and back faces are 0.2 mm *inside* the board's edges (so the DIN plates come to
+  0.8 mm behind them). Its sides are flush with the lid's.
 - **Z:** floor 2.0 + 0.1 + DIN 19.6 + board 1.6 + **7.2** to the lid's inside + lid 1.5.
 
 **Standing out (not counted):**
@@ -54,48 +56,78 @@ sh hardware/box/make_stl.sh               # about 15 s
 
 **Parts to print:** box, lid, 2 button caps, 3 + 1 slider caps, 1 knob (and `front_test` first).
 
-## Connectors at the wall
+## Connectors at the wall, the DINs in slots
 
-**How:** on every edge (all four carry connectors) **the board's edge comes 1.0 mm inside the box's outer face**
-(`edge_in`). The wall there is in two parts:
-- **the base's wall** from the floor up to the board's bottom, 1.9 mm (1.0 outside the board, 0.9 under it);
-- **the lid's skirt** from the board's top up to the lid, 2.3 mm (1.0 outside the board, 1.3 over it).
+**The lid (skirt):** on every edge **the board's edge is 1.0 mm inside the lid's outer face** (`edge_in`). The skirt
+comes down from the lid to the board's top. It is 2.3 mm thick: 1.0 outside the board, 1.3 over it.
 
-The board's 1.6 mm edge is clamped between them (0.05 design gaps) and screwed at H1..H4.
+**The base, front and back: the DINs slide into slots in the wall** (the user's rulings, 2026-11-09: "slots in which
+the MIDI DIN slides/slots in", "slots in the wall", "not a wall at the back"). These walls are **3.7 mm deep**, from
+0.2 inside the board's edge to 3.9 inside it. Round each DIN plate the wall carries:
+- **a front cheek 0.7 mm thick** (the plate's face 0.1 behind it), whose window leaves the plate's face open except its
+  edges;
+- **a 2.0 mm slot** (the plate's 1.8 + 0.1 a face, and 0.1 at its side edges), from the floor up to the board;
+- **a back cheek 1.0 mm thick**, whose opening lets the DIN's narrower body through.
 
-**Where each connector face ends up** (measured on the board model in the box):
+The plate slides **down** into its slot as the board is dropped into the base. Its far edge stands on the floor (0.1).
+There is no lip or wall behind the DIN's body any more.
+
+**How much of the plate the slot holds** (the cheeks' rims, the same in front and behind):
+- **1.3 mm on each side edge.** The body is 1.55 narrower a side; 0.2 is kept clear of it.
+- **2.2 mm at the far edge.** The body is 2.4 shorter there; 0.2 is kept clear.
+- **Nothing on the board-side edge.** The plate meets the board there.
+
+So the front window and the back opening are 18.3 x 17.4 mm.
+
+**Between two neighbouring DINs** (pitch 23.0): the plates are 2.1 mm apart, so the wall's **rib in that gap is 1.9 mm**
+(0.1 clearance a side). Each plate's edge has 1.3 mm of cheek over it on that rib, in front and behind. Behind the
+plates the bodies are 5.2 mm apart, so the back cheek between them is wide.
+
+**OUT1** at the back is the same.
+
+**OUT2's plate** is flush with the board's left edge. Its slot runs into the side wall, leaving 0.9 mm of wall outside
+it.
+
+**Over the jacks' pegs and leads** (above the rib, under the board), the rib and the back cheek stop 1.7 mm below the
+board.
+
+**The base's sides** are 1.9 mm (1.0 outside the board, 0.9 under it).
+
+**The board** is clamped between the skirt (1.3 over it) and the base's walls (front and back walls under the edge,
+the side walls 0.9 under it). It is screwed at H1..H4.
+
+**Where each connector face ends up** (on the board model in the box):
 
 | Connector | Its face | Distance from the outside | Why |
 |---|---|---|---|
-| MIDI jack body (front, back) | 0.5 past the board's edge | **0.5 mm inside**, the bushing **1.5 mm proud** | the skirt keeps a **0.4 mm web** in front of the body (0.1 gap): the pull-out bears on it |
-| DIN plate (front, back) | 1.0 behind the board's edge (the footprint's `DIN_BACK`) | **2.0 mm inside** | see the note below |
-| CLOCK / RESET jack body (sides) | on the board's edge | **1.0 mm inside**, the bushing **1.0 mm proud** | a 0.9 mm web in front |
-| XIAO USB-C | 1.5 past the board's edge | **0.5 mm proud** | |
-| Power USB-C (J1) | on the board's edge | **1.0 mm inside** | |
+| **DIN plate** (front, back) | 1.0 behind the board's edge | **0.8 mm inside the base's face** (2.0 inside the lid's) | the front cheek 0.7 + 0.1 |
+| **MIDI jack body** (front, back) | 0.5 past the board's edge | **0.5 mm inside the lid's face**, the bushing **1.5 mm proud** | the skirt's 0.4 mm web in front of the body takes the pull-out |
+| CLOCK / RESET jack body (sides) | on the board's edge | 1.0 mm inside, the bushing 1.0 mm proud | a 0.9 mm web |
+| XIAO USB-C | 1.5 past the board's edge | 0.5 mm proud | |
+| Power USB-C (J1) | on the board's edge | 1.0 mm inside the lid's face; its legs in a notch of the base's back wall | |
 
-**Note on the DINs: flush jacks and flush DINs together are not possible.** On the v5c footprint the DIN's plate is 1.0
-mm behind the board's edge and the MIDI jack's front 0.5 mm past it, so the two faces are 1.5 mm apart in depth. With
-the board's edge 1.0 mm in (the brief's number):
-- the jacks get a 0.4 mm web in front (pull-out braced) and 1.5 mm proud bushings;
-- the DIN plates end **2.0 mm** behind the outside, not flush.
+**Why the step:** the jack's front is 1.5 mm in front of the DIN plate's face on the footprint. One flat face would
+leave either the jacks with no web in front of them, or the DINs 2.0 mm in. The skirt (jacks) and the base (DINs)
+therefore have their own faces, 1.2 mm apart. The board's edge stands 0.2 mm proud of the base below it.
 
-To make the DINs flush instead, the base's wall would have to step 2.0 mm in from the skirt (a stepped box), or the
-footprint's `DIN_BACK` change. That is *the user's call*; `edge_in` is one parameter.
+**The DIN body, scaled off HOOYA's drawing** (the coordinator, 2026-11-09: 33.5 px/mm against the dimensioned 20.9,
+19.6, 11.8 and 1.8; ±0.2 mm, *not a caliper*):
+- 17.8 mm wide (the plate overhangs it 1.55 a side);
+- 17.2 mm high from the board's side (the plate overhangs it 2.4 at the far edge, none at the board's side);
+- 13.1 mm deep from the plate's front.
 
-**The DIN window:** each DIN shows through a **19.9 x 19.1 mm window** in the base's wall. The window is the plate's
-20.9 x 19.6 face less a **0.5 mm lip** on its two sides and its floor edge. The lip takes the pull-out (1.9 mm thick).
-The window is open at the top to the board, and the plate slides down behind the lip when the board goes in. The
-plate's own socket opening is the plug's way in. OUT2's plate is flush with the board's left edge, and the left base
-wall leaves it room.
+The back cheek's rims depend on these numbers. The checks use them for the DIN's body (`din_body`).
 
-**Print and fit:** the skirt's jack slots are open downwards: round at the bushing's axis, 5.2 mm, 2.5 mm above the
-board. The XIAO's opening is open full height through the lid's edge. J1's opening is 12.5 x 5.15, open downwards.
+**Print and fit:**
+- **The skirt's jack slots** are open downwards: round at the bushing's axis, 5.2 mm, 2.5 mm above the board.
+- **The XIAO's opening** is open full height through the lid's edge. **J1's opening** is 12.5 x 5.15, open downwards.
+- **The DIN slots** are open at the top, so the base prints without supports.
 
 ## Bracing
 
 | Part | Pull-out | Push-in | Down / up | Sideways |
 |---|---|---|---|---|
-| **DIN** (HOOYA: plate 20.9 x 19.6 x 1.8, body to 13.6) | the plate's front on the window's 0.5 lip (sides, floor edge) | the body's back on a **lip** from the floor (1.4 mm, 20.9 wide, to 5.0 mm under the board) | the plate's far edge on the floor (0.1); the board above | the lip round the window |
+| **DIN** (HOOYA: plate 20.9 x 19.6 x 1.8) | the plate's front on the **front cheek** (1.3 a side, 2.2 at the far edge; 0.1) | the plate's back on the **back cheek** (the same rims; 0.1) | the plate's far edge on the floor (0.1); the board above | the plate's side edges in the slot (0.1) |
 | **MIDI jack** (PJ-320D-B-SMT, 6.0 x 12.2 x 5.0, front 0.5 past the edge) | the body's front on the skirt's 0.4 web (0.1) | the body's back on the **lid's cap** (back stop 1.6, 0.15) | the board below, the cap's roof above | the cap's cheeks; the bushing in its slot |
 | **Side jack** (PJ-320A) | the body's front on the skirt's 0.9 web (0.1) | one **cap per side wall** round both jacks (6.7 apart) | as above | as above |
 | **The board** | | | clamped all round between the base's wall (0.9 under it) and the skirt (1.3 over it); four M2 x 20 into webbed columns | the walls (0.1 at the connectors) |
@@ -103,7 +135,7 @@ board. The XIAO's opening is open full height through the lid's edge. J1's openi
 **Unverified:**
 - The jacks' webs (0.4 at the MIDI jacks) take a 3–20 N pull together with the jacks' own SMD pads and pegs; *not
   computed*.
-- The DIN lip stops 5.0 mm under the board; *unverified* that the DIN's 2-pin legs stay within that.
+- The DIN's cheeks are 0.7 (front) and 1.0 (back) mm thick: how far they flex under a 5 kg pull is *not computed*.
 
 ## Lid
 
@@ -154,24 +186,25 @@ travel) and the OLED redrawn.
 | `check_lid`: the lid (skirt, caps, shroud, spacers) against the board and every part | empty | empty |
 | `check_lidbox`: lid against base | empty | empty (the board is between them) |
 | `check_drop`: the lid lowered straight down over the board and the caps | empty | empty |
-| `check_board_drop`: the board lowered straight into the base (the DIN plates behind their lips) | empty | empty |
+| `check_board_drop`: the board lowered straight into the base, every DIN plate sliding down its slot | empty | empty |
 | `check_text`: labels clear of every opening, slot, cavity and keep-out, inside the edges | empty | empty |
 | `check_caps`: caps at rest / pressed / both ends of travel against the lid, the board, the shaft; each knob in its pocket | empty | empty |
-| `brace_caps`, `brace_pull` (DINs on the lips), `brace_pull_jack` (MIDI jacks on the webs), `brace_push`, `brace_trs`, `brace_floor`, `brace_lid`, `brace_ledge` | contact | contact |
+| `brace_caps`, `brace_pull` (each DIN plate moved 0.15 out meets the front cheek), `brace_push` (0.15 in meets the back cheek), `brace_pull_jack` (MIDI jacks on the webs), `brace_push`, `brace_trs`, `brace_floor`, `brace_lid`, `brace_ledge` | contact | contact |
 | `brace_side_pull` / `brace_side_push`, each side jack | contact | 8 of 8 |
 | `check_stl.py` (box, lid, button cap, both slider caps, knob, front_test) | OK | OK: one body, 0 open edges, 0 non-manifold each |
 
 **Negative controls collide as they should:**
 - `gap_out = -0.05` (a jack body into its web);
 - `band_in = 2.0` (the skirt onto the DIN legs);
-- `base_in = 1.1` (the base's wall into the DIN plates);
+- `slot_play = -0.05` (a slot narrower than the plate);
+- `din_rim = [1.6, 2.6]` (the back cheek onto the DIN's body, in `check_board_drop`);
 - `standoff_d = 6.0`.
 
 ## Print
 
 | Part | Orientation | Supports |
 |---|---|---|
-| box (base) | floor on the bed | none: the DIN windows are open at the top |
+| box (base) | floor on the bed | none: the DIN slots and windows are open at the top |
 | lid | top face on the bed | none: the skirt's slots and openings are open at its free edge |
 | caps, knob | as listed above | none |
 | front_test | standing on its foot | none |
@@ -181,11 +214,11 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
 ## Assembly (who does what)
 
 1. **User solders the board** (board README).
-2. **User prints** `front_test.stl`. Check that a DIN plate slides behind its lip and that a plug seats with the plate's
-   face 2.0 mm in. Check that a jack's bushing comes through the skirt's slot with its body against the web.
+2. **User prints** `front_test.stl`. Check that a DIN plate slides down its slot (snug, not tight) and does not move in
+   or out, and that a plug seats with the plate's face 0.8 mm in. Check that a jack's bushing comes through the skirt's slot with its body against the web.
 3. **User puts** a 2.5 mm foam pad under the OLED's far end, and presses the button caps onto OK and BACK and the slider
    caps onto the four A/B knobs.
-4. **User lowers** the board straight into the base. The DIN plates slide down behind their lips onto the floor, and
+4. **User lowers** the board straight into the base. The DIN plates slide down their slots onto the floor, and
    the board's edge comes to rest on the base's wall and the four columns.
 5. **User lowers** the lid straight down. The skirt comes down over the bushings and onto the board's edge, and the
    caps come through their openings.
@@ -194,10 +227,11 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
 ## Unverified, all in one place
 
 - **The DINs:**
-  - the 2.0 mm recess of their faces (flush would need a stepped base or another `DIN_BACK`, above);
-  - a plug seating with the face 2.0 mm in;
-  - the HOOYA's body height and width behind the plate (taken as the plate's) and its 2-pin legs within 5.0 of the
-    board.
+  - the body behind the plate (17.8 x 17.2 x 13.1) is **scaled off the drawing**, not measured: the back cheek's rims
+    (1.3 / 2.2) rest on it;
+  - a plug seating with the plate's face 0.8 mm in;
+  - the slot's 0.1 mm play against the printer's tolerance (a tight print: ream or set `slot_play`);
+  - the cheeks' stiffness (0.7 / 1.0 mm).
 - **The jacks:**
   - the PJ-320D-B-SMT's body (the mockup's 6.2 x 12.2 x 5.0) and its 5.0 bushing;
   - the 0.4 mm web's strength.
