@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* MIDI out: a 1 MHz hardware timer that doubles as Link's clock, and UART1 at 31250 baud, plus USB MIDI on the S3.
  * The timer's alarm interrupt runs jc_step (multiply and shift only, in IRAM) and writes the bytes straight into the UART's
- * FIFO: no task is between the alarm and the wire. It is pinned to core 1, level 3, away from the Wi-Fi task on core 0. */
+ * FIFO: no task is between the alarm and the wire. It is pinned to core 1, level 3, and core 1 runs nothing else: every task
+ * (ours, TinyUSB's, the USB interrupt, FreeRTOS's timers, lwIP) is on core 0, because a critical section on core 1 masks
+ * this level-3 interrupt (measured 2026-11-09: late ticks up to 37 us while TinyUSB's task shared core 1). */
 #include <string.h>
 #include "app.h"
 #include "board.h"
@@ -19,6 +21,9 @@
 #define MIDI_UART UART_NUM_1
 #define MIDI_BAUD 31250
 #define ALARM_MARGIN_US 10            /* an alarm has to be ahead of the counter or it never fires */
+/* the alarm goes this early: from the alarm to the start bit on the pad takes 2.3 us (interrupt entry ~2.0 us, the UART
+ * 0.3 us; clkprobe.c, measured 2026-11-09 on the XIAO, 160 MHz, sd 0.18 us): the start bit then lands on the tick */
+#define CLK_LEAD_US 2
 
 static const char *TAG = "midi";
 static gptimer_handle_t s_timer;
@@ -42,9 +47,13 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
     portENTER_CRITICAL_ISR(&s_mux);
     jc_step(&s_tick, &s_map, now, &f);
     portEXIT_CRITICAL_ISR(&s_mux);
+#ifdef JANK_CLOCK_PROBE
+    if (f.n)
+        probe_mark((int64_t)ev->alarm_value + CLK_LEAD_US, now);
+#endif
     uart_ll_write_txfifo(UART_LL_GET_HW(MIDI_UART), f.bytes, f.n);
     woken = usb_midi_isr(f.bytes, f.n);
-    arm(timer, f.next, now);
+    arm(timer, f.next - CLK_LEAD_US, now);
     return woken;
 }
 
@@ -141,6 +150,10 @@ esp_err_t midi_start(void)
         e = source_pin_up();
     if (e != ESP_OK)
         return e;
+#ifdef JANK_CLOCK_PROBE
+    if ((e = probe_start()) != ESP_OK)
+        ESP_LOGE(TAG, "probe: %s", esp_err_to_name(e));
+#endif
     jc_ticker_init(&s_tick, 4);
     if (xTaskCreatePinnedToCore(start_on_core1, "midi_init", 3072, xTaskGetCurrentTaskHandle(), 5, NULL, 1) != pdPASS)
         return ESP_ERR_NO_MEM;
@@ -174,7 +187,7 @@ void midi_publish(const struct jc_map *m)
     }
     portEXIT_CRITICAL(&s_mux);
     if (begin) {
-        arm(s_timer, s_tick.t_due, now);
+        arm(s_timer, s_tick.t_due - CLK_LEAD_US, now);
     }
 }
 

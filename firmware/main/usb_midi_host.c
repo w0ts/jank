@@ -203,12 +203,12 @@ esp_err_t usb_midi_host_start(void)
     s_events = xQueueCreate(EVENTS, sizeof(struct event));
     if (!s_lock || !s_events)
         return ESP_ERR_NO_MEM;
-    if (xTaskCreatePinnedToCore(lib_task, "usb_lib", 4096, xTaskGetCurrentTaskHandle(), 5, NULL, 1) != pdPASS)
+    if (xTaskCreatePinnedToCore(lib_task, "usb_lib", 4096, xTaskGetCurrentTaskHandle(), 5, NULL, 0) != pdPASS)
         return ESP_ERR_NO_MEM;
     xTaskNotifyWait(0, 0, &r, portMAX_DELAY);
     if ((esp_err_t)r != ESP_OK)
         return (esp_err_t)r;
-    return xTaskCreatePinnedToCore(client_task, "usb_client", 4096, NULL, 5, NULL, 1) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    return xTaskCreatePinnedToCore(client_task, "usb_client", 4096, NULL, 5, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
 /* a device still busy with the last packets misses these: the clock's next tick is worth more than an old one */

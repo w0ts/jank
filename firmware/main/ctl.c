@@ -43,6 +43,18 @@ static void run_line(const char *line)
     enum jk_ctl_action a;
     if (ota_line(line))
         return;
+    if (!strcmp(line, "drive")) {
+        drive_state(s_out, sizeof s_out);
+        strlcat(s_out, "ok\n", sizeof s_out);
+        usb_serial_write(s_out, strlen(s_out));
+        return;
+    }
+#ifdef JANK_CLOCK_PROBE
+    if (!strncmp(line, "probe", 5) && (!line[5] || !strcmp(line + 5, " reset"))) {
+        usb_serial_write(s_out, probe_report(s_out, sizeof s_out, line[5] != 0));
+        return;
+    }
+#endif
     app_cfg_get(&cfg);
     bridge_snapshot(&s_snap);
     a = jk_ctl_line(line, &cfg, &s_snap, bridge_ms(), s_out, sizeof s_out);

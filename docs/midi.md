@@ -23,14 +23,25 @@ The bar is `quantum` beats on Link's own beat count, so the receiver lands on th
 most one bar. A click exactly on a bar line waits for the next one: stop and start never share a tick. A click starts
 stopped gear too, which stays started until the session's next stop.
 
-## Timing (estimates, none measured)
+## Timing (measured 2026-11-09, XIAO ESP32-S3, 120 BPM, in a session with Live and FM-1s)
 
-| | Expected |
-|---|---|
-| Timer to UART, tick to tick | Under about 50 us: interrupt latency, plus up to one 32 us bit |
-| Clock against the session | Link's own measurement error plus the above; steps when Link re-measures (30 s), then slews |
-| Bar start | The `0xF8` goes 320 us after `0xFA`, one byte on the wire |
-| Bridge, one way | 2 to 4 ms: USB, about 1 ms of air for 100 bytes at 1 Mb/s, the queue |
+**At the pin** (the MIDI TX pad, against the stick's own grid; a test build, `JANK_CLOCK_PROBE=1 scripts/build.sh xiao`,
+`probe` on the control line: the MCPWM capture unit timestamps the start bit at 80 MHz, `firmware/main/clkprobe.c`):
+
+| 2 min, 5760 ticks | mean | sd | worst |
+|---|---|---|---|
+| start bit after the tick | 0.30 us | 0.07 us | 2.3 us |
+
+What it took: the alarm goes 2 us early (`CLK_LEAD_US`: interrupt entry ~2.0 us, the UART 0.3 us, which starts the byte at
+once, not on a bit boundary), and core 1 runs the clock interrupt alone: with TinyUSB's task on core 1 the worst tick was
+37 us (a critical section there masks the level-3 interrupt).
+
+**Over USB-MIDI** (the Mac's Link library against arrival times, `aalink`): sd 110 to 240 us, p99 about 1 ms, a mean of
+0.4 to 0.6 ms late. USB full speed polls every 1 ms, so this path is bounded by USB; a computer is better served by Link
+itself, over the stick's network adapter.
+
+**Not measured yet:** the stick's grid against the session (Link over the air) at the pin; that needs the pin and Live
+recorded together (an audio interface at 192 kHz).
 
 `status` reports the stick's own part as `lat_air_max_us` and `lat_usb_max_us`.
 

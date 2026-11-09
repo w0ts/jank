@@ -26,6 +26,8 @@
 #include "freertos/task.h"
 #include "jank_ota.h"
 #include "nvs.h"
+#include "ff.h"
+#include "diskio_wl.h"
 #include "tinyusb_msc.h"
 #include "wear_levelling.h"
 
@@ -42,6 +44,7 @@ extern const char page_end[] asm("_binary_jank_html_end");
 
 static const char *TAG = "drive";
 static tinyusb_msc_storage_handle_t s_storage;
+static wl_handle_t s_wl = WL_INVALID_HANDLE;
 static TaskHandle_t s_task;
 static volatile int s_ready;                 /* the start is over: an app mount from now on is an eject (or an unplug) */
 static RTC_NOINIT_ATTR uint32_t s_erased;
@@ -131,11 +134,24 @@ static esp_err_t write_file(const char *path, const void *data, size_t n)
     return r;
 }
 
+/* the volume's name: JANK, also after the firmware formatted it (the rescue), where FatFs leaves it nameless */
+static void name_volume(void)
+{
+    char lbl[12] = "", set[8] = "0:JANK";
+    char drv[3] = {(char)('0' + ff_diskio_get_pdrv_wl(s_wl)), ':', 0};
+    if (f_getlabel(drv, lbl, NULL) == FR_OK && !strcmp(lbl, "JANK"))
+        return;
+    set[0] = drv[0];
+    if (f_setlabel(set) != FR_OK)
+        ESP_LOGE(TAG, "volume name not set");
+}
+
 static esp_err_t restore(void)
 {
     char text[NOTE_MAX];
     esp_err_t r = write_file(MOUNT "/jank.html", page_start, (size_t)(page_end - page_start - 1));   /* a text blob ends in a NUL */
     int forget = note_for_start(text, sizeof text);
+    name_volume();
     if (r == ESP_OK && text[0]) {
         strlcat(text, "\n", sizeof text);
         r = write_file(MOUNT "/UPDATE.TXT", text, strlen(text));
@@ -265,11 +281,25 @@ static esp_err_t open_volume(const esp_partition_t *p)
 {
     wl_handle_t wl;
     tinyusb_msc_driver_config_t drv = {.callback = on_event};
-    tinyusb_msc_storage_config_t c = {.fat_fs = {.config = {.max_files = 4}}, .mount_point = TINYUSB_MSC_STORAGE_MOUNT_APP};
+    /* a format (a blank or rescued volume) as the first-flashed image: FAT, no partition table */
+    tinyusb_msc_storage_config_t c = {.fat_fs = {.config = {.max_files = 4}, .format_flags = FM_FAT | FM_SFD}, .mount_point = TINYUSB_MSC_STORAGE_MOUNT_APP};
     ESP_RETURN_ON_ERROR(wl_mount(p, &wl), TAG, "wear levelling");
+    s_wl = wl;
     c.medium.wl_handle = wl;
     ESP_RETURN_ON_ERROR(tinyusb_msc_install_driver(&drv), TAG, "msc driver");
     return tinyusb_msc_new_storage_spiflash(&c, &s_storage);     /* mounted for the app, formatted if it holds no file system */
+}
+
+static const char *s_step = "not started";
+static esp_err_t s_err;
+
+/* the drive's start, for the control line's `drive`: "ok", or the step that failed and why */
+void drive_state(char *out, size_t cap)
+{
+    if (s_err == ESP_OK && s_ready)
+        snprintf(out, cap, "drive=ok\n");
+    else
+        snprintf(out, cap, "drive=%s %s\n", s_step, esp_err_to_name(s_err));
 }
 
 esp_err_t drive_start(void)
@@ -277,15 +307,23 @@ esp_err_t drive_start(void)
     const esp_partition_t *p = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "storage");
     esp_err_t e;
     ESP_RETURN_ON_FALSE(p, ESP_ERR_NOT_FOUND, TAG, "no storage partition");
+    s_step = "open";
     e = open_volume(p);
-    if (e == ESP_OK)
+    if (e == ESP_OK) {
+        s_step = "wipe";
         e = wipe(MOUNT, 0);
-    if (e == ESP_OK)
+    }
+    if (e == ESP_OK) {
+        s_step = "restore";
         e = restore();
+    }
+    s_err = e;
     if (e != ESP_OK)
         return rescue(p, e);
     s_erased = 0;
-    ESP_RETURN_ON_FALSE(xTaskCreate(install_task, "drive", 6144, NULL, 3, &s_task) == pdPASS, ESP_ERR_NO_MEM, TAG, "task");
+    ESP_RETURN_ON_FALSE(xTaskCreatePinnedToCore(install_task, "drive", 6144, NULL, 3, &s_task, 0) == pdPASS, ESP_ERR_NO_MEM, TAG, "task");
     s_ready = 1;
-    return tinyusb_msc_set_storage_mount_point(s_storage, TINYUSB_MSC_STORAGE_MOUNT_USB);
+    s_step = "to USB";
+    s_err = tinyusb_msc_set_storage_mount_point(s_storage, TINYUSB_MSC_STORAGE_MOUNT_USB);
+    return s_err;
 }

@@ -7,11 +7,13 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "jank_ota.h"
 
 #define VALID_POLL_MS 200
+#define VALID_MIN_UP_US 20000000LL     /* and 20 s alive: a crash once the clock or the radio gets going is rolled back too */
 #define RESTART_DELAY_MS 100
 
 static const char *TAG = "ota";
@@ -160,7 +162,8 @@ void ota_mark_valid(void)
 
 /* A new image starts "pending verify": the next reset of any kind, a crash included, puts the old image back. It is
  * confirmed once it has shown that the computer sees it (USB configured by the host) and the control task has gone round
- * once after that, which is the path the next update needs. A start as USB host (no computer) confirms in usb.c before
+ * once after that, which is the path the next update needs, and it has run 20 s (measured 2026-11-09: a probe build that
+ * crashed when its MIDI clock started, a few seconds in, had confirmed at USB-up and looped instead of rolling back). A start as USB host (no computer) confirms in usb.c before
  * its restart. */
 static void valid_task(void *arg)
 {
@@ -174,7 +177,7 @@ static void valid_task(void *arg)
         if (!seen) {
             seen = 1;
             beats = ctl_beats();
-        } else if (ctl_beats() != beats) {
+        } else if (ctl_beats() != beats && esp_timer_get_time() >= VALID_MIN_UP_US) {
             ota_mark_valid();
             vTaskDelete(NULL);
         }
@@ -188,6 +191,6 @@ void ota_validate_start(void)
     if (!run || esp_ota_get_state_partition(run, &st) != ESP_OK || st != ESP_OTA_IMG_PENDING_VERIFY)
         return;
     ESP_LOGW(TAG, "new image, not confirmed yet");
-    if (xTaskCreate(valid_task, "ota_valid", 2048, NULL, 1, NULL) != pdPASS)
+    if (xTaskCreatePinnedToCore(valid_task, "ota_valid", 2048, NULL, 1, NULL, 0) != pdPASS)
         ESP_LOGE(TAG, "no task to confirm the image: the next reset rolls it back");
 }

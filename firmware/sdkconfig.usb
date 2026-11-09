@@ -20,3 +20,9 @@ CONFIG_TINYUSB_DESC_MANUFACTURER_STRING="jank"
 CONFIG_TINYUSB_DESC_PRODUCT_STRING="jank"
 CONFIG_TINYUSB_DESC_USE_DEFAULT_PID=n
 CONFIG_TINYUSB_DESC_CUSTOM_PID=0x4A4B
+# the drive is named JANK again after the firmware formats it (drive.c name_volume)
+CONFIG_FATFS_USE_LABEL=y
+# core 1 runs the MIDI clock's interrupt alone (midi.c): the system's floating tasks go to core 0
+CONFIG_FREERTOS_TIMER_TASK_AFFINITY_CPU0=y
+CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y
+CONFIG_PTHREAD_DEFAULT_CORE_0=y

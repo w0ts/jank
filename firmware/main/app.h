@@ -83,8 +83,14 @@ void ota_mark_valid(void);
 
 /* drive.c: the JANK drive: wiped at every start, jank.html on it, a jank.bin copied onto it and ejected is installed */
 esp_err_t drive_start(void);
+#ifdef JANK_CLOCK_PROBE
+esp_err_t probe_start(void);                                 /* clkprobe.c: a test build's pin probe */
+void probe_mark(int64_t due, int64_t isr_now);
+size_t probe_report(char *out, size_t cap, int reset);
+#endif
 void drive_note(const char *slot, const char *text);         /* UPDATE.TXT at the next start, if slot runs (else: rolled back) */
-void drive_note_forget(void);                                /* the image is confirmed: the note is said */
+void drive_note_forget(void);
+void drive_state(char *out, size_t cap);                     /* `drive`: ok, or the start step that failed */                                /* the image is confirmed: the note is said */
 
 /* download.c: the ROM's download mode, with USB */
 void usb_to_rom_download(void);                              /* does not return */
