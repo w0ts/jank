@@ -175,21 +175,23 @@ def T(frame, lx, ly):
     return (round(ex + lx * c + ly * s_, 4), round(ey - lx * s_ + ly * c, 4))
 
 
-def cluster(refs, nets, cx, cy, orient, axial, value, dj=3.0, ds=3.2, frame=None, mirror=False, bottom=False):
+def cluster(refs, nets, cx, cy, orient, axial, value, dj=3.0, ds=3.2, frame=None, mirror=False, bottom=False, par2=None):
     """mirror: the jumper on the other side of the axial part (and the 1206 pads); bottom: the axial part on the bottom side
     (v5: the standing parts hang under the board, beside the DINs), the jumper and the 1206 pads stay on the top"""
     rmain, jp, rpar = refs
+    # par2 (v5c, "v" only): a second 1206 in parallel IN PLACE OF the bypass jumper (jp is then not placed)
     a, b = nets
     th = frame[1] if frame else 0.0
     xj, xs = (cx + dj, cx - ds) if mirror else (cx - dj, cx + ds)
     if orient == "v":
-        r = place(K("Resistor_THT"), axial, rmain, value, *T(frame, cx, cy - 1.27), (270 + th) % 360, bottom)
-        j = place(K("Jumper"), JPFP, jp, "bypass", *T(frame, xj, cy), (270 + th) % 360)
-        s = place(K("Resistor_SMD"), R1206, rpar, "DNP", *T(frame, xs, cy), (270 + th) % 360)
+        r = place(K("Resistor_THT"), axial, rmain, "DNP fix", *T(frame, cx, cy - 1.27), (270 + th) % 360, bottom)
+        j = (place(K("Resistor_SMD"), R1206, par2, "68", *T(frame, xj, cy), (270 + th) % 360) if par2 else
+             place(K("Jumper"), JPFP, jp, "bypass", *T(frame, xj, cy), (270 + th) % 360))
+        s = place(K("Resistor_SMD"), R1206, rpar, "68" if par2 else value, *T(frame, xs, cy), (270 + th) % 360)
     else:                                            # (bottom: the flip mirrors the part, so it turns the other way)
-        r = place(K("Resistor_THT"), axial, rmain, value, *T(frame, cx + 1.27, cy), (th if bottom else 180 + th) % 360, bottom)
+        r = place(K("Resistor_THT"), axial, rmain, "DNP fix", *T(frame, cx + 1.27, cy), (th if bottom else 180 + th) % 360, bottom)
         j = place(K("Jumper"), JPFP, jp, "bypass", *T(frame, cx, cy - dj), 180 + th)
-        s = place(K("Resistor_SMD"), R1206, rpar, "DNP", *T(frame, cx, cy + ds), 180 + th)
+        s = place(K("Resistor_SMD"), R1206, rpar, value, *T(frame, cx, cy + ds), 180 + th)
     for node, n in ((a, "1"), (b, "2")):
         j1, s1 = at(j, n), at(s, n)
         if orient == "v":
@@ -213,7 +215,7 @@ def front_unit(k, c, H, tx_lane):
     ta = cluster((f"R1{k}", f"JP1{k}", f"R3{k}"), ("MIDI_TXB", f"TIP{k}"), c + 6.2, GY, "v", AX0207, "10", 2.8, 2.9,
                  mirror=True, bottom=True)
     tb = cluster((f"R2{k}", f"JP2{k}", f"R4{k}"), ("+3V3", f"RING{k}"), c - 4.3, GY, "v", AX0309, "33", 3.1, 3.3,
-                 mirror=True, bottom=True)
+                 mirror=True, bottom=True, par2=f"R8{k}")
     sw = place(JANK, "SW_Slide_DPDT_MSS22D18", f"SW{1 + k}", "TRS A/B", c + 1.7, H - 19.0, 270)   # (top)
     din5, din4 = at(j, "5"), at(j, "4")
     jt, jr = at(j, "T"), at(j, "R")
@@ -250,7 +252,7 @@ def front_unit(k, c, H, tx_lane):
     route("MIDI_TXB", [v, at(ta["jp"], 1, v)])
     route("MIDI_TXB", [v, (v[0], tx_lane)], SIG, BOT)
     label(f"OUT{k} A|B", c - 4.1, H - 19.0, 0.7, rot=90)
-    label("JP=3V3!", c + 1.0, GY, 0.6, rot=90)       # (the ring's bypass: 3V3 straight on the ring)
+
     return v
 
 
@@ -411,7 +413,8 @@ def layout_long():
     J6 = place(JANK, "MIDI_OUT_PJ-320A_top_DIN-504B-M10_bottom", "J6", "TRS + DIN", C1X, 0.0, 180)
     # (the groups keep their board positions x 16.95 and 6.45 in front of the MIDI IN circuit; the DIN's axis is C1X)
     ta1 = cluster(("R11", "JP11", "R31"), ("MIDI_TX1", "TIP1"), C1X - 16.95, -20.5, "v", AX0207, "10", 2.8, 2.9, F1, bottom=True)
-    tb1 = cluster(("R21", "JP21", "R41"), ("SRC1", "RING1"), C1X - 6.45, -20.5, "v", AX0309, "33", 3.1, 3.3, F1, bottom=True)
+    tb1 = cluster(("R21", "JP21", "R41"), ("SRC1", "RING1"), C1X - 6.45, -20.5, "v", AX0309, "33", 3.1, 3.3, F1, bottom=True,
+                  par2="R81")
     # OUT1's A/B switch is the SURFACE-MOUNT one (SS-3235S), over the DIN's body on the top between the DIN's legs (y 3.5)
     # and its pin row (y 13.3): a through-hole switch's pins would hit the DIN under the board, and the strip east of the
     # DIN carries the XIAO's MIDI IN lines. Pins 1/2/3 at y SY - 3.25, 4/5/6 at SY + 3.25, 2.5 mm apart in x.

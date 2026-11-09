@@ -49,6 +49,14 @@ jack between the DIN plugs on the pcb, making sure the pins don't collide (DIN o
   bottom); OUT1's TIP throw crosses under the switch through two vias.
 - Prices of the two new parts not read (LCSC refused the page on 2026-11-09): **0.00 in the BOM**, fill in before
   trusting the total.
+- **The MIDI resistors are 1206s placed by JLC (later on 2026-11-09, the user: "the upright resistors are just post
+  fixes"):** R3k 10 ohm (C17903), the source two 68 ohm in parallel, R4k + R8k (C17976; 34 ohm, 0.5 W together, for a
+  mono plug on a TRS output: 0.33 W), R9 330 ohm for the LED (C17930). R8k sits where the 33 ohm group's bypass jumper
+  JP2k was (gone). The axial pads (R1k, R2k, R8) stay, empty ("DNP fix"): a bench fix solders an axial part there with
+  the 1206s removed. The 10 ohm group keeps its bypass jumper JP1k.
+- **The screen is the 0.96" 128 x 64 OLED** (HS96L03W2C03, C5248080; the user, 2026-11-09): 27.3 x 27.8 on its header
+  at (34.58, 24.0); the PCF8574 moved right of it; SDA / SCL swapped on the XIAO (SDA D8 = GPIO7, SCL D9 = GPIO8); the
+  expander's right channels on P2 / P3, P4..P7 on test pads.
 
 ## v5 in short (what changed from round 7 / 2026-11-08)
 
