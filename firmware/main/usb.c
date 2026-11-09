@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* USB: a CDC-NCM network adapter, a USB MIDI port and a read-only drive. The MIDI port carries the clock to the computer and
- * the control line in SysEx (core/jank_sysex.h); the drive holds the control page, so there is no link to remember.
+/* USB: a CDC-NCM network adapter, a USB MIDI port and a drive. The MIDI port carries the clock to the computer and
+ * the control line in SysEx (core/jank_sysex.h); the drive holds the control page (drive.c), so there is no link to remember.
  * No CDC-ACM serial: the S3 has 5 IN endpoints, EP0 included (tinyusb dwc2_esp32.h ep_in_count). NCM takes 2, MIDI 1 and
  * the drive 1, which is all of them; more fails when the host configures the device.
  * Device or host is decided at each start and kept: as a device first, and when no computer has spoken within HOST_WAIT_MS
@@ -13,7 +13,6 @@
 #include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_log.h"
-#include "esp_partition.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -22,10 +21,8 @@
 #include "jank_sysex.h"
 #include "tinyusb.h"
 #include "tinyusb_default_config.h"
-#include "tinyusb_msc.h"
 #include "tinyusb_net.h"
 #include "tusb.h"
-#include "wear_levelling.h"
 
 #define RING_SIZE 64u                  /* a power of two; a clock tick is one byte */
 #define TEXT_OUT_SIZE 2048u
@@ -96,24 +93,6 @@ bool IRAM_ATTR usb_midi_isr(const uint8_t *bytes, size_t n)
     __atomic_store_n(&s_head, head + n, __ATOMIC_RELEASE);
     vTaskNotifyGiveFromISR(s_task, &woken);
     return woken == pdTRUE;
-}
-
-/* the page cannot be deleted or damaged: the computer gets a read-only drive */
-bool tud_msc_is_writable_cb(uint8_t lun)
-{
-    (void)lun;
-    return false;
-}
-
-static esp_err_t disk_start(void)
-{
-    wl_handle_t wl;
-    const esp_partition_t *p = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "storage");
-    tinyusb_msc_storage_config_t c = {.fat_fs = {.do_not_format = true}, .mount_point = TINYUSB_MSC_STORAGE_MOUNT_USB};
-    ESP_RETURN_ON_FALSE(p, ESP_ERR_NOT_FOUND, TAG, "no storage partition");
-    ESP_RETURN_ON_ERROR(wl_mount(p, &wl), TAG, "wear levelling");
-    c.medium.wl_handle = wl;
-    return tinyusb_msc_new_storage_spiflash(&c, NULL);
 }
 
 /* TinyUSB's task: something arrived from the computer */
@@ -203,6 +182,7 @@ static void wait_for_a_computer(void *arg)
     (void)arg;
     vTaskDelay(pdMS_TO_TICKS(HOST_WAIT_MS));
     if (!tud_connected()) {              /* its first SETUP sets this */
+        ota_mark_valid();                /* a new image that got this far ran for 3 s with every task up: it is not a bad one */
         s_start_as = HOST_NEXT;
         esp_restart();
     }
@@ -239,7 +219,7 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
     cfg.descriptor.string = STRINGS;
     cfg.descriptor.string_count = STR_COUNT;
     memcpy(net.mac_addr, mac, 6);
-    e = disk_start();
+    e = drive_start();
     if (e != ESP_OK)                     /* the page on a web site still works: the network and MIDI go on without it */
         ESP_LOGE(TAG, "drive: %s", esp_err_to_name(e));
     /* The order matters: tinyusb_driver_install's task overwrites every string descriptor (tinyusb_descriptors_set) and

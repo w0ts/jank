@@ -70,6 +70,20 @@ esp_err_t ui_scan_table(struct js_table *out);               /* blocks about 1.0
 /* ctl.c: the control protocol on the serial */
 esp_err_t ctl_start(void);
 void ctl_serial_rx(const uint8_t *data, size_t n);
+uint32_t ctl_beats(void);                                    /* counts up while the task runs */
+
+/* ota.c: firmware updates over the control line, and the rollback's confirmation */
+bool ota_busy(void);                                         /* a transfer over MIDI is running */
+bool ota_line(const char *line);                             /* an "ota ..." line: handled and answered -> true */
+void ota_idle(void);                                         /* called about once a second: drops a silent transfer */
+void ota_validate_start(void);                               /* a new image confirms itself once USB and the control task work */
+void ota_mark_valid(void);
+
+/* drive.c: the JANK drive: wiped at every start, jank.html on it, a jank.bin copied onto it and ejected is installed */
+esp_err_t drive_start(void);
+
+/* download.c: the ROM's download mode, with USB */
+void usb_to_rom_download(void);                              /* does not return */
 
 /* main.c: the settings' one owner */
 void app_cfg_get(struct jk_cfg *c);

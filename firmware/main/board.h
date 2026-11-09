@@ -5,7 +5,6 @@
 #ifndef BOARD_H
 #define BOARD_H
 #include "sdkconfig.h"
-#include "soc/rtc_cntl_reg.h"
 
 #if CONFIG_JANK_BOARD_XIAO
 /* D6 = GPIO43 for data; the board's 3V3 pad is the source. The module has 499 ohm in series on D6 (v1.2 schematic, R6):
@@ -19,7 +18,4 @@
 #else
 #error "no board chosen"
 #endif
-
-/* The ROM's download mode by software, for flashing with no button. */
-#define BOARD_FORCE_DOWNLOAD() REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT)
 #endif

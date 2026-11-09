@@ -36,8 +36,7 @@ void app_reboot(void) { esp_restart(); }
 
 void app_bootloader(void)
 {
-    BOARD_FORCE_DOWNLOAD();
-    esp_restart();
+    usb_to_rom_download();
 }
 
 static esp_err_t nvs_up(void)
@@ -66,4 +65,5 @@ void app_main(void)
     ESP_ERROR_CHECK(ctl_start());
     ESP_ERROR_CHECK(bridge_start(&s_cfg, mac, peer_mac));
     ESP_ERROR_CHECK(ui_start());
+    ota_validate_start();
 }
