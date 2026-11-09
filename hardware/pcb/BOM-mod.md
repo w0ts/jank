@@ -38,7 +38,7 @@ plug one at a time), and its TRS A/B switch. One board: 4 jacks, 4 DINs, 4 A/B s
 | R8 | 1 | Resistor 330 1% 0.25 W axial (6.3 x 2.4 mm), standing | YAGEO MFR-25FBF52-330R | LCSC C1369900 | USD 0.0205 | 50 |
 | R9, R31, R41, R32, R42, R33, R43, R34, R44 | 9 (not fitted) | 1206 pads in parallel, not fitted (to lower a value on the bench) | - | - - | USD 0.0000 | 0 |
 | LED1 | 1 | RGB LED, addressable, 3.7 x 3.5 x 1.95 mm, top emitting (the beat LED) | OPSCO SK6812MINI-HS | LCSC C2922787 | USD 0.1085 | 5 |
-| J10 | 1 | OLED module 0.91 in 128 x 32, SSD1306, I2C, 38 x 12 mm, 4 holes 2.54 mm (GND VCC SCL SDA) | HS HS91L02W2C01 | LCSC C5248081 | USD 2.3670 | 1 |
+| J10 | 1 | OLED module 0.96 in 128 x 64, white, SSD1315 (SSD1306 commands), I2C, 27.3 x 27.8 mm, 4 holes 2.54 mm (GND VCC SCL SDA) | HS HS96L03W2C03 | LCSC C5248080 | USD 0.0000 | 1 |
 | (J10) | 1 | Pin header 1x4, 2.54 mm (the OLED module's legs) | XFCN PZ254V-11-04P | LCSC C2691448 | USD 0.0276 | 20 |
 | R11, R12, R13, R14 | 4 | Resistor 10 ohm 1% 0.25 W axial (6.3 x 2.4 mm), standing (RC, data) | YAGEO MFR-25FBF52-10R | LCSC C1365579 | USD 0.0205 | 50 |
 | R21, R22, R23, R24 | 4 | Resistor 33 ohm 1% 0.5 W axial (9 x 3.2 mm), standing (RA, source) | CCO MF1/2W-33R 1% T | LCSC C119401 | USD 0.0241 | 20 |
@@ -51,6 +51,6 @@ Test points TP1 to TP4 and the bypass jumpers JP8, JP11 to JP24 are bare pads, n
 
 | Build | Parts at unit price | With each shop's minimum order |
 |---|---|---|
-| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 20.03 | USD 33.32 |
+| 4 jacks + 4 DINs + 4 A/B switches, OLED, 1 LED + the modular outputs | USD 17.67 | USD 30.95 |
 
 USD: LCSC and Seeed (the XIAO). The bare board is ordered at JLCPCB with another board and is not in these totals.

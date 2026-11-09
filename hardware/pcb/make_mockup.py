@@ -32,7 +32,7 @@ LEADS_UP = 1.5                                   # (a bottom part's legs over th
 SMD = 0.8                                        # (0805 / SOT: about 0.6 to 1.1)
 XIAO_USB = (9.0, 1.5, 3.3)                       # its socket over the back edge: width, overhang, height
 ENC_BODY, ENC_SHAFT, ENC_D = (12.5, 6.5), 20.0, 6.0   # (the EC11: body 11.7 x 12.5 x 6.5, shaft 20 mm from the board)
-OLED_UP, OLED_T = 2.5, 2.6                       # (the module on a 2.54 header's 2.5 mm plastic; module + glass 2.6 thick)
+OLED_UP, OLED_T = 2.5, 2.65                      # (the module on a 2.54 header's 2.5 mm plastic; the 0.96in module 2.65 thick)
 SKIP = ("TP", "H", "JP")
 
 MOD = os.environ.get("MODULAR") == "1"         # (the modular variant: jank-pcb-mod.kicad_pcb -> mockup-mod.stl)
@@ -116,8 +116,8 @@ def blocks():
         if ref == "J10":                         # (the OLED: the header, the module over it, the glass on top)
             out.append(box(x0, y0, x1, y1, THICK - 0.01, THICK + OLED_UP + 0.01, "J10 header"))
             hx, hy = mm(fp.GetPosition().x), mm(fp.GetPosition().y)
-            out.append(box(hx - F.OLED_L + F.OLED_PIN_X, hy - F.OLED_W + F.OLED_PIN_Y, hx + F.OLED_PIN_X, hy + F.OLED_PIN_Y,
-                           THICK + OLED_UP, THICK + OLED_UP + OLED_T, "J10 OLED module (rot 180: along -x)"))
+            out.append(box(hx + F.O96_X0, hy - F.O96_ROW, hx + F.O96_X0 + F.O96_W, hy - F.O96_ROW + F.O96_L,
+                           THICK + OLED_UP, THICK + OLED_UP + OLED_T, "J10 OLED 0.96in module (rot 0: along +y)"))
             out.append(box(x0, y0, x1, y1, -LEADS[ref], 0.01, ref + " legs"))
             continue
         if bottom:

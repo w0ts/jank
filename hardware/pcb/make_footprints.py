@@ -270,6 +270,29 @@ OLED_L, OLED_W, OLED_PIN_X, OLED_PIN_Y = 38.0, 12.0, 1.5, 2.19
 OLED_AA = (7.62, 4.2, 30.0, 9.7)                 # (x0, y0, x1, y1 from the module's pin edge and GND side)
 
 
+# the 0.96" 128 x 64 OLED module HS96L03W2C03 (Hansheng, LCSC C5248080; its datasheet "1.4 Mechanical Drawing", 2018/07/23,
+# read 2026-11-09): PCB 27.30 x 27.80 x 1.0, 4 holes at 2.54 (GND VCC SCL SDA) centred on the 27.30 edge, the row 1.44 in;
+# the glass (LCD) 24.74 x 16.90 from 4.87, the viewing area 22.74 x 11.86, the active area 21.744 x 10.864 from 6.37
+# (from the pin edge); four 2.5 mm mounting holes 2.0 from the edges; SSD1315 (SSD1306 commands), I2C 0x3C. Seen from
+# the front with the pins at the top, GND is on the left. Origin: pin 1 (GND), the pins along +x, the module along +y.
+O96_W, O96_L, O96_ROW = 27.30, 27.80, 1.44
+O96_X0 = -(O96_W - 3 * 2.54) / 2                 # (the module's left edge from pin 1: -9.84)
+O96_LCD, O96_AA = (24.74, 16.90, 4.87), (21.744, 10.864, 6.37)
+
+
+def oled96_items():
+    out = [pth(str(i + 1), 2.54 * i, 0.0, 1.7, 1.0, "rect" if i == 0 else "circle") for i in range(4)]
+    x0, y0, cx = O96_X0, -O96_ROW, 3 * 2.54 / 2
+    out += [rect(x0, y0, x0 + O96_W, y0 + O96_L, "F.Fab", 0.1),
+            rect(cx - O96_LCD[0] / 2, y0 + O96_LCD[2], cx + O96_LCD[0] / 2, y0 + O96_LCD[2] + O96_LCD[1], "F.Fab", 0.1),
+            rect(cx - O96_AA[0] / 2, y0 + O96_AA[2], cx + O96_AA[0] / 2, y0 + O96_AA[2] + O96_AA[1], "F.Fab", 0.1),
+            rect(x0, y0, x0 + O96_W, y0 + O96_L, "F.SilkS", 0.12),
+            rect(-1.25, -1.25, 3 * 2.54 + 1.25, 1.25, "F.CrtYd", 0.05)]   # (the courtyard: the header only)
+    out += [f"  (fp_circle (center {x:.3f} {y:.3f}) (end {x + 1.25:.3f} {y:.3f}) {stroke(0.1, 'F.Fab')})"
+            for x in (x0 + 2.0, x0 + O96_W - 2.0) for y in (y0 + 2.0, y0 + O96_L - 2.0)]
+    return out
+
+
 def led_items():
     out = [f'  (pad "{n}" smd rect (at {x:.3f} {y:.3f}) (size {LED_PAD[0]} {LED_PAD[1]}) (layers "F.Cu" "F.Paste" "F.Mask"))'
            for n, (x, y) in LED_PADS.items()]
@@ -387,6 +410,12 @@ def write():
         "LED_SK6812MINI-HS_3.7x3.5mm_HandSolder",
         "Addressable RGB LED OPSCO SK6812MINI-HS, 3.7 x 3.5 x 1.95 mm, top emitting (datasheet rev B/0); pads lengthened outward",
         [text("Reference", "REF**", 0, -2.8, "F.SilkS", True), text("Value", "SK6812MINI-HS", 0, 2.8, "F.Fab"), *led_items()], "smd")
+    files["OLED_0.96in_128x64_I2C_HS96L03W2C03"] = footprint(
+        "OLED_0.96in_128x64_I2C_HS96L03W2C03",
+        "OLED module 0.96 in 128 x 64 (HS96L03W2C03, SSD1315, I2C) on a 1 x 4 2.54 mm header: GND VCC SCL SDA; the module"
+        " 27.3 x 27.8 drawn on F.Fab and the silk, the courtyard the header only (the module floats 2.5 mm up)",
+        [text("Reference", "REF**", 3.81, -2.6, "F.SilkS"), text("Value", "OLED 0.96in", 3.81, 12.0, "F.Fab"),
+         *oled96_items()])
     files["OLED_0.91in_128x32_I2C_HS91L02W2C01"] = footprint(
         "OLED_0.91in_128x32_I2C_HS91L02W2C01",
         "0.91 inch 128 x 32 OLED module HS91L02W2C01 (SSD1306, I2C), on a 1 x 4 2.54 mm header: 1 GND, 2 VCC, 3 SCL, 4 SDA;"

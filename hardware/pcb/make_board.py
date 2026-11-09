@@ -274,9 +274,11 @@ def modular(W, H, p, o, TX_LANE):
         solid(j, "S")
     t = {r: at(j, "T") for r, j in J.items()}
     RBX = W - 84.0                                    # (the right channels' parts follow the board's extra width, MOD_GROW_W)
-    U5 = place(K("Package_SO"), "SOIC-16W_7.5x10.3mm_P1.27mm", "U5", "PCF8574T", 44.0, 42.0, 0)
+    # the expander right of the screen (it is 2.65 tall: not under the module), turned 90: pins 9..16 on the north row
+    # (east to west), 1..8 on the south row (west to east); C12 west of it, under the screen's edge
+    U5 = place(K("Package_SO"), "SOIC-16W_7.5x10.3mm_P1.27mm", "U5", "PCF8574T", 57.9, 40.0, 90)
     u = {n: at(U5, n) for n in range(1, 17)}
-    C12 = place(K("Capacitor_SMD"), C0805, "C12", "100nF", 44.0, 35.6, 0)
+    C12 = place(K("Capacitor_SMD"), C0805, "C12", "100nF", 50.9, 38.6, 270)
     SOT5 = "SOT-23-5_HandSoldering"
     B = {r: place(K("Package_TO_SOT_SMD"), SOT5, r, "74AHCT1G125", x, y, rot)
          for r, x, y, rot in (("U6", 30.0, 39.3, 180), ("U7", 25.0, 44.4, 180), ("U8", RBX + 66.1, 50.2, 0),
@@ -293,41 +295,42 @@ def modular(W, H, p, o, TX_LANE):
          for k, x, y, rot in (("C13", 30.6, 42.4, 0), ("C14", 25.0, 47.6, 0), ("C15", RBX + 70.3, 47.75, 270),
                               ("C16", RBX + 70.3, 55.35, 270))}
     c = {k: (at(fp, 1), at(fp, 2)) for k, fp in C.items()}
+    # the spare outputs P4..P7 (the north row's east end) on test pads just north of the expander
     TP = {n: place(K("TestPoint"), "TestPoint_Pad_D1.0mm", n, v, x, y)
-          for n, v, x, y in (("TP5", "P2", 35.0, 45.2), ("TP6", "P3", 36.9, 46.2), ("TP7", "P6", 51.0, 44.2),
-                             ("TP8", "P7", 52.8, 42.0))}
+          for n, v, x, y in (("TP5", "P4", u[9][0], 32.9), ("TP6", "P5", u[10][0], 31.3), ("TP7", "P6", u[11][0], 32.9),
+                             ("TP8", "P7", u[12][0], 31.3))}
     DBG.update(mod=dict(t=t, u5=u, b=b, r=r, d=d, c=c, s={k: at(j, "S") for k, j in J.items()}))
     for fp_, ns in ((U5, ("1", "2", "3", "8")), *((B[k], ("1", "3")) for k in B), *((D[k], ("1",)) for k in D),
                     *((C[k], ("2",)) for k in C), (C12, ("2",))):
         for n in ns:
             solid(fp_, n)
 
-    # ---- I2C: SDA / SCL up from their bottom lines to the top, down to the expander; 3V3 along y 36.8 (also R51's now)
-    via("SDA", 55.5, o[4][1])
-    route("SDA", [(55.5, o[4][1]), (55.5, u[15][1]), u[15]])
-    via("SCL", 56.6, o[3][1])
-    route("SCL", [(56.6, o[3][1]), (56.6, u[14][1]), u[14]])
+    # ---- I2C from the screen's vias (layout_long): SDA on down the bottom to a via over pin 15, SCL down the top to pin 14
+    route("SDA", [(54.8, 29.0), (54.8, 33.0), (u[15][0], 33.6)], SIG, BOT)
+    via("SDA", u[15][0], 33.6)
+    route("SDA", [(u[15][0], 33.6), u[15]])
+    route("SCL", [(55.5, 30.6), (u[14][0], 31.2), u[14]])
+    # 3V3: the riser's via at y 36.8, the line west along y 36.8 (R51, the screen's VCC), east to pin 16 and C12
     via("+3V3", 51.45, 36.8)
     route("+3V3", [(51.45, 36.8), (27.5, 36.8)])
-    route("+3V3", [(u[16][0], 36.8), u[16]])
+    route("+3V3", [(51.45, 36.8), (u[16][0], 36.8), u[16]])
     route("+3V3", [(at(C12, 1)[0], 36.8), at(C12, 1)])
-    # ---- the expander's lines: P0 CLK_L, P1 RST_L (west), P5 CLK_R, P4 RST_R (east), P2 P3 P6 P7 on test pads
-    route("CLKL_IN", [u[4], (33.2, u[4][1]), (32.2, b["U6"][2][1]), b["U6"][2]])
-    route("RSTL_IN", [u[5], (38.0, u[5][1]), (37.4, 43.6), (27.8, 43.6), (27.8, b["U7"][2][1]), b["U7"][2]])
-    route("MOD_P2", [u[6], (38.6, 44.5), (35.6, 44.5), at(TP["TP5"], 1)])
-    route("MOD_P3", [u[7], (38.2, u[7][1]), at(TP["TP6"], 1)])
-    route("MOD_P6", [u[11], (at(TP["TP7"], 1)[0], u[11][1]), at(TP["TP7"], 1)])
-    route("MOD_P7", [u[12], (52.0, u[12][1]), at(TP["TP8"], 1)])
-    # CLKR_IN / RSTR_IN east on the top, down just past the TX lane (bottom, y 49.2) and OUT4's 10 ohm group's A pad,
+    # ---- the expander's lines: P0 CLK_L, P1 RST_L (south row, west along y 46.05 / 46.75 under the screen), P3 CLK_R,
+    # P2 RST_R (south row, down to vias past the TX lane), P4..P7 on test pads (north row)
+    route("CLKL_IN", [u[4], (u[4][0], 46.05), (33.2, 46.05), (33.2, 41.365), (32.2, b["U6"][2][1]), b["U6"][2]])
+    route("RSTL_IN", [u[5], (u[5][0], 46.75), (27.8, 46.75), (27.8, b["U7"][2][1]), b["U7"][2]])
+    for n, tp in ((9, "TP5"), (10, "TP6"), (11, "TP7"), (12, "TP8")):
+        route(f"MOD_P{n - 5}", [u[n], at(TP[tp], 1)])
+    # CLKR_IN / RSTR_IN down on the top to vias just past the TX lane (bottom, y 49.2) and OUT4's 10 ohm group's A pad,
     # then on the bottom: CLKR_IN straight to a via by U8's pin 2; RSTR_IN west of the 10 ohm group's standing part, east
     # along y 57.0 (between the front groups and the front switches' pins) to a via by U9's pin 2
     CV, RV = (64.8, 49.9), (62.9, 49.9)              # (CV east of the TX via's bottom stub at x 64.05)
-    route("CLKR_IN", [u[10], (CV[0], u[10][1]), CV])
+    route("CLKR_IN", [u[7], (u[7][0], 46.4), (CV[0], 46.4), CV])
     via("CLKR_IN", *CV)
     route("CLKR_IN", [CV, (b["U8"][2][0] - 1.45, b["U8"][2][1])], SIG, BOT)
     via("CLKR_IN", b["U8"][2][0] - 1.45, b["U8"][2][1])
     route("CLKR_IN", [(b["U8"][2][0] - 1.45, b["U8"][2][1]), b["U8"][2]])
-    route("RSTR_IN", [u[9], (RV[0], u[9][1]), RV])
+    route("RSTR_IN", [u[6], (u[6][0], 47.9), (RV[0], 47.9), RV])
     via("RSTR_IN", *RV)
     route("RSTR_IN", [RV, (61.0, 50.6), (61.0, 57.0), (b["U9"][2][0] - 1.45 - 0.8, 57.0), (b["U9"][2][0] - 1.45, b["U9"][2][1])], SIG, BOT)
     via("RSTR_IN", b["U9"][2][0] - 1.45, b["U9"][2][1])
@@ -349,9 +352,9 @@ def modular(W, H, p, o, TX_LANE):
     # ---- +5V: from U2's via down the right side on the bottom (x 70.6); west on the bottom (y 47.4), on top across the
     # expander's band, on the bottom again to the left channels
     route("+5V", [(72.4, p["v5y"]), (70.6, p["v5y"] + 1.25), (70.6, 63.5)], BUS, BOT)
-    route("+5V", [(70.6, 47.4), (62.2, 47.4)], 0.3, BOT)
-    via("+5V", 62.2, 47.4)
-    route("+5V", [(62.2, 47.4), (34.6, 47.4)], 0.3)
+    route("+5V", [(70.6, 47.4), (52.3, 47.4)], 0.3, BOT)      # (bottom under the expander's right-channel lines)
+    via("+5V", 52.3, 47.4)
+    route("+5V", [(52.3, 47.4), (34.6, 47.4)], 0.3)            # (top over the 3V3 riser and MIDI_TXB's bottom line)
     via("+5V", 34.6, 47.4)
     route("+5V", [(34.6, 47.4), (14.56, 47.4)], 0.3, BOT)
     for x, y0, top in ((28.65, 41.6, b["U6"][5]), (23.65, 46.4, b["U7"][5]), (18.06, 41.5, d["D3"][2]),
@@ -376,7 +379,7 @@ def modular(W, H, p, o, TX_LANE):
     label("RST", 13.4, jl["J12"], 0.7, rot=90)
     label("CLK", W - 6.0, jr["J13"] - 4.3, 0.7)
     label("RST", W - 6.0, jr["J14"] + 4.3, 0.7)
-    label("PCF8574 0x20", 44.0, 48.6, 0.6)
+    label("PCF8574 0x20", 57.9, 47.0, 0.6)
 
 
 def layout_long():
@@ -515,22 +518,36 @@ def layout_long():
     route("+3V3", [(51.45, 24.4), at(R65, 1)])
     DBG.update(r65=(at(R65, 1), at(R65, 2)), c11=(at(C11, 1), at(C11, 2)))
     solid(C11, "2")
-    # the screen's I2C on the bottom (SDA = D9, SCL = D8) to its header (J10, at the module's right end)
-    J10 = place(JANK, "OLED_0.91in_128x32_I2C_HS91L02W2C01", "J10", "OLED 0.91in 128x32", 62.3, 33.31, 180)
+    # ======== the screen: a 0.96" 128 x 64 OLED module (HS96L03W2C03, 27.3 x 27.8) on a 2.54 mm header (J10) ========
+    # The module floats 2.5 mm up on its header, its pin edge just in front of the XIAO, the glass towards the front; only
+    # low parts under it (0805, SOT-23). Header pins GND VCC SCL SDA at y OY, x from OX: MIDI_TXB's bottom line (x 35.85)
+    # passes between GND and VCC, MIDI_TX1's (y 22.6) ends above the row.
+    J10X, J10Y = 34.58, 24.0                         # (pin 1; not OX / OY: those are the board's page offset)
+    J10 = place(JANK, "OLED_0.96in_128x64_I2C_HS96L03W2C03", "J10", "OLED 0.96in 128x64", J10X, J10Y, 0)
     o = {n: at(J10, n) for n in range(1, 5)}
     DBG.update(oled=o)
-    route("SCL", [p[9], (54.8, p[9][1]), (54.8, o[3][1]), o[3]], SIG, BOT)
-    route("SDA", [p[10], (55.5, p[10][1]), (55.5, o[4][1]), o[4]], SIG, BOT)
-    R70 = place(K("Resistor_SMD"), R0805, "R70", "10k", 59.2, o[3][1], 0)
-    R71 = place(K("Resistor_SMD"), R0805, "R71", "10k", 59.2, o[4][1], 0)
-    route("SCL", [at(R70, 2), o[3]])
-    route("SDA", [at(R71, 2), o[4]])
-    route("+3V3", [(51.45, 31.5), (57.6, 31.5)], SIG, BOT)
-    via("+3V3", 57.6, 31.5)
-    route("+3V3", [(57.6, 31.5), (57.8, o[2][1]), o[2]])
-    route("+3V3", [(57.8, o[2][1]), (57.8, o[4][1]), at(R71, 1)])
-    route("+3V3", [(57.8, o[3][1]), at(R70, 1)])
     solid(J10, "1")
+    # I2C (the XIAO's right row: SDA on D8 = pin 9, x 54.8; SCL on D9 = pin 10, x 55.5; both on the bottom), up through
+    # vias east of the 3V3 riser (x 51.45, bottom), west on the top in two nested Ls to the header (SDA inside, SCL out)
+    SDV, SCV = (54.8, 29.0), (55.5, 30.6)
+    route("SDA", [p[9], (SDV[0], p[9][1]), SDV], SIG, BOT)
+    via("SDA", *SDV)
+    route("SDA", [SDV, (o[4][0], SDV[1]), o[4]])
+    route("SCL", [p[10], (SCV[0], p[10][1]), SCV], SIG, BOT)
+    via("SCL", *SCV)
+    route("SCL", [SCV, (o[3][0], SCV[1]), o[3]])
+    # pull-ups: R70 (SCL) west of the SCL line, R71 (SDA) east of the SDA line; VCC down the west to the 3V3 line (y 36.8)
+    R70 = place(K("Resistor_SMD"), R0805, "R70", "10k", o[3][0] - 0.95, 27.6, 0)
+    R71 = place(K("Resistor_SMD"), R0805, "R71", "10k", o[4][0] + 0.95, 26.6, 180)
+    route("+3V3", [o[2], (o[2][0], 27.6), at(R70, 1)])
+    route("+3V3", [(o[2][0], 27.6), (o[2][0], 36.8)])
+    R71V = (at(R71, 1)[0], 28.0)
+    route("+3V3", [at(R71, 1), R71V])
+    via("+3V3", *R71V)
+    route("+3V3", [R71V, (51.45, R71V[1])], SIG, BOT)
+    if not MODULAR:                                  # (the plain board: the 3V3 line along y 36.8 is the modular one's)
+        via("+3V3", 51.45, 36.8)
+        route("+3V3", [(51.45, 36.8), (o[2][0], 36.8)])
 
     # ======== the controls right of the screen (top): BACK, OK on a row, the encoder under them ========
     SW6 = place(K("Button_Switch_THT"), "SW_PUSH_6mm", "SW6", "BACK 9.5 mm", 65.9, 23.2, 0)

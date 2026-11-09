@@ -159,7 +159,7 @@ PARTS = [
     ("C4", "Device:C_Polarized", "100uF DNP", "Capacitor_SMD:CP_Elec_5x5.4", "cbulk", 193.04, 63.5, {"1": "+5V", "2": "GND"}),
     # the module, the button, the test points
     ("U1", "jank:XIAO_ESP32S3", "XIAO ESP32S3", "jank:XIAO-ESP32-S3-DIP", "xiao", 289.56, 63.5,
-     {"1": "MIDI_TX1", "2": "MIDI_TXB", "4": "LED_DATA", "5": "IN_EN", "6": "MIDI_RX", "3": "LADDER", "7": "ENC_A", "8": "ENC_B", "9": "SCL", "10": "SDA", "11": "PWR_CUT",
+     {"1": "MIDI_TX1", "2": "MIDI_TXB", "4": "LED_DATA", "5": "IN_EN", "6": "MIDI_RX", "3": "LADDER", "7": "ENC_A", "8": "ENC_B", "9": "SDA", "10": "SCL", "11": "PWR_CUT",
       "12": "+3V3", "13": "GND", "14": "+5V"}),
     ("SW1", "Switch:SW_Push", "OK 9.5 mm", "Button_Switch_THT:SW_PUSH_6mm", "sw", 360.68, 60.96, {"1": "LADDER", "2": "OK_R"}),
     ("TP1", "Connector:TestPoint", "5V", "TestPoint:TestPoint_Pad_D1.5mm", "", 337.82, 88.9, {"1": "+5V"}),
@@ -177,8 +177,10 @@ PARTS = [
     ("LED1", "LED:SK6812", "SK6812MINI-HS", "jank:LED_SK6812MINI-HS_3.7x3.5mm_HandSolder", "led", 132.08, 154.94,
      {"1": "GND", "2": "LED_DIN1", "3": "+5V"}),
     ("C6", "Device:C", "100nF", C0805, "c100n", 147.32, 154.94, {"1": "+5V", "2": "GND"}),
-    # the screen (v5): a 0.91 inch 128 x 32 OLED module (SSD1306, I2C 0x3C) on a 4-pin header, 3V3; SDA / SCL pulled up here
-    ("J10", "Connector_Generic:Conn_01x04", "OLED 0.91in 128x32", "jank:OLED_0.91in_128x32_I2C_HS91L02W2C01", "oled",
+    # the screen (v5c, the user 2026-11-09): a 0.96 inch 128 x 64 OLED module (SSD1315, SSD1306 commands, I2C 0x3C) on a
+    # 4-pin header, 3V3; SDA / SCL pulled up here. SDA on the XIAO's D8 (GPIO7), SCL on D9 (GPIO8): swapped from v5 for the
+    # layout (the S3's I2C goes on any pin)
+    ("J10", "Connector_Generic:Conn_01x04", "OLED 0.96in 128x64", "jank:OLED_0.96in_128x64_I2C_HS96L03W2C03", "oled",
      175.26, 154.94, {"1": "GND", "2": "+3V3", "3": "SCL", "4": "SDA"}),
     ("R70", "Device:R", "10k", R0805, "r10k", 195.58, 147.32, {"1": "+3V3", "2": "SCL"}),
     ("R71", "Device:R", "10k", R0805, "r10k", 205.74, 147.32, {"1": "+3V3", "2": "SDA"}),
@@ -242,8 +244,8 @@ if MODULAR:
     NAME = "jank-pcb-mod"
     PARTS += [
         ("U5", "Interface_Expansion:PCF8574T", "PCF8574T", "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm", "pcf", 30.48, 396.24,
-         {"1": "GND", "2": "GND", "3": "GND", "4": "CLKL_IN", "5": "RSTL_IN", "6": "MOD_P2", "7": "MOD_P3", "8": "GND",
-          "9": "RSTR_IN", "10": "CLKR_IN", "11": "MOD_P6", "12": "MOD_P7", "14": "SCL", "15": "SDA", "16": "+3V3"}),
+         {"1": "GND", "2": "GND", "3": "GND", "4": "CLKL_IN", "5": "RSTL_IN", "6": "RSTR_IN", "7": "CLKR_IN", "8": "GND",
+          "9": "MOD_P4", "10": "MOD_P5", "11": "MOD_P6", "12": "MOD_P7", "14": "SCL", "15": "SDA", "16": "+3V3"}),
         ("C12", "Device:C", "100nF", C0805, "c100n", 60.96, 396.24, {"1": "+3V3", "2": "GND"}),
     ]
     for i, (out, inp, buf, u, r, d, j, c) in enumerate(MOD_OUT):
@@ -257,7 +259,7 @@ if MODULAR:
             (j, "Connector_Audio:AudioJack3", "3.5 mm mono " + out, "jank:Jack_3.5mm_XKB_PJ-320A_Horizontal", "trs", x0 + 45.72, 396.24,
              {"T": out, "S": "GND"}),
         ]
-    for k, n in enumerate(("MOD_P2", "MOD_P3", "MOD_P6", "MOD_P7")):
+    for k, n in enumerate(("MOD_P4", "MOD_P5", "MOD_P6", "MOD_P7")):
         PARTS.append((f"TP{5 + k}", "Connector:TestPoint", n[4:], "TestPoint:TestPoint_Pad_D1.0mm", "", 406.4 + 12.7 * k, 411.48,
                       {"1": n}))
 
@@ -271,7 +273,7 @@ NOTES = [
     (238.76, 35.56, 1.27, "D6 = GPIO43 has 499 ohm on the module (U0TXD). D2 = GPIO3 strapping, ignored by default eFuses. ENC_A = D6 = GPIO43, ENC_B = D7 = GPIO44 (U0TXD / U0RXD), IN_EN = D4 = GPIO5, MIDI_RX = D5 = GPIO6 (v5)."),
     (238.76, 38.1, 1.27, "v5: MIDI_TX1 = D0 = GPIO1 (OUT1 alone: Hi-Z in IN mode); MIDI_TXB = D1 = GPIO2 drives OUT2, OUT3 and OUT4 together (3 loops on one pad)."),
     (238.76, 40.64, 1.27, "LADDER = D2 = GPIO3 (ADC1): OK / BACK / PUSH on one resistor ladder. LED_DATA = D3 = GPIO4. SCL = D8 = GPIO7, SDA = D9 = GPIO8 (the OLED, I2C by the GPIO matrix). PWR_CUT = D10 = GPIO9, low = J1 cut."),
-    (20.32, 129.54, 2.0, "LED: one SK6812MINI-HS on +5V (top); U3 lifts the 3.3 V data to 5 V (VIH = 0.7 x VDD = 3.5 V at 5 V). SCREEN: J10, a 0.91 in 128 x 32 OLED (SSD1306, I2C 0x3C, 3V3)"),
+    (20.32, 129.54, 2.0, "LED: one SK6812MINI-HS on +5V (top); U3 lifts the 3.3 V data to 5 V (VIH = 0.7 x VDD = 3.5 V at 5 V). SCREEN: J10, a 0.96 in 128 x 64 OLED (SSD1315, I2C 0x3C, 3V3)"),
     (20.32, 200.66, 2.0, "MIDI OUT 1-4 (CA-033 at 3.3 V), v5: BOTH fitted on every output, the TRS (type A, top) AND the DIN-5 (bottom), in parallel; plug one at a time"),
     (20.32, 205.74, 1.27, "TRS type A: tip = data (10 ohm to the TX pad), ring = source (33 ohm 0.5 W to 3V3), sleeve = GND."
                           "  DIN-5: pin 5 = tip net, pin 4 = ring net, pin 2 = GND, pins 1 and 3 open."),
@@ -382,6 +384,7 @@ FP_LIB_TABLE = '(fp_lib_table\n  (version 7)\n  (lib (name "jank")(type "KiCad")
 # Prices not read on 2026-11-09 (LCSC refused the page): 0.0 here, the BOM says so. Fill in from LCSC before trusting the total.
 SWS_PRICE = 0.0        # XKB SS-3235S-L2 (C500056), the surface-mount A/B switch
 PJD_PRICE = 0.0        # XKB PJ-320D-B-SMT (C2884940), the surface-mount output jack
+OLED96_PRICE = 0.0     # Hansheng HS96L03W2C03 (C5248080), the 0.96" screen
 LCSC = "LCSC"
 BOM = {
     "xiao": dict(part="Seeed XIAO ESP32S3 (plain, not Sense), no headers included", mpn="113991114", shop="Seeed Studio",
@@ -447,9 +450,9 @@ BOM = {
     "led": dict(part="RGB LED, addressable, 3.7 x 3.5 x 1.95 mm, top emitting (the beat LED)", mpn="OPSCO SK6812MINI-HS",
                 shop=LCSC, code="C2922787", price=0.1085, cur="USD", min=5,
                 datasheet="https://datasheet.lcsc.com/datasheet/pdf/d15550987339dcd676f3ed17cb498c41.pdf?productCode=C2922787"),
-    "oled": dict(part="OLED module 0.91 in 128 x 32, SSD1306, I2C, 38 x 12 mm, 4 holes 2.54 mm (GND VCC SCL SDA)",
-                 mpn="HS HS91L02W2C01", shop=LCSC, code="C5248081", price=2.367, cur="USD", min=1,
-                 datasheet="https://datasheet.lcsc.com/datasheet/pdf/8953314a04a56b0774ba6ab8fe698503.pdf?productCode=C5248081"),
+    "oled": dict(part="OLED module 0.96 in 128 x 64, white, SSD1315 (SSD1306 commands), I2C, 27.3 x 27.8 mm, 4 holes 2.54 mm"
+                      " (GND VCC SCL SDA)",
+                 mpn="HS HS96L03W2C03", shop=LCSC, code="C5248080", price=OLED96_PRICE, cur="USD", min=1),
     "hdr4": dict(part="Pin header 1x4, 2.54 mm (the OLED module's legs)", mpn="XFCN PZ254V-11-04P", shop=LCSC,
                  code="C2691448", price=0.0276, cur="USD", min=20, qty=1),
     "r10": dict(part="Resistor 10 ohm 1% 0.25 W axial (6.3 x 2.4 mm), standing (RC, data)", mpn="YAGEO MFR-25FBF52-10R",
