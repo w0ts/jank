@@ -3,7 +3,7 @@
 The box for the **modular** board in [`../pcb`](../pcb/README.md) (`jank-pcb-mod`, v5c), **87.0 x 79.5 mm**.
 
 **The board's top (the lid side):**
-- the XIAO, the 0.91" OLED, OK, BACK, the encoder, the beat LED;
+- the XIAO, the 0.96" 128 x 64 OLED (HS96L03W2C03), OK, BACK, the encoder, the beat LED;
 - the four MIDI jacks (XKB PJ-320D-B-SMT), each **beside** its DIN;
 - the four mono CLOCK / RESET jacks (XKB PJ-320A) on the side edges;
 - the A/B switches (SW2 surface-mount, SW3..SW5 through-hole).
@@ -151,7 +151,7 @@ The back cheek's rims depend on these numbers. The checks use them for the DIN's
 
 | Opening | Centre | Size | Note |
 |---|---|---|---|
-| OLED window | 45.0, 28.55 | 24.4 x 7.6 | the glass 2.1 under the lid |
+| OLED window | **38.39, 34.36** | **22.76 x 11.88** | the 0.96" module's viewing area (22.74 x 11.86, board y 28.43..40.29) + 0.02, as before; the glass top (5.15) 2.05 under the lid |
 | BACK, OK | 69.15 / 78.75, 25.45 | 6.0 round | the button caps' 5.4 stems |
 | Encoder | 73.9, 38.7 | 7.0 round | under the 14 mm knob |
 | LED | 33.0, 4.2 | 3.5 x 3.7 | a shroud to 0.3 over the LED, a 0.6 mm skin over it (`led_skin`): print the lid translucent |
@@ -159,8 +159,13 @@ The back cheek's rims depend on these numbers. The checks use them for the DIN's
 | SW3..SW5 (OUT2..OUT4) | 10.45 / 33.45 / 56.45, 60.5 | 3.5 x 6.0, along y | the cap (3.15 x 3.65) and its 2.0 travel |
 | Screws H1..H4 | (83.8, 3.2), (83.8, 76.3), (3.2, 26.0), (3.2, 34.0) | 2.4 | **4 x M2 x 20 self-tapping** through the lid, a 5.0 spacer, the board, 9.7 into a column |
 
-**Under the lid:** the skirt, the jack caps, the spacers, the LED shroud, and a rib over the OLED module's far end. The
-far end has nothing under it: **User puts a 2.5 mm foam pad there.**
+**Under the lid:** the skirt, the jack caps, the spacers, the LED shroud, and **four posts onto the OLED module**.
+- **The module:** 27.3 x 27.8 mm at board x 24.74..52.04, y 22.56..50.36, on its 1 x 4 header 2.5 mm up.
+- **The posts:** each is Ø4.0 and stands 0.2 mm above the module's PCB at its four Ø2.5 holes (x 26.74 / 50.04, y
+  24.56 / 48.36). There is no glass there: the glass spans y 27.43..44.33.
+- **The pins:** each post ends in a **Ø2.1 pin**, 0.6 mm into its hole. The pins hold the module on its header against
+  shifting and lifting.
+- **The front edge:** it has nothing under it. A 2.5 mm foam pad under it is still a good idea.
 
 ## Printed caps and knob
 
@@ -222,7 +227,7 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
 1. **User solders the board** (board README).
 2. **User prints** `front_test.stl`. Check that a DIN plate slides down its slot (snug, not tight) and does not move in
    or out, and that a plug seats with the plate's face 1.3 mm in. Check that a jack's bushing comes through the skirt's slot with its body against the web.
-3. **User puts** a 2.5 mm foam pad under the OLED's far end, and presses the button caps onto OK and BACK and the slider
+3. **User puts** a 2.5 mm foam pad under the OLED module's front edge (the edge away from its header), and presses the button caps onto OK and BACK and the slider
    caps onto the four A/B knobs.
 4. **User lowers** the board straight into the base. The DIN plates slide down their slots onto the floor, and
    the board's edge comes to rest on the base's wall and the four columns.
@@ -246,5 +251,7 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
   - its outline against the 0.1 mm gaps at the connectors (JLCPCB ±0.2: the board's edges are clamped, not fitted
     between walls, so the gap only limits how far the board can shift before a connector bears);
   - the mockup's positions (the PCB files are the board session's).
-- **Other:** the XIAO's 7.0 height, the OLED's heights, the encoder's 6.5 and 20, the buttons' 3.5 body, the cap press
+- **The OLED module:** its PCB 1.0 and glass 1.65 (top at 5.15), its holes' 2.5 and positions, and the glass's
+  position, from the board session's numbers, not a part in hand.
+- **Other:** the XIAO's 7.0 height, the encoder's 6.5 and 20, the buttons' 3.5 body, the cap press
   fits, the EC11 D flat, M2 into PLA, the USB overmold sizes, the font.

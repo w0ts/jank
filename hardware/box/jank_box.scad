@@ -35,10 +35,12 @@ holes = [[83.8, 3.2], [83.8, 76.3], [3.2, 26.0], [3.2, 34.0]];   // H1..H4 (2.2 
 buttons = [[69.15, 25.45], [78.75, 25.45]];   // BACK (SW6), OK (SW1): HRO K2-1102DP-L3SW-04, 9.5 mm
 enc = [73.9, 38.7];     // encoder shaft
 enc_hole = 7.0;
-oled_win = [45.0, 28.55, 24.4, 7.6];     // centre x, y, size x, y (the viewing area)
-oled = [25.8, 63.8, 23.5, 35.5];         // the module: x0, x1, y0, y1 (pins at the x1 end)
-oled_z = [2.5, 3.9, 5.1];                // above the board: its underside, its PCB's top, the glass top (UNVERIFIED split)
-oled_glass_x0 = 28.3;
+// the 0.96" 128 x 64 OLED module HS96L03W2C03 (the board's commit 0172784): 27.3 x 27.8, on a 1 x 4 header 2.5 up
+oled_win = [38.39, 34.36, 22.76, 11.88]; // centre x, y, size x, y: the viewing area 22.74 x 11.86 + 0.02 (as before)
+oled = [24.74, 52.04, 22.56, 50.36];     // the module: x0, x1, y0, y1 (y from the back; its pins along its back edge)
+oled_z = [2.5, 3.5, 5.15];               // above the board: its underside, its PCB's top (PCB 1.0), the glass top
+oled_glass = [26.02, 50.76, 27.43, 44.33];   // the glass (24.74 x 16.90): x0, x1, y0, y1
+oled_holes = [[26.74, 24.56], [50.04, 24.56], [26.74, 48.36], [50.04, 48.36]];   // its four 2.5 mm holes
 led = [33.0, 4.2];
 led_win = [3.5, 3.7];
 led_h = 1.95;
@@ -116,8 +118,8 @@ led_tube = 0.6;
 led_skin = 0.6;
 led_tube_gap = 0.3;
 button_hole = btn_cap[0] + 0.6;   // the cap's stem through it, 0.3 a side
-oled_rib = [26.0, 27.6];  // a rib in the lid over the module's far end (no glass there): x from / to
-oled_rib_gap = 0.2;
+oled_post = [4.0, 0.2, 2.1, 0.8];   // lid posts onto the module's PCB at its holes: dia, gap above the PCB, pin dia, pin length
+                                    // (the pin enters the 2.5 hole 0.6 deep: it keeps the module from shifting or lifting)
 // parts at the board's edges the skirt's band (top) or the base's band (bottom) must leave room for (mockup-mod,
 // courtyards + 0.2): [x0, x1, y0, y1 (y from the back), z0, z1 (from the board's top / bottom)]
 top_keep = [[35.05, 55.4, -0.2, 1.4, -1, face_h],       // the XIAO (and C5 under it), up to the lid's underside
@@ -186,7 +188,7 @@ module mock_m() {       // mockup frame: x 100..187, y -179.5 (front) .. -100 (b
         import("../pcb/mockup-mod.stl", convexity = 10);
         for (b = buttons) translate([100 + b[0] - 4.9, -100 - b[1] - 3.9, 1.5]) cube([9.8, 7.8, 10]);
         for (s = ab) translate([100 + s[0] - 4.3, -100 - s[1] - 5.0, 1.5]) cube([8.6, 10.0, 6]);
-        translate([125.7, -135.6, 4.0]) cube([38.2, 12.2, 2.8]);
+        translate([100 + oled[0] - 0.1, -100 - oled[3] - 0.1, 1.6 + oled_z[0] - 0.1]) cube([oled[1] - oled[0] + 0.2, oled[3] - oled[2] + 0.2, oled_z[2] - oled_z[0] + 0.2]);
         for (k = [0 : 3]) translate([100 + din_x[k] - 10.55, ch_back[k] ? -100 - 0.9 - 15 : -100 - board_w, -25])   // the mockup's DIN blocks
             cube([21.1, 16, 25]);
     }
@@ -205,8 +207,11 @@ module mock_m() {       // mockup frame: x 100..187, y -179.5 (front) .. -100 (b
         rotate([0, 0, ab_rot(s)]) translate([-s[3] / 2, -(s[4] + s[5]) / 2, 1.6 + s[6] - 0.01])
             cube([s[3], s[4] + s[5], s[7] - s[6] + 0.01]);                                          // the knob, whole travel
     }
-    translate([100 + oled[0], -100 - oled[3], 1.6 + oled_z[0]]) cube([oled[1] - oled[0], oled[3] - oled[2], oled_z[1] - oled_z[0]]);
-    translate([100 + oled_glass_x0, -100 - oled[3] + 0.22, 1.6 + oled_z[1] - 0.01]) cube([30.0, 11.56, oled_z[2] - oled_z[1] + 0.01]);
+    difference() {      // the module's PCB with its four holes, and the glass on it
+        translate([100 + oled[0], -100 - oled[3], 1.6 + oled_z[0]]) cube([oled[1] - oled[0], oled[3] - oled[2], oled_z[1] - oled_z[0]]);
+        for (h = oled_holes) translate([100 + h[0], -100 - h[1], 1.6 + oled_z[0] - 1]) cylinder(d = 2.5, h = 3);
+    }
+    translate([100 + oled_glass[0], -100 - oled_glass[3], 1.6 + oled_z[1] - 0.01]) cube([oled_glass[1] - oled_glass[0], oled_glass[3] - oled_glass[2], oled_z[2] - oled_z[1] + 0.01]);
 }
 module mock() { translate([X0 - 100, Y0 + 100 + board_w, Zbot]) mock_m(); }
 
@@ -356,8 +361,10 @@ module lid() {          // in place: the plate, the skirt down to the board's to
                     cube([led_win[0] + 2 * led_tube, led_win[1] + 2 * led_tube, Zl - Zb - led_h - led_tube_gap + 0.01]);
                 translate([kx(35.255) - 0.2, Y0, Zb - 1]) cube([30, board_w, face_h + 2]);
             }
-            translate([kx(oled_rib[0]), ky(oled[3]), Zb + oled_z[1] + oled_rib_gap])   // over the module's far end
-                cube([oled_rib[1] - oled_rib[0], oled[3] - oled[2], Zl - Zb - oled_z[1] - oled_rib_gap + 0.01]);
+            for (h = oled_holes) translate([kx(h[0]), ky(h[1]), 0]) {   // posts onto the module's PCB, a pin into each hole
+                translate([0, 0, Zb + oled_z[1] + oled_post[1]]) cylinder(d = oled_post[0], h = Zl - Zb - oled_z[1] - oled_post[1] + 0.01);
+                translate([0, 0, Zb + oled_z[1] + oled_post[1] - oled_post[3]]) cylinder(d = oled_post[2], h = oled_post[3] + 0.01);
+            }
         }
         for (k = [0 : 3]) at_jack(k) { jack_slot(jack_out); jack_cavity(jack_out); }
         for (j = [0 : 3]) at_side(j) { jack_slot(0); jack_cavity(0); }
