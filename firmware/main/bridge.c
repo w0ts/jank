@@ -386,6 +386,24 @@ int bridge_beat(int64_t *beat_ub, int32_t *mpb)
     return joined;
 }
 
+int bridge_tempo(int32_t mpb)
+{
+    int r;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    r = jp_set_tempo(&s_peer, mpb, midi_now_us());
+    xSemaphoreGive(s_lock);
+    return r;
+}
+
+int bridge_play(int play)
+{
+    int r;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    r = jp_set_playing(&s_peer, play, midi_now_us());
+    xSemaphoreGive(s_lock);
+    return r;
+}
+
 uint32_t bridge_peers_heard(void)
 {
     uint32_t n;
