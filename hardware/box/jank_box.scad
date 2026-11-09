@@ -6,15 +6,17 @@
 // its BOTTOM carries the four DINs (HOOYA DIN-504B-M10) hanging 19.6 mm down: the board stands about 20 mm up.
 //
 // CONNECTORS AT THE WALL (the user's ruling 2026-11-08/09): on every edge the board's edge comes edge_in (1.0 mm)
-// inside the box's outer face. The base's wall rises to the board's bottom, the lid's skirt comes down to its top, the
-// board is clamped between them (and screwed at H1..H4). The MIDI jacks' bodies end 0.5 mm inside the outside, their
+// inside the box's outer face (the lid and the base flush on all four sides, 2026-11-09). The base's wall rises to the
+// board's bottom and its rim round the edge to 1.6 over its top; the lid's skirt comes down to the board's top inside the
+// rim; the board is clamped between them (and screwed at H1..H4). See THE JOINT below. The MIDI jacks' bodies end 0.5 mm inside the outside, their
 // bushings 1.5 proud; the DIN plates (1.0 behind the board's edge on the footprint) sit 2.0 behind the outside in a
 // window with a 0.5 lip; the side jacks' bodies 1.0 inside, bushings 1.0 proud.
 //
 // FIRST REQUIREMENT (the user's ruling 2026-11-08): plugging and unplugging loads the box, not the solder joints.
 //   DIN: pull-out -> the plate's front on the window's lip (sides, floor edge); push-in -> the body's back on a lip from
 //        the floor; down -> the plate's far edge on the floor.
-//   jack: pull-out -> the body's front on the skirt's web; push-in -> the body's back on the lid's cap.
+//   jack: pull-out -> the body's front on the web (the skirt's above the axis, the base's tongue below); push-in -> the
+//        body's back on the lid's cap.
 //
 // Frame: box outer corner at the origin, X along the front (left to right seen from the front, lid up), Y from the
 // front to the back, Z up. KiCad x maps to X directly (the board lies top up); KiCad y is measured from the BACK edge.
@@ -22,7 +24,7 @@
 
 /* [What to render] */
 sj = 0;                 // the side jack a brace_side_* check looks at
-part = "assembly";      // [assembly, box, lid, button_cap, slider_cap, slider_cap_smd, knob, front_test, mock, open, front, back, lid_top, caps_view, check_box, check_lid, check_lidbox, check_drop, check_board_drop, check_text, check_caps, brace_caps, brace_pull, brace_pull_jack, brace_push, brace_trs, brace_side_pull, brace_side_push, brace_floor, brace_lid, brace_ledge]
+part = "assembly";      // [assembly, box, lid, button_cap, slider_cap, slider_cap_smd, knob, front_test, mock, open, front, back, joint, lid_top, caps_view, check_box, check_lid, check_lidbox, check_drop, check_board_drop, check_text, check_caps, check_usb, brace_caps, brace_pull, brace_pull_jack, brace_push, brace_trs, brace_side_pull, brace_side_push, brace_floor, brace_lid, brace_ledge, brace_reg, brace_snap]
 
 /* [Board v5c, modular: hardware/pcb (jank-pcb-mod.kicad_pcb, mockup-mod.stl)] */
 board_l = 87.0;
@@ -64,9 +66,17 @@ enc_flat = 4.5;         // UNVERIFIED: the EC11's D shaft, 4.5 across the flat o
 function cap_size(c) = [c[3] + slider_fit + 2 * slider_wall, c[4] + slider_fit + 2 * slider_wall];   // across, along
 function slot_size(c) = [cap_size(c)[0] + 0.35, cap_size(c)[1] + c[5] + 0.35];                     // across, along
 sw_body_h = 3.5;        // UNVERIFIED: the buttons' body height
-usb_xiao = [45.2, 5.35];    // XIAO socket: KiCad x, centre above the board's top (UNVERIFIED estimate)
-usb_j1 = [64.5, 1.6];       // J1 SHOU HAN TYPE-C 6P (C456012), 8.94 x 6.81 x 3.2: KiCad x, its mouth's centre above the board's top
-usb_open = [12.5, 7.0];
+// USB-C (2026-11-09, the user: "one hole per USB connector"): each socket gets ONE opening of its own.
+//   XIAO (U1): the module's PCB ends at the board's back edge (footprint F.Fab 0.0 to 21.0 in from it); only its USB-C
+//   socket (9.0 wide, 3.3 high, top 7.0 above the board: mockup, UNVERIFIED) stands 1.5 past the board's edge (footprint
+//   silk, mockup 1.545), so 0.5 PAST the box's back face: a plug's overmold stays outside, the hole only clears the socket.
+//   J1: its mouth 0.035 past the board's edge, 0.965 behind the box's face: a recess for the plug's overmold to reach it.
+usb_xiao = [45.2, 5.35, 9.0, 3.3, 1.545];   // KiCad x, socket centre above the board's top, width, height, mouth past the edge
+usb_j1 = [64.5, 1.6, 8.94, 3.2, 0.035];     // J1 SHOU HAN TYPE-C 6P (C456012): the same (centre and height from the mockup)
+xiao_clear = 0.4;           // the XIAO socket's hole: 0.4 a side round the socket (9.8 x 4.1)
+plug_mold = [12.5, 7.0];    // ASSUMED typical USB-C plug overmold, width x height, centred on the plug (UNVERIFIED: cables vary)
+plug_clear = 0.25;          // round it, a side: J1's recess 13.0 x 7.5
+plug_r = 1.5;               // the overmold's corner radius (ASSUMED); the recess's: + plug_clear
 
 /* [DIN: HOOYA DIN-504B-M10, drawing rev A1 2019-07-10] */
 din_plate = [20.9, 19.6, 1.8];   // the plate: a flange the wall's slot grips
@@ -78,8 +88,8 @@ din_floor_gap = 0.1;
 // THE SLOTS (the user's ruling 2026-11-09: "slots in the wall"): the front and back walls carry, round each DIN, a
 // cheek in front of the plate, a 2.0 slot (the plate's 1.8 + 0.1 a face) and a cheek behind it; the plate slides down
 // into the slot as the board goes in. No lip or wall behind the body.
-din_face_in = 1.3;      // the plate's face behind the base's outer face: the front cheek 1.2 + 0.1 (the user, 2026-11-09:
-                        // "make the wall thicker"; the base's face 0.3 proud of the board's edge)
+din_face_in = 2.0;      // the plate's face behind the base's outer face: the front cheek 1.9 + 0.1 (the user, 2026-11-09:
+                        // "the lid seems bigger than the base": the base's face flush with the lid's, 1.0 past the board's edge)
 slot_play = 0.1;        // a face, and at the plate's side edges
 din_rim = [1.3, 2.2];   // how much of the plate's edge the cheeks hold: [each side, the far edge] (body overhang - 0.2)
 back_cheek = 2.0;       // the cheek behind the plate
@@ -95,7 +105,6 @@ jack_out = 0.5;         // the MIDI jacks' fronts past the board's edge
 bush_d = 5.0;           // UNVERIFIED (measured on the sheet)
 bush_out = 2.0;
 bush_z = 2.5;
-bush_slot = 5.2;
 jack_play = 0.15;
 cap_wall = 1.6;
 cap_stop = 1.6;         // the lid's jack cap stops this far above the board: the DINs' legs (1.5) stand there
@@ -106,6 +115,23 @@ edge_in = 1.0;          // the board's edges to the box's outer faces (all four 
 gap_out = 0.1;          // a connector's front to the wall in front of it
 base_in = din_in - gap_out;   // the side walls reach 0.9 under the board
 band_in = 1.3;          // the lid's skirt reaches 1.3 over the board
+// THE JOINT (the user, 2026-11-09: "an alignment / locking system; the screws just lock it"): the base's RIM rises round
+// the board's edge (outside it) to rim_h above the board's top; the lid's skirt has a rebate over it, its inner band (over
+// the board) inside the rim with reg_gap a side: the lid registers on the rim. At every 3.5 mm jack the rim rises to the
+// jack's axis (a TONGUE) and holds the lower half of a round hole, the lid the upper half ("round on lid and base").
+// Four light snap catches: a 45-degree bump on the lid's band into a groove in the rim's inside. FDM clearances 0.2.
+rim_gap = 0.2;          // the rim's inside to the board's edge (and the lid's band outside = the board's edge: reg_gap)
+reg_gap = 0.2;          // the lid's band to the rim's inside, a side
+rim_h = 1.6;            // the rim's top above the board's top
+reg_top = 0.1;          // the rim's / the tongues' top to the lid above them
+jack_hole = 5.4;        // the jacks' round hole: the bushing 5.0 (UNVERIFIED) + 0.2 a side
+tongue_side = 1.6;      // the tongue beside the jack's body cavity, a side
+tongue_clear = 0.2;     // the lid's notch round a tongue, a side
+catch_c = 0.8;          // the catch's centre above the board's top
+catch_len = 8.0;
+catch_bump = 0.35;      // the bump's height off the lid's band (45 degrees): 0.15 into the rim on the way down
+catch_groove = 0.35;    // the groove's depth into the rim's inside (45 degrees): 0.45 of rim behind it
+catches = [[0, 34.45], [1, 21.0], [2, 69.5], [3, 61.5]];   // [wall (0 front, 1 back, 2 left, 3 right), box X or Y]
 floor_t = 2.0;
 contact = 0.05;
 face_h = 7.2;           // the board's top to the lid's inside: the XIAO's 7.0 + 0.2
@@ -127,7 +153,7 @@ top_keep = [[35.05, 55.4, -0.2, 1.4, -1, face_h],       // the XIAO (and C5 unde
             [58.9, 70.1, -0.8, 1.4, -1, 3.5],           // J1
             [30.7, 35.3, 0.75, 1.4, -1, 2.2]];          // LED1
 bot_keep = [[35.05, 55.4, -0.2, 21.2, -3.2, 1],         // the XIAO's header pins
-            [58.9, 70.1, -0.75, 8.0, -2.1, 1],          // J1's shell legs (0.55 past the edge in the mockup)
+            [58.9, 70.1, -0.25, 8.0, -2.1, 1],          // J1's legs (the mockup's block 0.035 past the edge; pads 1.65 in)
             [39.43, 45.01, 2.55, 6.0, -9.2, 1]];        // R8 standing under the board by the back wall
 
 /* [Markings] */
@@ -153,11 +179,13 @@ Zl = Zb + face_h;                        // the lid's underside
 H = Zl + lid_t;
 L = board_l + 2 * edge_in;
 W = board_w + 2 * edge_in;
-base_off = din_in - din_face_in;         // the base's front / back outer faces, inside the board's edge (0.2)
+base_off = din_in - din_face_in;         // the base's front / back outer faces, inside the board's edge (-1.0: flush)
 wall_d = din_in - slot_play + 2 * slot_play + din_plate[2] + back_cheek;   // the front / back wall's depth from the board's edge
 function kx(x) = X0 + x;
 function ky(y) = Ybk - y;
 encC = [kx(enc[0]), ky(enc[1])];
+tongue_w = jack[0] + 2 * jack_play + 2 * tongue_side;   // 9.7
+rim_t = edge_in - rim_gap;               // 0.8
 
 // frames: origin on the board's edge at the axis, +y into the board
 module at_din(k) { if (ch_back[k]) translate([kx(din_x[k]), Ybk, 0]) mirror([0, 1, 0]) children();
@@ -167,8 +195,12 @@ module at_jack(k) { if (ch_back[k]) translate([kx(jack_x[k]), Ybk, 0]) mirror([0
 module at_side(j) { s = side_jacks[j];
     if (s[0] == 0) translate([X0, ky(s[1]), 0]) rotate([0, 0, -90]) children();
     else translate([X0 + board_l, ky(s[1]), 0]) rotate([0, 0, 90]) children(); }
+module at_wall(w, s) {   // origin on the outer face at s along it, +y inwards
+    if (w == 0) translate([s, 0, 0]) children();
+    else if (w == 1) translate([s, W, 0]) mirror([0, 1, 0]) children();
+    else if (w == 2) translate([0, s, 0]) rotate([0, 0, -90]) children();
+    else translate([L, s, 0]) rotate([0, 0, 90]) children(); }
 module xz_extrude(y0, len) { translate([0, y0 + len, 0]) rotate([90, 0, 0]) linear_extrude(len) children(); }
-module dslot2d(d, down) { union() { circle(d = d); translate([-d / 2, -down]) square([d, down]); } }   // open downwards
 module rect_ring(z0, z1, inset) {         // the outer rectangle minus the board inset by `inset`, from z0 to z1
     translate([0, 0, z0]) linear_extrude(z1 - z0) difference() {
         square([L, W]);
@@ -219,7 +251,7 @@ module mock() { translate([X0 - 100, Y0 + 100 + board_w, Zbot]) mock_m(); }
 // ---------------------------------------------------------------------------------------------------------------
 module din_slot() {     // round one DIN, in the front / back wall: the window, the slot, the opening behind
     zp = Zbot - din_plate[1];   // the plate's far edge
-    translate([-din_plate[0] / 2 + din_rim[0], -edge_in - 1, zp + din_rim[1]]) cube([din_plate[0] - 2 * din_rim[0], edge_in + wall_d + 2, din_plate[1]]);
+    translate([-din_plate[0] / 2 + din_rim[0], -edge_in - 1, zp + din_rim[1]]) cube([din_plate[0] - 2 * din_rim[0], edge_in + wall_d + 2, Zbot - contact - zp - din_rim[1]]);
     translate([-din_plate[0] / 2 - slot_play, din_in - slot_play, floor_t]) cube([din_plate[0] + 2 * slot_play, din_plate[2] + 2 * slot_play, din_plate[1] + 1]);
 }
 module din_posts() {    // local frame: beside the body, behind the back cheek, back to the body's back; and the fillets
@@ -239,8 +271,18 @@ module din_posts() {    // local frame: beside the body, behind the back cheek, 
              translate([-din_plate[0] / 2, yw - 0.01, floor_t - 0.01]) cube([din_plate[0], chamfer, 0.01]); }
 }
 // a jack in its frame, its front at -f (f = jack_out for the MIDI jacks, 0 for the side ones)
-module jack_slot(f) {   // through the lid's skirt, open downwards: the skirt comes down over the bushing
-    translate([0, 0, Zb + bush_z]) xz_extrude(-edge_in - 1, edge_in + band_in + 1.01) dslot2d(bush_slot, bush_z + 1);
+module jack_hole() {    // the round hole round the bushing, half in the base's tongue, half in the lid
+    translate([0, 0, Zb + bush_z]) xz_extrude(-edge_in - 1, edge_in + band_in + 1.01) circle(d = jack_hole);
+}
+module tongue() {       // the base's rim, risen to the jack's axis outside the board's edge (frame: the board's edge at 0)
+    translate([-tongue_w / 2, -edge_in, Zbot - contact - 0.01]) cube([tongue_w, rim_t, Zb + bush_z - Zbot + contact + 0.01]);
+}
+module tongue_cut(f) {  // the hole's lower half and the jack's body (open upwards: the board drops in)
+    jack_hole();
+    translate([-jack[0] / 2 - jack_play, -f - gap_out, Zb - 0.05]) cube([jack[0] + 2 * jack_play, jack[1], bush_z + 1.05]);
+}
+module tongue_notch() { // the lid's notch over a tongue
+    translate([-tongue_w / 2 - tongue_clear, -edge_in - 1, Zb - 1]) cube([tongue_w + 2 * tongue_clear, edge_in + 1, bush_z + reg_top + 1]);
 }
 module jack_cavity(f) { // the jack's body in the skirt: the skirt keeps edge_in - f - gap_out in front of it
     translate([-jack[0] / 2 - jack_play, -f - gap_out, Zb - 1]) cube([jack[0] + 2 * jack_play, jack[1] + jack_play + gap_out, jack[2] + jack_play + 1]);
@@ -268,8 +310,39 @@ module standoff(h) {
         translate([xw, c[1] - 1, floor_t - 0.01]) cube([0.02, 2, Zbot - contact - floor_t]);
     }
 }
-module usb_skirt_cut(u, top) {   // an opening in the lid's skirt at the back, open downwards
-    translate([kx(u[0]) - usb_open[0] / 2, Ybk - band_in - 1, Zb - 1]) cube([usb_open[0], W - Ybk + band_in + 2, top - Zb + 1]);
+module rim() {          // the base's rim round the board, outside its edge: rim_gap from it, up to rim_h over its top
+    translate([0, 0, Zbot - contact - 0.01]) linear_extrude(Zb + rim_h - Zbot + contact + 0.01) difference() {
+        square([L, W]); translate([rim_t, rim_t]) square([L - 2 * rim_t, W - 2 * rim_t]); }
+}
+module lid_rebate() {   // the lid's skirt cut back outside the board's edge, over the rim
+    translate([0, 0, Zb - 1]) linear_extrude(rim_h + reg_top + 1) difference() {
+        translate([-1, -1]) square([L + 2, W + 2]); translate([X0, Y0]) square([board_l, board_w]); }
+}
+module catch_prism(pts, len) { translate([-len / 2, 0, 0]) rotate([90, 0, 90]) linear_extrude(len) polygon(pts); }
+module catch_groove() { c = Zb + catch_c; g = catch_groove + 0.01;   // in the rim's inside (the wall's frame)
+    catch_prism([[rim_t + 0.01, c - g], [rim_t - catch_groove, c], [rim_t + 0.01, c + g]], catch_len + 1.0); }
+module catch_bump() { c = Zb + catch_c; b = catch_bump + 0.01;        // on the lid's band, at the board's edge
+    catch_prism([[edge_in + 0.01, c - b], [edge_in - catch_bump, c], [edge_in + 0.01, c + b]], catch_len); }
+module usb_rrect(u, size, r, y0, len) {   // a rounded opening round a socket's axis, from y0 for len (box Y)
+    translate([kx(u[0]), 0, Zb + u[1]]) xz_extrude(y0, len) offset(r = r) square([size[0] - 2 * r, size[1] - 2 * r], center = true);
+}
+module j1_opening() {   // the overmold's recess: from the face to the board's edge (the mouth 0.035 past it)
+    usb_rrect(usb_j1, [plug_mold[0] + 2 * plug_clear, plug_mold[1] + 2 * plug_clear], plug_r + plug_clear, Ybk, W - Ybk + 1);
+}
+xiao_hole = [usb_xiao[2] + 2 * xiao_clear, usb_xiao[3] + 2 * xiao_clear];   // 9.8 x 4.1
+module xiao_opening() { // round the socket that stands through the face
+    usb_rrect(usb_xiao, xiao_hole, 0.8, Ybk - band_in - 1, W - Ybk + band_in + 2);
+}
+// The socket stands through the face, so the hole is split at its axis like the jacks': the base rises under it (a
+// tongue, open upwards as the board drops in), the lid comes down over it (its notch open downwards)
+module xiao_tongue() { translate([kx(usb_xiao[0]) - xiao_hole[0] / 2 - tongue_side, W - rim_t, Zbot - contact - 0.01])
+    cube([xiao_hole[0] + 2 * tongue_side, rim_t, Zb + usb_xiao[1] - Zbot + contact + 0.01]); }
+module xiao_notch() { translate([kx(usb_xiao[0]) - xiao_hole[0] / 2 - tongue_side - tongue_clear, Ybk, Zb - 1])
+    cube([xiao_hole[0] + 2 * (tongue_side + tongue_clear), W - Ybk + 1, usb_xiao[1] + reg_top + 1]); }
+module xiao_cut_box() { usb_rrect(usb_xiao, xiao_hole, 0.8, Ybk - 1, W - Ybk + 2);   // the hole's lower half, open upwards
+    translate([kx(usb_xiao[0]) - xiao_hole[0] / 2, Ybk - 1, Zb + usb_xiao[1]]) cube([xiao_hole[0], W - Ybk + 2, 10]); }
+module usb_plugs() {    // the plugs' overmolds, seated: from each socket's mouth outwards (for check_usb)
+    for (u = [usb_j1, usb_xiao]) usb_rrect(u, plug_mold, plug_r, Ybk + u[4], 20);
 }
 
 module box() {          // the base: the floor, the side walls, the front and back walls with the DIN slots
@@ -281,12 +354,21 @@ module box() {          // the base: the floor, the side walls, the front and ba
             translate([0, yf, floor_t - 0.01]) cube([L, wall_d - base_off, Zbot - contact - floor_t + 0.01]);             // front wall
             translate([0, Ybk - wall_d, floor_t - 0.01]) cube([L, wall_d - base_off, Zbot - contact - floor_t + 0.01]);  // back wall
             for (h = holes) standoff(h);
+            rim();
+            for (k = [0 : 3]) at_jack(k) tongue();
+            for (j = [0 : 3]) at_side(j) tongue();
+            xiao_tongue();
             intersection() {    // the posts behind the cheeks, between the DIN bodies (5.2 apart: 4.6 posts), tied to the floor
                 translate([0, yf, 0]) cube([L, yb - yf, Zbot]);
                 for (k = [0 : 3]) at_din(k) din_posts();
             }
         }
         for (k = [0 : 3]) at_din(k) din_slot();
+        for (k = [0 : 3]) at_jack(k) tongue_cut(jack_out);
+        for (j = [0 : 3]) at_side(j) tongue_cut(0);
+        for (c = catches) at_wall(c[0], c[1]) catch_groove();
+        j1_opening();
+        xiao_cut_box();
         for (k = [0 : 3]) at_jack(k)     // the jacks' pegs and leads under the board (mockup), over the rib between plates
             translate([-jack[0] / 2 - 0.2, din_in - slot_play - 0.01, Zbot - 1.7]) cube([jack[0] + 0.4, jack[1], 2]);
         for (k = bot_keep) keep_cut(k, Zbot);
@@ -316,17 +398,18 @@ module label2d(l) { translate([l[1], l[2]]) text(l[0], size = l[5], font = mark_
 module lid_text_cut() { if (markings) translate([0, 0, H - mark_depth]) linear_extrude(mark_depth + 1) for (l = lid_labels()) label2d(l); }
 // wall labels: [text, x or y, z (baseline), wall (0 front, 1 back, 2 left, 3 right), halign, on ("lid" = the skirt,
 // "box" = the base's wall)]; on the back, "right" runs towards +X; on the left wall text runs towards -Y, on the right +Y
-side_off = jack[0] / 2 + jack_play + mark_gap;   // beside a jack: clear of its slot and of its cavity behind the skirt
+side_off = tongue_w / 2 + tongue_clear + mark_gap;   // beside a jack: clear of its tongue's notch and its cavity
+mark_z = Zb + rim_h + reg_top + 0.9;   // the skirt's labels' baseline: above the joint
 function wall_labels() = concat(
-    [for (k = [1 : 3]) [str(k + 1), kx(jack_x[k]) + side_off, Zb + 1.2, 0, "left", "lid"]],
-    [["1 / IN", kx(jack_x[0]) + side_off, Zb + 1.2, 1, "right", "lid"],
+    [for (k = [1 : 3]) [str(k + 1), kx(jack_x[k]) + side_off, mark_z, 0, "left", "lid"]],
+    [["1 / IN", kx(jack_x[0]) + side_off, mark_z, 1, "right", "lid"],
      ["USB", kx(usb_xiao[0]), Zbot - 14.5, 1, "center", "box"],     // under the XIAO (below R8), on the base's wall
      ["PWR", kx(usb_j1[0]), Zbot - 7.5, 1, "center", "box"]],       // under J1
     [for (j = [0 : 3]) let(s = side_jacks[j], other = side_jacks[j % 2 == 0 ? j + 1 : j - 1],
                           away = ky(s[1]) > ky(other[1]) ? 1 : -1,          // +1: this jack is the one nearer the back
                           y = ky(s[1]) + away * side_off,
                           hal = (s[0] == 0) == (away > 0) ? "right" : "left")
-        [s[2], y, Zb + 1.2, 2 + s[0], hal, "lid"]]);
+        [s[2], y, mark_z, 2 + s[0], hal, "lid"]]);
 module wall_label(l, depth, grow = 0) {
     if (l[3] >= 2) translate([l[3] == 2 ? depth : L - depth, l[1], l[2]]) rotate([0, 0, l[3] == 2 ? -90 : 90]) rotate([90, 0, 0])
         linear_extrude(depth + 1) offset(r = grow) text(l[0], size = mark_size, font = mark_font, halign = l[4], valign = "baseline");
@@ -346,10 +429,13 @@ module lid_openings2d() {
     translate([kx(led[0]) - led_win[0] / 2, ky(led[1]) - led_win[1] / 2]) square(led_win);
     for (c = ab) ab_slot2d(c);
     for (h = holes) translate([kx(h[0]), ky(h[1])]) circle(d = 4.0);
-    translate([kx(usb_xiao[0]) - usb_open[0] / 2, Ybk - band_in - 1]) square([usb_open[0], W - Ybk + band_in + 2]);
     difference() { translate([-5, -5]) square([L + 10, W + 10]); offset(delta = -0.8) square([L, W]); }
 }
-module lid() {          // in place: the plate, the skirt down to the board's top, the caps, the spacers
+module lid(bumps = true) {   // in place, with its catches' bumps (on the band, where the rebate has cut the skirt back)
+    lid_body();
+    if (bumps) for (c = catches) at_wall(c[0], c[1]) catch_bump();
+}
+module lid_body() {     // the plate, the skirt down to the board's top, the caps, the spacers
     difference() {
         union() {
             translate([0, 0, Zl]) cube([L, W, lid_t]);
@@ -367,10 +453,12 @@ module lid() {          // in place: the plate, the skirt down to the board's to
                 translate([0, 0, Zb + oled_z[1] + oled_post[1] - oled_post[3]]) cylinder(d = oled_post[2], h = oled_post[3] + 0.01);
             }
         }
-        for (k = [0 : 3]) at_jack(k) { jack_slot(jack_out); jack_cavity(jack_out); }
-        for (j = [0 : 3]) at_side(j) { jack_slot(0); jack_cavity(0); }
-        usb_skirt_cut(usb_xiao, H + 1);                          // the XIAO's socket stands out: open to the top
-        usb_skirt_cut(usb_j1, Zb + usb_j1[1] + usb_open[1] / 2);
+        lid_rebate();
+        for (k = [0 : 3]) at_jack(k) { jack_hole(); jack_cavity(jack_out); tongue_notch(); }
+        for (j = [0 : 3]) at_side(j) { jack_hole(); jack_cavity(0); tongue_notch(); }
+        j1_opening();
+        xiao_opening();
+        xiao_notch();
         for (k = top_keep) keep_cut(k, Zb);
         for (p = buttons) translate([kx(p[0]), ky(p[1]), Zl - 1]) cylinder(d = button_hole, h = lid_t + 2);
         translate([encC[0], encC[1], Zl - 1]) cylinder(d = enc_hole, h = lid_t + 2);
@@ -433,35 +521,13 @@ module caps(press = 0, pos = 0) {
 
 module lid_print() { translate([0, W, H]) rotate([180, 0, 0]) lid(); }   // top face on the bed
 
-// a strip of the front edge as built: the base's wall with one DIN slot (window, the 2.0 slot, the cheek behind), the
-// 1.6 mm gap the board's edge fills, the skirt (1.2 further out) with the jack beside it (its slot, open downwards,
-// and the web in front of its body); end posts join them into one piece; printed standing on a foot
+// a strip of the front edge as built, cut from the real base and lid round OUT3 (its DIN window and slot, its jack's
+// round hole in the tongue and the skirt, the joint with a catch), the two joined by end posts into one piece; printed
+// standing on the floor
+ft = [kx(din_x[2]) - 12.0, kx(jack_x[2]) + 7.0, 7.0];   // x0, x1, depth (y)
 module front_test() {
-    dx = 13.0; jx = dx + 11.5; w = jx + 5.0; p = 2.0;          // the DIN's and the jack's axes along the strip
-    zb0 = din_plate[1] + 0.6; zt0 = zb0 + board_t; e = edge_in;   // e: the board's edge in strip coordinates (y)
-    yf = e + base_off; ts = e + band_in;
-    difference() {
-        union() {
-            translate([p, yf, 0]) cube([w, wall_d - base_off, zb0]);               // the front wall
-            intersection() { translate([p, 0, 0]) cube([w, 40, zb0]); translate([p + dx, e, -floor_t]) din_posts_at(zb0); }
-            translate([p, 0, zt0]) cube([w, ts, face_h]);                         // the skirt
-            for (x = [0, w + p]) cube([p, e + wall_d, zt0 + face_h]);             // the end posts
-            translate([0, yf, 0]) cube([w + 2 * p, 12, 1.5]);                      // the foot
-        }
-        translate([p + dx, e, 0]) din_slot_at(zb0);
-        translate([p + jx, 0, zt0 + bush_z]) xz_extrude(-1, ts + 2) dslot2d(bush_slot, bush_z + 1);
-        translate([p + jx - jack[0] / 2 - jack_play, e - jack_out - gap_out, zt0 - 1]) cube([jack[0] + 2 * jack_play, ts, jack[2] + jack_play + 1]);
-    }
-}
-module din_posts_at(zb0) {   // din_posts() in the strip (the floor at 0, the board's bottom at zb0)
-    pw = 23.0 - din_body[0] - 2 * post_clear; yw = din_in + din_plate[2] + slot_play + back_cheek; y1 = din_in + din_body[2];
-    for (sd = [-1, 1]) translate([sd > 0 ? din_body[0] / 2 + post_clear : -din_body[0] / 2 - post_clear - pw, yw - 0.01, floor_t])
-        cube([pw, y1 - yw + 0.01, zb0 - post_stop]);
-}
-module din_slot_at(zb0) {   // the same cut as din_slot(), with the board's bottom at zb0 and the floor at 0
-    zp = 0.6;
-    translate([-din_plate[0] / 2 + din_rim[0], -edge_in - 1, zp + din_rim[1]]) cube([din_plate[0] - 2 * din_rim[0], edge_in + wall_d + 2, din_plate[1]]);
-    translate([-din_plate[0] / 2 - slot_play, din_in - slot_play, 0.5]) cube([din_plate[0] + 2 * slot_play, din_plate[2] + 2 * slot_play, din_plate[1] + 1]);
+    intersection() { union() { box(); lid(); } translate([ft[0], -1, -1]) cube([ft[1] - ft[0], ft[2] + 1, Zl + 1]); }
+    for (x = [ft[0], ft[1] - 2.0]) translate([x, 0, 0]) cube([2.0, ft[2], Zl]);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -494,7 +560,7 @@ else if (part == "mock") mock();
 else if (part == "check_box") intersection() { box(); mock(); }
 else if (part == "check_lid") intersection() { lid(); mock(); }
 else if (part == "check_lidbox") intersection() { lid(); box(); }   // they never touch: the board is between them
-else if (part == "check_drop") intersection() { union() { for (dz = [0.25 : 0.25 : 22]) translate([0, 0, dz]) lid(); } union() { box(); mock(); for (b = buttons) button_cap(b); for (c = ab) slider_cap(c); } }
+else if (part == "check_drop") intersection() { union() { for (dz = [0.25 : 0.25 : 22]) translate([0, 0, dz]) lid(false); } union() { box(); mock(); for (b = buttons) button_cap(b); for (c = ab) slider_cap(c); } }
 else if (part == "check_board_drop") intersection() { union() { for (dz = [0.5 : 0.5 : 26]) translate([0, 0, dz]) mock(); } box(); }
 else if (part == "check_text") {
     if (markings) {
@@ -506,12 +572,14 @@ else if (part == "check_text") {
         for (side = [false, true]) intersection() {   // the skirt's labels: clear of the slots, the cavities and keep-outs behind them, the edges
             for (l = wall_labels()) if (l[5] == "lid" && (l[3] >= 2) == side) wall_label(l, 3, mark_clear);
             union() {
-                for (k = [0 : 3]) at_jack(k) { jack_slot(jack_out); translate([0, -edge_in - 1, 0]) jack_cavity(jack_out); }
-                for (j = [0 : 3]) at_side(j) { jack_slot(0); translate([0, -edge_in - 1, 0]) jack_cavity(0); }
-                usb_skirt_cut(usb_xiao, H + 1); usb_skirt_cut(usb_j1, Zb + usb_j1[1] + usb_open[1] / 2);
+                for (k = [0 : 3]) at_jack(k) { jack_hole(); translate([0, -edge_in - 1, 0]) jack_cavity(jack_out); }
+                for (j = [0 : 3]) at_side(j) { jack_hole(); translate([0, -edge_in - 1, 0]) jack_cavity(0); }
+                j1_opening(); xiao_opening(); xiao_notch();
+                for (k = [0 : 3]) at_jack(k) tongue_notch();
+                for (j = [0 : 3]) at_side(j) tongue_notch();
                 for (k = top_keep) keep_cut(k, Zb, 3);
-                translate([-1, -1, Zl - 0.5]) cube([L + 2, W + 2, 20]);
-                translate([-1, -1, -20]) cube([L + 2, W + 2, Zb + 20.3]);
+                translate([-1, -1, H - 0.5]) cube([L + 2, W + 2, 20]);
+                translate([-1, -1, -20]) cube([L + 2, W + 2, Zb + rim_h + reg_top + 20]);
                 if (side) for (y = [-10, W - 0.5]) translate([-1, y, -1]) cube([L + 2, 10.5, H + 2]);   // the side walls' ends
                 else for (x = [-10, L - 0.5]) translate([x, -1, -1]) cube([10.5, W + 2, H + 2]);       // the front / back's ends
             }
@@ -521,6 +589,7 @@ else if (part == "check_text") {
             union() {
                 for (k = [0 : 3]) at_din(k) din_slot();
                 for (k = bot_keep) keep_cut(k, Zbot, 3);
+                j1_opening();
                 translate([-1, -1, Zbot - 0.3]) cube([L + 2, W + 2, 20]);
                 translate([-1, -1, -1]) cube([L + 2, W + 2, floor_t + 1.5]);
                 for (x = [-10, L - 0.5]) translate([x, -1, -1]) cube([10.5, W + 2, H + 2]);
@@ -539,15 +608,26 @@ else if (part == "lid_top") {
     if (markings) color("DimGray") translate([0, 0, H - mark_depth]) linear_extrude(0.05) for (l = lid_labels()) label2d(l);
 }
 else if (part == "brace_pull") intersection() { box(); for (k = [0 : 3]) at_din(k) translate([0, -(slot_play + 0.05), 0]) din_plate_m(); }   // into the cheek in front
-else if (part == "brace_pull_jack") intersection() { lid(); for (k = [0 : 3]) at_jack(k) translate([0, -(gap_out + 0.05), 0]) jack_body(jack_out); }
+else if (part == "brace_pull_jack") intersection() { union() { lid(); box(); } for (k = [0 : 3]) at_jack(k) translate([0, -(gap_out + 0.05), 0]) jack_body(jack_out); }
 else if (part == "brace_push") intersection() { box(); for (k = [0 : 3]) at_din(k) translate([0, slot_play + 0.05, 0]) din_plate_m(); }   // into the cheek behind
 else if (part == "brace_trs") intersection() { lid(); for (k = [0 : 3]) at_jack(k) translate([0, jack_play + 0.05, 0]) jack_body(jack_out); }
 // must NOT be empty, for each side jack sj (0..3): pulled out it meets the skirt, pushed in the lid's cap
-else if (part == "brace_side_pull") intersection() { lid(); at_side(sj) translate([0, -(gap_out + 0.05), 0]) jack_body(0); }
+else if (part == "brace_side_pull") intersection() { union() { lid(); box(); } at_side(sj) translate([0, -(gap_out + 0.05), 0]) jack_body(0); }
 else if (part == "brace_side_push") intersection() { lid(); at_side(sj) translate([0, jack_play + 0.05, 0]) jack_body(0); }
 else if (part == "brace_floor") intersection() { box(); for (k = [0 : 3]) at_din(k) translate([0, 0, -(din_floor_gap + 0.05)]) din_model(); }
 else if (part == "brace_lid") intersection() { lid(); board_slab(contact + 0.05); }
 else if (part == "brace_ledge") intersection() { box(); board_slab(-(contact + 0.05)); }
+// must NOT be empty, for each direction sj (0..3: -x, +x, -y, +y): the lid (no catches) moved 0.25 meets the base's rim
+else if (part == "brace_reg") intersection() { box(); translate(0.25 * [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0]][sj]) lid(false); }
+// must NOT be empty: the lid lifted 0.3 meets the base at the catches (the bumps under the grooves' upper flanks)
+else if (part == "brace_snap") intersection() { box(); translate([0, 0, 0.3]) lid(); for (c = catches) at_wall(c[0], c[1]) translate([-catch_len, -1, Zb]) cube([2 * catch_len, 3, 2]); }
+// must be EMPTY: the plugs' overmolds, seated, against the base and the lid
+else if (part == "check_usb") intersection() { union() { box(); lid(); } usb_plugs(); }
+else if (part == "joint") {   // the joint, cut through the front catch's middle, to OUT3's jack: the lid lifted 6 mm
+    for (c = [["SteelBlue", 0], ["LightSteelBlue", 1]]) color(c[0]) intersection() {
+        if (c[1] == 0) box(); else translate([0, 0, 6]) lid();
+        translate([catches[0][1], -1, Zbot - 6]) cube([kx(jack_x[2]) + 8 - catches[0][1], 7, 22]); }
+}
 else if (part == "open") { color("SteelBlue") box(); color("DarkGreen") mock(); color("LightSteelBlue") translate([0, 0, 30]) lid(); }
 else if (part == "front" || part == "back") { color("SteelBlue") box(); color("LightSteelBlue") lid(); color("DarkGreen") mock(); }
 else { color("SteelBlue", 0.5) box(); color("LightSteelBlue", 0.35) lid(); color("DarkGreen") mock(); }

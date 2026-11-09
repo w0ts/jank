@@ -35,8 +35,8 @@ below.
 | `make_stl.sh` | Exports the STLs, runs the checks, renders the PNGs, runs `../check_stl.py` |
 | `stl/jank_box_box.stl`, `stl/jank_box_lid.stl` | The base and the lid, in print orientation |
 | `stl/jank_box_button_cap.stl` (print 2), `stl/jank_box_slider_cap.stl` (print 3), `stl/jank_box_slider_cap_smd.stl` (print 1), `stl/jank_box_knob.stl` (print 1) | OK / BACK caps, the A/B slider caps (SW3..SW5, SW2), the encoder knob |
-| `stl/jank_box_front_test.stl` | A strip of the front edge as built: one DIN in its slot (front cheek, slot, back cheek) and the jack beside it in the skirt; try the parts first |
-| `renders/open.png`, `box.png`, `front.png`, `back.png`, `left.png`, `right.png`, `lid_underside.png`, `lid_top.png`, `caps.png` | The box with the board (lid lifted), the empty base, the four sides, the lid as printed, the lid's top with its labels and caps, the closed box |
+| `stl/jank_box_front_test.stl` | A strip of the front edge cut from the real base and lid round OUT3: its DIN in its slot (front cheek, slot, back cheek), its jack's round hole (half in the base's tongue, half in the skirt), the joint with the front catch; the two halves joined by end posts. Try the parts first |
+| `renders/open.png`, `box.png`, `front.png`, `back.png`, `left.png`, `right.png`, `lid_underside.png`, `lid_top.png`, `joint.png`, `caps.png` | The box with the board (lid lifted), the empty base, the four sides, the lid as printed, the lid's top with its labels and caps, the joint (cut at the front catch and OUT3's jack, the lid lifted 6 mm), the closed box |
 
 ```
 sh hardware/box/make_stl.sh               # about 15 s
@@ -44,31 +44,33 @@ sh hardware/box/make_stl.sh               # about 15 s
 
 ## Size
 
-**Outer: 89.0 x 81.5 x 32.0 mm** (X x Y x Z, lid included). The box is stepped at the board's line on the front and
-back:
-- **Lid (skirt):** 89.0 x 81.5, i.e. 1.0 + board 87.0 + 1.0 and 1.0 + board 79.5 + 1.0.
-- **Base:** 89.0 x **80.1**. Its front and back faces stand 0.3 mm *proud* of the board's edges, 0.7 mm inside the
-  lid's faces, so the DIN plates come to 1.3 mm behind them. Its sides are flush with the lid's.
-- **Z:** floor 2.0 + 0.1 + DIN 19.6 + board 1.6 + **7.2** to the lid's inside + lid 1.5.
+**Outer: 89.0 x 81.5 x 32.0 mm** (X x Y x Z, lid included). **The lid and the base have the same footprint on all four
+sides, no step** (the user, 2026-11-09: "the lid seems bigger by a few mm than the base"; until then the base's front
+and back faces were 0.7 mm inside the lid's):
+- **Lid and base:** 89.0 x 81.5, i.e. 1.0 + board 87.0 + 1.0 and 1.0 + board 79.5 + 1.0. Every outer face of both parts
+  is 1.0 mm outside the board's edge.
+- **Z:** floor 2.0 + 0.1 + DIN 19.6 + board 1.6 + **7.2** to the lid's inside + lid 1.5. The joint line runs 1.6 mm
+  above the board's top (the base's rim), and steps up to the jacks' and the XIAO socket's axes there.
 
 **Standing out (not counted):**
 - the MIDI jacks' bushings 1.5 mm (front and back), the side jacks' bushings 1.0 mm;
-- the XIAO's USB-C 0.5 mm (back);
+- the XIAO's USB-C socket 0.5 mm (back);
 - the knob 13.3 mm, the button caps 3.0 mm, the slider caps 1.0 mm above the lid.
 
 **Parts to print:** box, lid, 2 button caps, 3 + 1 slider caps, 1 knob (and `front_test` first).
 
 ## Connectors at the wall, the DINs in slots
 
-**The lid (skirt):** on every edge **the board's edge is 1.0 mm inside the lid's outer face** (`edge_in`). The skirt
-comes down from the lid to the board's top. It is 2.3 mm thick: 1.0 outside the board, 1.3 over it.
+**The lid (skirt):** on every edge **the board's edge is 1.0 mm inside the outer face** (`edge_in`). The skirt comes
+down from the lid to the board's top. It is 2.3 mm thick: 1.0 outside the board, 1.3 over it. Its outer 1.0 stops 1.7
+above the board's top, over the base's rim (see "The joint").
 
 **The base, front and back: the DINs slide into slots in the wall** (the user's rulings, 2026-11-09: "slots in which
-the MIDI DIN slides/slots in", "slots in the wall", "not a wall at the back"). These walls are **5.2 mm deep**, from
-0.3 outside the board's edge to 4.9 inside it (thickened 2026-11-09, the user: "can you make the wall thicker?").
+the MIDI DIN slides/slots in", "slots in the wall", "not a wall at the back"). These walls are **5.9 mm deep**, from
+the outer face (1.0 outside the board's edge, flush with the lid) to 4.9 inside it.
 Round each DIN plate the wall carries:
-- **a front cheek 1.2 mm thick** (the plate's face 0.1 behind it), whose window leaves the plate's face open except its
-  edges;
+- **a front cheek 1.9 mm thick** (the plate's face 0.1 behind it, **2.0 mm inside the outer face**; it was 1.2 before
+  the faces were made flush), whose window leaves the plate's face open except its edges;
 - **a 2.0 mm slot** (the plate's 1.8 + 0.1 a face, and 0.1 at its side edges), from the floor up to the board;
 - **a back cheek 2.0 mm thick**, whose opening lets the DIN's narrower body through;
 - **posts behind the back cheek**, beside the bodies, **4.6 mm wide** (the 5.2 between two bodies less 0.3 a side) and
@@ -84,7 +86,8 @@ There is no lip or wall behind the DIN's body any more.
 - **2.2 mm at the far edge.** The body is 2.4 shorter there; 0.2 is kept clear.
 - **Nothing on the board-side edge.** The plate meets the board there.
 
-So the front window and the back opening are 18.3 x 17.4 mm.
+So the front window and the back opening are 18.3 mm wide. The window is 17.35 mm high, up to the base's top under the
+board; the rim closes it above.
 
 **Between two neighbouring DINs** (pitch 23.0): the plates are 2.1 mm apart, so the wall's **rib in that gap is 1.9 mm**
 (0.1 clearance a side). Each plate's edge has 1.3 mm of cheek over it on that rib, in front and behind. Behind the
@@ -98,7 +101,7 @@ it.
 **Over the jacks' pegs and leads** (above the rib, under the board), the rib and the back cheek stop 1.7 mm below the
 board.
 
-**The base's sides** are 1.9 mm (1.0 outside the board, 0.9 under it).
+**The base's sides** are 1.9 mm (1.0 outside the board, 0.9 under it), with the rim on top of the outer 0.8.
 
 **The board** is clamped between the skirt (1.3 over it) and the base's walls (front and back walls under the edge,
 the side walls 0.9 under it). It is screwed at H1..H4.
@@ -107,15 +110,11 @@ the side walls 0.9 under it). It is screwed at H1..H4.
 
 | Connector | Its face | Distance from the outside | Why |
 |---|---|---|---|
-| **DIN plate** (front, back) | 1.0 behind the board's edge | **1.3 mm inside the base's face** (2.0 inside the lid's) | the front cheek 1.2 + 0.1 |
-| **MIDI jack body** (front, back) | 0.5 past the board's edge | **0.5 mm inside the lid's face**, the bushing **1.5 mm proud** | the skirt's 0.4 mm web in front of the body takes the pull-out |
-| CLOCK / RESET jack body (sides) | on the board's edge | 1.0 mm inside, the bushing 1.0 mm proud | a 0.9 mm web |
-| XIAO USB-C | 1.5 past the board's edge | 0.5 mm proud | |
-| Power USB-C (J1, SHOU HAN TYPE-C 6P, C456012, 8.94 x 6.81 x 3.2) | on the board's edge | 1.0 mm inside the lid's face; its legs in a notch of the base's back wall | its mouth (8.94 x 3.2) inside the 12.5 x 7.0 opening, 1.8 clear a side and 1.9 above / below |
-
-**Why the step:** the jack's front is 1.5 mm in front of the DIN plate's face on the footprint. One flat face would
-leave either the jacks with no web in front of them, or the DINs 2.0 mm in. The skirt (jacks) and the base (DINs)
-therefore have their own faces, 0.7 mm apart. The base's face stands 0.3 mm proud of the board's edge above it.
+| **DIN plate** (front, back) | 1.0 behind the board's edge | **2.0 mm inside the outer face** | the front cheek 1.9 + 0.1 (the user accepted the 2.0, 2026-11-09) |
+| **MIDI jack body** (front, back) | 0.5 past the board's edge | **0.5 mm inside the face**, the bushing **1.5 mm proud** | a 0.4 mm web in front of the body: the skirt's above the jack's axis, the base's tongue below it |
+| CLOCK / RESET jack body (sides) | on the board's edge | 1.0 mm inside, the bushing 1.0 mm proud | the skirt's 0.9 mm web above the axis, the tongue (0.8, 0.2 clear) below |
+| XIAO USB-C socket | 1.545 past the board's edge | **0.5 mm proud** | through a 9.8 x 4.1 hole (see "USB-C") |
+| Power USB-C (J1, SHOU HAN TYPE-C 6P, C456012, 8.94 x 6.81 x 3.2) | 0.035 past the board's edge | **0.965 mm inside the face** | a 13.0 x 7.5 recess for the plug's overmold (see "USB-C") |
 
 **The DIN body, scaled off HOOYA's drawing** (the coordinator, 2026-11-09: 33.5 px/mm against the dimensioned 20.9,
 19.6, 11.8 and 1.8; ±0.2 mm, *not a caliper*):
@@ -126,18 +125,73 @@ therefore have their own faces, 0.7 mm apart. The base's face stands 0.3 mm prou
 The back cheek's rims depend on these numbers. The checks use them for the DIN's body (`din_body`).
 
 **Print and fit:**
-- **The skirt's jack slots** are open downwards: round at the bushing's axis, 5.2 mm, 2.5 mm above the board.
-- **The XIAO's opening** is open full height through the lid's edge. **J1's opening** is 12.5 wide, 5.1 high above the board's top, open downwards.
-- **The DIN slots** are open at the top, so the base prints without supports.
+- **The jack holes** are round, **Ø5.4** (the bushing's 5.0 + 0.2 a side), centred on the jack's axis 2.5 mm above the
+  board, the same at all eight jacks; the lower half in the base's tongue (open upwards), the upper half in the skirt.
+- **The DIN slots** are open at the top. The rim bridges each DIN window (18.3 mm) above it.
+
+## The joint: registration, round jack holes, catches
+
+The user, 2026-11-09: "bottom and lid should have an alignment / locking system; the screws are just there to lock it
+in place", and "round on lid and bottom" for the jacks' holes. FDM clearances: **0.2 mm** a side wherever the lid fits
+over the base, 0.1 at the tops.
+
+- **The rim (base):** round the whole board, outside its edge: **0.8 mm thick** (the outer face to 0.2 short of the
+  board's edge), from the base's top under the board to **1.6 mm above the board's top**. It covers the board's edge.
+- **The rebate (lid):** the skirt's outer 1.0 mm stops 0.1 above the rim. The skirt's band over the board (1.3, on the
+  board's top) comes down inside the rim, its face on the board's edge: **0.2 mm from the rim all round**. The lid
+  cannot move more than 0.2 in X or Y on the base (`brace_reg`: 0.25 in any of the four directions meets the rim).
+- **The jacks (eight):** at each, the rim rises to the jack's axis as a **tongue 9.7 mm wide** (the body's cavity 6.5 +
+  1.6 a side), **0.8 thick**, with the hole's **lower half-round**; the lid has a notch over it (0.2 a side, 0.1 above)
+  and the **upper half-round**. Split line at the axis, 2.5 mm above the board's top. The two side jacks on a wall (6.7
+  apart) share one tongue. The jack's body drops into the tongue's cavity (open upwards) with the board.
+- **The XIAO's socket:** the same split at its axis (5.35 above the board's top): a tongue 13.0 wide (the hole 9.8 +
+  1.6 a side) under it, the lid's notch over it.
+- **Snap catches (four, light):** an **8 mm bump on the lid's band, 0.35 high with 45-degree flanks**, 0.8 above the
+  board's top, clicks into a **45-degree groove 0.35 deep in the rim's inside** (0.45 of rim behind it). Going down the
+  bump pushes the rim out by 0.15; seated it has about 0.14 clear in the groove (`check_lidbox` empty); lifted 0.3 it
+  bears on the groove's upper flank (`brace_snap`). Where: front at X 34.45 (between jacks 2 and 3), back at X 21.0
+  (between OUT1's jack and the LED), left at Y 69.5, right at Y 61.5 (box coordinates). The 4 x M2 screws stay the
+  final lock.
+- **Printing:** the rim's grooves (45-degree roof), the tongues and cradles (open upwards) print on the base as it
+  stands; the bumps (45-degree flanks), the rebate and the upper half-rounds print on the lid top-down. No supports.
+  The only bridges are the rim over each DIN window (18.3 mm, in the base).
+
+## USB-C
+
+**What the cut-out at the XIAO was** (measured 2026-11-09 on `jank-pcb-mod.kicad_pcb` and `mockup-mod.stl`):
+- **The XIAO module's PCB does not pass the board's edge.** Its outline (the footprint's F.Fab) runs 0.0 to 21.0 mm in
+  from the board's back edge; its courtyard starts 0.025 past it.
+- **Only its USB-C socket stands out: 1.5 mm past the board's edge** (footprint silk 1.51, mockup 1.545), **0.5 mm past
+  the box's back face**. It is 9.0 wide and sits high: 3.7 to 7.0 above the board's top (mockup), its axis at 5.35.
+  The lid's underside is 7.2 above the board's top, its top 8.7.
+- **So the old opening was a 12.5 mm notch through the lid's skirt and plate, open to the top** (3.3 mm into the lid's
+  top). It was sized for a 12.5 x 7.0 overmold centred on that socket. That shape reaches 8.85 above the board's top,
+  higher than the lid's top. A closed 12.5 x 7.0 hole there does not fit under the lid.
+- **Now:** the socket stands 0.5 past the face, so a plug's overmold stops outside the box. The opening only has to
+  clear the socket: **one hole 9.8 x 4.1 mm** (0.4 round the 9.0 x 3.3 socket, corners r 0.8), 3.3 to 7.4 above the
+  board's top. That leaves 1.3 mm of lid above it, split at the socket's axis as described above.
+- **If the XIAO is pulled in** (a PCB change: it would collide with the OLED's header in front of it), its socket comes
+  behind the face. The overmold must then enter the wall, and a 12.5 x 7.0 overmold centred on the socket reaches above
+  the lid's top. That needs either the lid raised about 1.5 mm or the notch through the top again. *Not done.*
+
+**J1 (power):** its mouth is 0.035 past the board's edge, 0.965 behind the face. **One recess, 13.0 x 7.5 mm**
+(corners r 1.75), from the face to the board's edge, centred on its axis 1.6 above the board's top. The base has its
+lower part (to 0.55 below the board's bottom) and the lid its upper part. It assumes a **typical overmold of 12.5 x
+7.0 with r 1.5 corners** (*unverified*: cables vary; a squarer or bigger overmold will not seat). The mouth (8.94 x
+3.2) has about 2.0 clear a side, 2.15 above and below. J1's legs keep-out under the board now ends 0.25 past the edge
+(the mockup's block, 0.035 past; its THT pads are 1.65 in), so the base's wall is full behind them.
+
+`check_usb`: both plugs' overmolds, seated (from each mouth outwards), clear the base and the lid.
 
 ## Bracing
 
 | Part | Pull-out | Push-in | Down / up | Sideways |
 |---|---|---|---|---|
 | **DIN** (HOOYA: plate 20.9 x 19.6 x 1.8) | the plate's front on the **front cheek** (1.3 a side, 2.2 at the far edge; 0.1) | the plate's back on the **back cheek** (the same rims; 0.1) | the plate's far edge on the floor (0.1); the board above | the plate's side edges in the slot (0.1) |
-| **MIDI jack** (PJ-320D-B-SMT, 6.0 x 12.2 x 5.0, front 0.5 past the edge) | the body's front on the skirt's 0.4 web (0.1) | the body's back on the **lid's cap** (back stop 1.6, 0.15) | the board below, the cap's roof above | the cap's cheeks; the bushing in its slot |
+| **MIDI jack** (PJ-320D-B-SMT, 6.0 x 12.2 x 5.0, front 0.5 past the edge) | the body's front on the 0.4 web (0.1): the skirt's above the axis, the base's tongue below it | the body's back on the **lid's cap** (back stop 1.6, 0.15) | the board below, the cap's roof above | the cap's cheeks; the bushing in its round hole (0.2) |
 | **Side jack** (PJ-320A) | the body's front on the skirt's 0.9 web (0.1) | one **cap per side wall** round both jacks (6.7 apart) | as above | as above |
-| **The board** | | | clamped all round between the base's wall (0.9 under it) and the skirt (1.3 over it); four M2 x 20 into webbed columns | the walls (0.1 at the connectors) |
+| **The board** | | | clamped all round between the base's wall (0.9 under it) and the skirt (1.3 over it); four M2 x 20 into webbed columns | the rim (0.2 from its edge) |
+| **The lid on the base** | the catches (`brace_snap`), then the screws | | | the rim (0.2, `brace_reg`) |
 
 **Unverified:**
 - The jacks' webs (0.4 at the MIDI jacks) take a 3–20 N pull together with the jacks' own SMD pads and pegs; *not
@@ -197,13 +251,16 @@ travel) and the OLED redrawn.
 |---|---|---|
 | `check_box`: the base against the board and every part | empty | empty |
 | `check_lid`: the lid (skirt, caps, shroud, spacers) against the board and every part | empty | empty |
-| `check_lidbox`: lid against base | empty | empty (the board is between them) |
-| `check_drop`: the lid lowered straight down over the board and the caps | empty | empty |
+| `check_lidbox`: lid against base, seated, with the catches | empty | empty (0.2 at the rim, 0.1 over it, the bumps in their grooves) |
+| `check_drop`: the lid (without its bumps) lowered straight down over the base, the board and the caps | empty | empty |
+| `check_usb`: the USB-C plugs' overmolds (12.5 x 7.0, r 1.5), seated, against the base and the lid | empty | empty |
 | `check_board_drop`: the board lowered straight into the base, every DIN plate sliding down its slot | empty | empty |
 | `check_text`: labels clear of every opening, slot, cavity and keep-out, inside the edges | empty | empty |
 | `check_caps`: caps at rest / pressed / both ends of travel against the lid, the board, the shaft; each knob in its pocket | empty | empty |
 | `brace_caps`, `brace_pull` (each DIN plate moved 0.15 out meets the front cheek), `brace_push` (0.15 in meets the back cheek), `brace_pull_jack` (MIDI jacks on the webs), `brace_push`, `brace_trs`, `brace_floor`, `brace_lid`, `brace_ledge` | contact | contact |
 | `brace_side_pull` / `brace_side_push`, each side jack | contact | 8 of 8 |
+| `brace_reg`: the lid (no bumps) moved 0.25 in -X, +X, -Y, +Y meets the base's rim | contact | 4 of 4 |
+| `brace_snap`: the lid lifted 0.3 meets the base at the catches | contact | contact |
 | `check_stl.py` (box, lid, button cap, both slider caps, knob, front_test) | OK | OK: one body, 0 open edges, 0 non-manifold each |
 
 **Negative controls collide as they should:**
@@ -211,16 +268,18 @@ travel) and the OLED redrawn.
 - `band_in = 2.0` (the skirt onto the DIN legs);
 - `slot_play = -0.05` (a slot narrower than the plate);
 - `din_rim = [1.6, 2.6]` (the back cheek onto the DIN's body, in `check_board_drop`);
-- `standoff_d = 6.0`.
+- `standoff_d = 6.0`;
+- 2026-11-09, the joint: `catch_groove = 0.1` and `tongue_clear = -0.05` (`check_lidbox`), `jack_hole = 4.9` (`check_box`,
+  `check_lid`), `plug_clear = -0.1` (`check_usb`).
 
 ## Print
 
 | Part | Orientation | Supports |
 |---|---|---|
-| box (base) | floor on the bed | none: the DIN slots and windows are open at the top |
-| lid | top face on the bed | none: the skirt's slots and openings are open at its free edge |
+| box (base) | floor on the bed | none: the DIN slots, the tongues' cradles and J1's recess are open at the top; the rim bridges the DIN windows (18.3 mm); the catch grooves have 45-degree roofs |
+| lid | top face on the bed | none: the rebate, the notches and the upper half-rounds are open at its free edge; the bumps have 45-degree flanks |
 | caps, knob | as listed above | none |
-| front_test | standing on its foot | none |
+| front_test | standing on its floor | the skirt's half spans between the end posts (a 26.5 mm bridge) |
 
 PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
 
@@ -228,13 +287,15 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
 
 1. **User solders the board** (board README).
 2. **User prints** `front_test.stl`. Check that a DIN plate slides down its slot (snug, not tight) and does not move in
-   or out, and that a plug seats with the plate's face 1.3 mm in. Check that a jack's bushing comes through the skirt's slot with its body against the web.
+   or out, and that a plug seats with the plate's face 2.0 mm in. Check that a jack's bushing sits in the round hole with
+   its body against the web, and that a 3.5 mm plug goes in.
 3. **User puts** a 2.5 mm foam pad under the OLED module's front edge (the edge away from its header), and presses the button caps onto OK and BACK and the slider
    caps onto the four A/B knobs.
-4. **User lowers** the board straight into the base. The DIN plates slide down their slots onto the floor, and
-   the board's edge comes to rest on the base's wall and the four columns.
-5. **User lowers** the lid straight down. The skirt comes down over the bushings and onto the board's edge, and the
-   caps come through their openings.
+4. **User lowers** the board straight into the base. The DIN plates slide down their slots onto the floor, the jacks'
+   bushings and the XIAO's socket into their cradles, and the board's edge comes to rest on the base's wall and the four
+   columns, inside the rim.
+5. **User lowers** the lid straight down. Its band goes inside the rim, the notches over the tongues, and the catches
+   click (four). The caps come through their openings.
 6. **User screws** 4 x M2 x 20 self-tapping at H1..H4, snug only. Then the knob on the encoder.
 
 ## Unverified, all in one place
@@ -242,11 +303,11 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
 - **The DINs:**
   - the body behind the plate (17.8 x 17.2 x 13.1) is **scaled off the drawing**, not measured: the back cheek's rims
     (1.3 / 2.2) rest on it;
-  - a plug seating with the plate's face 1.3 mm in;
+  - a plug seating with the plate's face 2.0 mm in (the user accepted it, 2026-11-09);
   - the slot's 0.1 mm play against the printer's tolerance (a tight print: ream or set `slot_play`);
-  - the cheeks' stiffness (0.7 / 1.0 mm).
+  - the cheeks' stiffness.
 - **The jacks:**
-  - the PJ-320D-B-SMT's body (the mockup's 6.2 x 12.2 x 5.0) and its 5.0 bushing;
+  - the PJ-320D-B-SMT's body (the mockup's 6.2 x 12.2 x 5.0) and its 5.0 bushing (the Ø5.4 holes rest on it);
   - the 0.4 mm web's strength.
 - **SW2:** its knob's length (1.5 taken), its travel direction, which end is A.
 - **The board:**
@@ -255,5 +316,10 @@ PETG or PLA, 0.2 mm layers, 4 perimeters, 25 % infill.
   - the mockup's positions (the PCB files are the board session's).
 - **The OLED module:** its PCB 1.0 and glass 1.65 (top at 5.15), its holes' 2.5 and positions, and the glass's
   position, from the board session's numbers, not a part in hand.
+- **The joint:** the 0.2 mm clearances against the printer (FDM: a tight print, sand the band); the catches' force (the
+  rim, 0.8 thick, bends 0.15 going over a bump: up to about 3 % strain at its root as a cantilever from the board's bottom, less along the wall, *not
+  tested*; PETG is the safer material). The rim's 0.8 is thin over the 18.3 mm DIN windows.
+- **USB-C:** the overmold taken as 12.5 x 7.0 with r 1.5 corners; the XIAO socket's height (3.7 to 7.0) and J1's (axis
+  1.6), both from the mockup.
 - **Other:** the XIAO's 7.0 height, the encoder's 6.5 and 20, the buttons' 3.5 body, the cap press
-  fits, the EC11 D flat, M2 into PLA, the USB overmold sizes, the font.
+  fits, the EC11 D flat, M2 into PLA, the font.
