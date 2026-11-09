@@ -1,6 +1,6 @@
 # jank board: schematic and layout for review
 
-Part of the **[jank device](../../docs/device.md)** · the other half: [the box](../box/README.md)
+Part of the **[jank device](../../README.md)** · the other half: [the box](../box/README.md)
 
 A carrier board for a **Seeed XIAO ESP32S3**: jank as one stick with a second USB-C for power, **a 0.91" OLED, an
 encoder and two buttons (OK, BACK) on the lid side**, one RGB beat LED and **four MIDI outputs**. **v5 fits both
