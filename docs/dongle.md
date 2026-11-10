@@ -70,7 +70,22 @@ core: the clock shares it, as on the stick before core 1 was given to it; 3x the
 | MIDI ticks with the CPU woken from light sleep 1.5 ms early, then waiting | late by 2 us on average, 12 us at worst (`esp_timer`, not the pin) |
 | listening all the time | ~99 frames a second on a channel with 5 access points |
 
-With these, the budget (datasheet currents; no meter yet): radio ~8 ms a second at 88 mA, ~0.7 mA; the ticks 48 wakes
+Currents, 2026-11-10, an in-line USB meter at 5 V read by a webcam every 3 s (1 mA steps; the whole XIAO board):
+
+| phase | meter |
+|---|---|
+| listening all the time | 71-72 mA |
+| Wi-Fi stopped and started around each 1 s sleep | mostly 2 mA, spikes 6-23: ~4 mA |
+| Wi-Fi kept, ~22 ms awake a second | mostly 2 mA, spikes: ~4 mA |
+| light sleep only | 2 mA (the board's floor: its charger and regulator, the chip's 0.24) |
+| 48 wakes a second for the ticks (1.5 ms early, then waiting) | 4-5 mA: the ticks cost ~2.2 mA |
+
+On this board the dongle would draw about 2 + 2.2 + 0.8 (8 ms of radio a second at a known sync time) = **~5 mA at
+5 V**: at the edge. Lower: a board of our own (no charger, a buck from the MIDI side: about a fifth less input
+current), waking ~0.3 ms before a tick instead of 1.5 ms (the wake lands within 12 us), or the ULP sending the ticks:
+**~3 mA** is the target.
+
+The earlier budget (datasheet currents, before the meter): radio ~8 ms a second at 88 mA, ~0.7 mA; the ticks 48 wakes
 of ~1.8 ms at 13-22 mA, ~1.1-1.9 mA; light sleep ~0.2 mA: **about 2-3 mA**. Still to measure: the currents themselves
 (an in-line USB meter on a charger: the probe's five phases, the LED blinking 1..5 times at each start; a Mac only shows
 the 500 mA allotted), and the user's gear: each MIDI OUT's current into ~330 ohm (or a 3.3 V load) between pin 4 and
