@@ -40,8 +40,19 @@ once, not on a bit boundary), and core 1 runs the clock interrupt alone: with Ti
 0.4 to 0.6 ms late. USB full speed polls every 1 ms, so this path is bounded by USB; a computer is better served by Link
 itself, over the stick's network adapter.
 
-**Not measured yet:** the stick's grid against the session (Link over the air) at the pin; that needs the pin and Live
-recorded together (an audio interface at 192 kHz).
+**Against Live** (2026-11-10: the pin through 1 kohm into a MOTU input, Live's clock out into another, both over ADAT
+into the Fireface at 44.1 kHz, edges interpolated between samples; the stick's ticks against Live's 16th pulses, 60 s):
+
+| path to Live | offset | stick - Live, mean | sd | p1 .. p99 |
+|---|---|---|---|---|
+| the stick's USB network adapter | 0 | -1268 us | 33 us | -1351 .. -1221 us |
+| the stick's USB network adapter | +1.27 ms | +42 us | 44 us | -24 .. +181 us |
+| Wi-Fi through a router, the stick on a charger | +1.27 ms | +305 us | 94 us | +205 .. +560 us |
+
+Live's own pulses wobble 24 to 48 us (sd) against a straight line. The ~1 ms constant is mostly Live's (its output
+latency as the driver reports it); the path adds ~0.26 ms (Link's round-trip estimate over uneven Wi-Fi delays). Over the
+air the stick's grid wanders more (78 us sd against its own straight line, 23 us over USB): Link's time estimate between
+measurements, the next thing to improve. MODE JANK's direct frames with an FM-1 are not measured yet.
 
 `status` reports the stick's own part as `lat_air_max_us` and `lat_usb_max_us`.
 
