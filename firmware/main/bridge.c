@@ -212,7 +212,7 @@ static void handle(struct slot *s, int i)
     static uint8_t eth[SLOT_BYTES];
     if (s->from == FROM_NETWORK) {
         int pass = !jn_input(&s_net, s->data, s->len, bridge_ms()) && jp_input(&s_peer, s->data, s->len, JP_TO_AIR, s->at);
-        if (pass)
+        if (pass && jn_to_computer(s->data, s->len))  /* an address for the computer, never a way out (jank_net.h) */
             to_computer(s->data, s->len, s->at);
         give_slot(i);
         return;
@@ -402,6 +402,15 @@ int bridge_play(int play)
     r = jp_set_playing(&s_peer, play, midi_now_us());
     xSemaphoreGive(s_lock);
     return r;
+}
+
+/* the Link clock filter's state, for `diag` */
+void bridge_diag(char *out, size_t cap)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    snprintf(out, cap, "link_settled=%u\nlink_drift_ppb=%ld\nlink_last_err_us=%lld\nlink_far=%u\n", s_peer.k.settled,
+             (long)lk_drift_ppb(&s_peer.k), (long long)s_peer.k.last_err, s_peer.k.far);
+    xSemaphoreGive(s_lock);
 }
 
 uint32_t bridge_peers_heard(void)

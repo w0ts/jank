@@ -38,6 +38,10 @@ void jn_link(struct jank_net *n, int up, uint32_t now_ms);   /* associated with 
 void jn_poll(struct jank_net *n, uint32_t now_ms);
 /* a frame from the network -> 1 when it was jank's own DHCP reply, and nobody else's business */
 int jn_input(struct jank_net *n, const uint8_t *eth, size_t len, uint32_t now_ms);
+/* a frame from the network on its way to the computer -> 0 drop it, 1 pass it (perhaps changed). The computer gets an
+ * address on the network (all Link needs) but never a way out through the stick: the DHCP reply's gateway, DNS, domain
+ * and routes are blanked, IPv6 router advertisements and DHCPv6 replies dropped. Else a Mac sends its internet here */
+int jn_to_computer(uint8_t *eth, size_t len);
 uint32_t jn_ip(const struct jank_net *n);                    /* host order; 0: none */
 uint32_t jn_mask(const struct jank_net *n);
 uint32_t jn_sum(const uint8_t *data, size_t n);              /* the one's complement sum; 0 over a checksummed block */

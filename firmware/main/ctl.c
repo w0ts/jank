@@ -43,6 +43,17 @@ static void run_line(const char *line)
     enum jk_ctl_action a;
     if (ota_line(line))
         return;
+    if (!strcmp(line, "diag")) {
+        size_t n;
+        app_diag(s_out, sizeof s_out);
+        n = strlen(s_out);
+        bridge_diag(s_out + n, sizeof s_out - n);
+        n = strlen(s_out);
+        drive_state(s_out + n, sizeof s_out - n);
+        strlcat(s_out, "ok\n", sizeof s_out);
+        usb_serial_write(s_out, strlen(s_out));
+        return;
+    }
     if (!strcmp(line, "drive")) {
         drive_state(s_out, sizeof s_out);
         strlcat(s_out, "ok\n", sizeof s_out);
