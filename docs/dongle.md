@@ -85,6 +85,11 @@ On this board the dongle would draw about 2 + 2.2 + 0.8 (8 ms of radio a second 
 current), waking ~0.3 ms before a tick instead of 1.5 ms (the wake lands within 12 us), or the ULP sending the ticks:
 **~3 mA** is the target.
 
+Driving the gear's MIDI IN (arithmetic): current flows only for 0 bits; F8 has 4 of its 10 (start + three low bits,
+sent first): 128 us a byte, 48 a second at 120 BPM, 0.6 % of the time at ~5-8 mA (the receiver's 220 ohm, its
+opto's ~1.2 V): **~0.04 mA** on average (~0.1 mA at 300 BPM), its 128 us peaks from the capacitor bank. The clock's
+real cost is the CPU's wakes (above).
+
 The earlier budget (datasheet currents, before the meter): radio ~8 ms a second at 88 mA, ~0.7 mA; the ticks 48 wakes
 of ~1.8 ms at 13-22 mA, ~1.1-1.9 mA; light sleep ~0.2 mA: **about 2-3 mA**. Still to measure: the currents themselves
 (an in-line USB meter on a charger: the probe's five phases, the LED blinking 1..5 times at each start; a Mac only shows
