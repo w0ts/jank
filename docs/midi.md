@@ -63,8 +63,18 @@ same recording; 2 min after 2 min of settling, 240 FM-1 hits, 960 Live pulses):
 | FM-1's sound - Live | sd 140 to 480 us (30 s ramps and steps) | sd 66 us (-408 .. -159 us) |
 | the stick's MIDI - Live | sd 158 to 320 us | sd 51 us (-40 .. +150 us) |
 
-The constants are the FM-1's audio path and Live's output latency. Left: ~100 us steps both take together against Live,
-Live's own Link remeasurement (Ableton's method).
+The constants are the FM-1's audio path and Live's output latency.
+
+**Who is steadiest** (same bench, 3 min, a steady tempo: each stream against its own straight line in the audio
+interface's sample time, one crystal for all; `jank-scratch/bench/absolute.py`; the Mac loaded):
+
+| | sd | worst | steps over 50 us |
+|---|---|---|---|
+| the stick's MIDI start bits | 5.6 us | 13 us | none |
+| the FM-1's kick (onset detection included) | 19.6 us | 62 us | none |
+| Live's clock out | 38.1 us | 150 us | +55 us at 37, 97, 158 s: a ramp, then a step back (Link's method) |
+
+The stick's own log over the same 3 min: every measurement within +-58 us of Live, each correction 7 us or less.
 
 `status` reports the stick's own part as `lat_air_max_us` and `lat_usb_max_us`.
 
