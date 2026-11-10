@@ -52,7 +52,19 @@ into the Fireface at 44.1 kHz, edges interpolated between samples; the stick's t
 Live's own pulses wobble 24 to 48 us (sd) against a straight line. The ~1 ms constant is mostly Live's (its output
 latency as the driver reports it); the path adds ~0.26 ms (Link's round-trip estimate over uneven Wi-Fi delays). Over the
 air the stick's grid wanders more (78 us sd against its own straight line, 23 us over USB): Link's time estimate between
-measurements, the next thing to improve. MODE JANK's direct frames with an FM-1 are not measured yet.
+measurements.
+
+**The jam chain** (2026-11-10, MODE JANK, Live on the stick's USB, an FM-1 on the air playing a hit each beat into the
+same recording; 2 min after 2 min of settling, 240 FM-1 hits, 960 Live pulses):
+
+| | Link's method (both) | the filtered Link clock (both: jank 26ddb7c, fm1-base d26193e) |
+|---|---|---|
+| FM-1's sound - the stick's MIDI | sd 227 to 349 us | sd 27 us (p1 .. p99: -396 .. -291 us) |
+| FM-1's sound - Live | sd 140 to 480 us (30 s ramps and steps) | sd 66 us (-408 .. -159 us) |
+| the stick's MIDI - Live | sd 158 to 320 us | sd 51 us (-40 .. +150 us) |
+
+The constants are the FM-1's audio path and Live's output latency. Left: ~100 us steps both take together against Live,
+Live's own Link remeasurement (Ableton's method).
 
 `status` reports the stick's own part as `lat_air_max_us` and `lat_usb_max_us`.
 
