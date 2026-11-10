@@ -61,13 +61,20 @@ core: the clock shares it, as on the stick before core 1 was given to it; 3x the
 - USB-C wins when present (power and data). The firmware reads the bank's voltage and waits when it is low.
 - No supercap: no SMD one found at JLC (the small ones are through-hole), and not needed for listening only.
 
-## To measure first (on the XIAO ESP32-S3, on USB power, with a meter)
+## Measured on the XIAO ESP32-S3 (2026-11-10, `tools/powerprobe`, 40 s a phase, timings by the chip)
 
-1. Wi-Fi from light sleep back to receive: time and charge. The whole budget rests on it.
-2. Promiscuous receive across light sleep (re-entered each window?).
-3. The MIDI tick timing when the CPU wakes for each one (the pin probe, `JANK_CLOCK_PROBE`).
-4. The user's gear: each MIDI OUT's current into ~330 ohm (or a 3.3 V load) between pin 4 and pin 2, and pin 5 to pin 2,
-   on 2-3 devices: the real budget.
+| | result |
+|---|---|
+| Wi-Fi left started across `esp_light_sleep_start` | survives: promiscuous again **3.0 ms** after waking (max 3.5 ms), frames heard in 40 of 40 windows |
+| Wi-Fi stopped and started around each sleep | 8.1 ms (max 56 ms): keep it started |
+| MIDI ticks with the CPU woken from light sleep 1.5 ms early, then waiting | late by 2 us on average, 12 us at worst (`esp_timer`, not the pin) |
+| listening all the time | ~99 frames a second on a channel with 5 access points |
+
+With these, the budget (datasheet currents; no meter yet): radio ~8 ms a second at 88 mA, ~0.7 mA; the ticks 48 wakes
+of ~1.8 ms at 13-22 mA, ~1.1-1.9 mA; light sleep ~0.2 mA: **about 2-3 mA**. Still to measure: the currents themselves
+(an in-line USB meter on a charger: the probe's five phases, the LED blinking 1..5 times at each start; a Mac only shows
+the 500 mA allotted), and the user's gear: each MIDI OUT's current into ~330 ohm (or a 3.3 V load) between pin 4 and
+pin 2, and pin 5 to pin 2, on 2-3 devices.
 
 Then: the sync frame in jank and Optimist, the board (S3-MINI-1, two PJ-320 jacks, one button, USB-C, the buck, the
 cap bank), the case.
