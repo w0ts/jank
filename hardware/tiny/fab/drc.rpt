@@ -1,0 +1,42 @@
+** Drc report for tiny.kicad_pcb **
+** Created on 2026-11-10T20:23:53 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 6 DRC violations **
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(142.0000 mm, 100.0000 mm): Segment on Edge.Cuts
+    @(142.1500 mm, 111.9200 mm): Footprint text of P3 (S)
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(142.0000 mm, 100.0000 mm): Segment on Edge.Cuts
+    @(142.1500 mm, 114.4600 mm): Footprint text of P3 (R)
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(142.0000 mm, 100.0000 mm): Segment on Edge.Cuts
+    @(142.1500 mm, 117.0000 mm): Footprint text of P3 (T)
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(108.0000 mm, 120.0000 mm): PCB text 'BOOT' on F.Silkscreen
+    @(106.3000 mm, 122.5000 mm): Pad 1 [VSYS] of C1 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(135.0000 mm, 109.1000 mm): PCB text 'POWER IN' on F.Silkscreen
+    @(132.0000 mm, 108.5000 mm): Pad 4 [PIN_T] of J3 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(135.0000 mm, 109.1000 mm): PCB text 'POWER IN' on F.Silkscreen
+    @(136.0000 mm, 108.5000 mm): Pad 3 [PIN_R] of J3 on F.Cu
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **
