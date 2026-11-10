@@ -91,7 +91,9 @@ struct lk_node {
     int64_t icpt;                          /* ghost time = host + icpt + drift x (host - icpt_t) */
     int64_t icpt_t;                        /* host us icpt was measured for */
     int64_t drift_q30;                     /* the session's clock against ours, (ghost - host) us a host us, Q30 */
-    int64_t prev_icpt, prev_t;             /* the measurement before, to learn the drift; prev_t 0: none */
+    int64_t prev_icpt, prev_t;             /* the measurement before; prev_t 0: none (a new clock) */
+    int64_t hist_icpt[8], hist_t[8];       /* the last measurements of our own session: the drift is their slope */
+    uint8_t hist_n, hist_at;
     uint8_t settled;                       /* measurements since the clock was new: the filter's gains shrink with it */
     uint8_t far;                           /* the last measurement was far off and set aside: a second one snaps */
     int64_t last_err;                      /* the last measurement against the clock, us (for diagnostics) */

@@ -24,12 +24,13 @@
 #define LK_FAST_DIV 2u                     /* the median of the fastest half of the points (round trip) .. */
 #define LK_FAST_MIN 8u                     /* .. and at least these */
 #define LK_DRIFT_MAX_Q30 214748            /* 200 ppm: any more is a measurement gone wrong */
-#define LK_DRIFT_MIN_SPAN_US 2000000        /* two measurements this far apart at least to learn the drift */
-#define LK_PHASE_SHIFT 2u                  /* settled, a measurement moves the clock 1/4 of the way (a filter, as NTP's) .. */
-#define LK_FREQ_SHIFT 4u                   /* .. and its drift by 1/16 of the rate it implies: measurements over Wi-Fi
-                                            * scatter by +-250 us (bench 2026-11-10); taken whole, each was a step.
-                                            * Until then the gains start large (1/2) and halve a measurement (NTP's
-                                            * gear shift): the drift is learned in a few measurements */
+#define LK_HIST 8u                         /* the drift: the slope through the last 8 measurements (~80 s) .. */
+#define LK_HIST_SPAN_US 20000000           /* .. once they span 20 s. (A filter on single steps learned -20 ppm from
+                                            * a restart's first noisy measurements and took minutes to unlearn it) */
+#define LK_PHASE_SHIFT 3u                  /* settled, a measurement moves the clock 1/8 of the way (a filter, as NTP's):
+                                            * measurements scatter by +-250 us over Wi-Fi and +-300 us over the stick's
+                                            * USB (bench 2026-11-10); taken whole, each was a step. The first ones move
+                                            * it further (whole, 1/2, 1/4); the drift is the slope, so this can be small */
 #define LK_SNAP_US 2000                    /* two measurements in a row this far off: taken whole, the drift forgotten
                                             * (one alone is set aside: a fresh start's first was 2.4 ms off, bench) */
 #define LK_RECHECK_N 6u                    /* every 6th measurement (a minute) re-checks the member measured longest ago */
@@ -147,6 +148,7 @@ static int64_t r64(const uint8_t *p) { return (int64_t)((uint64_t)r32(p) << 32 |
 
 /* ---- ghost time */
 static int64_t rdiv(int64_t a, uint32_t s);
+static int64_t sdiv64(int64_t a, int64_t b);
 
 /* Ghost time with the drift between the session's clock and ours (crystals differ by tens of ppm): measured
  * intercepts alone ramp away between measurements and step back at each (40 ppm: 1.2 ms over Link's 30 s) */
@@ -171,6 +173,30 @@ static void clock_reset(struct lk_node *k, int64_t icpt, int64_t now)
     k->prev_t = 0;
     k->settled = 0;
     k->far = 0;
+    k->hist_n = 0;
+    k->hist_at = 0;
+}
+
+/* the least-squares slope through the history, Q30 (ghost - host us a host us); 0 until it spans LK_HIST_SPAN_US */
+static int64_t hist_slope(const struct lk_node *k)
+{
+    int64_t t0 = k->hist_t[0], tmin = INT64_MAX, tmax = INT64_MIN, st = 0, si = 0, stt = 0, sti = 0, n = k->hist_n, den;
+    uint32_t i;
+    for (i = 0; i < k->hist_n; i++) {
+        int64_t t = (k->hist_t[i] - t0) >> 10, v = k->hist_icpt[i] - k->hist_icpt[0];   /* (t in ~ms: no overflow) */
+        tmin = k->hist_t[i] < tmin ? k->hist_t[i] : tmin;
+        tmax = k->hist_t[i] > tmax ? k->hist_t[i] : tmax;
+        st += t;
+        si += v;
+        stt += t * t;
+        sti += t * v;
+    }
+    if (n < 3 || tmax - tmin < LK_HIST_SPAN_US)
+        return 0;
+    den = n * stt - st * st;
+    if (den <= 0)
+        return 0;
+    return sdiv64((n * sti - st * si) * ((int64_t)1 << 20), den);  /* us per 1024 us, Q30: (x 2^30 / 2^10) */
 }
 
 /* a / b, b > 0, by shift and subtract (the FM-1's toolchain has no 64-bit division) */
@@ -188,14 +214,12 @@ static int64_t sdiv64(int64_t a, int64_t b)
     return a < 0 ? -(int64_t)q : (int64_t)q;
 }
 
-/* our own session measured: its intercept is icpt at host t_mid. A filter: the clock goes part of the way to it, and the
- * drift learns from what is left over (a second-order loop, as NTP's); the first measurement, or one far off, is taken
- * whole */
+/* our own session measured: its intercept is icpt at host t_mid. A filter: the clock goes part of the way to it; the
+ * drift is the slope through the last measurements. The first measurement, or two far off in a row, are taken whole */
 static void clock_measured(struct lk_node *k, int64_t icpt, int64_t t_mid)
 {
-    int64_t predicted = eff_icpt(k, t_mid), err = icpt - predicted, span = t_mid - k->prev_t;
+    int64_t predicted = eff_icpt(k, t_mid), err = icpt - predicted;
     uint32_t ps = k->settled < LK_PHASE_SHIFT ? k->settled : LK_PHASE_SHIFT;
-    uint32_t fs = 1u + k->settled < LK_FREQ_SHIFT ? 1u + k->settled : LK_FREQ_SHIFT;
     k->last_err = err;
     if (k->prev_t && (err > LK_SNAP_US || err < -LK_SNAP_US) && !k->far) {
         k->far = 1;                                /* set aside: noise, unless the next one agrees */
@@ -209,18 +233,22 @@ static void clock_measured(struct lk_node *k, int64_t icpt, int64_t t_mid)
     } else {
         if (k->settled < 255u)
             k->settled++;
-        if (span >= LK_DRIFT_MIN_SPAN_US) {
-            k->drift_q30 += rdiv(sdiv64(err * ((int64_t)1 << 30), span), fs);
-            if (k->drift_q30 > LK_DRIFT_MAX_Q30)
-                k->drift_q30 = LK_DRIFT_MAX_Q30;
-            if (k->drift_q30 < -LK_DRIFT_MAX_Q30)
-                k->drift_q30 = -LK_DRIFT_MAX_Q30;
-        }
         k->icpt = ps ? predicted + rdiv(err, ps) : icpt;
     }
     k->prev_icpt = icpt;
     k->prev_t = t_mid;
     k->icpt_t = t_mid;
+    k->hist_icpt[k->hist_at] = icpt;               /* the raw measurement: the slope of what was measured */
+    k->hist_t[k->hist_at] = t_mid;
+    k->hist_at = (uint8_t)((k->hist_at + 1u) % LK_HIST);
+    if (k->hist_n < LK_HIST)
+        k->hist_n++;
+    {
+        int64_t d = hist_slope(k);
+        if (d > LK_DRIFT_MAX_Q30 || d < -LK_DRIFT_MAX_Q30)
+            d = 0;
+        k->drift_q30 = d;
+    }
 }
 int32_t lk_mpb(const struct lk_node *k) { return (int32_t)k->tl.mpb; }
 int lk_playing(const struct lk_node *k) { return k->ss.play; }
@@ -341,6 +369,18 @@ static void meas_note_rtt(struct lk_node *k, uint16_t rtt, int64_t now)
     k->last_rtt = rtt;
 }
 
+/* a member of our session answers more than twice as fast as rtt: that measurement is a re-check, not the clock's */
+static int slower_than_best(const struct lk_node *k, uint16_t rtt)
+{
+    uint32_t i;
+    for (i = 0; i < LK_PEERS; i++) {
+        const struct lk_peer *p = &k->peer[i];
+        if (p->used && id_eq(p->sess, k->sess) && p->rtt && !p->noping && (uint32_t)p->rtt * 2u < rtt)
+            return 1;
+    }
+    return 0;
+}
+
 static void meas_failed_with(struct lk_node *k)   /* the member just measured with answers no more: the others first */
 {
     uint32_t i;
@@ -424,7 +464,8 @@ static void meas_done(struct lk_node *k, int ok, int64_t icpt, int64_t now)
         if (ok) {
             int64_t before = ghost(k, now);
             k->measures++;
-            clock_measured(k, icpt, k->meas.t0 + rdiv(now - k->meas.t0, 1u));
+            if (!slower_than_best(k, k->last_rtt))     /* a re-check of a slower member updates its round trip only */
+                clock_measured(k, icpt, k->meas.t0 + rdiv(now - k->meas.t0, 1u));
             if (ghost(k, now) != before)
                 changed(k, now);
         }
