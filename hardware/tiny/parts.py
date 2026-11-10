@@ -13,7 +13,7 @@ FP = {   # footprint names in lib/tiny.pretty (copies of lib/jlc.pretty, plus ou
     "bav70": "SOT-23-3_L3.0-W1.7-P0.95-LS2.9-BR", "sod123": "SOD-123_L2.7-W1.6-LS3.7-RD-1",
     "led": "LED-SMD_L1.6-W0.8-R-RD", "sw": "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5", "l0806": "L0806",
     "can10": "CAP-SMD_BD10.0-L10.3-W10.3-LS11.0-FD", "r0603": "R0603", "r0805": "R0805", "c0603": "C0603",
-    "c0805": "C0805", "trs": "TRS_PADS_3x1.0mm",
+    "c0805": "C0805", "trs": "TRS_PADS_SMD",
 }
 
 # the module's pads (JLC footprint numbering = Espressif's pin numbers; the nine centre pads are all named "GND")

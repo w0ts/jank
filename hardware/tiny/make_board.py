@@ -27,16 +27,20 @@ from stitch import stitch            # (hardware/pcb/lib/stitch.py, after m-card
 MM = pcbnew.FromMM
 OX, OY = 100.0, 100.0
 LIB = os.path.join(HERE, "lib", "tiny.pretty")
-W, H = 42.0, 44.0
-CX, CY = 21.0, H - 0.3 - 12.78               # the module's origin (turned 180: antenna down, its end 0.3 inside the edge)
+VARIANT = os.environ.get("VARIANT", "2s")      # 2s: tiny (two-sided, the board); 1s: tiny-1s (one-sided, for the cost)
+NAME = {"2s": "tiny", "1s": "tiny-1s"}[VARIANT]
+W, H = {"2s": (27.0, 36.0), "1s": (42.0, 44.0)}[VARIANT]
+CX = {"2s": 13.6, "1s": 21.0}[VARIANT]
+CY = H - 0.3 - 12.78                         # the module's origin (turned 180: antenna down, its end 0.3 inside the edge)
 KEEP_Y = CY + 7.75 - 0.3                     # the antenna keep-out: from 0.3 above the antenna's start to the bottom edge
 
-# ref: (x, y, rotation); the footprints' origins (JLC's placement origins)
-PLACE = {
+# ref: (x, y, rotation, side); the footprints' origins (JLC's placement origins). A bottom part is flipped, then turned
+# (its rotation is KiCad's as seen from the top).
+PLACE_1S = {
     "J1": (CX, 4.97, 180), "J2": (7.25, 5.0, 0), "J3": (W - 7.25, 5.0, 180),
     "U1": (CX, CY, 180),
     "C1": (6.3, 27.0, 270), "C2": (W - 6.3, 27.0, 270),
-    "P2": (1.6, 17.0, 90), "P3": (W - 1.6, 17.0, 90),
+    "P2": (1.2, 11.9, 0), "P3": (W - 1.2, 11.9, 0),
     # left top: the MIDI OUT resistors, the button
     "R14": (6.0, 11.6, 90), "R15": (10.0, 11.6, 90), "SW1": (8.0, 16.6, 0),
     # right top: the POWER IN resistors and diodes
@@ -52,8 +56,31 @@ PLACE = {
     # bottom right: 3V3 decoupling at the module, the reservoir's sense
     "C6": (30.6, 35.5, 0), "R10": (33.9, 35.5, 0), "R11": (37.2, 35.5, 0), "C8": (40.3, 35.5, 0),
 }
+PLACE_2S = {   # (the user's ruling 2026-11-10: half the area; the reservoir and parts under the module on the bottom)
+    # top: the USB-C (right of centre: its shell legs stay clear of the bottom jacks), the module, the cable pads (clear
+    # of the jacks' peg holes, which go through the board)
+    "J1": (18.0, 4.97, 180), "U1": (CX, CY, 180), "P2": (1.0, 7.2, 0), "P3": (W - 1.1, 14.5, 0),
+    # top left (round J2's pegs at (1.5, 5) and (8.5, 5)): the buck, the detector, BUCK_EN's diode and capacitor, the
+    # MIDI OUT resistors
+    "U2": (5.0, 2.0, 90), "L1": (10.6, 1.9, 0), "C5": (4.2, 6.9, 0), "C3": (10.7, 6.9, 0),
+    "U3": (4.0, 9.9, 0), "D4": (7.9, 9.9, 0), "R7": (11.3, 9.4, 0), "C4": (11.3, 11.4, 0), "R15": (11.3, 13.5, 0),
+    "R14": (6.5, 12.8, 0),
+    # top right (round J3's pegs at (18.5, 11.8) and (25.5, 11.8)): VBUS into BUCK_EN; the POWER IN diodes and resistors
+    "D5": (22.0, 10.0, 0), "D1": (23.0, 18.6, 90), "D2": (23.0, 23.7, 90), "R1": (25.6, 23.2, 270), "R2": (25.6, 26.4, 270),
+    # top left column: the button, the LED
+    "SW1": (2.75, 19.5, 90), "LED1": (2.6, 25.1, 90), "R9": (2.6, 28.5, 90),
+    # bottom: the jacks (staggered), the reservoir, the rest under the module
+    "J2": (7.25, 4.9, 0, "B"), "J3": (W - 7.25, 12.6, 180, "B"),
+    "C1": (5.5, 16.5, 90, "B"), "C2": (W - 7.1, 24.7, 0, "B"),
+    "D3": (18.0, 1.4, 0, "B"), "R5": (18.0, 3.7, 0, "B"),
+    "R3": (12.2, 11.3, 90, "B"), "R4": (12.2, 14.5, 90, "B"), "R6": (12.2, 17.7, 90, "B"),
+    "R8": (1.9, 24.6, 0, "B"), "C7": (5.1, 24.6, 0, "B"), "R10": (8.3, 24.6, 0, "B"),
+    "R11": (1.9, 26.8, 0, "B"), "C8": (5.1, 26.8, 0, "B"), "R12": (8.3, 26.8, 0, "B"), "R13": (8.3, 29.0, 0, "B"),
+    "C6": (11.8, 26.5, 90, "B"),
+}
+PLACE = {k: (v + ("T",))[:4] for k, v in (PLACE_2S if VARIANT == "2s" else PLACE_1S).items()}
 WIDTH = {"VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
-ORDER = ["USB_DP", "USB_DN", "SW", "+3V3", "VSYS", "VBUS", "VUSB_D"]     # (the rest after these, shortest first)
+ORDER = ["USB_DP", "USB_DN", "SW", "+3V3", "VSYS", "VBUS", "VUSB_D", "BUCK_EN", "DET"]     # (the rest after these, shortest first)
 
 board = pcbnew.BOARD()
 nets = {}
@@ -70,25 +97,26 @@ def net(name):
 def place():
     fps = {}
     for ref, _k, value, fp, _lcsc, pins in P.PARTS:
-        x, y, rot = PLACE[ref]
+        x, y, rot, side = PLACE[ref]
         f = pcbnew.FootprintLoad(LIB, P.FP[fp])
         f.SetFPID(pcbnew.LIB_ID("tiny", P.FP[fp]))
         f.SetReference(ref)
         f.SetValue(value)
         f.SetPosition(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)))
-        f.SetOrientationDegrees(rot)
         f.Reference().SetVisible(False)
         f.Value().SetVisible(False)
         board.Add(f)
+        if side == "B":                          # (flipped once on the board: a loose footprint has no layers to flip)
+            f.Flip(f.GetPosition(), pcbnew.FLIP_DIRECTION_LEFT_RIGHT)
+        f.SetOrientationDegrees(rot)
         for p in f.Pads():
             n = pins.get(p.GetNumber())
             if n:
                 p.SetNet(net(n))
         fps[ref] = f
-    for ref in ("P2", "P3"):                     # (the sleeve pads by the edge: no room for thermal spokes)
-        for p in fps[ref].Pads():
-            if p.GetNumber() == "S":
-                p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
+    for p in fps["J1"].Pads():                   # (the USB-C's shell legs: crowded, joined to the pours solid)
+        if p.GetNumber() in ("13", "14"):
+            p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
     return fps
 
 
@@ -138,11 +166,14 @@ def pad_center(p):
     return pcbnew.ToMM(p.GetPosition().x) - OX, pcbnew.ToMM(p.GetPosition().y) - OY
 
 
+ITEMS = []                                       # (the routing of the attempt in progress: tracks and vias)
+
+
 def put(n, segs, vias, w):
     for layer, x0, y0, x1, y1 in segs:
-        add_track(n, layer, x0, y0, x1, y1, w)
+        ITEMS.append(("t", n, layer, x0, y0, x1, y1, w))
     for x, y in vias:
-        add_via(n, x, y)
+        ITEMS.append(("v", n, x, y))
 
 
 def entry(p, r):
@@ -154,9 +185,11 @@ def entry(p, r):
     return (cx - k, cy - k, cx + k, cy + k)
 
 
-def route_all(fps):
+def route_all(fps, first=()):
+    """one attempt: the nets in `first` before the rest; returns the pads it could not reach"""
+    del ITEMS[:]
     R = route.Router(W, H)
-    R.block((0, 1), (0.0, KEEP_Y, W, H))
+    R.block((0, 1), (0.0, KEEP_Y - 0.45, W, H))     # (a via's ring and the clearance stay out of the keep-out too)
     by_net = {}
     for f in fps.values():
         for p in f.Pads():
@@ -177,6 +210,7 @@ def route_all(fps):
         ys = [q[0][1] for q in by_net[n]]
         return (max(xs) - min(xs)) + (max(ys) - min(ys))
     order = [n for n in ORDER if n in signal] + sorted((n for n in signal if n not in ORDER), key=span)
+    order = [n for n in first if n in order] + [n for n in order if n not in first]
     failed = []
     for n in order:
         w = WIDTH.get(n, 0.2)
@@ -198,20 +232,45 @@ def route_all(fps):
     # ground: a via beside every top-side GND pad (the pours join them; this makes sure)
     gvias = 0
     for r, layers, p in by_net["GND"]:
-        if layers != (0,):
+        if len(layers) != 1:
             continue
-        res = route.via_near(R, "GND", r, 0)
+        res = route.via_near(R, "GND", r, layers[0])
         if not res:
             continue
         segs, (x, y) = res
+        put("GND", segs, [(x, y)], 0.2)
         for layer, x0, y0, x1, y1 in segs:
-            add_track("GND", layer, x0, y0, x1, y1, 0.2)
             R.seg(layer, "GND", (x0, y0, x1, y1), 0.2)
-        add_via("GND", x, y)
         R.circle((0, 1), "GND", x, y, route.VIA_D / 2 + route.VIA_EXTRA)
         R.drill(x, y, route.VIA_DRILL)
         gvias += 1
     print(f"routed {len(order)} nets, {len(failed)} pads not reached; {gvias} ground vias by pads")
+    for e in failed:
+        print("  not reached:", e)
+    return failed
+
+
+def route_best(fps, attempts=4):
+    """rip up and retry: the nets that failed go first next time; the best attempt goes on the board"""
+    first, best = [], None
+    for k in range(attempts):
+        failed = route_all(fps, first)
+        if best is None or len(failed) < len(best[0]):
+            best = (failed, list(ITEMS))
+        if not failed:
+            break
+        bad = []
+        for e in failed:
+            n = e.split(":")[0]
+            if n not in bad:
+                bad.append(n)
+        first = bad + [n for n in first if n not in bad]
+    failed, items = best
+    for it in items:
+        if it[0] == "t":
+            add_track(it[1], *it[2:])
+        else:
+            add_via(it[1], it[2], it[3])
     for e in failed:
         print("FAILED", e)
     return failed
@@ -263,9 +322,14 @@ def zones():
 
 
 def silk():
-    label("MIDI OUT", 7.0, 9.1, 0.8)
-    label("POWER IN", W - 7.0, 9.1, 0.8)
-    label("BOOT", 8.0, 20.0, 0.7)
+    if VARIANT == "1s":
+        label("MIDI OUT", 7.0, 9.1, 0.8)
+        label("POWER IN", W - 7.0, 9.1, 0.8)
+        label("BOOT", 8.0, 20.0, 0.7)
+    else:
+        label("OUT", 1.3, 4.3, 0.6)
+        label("PWR", W - 3.2, 21.0, 0.6, 90)
+        label("BOOT", 0.9, 19.5, 0.6, 90)
     label("jank tiny", CX, KEEP_Y + 2.6, 1.0)
     label("antenna: no copper", CX, KEEP_Y + 4.0, 0.6)
 
@@ -273,7 +337,7 @@ def silk():
 def main():
     make_footprints.write()
     fps = place()
-    failed = route_all(fps)
+    failed = [] if os.environ.get("PLACE_ONLY") else route_best(fps)   # (PLACE_ONLY=1: placement only, to check it)
     outline()
     zones()
     silk()
@@ -284,7 +348,7 @@ def main():
     ds = board.GetDesignSettings()
     ds.SetCopperLayerCount(2)
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
-    out = os.path.join(HERE, "tiny.kicad_pcb")
+    out = os.path.join(HERE, f"{NAME}.kicad_pcb")
     board.Save(out)
     print("saved", out, f"{W} x {H} mm")
     return 1 if failed else 0

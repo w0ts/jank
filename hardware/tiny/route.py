@@ -232,7 +232,7 @@ def route_net(R, net, cls, width, pads, margin=6.0):
         pad = left.pop(0)
         starts = R._cells_in(*pad)
         res = None
-        for mg in (margin, margin * 3, 100.0):
+        for mg in (margin, margin * 3):
             win = (max(0, int((min(xs) - mg) / GRID)), max(0, int((min(ys) - mg) / GRID)),
                    min(R.nx - 1, int((max(xs) + mg) / GRID)), min(R.ny - 1, int((max(ys) + mg) / GRID)))
             res = R.path(net, cls, starts, list(tree), win)

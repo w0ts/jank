@@ -4,7 +4,7 @@
   plated pads with no ring), its silkscreen dropped (it runs over pads and past the board edge) and its courtyard redrawn as one rectangle round its
   pads and its drawing (EasyEDA's courtyards are often smaller than the pads: R0603's is 1.6 x 0.8 round pads that
   reach 2.3 mm), 0.15 mm out; the pads, the origin and the orientation stay JLC's (the CPL depends on them);
-- TRS_PADS_3x1.0mm: three plated holes (T, R, S; 1.0 mm drill, 1.8 mm pads, 2.54 mm apart) for a soldered cable.
+- TRS_PADS_SMD: three top-side pads (T, R, S; 1.5 x 2.0 mm, 2.54 mm apart) for a soldered cable.
 
   python3 make_footprints.py      (run by make_board.py)
 """
@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "lib", "jlc.pretty")
 OUT = os.path.join(HERE, "lib", "tiny.pretty")
 MARGIN = 0.15
-TRS_PITCH, TRS_PAD, TRS_DRILL = 2.54, 1.8, 1.0
+TRS_PITCH, TRS_PAD_W, TRS_PAD_H = 2.54, 1.5, 2.0
 
 
 def bbox(src):
@@ -52,21 +52,21 @@ def jlc(path):
 
 
 def trs_pads():
+    """three surface-mount pads in a column (T, R, S from the top, 2.54 apart), on the top side: a cable soldered
+    there leaves through the jack's opening; no hole, so nothing under it on the bottom is in the way"""
     pads, silk = [], []
     for i, n in enumerate("TRS"):
-        x = i * TRS_PITCH
-        shape = "rect" if n == "T" else "circle"
-        pads.append(f'  (pad "{n}" thru_hole {shape} (at {x:.2f} 0) (size {TRS_PAD} {TRS_PAD}) (drill {TRS_DRILL})'
-                    ' (layers "*.Cu" "*.Mask"))')
-        silk.append(f'  (fp_text user "{n}" (at {x:.2f} 1.75) (layer "F.SilkS") (effects (font (size 0.7 0.7) (thickness 0.12))))')
-    a, b = -TRS_PAD / 2 - 0.25, 2 * TRS_PITCH + TRS_PAD / 2 + 0.25
-    return "\n".join(['(footprint "TRS_PADS_3x1.0mm" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
-                      '  (descr "three plated holes for a TRS cable (tip, ring, sleeve) beside a jack; not a part")',
-                      "  (attr through_hole exclude_from_pos_files exclude_from_bom)",
-                      '  (property "Reference" "REF**" (at 0 -1.8 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
-                      '  (property "Value" "TRS pads" (at 2.54 -1.8 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
+        y = i * TRS_PITCH
+        pads.append(f'  (pad "{n}" smd rect (at 0 {y:.2f}) (size {TRS_PAD_W} {TRS_PAD_H}) (layers "F.Cu" "F.Paste" "F.Mask"))')
+        silk.append(f'  (fp_text user "{n}" (at {TRS_PAD_W / 2 + 0.75:.2f} {y:.2f}) (layer "F.SilkS") (effects (font (size 0.7 0.7) (thickness 0.12))))')
+    a, b = TRS_PAD_W / 2 + 0.2, TRS_PAD_H / 2 + 0.2
+    return "\n".join(['(footprint "TRS_PADS_SMD" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
+                      '  (descr "three pads for a TRS cable (tip, ring, sleeve) beside a jack; not a part, no paste needed")',
+                      "  (attr smd exclude_from_pos_files exclude_from_bom)",
+                      '  (property "Reference" "REF**" (at 0 -2 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      '  (property "Value" "TRS pads" (at 0 -2 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
                       *pads, *silk,
-                      f'  (fp_rect (start {a:.2f} -1.15) (end {b:.2f} 1.15) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
+                      f'  (fp_rect (start {-a:.2f} {-b:.2f}) (end {a:.2f} {2 * TRS_PITCH + b:.2f}) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
                       ")"]) + "\n"
 
 
@@ -77,8 +77,8 @@ def write():
         name, body = jlc(path)
         open(os.path.join(OUT, name + ".kicad_mod"), "w").write(body)
         names.append(name)
-    open(os.path.join(OUT, "TRS_PADS_3x1.0mm.kicad_mod"), "w").write(trs_pads())
-    return names + ["TRS_PADS_3x1.0mm"]
+    open(os.path.join(OUT, "TRS_PADS_SMD.kicad_mod"), "w").write(trs_pads())
+    return names + ["TRS_PADS_SMD"]
 
 
 if __name__ == "__main__":
