@@ -105,14 +105,14 @@ enum jk_net {
 #define JK_PASS_MIN 8u
 #define JK_PASS_MAX 63u
 #define JK_QUANTUM_MAX 16u
-#define JK_OFFSET_MAX_MS 100
+#define JK_OFFSET_MAX_10US 10000       /* +-100 ms */
 struct jk_cfg {
     uint8_t group, filter;
     uint8_t peer;                     /* 1: jank is a Link peer itself */
     uint8_t transport;                /* enum jk_transport */
     uint8_t net;                      /* enum jk_net */
     uint8_t quantum;                  /* beats in a bar for MIDI start, 1..JK_QUANTUM_MAX */
-    int16_t offset_ms;                /* MIDI clock against the session, -100..100, for the gear's own lag */
+    int16_t offset_10us;              /* MIDI clock against the session in 10 us steps, +-100 ms: the gear's own lag (was whole ms) */
     char name[JK_NAME_MAX + 1];
     char ssid[JK_SSID_MAX + 1];
     char pass[JK_PASS_MAX + 1];       /* never sent back: get says only whether there is one */

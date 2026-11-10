@@ -63,7 +63,7 @@ One command a line; each answer ends with `ok` or `err <why>`:
 get | status | scan | help | reboot | bootloader
 tempo 20..999 (BPM, up to two decimals) | play | stop
 set group 1..9 | name <text> | filter link|all | peer on|off | transport link|auto
-set quantum 1..16 | offset -100..100 | net jank|wifi | ssid <name> | pass <8..63 chars>
+set quantum 1..16 | offset -100.00..100.00 (ms, 10 us steps) | net jank|wifi | ssid <name> | pass <8..63 chars>
 ```
 
 `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins

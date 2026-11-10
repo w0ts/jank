@@ -80,7 +80,7 @@ static void test_set(void)
 static void test_set_music(void)
 {
     setup();
-    CHECK(cfg.peer == 1 && cfg.transport == JK_TRANSPORT_LINK && cfg.quantum == 4 && cfg.offset_ms == 0);
+    CHECK(cfg.peer == 1 && cfg.transport == JK_TRANSPORT_LINK && cfg.quantum == 4 && cfg.offset_10us == 0);
     CHECK(run("set peer off") == JK_CTL_CFG_CHANGED && cfg.peer == 0);
     CHECK(run("set peer on") == JK_CTL_CFG_CHANGED && cfg.peer == 1);
     CHECK(run("set peer maybe") == JK_CTL_NONE);
@@ -90,12 +90,20 @@ static void test_set_music(void)
     CHECK(run("set quantum 8") == JK_CTL_CFG_CHANGED && cfg.quantum == 8);
     CHECK(run("set quantum 0") == JK_CTL_NONE && cfg.quantum == 8);
     CHECK(run("set quantum 17") == JK_CTL_NONE);
-    CHECK(run("set offset -12") == JK_CTL_CFG_CHANGED && cfg.offset_ms == -12);
-    CHECK(run("set offset 101") == JK_CTL_NONE && cfg.offset_ms == -12);
+    CHECK(run("set offset -12") == JK_CTL_CFG_CHANGED && cfg.offset_10us == -1200);
+    CHECK(run("set offset 101") == JK_CTL_NONE && cfg.offset_10us == -1200);
+    CHECK(run("set offset 1.27") == JK_CTL_CFG_CHANGED && cfg.offset_10us == 127);   /* ms, two decimals: 10 us steps */
+    CHECK(run("set offset -0.5") == JK_CTL_CFG_CHANGED && cfg.offset_10us == -50);
+    CHECK(run("set offset 100.00") == JK_CTL_CFG_CHANGED && cfg.offset_10us == 10000);
+    CHECK(run("set offset -100.01") == JK_CTL_NONE && cfg.offset_10us == 10000);
+    CHECK(run("set offset 1.275") == JK_CTL_NONE && run("set offset 1.") == JK_CTL_NONE && run("set offset -") == JK_CTL_NONE);
+    CHECK(run("set offset 1.27") == JK_CTL_CFG_CHANGED && run("get") == JK_CTL_NONE && strstr(out, "offset=1.27\n"));
+    CHECK(run("set offset -0.05") == JK_CTL_CFG_CHANGED && run("get") == JK_CTL_NONE && strstr(out, "offset=-0.05\n"));
+    CHECK(run("set offset 0") == JK_CTL_CFG_CHANGED && run("get") == JK_CTL_NONE && strstr(out, "offset=0.00\n"));
     CHECK(run("set offset -101") == JK_CTL_NONE);
     CHECK(run("get") == JK_CTL_NONE);
     CHECK(strstr(out, "peer=on\n") && !strstr(out, "midi=") && strstr(out, "transport=auto\n"));
-    CHECK(strstr(out, "quantum=8\n") && strstr(out, "offset=-12\n"));
+    CHECK(strstr(out, "quantum=8\n") && strstr(out, "offset=0.00\n"));
 }
 
 static void test_network_settings(void)
