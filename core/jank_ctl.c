@@ -62,7 +62,7 @@ static void put_ip(struct writer *w, const char *key, uint32_t ip)
 static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct writer *w)
 {
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
-    put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_ms);
+    put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%s%d.%02d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_10us < 0 ? "-" : "", abs(c->offset_10us) / 100, abs(c->offset_10us) % 100);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "version=%s\nok\n", JK_VERSION);
@@ -122,6 +122,30 @@ static int parse_int(const char *s, long lo, long hi, long *out)
     return 0;
 }
 
+/* "-1.27", "12", "0.5" -> hundredths (-127, 1200, 50): up to three digits, up to two decimals; -1 otherwise */
+static int parse_hundredths(const char *s, long *out)
+{
+    long whole = 0, frac = 0;
+    int neg = *s == '-', digits = 0, fd = 0;
+    s += neg;
+    for (; *s >= '0' && *s <= '9' && digits < 4; s++, digits++)
+        whole = whole * 10 + (*s - '0');
+    if (!digits || digits > 3)
+        return -1;
+    if (*s == '.') {
+        for (s++; *s >= '0' && *s <= '9' && fd < 3; s++, fd++)
+            frac = frac * 10 + (*s - '0');
+        if (!fd || fd > 2)
+            return -1;
+        if (fd == 1)
+            frac *= 10;
+    }
+    if (*s)
+        return -1;
+    *out = (neg ? -1 : 1) * (whole * 100 + frac);
+    return 0;
+}
+
 static int parse_on_off(const char *s, uint8_t *out)
 {
     if (!strcmp(s, "on") || !strcmp(s, "off")) {
@@ -147,8 +171,8 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
         c->group = (uint8_t)v;
     else if (!strcmp(key, "quantum") && !parse_int(val, 1, JK_QUANTUM_MAX, &v))
         c->quantum = (uint8_t)v;
-    else if (!strcmp(key, "offset") && !parse_int(val, -JK_OFFSET_MAX_MS, JK_OFFSET_MAX_MS, &v))
-        c->offset_ms = (int16_t)v;
+    else if (!strcmp(key, "offset") && !parse_hundredths(val, &v) && v >= -JK_OFFSET_MAX_10US && v <= JK_OFFSET_MAX_10US)
+        c->offset_10us = (int16_t)v;
     else
         return -1;
     return 0;

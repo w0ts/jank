@@ -12,7 +12,7 @@ static const char *TAG = "store";
 static int valid(const struct jk_cfg *c)
 {
     return jk_channel(c->group) && c->filter <= JK_FILTER_ALL && c->transport <= JK_TRANSPORT_AUTO && c->quantum >= 1u && c->quantum <= JK_QUANTUM_MAX
-           && c->offset_ms >= -JK_OFFSET_MAX_MS && c->offset_ms <= JK_OFFSET_MAX_MS && memchr(c->name, 0, sizeof c->name);
+           && c->offset_10us >= -JK_OFFSET_MAX_10US && c->offset_10us <= JK_OFFSET_MAX_10US && memchr(c->name, 0, sizeof c->name);
 }
 
 void store_load(struct jk_cfg *c)

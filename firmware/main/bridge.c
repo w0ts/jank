@@ -267,7 +267,7 @@ static void publish(int64_t now)
     if (now < next || !jp_joined(&s_peer) || s_away)
         return;                       /* no session: the timer keeps the last tempo and phase */
     next = now + PUBLISH_US;
-    jc_map_make(&m, now, jp_beat_at(&s_peer, now), jp_mpb(&s_peer), (int32_t)s_cfg.offset_ms * 1000);
+    jc_map_make(&m, now, jp_beat_at(&s_peer, now), jp_mpb(&s_peer), (int32_t)s_cfg.offset_10us * 10);
     midi_publish(&m);
 }
 
