@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* jank: start-up, and the settings' one owner. */
+#include <stdio.h>
 #include <string.h>
 #include "app.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_system.h"
@@ -51,9 +53,34 @@ static esp_err_t nvs_up(void)
     return e;
 }
 
+/* restarts since power-on and why the last one happened, for `diag` (RTC memory: survives a restart, not power-off) */
+#define BOOTS_MAGIC 0x4A424F54u
+static RTC_NOINIT_ATTR uint32_t s_boots_magic, s_boots;
+static uint32_t s_boots_now;
+static esp_reset_reason_t s_reason;
+
+static void count_boot(void)
+{
+    s_reason = esp_reset_reason();
+    if (s_boots_magic != BOOTS_MAGIC || s_reason == ESP_RST_POWERON) {
+        s_boots_magic = BOOTS_MAGIC;
+        s_boots = 0;
+    }
+    s_boots_now = ++s_boots;
+}
+
+void app_diag(char *out, size_t cap)
+{
+    static const char *const why[] = {"unknown", "poweron", "ext", "sw", "panic", "int_wdt", "task_wdt", "wdt", "deepsleep",
+                                      "brownout", "sdio", "usb", "jtag", "efuse", "pwr_glitch", "cpu_lockup"};
+    unsigned r = (unsigned)s_reason;
+    snprintf(out, cap, "boots=%lu\nreset=%s\n", (unsigned long)s_boots_now, r < sizeof why / sizeof why[0] ? why[r] : "?");
+}
+
 void app_main(void)
 {
     uint8_t efuse[6], mac[6], peer_mac[6];
+    count_boot();
     s_cfg_lock = xSemaphoreCreateMutex();
     ESP_ERROR_CHECK(s_cfg_lock ? ESP_OK : ESP_ERR_NO_MEM);
     ESP_ERROR_CHECK(nvs_up());

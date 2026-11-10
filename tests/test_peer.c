@@ -263,11 +263,33 @@ static uint32_t pc_arp_ip;
 static uint8_t pc_arp_mac[6];
 static int pc_arp_ok;
 static int64_t sim_now;
+/* the computer's own clock: off by pc_ppm against the stick's (crystals differ by tens of ppm) */
+static int64_t pc_ppm;
+static int64_t pc_clock(int64_t t) { return t + t * pc_ppm / 1000000; }
+#define PC_NOW pc_clock(sim_now)
+/* Wi-Fi-like delays: each frame queued 0.5..6 ms, mostly short, in order (a queue) */
+static int jitter_on;                           /* 1: both ways; 2: towards the stick only (an access point's queue) */
+static int to_stick_now;
+static uint32_t jit_seed = 12345u;
+static int64_t delay_now(int64_t last_at)
+{
+    int64_t at;
+    if (!jitter_on || (jitter_on == 2 && !to_stick_now))
+        return sim_now + DELAY_US;
+    jit_seed = jit_seed * 1664525u + 1013904223u;
+    {
+        double r = (double)(jit_seed >> 8) / 16777216.0;
+        double tail = jitter_on == 3 ? 20000.0 : 5500.0;      /* 3: a busy network, a heavy tail both ways */
+        at = sim_now + 500 + (int64_t)(r * r * r * r * (jitter_on == 3 ? 1.0 : 1.0 / r) * tail);
+    }
+    return at > last_at ? at : last_at;
+}
 
 static void push(struct wire *w, uint32_t *n, const uint8_t *f, size_t len)
 {
     if (*n < WIRE) {
-        w[*n].at = sim_now + DELAY_US;
+        to_stick_now = w == to_stick;
+        w[*n].at = delay_now(*n ? w[*n - 1].at : 0);
         w[*n].len = len;
         memcpy(w[*n].f, f, len);
         (*n)++;
@@ -307,7 +329,7 @@ static void pc_input(const uint8_t *f, size_t len)
         return;
     }
     CHECK(rd32(f + 26) == jp.ip);
-    lk_rx(&pc, sim_now, rd32(f + 26), (uint16_t)(f[34] << 8 | f[35]), f + 42, (uint32_t)(len - 42));
+    lk_rx(&pc, PC_NOW, rd32(f + 26), (uint16_t)(f[34] << 8 | f[35]), f + 42, (uint32_t)(len - 42));
 }
 
 static void drain(struct wire *w, uint32_t *n, int to_stick_side)
@@ -332,7 +354,7 @@ static void run_for(int64_t us)
     while (sim_now < end) {
         drain(to_stick, &n_stick, 1);
         drain(to_pc, &n_pc, 0);
-        lk_poll(&pc, sim_now);
+        lk_poll(&pc, PC_NOW);
         jp_poll(&jp, sim_now);
         sim_now += 500;
     }
@@ -345,7 +367,7 @@ static void pc_start(int64_t age_us, int32_t mpb)
     pc_arp_ok = 0;
     sim_now = 1000000;
     lk_init(&pc, &c, 77, mpb);
-    lk_enable(&pc, 1, sim_now);
+    lk_enable(&pc, 1, PC_NOW);
     lk_set_addr(&pc, COMPUTER_IP, LK_MCAST_PORT);
     jp_init(&jp, P, M, 0x1234, stick_out, NULL);
     jp_allow(&jp, 1, sim_now);
@@ -363,7 +385,7 @@ static void test_joins_session(void)
     CHECK(lk_peers(&pc) == 1);
     CHECK(jp_mpb(&jp) == 433333);          /* jank took the tempo, it did not impose 120 */
     CHECK(lk_mpb(&pc) == 433333);
-    int64_t a = lk_beat_at(&pc, sim_now), b = jp_beat_at(&jp, sim_now);
+    int64_t a = lk_beat_at(&pc, PC_NOW), b = jp_beat_at(&jp, PC_NOW);
     CHECK(abs64(a - b) < 4000);            /* under 2 ms of beat at this tempo */
     printf("peer: session phase error %lld micro-beats\n", (long long)abs64(a - b));
 }
@@ -372,15 +394,57 @@ static void test_follows(void)
 {
     pc_start(100000, 500000);
     run_for(6000000);
-    lk_set_tempo(&pc, 400000, sim_now);
+    lk_set_tempo(&pc, 400000, PC_NOW);
     run_for(1000000);
     CHECK(jp_mpb(&jp) == 400000);
-    lk_set_playing(&pc, 1, lk_beat_at(&pc, sim_now), sim_now);
+    lk_set_playing(&pc, 1, lk_beat_at(&pc, PC_NOW), PC_NOW);
     run_for(1000000);
     CHECK(jp_playing(&jp) == 1);
-    lk_set_playing(&pc, 0, lk_beat_at(&pc, sim_now), sim_now);
+    lk_set_playing(&pc, 0, lk_beat_at(&pc, PC_NOW), PC_NOW);
     run_for(1000000);
     CHECK(jp_playing(&jp) == 0);
+}
+
+/* A computer whose clock runs 40 ppm fast, over Wi-Fi-like delays: the stick's beat against the computer's, every
+ * 100 ms for 2 minutes after joining. Prints the error; checks the bound the measurement reaches. */
+static void session_error(int64_t ppm, int jitter, int64_t *mean, int64_t *rms, int64_t *worst)
+{
+    double sum = 0, sq = 0, w = 0;
+    int n = 0;
+    pc_ppm = ppm;
+    jitter_on = jitter;
+    pc_start(100000, 500000);
+    run_for(60000000);                             /* (joined, then five measurements: the drift is learned) */
+    CHECK(jp_joined(&jp));
+    for (int i = 0; i < 1200; i++) {
+        run_for(100000);
+        double e = (double)(lk_beat_at(&pc, PC_NOW) - jp_beat_at(&jp, sim_now)) * jp_mpb(&jp) / 1e6;   /* us */
+        sum += e;
+        sq += e * e;
+        w = e < 0 ? (-e > w ? -e : w) : (e > w ? e : w);
+        n++;
+    }
+    *mean = (int64_t)(sum / n);
+    *rms = (int64_t)__builtin_sqrt(sq / n);
+    *worst = (int64_t)w;
+    pc_ppm = 0;
+    jitter_on = 0;
+}
+
+static void test_drift_and_wifi(void)
+{
+    int64_t mean, rms, worst;
+    session_error(40, 0, &mean, &rms, &worst);
+    printf("peer: computer 40 ppm fast, steady delays: mean %lld us, rms %lld us, worst %lld us\n", (long long)mean, (long long)rms, (long long)worst);
+    CHECK(rms < 100 && worst < 300);
+    session_error(40, 1, &mean, &rms, &worst);
+    printf("peer: computer 40 ppm fast, Wi-Fi-like delays both ways: mean %lld us, rms %lld us, worst %lld us\n", (long long)mean, (long long)rms, (long long)worst);
+    CHECK(rms < 200 && worst < 600);
+    session_error(5, 3, &mean, &rms, &worst);
+    printf("peer: computer 5 ppm fast, a busy network both ways: mean %lld us, rms %lld us, worst %lld us\n", (long long)mean, (long long)rms, (long long)worst);
+    session_error(40, 2, &mean, &rms, &worst);
+    printf("peer: computer 40 ppm fast, delays towards the stick only: mean %lld us, rms %lld us, worst %lld us\n", (long long)mean, (long long)rms, (long long)worst);
+    CHECK(rms < 300 && worst < 800);
 }
 
 /* the whole way: the session -> a map every 5 ms -> ticks; every tick lands on the computer's own beat */
@@ -461,6 +525,7 @@ int main(void)
     test_follows();
     test_leads();
     test_ticks_on_the_session();
+    test_drift_and_wifi();
     test_leave();
     printf("peer: %d checks, %d failed\n", checks, fails);
     return fails != 0;

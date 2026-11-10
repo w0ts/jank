@@ -61,7 +61,9 @@ void bridge_table_start(void);                               /* frames of every 
 void bridge_table_stop(struct js_table *out);                /* .. to here */
 uint32_t bridge_peers_heard(void);
 int bridge_beat(int64_t *beat_ub, int32_t *mpb);
-int bridge_tempo(int32_t mpb);                       /* 0 set; -1 no session to set it in */
+int bridge_tempo(int32_t mpb);
+void bridge_diag(char *out, size_t cap);                     /* the Link clock filter, for `diag` */
+void app_diag(char *out, size_t cap);                        /* restarts and the last reset's reason, for `diag` */                       /* 0 set; -1 no session to set it in */
 int bridge_play(int play);                           /* 0 started / stopped; -1 no session */    /* 1 in a session, with its beat now */
 uint32_t bridge_ms(void);
 

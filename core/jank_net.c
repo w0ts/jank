@@ -294,3 +294,45 @@ int jn_input(struct jank_net *n, const uint8_t *eth, size_t len, uint32_t now_ms
 
 uint32_t jn_ip(const struct jank_net *n) { return n->ip; }
 uint32_t jn_mask(const struct jank_net *n) { return n->mask; }
+
+/* DHCP options the computer must not get from the stick: router, DNS, domain, search, routes (classless, Microsoft's) */
+static int a_way_out(uint8_t code) { return code == 3u || code == 6u || code == 15u || code == 119u || code == 121u || code == 249u; }
+
+static void blank_way_out(uint8_t *eth, size_t len)
+{
+    size_t at = OPT_AT;
+    while (at < len && eth[at] != 255u) {
+        size_t n;
+        if (eth[at] == 0u) {
+            at++;
+            continue;
+        }
+        if (at + 1u >= len || at + 2u + eth[at + 1u] > len)
+            return;
+        n = 2u + eth[at + 1u];
+        if (a_way_out(eth[at]))
+            memset(eth + at, 0, n);                  /* PAD bytes: the length stays, so the IP header does too */
+        at += n;
+    }
+}
+
+int jn_to_computer(uint8_t *eth, size_t len)
+{
+    if (len >= ETH_HDR + 40u + 8u && eth[12] == 0x86u && eth[13] == 0xDDu) {
+        uint8_t next = eth[ETH_HDR + 6u];
+        const uint8_t *l4 = eth + ETH_HDR + 40u;
+        if (next == 58u && l4[0] == 134u)            /* ICMPv6 router advertisement */
+            return 0;
+        if (next == 17u && l4[0] == 0x02u && l4[1] == 0x23u)   /* from DHCPv6's server port, 547 */
+            return 0;
+        return 1;
+    }
+    if (len >= OPT_AT && eth[12] == 0x08u && eth[13] == 0x00u && (eth[ETH_HDR] & 0x0Fu) == 5u && eth[ETH_HDR + 9u] == 17u
+        && eth[ETH_HDR + IP_HDR] == 0u && eth[ETH_HDR + IP_HDR + 1u] == 67u && eth[ETH_HDR + IP_HDR + 2u] == 0u
+        && eth[ETH_HDR + IP_HDR + 3u] == 68u && rd32(eth + OPT_AT - 4u) == COOKIE) {
+        blank_way_out(eth, len);
+        eth[ETH_HDR + IP_HDR + 6u] = 0;              /* UDP checksum 0: none, allowed over IPv4 */
+        eth[ETH_HDR + IP_HDR + 7u] = 0;
+    }
+    return 1;
+}

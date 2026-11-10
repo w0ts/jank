@@ -254,6 +254,45 @@ static void test_bad_options_do_not_read_past_the_frame(void)
     assert(jn_input(&n, f, len, 5) == 1 && jn_ip(&n) == 0);
 }
 
+/* towards the computer on a normal network: an address, never a gateway, DNS or IPv6 router (2026-11-10: the Mac sent
+ * its whole internet through the stick) */
+static void test_the_computer_gets_no_gateway(void)
+{
+    uint8_t f[400];
+    size_t len = reply(f, 7, M, 5, GIVEN, 3600), at;
+    at = len - 1u;                                   /* router, DNS, domain, classless routes before the end */
+    f[at++] = 3, f[at++] = 4, wr32(f + at, SERVER), at += 4;
+    f[at++] = 6, f[at++] = 8, wr32(f + at, SERVER), wr32(f + at + 4, 0x08080808u), at += 8;
+    f[at++] = 15, f[at++] = 5, memcpy(f + at, "local", 5), at += 5;
+    f[at++] = 121, f[at++] = 5, f[at] = 0, wr32(f + at + 1, SERVER), at += 5;
+    f[at++] = 255;
+    len = at;
+    f[40] = 0x12, f[41] = 0x34;                      /* a UDP checksum that the change makes wrong */
+    assert(jn_to_computer(f, len) == 1);
+    assert(!option(f, len, 3) && !option(f, len, 6) && !option(f, len, 15) && !option(f, len, 121));
+    assert(option(f, len, 1) && option(f, len, 51) && rd32(f + DHCP_AT + 16) == GIVEN);   /* address, mask, lease kept */
+    assert(f[40] == 0 && f[41] == 0);                /* no UDP checksum: allowed over IPv4 */
+    /* other frames pass untouched */
+    {
+        uint8_t g[400], h[400];
+        size_t gl = reply(g, 7, M, 5, GIVEN, 3600);
+        g[37] = 69;                                  /* not to the DHCP client port */
+        memcpy(h, g, sizeof g);
+        assert(jn_to_computer(g, gl) == 1 && !memcmp(g, h, sizeof g));
+    }
+    /* IPv6: a router advertisement and a DHCPv6 reply are dropped, a neighbour solicitation passes */
+    {
+        uint8_t v6[90] = {0};
+        v6[12] = 0x86, v6[13] = 0xDD, v6[14] = 0x60, v6[20] = 58, v6[54] = 134;
+        assert(jn_to_computer(v6, sizeof v6) == 0);
+        v6[54] = 135;
+        assert(jn_to_computer(v6, sizeof v6) == 1);
+        v6[20] = 17, v6[54] = 0x02, v6[55] = 0x23;  /* UDP from port 547 */
+        assert(jn_to_computer(v6, sizeof v6) == 0);
+        assert(jn_to_computer(v6, 40) == 1);         /* too short to read: passes */
+    }
+}
+
 int main(void)
 {
     test_silent_until_the_link_is_up();
@@ -268,6 +307,7 @@ int main(void)
     test_link_down_forgets();
     test_a_lease_of_for_ever_fits();
     test_bad_options_do_not_read_past_the_frame();
+    test_the_computer_gets_no_gateway();
     puts("net: ok");
     return 0;
 }
