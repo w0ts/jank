@@ -408,8 +408,8 @@ int bridge_play(int play)
 void bridge_diag(char *out, size_t cap)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    snprintf(out, cap, "link_settled=%u\nlink_drift_ppb=%ld\nlink_last_err_us=%lld\nlink_far=%u\n", s_peer.k.settled,
-             (long)lk_drift_ppb(&s_peer.k), (long long)s_peer.k.last_err, s_peer.k.far);
+    snprintf(out, cap, "link_settled=%u\nlink_drift_ppb=%ld\nlink_last_err_us=%lld\nlink_far=%u\nlink_partner_rtt_us=%u\n", s_peer.k.settled,
+             (long)lk_drift_ppb(&s_peer.k), (long long)s_peer.k.last_err, s_peer.k.far, s_peer.k.last_rtt);
     xSemaphoreGive(s_lock);
 }
 

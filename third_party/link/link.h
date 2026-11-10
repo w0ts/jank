@@ -56,6 +56,8 @@ struct lk_peer {
     uint32_t mip;                          /* its measurement endpoint (mep4) */
     uint16_t mport;
     uint8_t noping;                        /* a measurement with it failed: the session's other members first */
+    uint16_t rtt;                          /* its fastest round trip in its last measurement, us; 0: not measured */
+    int64_t measured_at;                   /* host us of that measurement */
     int64_t dead;                          /* host us it is forgotten at (its ttl) */
 };
 
@@ -93,6 +95,8 @@ struct lk_node {
     uint8_t settled;                       /* measurements since the clock was new: the filter's gains shrink with it */
     uint8_t far;                           /* the last measurement was far off and set aside: a second one snaps */
     int64_t last_err;                      /* the last measurement against the clock, us (for diagnostics) */
+    uint16_t last_rtt;                     /* the measured member's fastest round trip, us (for diagnostics) */
+    uint32_t measures;                     /* measurements of our own session, for the partner's re-check */
     int64_t remeasure;                     /* host us the session is measured again (Link: every 30 s; here 10 s) */
     int64_t last_bc, next_bc;              /* the last broadcast; the next one due */
     uint32_t rnd;                          /* xorshift state (ids) */
