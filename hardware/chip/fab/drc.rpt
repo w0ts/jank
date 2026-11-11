@@ -1,0 +1,21 @@
+** Drc report for chip.kicad_pcb **
+** Created on 2026-11-11T08:17:27 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 1 DRC violations **
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(127.1000 mm, 147.1600 mm): Track [ANT_END] on F.Cu, length 1.6000 mm
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **
