@@ -17,9 +17,9 @@ board for 5**. The user calls it **jank mini**; the files keep the name "chip". 
 | | |
 |---|---|
 | Size | **44.0 x 51.5 mm**, 2 layers, 1.6 mm FR-4 |
-| Assembly | JLC **Economic**: every fitted part on the top side, SMD only; 64 parts on 40 BOM lines, 216 joints |
+| Assembly | JLC **Economic**: every fitted part on the top side, SMD only; 64 parts on 38 BOM lines, 216 joints |
 | Checks | ERC 0 errors (1 warning: ANT_END, a one-pin net by design); DRC **0 errors** (1 warning: the antenna's end-pad copper ends in the open, as on YAGEO's board); every board pad against the schematic: 0 problems; every CPL place against JLC's footprint: within 0.01 mm |
-| Estimate (shipping left out) | **5 boards: $80.55, $16.11 / EUR 13.85 a board; 10 boards: $106.45, $10.65 / EUR 9.16 a board** (`fab/cost.md`) |
+| Estimate (shipping left out) | **5 boards: $80.08, $16.02 / EUR 13.77 a board; 10 boards: $105.92, $10.59 / EUR 9.11 a board** (`fab/cost.md`) |
 | Files for JLC | `fab/chip-gerbers.zip`, `fab/bom.csv`, `fab/cpl.csv` |
 | Pictures | `render-top.png`, `render-bottom.png`, `render-3d.png`, `preview/` (routing with the DIN pads' iron room, 3D, a DIN close-up) |
 
@@ -238,11 +238,15 @@ or the CPL; JLC drills their holes only.
 - **Under the jacks, both side edges:** the DIN sockets' holes (J5 / J6, bodies on the bottom); between them, 0.8 mm
   clear of every pad, the LED and the MIDI OUT resistors (left), the POWER IN diodes and resistors and the detector
   (right).
-- **Middle:** the buck block, BUCK_EN's diode, the reservoir's sense, CHIP_PU's RC; the two cans down the sides
-  below the DINs.
-- **The button (SW1)** lower left at the ground's edge, away from the RF line: its body ~12 mm from AE1, outside the
-  antenna strip (YAGEO's datasheet says nothing about metal near the antenna beyond its eval board's 10 mm clearance with
-  no copper; the switch's metal is outside it). **MIDI OUT 2's parts** (D6, R21, Q1, R20, R22) lower right, beside C2.
+- **Middle, between the DINs:** **the button (SW1) at (21.6, 19.55)**, chosen so a finger reaches it through the lid:
+  8.0 mm or more from every part taller than 3 mm (courtyards: J2 8.0, J3 8.6, the USB-C 8.7, C1 10.3, C2 11.0 mm);
+  the LED (LED1 at (19.9, 14.9)) just above it with R9; BUCK_EN's diode D4, C4 and R6 to its right; the reservoir's
+  sense; CHIP_PU's RC. The two cans down the sides below the DINs.
+- **Lower left, beside C1:** the buck (U2, L1, C5, C6, R7, C3), next to the reservoir it draws from.
+- **The button and the antenna:** SW1 is 26.6 mm (centre to centre) from AE1, far from the RF line. YAGEO's datasheet
+  gives no keep-out of its own, only its evaluation board: the antenna in a 10 mm wide copper-free area across the board's
+  end. A button in that strip (a corner far from AE1) would need copper there (its pads and a track): not done.
+  **MIDI OUT 2's parts** (D6, R21, Q1, R20, R22) lower right, beside C2.
 - **The chip** in the lower middle, turned so LNA_IN is at its lower right corner; its decoupling round it, the crystal
   right under its XTAL pins, the VDD3P3 filter to its right, the u.FL (DNP) left of the RF line.
 - **The antenna strip:** the bottom 10 mm, no copper, track, via or pour on either layer except the antenna's feed and
@@ -261,11 +265,10 @@ or the CPL; JLC drills their holes only.
 - **Routing notes:** the chip's right-side pins (CHIP_PU, GPIO0, 1, 2, 4) are fanned out by hand in `make_board.py`
   (FANOUT: one lane each, 0.8 mm apart, each ending in a via); the RF path, its via fences and the exposed pad's 9 vias
   are drawn there too; route.py does the rest (the ground vias by each pad first, then the signals). Measured on the
-  board: **USB D+ 22.2 mm on top; D- 22.0 mm, 9 mm of it on the bottom through 2 vias** (the bigger DIN pad beside the
-  chip's corner pushed it off the pair's path): **not a coupled pair, and the ground under D+ is crossed by bottom
-  tracks**; tolerable at USB full speed (12 Mb/s), *unverified*. **Crystal:** right under the XTAL pins, XTAL_P 0.5 mm
-  to R17, R17 to Y1 3.4 mm, XTAL_N 6.5 mm; X1 and XTAL_N each dip to the bottom layer through 2 vias (2.3 / 2.5 mm
-  there). **RF:** LNA_IN 3.4 mm to L3; the 1.2 mm line from L3 to R18
+  board: the USB pair and the crystal are routed before anything else (`PRIORITY`): **USB D+ 22.0 mm, D- 21.7 mm, both
+  on the top layer, no vias** (the grid router lays them as two tracks, not as a coupled pair: their spacing is not
+  controlled, and bottom tracks still cross under them: *unverified*, tolerable at full speed). **Crystal:** right under
+  the XTAL pins, all on top, no vias: XTAL_P 0.5 mm to R17, R17 to Y1 3.9 mm, XTAL_N 6.0 mm. **RF:** LNA_IN 3.4 mm to L3; the 1.2 mm line from L3 to R18
   ~9 mm; the antenna feed 4.6 mm.
 
 ## Parts and cost
@@ -278,8 +281,8 @@ or the CPL; JLC drills their holes only.
 | Economic setup + stencil + nitrogen (as quoted) | $10.70 | $10.70 |
 | Extended part types, 11 x $3.09 | $33.99 | $33.99 |
 | Joints (216 a board x $0.0017) | $1.84 | $3.67 |
-| Parts (with JLC's loss) | $30.73 | $53.09 |
-| **Total / a board** (shipping left out: shared with other boards) | **$80.55 / $16.11 (EUR 13.85)** | **$106.45 / $10.65 (EUR 9.16)** |
+| Parts (with JLC's loss) | $30.26 | $52.56 |
+| **Total / a board** (shipping left out: shared with other boards) | **$80.08 / $16.02 (EUR 13.77)** | **$105.92 / $10.59 (EUR 9.11)** |
 
 EUR at an *assumed* 0.86 a dollar. **Extended parts that pay the $3.09 fee (11) and why none can be Basic:**
 
@@ -305,13 +308,8 @@ line (the lowest: the crystal, 2 748).
 
 ## Case (`case/`)
 
-`chip_case.scad`: a shallow **base** (the jacks' pegs come through the board) and a deep **lid** (the cans: 11.2 mm
-over the board) with the two jack holes in its side walls, the USB-C opening in its top wall, a hole for the printed
-**button cap** and the **LED window**. They meet at the board's top face with a rabbet; posts clamp the board (four
-under it at its corners, three over it along the antenna strip). No screws, no metal near the antenna. **With the DINs
-fitted:** `din = true` makes a 21 mm deep base with a 16 mm opening in each side wall
-(`stl/chip_case_base_din.stl`; the DIN's height and axis are *estimates* from its 3D model). `make_stl.sh` exports the
-STLs, checks that neither half nor the cap meets the board's mockup, and that every STL is one closed solid.
+See [case/README.md](case/README.md): `mini_case.scad` reads SW1 and LED1 from `PLACE` in `make_board.py`
+(`place_args.py`); `make_stl.sh` builds both versions (with and without the DINs) and runs their checks.
 
 ## Unverified, all in one place
 

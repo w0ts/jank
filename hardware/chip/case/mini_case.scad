@@ -46,7 +46,9 @@ zbot = -under - floor_t;
 din_y = 20.0;                            // the axis, board y
 plate = [20.9, 1.8, 19.6];               // along the edge, thick, high (z down from the board)
 body = [17.9, 15.3 - 1.8, 17.6];         // behind the plate: wide, deep, high (UNVERIFIED: the 3D model, +-0.2)
-play = 0.35;                             // plate / body to the cheeks and the slot
+play = 0.35;                             // the body to the back cheek's opening
+slot_play = 0.1;                         // the plate in its slot: a face and each side edge (slot = plate + 0.2, as
+                                         // hardware/box's slot_play on the hardware branch: the plate locks in)
 rim = [1.3, 2.2];                        // what the cheeks hold of the plate: each side, the far edge
 back_x = 2.4;  back_t = 2.0;             // the back cheek: its front face (clear of the jacks' pegs at x 2.05), its thickness
 din_holes = [[12.25, 27.5], [14.75, 25], [12.25, 20], [14.75, 15], [12.25, 12.5], [2.45, 25], [2.45, 15]];   // J5 (board x, y)
@@ -75,8 +77,9 @@ module tails() {       // under the board: the jack pegs (x 1.55, 8.55) and the 
     for (x = [1.55, 8.55]) both() translate([x - 0.5, by(jack_y) - 0.5, -tail]) cube([1, 1, tail + 0.1]);
     for (p = [[26.32, 6.8], [26.32, 2.59], [17.68, 6.8], [17.68, 2.59]]) translate([p[0] - 0.5, by(p[1]) - 0.5, -tail]) cube([1, 1, tail + 0.1]);
 }
+module din_plate() translate([-0.01, by(din_y) - plate[0] / 2, -plate[2]]) cube([plate[1], plate[0], plate[2]]);
 module din_model() {   // one socket, J5 (left); face on the edge, body under the board, pins up through it
-    translate([-0.01, by(din_y) - plate[0] / 2, -plate[2]]) cube([plate[1], plate[0], plate[2]]);
+    din_plate();
     translate([plate[1] - 0.02, by(din_y) - body[0] / 2, -body[2]]) cube([body[1] + 0.02, body[0], body[2]]);
     for (h = din_holes) translate([h[0] - 0.5, by(h[1]) - 0.5, 0]) cube([1, 1, 4.0]);
 }
@@ -101,8 +104,15 @@ module usb_cut(z0) translate([usb_x - usb_w / 2, H, z0]) cube([usb_w, e + 1, usb
 module din_walls() both() {
     ya = by(din_y);
     // the ribs either side of the plate's slot (from the wall to the back cheek), under the board
-    for (s = [-1, 1]) translate([-clr - 0.01, ya + (s > 0 ? plate[0] / 2 + play : -plate[0] / 2 - play - 2.0), -under - 0.01])
+    for (s = [-1, 1]) translate([-clr - 0.01, ya + (s > 0 ? plate[0] / 2 + slot_play : -plate[0] / 2 - slot_play - 2.0), -under - 0.01])
         cube([back_x + clr + 0.01, 2.0, under - 0.35 + 0.01]);
+    // the slot's faces, slot_play from the plate: in front a cheek on the wall (the front window cuts its middle), behind
+    // a cheek on the back partition over the plate's rims (the body passes between them)
+    translate([-clr - 0.01, ya - plate[0] / 2 - slot_play, -under - 0.01]) cube([clr - slot_play + 0.01, plate[0] + 2 * slot_play, under - 0.35 + 0.01]);
+    difference() {
+        translate([plate[1] + slot_play, ya - plate[0] / 2 - slot_play, -under - 0.01]) cube([back_x - plate[1] - slot_play + 0.01, plate[0] + 2 * slot_play, under - 0.35 + 0.01]);
+        translate([plate[1], ya - body[0] / 2 - play, -body[2] - play]) cube([back_x, body[0] + 2 * play, body[2] + play + 1]);
+    }
     // the back cheek: a partition across the case, with the body's opening (open at the top)
     difference() {
         translate([back_x, -clr - 0.01, -under - 0.01]) cube([back_t, H + 2 * clr + 0.02, under - 0.35 + 0.01]);
@@ -141,7 +151,8 @@ module lid_core(pads = true) difference() {
             cav(wall, zs - 0.01, z_in);                                      // the inside
         }
         if (pads) for (p = lid_pads) translate([p[0], p[1], bt + 0.1 - 0.0]) cylinder(d = 2.4, h = z_in - bt - 0.1 + 0.01, $fn = 24);
-        translate([led[0], by(led[1]), 3.3]) cylinder(d = 3.4, h = z_in - 3.3 + 0.01, $fn = 32);   // the LED's chimney
+        translate([led[0], by(led[1]), 3.5]) cylinder(d = 3.4, h = z_in - 3.5 + 0.01, $fn = 32);   // the LED's chimney (its foot
+        //  0.3 over SW1's body beside it, the button now next to the LED)
     }
     // the jacks' slots: open downwards, in the skirt and the wall (the board drops in from below)
     both() translate([-e - 1, by(jack_y) - jack_w / 2, -1]) hull() {   // (a rounded-top slot, open at the lid's bottom edge)
@@ -210,8 +221,14 @@ if (part == "section_din" || part == "section_jack") {
     }
 }
 // the checks
-if (part == "check_base") intersection() { base_core(); inflate(clr_check) board_all(); }        // the base (no pads) 0.3 clear of the board, every part, the DINs
-if (part == "check_lid") intersection() { lid_core(false); inflate(clr_check) board_all(); }          // (the lid's pads are in lid_core: see check_lid_pads)
+// (the DIN plates sit in their slots slot_play from each face: the checks hold them to half that, the rest to clr_check)
+module board_check() { inflate(clr_check) { mock(); jack_fronts(); tails(); if (din) both() din_body_pins(); } if (din) inflate(slot_play / 2) both() din_plate(); }
+module din_body_pins() {
+    translate([plate[1] + slot_play, by(din_y) - body[0] / 2, -body[2]]) cube([body[1] - slot_play, body[0], body[2]]);
+    for (h = din_holes) translate([h[0] - 0.5, by(h[1]) - 0.5, 0]) cube([1, 1, 4.0]);
+}
+if (part == "check_base") intersection() { base_core(); board_check(); }        // the base (no pads) 0.3 clear of the board, every part, the DINs
+if (part == "check_lid") intersection() { lid_core(false); board_check(); }          // (the lid's pads are in lid_core: see check_lid_pads)
 if (part == "check_pads_touch") intersection() { inflate(0.0) base_pads(); board_all(); }  // the base's pads must not touch the board...
 if (part == "check_pads_near") intersection() { inflate(0.12) base_pads(); board_all(); } // ...and be within 0.12 of it (must NOT be empty)
 if (part == "check_cap") intersection() { inflate(clr_check) cap_in_place(); board_all(); }

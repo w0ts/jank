@@ -1,8 +1,11 @@
 ** Drc report for chip.kicad_pcb **
-** Created on 2026-11-11T09:43:21 **
+** Created on 2026-11-11T10:22:13 **
 ** Report includes: Errors, Warnings, Exclusions **
 
-** Found 1 DRC violations **
+** Found 2 DRC violations **
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(107.8000 mm, 119.4000 mm): Track [+3V3] on F.Cu, length 0.0500 mm
 [track_dangling]: Track has unconnected end
     Local override; warning
     @(127.1000 mm, 147.1600 mm): Track [ANT_END] on F.Cu, length 1.6000 mm

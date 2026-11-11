@@ -50,19 +50,21 @@ PLACE = {
     # between the DINs' holes: left the MIDI OUT resistors, the button, the LED; right the POWER IN resistors and diodes,
     # the detector
     # (every top part keeps 0.8 mm from the DIN pads' copper: the iron's room, README "DIN")
-    "R14": (6.3, 17.0, 90), "R15": (8.5, 21.0, 90), "LED1": (11.2, 31.0, 0), "R9": (11.2, 33.0, 0),
+    "R14": (6.3, 17.0, 90), "R15": (8.5, 21.0, 90), "LED1": (19.9, 14.9, 0), "R9": (23.4, 14.9, 0),
     "R1": (W - 2.5, 18.5, 0), "R2": (W - 2.5, 21.5, 0), "D1": (W - 8.4, 15.6, 90), "D2": (W - 6.05, 15.6, 90),
-    "U3": (W - 7.7, 21.2, 90), "D5": (W - 7.7, 25.0, 90), "C4": (20.2, 23.6, 90), "R6": (22.0, 23.6, 90),
-    # the button: lower left, at the ground's edge, away from the RF line; its pull-up above it
-    "SW1": (11.8, 37.8, 90), "R16": (15.8, 36.0, 90),
+    "U3": (W - 7.7, 21.2, 90), "D5": (W - 7.7, 25.0, 90), "C4": (23.7, 16.3, 0), "R6": (26.0, 15.18, 90),
+    # the button: in the middle, between the DINs, 8 mm or more from every tall part (the cans, the jacks, the USB-C) so a
+    # finger reaches it through the lid; the LED just above it; the button's pull-up by the chip
+    "SW1": (21.6, 19.55, 0), "R16": (15.8, 36.0, 90),
     # the reservoir: one can down each side, under the DINs' holes
     "C1": (4.6, CAN_Y, 90), "C2": (W - 4.6, CAN_Y, 90),
     # under the USB-C: the CC resistors, the VBUS diode and its resistor, the VBUS sense
     "R3": (W / 2 - 4.2, 9.0, 0), "R13": (W / 2 - 4.2, 10.8, 0), "D3": (W / 2, 10.1, 0), "R12": (W / 2 + 3.6, 9.8, 90),
     "R4": (W / 2 + 5.4, 9.8, 90), "R5": (W / 2, 12.35, 0),
     # centre: the buck, BUCK_EN's diode, the senses
-    "U2": (18.8, 16.9, 0), "L1": (22.1, 16.4, 90), "C5": (24.6, 16.4, 90), "C3": (18.2, 22.1, 90), "C6": (22.1, 20.5, 180),
-    "R7": (19.95, 20.9, 270), "D4": (24.7, 23.6, 0),
+    # the buck: lower left, beside C1 (VSYS) and under the chip's left side
+    "U2": (11.2, 32.9, 0), "L1": (11.2, 37.4, 0), "C5": (11.2, 40.0, 0), "R7": (13.9, 35.25, 0), "C6": (14.35, 36.75, 90),
+    "C3": (14.35, 39.2, 90), "D4": (27.13, 19.2, 0),
     # the chip (turned 180: LNA_IN at the bottom of its right side) and its parts round it
     "U1": (CX, CY, 180),
     "C20": (CX + 0.6, CY - 4.45, 0),                                                    # VDD3P3_RTC (pin 20, top)
@@ -73,7 +75,7 @@ PLACE = {
     "L2": (CX + 9.1, CY - 0.2, 270), "C18": (CX + 9.8, CY + 1.5, 0),                   # VDD3P3: the 2 nH, 100 nF after it
     "C16": (29.0, 30.0, 90), "C14": (30.0, 32.2, 90), "C15": (31.0, 32.2, 90),
     "C17": (32.4, 32.4, 90),                                                    # (10 uF: the checklist)
-    "Y1": (19.5, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.75, 37.7, 90), "C9": (21.0, CY + 10.3, 0),
+    "Y1": (19.5, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.75, 37.7, 270), "C9": (21.0, CY + 10.3, 0),
     # RF (README "RF"): the chip's pi (C23 shunt at the pin, L3 series, C24 shunt), the line down to the antenna's pi
     # (C25 shunt, R18 the series 0 ohm, C26 shunt) at the ground edge; R19 / J4 the u.FL path (unfitted)
     "C23": (CX + 4.8, Y_LINE + 1.8, 270), "L3": (CX + 5.9, Y_LINE, 0), "C24": (XA + 1.35, Y_LINE + 1.0, 0),
@@ -87,7 +89,8 @@ WIDTH = {"VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
 ORDER = ["USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
          "VDD3P3", "MIDI_TX", "MIDI2_TX", "LED_DRV", "SW", "+3V3", "VSYS", "VBUS", "VUSB_D", "BUCK_EN", "DET"]
 # (the chip's signal pins escape first: on its right side they sit between the RF supply's pins and the rest)
-RF_NETS = {"LNA_IN", "RF", "ANT_FEED", "UFL", "ANT_END"}      # (drawn here, not routed)
+RF_NETS = {"LNA_IN", "RF", "ANT_FEED", "UFL", "ANT_END"}
+PRIORITY = ["USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1"]      # (routed before anything else, ground vias included)      # (drawn here, not routed)
 # the chip's right-side signal pins (between the RF supply's pins and the rest): drawn fan-out, one lane each, the lowest
 # pin on the outermost lane so they never cross; the router goes on from each lane's end. (net, chip pin y, lane x)
 # (net, chip pin y, lane x, lane end y, a via at the end): 0.8 mm apart, each ending in a via, so the router may take
@@ -343,22 +346,40 @@ def route_all(fps, first=()):
             R.drill(x, y, route.VIA_DRILL)
             gv.append((x, y))
     put("GND", [], gv, 0.2)
-    # ground first: a via beside every top-side GND pad (the pours join them; done before the signals, so each
-    # pad keeps a way down; afterwards the tracks cut the top pour into islands round some of them)
-    gvias = 0
-    for r, layers, p in by_net["GND"]:
-        if len(layers) != 1 or p.GetParentFootprint().GetReference() == "U1":
-            continue
-        res = route.via_near(R, "GND", r, layers[0])
-        if not res:
-            continue
-        segs, (x, y) = res
-        put("GND", segs, [(x, y)], 0.2)
-        for layer, x0, y0, x1, y1 in segs:
-            R.seg(layer, "GND", (x0, y0, x1, y1), 0.2)
-        R.circle((0, 1), "GND", x, y, route.VIA_D / 2 + route.VIA_EXTRA)
-        R.drill(x, y, route.VIA_DRILL)
-        gvias += 1
+    def ground_vias():
+        # a via beside every top-side GND pad (the pours join them), after the USB pair and the crystal but before the
+        # other signals, so each pad keeps a way down and the USB / crystal tracks keep the top layer
+        n = 0
+        # the DIN sockets' ground pins: no via may come near them (the iron's room), so each gets a track to the nearest
+        # ground pad of a fitted part; the pours alone can leave them on an island
+        smd = [q for q in by_net["GND"] if q[2].GetParentFootprint().GetReference() not in ("J5", "J6", "U1")
+               and len(q[1]) == 1]
+        for r, layers, p in by_net["GND"]:
+            if p.GetParentFootprint().GetReference() not in ("J5", "J6"):
+                continue
+            c = pad_center(p)
+            for mate in sorted(smd, key=lambda q: (q[0][0] + q[0][2] - 2 * c[0]) ** 2 + (q[0][1] + q[0][3] - 2 * c[1]) ** 2)[:4]:
+                segs, vias, bad = route.route_net(R, "GND", "sig", 0.3, [(r, layers), (mate[0], mate[1])])
+                if not bad:
+                    put("GND", segs, vias, 0.3)
+                    break
+            else:
+                print("a DIN ground pin with no track to ground:", p.GetParentFootprint().GetReference(), p.GetNumber())
+        for r, layers, p in by_net["GND"]:
+            if len(layers) != 1 or p.GetParentFootprint().GetReference() == "U1":
+                continue
+            res = route.via_near(R, "GND", r, layers[0])
+            if not res:
+                continue
+            segs, (x, y) = res
+            put("GND", segs, [(x, y)], 0.2)
+            for layer, x0, y0, x1, y1 in segs:
+                R.seg(layer, "GND", (x0, y0, x1, y1), 0.2)
+            R.circle((0, 1), "GND", x, y, route.VIA_D / 2 + route.VIA_EXTRA)
+            R.drill(x, y, route.VIA_DRILL)
+            n += 1
+        return n
+
     signal = [n for n in by_net if n != "GND" and n not in RF_NETS and len(by_net[n]) > 1]
 
     def span(n):
@@ -367,8 +388,12 @@ def route_all(fps, first=()):
         return (max(xs) - min(xs)) + (max(ys) - min(ys))
     order = [n for n in ORDER if n in signal] + sorted((n for n in signal if n not in ORDER), key=span)
     order = [n for n in first if n in order] + [n for n in order if n not in first]
+    order = [n for n in PRIORITY if n in order] + [n for n in order if n not in PRIORITY]
     failed = []
+    gvias = None
     for n in order:
+        if gvias is None and n not in PRIORITY:
+            gvias = ground_vias()
         w = WIDTH.get(n, 0.2)
         cls = "pwr" if w > 0.25 else "sig"
         pads = [(q[0], q[1]) for q in by_net[n]]
@@ -520,7 +545,7 @@ def zones():
 
 def silk():
     label("OUT", 2.0, 22.0, 0.7, 90)            # (POWER IN's label: on the case; no room by J3)
-    label("BOOT", 11.8, 42.2, 0.6)
+    label("BOOT", 21.6, 23.0, 0.6)
     label("jank chip", 12.0, GE + 3.0, 1.0)
     label("antenna strip:", 12.0, GE + 4.6, 0.6)
     label("no copper", 12.0, GE + 5.5, 0.6)

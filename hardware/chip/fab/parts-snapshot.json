@@ -9,7 +9,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 3453047,
+   "stock": 3453993,
    "loss": 14,
    "prices": [
     [
@@ -38,42 +38,6 @@
     ]
    ]
   },
-  "C14663": {
-   "code": "C14663",
-   "mpn": "CC0603KRX7R9BB104",
-   "brand": "YAGEO",
-   "package": "0603",
-   "type": "Basic",
-   "preferred": false,
-   "stock": 35908559,
-   "loss": 15,
-   "prices": [
-    [
-     1,
-     0.0058
-    ],
-    [
-     1000,
-     0.0046
-    ],
-    [
-     4000,
-     0.0039
-    ],
-    [
-     8000,
-     0.0035
-    ],
-    [
-     48000,
-     0.0032
-    ],
-    [
-     100000,
-     0.003
-    ]
-   ]
-  },
   "C15195": {
    "code": "C15195",
    "mpn": "CL05B103KB5NNNC",
@@ -81,7 +45,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 4642671,
+   "stock": 4626839,
    "loss": 15,
    "prices": [
     [
@@ -117,7 +81,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 31538210,
+   "stock": 31388836,
    "loss": 15,
    "prices": [
     [
@@ -153,7 +117,7 @@
    "package": "0402",
    "type": "Extended",
    "preferred": true,
-   "stock": 715845,
+   "stock": 715240,
    "loss": 10,
    "prices": [
     [
@@ -182,42 +146,6 @@
     ]
    ]
   },
-  "C15850": {
-   "code": "C15850",
-   "mpn": "CL21A106KAYNNNE",
-   "brand": "Samsung Electro-Mechanics",
-   "package": "0805",
-   "type": "Basic",
-   "preferred": false,
-   "stock": 8303357,
-   "loss": 10,
-   "prices": [
-    [
-     1,
-     0.0314
-    ],
-    [
-     200,
-     0.0236
-    ],
-    [
-     600,
-     0.0202
-    ],
-    [
-     2000,
-     0.0175
-    ],
-    [
-     10000,
-     0.0164
-    ],
-    [
-     20000,
-     0.0157
-    ]
-   ]
-  },
   "C17168": {
    "code": "C17168",
    "mpn": "0402WGF0000TCE",
@@ -225,7 +153,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 16169271,
+   "stock": 16090987,
    "loss": 10,
    "prices": [
     [
@@ -261,7 +189,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 1177273,
+   "stock": 1175819,
    "loss": 10,
    "prices": [
     [
@@ -297,7 +225,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 98672,
+   "stock": 96307,
    "loss": 10,
    "prices": [
     [
@@ -333,7 +261,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 9524173,
+   "stock": 9267899,
    "loss": 10,
    "prices": [
     [
@@ -369,7 +297,7 @@
    "package": "SOT-23",
    "type": "Basic",
    "preferred": false,
-   "stock": 944126,
+   "stock": 934678,
    "loss": 4,
    "prices": [
     [
@@ -405,7 +333,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 5204782,
+   "stock": 5170409,
    "loss": 10,
    "prices": [
     [
@@ -441,7 +369,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 6133212,
+   "stock": 6114900,
    "loss": 10,
    "prices": [
     [
@@ -477,7 +405,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 3504395,
+   "stock": 3467751,
    "loss": 10,
    "prices": [
     [
@@ -513,7 +441,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 1181651,
+   "stock": 1165806,
    "loss": 10,
    "prices": [
     [
@@ -549,7 +477,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 19811693,
+   "stock": 19801806,
    "loss": 10,
    "prices": [
     [
@@ -585,7 +513,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 3183425,
+   "stock": 3167550,
    "loss": 15,
    "prices": [
     [
@@ -657,7 +585,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 7947869,
+   "stock": 7948275,
    "loss": 12,
    "prices": [
     [
@@ -693,7 +621,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 20913902,
+   "stock": 20844382,
    "loss": 15,
    "prices": [
     [
@@ -729,7 +657,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 1024219,
+   "stock": 1019435,
    "loss": 10,
    "prices": [
     [
@@ -765,7 +693,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 15397164,
+   "stock": 15322673,
    "loss": 10,
    "prices": [
     [
@@ -801,7 +729,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 2534016,
+   "stock": 2527503,
    "loss": 15,
    "prices": [
     [
@@ -837,7 +765,7 @@
    "package": "SMD",
    "type": "Extended",
    "preferred": false,
-   "stock": 1092873,
+   "stock": 1088170,
    "loss": 3,
    "prices": [
     [
@@ -873,7 +801,7 @@
    "package": "HVSSOP-8-EP-0.65mm",
    "type": "Extended",
    "preferred": false,
-   "stock": 44963,
+   "stock": 44933,
    "loss": 0,
    "prices": [
     [
@@ -981,7 +909,7 @@
    "package": "1206",
    "type": "Extended",
    "preferred": false,
-   "stock": 20961,
+   "stock": 20936,
    "loss": 2,
    "prices": [
     [
@@ -1053,7 +981,7 @@
    "package": "SMD-4P,5.1x5.1mm",
    "type": "Basic",
    "preferred": false,
-   "stock": 838799,
+   "stock": 835301,
    "loss": 8,
    "prices": [
     [
@@ -1089,7 +1017,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 2118815,
+   "stock": 2117482,
    "loss": 10,
    "prices": [
     [
@@ -1125,7 +1053,7 @@
    "package": "SMD",
    "type": "Extended",
    "preferred": false,
-   "stock": 62470,
+   "stock": 62435,
    "loss": 5,
    "prices": [
     [
@@ -1161,7 +1089,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 3774031,
+   "stock": 3770476,
    "loss": 4,
    "prices": [
     [
@@ -1197,7 +1125,7 @@
    "package": "SMD,D8xL10.5mm",
    "type": "Extended",
    "preferred": false,
-   "stock": 11589,
+   "stock": 11578,
    "loss": 1,
    "prices": [
     [
@@ -1233,7 +1161,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 10750224,
+   "stock": 10741411,
    "loss": 12,
    "prices": [
     [
@@ -1269,7 +1197,7 @@
    "package": "SOT-23",
    "type": "Basic",
    "preferred": false,
-   "stock": 565038,
+   "stock": 576971,
    "loss": 8,
    "prices": [
     [
@@ -1305,7 +1233,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 814275,
+   "stock": 814398,
    "loss": 10,
    "prices": [
     [
@@ -1413,7 +1341,7 @@
    "package": "SOD-123",
    "type": "Basic",
    "preferred": false,
-   "stock": 638345,
+   "stock": 382590,
    "loss": 8,
    "prices": [
     [
@@ -1485,7 +1413,7 @@
    "package": "SMD",
    "type": "Extended",
    "preferred": false,
-   "stock": 326852,
+   "stock": 9754,
    "loss": 4,
    "prices": [
     [

@@ -79,13 +79,13 @@ PARTS = [
     # ---- the reservoir: 2 x 1000 uF 10 V aluminium (2 mF), the buck's own 10 uF
     ("C1", "CP", "1000u 10V", "can8", "C5246577", {"1": "VSYS", "2": "GND"}),
     ("C2", "CP", "1000u 10V", "can8", "C5246577", {"1": "VSYS", "2": "GND"}),
-    ("C3", "C", "10u", "c0805", "C15850", {"1": "VSYS", "2": "GND"}),
+    ("C3", "C", "10u", "c0603", "C19702", {"1": "VSYS", "2": "GND"}),
     # ---- start-up: the detector (4.0 V falling / ~4.16 V rising) or VBUS or PWR_HOLD enables the buck; C4 / R6 keep
     #      it on ~1 s after the detector drops, so the firmware has time to raise PWR_HOLD
     ("U3", "det", "BL8506-40CRM", "det", "C2909397", {"3": "VSYS", "2": "GND", "1": "DET"}),
     ("D4", "bav70", "BAV70", "bav70", "C68978", {"1": "DET", "2": "PWR_HOLD", "3": "BUCK_EN"}),
     ("D5", "bav70", "BAV70", "bav70", "C68978", {"1": "VBUS", "2": "VBUS", "3": "BUCK_EN"}),
-    ("C4", "C", "100n", "c0603", "C14663", {"1": "BUCK_EN", "2": "GND"}),
+    ("C4", "C", "100n", "c0402", "C1525", {"1": "BUCK_EN", "2": "GND"}),
     ("R6", "R", "10M", "r0603", "C7250", {"1": "BUCK_EN", "2": "GND"}),
     # ---- 3.3 V: TPS62842 (60 nA), 3.3 V set by R7 = 51 k (TI table 1: 50.21..54.39 k), power-save mode (MODE low)
     ("U2", "buck", "TPS62842DGRR", "buck", "C2873354",
@@ -93,7 +93,7 @@ PARTS = [
     ("R7", "R", "51k", "r0402", "C25794", {"1": "VSET", "2": "GND"}),
     ("L1", "L", "2.2u", "l0806", "C79317", {"1": "SW", "2": "+3V3"}),
     ("C5", "C", "22u", "c0805", "C45783", {"1": "+3V3", "2": "GND"}),
-    ("C6", "C", "100n", "c0603", "C14663", {"1": "+3V3", "2": "GND"}),
+    ("C6", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
     # ---- the chip (ESP32-S3FN8) and its supplies (XIAO ESP32S3 v1.2 values; Espressif's checklist)
     ("U1", "chip", "ESP32-S3FN8", "qfn56", "C2913196", U1),
     #      VDDA (55, 56): 2.2 uF + 100 nF + 10 nF

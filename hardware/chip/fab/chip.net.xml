@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>/Users/mots/GitHub/jank/worktrees/hw-tiny/hardware/chip/chip.kicad_sch</source>
-    <date>2026-11-11T09:43:19</date>
+    <date>2026-11-11T10:22:11</date>
     <tool>Eeschema 10.0.8</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -98,15 +98,15 @@
     </comp>
     <comp ref="C3">
       <value>10u</value>
-      <footprint>chip:C0805</footprint>
+      <footprint>chip:C0603</footprint>
       <fields>
-        <field name="LCSC">C15850</field>
-        <field name="Footprint">chip:C0805</field>
+        <field name="LCSC">C19702</field>
+        <field name="Footprint">chip:C0603</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="C" description="jank chip: C"/>
-      <property name="LCSC" value="C15850"/>
+      <property name="LCSC" value="C19702"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -122,15 +122,15 @@
     </comp>
     <comp ref="C4">
       <value>100n</value>
-      <footprint>chip:C0603</footprint>
+      <footprint>chip:C0402</footprint>
       <fields>
-        <field name="LCSC">C14663</field>
-        <field name="Footprint">chip:C0603</field>
+        <field name="LCSC">C1525</field>
+        <field name="Footprint">chip:C0402</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="C" description="jank chip: C"/>
-      <property name="LCSC" value="C14663"/>
+      <property name="LCSC" value="C1525"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -170,15 +170,15 @@
     </comp>
     <comp ref="C6">
       <value>100n</value>
-      <footprint>chip:C0603</footprint>
+      <footprint>chip:C0402</footprint>
       <fields>
-        <field name="LCSC">C14663</field>
-        <field name="Footprint">chip:C0603</field>
+        <field name="LCSC">C1525</field>
+        <field name="Footprint">chip:C0402</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="C" description="jank chip: C"/>
-      <property name="LCSC" value="C14663"/>
+      <property name="LCSC" value="C1525"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
