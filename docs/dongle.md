@@ -28,8 +28,17 @@ jank keeps the Wi-Fi receiver on (60-90 mA): 10 to 20 times the budget. The dong
   it in its next frame for the previous sequence number (two steps, as PTP). The receiver takes its own hardware receive
   timestamp (`rx_ctrl.timestamp`, us). One-way over air: microseconds of delay, known from the frame length.
 - Sent on every beat by any jank in a session (FM-1s once Optimist adds it): the dongle needs one sender in the group.
-- The dongle never transmits: no 300 mA peaks. It wakes for about 10 ms a second (*estimate*: Wi-Fi wake from light
-  sleep is not documented anywhere; measure it).
+- The dongle transmits rarely (2026-11-11, the user: "it would be nice if it could be counted as a peer"): one short
+  "here" frame about once a second (its node id, the session id; a tap tempo from the button rides on it), ~1 ms at
+  ~300 mA from the capacitor bank (a ~0.15 V dip on 2 mF), **~0.3 mA on average** (*estimate*). Any jank or FM-1 on
+  USB (a bridge, running Link) hears it and sends Link's ALIVE for the dongle under its node id. Link keeps a peer for
+  the ttl in its ALIVE (5 s, discovery/PeerGateway.hpp; third_party/link LK_TTL), so a frame a second keeps the dongle
+  in Live's peer count. A Link peer that wants to measure the dongle's session reaches the bridge's endpoint (same
+  session clock). Without a bridge the dongles count each other through the jank frames only. It can also lead: a sync
+  frame on every beat (2 a second at 120 BPM), ~0.5-1 mA (*estimate*). Not a Link peer itself on MIDI power: Link keeps
+  the receiver on and answers at any time (70+ mA).
+- Otherwise the radio only listens: it wakes for about 10 ms a second (*estimate*: Wi-Fi wake from light sleep is not
+  documented anywhere; measure it).
 - The first lock after power-on: the beat's place is unknown, so it listens in chunks (8 ms, then ~120 ms recharging),
   a few seconds once.
 
