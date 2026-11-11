@@ -16,7 +16,7 @@ board for 5**. The user calls it **jank mini**; the files keep the name "chip". 
 
 | | |
 |---|---|
-| Size | **47.6 x 51.5 mm**, 2 layers, 1.6 mm FR-4 |
+| Size | **49.6 x 52.5 mm**, 2 layers, 1.6 mm FR-4 |
 | Assembly | JLC **Economic**: every fitted part on the top side, SMD only; 67 parts on 40 BOM lines, 223 joints |
 | Checks | ERC 0 errors (1 warning: ANT_END, a one-pin net by design); DRC **0 errors** (2 warnings: the antenna's end-pad copper ends in the open, as on YAGEO's board; a 0.25 mm PIN_T stub on the bottom); every board pad against the schematic: 0 problems; every CPL place against JLC's footprint: within 0.01 mm |
 | Estimate (shipping left out) | **5 boards: $86.29, $17.26 / EUR 14.84 a board; 10 boards: $115.14, $11.51 / EUR 9.90 a board** (`fab/cost.md`) |
@@ -33,6 +33,7 @@ board for 5**. The user calls it **jank mini**; the files keep the name "chip". 
 | `make_schematic.py` | `chip.kicad_sch` (every pin labelled), `chip.kicad_pro`, `lib/chip.kicad_sym`, `fab/intended-nets.json` |
 | `route.py` | the two-layer grid router from hardware/tiny; one change: a keep-out can bar tracks but allow vias |
 | `make_board.py` | `chip.kicad_pcb`: placement, the RF path drawn (line, fences, antenna feed), the rest routed, pours, antenna strip, stitching |
+| `tie_groups.py` | after routing: a via for any ground pour piece cut off on both layers at once (`make_fab.sh` runs it) |
 | `check_nets.py` | the netlist against `parts.py`, every board pad against it, the pin rules |
 | `make_assembly.py` | `fab/bom.csv`, `fab/cpl.csv` (fitted parts only); every part's pads checked against JLC's footprint at the CPL place |
 | `jlc_parts.py` | `fab/parts-snapshot.json`: stock, prices, Basic / Extended |
@@ -148,7 +149,7 @@ current and length *unmeasured*; at 2 mF it was ~74 ms).
   the RF path is kept solid ground (the router may not use it there). 4 layers would give a thinner dielectric and a
   narrower line (~0.3 mm) but costs more at JLC; not needed for one short line.
 - **What only a measurement can tell:** the match, the antenna's resonance on this ground (the eval board's ground is
-  30 x 18 mm; ours is 47.6 x 41.5 mm with an aluminium can 5 mm from the line), the range. A Wi-Fi RSSI test against the
+  30 x 18 mm; ours is 49.6 x 42.5 mm with an aluminium can 5 mm from the line), the range. A Wi-Fi RSSI test against the
   XIAO at the same spot is the first check.
 
 ## DNP (pads only, out of the BOM and the CPL)
@@ -226,36 +227,41 @@ or the CPL; JLC drills their holes only.
 - **J6, POWER IN (right edge):** DIN 4 = PIN_R, DIN 5 = PIN_T (the power path, as the jack's ring and tip), DIN 2 = GND;
   the shell left open (a receiver does not ground the cable's shield).
 - **The part:** HOOYA DIN-504B-M10 (C2939346, female, right angle, through hole; JLC's own footprint), its face on the
-  side edge, its axis at y 20 mm (below the jacks), its body under the board. **JLC's pad numbers are not the DIN pin
+  side edge, its axis at y 20.3 mm (below the jacks), its body under the board. **JLC's pad numbers are not the DIN pin
   numbers**: pad 1 = DIN 1, pad 2 = DIN 4, pad 3 = DIN 2 (the middle), pad 4 = DIN 5, pad 5 = DIN 3 (hardware/pcb's own footprint for this part has the same holes numbered as DIN pins; *unverified against a
   part: check with a meter before soldering*). Pads 6 and 7: the shell.
 - **Pads for a hand iron:** HOOYA's drawing asks 7 x 1.5 mm holes (kept). JLC's footprint had 2.2 mm pads (a 0.35 mm
-  ring); `make_footprints.py` makes them **3.0 mm round on DIN pins 1, 4, 5, 3 (pads 1, 2, 4, 5: 0.75 mm ring),
-  4.0 mm on DIN 2 (pad 3, 1.25 mm ring), 3.5 mm on the shell (1.0 mm ring)**. The closest pads are the paired pins 3.54 mm
-  apart: **0.54 mm** between them. Ovals stretched away from the pair's other pin were tried: they meet the top parts
+  ring); `make_footprints.py` makes them **3.0 mm round on the used pins DIN 4 and 5 (pads 2, 4: 0.75 mm ring),
+  4.0 mm on DIN 2 (pad 3, 1.25 mm ring), 3.5 mm on the shell (1.0 mm ring), 2.4 mm on the unused DIN 1 and 3
+  (pads 1, 5: 0.45 mm ring)**. The closest pads are the paired pins 3.54 mm apart: **0.84 mm** between them. Ovals stretched away from the pair's other pin were tried: they meet the top parts
   (U2, C8, C15, C17, J3, R1), so the pads stay round. The ground pins (DIN 2, the MIDI OUT shell) join the pours on
   four 0.5 mm spokes with a 0.5 mm gap, not solid, so the iron can heat them.
+- **Bridges (the user's rule, 2026-11-11):** on both layers, no other net's pad within **0.8 mm** of a DIN pad's copper
+  and no other net's track within **0.5 mm** (the router keeps a ring round each pad, `DIN_TRACK_ROOM`). Measured
+  (`near.py`): tracks 0.55 mm or more; pads: the paired DIN pins 0.84 mm, J5 pad 5 to the MIDI OUT jack's ground
+  pad J2.1 0.80 mm.
 - **The iron's room:** no top-side part's courtyard and no via within **0.8 mm of a DIN pad's copper** (the router and
   the stitching keep vias out; `IRON` in `make_board.py`), so a tip reaches each pad from its outer side. Three pads
   have a neighbour closer on one side only, the rest of their ring open: J5 pad 5 and J6 pad 1 (DIN 3 / DIN 1, unused
-  pins) under the jacks' bodies' courtyards (0.0 mm, open below), and J5 pad 2 (DIN 4, MO_R) 0.4 mm from the QFN's
+  pins) under the jacks' bodies' courtyards (0.6 mm, open below), and J5 pad 2 (DIN 4, MO_R) 0.4 mm from the QFN's
   body corner (the chip is 0.9 mm tall; open above and to the left). Solder from the top.
 - **The cable pads P2 / P3 are gone:** they sat between the jacks and the DIN shell pins, where the iron needs room. A
   cable now goes on the DIN pads (ring = DIN 4, tip = DIN 5, sleeve = DIN 2).
 - **Size:** the DINs' holes need ~16 mm in from each side edge over 17 mm of height: with 3 mm more
-  for the chip's fan-out (below), the board grew from 38 x 47 to 44.0 x 51.5 mm, and with the 2200 uF cans to **47.6 x 51.5 mm**.
+  for the chip's fan-out (below), the board grew from 38 x 47 to 44.0 x 51.5 mm, with the 2200 uF cans to 47.6 x 51.5 mm, and with the DIN pads'
+  rings (the cans 1 mm lower, the middle 1 mm right for the buck's tracks) to **49.6 x 52.5 mm**.
 - **Don't fit both a jack and its DIN to two pieces of gear at once:** they are the same nets.
 
-## Layout (47.6 x 51.5 mm, 2 layers, 1.6 mm, every fitted part on top)
+## Layout (49.6 x 52.5 mm, 2 layers, 1.6 mm, every fitted part on top)
 
 - **Top edge:** the USB-C in the middle, **MIDI OUT (J2) on the left edge, POWER IN (J3) on the right edge** (both
   jacks at the top, their bushings past the side edges).
 - **Under the jacks, both side edges:** the DIN sockets' holes (J5 / J6, bodies on the bottom); between them, 0.8 mm
   clear of every pad, the LED and the MIDI OUT resistors (left), the POWER IN diodes and resistors and the detector
   (right).
-- **Middle, between the DINs:** **the button (SW1) at (23.4, 19.55)**, chosen so a finger reaches it through the lid:
-  8.7 mm or more from every part taller than 3 mm (courtyards: the USB-C 8.7, J2 9.3, J3 10.0, C1 10.2, C2 10.9 mm);
-  the LED (LED1 at (21.7, 14.9)) just above it with R9; BUCK_EN's diode D4, C4 and R6 to its right; the reservoir's
+- **Middle, between the DINs:** **the button (SW1) at (24.4, 19.55)**, chosen so a finger reaches it through the lid:
+  8.7 mm or more from every part taller than 3 mm (courtyards: the USB-C 8.7, J2 10.1, J3 10.8, C1 11.6, C2 12.3 mm);
+  the LED (LED1 at (22.7, 14.9)) just above it with R9; BUCK_EN's diode D4, C4 and R6 to its right; the reservoir's
   sense; CHIP_PU's RC. The two cans down the sides below the DINs.
 - **Lower left, beside C1:** the buck (U2, L1, C5, C6, R7, C3), next to the reservoir it draws from.
 - **The button and the antenna:** SW1 is 26.6 mm (centre to centre) from AE1, far from the RF line. YAGEO's datasheet
@@ -348,9 +354,9 @@ See [case/README.md](case/README.md): `mini_case.scad` reads SW1 and LED1 from `
   family's curve), not measured; into real gear untested.
 - The electrolytics' polarity (pad 1 = +) and every part's rotation: JLC's placement preview.
 - The case's fit (rabbet, posts, openings); every height in the mockup.
-- **The 2200 uF cans and the DIN sockets' iron room (open):** C1 / C2 (10.3 mm) reach over DIN pad 1 (J5) and pad 5
-  (J6) by 0.17 mm (courtyard to pad copper): the 0.8 mm room the user asked for is not met there. Fix: the cans
-  ~1 mm lower (they have ~1.6 mm above the antenna strip) and a reroute.
+- **The 2200 uF cans and the DIN sockets' iron room (short of 0.8 mm):** C1 / C2 were moved 1 mm lower (the board
+  1 mm taller, the antenna strip kept 10 mm): their courtyards are now **0.33 mm** from DIN pad 1 (J5) and pad 5 (J6)
+  (the cans' bodies ~0.6 mm), unused pins. Lower would put the cans' pads into the antenna strip.
 - **R5 (4.7 ohm, VBUS):** no Basic 1206 found at JLC; kept 0805 (its pulse rating unmeasured).
 - **C5 22 uF 0603 6.3 V:** its capacitance at 3.3 V DC bias is well below 22 uF (unmeasured).
 - Stock and prices: one snapshot (`fab/parts-snapshot.json`); fees from earlier quotes (`fab/cost.md`).

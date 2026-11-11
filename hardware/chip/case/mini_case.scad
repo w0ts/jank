@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// jank mini: the printed case for the jank chip board (hardware/chip, chip.kicad_pcb, 47.6 x 51.5 x 1.6 mm), with
+// jank mini: the printed case for the jank chip board (hardware/chip, chip.kicad_pcb, 49.6 x 52.5 x 1.6 mm), with
 // (din = true) or without (din = false) the two 5-pin DIN sockets J5 / J6 on the board's bottom.
 //
 // The board lies top up. Its TOP carries everything tall (the two reservoir cans 10.5 mm, the USB-C, the two 3.5 mm
@@ -22,7 +22,7 @@ part = "assembly";   // [assembly, open, base, lid, button_cap, led_pipe, check_
 din = false;         // true: the DIN sockets J5 / J6 fitted: the deep base with their slots
 
 /* [Board] */
-W = 47.6;  H = 51.5;  bt = 1.6;     // (47.6 since the 2200 uF cans, 2026-11-11)
+W = 49.6;  H = 52.5;  bt = 1.6;     // (49.6 x 52.5 since the DIN pads' rings, 2026-11-11)
 function by(y) = H - y;
 /* [Case] */
 e = 1.8;          // the outer face from the board's edge
@@ -58,9 +58,9 @@ jack_y = 5.8;  jack_w = 6.9;  jack_top = bt + 5.8;                   // the jack
 sw = [11.8, 37.8];  led = [11.2, 31.0];
 sw_top = bt + 1.5;                                                   // the tactile switch's plunger top (TS-1187A, 1.5 tall: UNVERIFIED)
 led_top = bt + 0.8;      // (the mockup's block; the part is 0.6)
-base_pads = [[5, 13, 50.5, 51.7], [31, 39, 50.5, 51.7],     // the USB edge
+base_pads = [[5, 13, H - 1.0, H + 0.2], [31, 39, H - 1.0, H + 0.2],     // the USB edge
              [3, 9, -0.2, 1.0], [35, 41, -0.2, 1.0],        // the antenna edge: plastic only, 17 mm from the antenna
-             [-0.2, 0.95, 45, 50], [-0.2, 0.95, 6, 12]];    // the left edge (mirrored to the right)
+             [-0.2, 0.95, H - 6.5, H - 1.5], [-0.2, 0.95, 6, 12]];    // the left edge (mirrored to the right)
 lid_pads = [[2, 2], [W - 2, 2], [2, 6.5], [W - 2, 6.5]];          // the lid's feet on the board's top, clear of every part
 bumps = [[0, 26], [1, 26], [2, 11], [2, 33], [3, 11], [3, 33]];   // [side 0 left 1 right 2 top 3 bottom, along the wall]
 
@@ -165,9 +165,9 @@ module lid_core(pads = true) difference() {
     translate([led[0], by(led[1]), zt - 0.8]) cylinder(d = 3.2, h = 1.0, $fn = 32);               // its head's recess
     for (b = bumps) at_side(b[0], b[1]) bump(0.15);                                                // the snap pockets
     // the seat for a 2.4 GHz flex (FPC) IPEX antenna on J4's u.FL: a 0.4 mm recess in the roof's inside over the
-    // antenna strip (board y 43..50.5: nothing tall there, 1.6 mm clear of the cans' sides), between the lid's feet;
-    // plastic only. Its cable rises straight from J4 (board 26.0, 38.95) through the open lid: no rib or post there
-    translate([3.6, by(50.5), z_in - 0.01]) cube([W - 7.2, 7.5, 0.4 + 0.01]);
+    // antenna strip (board y 44..51.5: nothing tall there, 1.6 mm clear of the cans' sides), between the lid's feet;
+    // plastic only. Its cable rises straight from J4 (board 27.0, 39.95) through the open lid: no rib or post there
+    translate([3.6, by(H - 1.0), z_in - 0.01]) cube([W - 7.2, 7.5, 0.4 + 0.01]);
 }
 module lid() {    // as printed: roof down
     translate([0, 0, zt]) rotate([180, 0, 0]) translate([W, 0, 0]) mirror([1, 0, 0]) lid_core();

@@ -1,6 +1,6 @@
 # jank mini case
 
-Printed case for the jank chip board (`../chip.kicad_pcb`, 47.6 x 51.5 x 1.6 mm), in two versions from one
+Printed case for the jank chip board (`../chip.kicad_pcb`, 49.6 x 52.5 x 1.6 mm), in two versions from one
 parametric file: **without** the DIN sockets (3.5 mm jacks only) and **with** J5 / J6 (`din = true`). Ideas taken from
 the big jank box (`hardware/box` on the `hardware` branch): DIN plates in slots in the wall (front cheek, back cheek, no
 wall behind the body), a stepped wall (the lid's skirt holds the jacks, the base the DINs), a cap through the lid for
@@ -33,8 +33,8 @@ sh hardware/chip/case/make_stl.sh        # about 40 s; BOARD_PY=<make_board.py> 
 
 | | Outer (X x Y x Z) | Parts |
 |---|---|---|
-| **No DIN** | **47.6 x 55.1 x 17.3 mm** | base 4.2 high, lid 13.9 high (they overlap 0.9 in the lap) |
-| **DIN** | **47.6 x 55.1 x 35.4 mm** | base 22.3 high, same lid |
+| **No DIN** | **53.2 x 56.1 x 17.3 mm** | base 4.2 high, lid 13.9 high (they overlap 0.9 in the lap) |
+| **DIN** | **53.2 x 56.1 x 35.4 mm** | base 22.3 high, same lid |
 
 The jacks' bushings stand 0.45 mm proud of the side faces (the USB-C is recessed behind a 13 mm opening in the top
 face). The board edge is 1.8 mm inside the outer face on every side (0.4 side play + 1.4 wall).
@@ -50,7 +50,7 @@ No screw, no insert, no metal: the antenna (bottom edge) needs about 10 mm of ai
   play) and six snap bumps (0.35 mm high, 6 mm wide, on the base's lap, into pockets in the skirt: 2 on the top/bottom
   edges each, 1 on each side). If they do not hold, a drop of glue on the lap or a turn of tape closes it.
 - **Antenna:** the base's pads at the antenna edge are plastic, 17 mm from the antenna (x 3..9 and 35..41); the wall there is 1.4 mm PLA/PETG. No metal anywhere.
-- **The flex antenna (the u.FL, fitted and selected by default, 2026-11-11):** the lid has a flat seat, 0.4 mm deep, over the antenna strip (board y 43..50.5, x 3.6 .. W-3.6), for a 2.4 GHz flex (FPC) antenna stuck inside the lid, away from the cans. Its IPEX cable runs from J4 (board 26.0, 38.95) straight down to it; plastic only.
+- **The flex antenna (the u.FL, fitted and selected by default, 2026-11-11):** the lid has a flat seat, 0.4 mm deep, over the antenna strip (board y 44..51.5, x 3.6 .. W-3.6), for a 2.4 GHz flex (FPC) antenna stuck inside the lid, away from the cans. Its IPEX cable runs from J4 (board 27.0, 39.95) straight down to it; plastic only.
 - **Jacks:** J2 / J3's front blocks (6.0 x 5.5 mm, 2.2 mm past the edge) go through slots in the lid's side walls, open downwards (the lid is
   put on from above); the body's front pushes on the wall beside the slot (0.75 mm lip each side).
 - **DINs:** each plate (20.9 x 19.6 x 1.8) slides down into a slot in the base between a front cheek (1.4 mm, in the
@@ -99,5 +99,5 @@ Clearances are found by growing the board model by a ball of the stated size and
 - **Under the board:** tails 1.5 mm assumed (3D models: USB-C legs 0.9, jack pegs 0.55); the floor is 1.9 mm under the board without DINs.
 - **The jacks' front blocks** (6.0 x 5.5 x 2.2) come from the 3D model of the PJ-320D, not the part. Bushings stand only 0.45 mm proud of the face: a plug with a wide collar may need the wall thinned there.
 - **USB-C:** the plug's overmold is assumed <= 12.5 x 6.5 mm. The switch's plunger height (1.5 mm) is from the footprint's model.
-- **The button and LED positions** (SW1 23.4, 19.55; LED1 21.7, 14.9; board 47.6 wide since the 2 x 2200 uF cans, 2026-11-11) are those of the commit that adds this line. If `make_board.py` moves them, run `make_mockup.py`, then `make_stl.sh` (it reads them from `PLACE`); the lid's chimney and button hole follow, the checks rerun.
+- **The button and LED positions** (SW1 24.4, 19.55; LED1 22.7, 14.9; board 49.6 x 52.5 since the DIN pads' rings, 2026-11-11) are those of the commit that adds this line. If `make_board.py` moves them, run `make_mockup.py`, then `make_stl.sh` (it reads them from `PLACE`); the lid's chimney and button hole follow, the checks rerun.
 - Nothing about the antenna was measured: the case is plastic only, 1.4 mm wall, at the antenna's edge.

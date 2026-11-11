@@ -10,11 +10,11 @@
 		(effects (font (size 1 1) (thickness 0.15)))
 	)
 	(property "LCSC Part" "C2939346")
-	(pad 1 thru_hole circle (at -7.50 -3.65 0) (size 3.0 3.0) (drill 1.5) (layers *.Cu *.Mask))
+	(pad 1 thru_hole circle (at -7.50 -3.65 0) (size 2.4 2.4) (drill 1.5) (layers *.Cu *.Mask))
 	(pad 2 thru_hole circle (at -5.00 -6.15 0) (size 3.0 3.0) (drill 1.5) (layers *.Cu *.Mask))
 	(pad 3 thru_hole circle (at -0.00 -3.65 0) (size 4.0 4.0) (drill 1.5) (layers *.Cu *.Mask))
 	(pad 4 thru_hole circle (at 5.00 -6.15 0) (size 3.0 3.0) (drill 1.5) (layers *.Cu *.Mask))
-	(pad 5 thru_hole circle (at 7.50 -3.65 0) (size 3.0 3.0) (drill 1.5) (layers *.Cu *.Mask))
+	(pad 5 thru_hole circle (at 7.50 -3.65 0) (size 2.4 2.4) (drill 1.5) (layers *.Cu *.Mask))
 	(pad 6 thru_hole circle (at -5.00 6.15 0) (size 3.5 3.5) (drill 1.5) (layers *.Cu *.Mask))
 	(pad 7 thru_hole circle (at 5.00 6.15 0) (size 3.5 3.5) (drill 1.5) (layers *.Cu *.Mask))
 	(model "${KIPRJMOD}/lib/3d/CONN-TH_DIN-504B-M10.wrl"

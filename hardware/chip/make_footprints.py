@@ -85,7 +85,7 @@ def trs_pads():
 # middle, 5.6 mm from its neighbours) and the shell's two pins get 4.0 mm round pads. (pad: angle of the oval's long axis
 # in KiCad's sense, or None for a round pad; size)
 DIN = "CONN-TH_DIN-504B-M10"
-DIN_PADS = {"1": (None, 3.0), "2": (None, 3.0), "4": (None, 3.0), "5": (None, 3.0), "3": (None, 4.0), "6": (None, 3.5),
+DIN_PADS = {"1": (None, 2.4), "2": (None, 3.0), "4": (None, 3.0), "5": (None, 2.4), "3": (None, 4.0), "6": (None, 3.5),
             "7": (None, 3.5)}
 DIN_STRETCH = 1.2
 

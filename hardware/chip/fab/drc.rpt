@@ -1,32 +1,29 @@
 ** Drc report for chip.kicad_pcb **
-** Created on 2026-11-11T15:47:09 **
+** Created on 2026-11-11T17:49:54 **
 ** Report includes: Errors, Warnings, Exclusions **
 
-** Found 8 DRC violations **
+** Found 7 DRC violations **
 [track_dangling]: Track has unconnected end
     Local override; warning
-    @(140.8000 mm, 118.4000 mm): Track [PIN_T] on B.Cu, length 0.2500 mm
-[track_dangling]: Track has unconnected end
+    @(129.9000 mm, 148.1600 mm): Track [ANT_END] on F.Cu, length 1.6000 mm
+[lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
     Local override; warning
-    @(128.9000 mm, 147.1600 mm): Track [ANT_END] on F.Cu, length 1.6000 mm
+    @(130.9000 mm, 134.6000 mm): Footprint C24
 [lib_footprint_mismatch]: Footprint 'SOT-23-3_L2.9-W1.6-P1.90-LS2.8-TL' does not match copy in library 'chip'
     Local override; warning
-    @(125.6000 mm, 124.0500 mm): Footprint U4
-[lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
-    Local override; warning
-    @(129.9000 mm, 138.3000 mm): Footprint C25
-[lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
-    Local override; warning
-    @(130.2500 mm, 140.6000 mm): Footprint C26
-[lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
-    Local override; warning
-    @(129.9000 mm, 134.6000 mm): Footprint C24
-[lib_footprint_mismatch]: Footprint 'QFN-56_L7.0-W7.0-P0.40-TL-EP4.0' does not match copy in library 'chip'
-    Local override; warning
-    @(120.6000 mm, 130.4000 mm): Footprint U1
+    @(126.6000 mm, 124.0500 mm): Footprint U4
 [lib_footprint_mismatch]: Footprint 'R0402' does not match copy in library 'chip'
     Local override; warning
-    @(128.9000 mm, 139.9000 mm): Footprint R18
+    @(129.9000 mm, 140.9000 mm): Footprint R18
+[lib_footprint_mismatch]: Footprint 'QFN-56_L7.0-W7.0-P0.40-TL-EP4.0' does not match copy in library 'chip'
+    Local override; warning
+    @(121.6000 mm, 130.4000 mm): Footprint U1
+[lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
+    Local override; warning
+    @(130.9000 mm, 139.3000 mm): Footprint C25
+[lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
+    Local override; warning
+    @(131.2500 mm, 141.6000 mm): Footprint C26
 
 ** Found 0 unconnected pads **
 

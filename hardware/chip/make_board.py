@@ -29,9 +29,9 @@ MM = pcbnew.FromMM
 OX, OY = 100.0, 100.0
 LIB = os.path.join(HERE, "lib", "chip.pretty")
 NAME = "chip"
-W, H = 47.6, 51.5
-GE = 41.5                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
-S = 1.8                     # (the middle's shift since the 2200 uF cans widened the board from 44 to 47.6 mm)
+W, H = 49.6, 52.5
+GE = 42.5                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
+S = 2.8                     # (the middle's shift: 44 -> 47.6 mm for the 2200 uF cans, 49.6 for the DIN pads' rings)
 CX, CY = 18.8 + S, 30.4     # the chip's centre (turned 180: LNA_IN at the right side's bottom)
 # the RF path (README "RF"): the line's centre x, its width and gap (grounded coplanar waveguide, 50 ohm: README)
 XA = 27.1 + S               # the line and the antenna on this x
@@ -40,8 +40,8 @@ Y_LINE = CY + 2.6           # LNA_IN's y
 Y_L3 = Y_LINE + 0.6         # L3 and the line's top, 0.6 under LNA_IN: room for C28 at the RF supply's pins above it
 ANT_Y = GE + 2.5 + 1.58     # the antenna's centre: its feed pad (S1) 2.0 mm past the ground edge (eval board)
 END_PAD = (1.8, 2.5)        # the copper beyond the antenna's end pad (S2), unconnected (eval board: 1.8 x 2.5)
-DIN_D, DIN_Y = 8.6, 20.0    # the DINs' origins: their faces (8.6 from JLC's origin) on the side edges, their axes at y 20
-CAN_Y = 34.5                # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
+DIN_D, DIN_Y = 8.6, 20.3    # the DINs' origins: their faces (8.6 from JLC's origin) on the side edges, their axes at y 20
+CAN_Y = 35.5                # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
 
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
@@ -117,6 +117,7 @@ def net(name):
     return nets[name]
 
 
+DIN_TRACK_ROOM = 0.52       # no other net's track nearer a DIN pad (the rule 0.5, +0.02 for the grid)
 IRON = 0.8                  # the room round each DIN pad for a soldering iron: no top part or via nearer (README "DIN")
 DIN_ROOM = []               # (x, y, radius): each DIN pad's copper plus IRON
 
@@ -365,6 +366,12 @@ def router(fps):
             R.seg(layer, None, (x0, y0, x1, y1), w + 2 * max(0.0, RF_GAP + 0.05 - route.CLEAR))
     for r in COPPER:
         R.rect((0,), None, r)
+    # the DIN sockets' hand-soldered pads: no other net's track within DIN_TRACK_ROOM of their copper (both layers)
+    for ref in ("J5", "J6"):
+        for p in fps[ref].Pads():
+            if p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH:
+                cx, cy = pad_center(p)
+                R.circle((0, 1), p.GetNetname() or None, cx, cy, pcbnew.ToMM(p.GetSize().x) / 2 + DIN_TRACK_ROOM - route.CLEAR)
     # the drawn fan-out stubs are their net's copper: their centre lines stay passable for it even where a neighbour's
     # clearance margin (the router's 0.17 against the rules' 0.15) reaches over them
     for n, y, x, top, via in FANOUT:

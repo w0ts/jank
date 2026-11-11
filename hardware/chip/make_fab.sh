@@ -19,6 +19,7 @@ if grep -q "; error" fab/erc.rpt; then grep -B1 "; error" fab/erc.rpt; exit 1; f
 "$KC" sch export pdf -o chip-schematic.pdf chip.kicad_sch 2>&1 | Q >/dev/null
 
 if [ "${ROUTE:-1}" = 1 ]; then "$KP" make_board.py 2>&1 | Q; fi
+"$KP" tie_groups.py chip.kicad_pcb 2>&1 | Q
 "$KC" pcb drc --severity-all -o fab/drc.rpt chip.kicad_pcb 2>&1 | Q >/dev/null
 grep -E "Found" fab/drc.rpt
 grep -E "^\[" fab/drc.rpt | sed 's/:.*//' | sort | uniq -c || true
