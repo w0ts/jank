@@ -30,7 +30,7 @@ HEIGHT = {   # above (or below) the board face, mm
     "CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD": 10.5,      # (KNSCHA RVT 8 x 10.5)
     "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5": 1.5,
     "L0806": 1.2, "HVSSOP-8_L3.0-W3.0-P0.65-LS4.9-BL-EP": 1.1, "SOD-123_L2.7-W1.6-LS3.7-RD-1": 1.2,
-    "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR": 1.1, "SOT-23-3_L3.0-W1.7-P0.95-LS2.9-BR": 1.1,
+    "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR": 1.1, "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR": 1.1, "SOT-23-3_L3.0-W1.7-P0.95-LS2.9-BR": 1.1,
     "LED-SMD_L1.6-W0.8-R-RD": 0.8, "R0603": 0.55, "C0603": 0.9, "R0805": 0.6, "C0805": 1.3,
 }
 

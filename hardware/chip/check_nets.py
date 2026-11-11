@@ -32,7 +32,7 @@ for name, (gpio, _pin) in P.GPIO.items():
 for name in ("VBANK_ADC", "VBUS_SENSE"):
     if not 1 <= P.GPIO[name][0] <= 10:
         errors.append(f"{name} on GPIO{P.GPIO[name][0]}: not ADC1 (ADC2 is not usable with Wi-Fi on)")
-for name in ("MIDI_TX", "PWR_HOLD"):
+for name in ("MIDI_TX", "PWR_HOLD", "MIDI2_TX"):
     if P.GPIO[name][0] > 21:
         errors.append(f"{name} on GPIO{P.GPIO[name][0]}: not an RTC GPIO (the ULP and deep-sleep hold need one)")
 if P.GPIO["USB_DN"][0] != 19 or P.GPIO["USB_DP"][0] != 20:

@@ -9,7 +9,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 3451337,
+   "stock": 3453047,
    "loss": 14,
    "prices": [
     [
@@ -45,7 +45,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 35802145,
+   "stock": 35908559,
    "loss": 15,
    "prices": [
     [
@@ -81,7 +81,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 4650927,
+   "stock": 4642671,
    "loss": 15,
    "prices": [
     [
@@ -117,7 +117,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 31556013,
+   "stock": 31538210,
    "loss": 15,
    "prices": [
     [
@@ -189,7 +189,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 8313418,
+   "stock": 8303357,
    "loss": 10,
    "prices": [
     [
@@ -225,7 +225,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 16184434,
+   "stock": 16169271,
    "loss": 10,
    "prices": [
     [
@@ -261,7 +261,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 1177633,
+   "stock": 1177273,
    "loss": 10,
    "prices": [
     [
@@ -297,7 +297,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 98702,
+   "stock": 98672,
    "loss": 10,
    "prices": [
     [
@@ -333,7 +333,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 9557988,
+   "stock": 9524173,
    "loss": 10,
    "prices": [
     [
@@ -362,6 +362,42 @@
     ]
    ]
   },
+  "C20917": {
+   "code": "C20917",
+   "mpn": "AO3400A",
+   "brand": "Alpha & Omega Semicon",
+   "package": "SOT-23",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 944126,
+   "loss": 4,
+   "prices": [
+    [
+     1,
+     0.0801
+    ],
+    [
+     50,
+     0.0631
+    ],
+    [
+     150,
+     0.0545
+    ],
+    [
+     500,
+     0.0471
+    ],
+    [
+     3000,
+     0.0447
+    ],
+    [
+     6000,
+     0.043
+    ]
+   ]
+  },
   "C22859": {
    "code": "C22859",
    "mpn": "0603WAF100JT5E",
@@ -369,7 +405,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 5205545,
+   "stock": 5204782,
    "loss": 10,
    "prices": [
     [
@@ -405,7 +441,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 6137093,
+   "stock": 6133212,
    "loss": 10,
    "prices": [
     [
@@ -434,6 +470,42 @@
     ]
    ]
   },
+  "C23140": {
+   "code": "C23140",
+   "mpn": "0603WAF330JT5E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 3504395,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0024
+    ],
+    [
+     1000,
+     0.0019
+    ],
+    [
+     5000,
+     0.0016
+    ],
+    [
+     10000,
+     0.0014
+    ],
+    [
+     50000,
+     0.0013
+    ],
+    [
+     50200,
+     0.0013
+    ]
+   ]
+  },
   "C23182": {
    "code": "C23182",
    "mpn": "0603WAF470JT5E",
@@ -441,7 +513,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 1182126,
+   "stock": 1181651,
    "loss": 10,
    "prices": [
     [
@@ -477,7 +549,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 19820003,
+   "stock": 19811693,
    "loss": 10,
    "prices": [
     [
@@ -503,6 +575,42 @@
     [
      50200,
      0.0007
+    ]
+   ]
+  },
+  "C25077": {
+   "code": "C25077",
+   "mpn": "0402WGF100JTCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 3183425,
+   "loss": 15,
+   "prices": [
+    [
+     1,
+     0.001
+    ],
+    [
+     1000,
+     0.0008
+    ],
+    [
+     3000,
+     0.0007
+    ],
+    [
+     10000,
+     0.0006
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
     ]
    ]
   },
@@ -542,6 +650,42 @@
     ]
    ]
   },
+  "C25741": {
+   "code": "C25741",
+   "mpn": "0402WGF1003TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 7947869,
+   "loss": 12,
+   "prices": [
+    [
+     1,
+     0.0012
+    ],
+    [
+     1000,
+     0.0009
+    ],
+    [
+     3000,
+     0.0008
+    ],
+    [
+     10000,
+     0.0007
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
+    ]
+   ]
+  },
   "C25744": {
    "code": "C25744",
    "mpn": "0402WGF1002TCE",
@@ -549,7 +693,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 21006761,
+   "stock": 20913902,
    "loss": 15,
    "prices": [
     [
@@ -585,7 +729,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 1023835,
+   "stock": 1024219,
    "loss": 10,
    "prices": [
     [
@@ -621,7 +765,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 15400602,
+   "stock": 15397164,
    "loss": 10,
    "prices": [
     [
@@ -657,7 +801,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 2543111,
+   "stock": 2534016,
    "loss": 15,
    "prices": [
     [
@@ -693,7 +837,7 @@
    "package": "SMD",
    "type": "Extended",
    "preferred": false,
-   "stock": 1093204,
+   "stock": 1092873,
    "loss": 3,
    "prices": [
     [
@@ -729,7 +873,7 @@
    "package": "HVSSOP-8-EP-0.65mm",
    "type": "Extended",
    "preferred": false,
-   "stock": 44968,
+   "stock": 44963,
    "loss": 0,
    "prices": [
     [
@@ -837,7 +981,7 @@
    "package": "1206",
    "type": "Extended",
    "preferred": false,
-   "stock": 20968,
+   "stock": 20961,
    "loss": 2,
    "prices": [
     [
@@ -909,7 +1053,7 @@
    "package": "SMD-4P,5.1x5.1mm",
    "type": "Basic",
    "preferred": false,
-   "stock": 840324,
+   "stock": 838799,
    "loss": 8,
    "prices": [
     [
@@ -945,7 +1089,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 2120127,
+   "stock": 2118815,
    "loss": 10,
    "prices": [
     [
@@ -1017,7 +1161,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 3794623,
+   "stock": 3774031,
    "loss": 4,
    "prices": [
     [
@@ -1089,7 +1233,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 10755547,
+   "stock": 10750224,
    "loss": 12,
    "prices": [
     [
@@ -1125,7 +1269,7 @@
    "package": "SOT-23",
    "type": "Basic",
    "preferred": false,
-   "stock": 565051,
+   "stock": 565038,
    "loss": 8,
    "prices": [
     [
@@ -1161,7 +1305,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 819340,
+   "stock": 814275,
    "loss": 10,
    "prices": [
     [
@@ -1197,7 +1341,7 @@
    "package": "0402",
    "type": "Extended",
    "preferred": false,
-   "stock": 173735,
+   "stock": 173125,
    "loss": 10,
    "prices": [
     [
@@ -1269,7 +1413,7 @@
    "package": "SOD-123",
    "type": "Basic",
    "preferred": false,
-   "stock": 687634,
+   "stock": 638345,
    "loss": 8,
    "prices": [
     [
@@ -1341,7 +1485,7 @@
    "package": "SMD",
    "type": "Extended",
    "preferred": false,
-   "stock": 326956,
+   "stock": 326852,
    "loss": 4,
    "prices": [
     [

@@ -79,22 +79,29 @@ def main():
     for ref, x, y, _s, _r in places:
         assert 0 <= x <= W and 0 <= y <= H, (ref, x, y)
     nat = lambda r: [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", r)]
-    groups = {}
+    # one BOM line per LCSC code: JLC unticks every line when two lines name the same part ("Multiple lines in the BOM
+    # have been matched to the same part": the jacks, MIDI OUT and POWER IN, were two lines); the comment joins the values
+    groups, values = {}, {}
     for value, ref, name, code in rows:
-        groups.setdefault((value, name, code), []).append(ref)
+        groups.setdefault((name, code), []).append(ref)
+        values.setdefault((name, code), [])
+        if value not in values[(name, code)]:
+            values[(name, code)].append(value)
+    codes = [code for _n, code in groups]
+    assert len(codes) == len(set(codes)), "one LCSC code on two footprints"
     os.makedirs(FAB, exist_ok=True)
     with open(os.path.join(FAB, "bom.csv"), "w", newline="") as f:
         w = csv.writer(f, quoting=csv.QUOTE_ALL, lineterminator="\n")
         w.writerow(["Comment", "Designator", "Footprint", "LCSC Part #"])
-        for (value, name, code), rs in sorted(groups.items(), key=lambda g: nat(sorted(g[1], key=nat)[0])):
-            w.writerow([value, ",".join(sorted(rs, key=nat)), name, code])
+        for (name, code), rs in sorted(groups.items(), key=lambda g: nat(sorted(g[1], key=nat)[0])):
+            w.writerow([" / ".join(values[(name, code)]), ",".join(sorted(rs, key=nat)), name, code])
     with open(os.path.join(FAB, "cpl.csv"), "w") as f:
         f.write("Designator,Mid X,Mid Y,Layer,Rotation\n")
         for ref, x, y, side, rot in sorted(places, key=lambda p: nat(p[0])):
             f.write(f"{ref},{x:.3f}mm,{y:.3f}mm,{side},{rot}\n")
     summary = {"variant": NAME, "board_mm": [round(W, 2), round(H, 2)], "parts": len(rows), "lines": len(groups),
                "joints": joints, "sides": sorted(sides),
-               "qty": {code: len(rs) for (_v, _n, code), rs in groups.items()}}
+               "qty": {code: len(rs) for (_n, code), rs in groups.items()}}
     json.dump(summary, open(os.path.join(FAB, "summary.json"), "w"), indent=1)
     print(f"{os.path.relpath(FAB, HERE)}/bom.csv {len(groups)} lines, cpl.csv {len(rows)} parts ({', '.join(sorted(sides))}),"
           f" {joints} joints; every part within 0.01 mm of JLC's footprint")

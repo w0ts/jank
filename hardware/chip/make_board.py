@@ -31,7 +31,7 @@ LIB = os.path.join(HERE, "lib", "chip.pretty")
 NAME = "chip"
 W, H = 44.0, 51.5
 GE = 41.5                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
-CX, CY = 18.5, 30.4         # the chip's centre (turned 180: LNA_IN at the right side's bottom)
+CX, CY = 18.8, 30.4         # the chip's centre (turned 180: LNA_IN at the right side's bottom)
 # the RF path (README "RF"): the line's centre x, its width and gap (grounded coplanar waveguide, 50 ohm: README)
 XA = 27.1                   # the line and the antenna on this x
 RF_W, RF_GAP = 1.2, 0.2
@@ -39,49 +39,53 @@ Y_LINE = CY + 2.6           # LNA_IN's y: L3 and the line's top run along it
 ANT_Y = GE + 2.5 + 1.58     # the antenna's centre: its feed pad (S1) 2.0 mm past the ground edge (eval board)
 END_PAD = (1.8, 2.5)
 DIN_D, DIN_Y = 8.6, 20.0    # the DINs' origins: their faces (8.6 from JLC's origin) on the side edges, their axes at y 20
-CAN_Y = 32.8                # the cans' centre y (their courtyards start under the DINs' last holes)        # the copper beyond the antenna's end pad (S2), unconnected (eval board: 1.8 x 2.5)
+CAN_Y = 33.8                # the cans' centre y (their courtyards start under the DINs' last holes)        # the copper beyond the antenna's end pad (S2), unconnected (eval board: 1.8 x 2.5)
 
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
     # top edge: the jacks (bushings past the side edges), the USB-C between them; the cable pads under the jacks
     "J1": (W / 2, 4.97, 180), "J2": (7.25, 5.8, 0), "J3": (W - 7.25, 5.8, 180),
-    "P2": (1.4, 12.5, 90), "P3": (W - 1.4, 12.5, 270),
     # the DIN sockets (DNP, hand-soldered) on the BOTTOM under each side edge, their faces on the edges (README "DIN")
     "J5": (DIN_D, DIN_Y, 90, "B"), "J6": (W - DIN_D, DIN_Y, 270, "B"),
     # between the DINs' holes: left the MIDI OUT resistors, the button, the LED; right the POWER IN resistors and diodes,
     # the detector
-    "R14": (2.0, 18.4, 90), "R15": (14.9, 18.5, 90), "SW1": (7.35, 18.0, 90), "LED1": (7.3, 23.4, 0), "R9": (7.3, 25.4, 0),
-    "R1": (W - 2.0, 18.2, 90), "R2": (W - 2.0, 21.6, 90), "D1": (W - 9.6, 16.9, 90), "D2": (W - 7.2, 16.9, 90),
-    "U3": (W - 9.0, 21.5, 90), "D5": (W - 5.4, 21.5, 90), "C4": (W - 9.1, 25.2, 0), "R6": (W - 5.7, 25.2, 0),
+    # (every top part keeps 0.8 mm from the DIN pads' copper: the iron's room, README "DIN")
+    "R14": (6.3, 17.0, 90), "R15": (8.5, 21.0, 90), "LED1": (11.2, 31.0, 0), "R9": (11.2, 33.0, 0),
+    "R1": (W - 2.5, 18.5, 0), "R2": (W - 2.5, 21.5, 0), "D1": (W - 8.4, 15.6, 90), "D2": (W - 6.05, 15.6, 90),
+    "U3": (W - 7.7, 21.2, 90), "D5": (W - 7.7, 25.0, 90), "C4": (20.2, 23.6, 90), "R6": (22.0, 23.6, 90),
+    # the button: lower left, at the ground's edge, away from the RF line; its pull-up above it
+    "SW1": (11.8, 37.8, 90), "R16": (15.8, 36.0, 90),
     # the reservoir: one can down each side, under the DINs' holes
     "C1": (4.6, CAN_Y, 90), "C2": (W - 4.6, CAN_Y, 90),
     # under the USB-C: the CC resistors, the VBUS diode and its resistor, the VBUS sense
     "R3": (W / 2 - 4.2, 9.0, 0), "R13": (W / 2 - 4.2, 10.8, 0), "D3": (W / 2, 10.1, 0), "R12": (W / 2 + 3.6, 9.8, 90),
     "R4": (W / 2 + 5.4, 9.8, 90), "R5": (W / 2, 12.35, 0),
     # centre: the buck, BUCK_EN's diode, the senses
-    "U2": (18.0, 16.9, 0), "L1": (21.3, 16.4, 90), "C5": (23.8, 16.4, 90), "C3": (16.5, 21.6, 0), "C6": (21.3, 20.5, 180),
-    "R7": (19.15, 20.9, 270), "D4": (21.0, 23.6, 0), "R16": (9.9, 22.9, 0),
+    "U2": (18.8, 16.9, 0), "L1": (22.1, 16.4, 90), "C5": (24.6, 16.4, 90), "C3": (18.2, 22.1, 90), "C6": (22.1, 20.5, 180),
+    "R7": (19.95, 20.9, 270), "D4": (24.7, 23.6, 0),
     # the chip (turned 180: LNA_IN at the bottom of its right side) and its parts round it
     "U1": (CX, CY, 180),
     "C20": (CX + 0.6, CY - 4.45, 0),                                                    # VDD3P3_RTC (pin 20, top)
-    "R10": (26.0, 22.0, 270), "R11": (27.0, 22.0, 90), "C8": (28.0, 22.0, 90), "R8": (28.0, 28.5, 180), "C7": (28.0, 27.2, 0),
-    "C21": (CX - 4.9, CY - 0.6, 0), "C22": (CX - 4.9, CY + 0.4, 0),                   # VDD_SPI (pin 29, left)
+    "R10": (38.52, 21.2, 90), "R11": (27.0, 22.0, 90), "C8": (28.0, 21.95, 90), "R8": (27.85, 28.1, 90), "C7": (26.9, 28.0, 90),
+    "C21": (13.9, 30.5, 270), "C22": (13.9, 32.3, 270),                   # VDD_SPI (pin 29, left)
     "C19": (CX - 1.4, CY + 4.85, 90),                                                  # VDD3P3_CPU (pin 46, bottom)
     "C13": (CX + 2.94, CY + 4.9, 270), "C12": (CX + 3.87, CY + 4.9, 270), "C11": (CX + 5.9, CY + 4.6, 90),   # VDDA
     "L2": (CX + 9.1, CY - 0.2, 270), "C18": (CX + 9.8, CY + 1.5, 0),                   # VDD3P3: the 2 nH, 100 nF after it
-    "C16": (CX + 10.5, CY - 0.4, 90), "C14": (CX + 11.5, CY - 0.4, 90), "C15": (CX + 12.5, CY - 0.4, 90),
-    "C17": (CX + 14.3, CY + 0.3, 90),                                                    # (10 uF: the checklist)
-    "Y1": (CX + 1.0, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (CX - 2.15, CY + 8.75, 180), "C9": (CX + 2.5, CY + 10.3, 0),
+    "C16": (29.0, 30.0, 90), "C14": (30.0, 32.2, 90), "C15": (31.0, 32.2, 90),
+    "C17": (32.4, 32.4, 90),                                                    # (10 uF: the checklist)
+    "Y1": (19.5, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.75, 37.7, 90), "C9": (21.0, CY + 10.3, 0),
     # RF (README "RF"): the chip's pi (C23 shunt at the pin, L3 series, C24 shunt), the line down to the antenna's pi
     # (C25 shunt, R18 the series 0 ohm, C26 shunt) at the ground edge; R19 / J4 the u.FL path (unfitted)
     "C23": (CX + 4.8, Y_LINE + 1.8, 270), "L3": (CX + 5.9, Y_LINE, 0), "C24": (XA + 1.35, Y_LINE + 1.0, 0),
     "C25": (XA + 1.35, GE - 3.2, 0), "R18": (XA, GE - 1.6, 270), "C26": (XA + 1.35, GE - 0.9, 0),
     "R19": (XA - 1.4, GE - 5.15, 180), "J4": (XA - 2.9, GE - 2.1, 0),
     "AE1": (XA, ANT_Y, 270),
+    # MIDI OUT 2 (README "MIDI OUT 2"): the source's 33 ohm and Schottky, the sink's FET, 10 ohm and gate pull-down
+    "D6": (32.15, 35.15, 0), "Q1": (31.4, 37.95, 0), "R21": (31.4, 40.55, 0), "R20": (34.2, 37.8, 90), "R22": (34.2, 39.9, 90),
 }
 WIDTH = {"VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
-ORDER = ["USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
-         "VDD3P3", "MIDI_TX", "LED_DRV", "VDD_SPI", "SW", "+3V3", "VSYS", "VBUS", "VUSB_D", "BUCK_EN", "DET"]
+ORDER = ["USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
+         "VDD3P3", "MIDI_TX", "MIDI2_TX", "LED_DRV", "SW", "+3V3", "VSYS", "VBUS", "VUSB_D", "BUCK_EN", "DET"]
 # (the chip's signal pins escape first: on its right side they sit between the RF supply's pins and the rest)
 RF_NETS = {"LNA_IN", "RF", "ANT_FEED", "UFL", "ANT_END"}      # (drawn here, not routed)
 # the chip's right-side signal pins (between the RF supply's pins and the rest): drawn fan-out, one lane each, the lowest
@@ -102,6 +106,14 @@ def net(name):
         board.Add(n)
         nets[name] = n
     return nets[name]
+
+
+IRON = 0.8                  # the room round each DIN pad for a soldering iron: no top part or via nearer (README "DIN")
+DIN_ROOM = []               # (x, y, radius): each DIN pad's copper plus IRON
+
+
+def in_din_room(x, y):
+    return any(math.hypot(x - cx, y - cy) < r + route.VIA_D / 2 for cx, cy, r in DIN_ROOM)
 
 
 def place():
@@ -131,6 +143,9 @@ def place():
     for p in fps["J1"].Pads():                   # (the USB-C's shell legs: crowded, joined to the pours solid)
         if p.GetNumber() in ("13", "14"):
             p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
+    for ref in ("J5", "J6"):
+        for p in fps[ref].Pads():
+            DIN_ROOM.append((*pad_center(p), pcbnew.ToMM(p.GetSize().x) / 2 + IRON))
     for p in fps["U1"].Pads():                   # (the exposed pad: solid to the pour, its vias inside)
         if p.GetNumber() == "57":
             p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
@@ -306,6 +321,14 @@ def router(fps):
     for n, x, y in FAN_VIAS:
         R.circle((0, 1), n, x, y, route.VIA_D / 2 + route.VIA_EXTRA)
         R.drill(x, y, route.VIA_DRILL)
+    for x, y, r in DIN_ROOM:                       # (no via in the DIN pads' iron room, on either layer)
+        rr = r + route.VIA_D / 2
+        for layer in (0, 1):
+            a = R.mask["via"][layer]
+            for iy in range(max(0, int((y - rr) / route.GRID)), min(R.ny, int((y + rr) / route.GRID) + 2)):
+                for ix in range(max(0, int((x - rr) / route.GRID)), min(R.nx, int((x + rr) / route.GRID) + 2)):
+                    if math.hypot(ix * route.GRID - x, iy * route.GRID - y) < rr:
+                        a[iy * R.nx + ix] = -1
     return R, by_net
 
 
@@ -320,6 +343,22 @@ def route_all(fps, first=()):
             R.drill(x, y, route.VIA_DRILL)
             gv.append((x, y))
     put("GND", [], gv, 0.2)
+    # ground first: a via beside every top-side GND pad (the pours join them; done before the signals, so each
+    # pad keeps a way down; afterwards the tracks cut the top pour into islands round some of them)
+    gvias = 0
+    for r, layers, p in by_net["GND"]:
+        if len(layers) != 1 or p.GetParentFootprint().GetReference() == "U1":
+            continue
+        res = route.via_near(R, "GND", r, layers[0])
+        if not res:
+            continue
+        segs, (x, y) = res
+        put("GND", segs, [(x, y)], 0.2)
+        for layer, x0, y0, x1, y1 in segs:
+            R.seg(layer, "GND", (x0, y0, x1, y1), 0.2)
+        R.circle((0, 1), "GND", x, y, route.VIA_D / 2 + route.VIA_EXTRA)
+        R.drill(x, y, route.VIA_DRILL)
+        gvias += 1
     signal = [n for n in by_net if n != "GND" and n not in RF_NETS and len(by_net[n]) > 1]
 
     def span(n):
@@ -348,21 +387,6 @@ def route_all(fps, first=()):
         failed += bad
         if os.environ.get("VERBOSE"):
             print(f"  {n}: {len(segs)} segments, {len(vias)} vias, {len(bad)} failed", flush=True)
-    # ground: a via beside every top-side GND pad (the pours join them; this makes sure)
-    gvias = 0
-    for r, layers, p in by_net["GND"]:
-        if len(layers) != 1 or p.GetParentFootprint().GetReference() == "U1":
-            continue
-        res = route.via_near(R, "GND", r, layers[0])
-        if not res:
-            continue
-        segs, (x, y) = res
-        put("GND", segs, [(x, y)], 0.2)
-        for layer, x0, y0, x1, y1 in segs:
-            R.seg(layer, "GND", (x0, y0, x1, y1), 0.2)
-        R.circle((0, 1), "GND", x, y, route.VIA_D / 2 + route.VIA_EXTRA)
-        R.drill(x, y, route.VIA_DRILL)
-        gvias += 1
     print(f"routed {len(order)} nets, {len(failed)} pads not reached; {gvias} ground vias by pads, {len(gv)} RF / pad vias")
     for e in failed:
         print("  not reached:", e)
@@ -438,7 +462,8 @@ def tie_islands():
                     if best is None or d > best[0]:
                         best = (d, p)
             if best and best[0] >= route.VIA_D / 2:
-                add_via("GND", pcbnew.ToMM(best[1].x) - OX, pcbnew.ToMM(best[1].y) - OY)
+                if not in_din_room(pcbnew.ToMM(best[1].x) - OX, pcbnew.ToMM(best[1].y) - OY):
+                    add_via("GND", pcbnew.ToMM(best[1].x) - OX, pcbnew.ToMM(best[1].y) - OY)
                 added += 1
             else:
                 print("a ground island with no via, too small for one at", pcbnew.ToMM(b.GetLeft()) - OX, pcbnew.ToMM(b.GetTop()) - OY)
@@ -465,7 +490,9 @@ def zones():
         z.SetNet(net("GND"))
         z.SetLocalClearance(MM(RF_GAP))         # (the RF line's gap; the rules' 0.15 elsewhere is less)
         z.SetMinThickness(MM(0.25))
-        z.SetPadConnection(pcbnew.ZONE_CONNECTION_THT_THERMAL)   # (SMD pads solid)
+        z.SetPadConnection(pcbnew.ZONE_CONNECTION_THT_THERMAL)   # (SMD pads solid; through-hole pads on spokes)
+        z.SetThermalReliefGap(MM(0.5))           # (the DIN sockets' ground pins: a hand iron must heat them)
+        z.SetThermalReliefSpokeWidth(MM(0.5))
         z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
         o = z.Outline()
         o.NewOutline()
@@ -493,7 +520,7 @@ def zones():
 
 def silk():
     label("OUT", 2.0, 22.0, 0.7, 90)            # (POWER IN's label: on the case; no room by J3)
-    label("BOOT", 9.6, 13.95, 0.6)
+    label("BOOT", 11.8, 42.2, 0.6)
     label("jank chip", 12.0, GE + 3.0, 1.0)
     label("antenna strip:", 12.0, GE + 4.6, 0.6)
     label("no copper", 12.0, GE + 5.5, 0.6)
@@ -514,7 +541,7 @@ def main():
     zones()
     silk()
     pts = [(OX + x, OY + y) for x, y in ((0, 0), (W, 0), (W, GE - 0.6), (0, GE - 0.6))]
-    st = stitch(board, lambda x, y: add_via("GND", x - OX, y - OY), pts)
+    st = stitch(board, lambda x, y: None if in_din_room(x - OX, y - OY) else add_via("GND", x - OX, y - OY), pts)
     print(f"{len(st)} stitching vias")
     board.GetDesignSettings().SetAuxOrigin(pcbnew.VECTOR2I(MM(OX), MM(OY + H)))
     ds = board.GetDesignSettings()

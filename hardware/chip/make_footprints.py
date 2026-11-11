@@ -49,6 +49,8 @@ def jlc(path):
     src = re.sub(r'\(pad "" thru_hole circle (\(at [^)]*\)) \(size ([\d.]+) ([\d.]+)\) \(drill ([\d.]+)\) \(layers \*\.Cu \*\.Mask\)\)',
                  r'(pad "" np_thru_hole circle \1 (size \2 \3) (drill \4) (layers *.Cu *.Mask))', src)
     name = os.path.basename(path)[:-len(".kicad_mod")]
+    if name == DIN:
+        src = din_pads(src)
     x0, y0, x1, y1 = bbox(src, name in PADS_ONLY)                 # (the courtyard takes the drawing before the silk goes)
     src = re.sub(r"\n\t\(fp_(?:line|circle|arc|poly|text user) [^\n]*F\.SilkS[^\n]*", "", src)   # (EasyEDA's silk runs over pads and past
     #  the board edge; the board's own labels say what matters)
@@ -75,6 +77,29 @@ def trs_pads():
                       *pads, *silk,
                       f'  (fp_rect (start {-a:.2f} {-b:.2f}) (end {a:.2f} {2 * TRS_PITCH + b:.2f}) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
                       ")"]) + "\n"
+
+
+# The DIN sockets are soldered by hand (README "DIN"): JLC's 2.2 mm pads on the 1.5 mm holes (HOOYA's drawing: 7 x
+# 1.5 mm) leave a 0.35 mm ring. Pins 1, 2, 4, 5 (3.54 mm apart in pairs) get 3.0 x 4.2 mm ovals: 1.5 mm of copper
+# round the hole on the side of the pair's other pin (0.54 mm between them), stretched 1.2 mm away from it; pin 3 (the
+# middle, 5.6 mm from its neighbours) and the shell's two pins get 4.0 mm round pads. (pad: angle of the oval's long axis
+# in KiCad's sense, or None for a round pad; size)
+DIN = "CONN-TH_DIN-504B-M10"
+DIN_PADS = {"1": (None, 3.0), "2": (None, 3.0), "4": (None, 3.0), "5": (None, 3.0), "3": (None, 4.0), "6": (None, 3.5),
+            "7": (None, 3.5)}
+DIN_STRETCH = 1.2
+
+
+def din_pads(src):
+    def pad(m):
+        num, x, y = m[1], m[2], m[3]
+        angle, size = DIN_PADS[num]
+        if angle is None:
+            return f'(pad {num} thru_hole circle (at {x} {y} 0) (size {size} {size}) (drill 1.5) (layers *.Cu *.Mask))'
+        return (f'(pad {num} thru_hole oval (at {x} {y} {angle}) (size {size + DIN_STRETCH} {size})'
+                f' (drill 1.5 (offset {DIN_STRETCH / 2} 0)) (layers *.Cu *.Mask))')
+    return re.sub(r"\(pad (\d) thru_hole circle \(at ([-\d.]+) ([-\d.]+) [-\d.]+\) \(size [\d.]+ [\d.]+\) \(layers \*\.Cu \*\.Mask\)\(drill [\d.]+\)\)",
+                  pad, src)
 
 
 def write():

@@ -19,6 +19,7 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
     "led": "LED-SMD_L1.6-W0.8-R-RD", "sw": "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5", "l0806": "L0806",
     "can8": "CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD", "r0603": "R0603", "r0805": "R0805", "c0603": "C0603",
     "c0805": "C0805", "r0402": "R0402", "c0402": "C0402", "l0402": "L0402", "trs": "TRS_PADS_SMD",
+    "sot23fet": "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR",
     "din": "CONN-TH_DIN-504B-M10",
 }
 
@@ -34,6 +35,8 @@ GPIO = {   # firmware's board.h (README "Pin map"): function -> (GPIO, chip pin)
     "VBANK_ADC": (1, "6"),      # ADC1_CH0: the reservoir through 1 M / 1 M (half its voltage)
     "VBUS_SENSE": (2, "7"),     # ADC1_CH1: USB VBUS through 100 k / 100 k (2.5 V when USB is plugged)
     "PWR_HOLD": (4, "9"),       # RTC_GPIO4: high keeps the buck on below the detector's threshold (hold it in sleep)
+    "MIDI2_TX": (10, "15"),     # the second MIDI OUT on the POWER IN port (USB power only): the gate of Q1, high = current
+                                #  = a 0 bit (UART TX inverted in the GPIO matrix); R22 holds it low in reset and sleep
     "USB_DN": (19, "25"),
     "USB_DP": (20, "26"),
 }
@@ -61,8 +64,14 @@ PARTS = [
     ("R5", "R", "4.7", "r0805", "C17675", {"1": "VUSB_D", "2": "VSYS"}),
     # ---- POWER IN: the gear's MIDI OUT / THRU; ring (pin 4) and tip (pin 5) each through 47 ohm and a Schottky
     ("J3", "jack", "POWER IN", "jack", "C431535", {"4": "PIN_T", "3": "PIN_R", "1": "GND"}),
-    ("P3", "trs", "POWER IN pads", "trs", "", {"T": "PIN_T", "R": "PIN_R", "S": "GND"}),
     ("J6", "din", "POWER IN DIN", "din", "C2939346", {"2": "PIN_R", "4": "PIN_T", "3": "GND"}),
+    # ---- the second MIDI OUT on the same port, from USB power only (README "MIDI OUT 2"): ring = +3V3 through 33 ohm
+    #      and a Schottky (a gear's 5 V there never reaches +3V3), tip = an open drain through 10 ohm (off: nothing)
+    ("R21", "R", "33", "r0603", "C23140", {"1": "+3V3", "2": "M2_A"}),
+    ("D6", "D", "B5819W", "sod123", "C8598", {"1": "PIN_R", "2": "M2_A"}),
+    ("Q1", "nfet", "AO3400A", "sot23fet", "C20917", {"1": "MIDI2_TX", "2": "GND", "3": "M2_D"}),
+    ("R20", "R", "10", "r0402", "C25077", {"1": "M2_D", "2": "PIN_T"}),
+    ("R22", "R", "100k", "r0402", "C25741", {"1": "MIDI2_TX", "2": "GND"}),
     ("R1", "R", "47", "r0603", "C23182", {"1": "PIN_R", "2": "PR"}),
     ("R2", "R", "47", "r0603", "C23182", {"1": "PIN_T", "2": "PT"}),
     ("D1", "D", "B5819W", "sod123", "C8598", {"1": "VSYS", "2": "PR"}),
@@ -136,7 +145,6 @@ PARTS = [
     ("R13", "R", "100k", "r0603", "C25803", {"1": "VBUS_SENSE", "2": "GND"}),
     # ---- MIDI OUT (MIDI 1.0 at 3.3 V, CA-033): ring = source through 33 ohm, tip = sink through 10 ohm from the UART
     ("J2", "jack", "MIDI OUT", "jack", "C431535", {"4": "MO_T", "3": "MO_R", "1": "GND"}),
-    ("P2", "trs", "MIDI OUT pads", "trs", "", {"T": "MO_T", "R": "MO_R", "S": "GND"}),
     ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"2": "MO_R", "4": "MO_T", "3": "GND", "6": "GND", "7": "GND"}),
     ("R14", "R", "33", "r0805", "C17634", {"1": "+3V3", "2": "MO_R"}),
     ("R15", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MO_T"}),
@@ -156,6 +164,7 @@ LCSC = {
     "C431535": "SHOU HAN PJ-320D, 3.5 mm jack, surface mount",
     "C2873354": "TI TPS62842DGRR, 60 nA buck, 750 mA, HVSSOP-8",
     "C2909397": "Belling BL8506-40CRM, 4.0 V detector, push-pull, 0.5 uA",
+    "C20917": "AOS AO3400A, N-MOSFET 30 V 5.7 A, Vgs(th) 1.45 V, 48 mohm at 2.5 V, SOT-23",
     "C5246577": "KNSCHA RVT1000UF10V167RV0083, 1000 uF 10 V aluminium, 8 x 10.5 mm",
     "C79317": "Murata DFE201612P-2R2M, 2.2 uH 1.5 A, 0806",
     "C8598": "CJ B5819W SL, Schottky 40 V 1 A, SOD-123",
@@ -164,7 +173,7 @@ LCSC = {
     "C2286": "KT-0603R, red LED 0603",
     "C23186": "5.1 k 1% 0603", "C23182": "47 ohm 1% 0603", "C17675": "4.7 ohm 1% 0805", "C7250": "10 M 1% 0603",
     "C23196": "51 k 1% 0603", "C25804": "10 k 1% 0603", "C22935": "1 M 1% 0603", "C25803": "100 k 1% 0603",
-    "C17634": "33 ohm 1% 0805", "C22859": "10 ohm 1% 0603", "C17168": "0 ohm 0402", "C25744": "10 k 1% 0402", "C26083": "1 M 1% 0402", "C25794": "51 k 1% 0402",
+    "C17634": "33 ohm 1% 0805", "C22859": "10 ohm 1% 0603", "C17168": "0 ohm 0402", "C25744": "10 k 1% 0402", "C26083": "1 M 1% 0402", "C25077": "10 ohm 1% 0402", "C23140": "33 ohm 1% 0603", "C25741": "100 k 1% 0402", "C25794": "51 k 1% 0402",
     "C14663": "100 nF 50 V X7R 0603", "C15849": "1 uF 50 V X5R 0603", "C15850": "10 uF 25 V X5R 0805",
     "C45783": "22 uF 25 V X5R 0805", "C19702": "10 uF 10 V X5R 0603",
     "C1525": "100 nF 16 V X7R 0402", "C12530": "2.2 uF 6.3 V X5R 0402", "C15195": "10 nF 50 V X7R 0402",

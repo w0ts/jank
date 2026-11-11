@@ -69,6 +69,7 @@ SYMBOLS["xtal"] = ([("1", "X1", PAS), ("3", "X2", PAS)], [("2", "GND", PAS), ("4
 SYMBOLS["ant"] = ([("1", "FEED", PAS)], [("2", "END", PAS)], "AE", 5.08)
 SYMBOLS["din"] = ([("2", "DIN4", PAS), ("4", "DIN5", PAS), ("3", "DIN2", PAS)],
                   [("1", "DIN1", PAS), ("5", "DIN3", PAS), ("6", "SHELL", PAS), ("7", "SHELL", PAS)], "J", 5.08)
+SYMBOLS["nfet"] = ([("1", "G", "input")], [("3", "D", PAS), ("2", "S", PAS)], "Q", 5.08)
 SYMBOLS["ufl"] = ([("1", "SIG", PAS)], [("2", "GND", PAS), ("3", "GND", PAS)], "J", 5.08)
 
 
@@ -167,9 +168,9 @@ def schematic():
         "VSYS: C1 + C2 (2 x 1000 uF) and C3. U2 TPS62842 makes +3V3 (R7 51k), enabled by BUCK_EN = U3 (VSYS above ~4.16 V rising,"
         " 4.0 V falling) OR VBUS OR PWR_HOLD (GPIO4), through D4 / D5; C4 + R6 keep it ~1 s after they drop.",
         "MIDI OUT J2 (to a gear's MIDI IN, type A): ring = +3V3 through R14 33 ohm, tip = MIDI_TX (GPIO21) through R15 10 ohm, sleeve = GND."
-        " P2 / P3: solder pads for a cable instead of each jack; J5 / J6: DIN sockets on the bottom, in parallel (DNP, hand-soldered).",
+        " J5 / J6: DIN sockets on the bottom, in parallel (DNP, hand-soldered; a cable can go on their pads too).",
         "Pins: GPIO21 MIDI_TX, GPIO38 LED, GPIO0 BOOT, GPIO1 VBANK_ADC (VSYS / 2), GPIO2 VBUS_SENSE (VBUS / 2), GPIO4 PWR_HOLD,"
-        " GPIO19 / 20 USB D- / D+. GPIO3, 45, 46 (strapping) open: internal defaults (3.3 V flash, SPI boot).",
+        " GPIO19 / 20 USB D- / D+, GPIO10 MIDI2_TX (Q1: the POWER IN port as a second MIDI OUT, USB power only). GPIO3, 45, 46 (strapping) open: internal defaults (3.3 V flash, SPI boot).",
         "U1 ESP32-S3FN8: VDDA C11-C13; VDD3P3 through L2 2 nH (C14-C17 before, C18 after); VDD3P3_CPU C19, VDD3P3_RTC C20; VDD_SPI C21 + C22;"
         " CHIP_PU R8 10k / C7 1u; Y1 40 MHz, C9 / C10 10 pF, R17 0 ohm on XTAL_P (XIAO ESP32S3 v1.2 values).",
         "RF: LNA_IN, C23 1 pF shunt, L3 3.3 nH series, C24 shunt (DNP), the 50 ohm line (net RF), C25 (DNP), R18 0 ohm, C26 (DNP),"
