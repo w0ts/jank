@@ -11,8 +11,9 @@ for ref, var in (("SW1", "sw"), ("LED1", "led")):
     m = re.search(r'"%s":\s*\(([^,]+),\s*([^,]+),' % ref, src)
     if not m:
         sys.exit("place_args: %s not found in PLACE" % ref)
-    W = 44.0
-    x = eval(m.group(1), {"W": W}) if "W" in m.group(1) else float(m.group(1))
+    W = float(re.search(r"^W, H = ([\d.]+)", src, re.M).group(1))
+    S = float(re.search(r"^S = ([\d.]+)", src, re.M).group(1)) if re.search(r"^S = ", src, re.M) else 0.0
+    x = eval(m.group(1), {"W": W, "S": S})
     y = float(m.group(2))
     out.append("%s=[%g,%g]" % (var, x, y))
 print(*out)

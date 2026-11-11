@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>/Users/mots/GitHub/jank/worktrees/hw-tiny/hardware/chip/chip.kicad_sch</source>
-    <date>2026-11-11T10:22:11</date>
+    <date>2026-11-11T15:47:08</date>
     <tool>Eeschema 10.0.8</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -49,16 +49,16 @@
       </units>
     </comp>
     <comp ref="C1">
-      <value>1000u 10V</value>
-      <footprint>chip:CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD</footprint>
+      <value>2200u 10V</value>
+      <footprint>chip:CAP-SMD_BD10.0-L10.3-W10.3-LS10.9-FD</footprint>
       <fields>
-        <field name="LCSC">C5246577</field>
-        <field name="Footprint">chip:CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD</field>
+        <field name="LCSC">C51018335</field>
+        <field name="Footprint">chip:CAP-SMD_BD10.0-L10.3-W10.3-LS10.9-FD</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="CP" description="jank chip: CP"/>
-      <property name="LCSC" value="C5246577"/>
+      <property name="LCSC" value="C51018335"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -73,16 +73,16 @@
       </units>
     </comp>
     <comp ref="C2">
-      <value>1000u 10V</value>
-      <footprint>chip:CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD</footprint>
+      <value>2200u 10V</value>
+      <footprint>chip:CAP-SMD_BD10.0-L10.3-W10.3-LS10.9-FD</footprint>
       <fields>
-        <field name="LCSC">C5246577</field>
-        <field name="Footprint">chip:CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD</field>
+        <field name="LCSC">C51018335</field>
+        <field name="Footprint">chip:CAP-SMD_BD10.0-L10.3-W10.3-LS10.9-FD</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="CP" description="jank chip: CP"/>
-      <property name="LCSC" value="C5246577"/>
+      <property name="LCSC" value="C51018335"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -146,15 +146,15 @@
     </comp>
     <comp ref="C5">
       <value>22u</value>
-      <footprint>chip:C0805</footprint>
+      <footprint>chip:C0603</footprint>
       <fields>
-        <field name="LCSC">C45783</field>
-        <field name="Footprint">chip:C0805</field>
+        <field name="LCSC">C59461</field>
+        <field name="Footprint">chip:C0603</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="C" description="jank chip: C"/>
-      <property name="LCSC" value="C45783"/>
+      <property name="LCSC" value="C59461"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -678,6 +678,30 @@
         </unit>
       </units>
     </comp>
+    <comp ref="C28">
+      <value>100n</value>
+      <footprint>chip:C0402</footprint>
+      <fields>
+        <field name="LCSC">C1525</field>
+        <field name="Footprint">chip:C0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value="C1525"/>
+      <property name="Sheetname" value="chip"/>
+      <property name="Sheetfile" value="chip.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>50dfae9c-1a6b-5287-b3cd-d63dfe746178</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
     <comp ref="D1">
       <value>B5819W</value>
       <footprint>chip:SOD-123_L2.7-W1.6-LS3.7-RD-1</footprint>
@@ -913,7 +937,7 @@
       </units>
     </comp>
     <comp ref="J4">
-      <value>U.FL DNP</value>
+      <value>U.FL</value>
       <footprint>chip:RF-SMD_FRF05002-JSS103M</footprint>
       <fields>
         <field name="LCSC">C88374</field>
@@ -925,8 +949,6 @@
       <property name="LCSC" value="C88374"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
-      <property name="exclude_from_bom"/>
-      <property name="dnp"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>e73fea6e-b2af-5b60-88d7-ebc446c15b6e</tstamps>
       <units>
@@ -1531,7 +1553,7 @@
       </units>
     </comp>
     <comp ref="R18">
-      <value>0</value>
+      <value>0 DNP</value>
       <footprint>chip:R0402</footprint>
       <fields>
         <field name="LCSC">C17168</field>
@@ -1543,6 +1565,8 @@
       <property name="LCSC" value="C17168"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>0ab5837c-177f-5cde-8934-58ae37ea369e</tstamps>
       <units>
@@ -1555,20 +1579,18 @@
       </units>
     </comp>
     <comp ref="R19">
-      <value>0 DNP</value>
+      <value>0</value>
       <footprint>chip:R0402</footprint>
       <fields>
-        <field name="LCSC"/>
+        <field name="LCSC">C17168</field>
         <field name="Footprint">chip:R0402</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value=""/>
+      <property name="LCSC" value="C17168"/>
       <property name="Sheetname" value="chip"/>
       <property name="Sheetfile" value="chip.kicad_sch"/>
-      <property name="exclude_from_bom"/>
-      <property name="dnp"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>f0583a19-50e4-5b80-b66b-0488d064bdfd</tstamps>
       <units>
@@ -1643,6 +1665,30 @@
       <property name="Sheetfile" value="chip.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>8701914e-3b90-58ee-97d7-0e2b3d9639f4</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R23">
+      <value>33k</value>
+      <footprint>chip:R0603</footprint>
+      <fields>
+        <field name="LCSC">C4216</field>
+        <field name="Footprint">chip:R0603</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C4216"/>
+      <property name="Sheetname" value="chip"/>
+      <property name="Sheetfile" value="chip.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>540d661d-179f-592e-bc85-7e37c2343fc6</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -1803,6 +1849,33 @@
       <property name="Sheetfile" value="chip.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>47a27607-953c-52cb-8a20-d67cf3f6b945</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="3"/>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="U4">
+      <value>BL8506-30NRM</value>
+      <footprint>chip:SOT-23-3_L2.9-W1.6-P1.90-LS2.8-TL</footprint>
+      <fields>
+        <field name="LCSC">C2763866</field>
+        <field name="Footprint">chip:SOT-23-3_L2.9-W1.6-P1.90-LS2.8-TL</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="det" description="jank chip: det"/>
+      <property name="LCSC" value="C2763866"/>
+      <property name="Sheetname" value="chip"/>
+      <property name="Sheetfile" value="chip.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>371bfed8-a876-58a8-b362-3d11c59400a4</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -2212,6 +2285,7 @@
       <node ref="U1" pin="55" pinfunction="VDDA_55" pintype="power_in"/>
       <node ref="U1" pin="56" pinfunction="VDDA_56" pintype="power_in"/>
       <node ref="U2" pin="1" pinfunction="VOS_1" pintype="power_in"/>
+      <node ref="U4" pin="3" pinfunction="VDD_3" pintype="power_in"/>
     </net>
     <net code="2" name="/ANT_END" class="Default">
       <node ref="AE1" pin="2" pinfunction="END_2" pintype="passive"/>
@@ -2246,6 +2320,7 @@
       <node ref="C7" pin="1" pintype="passive"/>
       <node ref="R8" pin="2" pintype="passive"/>
       <node ref="U1" pin="4" pinfunction="CHIP_PU_4" pintype="input"/>
+      <node ref="U4" pin="1" pinfunction="VOUT_1" pintype="output"/>
     </net>
     <net code="9" name="/DET" class="Default">
       <node ref="D4" pin="1" pinfunction="A1_1" pintype="passive"/>
@@ -2271,6 +2346,7 @@
       <node ref="C24" pin="2" pintype="passive"/>
       <node ref="C25" pin="2" pintype="passive"/>
       <node ref="C26" pin="2" pintype="passive"/>
+      <node ref="C28" pin="2" pintype="passive"/>
       <node ref="C3" pin="2" pintype="passive"/>
       <node ref="C4" pin="2" pintype="passive"/>
       <node ref="C5" pin="2" pintype="passive"/>
@@ -2295,6 +2371,7 @@
       <node ref="R11" pin="2" pintype="passive"/>
       <node ref="R13" pin="2" pintype="passive"/>
       <node ref="R22" pin="2" pintype="passive"/>
+      <node ref="R23" pin="2" pintype="passive"/>
       <node ref="R3" pin="2" pintype="passive"/>
       <node ref="R4" pin="2" pintype="passive"/>
       <node ref="R6" pin="2" pintype="passive"/>
@@ -2306,6 +2383,7 @@
       <node ref="U2" pin="8" pinfunction="GND_8" pintype="power_in"/>
       <node ref="U2" pin="9" pinfunction="EP_9" pintype="power_in"/>
       <node ref="U3" pin="2" pinfunction="VSS_2" pintype="power_in"/>
+      <node ref="U4" pin="2" pinfunction="VSS_2" pintype="power_in"/>
       <node ref="Y1" pin="2" pinfunction="GND_2" pintype="passive"/>
       <node ref="Y1" pin="4" pinfunction="GND_4" pintype="passive"/>
     </net>
@@ -2411,6 +2489,7 @@
       <node ref="J1" pin="A4B9" pinfunction="VBUS_A4B9" pintype="passive"/>
       <node ref="J1" pin="B4A9" pinfunction="VBUS_B4A9" pintype="passive"/>
       <node ref="R12" pin="1" pintype="passive"/>
+      <node ref="R23" pin="1" pintype="passive"/>
     </net>
     <net code="32" name="/VBUS_SENSE" class="Default">
       <node ref="R12" pin="2" pintype="passive"/>
@@ -2419,6 +2498,7 @@
     </net>
     <net code="33" name="/VDD3P3" class="Default">
       <node ref="C18" pin="1" pintype="passive"/>
+      <node ref="C28" pin="1" pintype="passive"/>
       <node ref="L2" pin="2" pintype="passive"/>
       <node ref="U1" pin="2" pinfunction="VDD3P3_2" pintype="power_in"/>
       <node ref="U1" pin="3" pinfunction="VDD3P3_3" pintype="power_in"/>

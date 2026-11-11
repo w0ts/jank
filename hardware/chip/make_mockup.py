@@ -27,7 +27,8 @@ HEIGHT = {   # above (or below) the board face, mm
     "C0402": 0.55, "R0402": 0.45, "L0402": 0.55,
     "USB-C-SMD_TYPE-C-16PIN-2MD-073": 3.3,         # (estimate: the usual 3.26)
     "AUDIO-SMD_PJ-320D-1": 5.0,                    # (the PJ-320D family: 5.0, UNVERIFIED for C431535)
-    "CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD": 10.5,      # (KNSCHA RVT 8 x 10.5)
+    "CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD": 10.5, "CAP-SMD_BD10.0-L10.3-W10.3-LS10.9-FD": 10.5,   # (8 / 10 x 10.5 cans)
+    "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-TL": 1.1,
     "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5": 1.5,
     "L0806": 1.2, "HVSSOP-8_L3.0-W3.0-P0.65-LS4.9-BL-EP": 1.1, "SOD-123_L2.7-W1.6-LS3.7-RD-1": 1.2,
     "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR": 1.1, "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR": 1.1, "SOT-23-3_L3.0-W1.7-P0.95-LS2.9-BR": 1.1,

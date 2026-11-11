@@ -17,7 +17,7 @@ CLEAR = 0.17            # (the rules say 0.15; 0.02 for the grid's corners)
 EDGE = 0.3              # copper to the board edge
 VIA_D, VIA_DRILL = 0.6, 0.3
 VIA_EXTRA = 0.12        # (a via's drill keeps 0.5 mm from the next drill: vias at least 0.8 apart)
-CLASSES = {"sig": 0.2, "pwr": 0.5, "via": VIA_D}   # (pwr: the widest power track, 0.5)
+CLASSES = {"sig": 0.2, "mid": 0.3, "pwr": 0.5, "via": VIA_D}   # (mid: the 0.3 joins to the buck's pins; pwr: the widest power track, 0.5)
 DIRS = [(1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0),
         (1, 1, 1.4142), (1, -1, 1.4142), (-1, 1, 1.4142), (-1, -1, 1.4142)]
 BOTTOM_COST = 1.6       # (keep the bottom a ground plane where possible)
@@ -258,7 +258,7 @@ def route_net(R, net, cls, width, pads, margin=6.0):
     return segs_all, vias_all, failed
 
 
-def via_near(R, net, rect, layer, reach=2.5):
+def via_near(R, net, rect, layer, reach=2.5, avoid=frozenset()):
     """a stub from a pad to the nearest place a via of the net fits: (segments, via) or None"""
     n = R.nid(net)
     mv = R.mask["via"]
@@ -271,7 +271,7 @@ def via_near(R, net, rect, layer, reach=2.5):
             if not (0 <= ix < nx and 0 <= iy < R.ny):
                 continue
             i = iy * nx + ix
-            if mv[0][i] in (0, n) and mv[1][i] in (0, n):
+            if mv[0][i] in (0, n) and mv[1][i] in (0, n) and i not in avoid:
                 goals.append((layer, ix, iy))
     if not goals:
         return None

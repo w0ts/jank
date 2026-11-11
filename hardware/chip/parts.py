@@ -17,7 +17,7 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
     "buck": "HVSSOP-8_L3.0-W3.0-P0.65-LS4.9-BL-EP", "det": "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR",
     "bav70": "SOT-23-3_L3.0-W1.7-P0.95-LS2.9-BR", "sod123": "SOD-123_L2.7-W1.6-LS3.7-RD-1",
     "led": "LED-SMD_L1.6-W0.8-R-RD", "sw": "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5", "l0806": "L0806",
-    "can8": "CAP-SMD_BD8.0-L8.3-W8.3-LS9.3-FD", "r0603": "R0603", "r0805": "R0805", "c0603": "C0603",
+    "can10": "CAP-SMD_BD10.0-L10.3-W10.3-LS10.9-FD", "det_tl": "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-TL", "r0603": "R0603", "r0805": "R0805", "c0603": "C0603",
     "c0805": "C0805", "r0402": "R0402", "c0402": "C0402", "l0402": "L0402", "trs": "TRS_PADS_SMD",
     "sot23fet": "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR",
     "din": "CONN-TH_DIN-504B-M10",
@@ -47,7 +47,7 @@ CHIP_PIN = {"1": "LNA_IN", "2": "VDD3P3", "3": "VDD3P3", "4": "CHIP_PU", "20": "
 U1 = dict(CHIP_PIN)
 U1.update({pin: name for name, (_g, pin) in GPIO.items()})
 
-DNP = {"C24", "C25", "C26", "R19", "J4",   # (pads only: matching positions and the u.FL path)
+DNP = {"C24", "C25", "C26", "R18", "U4",   # (pads only: the matching positions, the chip antenna's 0 ohm, the supervisor)
        "J5", "J6"}                            # (the DIN sockets, bottom side: an optional hand-solder, README "DIN")
 # JLC's footprint for the DIN-504B-M10 numbers its pads 1..5 along the two rows, not as the DIN pins: pad 1 = DIN 1,
 # pad 2 = DIN 4, pad 3 = DIN 2 (the middle), pad 4 = DIN 5, pad 5 = DIN 3 (hardware/pcb's
@@ -76,9 +76,9 @@ PARTS = [
     ("R2", "R", "47", "r0603", "C23182", {"1": "PIN_T", "2": "PT"}),
     ("D1", "D", "B5819W", "sod123", "C8598", {"1": "VSYS", "2": "PR"}),
     ("D2", "D", "B5819W", "sod123", "C8598", {"1": "VSYS", "2": "PT"}),
-    # ---- the reservoir: 2 x 1000 uF 10 V aluminium (2 mF), the buck's own 10 uF
-    ("C1", "CP", "1000u 10V", "can8", "C5246577", {"1": "VSYS", "2": "GND"}),
-    ("C2", "CP", "1000u 10V", "can8", "C5246577", {"1": "VSYS", "2": "GND"}),
+    # ---- the reservoir: 2 x 2200 uF 10 V aluminium (4.4 mF, the user's ruling 2026-11-11), the buck's own 10 uF
+    ("C1", "CP", "2200u 10V", "can10", "C51018335", {"1": "VSYS", "2": "GND"}),
+    ("C2", "CP", "2200u 10V", "can10", "C51018335", {"1": "VSYS", "2": "GND"}),
     ("C3", "C", "10u", "c0603", "C19702", {"1": "VSYS", "2": "GND"}),
     # ---- start-up: the detector (4.0 V falling / ~4.16 V rising) or VBUS or PWR_HOLD enables the buck; C4 / R6 keep
     #      it on ~1 s after the detector drops, so the firmware has time to raise PWR_HOLD
@@ -92,13 +92,15 @@ PARTS = [
      {"1": "+3V3", "2": "SW", "3": "GND", "4": "VSET", "5": "BUCK_EN", "6": "VSYS", "8": "GND", "9": "GND"}),
     ("R7", "R", "51k", "r0402", "C25794", {"1": "VSET", "2": "GND"}),
     ("L1", "L", "2.2u", "l0806", "C79317", {"1": "SW", "2": "+3V3"}),
-    ("C5", "C", "22u", "c0805", "C45783", {"1": "+3V3", "2": "GND"}),
+    ("C5", "C", "22u", "c0603", "C59461", {"1": "+3V3", "2": "GND"}),
     ("C6", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
     # ---- the chip (ESP32-S3FN8) and its supplies (XIAO ESP32S3 v1.2 values; Espressif's checklist)
     ("U1", "chip", "ESP32-S3FN8", "qfn56", "C2913196", U1),
     #      VDDA (55, 56): 2.2 uF + 100 nF + 10 nF
     ("C11", "C", "2.2u", "c0402", "C12530", {"1": "+3V3", "2": "GND"}),
     ("C12", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
+    #      VDD3P3 right at its pins: 100 nF (the 2 nH's own 100 nF, C18, is past it)
+    ("C28", "C", "100n", "c0402", "C1525", {"1": "VDD3P3", "2": "GND"}),
     ("C13", "C", "10n", "c0402", "C15195", {"1": "+3V3", "2": "GND"}),
     #      VDD3P3 (2, 3, the RF supply): 10 uF (the checklist) + 2 x 2.2 uF + 100 nF, the 2 nH (>= 500 mA), 100 nF after
     ("C17", "C", "10u", "c0603", "C19702", {"1": "+3V3", "2": "GND"}),
@@ -116,7 +118,10 @@ PARTS = [
     ("R8", "R", "10k", "r0402", "C25744", {"1": "+3V3", "2": "CHIP_PU"}),
     ("C7", "C", "1u", "c0402", "C52923", {"1": "CHIP_PU", "2": "GND"}),
     ("R16", "R", "10k", "r0402", "C25744", {"1": "+3V3", "2": "BOOT"}),
-    #      40 MHz crystal, 8 pF load, +-10 ppm; 10 pF each side, 0 ohm in series on XTAL_P (XIAO)
+    #      (DNP) pads for a 3.0 V supervisor on CHIP_PU (open drain, R8 the pull-up): README "Start-up"
+    ("U4", "det", "BL8506-30NRM", "det_tl", "C2763866", {"3": "+3V3", "2": "GND", "1": "CHIP_PU"}),
+    #      40 MHz crystal, 8 pF load, +-10 ppm; 10 pF each side (C_L = 10 x 10 / 20 + ~2.5 pF stray = ~7.5 pF: README),
+    #      0 ohm in series on XTAL_P (XIAO)
     ("Y1", "xtal", "40MHz 8pF", "xtal", "C254377", {"1": "XTAL_X1", "3": "XTAL_N", "2": "GND", "4": "GND"}),
     ("R17", "R", "0", "r0402", "C17168", {"1": "XTAL_X1", "2": "XTAL_P"}),
     ("C9", "C", "10p", "c0402", "C32949", {"1": "XTAL_X1", "2": "GND"}),
@@ -128,11 +133,11 @@ PARTS = [
     ("L3", "L", "3.3nH", "l0402", "C87532", {"1": "LNA_IN", "2": "RF"}),
     ("C24", "C", "DNP", "c0402", "", {"1": "RF", "2": "GND"}),
     ("C25", "C", "DNP", "c0402", "", {"1": "RF", "2": "GND"}),
-    ("R18", "R", "0", "r0402", "C17168", {"1": "RF", "2": "ANT_FEED"}),
+    ("R18", "R", "0 DNP", "r0402", "C17168", {"1": "RF", "2": "ANT_FEED"}),
     ("C26", "C", "DNP", "c0402", "", {"1": "ANT_FEED", "2": "GND"}),
     ("AE1", "ant", "ANT3216LL00R2400A", "ant", "C293767", {"1": "ANT_FEED", "2": "ANT_END"}),   # (2: the end pad, its copper extended, unconnected)
-    ("R19", "R", "0 DNP", "r0402", "", {"1": "RF", "2": "UFL"}),
-    ("J4", "ufl", "U.FL DNP", "ufl", "C88374", {"1": "UFL", "2": "GND", "3": "GND"}),
+    ("R19", "R", "0", "r0402", "C17168", {"1": "RF", "2": "UFL"}),
+    ("J4", "ufl", "U.FL", "ufl", "C88374", {"1": "UFL", "2": "GND", "3": "GND"}),
     # ---- the button, the LED
     ("SW1", "sw", "BOOT", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BOOT", "4": "BOOT"}),
     ("LED1", "led", "red", "led", "C2286", {"1": "LED_A", "2": "GND"}),
@@ -143,6 +148,8 @@ PARTS = [
     ("C8", "C", "100n", "c0402", "C1525", {"1": "VBANK_ADC", "2": "GND"}),
     ("R12", "R", "100k", "r0603", "C25803", {"1": "VBUS", "2": "VBUS_SENSE"}),
     ("R13", "R", "100k", "r0603", "C25803", {"1": "VBUS_SENSE", "2": "GND"}),
+    # ---- VBUS's pull-down: without USB, D3's leakage could float VBUS up through R12 / R13 and lift BUCK_EN via D5
+    ("R23", "R", "33k", "r0603", "C4216", {"1": "VBUS", "2": "GND"}),
     # ---- MIDI OUT (MIDI 1.0 at 3.3 V, CA-033): ring = source through 33 ohm, tip = sink through 10 ohm from the UART
     ("J2", "jack", "MIDI OUT", "jack", "C431535", {"4": "MO_T", "3": "MO_R", "1": "GND"}),
     ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"2": "MO_R", "4": "MO_T", "3": "GND", "6": "GND", "7": "GND"}),
@@ -153,9 +160,9 @@ PARTS = [
 # what each LCSC code is (README part list; jlc_parts.py adds stock, price and Basic / Extended as read on a day)
 LCSC = {
     "C2913196": "Espressif ESP32-S3FN8, QFN56 7 x 7, 8 MB flash in the package",
-    "C254377": "YXC X3S040000B81H-R, 40 MHz crystal 3225, 8 pF load, +-10 ppm, +-10 ppm over -20..75 C",
+    "C254377": "HELE X3S040000B81H-R, 40 MHz crystal 3225, 8 pF load, +-10 ppm, +-10 ppm over -20..75 C",
     "C293767": "YAGEO ANT3216LL00R2400A, 2.4 GHz ceramic chip antenna 3.2 x 1.6 mm",
-    "C88374": "Hirose U.FL-R-SMT-1(80), u.FL receptacle (DNP: pads only)",
+    "C88374": "Hirose U.FL-R-SMT-1(80), u.FL receptacle (fitted: the default antenna path, the user's ruling 2026-11-11)",
     "C2939346": "HOOYA DIN-504B-M10, 5-pin DIN socket, female, right angle, through hole (DNP: hand-soldered, bottom side)",
     "C76769": "TDK MLG1005S2N0BT000, 2.0 nH 900 mA 0402 (the VDD3P3 filter)",
     "C87532": "TDK MLG1005S3N3BT000, 3.3 nH 800 mA 0402 (the RF match)",
@@ -164,8 +171,9 @@ LCSC = {
     "C431535": "SHOU HAN PJ-320D, 3.5 mm jack, surface mount",
     "C2873354": "TI TPS62842DGRR, 60 nA buck, 750 mA, HVSSOP-8",
     "C2909397": "Belling BL8506-40CRM, 4.0 V detector, push-pull, 0.5 uA",
+    "C2763866": "Belling BL8506-30NRM, 3.0 V detector, open drain (DNP: pads only)",
     "C20917": "AOS AO3400A, N-MOSFET 30 V 5.7 A, Vgs(th) 1.45 V, 48 mohm at 2.5 V, SOT-23",
-    "C5246577": "KNSCHA RVT1000UF10V167RV0083, 1000 uF 10 V aluminium, 8 x 10.5 mm",
+    "C51018335": "JVB10V2200M10X10, 2200 uF 10 V aluminium, 10 x 10.5 mm",
     "C79317": "Murata DFE201612P-2R2M, 2.2 uH 1.5 A, 0806",
     "C8598": "CJ B5819W SL, Schottky 40 V 1 A, SOD-123",
     "C68978": "CJ BAV70, dual diode common cathode, SOT-23",
@@ -175,7 +183,7 @@ LCSC = {
     "C23196": "51 k 1% 0603", "C25804": "10 k 1% 0603", "C22935": "1 M 1% 0603", "C25803": "100 k 1% 0603",
     "C17634": "33 ohm 1% 0805", "C22859": "10 ohm 1% 0603", "C17168": "0 ohm 0402", "C25744": "10 k 1% 0402", "C26083": "1 M 1% 0402", "C25077": "10 ohm 1% 0402", "C23140": "33 ohm 1% 0603", "C25741": "100 k 1% 0402", "C25794": "51 k 1% 0402",
     "C14663": "100 nF 50 V X7R 0603", "C15849": "1 uF 50 V X5R 0603", "C15850": "10 uF 25 V X5R 0805",
-    "C45783": "22 uF 25 V X5R 0805", "C19702": "10 uF 10 V X5R 0603",
+    "C59461": "22 uF 6.3 V X5R 0603", "C4216": "33 k 1% 0603", "C19702": "10 uF 10 V X5R 0603",
     "C1525": "100 nF 16 V X7R 0402", "C12530": "2.2 uF 6.3 V X5R 0402", "C15195": "10 nF 50 V X7R 0402",
     "C52923": "1 uF 25 V X5R 0402", "C32949": "10 pF 50 V C0G 0402",
 }

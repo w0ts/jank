@@ -29,61 +29,67 @@ MM = pcbnew.FromMM
 OX, OY = 100.0, 100.0
 LIB = os.path.join(HERE, "lib", "chip.pretty")
 NAME = "chip"
-W, H = 44.0, 51.5
+W, H = 47.6, 51.5
 GE = 41.5                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
-CX, CY = 18.8, 30.4         # the chip's centre (turned 180: LNA_IN at the right side's bottom)
+S = 1.8                     # (the middle's shift since the 2200 uF cans widened the board from 44 to 47.6 mm)
+CX, CY = 18.8 + S, 30.4     # the chip's centre (turned 180: LNA_IN at the right side's bottom)
 # the RF path (README "RF"): the line's centre x, its width and gap (grounded coplanar waveguide, 50 ohm: README)
-XA = 27.1                   # the line and the antenna on this x
+XA = 27.1 + S               # the line and the antenna on this x
 RF_W, RF_GAP = 1.2, 0.2
-Y_LINE = CY + 2.6           # LNA_IN's y: L3 and the line's top run along it
+Y_LINE = CY + 2.6           # LNA_IN's y
+Y_L3 = Y_LINE + 0.6         # L3 and the line's top, 0.6 under LNA_IN: room for C28 at the RF supply's pins above it
 ANT_Y = GE + 2.5 + 1.58     # the antenna's centre: its feed pad (S1) 2.0 mm past the ground edge (eval board)
-END_PAD = (1.8, 2.5)
+END_PAD = (1.8, 2.5)        # the copper beyond the antenna's end pad (S2), unconnected (eval board: 1.8 x 2.5)
 DIN_D, DIN_Y = 8.6, 20.0    # the DINs' origins: their faces (8.6 from JLC's origin) on the side edges, their axes at y 20
-CAN_Y = 33.8                # the cans' centre y (their courtyards start under the DINs' last holes)        # the copper beyond the antenna's end pad (S2), unconnected (eval board: 1.8 x 2.5)
+CAN_Y = 34.5                # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
 
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
-    # top edge: the jacks (bushings past the side edges), the USB-C between them; the cable pads under the jacks
+    # top edge: the jacks (bushings past the side edges), the USB-C between them
     "J1": (W / 2, 4.97, 180), "J2": (7.25, 5.8, 0), "J3": (W - 7.25, 5.8, 180),
     # the DIN sockets (DNP, hand-soldered) on the BOTTOM under each side edge, their faces on the edges (README "DIN")
     "J5": (DIN_D, DIN_Y, 90, "B"), "J6": (W - DIN_D, DIN_Y, 270, "B"),
-    # between the DINs' holes: left the MIDI OUT resistors, the button, the LED; right the POWER IN resistors and diodes,
-    # the detector
-    # (every top part keeps 0.8 mm from the DIN pads' copper: the iron's room, README "DIN")
-    "R14": (6.3, 17.0, 90), "R15": (8.5, 21.0, 90), "LED1": (19.9, 14.9, 0), "R9": (23.4, 14.9, 0),
+    # between the DINs' holes (every top part keeps 0.8 mm from the DIN pads' copper: the iron's room, README "DIN"):
+    # left the MIDI OUT resistors; right the POWER IN resistors and diodes, the detector, the reservoir's sense
+    "R14": (6.3, 17.0, 90), "R15": (8.5, 21.0, 90),
     "R1": (W - 2.5, 18.5, 0), "R2": (W - 2.5, 21.5, 0), "D1": (W - 8.4, 15.6, 90), "D2": (W - 6.05, 15.6, 90),
-    "U3": (W - 7.7, 21.2, 90), "D5": (W - 7.7, 25.0, 90), "C4": (23.7, 16.3, 0), "R6": (26.0, 15.18, 90),
-    # the button: in the middle, between the DINs, 8 mm or more from every tall part (the cans, the jacks, the USB-C) so a
-    # finger reaches it through the lid; the LED just above it; the button's pull-up by the chip
-    "SW1": (21.6, 19.55, 0), "R16": (15.8, 36.0, 90),
-    # the reservoir: one can down each side, under the DINs' holes
-    "C1": (4.6, CAN_Y, 90), "C2": (W - 4.6, CAN_Y, 90),
-    # under the USB-C: the CC resistors, the VBUS diode and its resistor, the VBUS sense
+    "U3": (W - 7.7, 21.2, 90), "D5": (W - 7.7, 25.0, 90), "R10": (W - 5.48, 21.2, 90),
+    # the button: in the middle, 8 mm or more from every tall part (the cans, the jacks, the USB-C), so a finger reaches it
+    # through the lid; the LED above it; BUCK_EN's parts beside it
+    "SW1": (21.6 + S, 19.55, 0), "LED1": (19.9 + S, 14.9, 0), "R9": (23.4 + S, 14.9, 0),
+    "C4": (23.7 + S, 16.3, 0), "R6": (26.0 + S, 15.18, 90), "D4": (27.13 + S, 19.2, 0),
+    # the reservoir: one 2200 uF can down each side, under the DINs' holes
+    "C1": (5.5, CAN_Y, 90), "C2": (W - 5.5, CAN_Y, 90),
+    # under the USB-C: the CC resistors, the VBUS diode and its resistor, the VBUS sense and pull-down
     "R3": (W / 2 - 4.2, 9.0, 0), "R13": (W / 2 - 4.2, 10.8, 0), "D3": (W / 2, 10.1, 0), "R12": (W / 2 + 3.6, 9.8, 90),
-    "R4": (W / 2 + 5.4, 9.8, 90), "R5": (W / 2, 12.35, 0),
-    # centre: the buck, BUCK_EN's diode, the senses
-    # the buck: lower left, beside C1 (VSYS) and under the chip's left side
-    "U2": (11.2, 32.9, 0), "L1": (11.2, 37.4, 0), "C5": (11.2, 40.0, 0), "R7": (13.9, 35.25, 0), "C6": (14.35, 36.75, 90),
-    "C3": (14.35, 39.2, 90), "D4": (27.13, 19.2, 0),
+    "R4": (W / 2 + 5.4, 9.8, 90), "R5": (W / 2, 12.35, 0), "R23": (W / 2 + 7.2, 9.8, 90),
+    # the buck: lower left beside C1, its 10 uF input ceramic C3 right at VIN / GND (pins 6 / 8), L1 under it
+    "C3": (11.2 + S, 30.68, 180), "U2": (11.2 + S, 34.6, 0), "L1": (11.25 + S, 39.0, 0),
+    "C5": (14.35 + S, 39.4, 90), "C6": (14.35 + S, 35.0, 90), "R7": (13.9 + S, 36.7, 0), "R16": (15.8 + S, 34.85, 0),
     # the chip (turned 180: LNA_IN at the bottom of its right side) and its parts round it
     "U1": (CX, CY, 180),
-    "C20": (CX + 0.6, CY - 4.45, 0),                                                    # VDD3P3_RTC (pin 20, top)
-    "R10": (38.52, 21.2, 90), "R11": (27.0, 22.0, 90), "C8": (28.0, 21.95, 90), "R8": (27.85, 28.1, 90), "C7": (26.9, 28.0, 90),
-    "C21": (13.9, 30.5, 270), "C22": (13.9, 32.3, 270),                   # VDD_SPI (pin 29, left)
+    "C20": (CX + 1.5, CY - 4.45, 0),                                                  # VDD3P3_RTC (pin 20, top)
+    "U4": (23.8 + S, 24.05, 180),                                    # (DNP) a 3.0 V supervisor on CHIP_PU, README "Start-up"
+    "R11": (27.0 + S, 22.0, 90), "C8": (28.0 + S, 21.95, 90), "R8": (27.85 + S, 28.1, 90), "C7": (26.9 + S, 28.0, 90),
+    "C21": (13.9 + S, 30.5, 270), "C22": (13.9 + S, 32.3, 270),                       # VDD_SPI (pin 29, left)
     "C19": (CX - 1.4, CY + 4.85, 90),                                                  # VDD3P3_CPU (pin 46, bottom)
     "C13": (CX + 2.94, CY + 4.9, 270), "C12": (CX + 3.87, CY + 4.9, 270), "C11": (CX + 5.9, CY + 4.6, 90),   # VDDA
+    "C28": (CX + 4.82, CY + 2.0, 0),                                   # 100 nF right at the RF supply's pins (2, 3)
     "L2": (CX + 9.1, CY - 0.2, 270), "C18": (CX + 9.8, CY + 1.5, 0),                   # VDD3P3: the 2 nH, 100 nF after it
-    "C16": (29.0, 30.0, 90), "C14": (30.0, 32.2, 90), "C15": (31.0, 32.2, 90),
-    "C17": (32.4, 32.4, 90),                                                    # (10 uF: the checklist)
-    "Y1": (19.5, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.75, 37.7, 270), "C9": (21.0, CY + 10.3, 0),
-    # RF (README "RF"): the chip's pi (C23 shunt at the pin, L3 series, C24 shunt), the line down to the antenna's pi
-    # (C25 shunt, R18 the series 0 ohm, C26 shunt) at the ground edge; R19 / J4 the u.FL path (unfitted)
-    "C23": (CX + 4.8, Y_LINE + 1.8, 270), "L3": (CX + 5.9, Y_LINE, 0), "C24": (XA + 1.35, Y_LINE + 1.0, 0),
-    "C25": (XA + 1.35, GE - 3.2, 0), "R18": (XA, GE - 1.6, 270), "C26": (XA + 1.35, GE - 0.9, 0),
-    "R19": (XA - 1.4, GE - 5.15, 180), "J4": (XA - 2.9, GE - 2.1, 0),
+    "C16": (29.0 + S, 30.0, 90), "C14": (30.0 + S, 32.2, 90), "C15": (31.0 + S, 32.2, 90),
+    "C17": (32.4 + S, 32.4, 90),                                                         # (10 uF: the checklist)
+    "Y1": (19.5 + S, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.75 + S, 37.7, 270), "C9": (21.0 + S, CY + 10.3, 0),
+    # RF (README "RF"): the chip's pi (C23 shunt on the line at the pin, its ground end to a via; L3 series; C24 shunt),
+    # the line down to the antenna's pi (C25 shunt, R18 the series 0 ohm: DNP, C26 shunt) at the ground edge; R19 (fitted) / J4
+    # (fitted) the u.FL path, the default (the user's ruling 2026-11-11); the unfitted pads right against the line (their
+    # stubs as short as the pads allow)
+    "C23": (CX + 4.8, Y_LINE + 0.85, 270), "L3": (CX + 6.5, Y_L3, 0), "C24": (XA + 1.0, Y_L3 + 1.0, 0),
+    "C25": (XA + 1.0, GE - 3.2, 0), "R18": (XA, GE - 1.6, 270), "C26": (XA + 1.35, GE - 0.9, 0),
+    "R19": (XA - 1.0, 36.8, 180), "J4": (XA - 2.9, GE - 2.55, 180),   # (J4's signal pad up, ~2 mm from R19)
     "AE1": (XA, ANT_Y, 270),
     # MIDI OUT 2 (README "MIDI OUT 2"): the source's 33 ohm and Schottky, the sink's FET, 10 ohm and gate pull-down
-    "D6": (32.15, 35.15, 0), "Q1": (31.4, 37.95, 0), "R21": (31.4, 40.55, 0), "R20": (34.2, 37.8, 90), "R22": (34.2, 39.9, 90),
+    "D6": (32.15 + S, 35.15, 0), "Q1": (31.4 + S, 37.95, 0), "R21": (31.4 + S, 40.55, 0), "R20": (34.2 + S, 37.8, 90),
+    "R22": (34.2 + S, 39.9, 90),
 }
 WIDTH = {"VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
 ORDER = ["USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
@@ -134,10 +140,14 @@ def place():
         if side == "B":                          # (flipped once on the board: a loose footprint has no layers to flip)
             f.Flip(f.GetPosition(), pcbnew.FLIP_DIRECTION_LEFT_RIGHT)
         f.SetOrientationDegrees(rot)
-        if not P.fitted(ref):                    # (pads only: no part, no model, out of the BOM and the CPL)
+        if not P.fitted(ref):                    # (pads only: no part, no model, out of the BOM and the CPL, no paste)
             f.SetDNP(True)
             f.SetExcludedFromBOM(True)
             f.SetExcludedFromPosFiles(True)
+            for p in f.Pads():
+                ls = p.GetLayerSet()
+                ls.RemoveLayer(pcbnew.F_Paste)
+                p.SetLayerSet(ls)
         for p in f.Pads():
             n = pins.get(p.GetNumber())
             if n:
@@ -152,7 +162,33 @@ def place():
     for p in fps["U1"].Pads():                   # (the exposed pad: solid to the pour, its vias inside)
         if p.GetNumber() == "57":
             p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
+            windowpane(fps["U1"], p)
     return fps
+
+
+EP_VIAS = [(0.0, 0.0), (1.4, 0.0), (-1.4, 0.0), (0.0, 1.4), (0.0, -1.4)]   # the exposed pad's vias: a cross
+EP_PANE, EP_PANE_AT = 1.45, 1.05          # the paste: 4 squares 1.45 mm at (+-1.05, +-1.05), 53 % of the 4 x 4 pad, off the vias
+
+
+def windowpane(f, ep):
+    """the exposed pad's paste as four windows between its vias (a whole-pad paste would float the QFN and fill the
+    vias): the pad itself loses its paste layer; four paste-only apertures are added to the footprint"""
+    ls = ep.GetLayerSet()
+    ls.RemoveLayer(pcbnew.F_Paste)
+    ep.SetLayerSet(ls)
+    c = ep.GetPosition()
+    for dx in (-EP_PANE_AT, EP_PANE_AT):
+        for dy in (-EP_PANE_AT, EP_PANE_AT):
+            a = pcbnew.PAD(f)
+            a.SetAttribute(pcbnew.PAD_ATTRIB_SMD)
+            a.SetShape(pcbnew.PAD_SHAPE_RECT)
+            a.SetSize(pcbnew.VECTOR2I(MM(EP_PANE), MM(EP_PANE)))
+            pl = pcbnew.LSET()
+            pl.AddLayer(pcbnew.F_Paste)
+            a.SetLayerSet(pl)
+            a.SetNumber("")
+            a.SetPosition(pcbnew.VECTOR2I(c.x + MM(dx), c.y + MM(dy)))
+            f.Add(a)
 
 
 def bb(item):
@@ -218,10 +254,12 @@ def rf_path(fps):
     lx, ly = pad_center(pad_of(fps, "U1", "1"))
     c23 = pad_center(pad_of(fps, "C23", "1"))
     l3a, l3b = pad_center(pad_of(fps, "L3", "1")), pad_center(pad_of(fps, "L3", "2"))
-    RF_SEGS.append(("LNA_IN", 0, lx, ly, l3a[0], l3a[1], 0.25))           # (the pin is 0.2 wide)
-    RF_SEGS.append(("LNA_IN", 0, c23[0], ly, c23[0], c23[1], 0.3))        # (C23: the stub Espressif asks for)
+    # LNA_IN runs through C23's pad (no stub on the signal side; C23's ground end gets its via: Espressif's stub) to L3
+    RF_SEGS.append(("LNA_IN", 0, lx, ly, c23[0], ly, 0.25))               # (the pin is 0.2 wide)
+    RF_SEGS.append(("LNA_IN", 0, c23[0], ly, c23[0], c23[1], 0.3))
+    RF_SEGS.append(("LNA_IN", 0, c23[0], c23[1], l3a[0], l3a[1], 0.3))
     r18 = pad_center(pad_of(fps, "R18", "1"))
-    y_turn = Y_LINE
+    y_turn = Y_L3
     RF_SEGS.append(("RF", 0, l3b[0], y_turn, l3b[0] + RF_W / 2, y_turn, 0.5))   # (out of L3's pad, narrow)
     RF_SEGS.append(("RF", 0, l3b[0] + RF_W / 2, y_turn, XA, y_turn, RF_W))
     RF_SEGS.append(("RF", 0, XA, y_turn, XA, r18[1] - RF_W, RF_W))       # (its round end stops clear of R18's pad 2)
@@ -231,8 +269,7 @@ def rf_path(fps):
         RF_SEGS.append(("RF", 0, XA, c[1], c[0], c[1], 0.5))
     r19b = pad_center(pad_of(fps, "R19", "2"))
     j4 = pad_center(pad_of(fps, "J4", "1"))
-    RF_SEGS.append(("UFL", 0, r19b[0], r19b[1], j4[0], r19b[1], 0.4))     # (across, then down between J4's ground pads)
-    RF_SEGS.append(("UFL", 0, j4[0], r19b[1], j4[0], j4[1], 0.4))
+    RF_SEGS.append(("UFL", 0, r19b[0], r19b[1], j4[0], j4[1], 0.5))         # (the selector straight to J4's signal pad)
     r18b = pad_center(pad_of(fps, "R18", "2"))
     a1 = pad_center(pad_of(fps, "AE1", "1"))
     c26 = pad_center(pad_of(fps, "C26", "1"))
@@ -257,10 +294,11 @@ def rf_path(fps):
         RF_SEGS.append((n, 0, x, y, x, top, 0.2))
         if via:
             FAN_VIAS.append((n, x, top))
-    # the exposed pad: 3 x 3 vias, 1.0 mm apart (as JLC's footprint drew them)
-    for dx in (-1.0, 0.0, 1.0):
-        for dy in (-1.0, 0.0, 1.0):
-            RF_VIAS.append((CX + dx, CY + dy))
+    # VDD3P3's two pins (2 and 3) joined on top, at their pads' centre line
+    RF_SEGS.append(("VDD3P3", 0, CX + 3.41, CY + 1.8, CX + 3.41, CY + 2.2, 0.2))
+    # the exposed pad's vias (EP_VIAS: a cross, clear of the paste windows)
+    for dx, dy in EP_VIAS:
+        RF_VIAS.append((CX + dx, CY + dy))
 
 
 ITEMS = []                                       # (the routing of the attempt in progress: tracks and vias)
@@ -292,17 +330,25 @@ def via_free(R, x, y):
     return all(R.mask["via"][layer][i] in (0, n) for layer in (0, 1))
 
 
+FAN_KEEP = set()                                 # (grid cells near the fan-out stubs: no ground via there)
+
+
 def router(fps):
     """a fresh grid with every pad, the RF copper, the keep-outs; returns (router, {net: [(rect, layers, pad)]})"""
     R = route.Router(W, H)
+    FAN_KEEP.clear()
     R.block((0, 1), (0.0, GE - 0.45, W, H))     # (a via's ring and the clearance stay out of the antenna strip)
     # the bottom layer under the RF path and the chip stays ground (no tracks there)
-    R.block((1,), (CX + 3.0, Y_LINE - 0.45, XA + 1.8, Y_LINE + 1.0), ("sig", "pwr"))    # (LNA_IN, L3, the line's top)
-    R.block((1,), (XA - 1.8, Y_LINE - 1.0, XA + 1.8, GE), ("sig", "pwr"))               # (the line down to the antenna)
-    R.block((1,), (CX - 3.0, CY - 3.0, CX + 3.0, CY + 3.0), ("sig", "pwr"))
+    R.block((1,), (CX + 3.0, Y_LINE + 0.3, XA + 1.8, Y_L3 + 1.0), ("sig", "mid", "pwr"))       # (LNA_IN, L3, the line's top)
+    R.block((1,), (XA - 1.8, Y_L3 - 1.0, XA + 1.8, GE), ("sig", "mid", "pwr"))                 # (the line down to the antenna)
+    R.block((1,), (CX - 3.8, CY - 3.8, CX + 3.8, CY + 3.8), ("sig", "mid", "pwr"))             # (the chip)
+    y1 = PLACE["Y1"]
+    R.block((1,), (y1[0] - 2.0, y1[1] - 1.7, y1[0] + 2.0, y1[1] + 1.7), ("sig", "mid", "pwr"))  # (the crystal)
     by_net = {}
     for f in fps.values():
         for p in f.Pads():
+            if not (p.IsOnLayer(pcbnew.F_Cu) or p.IsOnLayer(pcbnew.B_Cu)):
+                continue                           # (the exposed pad's paste-only windows: no copper)
             n = p.GetNetname() or None
             r = bb(p)
             if p.GetAttribute() in (pcbnew.PAD_ATTRIB_PTH, pcbnew.PAD_ATTRIB_NPTH):
@@ -319,6 +365,22 @@ def router(fps):
             R.seg(layer, None, (x0, y0, x1, y1), w + 2 * max(0.0, RF_GAP + 0.05 - route.CLEAR))
     for r in COPPER:
         R.rect((0,), None, r)
+    # the drawn fan-out stubs are their net's copper: their centre lines stay passable for it even where a neighbour's
+    # clearance margin (the router's 0.17 against the rules' 0.15) reaches over them
+    for n, y, x, top, via in FANOUT:
+        k = R.nid(n)
+        pts = [(CX + 3.41 + i * route.GRID, y) for i in range(int((x - CX - 3.41) / route.GRID) + 1)]
+        pts += [(x, y - i * route.GRID) for i in range(int((y - top) / route.GRID) + 1)]
+        for px, py in pts:
+            ix, iy = int(round(px / route.GRID)), int(round(py / route.GRID))
+            R.mask["sig"][0][iy * R.nx + ix] = k
+            # (and no ground via within 0.75 of it (FAN_KEEP, for ground_vias): a via's mark on the grid, its ring +
+            # 0.12 drill room + the clearance, would otherwise close the stub although the copper keeps the rules)
+            rr = int(0.75 / route.GRID) + 1
+            for jy in range(iy - rr, iy + rr + 1):
+                for jx in range(ix - rr, ix + rr + 1):
+                    if math.hypot(jx - ix, jy - iy) * route.GRID < 0.75:
+                        FAN_KEEP.add(jy * R.nx + jx)
     for n, _y, x, top, via in FANOUT:              # (each lane's end joins its net like a pad)
         by_net.setdefault(n, []).append(((x - 0.1, top - 0.1, x + 0.1, top + 0.1), (0, 1) if via else (0,), None))
     for n, x, y in FAN_VIAS:
@@ -368,7 +430,7 @@ def route_all(fps, first=()):
         for r, layers, p in by_net["GND"]:
             if len(layers) != 1 or p.GetParentFootprint().GetReference() == "U1":
                 continue
-            res = route.via_near(R, "GND", r, layers[0])
+            res = route.via_near(R, "GND", r, layers[0], avoid=FAN_KEEP)
             if not res:
                 continue
             segs, (x, y) = res
@@ -404,8 +466,9 @@ def route_all(fps, first=()):
         for q in narrow if wide else []:
             c = ((q[0][0] + q[0][2]) / 2, (q[0][1] + q[0][3]) / 2)
             mate = min(wide, key=lambda o: (o[0][0] + o[0][2] - 2 * c[0]) ** 2 + (o[0][1] + o[0][3] - 2 * c[1]) ** 2)
-            segs, vias, bad = route.route_net(R, n, "sig", 0.2, [mate, q])
-            put(n, segs, vias, 0.2)
+            wn = 0.3 if min(q[0][2] - q[0][0], q[0][3] - q[0][1]) >= 0.3 else 0.2   # (the buck's 0.36 mm pins: 0.3)
+            segs, vias, bad = route.route_net(R, n, "mid" if wn > 0.25 else "sig", wn, [mate, q])
+            put(n, segs, vias, wn)
             failed += bad
         segs, vias, bad = route.route_net(R, n, cls, w, wide if wide else pads)
         put(n, segs, vias, w)
@@ -496,6 +559,28 @@ def tie_islands():
     return added
 
 
+def prune_dangling(longest=0.3):
+    """remove the router's leftovers: a track shorter than `longest` with an end that touches no other track, via or pad"""
+    tracks = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK"]
+    vias = [t for t in board.GetTracks() if t.GetClass() == "PCB_VIA"]
+    pads = [p for f in board.GetFootprints() for p in f.Pads()]
+    gone = 0
+    for t in tracks:
+        if pcbnew.ToMM(t.GetLength()) >= longest:
+            continue
+        hw = t.GetWidth() // 2                  # (an end touches what its round cap reaches: a pad's rounded corner too)
+        for e in (t.GetStart(), t.GetEnd()):
+            hit = any(o is not t and o.GetLayer() == t.GetLayer() and o.GetNetCode() == t.GetNetCode()
+                      and (o.HitTest(e, hw)) for o in tracks)
+            hit = hit or any(v.GetNetCode() == t.GetNetCode() and v.HitTest(e, hw) for v in vias)
+            hit = hit or any(p.GetNetCode() == t.GetNetCode() and p.IsOnLayer(t.GetLayer()) and p.HitTest(e, hw) for p in pads)
+            if not hit:
+                board.Remove(t)
+                gone += 1
+                break
+    print(f"{gone} dangling stubs removed")
+
+
 def outline():
     pts = [(0, 0), (W, 0), (W, H), (0, H)]
     for (ax, ay), (bx, by) in zip(pts, pts[1:] + pts[:1]):
@@ -544,8 +629,9 @@ def zones():
 
 
 def silk():
-    label("OUT", 2.0, 22.0, 0.7, 90)            # (POWER IN's label: on the case; no room by J3)
-    label("BOOT", 21.6, 23.0, 0.6)
+    label("MIDI OUT", 6.0, 12.3, 0.7)            # (J2 and J5)
+    label("PWR IN / OUT 2", W - 6.1, 12.3, 0.6)  # (J3 and J6: the power input, or MIDI OUT 2 on USB power)
+    label("BOOT", 21.6 + S, 23.0, 0.6)
     label("jank chip", 12.0, GE + 3.0, 1.0)
     label("antenna strip:", 12.0, GE + 4.6, 0.6)
     label("no copper", 12.0, GE + 5.5, 0.6)
@@ -562,6 +648,7 @@ def main():
             if via_free(R, x, y):
                 add_via("GND", x, y)
     draw_rf()
+    prune_dangling()
     outline()
     zones()
     silk()
