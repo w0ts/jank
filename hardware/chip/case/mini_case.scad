@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// jank mini: the printed case for the jank chip board (hardware/chip, chip.kicad_pcb, 49.6 x 52.5 x 1.6 mm), with
+// jank mini: the printed case for the jank chip board (hardware/chip, chip.kicad_pcb, 54.2 x 52.5 x 1.6 mm), with
 // (din = true) or without (din = false) the two 5-pin DIN sockets J5 / J6 on the board's bottom.
 //
 // The board lies top up. Its TOP carries everything tall (the two reservoir cans 10.5 mm, the USB-C, the two 3.5 mm
@@ -22,7 +22,7 @@ part = "assembly";   // [assembly, open, base, lid, button_cap, led_pipe, check_
 din = false;         // true: the DIN sockets J5 / J6 fitted: the deep base with their slots
 
 /* [Board] */
-W = 49.6;  H = 52.5;  bt = 1.6;     // (49.6 x 52.5 since the DIN pads' rings, 2026-11-11)
+W = 54.2;  H = 52.5;  bt = 1.6;     // (make_stl.sh sets W and H from make_board.py)
 function by(y) = H - y;
 /* [Case] */
 e = 1.8;          // the outer face from the board's edge
@@ -38,12 +38,14 @@ roof = 1.4;
 zt = z_in + roof;         // 14.0
 floor_t = 1.4;
 /* [Under the board] */
-tail = 1.5;       // the longest tail under the board (USB-C legs 0.9, jack pegs 0.55 in their 3D models: UNVERIFIED) + margin
+tail = 3.9;       // the longest tail under the board: the through-hole jacks' legs, 3.5 in their 3D model (UNVERIFIED), + margin
+jack_legs = [[11.3, 8.1], [3.2, 3.5], [6.2, 3.5], [10.2, 3.5],               // J2's pads A, B, C, D (board x, y)
+             [W - 11.3, 3.5], [W - 3.2, 8.1], [W - 6.2, 8.1], [W - 10.2, 8.1]];   // J3's (turned 180)
 din_h = 19.6;  din_gap = 0.35;
 under = din ? din_h + din_gap : tail + 0.4;   // the floor's top under the board
 zbot = -under - floor_t;
 /* [DIN: HOOYA DIN-504B-M10, drawing rev A1 + lib/3d model] */
-din_y = 20.0;                            // the axis, board y
+din_y = 20.3;                            // the axis, board y (make_stl.sh sets it from make_board.py's DIN_Y)
 plate = [20.9, 1.8, 19.6];               // along the edge, thick, high (z down from the board)
 body = [17.9, 15.3 - 1.8, 17.6];         // behind the plate: wide, deep, high (UNVERIFIED: the 3D model, +-0.2)
 play = 0.35;                             // the body to the back cheek's opening
@@ -51,18 +53,19 @@ slot_play = 0.1;                         // the plate in its slot: a face and ea
                                          // hardware/box's slot_play on the hardware branch: the plate locks in)
 rim = [1.3, 2.2];                        // what the cheeks hold of the plate: each side, the far edge
 back_x = 2.4;  back_t = 2.0;             // the back cheek: its front face (clear of the jacks' pegs at x 2.05), its thickness
-din_holes = [[12.25, 27.5], [14.75, 25], [12.25, 20], [14.75, 15], [12.25, 12.5], [2.45, 25], [2.45, 15]];   // J5 (board x, y)
+din_holes = [[12.25, din_y + 7.5], [14.75, din_y + 5], [12.25, din_y], [14.75, din_y - 5], [12.25, din_y - 7.5],
+             [2.45, din_y + 5], [2.45, din_y - 5]];   // J5 (board x, y), following din_y
 /* [Parts the case meets] */
 usb_x = W / 2;  usb_w = 13.0;  usb_top = bt + 5.2;  usb_bot = -0.2;   // USB-C: its mouth axis 1.6 over the board; a plug's overmold ~ 12 x 6.5
 jack_y = 5.8;  jack_w = 6.9;  jack_top = bt + 5.8;                   // the jacks' front blocks 6.0 wide, 5.3 high, 2.2 past the edge
-sw = [11.8, 37.8];  led = [11.2, 31.0];
+sw = [11.8, 37.8];  sw2 = [30.0, 19.55];  led = [11.2, 31.0];   // (BOOT, RST, the LED: set by make_stl.sh)
 sw_top = bt + 1.5;                                                   // the tactile switch's plunger top (TS-1187A, 1.5 tall: UNVERIFIED)
 led_top = bt + 0.8;      // (the mockup's block; the part is 0.6)
-base_pads = [[5, 13, H - 1.0, H + 0.2], [31, 39, H - 1.0, H + 0.2],     // the USB edge
-             [3, 9, -0.2, 1.0], [35, 41, -0.2, 1.0],        // the antenna edge: plastic only, 17 mm from the antenna
+base_pads = [[W / 2 - 17, W / 2 - 9, H - 1.0, H + 0.2], [W / 2 + 9, W / 2 + 17, H - 1.0, H + 0.2],     // the USB edge
+             [3, 9, -0.2, 1.0], [W - 9, W - 3, -0.2, 1.0],        // the antenna edge: plastic only, 17 mm from the antenna
              [-0.2, 0.95, H - 6.5, H - 1.5], [-0.2, 0.95, 6, 12]];    // the left edge (mirrored to the right)
 lid_pads = [[2, 2], [W - 2, 2], [2, 6.5], [W - 2, 6.5]];          // the lid's feet on the board's top, clear of every part
-bumps = [[0, 26], [1, 26], [2, 11], [2, 33], [3, 11], [3, 33]];   // [side 0 left 1 right 2 top 3 bottom, along the wall]
+bumps = [[0, 26], [1, 26], [2, W / 2 - 11], [2, W / 2 + 11], [3, W / 2 - 11], [3, W / 2 + 11]];   // [side 0 left 1 right 2 top 3 bottom, along the wall]
 
 module rbox(x0, y0, x1, y1, z0, z1, r) {
     hull() for (x = [x0 + r, x1 - r], y = [y0 + r, y1 - r]) translate([x, y, z0]) cylinder(r = r, h = z1 - z0, $fn = 40);
@@ -73,8 +76,9 @@ module both() { children(); translate([W, 0, 0]) mirror([1, 0, 0]) children(); }
 // ---- the board and what hangs under / stands past it (for the checks and the renders) ----
 module mock() { translate([-100, 100 + H, 0]) import("../mockup.stl"); }
 module jack_fronts() both() translate([-2.25, by(jack_y) - 3.0, bt - 0.2]) cube([2.25, 6.0, 5.5]);
-module tails() {       // under the board: the jack pegs (x 1.55, 8.55) and the USB-C's legs; tail deep (assumed)
-    for (x = [1.55, 8.55]) both() translate([x - 0.5, by(jack_y) - 0.5, -tail]) cube([1, 1, tail + 0.1]);
+module tails() {       // under the board: the jacks' legs (3.5) and pegs, the USB-C's legs; tail deep (assumed)
+    for (x = [1.6, 8.6]) both() translate([x - 0.5, by(jack_y) - 0.5, -tail]) cube([1, 1, tail + 0.1]);
+    for (p = jack_legs) translate([p[0] - 1.1, by(p[1]) - 0.6, -tail]) cube([2.2, 1.2, tail + 0.1]);
     for (p = [[W / 2 + 4.32, 6.8], [W / 2 + 4.32, 2.59], [W / 2 - 4.32, 6.8], [W / 2 - 4.32, 2.59]]) translate([p[0] - 0.5, by(p[1]) - 0.5, -tail]) cube([1, 1, tail + 0.1]);
 }
 module din_plate() translate([-0.01, by(din_y) - plate[0] / 2, -plate[2]]) cube([plate[1], plate[0], plate[2]]);
@@ -160,7 +164,7 @@ module lid_core(pads = true) difference() {
         for (y = [0.6, jack_w - 0.6]) translate([0, y, jack_top + 1 - 0.6]) rotate([0, 90, 0]) cylinder(r = 0.6, h = e + 1.2, $fn = 20);
     }
     usb_cut(usb_bot);
-    translate([sw[0], by(sw[1]), z_in - 1]) cylinder(d = 3.8, h = roof + 2, $fn = 32);            // the button cap's hole
+    for (p = [sw, sw2]) translate([p[0], by(p[1]), z_in - 1]) cylinder(d = 3.8, h = roof + 2, $fn = 32);   // the button caps' holes (BOOT, RST)
     translate([led[0], by(led[1]), led_top - 1]) cylinder(d = 1.95, h = zt - led_top + 2, $fn = 24);      // the light pipe's bore
     translate([led[0], by(led[1]), zt - 0.8]) cylinder(d = 3.2, h = 1.0, $fn = 32);               // its head's recess
     for (b = bumps) at_side(b[0], b[1]) bump(0.15);                                                // the snap pockets
@@ -184,7 +188,7 @@ module led_pipe_core() {
     translate([0, 0, zt - 0.8]) cylinder(d = 3.0, h = 0.8, $fn = 24);
 }
 
-module cap_in_place() translate([sw[0], by(sw[1]), 0]) button_cap_core();
+module cap_in_place() for (p = [sw, sw2]) translate([p[0], by(p[1]), 0]) button_cap_core();   // (BOOT and RST: the same cap, print two)
 module pipe_shaft_in_place() translate([led[0], by(led[1]), 0]) translate([0, 0, led_top + 0.5]) cylinder(d = 1.8, h = zt - 0.8 - (led_top + 0.5), $fn = 24);
 module pipe_in_place() translate([led[0], by(led[1]), 0]) led_pipe_core();
 module lid_placed() translate([0, 0, 0]) lid_core();

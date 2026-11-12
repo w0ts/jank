@@ -39,7 +39,7 @@ SYMBOLS = {
     "led": ([("1", "A", PAS)], [("2", "K", PAS)], "LED", 2.54),
     "bav70": ([("1", "A1", PAS), ("2", "A2", PAS)], [("3", "K", PAS)], "D", 5.08),
     "sw": ([("1", "A", PAS), ("2", "B", PAS)], [("3", "C", PAS), ("4", "D", PAS)], "SW", 5.08),
-    "jack": ([("4", "T", PAS), ("3", "R", PAS)], [("1", "S", PAS), ("2", "SW", PAS)], "J", 5.08),
+    "jack": ([("D", "T", PAS), ("C", "R", PAS)], [("A", "S", PAS), ("B", "SW", PAS)], "J", 5.08),
     "trs": ([("T", "T", PAS), ("R", "R", PAS)], [("S", "S", PAS)], "P", 5.08),
     "det": ([("3", "VDD", "power_in")], [("1", "VOUT", "output"), ("2", "VSS", "power_in")], "U", 7.62),
     "buck": ([("6", "VIN", "power_in"), ("5", "EN", "input"), ("3", "MODE", "input"), ("4", "VSET", PAS)],
@@ -49,6 +49,8 @@ SYMBOLS = {
               ("B6", "DP2", PAS), ("A7", "DN1", PAS), ("B7", "DN2", PAS)],
              [("A8", "SBU1", PAS), ("B8", "SBU2", PAS), ("A1B12", "GND", PAS), ("B1A12", "GND", PAS), ("13", "SHELL", PAS),
               ("14", "SHELL", PAS)], "J", 7.62),
+    "esd": ([("1", "IO1", PAS), ("6", "IO1", PAS), ("3", "IO2", PAS), ("4", "IO2", PAS)],
+            [("5", "VBUS", PAS), ("2", "GND", PAS)], "U", 7.62),
     "flag": ([], [("1", "pwr", "power_out")], "#FLG", 2.54),
 }
 # ESP32-S3FN8 (QFN56): supplies and the system pins on the left, the GPIOs on the right (parts.py has the pin list)

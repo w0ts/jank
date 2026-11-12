@@ -13,11 +13,11 @@ DNP: parts on the board (pads only) but not fitted: left out of the BOM and the 
 FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus our TRS pads)
     "qfn56": "QFN-56_L7.0-W7.0-P0.40-TL-EP4.0", "xtal": "CRYSTAL-SMD_4P-L3.2-W2.5-BL", "ant": "ANT-SMD_L3.2-W1.6",
     "ufl": "RF-SMD_FRF05002-JSS103M",
-    "usbc": "USB-C-SMD_TYPE-C-16PIN-2MD-073", "jack": "AUDIO-SMD_PJ-320D-1",
+    "usbc": "USB-C-SMD_TYPE-C-16PIN-2MD-073", "sot236": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", "jack": "AUDIO-TH_PJ-320A-4P-DIP",
     "buck": "HVSSOP-8_L3.0-W3.0-P0.65-LS4.9-BL-EP", "det": "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR",
     "bav70": "SOT-23-3_L3.0-W1.7-P0.95-LS2.9-BR", "sod123": "SOD-123_L2.7-W1.6-LS3.7-RD-1",
     "led": "LED-SMD_L1.6-W0.8-R-RD", "sw": "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5", "l0806": "L0806",
-    "can10": "CAP-SMD_BD10.0-L10.3-W10.3-LS10.9-FD", "det_tl": "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-TL", "r0603": "R0603", "r0805": "R0805", "c0603": "C0603",
+    "can10": "CAP-SMD_BD10.0-L10.3-W10.3-LS10.9-FD", "det_tl": "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-TL", "r0603": "R0603", "r0805": "R0805", "r1206": "R1206", "r2010": "R2010", "c0603": "C0603",
     "c0805": "C0805", "r0402": "R0402", "c0402": "C0402", "l0402": "L0402", "trs": "TRS_PADS_SMD",
     "sot23fet": "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR",
     "din": "CONN-TH_DIN-504B-M10",
@@ -47,27 +47,35 @@ CHIP_PIN = {"1": "LNA_IN", "2": "VDD3P3", "3": "VDD3P3", "4": "CHIP_PU", "20": "
 U1 = dict(CHIP_PIN)
 U1.update({pin: name for name, (_g, pin) in GPIO.items()})
 
-DNP = {"C24", "C25", "C26", "R18", "U4",   # (pads only: the matching positions, the chip antenna's 0 ohm, the supervisor)
+DNP = {"C24", "C25", "C26", "R18",   # (pads only: the matching positions, the chip antenna's 0 ohm)
        "J5", "J6"}                            # (the DIN sockets, bottom side: an optional hand-solder, README "DIN")
-# JLC's footprint for the DIN-504B-M10 numbers its pads 1..5 along the two rows, not as the DIN pins: pad 1 = DIN 1,
-# pad 2 = DIN 4, pad 3 = DIN 2 (the middle), pad 4 = DIN 5, pad 5 = DIN 3 (hardware/pcb's
-# footprint for this part has the same holes numbered as DIN pins); pads 6, 7 = the shell. UNVERIFIED: check with a meter.
+# JLC's footprint for the DIN-504B-M10 numbers its pads 1..5 along the two rows, not as the DIN pins. Its frame and
+# hardware/pcb's own table for the part (HY_PINS, the CUI SDS-50J pattern; the same in hardware/pcb/lib) agree: the
+# shell pins at the front, the 3-pin row 2.5 mm before the 2-pin row, x the same way. So pad 1 (x -7.5) = DIN 3,
+# pad 2 (x -5.0) = DIN 5, pad 3 (x 0) = DIN 2 (the middle), pad 4 (x +5.0) = DIN 4, pad 5 (x +7.5) = DIN 1; pads 6, 7 =
+# the shell. (Until 2026-11-12 this was read mirrored: pad 2 = DIN 4, pad 4 = DIN 5.) UNVERIFIED: check with a meter.
 
 PARTS = [
     # ---- USB-C: data + VBUS; 5.1 k on each CC (a sink); VBUS joins the reservoir through D3 and R5 (inrush limit)
     ("J1", "usbc", "USB-C 16P", "usbc", "C2765186",
      {"A1B12": "GND", "B1A12": "GND", "13": "GND", "14": "GND", "A4B9": "VBUS", "B4A9": "VBUS", "A5": "CC1", "B5": "CC2",
-      "A6": "USB_DP", "B6": "USB_DP", "A7": "USB_DN", "B7": "USB_DN"}),
+      "A6": "UDP", "B6": "UDP", "A7": "UDN", "B7": "UDN"}),
+    # (22 ohm in series on D+ / D- by the chip: the edges and ringing on the 22 mm tracks, Espressif's checklist)
+    # (ESD on D+ / D- right at the USB-C, before the 22 ohm: the user's ruling 2026-11-12; VBUS only its clamp reference)
+    ("U5", "esd", "USBLC6-2SC6", "sot236", "C7519", {"1": "UDP", "6": "UDP", "3": "UDN", "4": "UDN", "2": "GND", "5": "VBUS"}),
+    ("R24", "R", "22", "r0402", "C25092", {"1": "UDP", "2": "USB_DP"}),
+    ("R25", "R", "22", "r0402", "C25092", {"1": "UDN", "2": "USB_DN"}),
     ("R3", "R", "5.1k", "r0603", "C23186", {"1": "CC1", "2": "GND"}),
     ("R4", "R", "5.1k", "r0603", "C23186", {"1": "CC2", "2": "GND"}),
     ("D3", "D", "B5819W", "sod123", "C8598", {"1": "VUSB_D", "2": "VBUS"}),
-    ("R5", "R", "4.7", "r0805", "C17675", {"1": "VUSB_D", "2": "VSYS"}),
+    ("R5", "R", "4.7", "r2010", "C474307", {"1": "VUSB_D", "2": "VSYS"}),   # (4.7 ohm: 10 would starve USB; a 2010, 0.75 W: the plug-in pulse, 0.9 A / 45 mJ in ~20 ms, sim 2026-11-12)
     # ---- POWER IN: the gear's MIDI OUT / THRU; ring (pin 4) and tip (pin 5) each through 47 ohm and a Schottky
-    ("J3", "jack", "POWER IN", "jack", "C431535", {"4": "PIN_T", "3": "PIN_R", "1": "GND"}),
-    ("J6", "din", "POWER IN DIN", "din", "C2939346", {"2": "PIN_R", "4": "PIN_T", "3": "GND"}),
+    ("J3", "jack", "POWER IN", "jack", "C18185602", {"D": "PIN_T", "C": "PIN_R", "A": "GND"}),
+    ("J6", "din", "POWER IN DIN", "din", "C2939346", {"4": "PIN_R", "2": "PIN_T", "3": "GND"}),   # (pad 4 = DIN 4, pad 2 = DIN 5)
     # ---- the second MIDI OUT on the same port, from USB power only (README "MIDI OUT 2"): ring = +3V3 through 33 ohm
     #      and a Schottky (a gear's 5 V there never reaches +3V3), tip = an open drain through 10 ohm (off: nothing)
-    ("R21", "R", "33", "r0603", "C23140", {"1": "+3V3", "2": "M2_A"}),
+    ("R21", "R", "68", "r1206", "C17976", {"1": "+3V3", "2": "M2_A"}),   # (R21 // R27 = 34 ohm, 2 x 1206: 0.26 W into a mono plug)
+    ("R27", "R", "68", "r1206", "C17976", {"1": "+3V3", "2": "M2_A"}),
     ("D6", "D", "B5819W", "sod123", "C8598", {"1": "PIN_R", "2": "M2_A"}),
     ("Q1", "nfet", "AO3400A", "sot23fet", "C20917", {"1": "MIDI2_TX", "2": "GND", "3": "M2_D"}),
     ("R20", "R", "10", "r0402", "C25077", {"1": "M2_D", "2": "PIN_T"}),
@@ -119,7 +127,7 @@ PARTS = [
     ("C7", "C", "1u", "c0402", "C52923", {"1": "CHIP_PU", "2": "GND"}),
     ("R16", "R", "10k", "r0402", "C25744", {"1": "+3V3", "2": "BOOT"}),
     #      (DNP) pads for a 3.0 V supervisor on CHIP_PU (open drain, R8 the pull-up): README "Start-up"
-    ("U4", "det", "BL8506-30NRM", "det_tl", "C2763866", {"3": "+3V3", "2": "GND", "1": "CHIP_PU"}),
+    ("U4", "det", "BL8506-30NRM", "det_tl", "C2763866", {"3": "+3V3", "2": "GND", "1": "CHIP_PU"}),   # (fitted 2026-11-12: holds CHIP_PU low until +3V3 > 3.0 V)
     #      40 MHz crystal, 8 pF load, +-10 ppm; 10 pF each side (C_L = 10 x 10 / 20 + ~2.5 pF stray = ~7.5 pF: README),
     #      0 ohm in series on XTAL_P (XIAO)
     ("Y1", "xtal", "40MHz 8pF", "xtal", "C254377", {"1": "XTAL_X1", "3": "XTAL_N", "2": "GND", "4": "GND"}),
@@ -140,6 +148,7 @@ PARTS = [
     ("J4", "ufl", "U.FL", "ufl", "C88374", {"1": "UFL", "2": "GND", "3": "GND"}),
     # ---- the button, the LED
     ("SW1", "sw", "BOOT", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BOOT", "4": "BOOT"}),
+    ("SW2", "sw", "RST", "sw", "C318884", {"1": "GND", "2": "GND", "3": "CHIP_PU", "4": "CHIP_PU"}),   # (reset: CHIP_PU to ground)
     ("LED1", "led", "red", "led", "C2286", {"1": "LED_A", "2": "GND"}),
     ("R9", "R", "5.1k", "r0603", "C23186", {"1": "LED_DRV", "2": "LED_A"}),
     # ---- the firmware's senses: the reservoir (1 M / 1 M, 100 nF) and VBUS (100 k / 100 k)
@@ -149,11 +158,12 @@ PARTS = [
     ("R12", "R", "100k", "r0603", "C25803", {"1": "VBUS", "2": "VBUS_SENSE"}),
     ("R13", "R", "100k", "r0603", "C25803", {"1": "VBUS_SENSE", "2": "GND"}),
     # ---- VBUS's pull-down: without USB, D3's leakage could float VBUS up through R12 / R13 and lift BUCK_EN via D5
-    ("R23", "R", "33k", "r0603", "C4216", {"1": "VBUS", "2": "GND"}),
+    ("R23", "R", "10k", "r0603", "C25804", {"1": "VBUS", "2": "GND"}),   # (10 k: D3's leakage must not lift BUCK_EN via D5, sim 2026-11-12)
     # ---- MIDI OUT (MIDI 1.0 at 3.3 V, CA-033): ring = source through 33 ohm, tip = sink through 10 ohm from the UART
-    ("J2", "jack", "MIDI OUT", "jack", "C431535", {"4": "MO_T", "3": "MO_R", "1": "GND"}),
-    ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"2": "MO_R", "4": "MO_T", "3": "GND", "6": "GND", "7": "GND"}),
-    ("R14", "R", "33", "r0805", "C17634", {"1": "+3V3", "2": "MO_R"}),
+    ("J2", "jack", "MIDI OUT", "jack", "C18185602", {"D": "MO_T", "C": "MO_R", "A": "GND"}),
+    ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"4": "MO_R", "2": "MO_T", "3": "GND", "6": "GND", "7": "GND"}),   # (pad 4 = DIN 4, pad 2 = DIN 5)
+    ("R14", "R", "68", "r1206", "C17976", {"1": "+3V3", "2": "MO_R"}),   # (R14 // R26 = 34 ohm, 2 x 1206: a mono plug shorts the ring, 0.33 W)
+    ("R26", "R", "68", "r1206", "C17976", {"1": "+3V3", "2": "MO_R"}),
     ("R15", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MO_T"}),
 ]
 
@@ -162,16 +172,19 @@ LCSC = {
     "C2913196": "Espressif ESP32-S3FN8, QFN56 7 x 7, 8 MB flash in the package",
     "C254377": "HELE X3S040000B81H-R, 40 MHz crystal 3225, 8 pF load, +-10 ppm, +-10 ppm over -20..75 C",
     "C293767": "YAGEO ANT3216LL00R2400A, 2.4 GHz ceramic chip antenna 3.2 x 1.6 mm",
+    "C7519": "ST USBLC6-2SC6, USB 2.0 ESD protection, 2 lines + VBUS, SOT-23-6",
     "C88374": "Hirose U.FL-R-SMT-1(80), u.FL receptacle (fitted: the default antenna path, the user's ruling 2026-11-11)",
     "C2939346": "HOOYA DIN-504B-M10, 5-pin DIN socket, female, right angle, through hole (DNP: hand-soldered, bottom side)",
     "C76769": "TDK MLG1005S2N0BT000, 2.0 nH 900 mA 0402 (the VDD3P3 filter)",
     "C87532": "TDK MLG1005S3N3BT000, 3.3 nH 800 mA 0402 (the RF match)",
     "C1550": "FH 0402CG1R0C500NT, 1 pF C0G 0402 (the RF match; a preferred Extended part: no loading fee)",
     "C2765186": "SHOU HAN TYPE-C 16PIN 2MD(073), USB 2.0 receptacle",
-    "C431535": "SHOU HAN PJ-320D, 3.5 mm jack, surface mount",
+    # (the jacks: the PJ-320D's through-hole twin, same body, the pins at the same places; pads A = sleeve, C = ring,
+    #  D = tip, B = the switch; the user's ruling 2026-11-12: stronger, JLC solders it)
+    "C18185602": "SHOU HAN PJ-320A-4P DIP, 3.5 mm jack, through hole",
     "C2873354": "TI TPS62842DGRR, 60 nA buck, 750 mA, HVSSOP-8",
     "C2909397": "Belling BL8506-40CRM, 4.0 V detector, push-pull, 0.5 uA",
-    "C2763866": "Belling BL8506-30NRM, 3.0 V detector, open drain (DNP: pads only)",
+    "C2763866": "Belling BL8506-30NRM, 3.0 V detector, open drain (U4, the reset supervisor)",
     "C20917": "AOS AO3400A, N-MOSFET 30 V 5.7 A, Vgs(th) 1.45 V, 48 mohm at 2.5 V, SOT-23",
     "C51018335": "JVB10V2200M10X10, 2200 uF 10 V aluminium, 10 x 10.5 mm",
     "C79317": "Murata DFE201612P-2R2M, 2.2 uH 1.5 A, 0806",
@@ -179,7 +192,7 @@ LCSC = {
     "C68978": "CJ BAV70, dual diode common cathode, SOT-23",
     "C318884": "XKB TS-1187A-B-A-B, tactile switch 5.1 x 5.1 x 1.5 mm",
     "C2286": "KT-0603R, red LED 0603",
-    "C23186": "5.1 k 1% 0603", "C23182": "47 ohm 1% 0603", "C17675": "4.7 ohm 1% 0805", "C7250": "10 M 1% 0603",
+    "C23186": "5.1 k 1% 0603", "C23182": "47 ohm 1% 0603", "C474307": "UNI-ROYAL 201007J047JT4E, 4.7 ohm 5% 2010, 0.75 W", "C17976": "68 ohm 1% 1206, 0.25 W", "C25804": "10 k 1% 0603", "C25092": "22 ohm 5% 0402", "C7250": "10 M 1% 0603",
     "C23196": "51 k 1% 0603", "C25804": "10 k 1% 0603", "C22935": "1 M 1% 0603", "C25803": "100 k 1% 0603",
     "C17634": "33 ohm 1% 0805", "C22859": "10 ohm 1% 0603", "C17168": "0 ohm 0402", "C25744": "10 k 1% 0402", "C26083": "1 M 1% 0402", "C25077": "10 ohm 1% 0402", "C23140": "33 ohm 1% 0603", "C25741": "100 k 1% 0402", "C25794": "51 k 1% 0402",
     "C14663": "100 nF 50 V X7R 0603", "C15849": "1 uF 50 V X5R 0603", "C15850": "10 uF 25 V X5R 0805",

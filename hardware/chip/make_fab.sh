@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
 # jank chip, everything in order (README "Files"): the schematic and its ERC, the netlist and the PDF; the board (RF
-# path drawn, the rest routed by route.py), its DRC, the nets against the schematic, the Gerbers and drill files zipped
+# path drawn, the rest routed by Freerouting: freeroute.py), its DRC, the nets against the schematic, the Gerbers and drill files zipped
 # for JLCPCB, the assembly files, the renders (with the parts' 3D models) and the mockup; then the cost and the case.
 #   sh hardware/chip/make_fab.sh            (KiCad 10: kicad-cli and its Python; python3; OpenSCAD)
 #   ROUTE=0 sh hardware/chip/make_fab.sh    (keep the board as it is: no placement or routing, the rest again)
@@ -18,7 +18,11 @@ if grep -q "; error" fab/erc.rpt; then grep -B1 "; error" fab/erc.rpt; exit 1; f
 "$KC" sch export netlist --format kicadxml -o fab/chip.net.xml chip.kicad_sch 2>&1 | Q >/dev/null
 "$KC" sch export pdf -o chip-schematic.pdf chip.kicad_sch 2>&1 | Q >/dev/null
 
-if [ "${ROUTE:-1}" = 1 ]; then "$KP" make_board.py 2>&1 | Q; fi
+if [ "${ROUTE:-1}" = 1 ]; then       # (the placement, the drawn RF path and lanes; Freerouting the rest: README "Routing")
+    LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 "$KP" make_board.py 2>&1 | Q
+    sh fetch_freerouting.sh >/dev/null
+    "$KP" freeroute.py chip.kicad_pcb 2>&1 | Q
+fi
 "$KP" tie_groups.py chip.kicad_pcb 2>&1 | Q
 "$KC" pcb drc --severity-all -o fab/drc.rpt chip.kicad_pcb 2>&1 | Q >/dev/null
 grep -E "Found" fab/drc.rpt

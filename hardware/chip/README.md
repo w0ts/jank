@@ -16,10 +16,10 @@ board for 5**. The user calls it **jank mini**; the files keep the name "chip". 
 
 | | |
 |---|---|
-| Size | **49.6 x 52.5 mm**, 2 layers, 1.6 mm FR-4 |
-| Assembly | JLC **Economic**: every fitted part on the top side, SMD only; 67 parts on 40 BOM lines, 223 joints |
-| Checks | ERC 0 errors (1 warning: ANT_END, a one-pin net by design); DRC **0 errors** (2 warnings: the antenna's end-pad copper ends in the open, as on YAGEO's board; a 0.25 mm PIN_T stub on the bottom); every board pad against the schematic: 0 problems; every CPL place against JLC's footprint: within 0.01 mm |
-| Estimate (shipping left out) | **5 boards: $86.29, $17.26 / EUR 14.84 a board; 10 boards: $115.14, $11.51 / EUR 9.90 a board** (`fab/cost.md`) |
+| Size | **72 x 65 mm**, 2 layers, 1.6 mm FR-4 |
+| Assembly | JLC **Economic**: every fitted part on the top side; 74 parts on 42 BOM lines, 244 joints |
+| Checks | ERC 0 errors (1 warning: ANT_END, a one-pin net by design); DRC **0 errors, 0 unconnected** (6 warnings: the antenna's end-pad copper ends in the open, as on YAGEO's board; 5 library-footprint notes); every board pad against the schematic: 0 problems; every CPL place against JLC's footprint: within 0.01 mm |
+| Estimate (shipping left out) | **5 boards: $101.40, $20.28 a board; 10 boards: $132.40, $13.24 a board** (`fab/cost.md`, snapshot 2026-11-12) |
 | Files for JLC | `fab/chip-gerbers.zip`, `fab/bom.csv`, `fab/cpl.csv` |
 | Pictures | `render-top.png`, `render-bottom.png`, `render-3d.png`, `preview/` (routing with the DIN pads' iron room, 3D, a DIN close-up) |
 
@@ -31,8 +31,10 @@ board for 5**. The user calls it **jank mini**; the files keep the name "chip". 
 | `fetch_jlc.sh` | JLC's own footprints and 3D models (EasyEDA, easyeda2kicad 1.0.1 via `uvx`) into `lib/jlc.pretty`, `lib/3d` (committed) |
 | `make_footprints.py` | `lib/chip.pretty`: JLC's footprints, models pointed at `lib/3d`, the QFN's via "pads" dropped, peg holes unplated, courtyards redrawn; the DIN sockets' pads made bigger for a hand iron |
 | `make_schematic.py` | `chip.kicad_sch` (every pin labelled), `chip.kicad_pro`, `lib/chip.kicad_sym`, `fab/intended-nets.json` |
-| `route.py` | the two-layer grid router from hardware/tiny; one change: a keep-out can bar tracks but allow vias |
-| `make_board.py` | `chip.kicad_pcb`: placement, the RF path drawn (line, fences, antenna feed), the rest routed, pours, antenna strip, stitching |
+| `freeroute.py` | the routing (2026-11-12): Freerouting in three rounds on the placed board, then narrow tracks widened, GND stitching every 6 mm, a via in every cut-off pour piece (README "Routing") |
+| `fetch_freerouting.sh` | Freerouting 2.5.0 into `.freerouting/` (git-ignored), SHA-256 checked |
+| `route.py` | the old grid router (unused since 2026-11-12: it stalled for many minutes on single nets) |
+| `make_board.py` | `chip.kicad_pcb`: placement (PLACED: the placer's groups), the RF path drawn (line, fences, antenna feed, VDD3P3's via), pours, antenna strip; `make_fab.sh` runs it with `LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1` and routes with `freeroute.py` |
 | `tie_groups.py` | after routing: a via for any ground pour piece cut off on both layers at once (`make_fab.sh` runs it) |
 | `check_nets.py` | the netlist against `parts.py`, every board pad against it, the pin rules |
 | `make_assembly.py` | `fab/bom.csv`, `fab/cpl.csv` (fitted parts only); every part's pads checked against JLC's footprint at the CPL place |
@@ -55,7 +57,9 @@ side.
 ## Schematic
 
 The tiny circuit, unchanged (see [hardware/tiny/README.md](../tiny/README.md) "Schematic" for the why of every value):
-POWER IN through 47 ohm and B5819W from both data pins into VSYS (2 x 2200 uF, 4.4 mF), USB VBUS through D3 and 4.7 ohm (R23 33k holds VBUS down without USB), the
+POWER IN through 47 ohm and B5819W from both data pins into VSYS (2 x 2200 uF, 4.4 mF), USB VBUS through D3 and R5 4.7 ohm (a 2010, 0.75 W: on plug-in it takes ~0.9 A, 3.9 W, 45 mJ in ~20 ms, ngspice
+2026-11-12; R23 10k holds VBUS down without USB; 10 ohm was tried and dropped: it would
+starve USB, (VBUS - 0.35 - 3.4) / R5 = 75 mA at 4.5 V against Wi-Fi's ~100 mA, review 2026-11-12); USB D+ / D- clamped by **U5, a USBLC6-2SC6** (C7519, right under the USB-C, the user's ruling 2026-11-12; its pin 5 on VBUS as the clamp's reference), then through **R24 / R25 22 ohm** (0402, by the chip); a **RST button (SW2)** from CHIP_PU to ground beside BOOT, the
 BL8506-40 detector / VBUS / PWR_HOLD enabling the TPS62842 buck (3.3 V, 60 nA), MIDI OUT at 3.3 V (33 / 10 ohm), BOOT
 button on GPIO0, the LED, the two ADC dividers (tiny's cable pads P2 / P3 are gone: README "DIN"). Same values as tiny; R7, R8, R10, R11, C7 and
 C8 are 0402 here (Basic parts too) to make room round the chip. **New, round the chip** (values from the Seeed
@@ -71,7 +75,7 @@ XIAO ESP32S3 v1.2 schematic, a proven board with this chip; checked against Espr
 | 53, 54 XTAL_N / P | 40 MHz crystal Y1, 8 pF load, +-10 ppm | C9 / C10 10 pF each side, R17 0 ohm in series on XTAL_P |
 | 5 GPIO0 | BOOT | R16 10 k pull-up (the checklist), SW1 to GND |
 | 1 LNA_IN | RF | below |
-| 57 | GND, the exposed pad | 9 vias in it |
+| 57 | GND, the exposed pad | 9 vias in it (a 3 x 3 grid, 1.3 mm pitch; Espressif: 9 or more) |
 
 Every supply pin of the QFN56 is listed (datasheet "Pin Overview": 2, 3, 20, 29, 46, 55, 56, 57); nothing else is a
 supply. Pins 28, 30..37 are the in-package flash's SPI: left open.
@@ -93,12 +97,15 @@ out: not needed at full speed on traces this short).
 Espressif's checklist: with a *slow power rise*, the RC on CHIP_PU may not be enough; add a supervisor (~3.0 V). Here the
 slow rise is in VSYS (seconds, from MIDI), **not in +3V3**: the detector holds the buck off until VSYS reaches ~4.16 V
 and the buck then brings +3V3 up in its soft-start (~1 ms, TI datasheet), after which the 10 k / 1 uF RC releases
-CHIP_PU ~10 ms later. So the rise the chip sees is fast, and **no supervisor is fitted**; **U4 is its pads** (DNP,
-SOT-23, a 3.0 V open-drain detector such as BL8506-30NRM C2763866 on CHIP_PU, R8 its pull-up), by the CHIP_PU lane. The fall is the open case: if
+CHIP_PU ~10 ms later. **But on USB** +3V3 follows VSYS as the bank charges through R5 (4.4 mF x ~10 ohm: a ~44 ms
+time constant), and the 10 k / 1 uF RC then lets CHIP_PU go near 2.2 V, too early (review 2026-11-12). So **U4 is
+fitted** (2026-11-12): a BL8506-30NRM (C2763866, SOT-23, Extended), 3.0 V open-drain detector on CHIP_PU, R8 its
+pull-up, by the CHIP_PU lane: CHIP_PU stays low until +3V3 is past 3.0 V, whatever the rise. (C7 4.7 uF instead was
+the other choice: an RC still only lags +3V3, so it stays a race with a slow rise.) The fall is the open case: if
 the firmware keeps PWR_HOLD high while the bank runs down, +3V3 sags slowly with the buck in 100 % mode; the chip's own
 brown-out detector then resets it, but a flash write at that moment can be cut. **The firmware must release PWR_HOLD
 (and stop writing flash) before the bank drops under ~3.4 V** (it reads the bank on GPIO1). *Unverified on hardware.*
-If it proves fragile, fit U4 (one more Extended part, $3.09 a batch).
+U4 also resets the chip cleanly on that slow fall (+3V3 under 3.0 V).
 
 **The start-up budget (the bank, 2 x 2200 uF = 4.4 mF, the user's ruling 2026-11-11):** the detector releases the buck
 at ~4.16 V; the chip runs until the bank is down to ~3.05 V (3.0 V for the ESP32-S3 plus the buck's 100 % mode drop at
@@ -106,7 +113,13 @@ light load, *estimated*). Held between them: 4.4 mF x (4.16 - 3.05) V = **4.9 mC
 current and length *unmeasured*; at 2 mF it was ~74 ms).
 
 **VBUS without USB:** D3's reverse leakage (microamps, more when warm) would otherwise float VBUS up through R12 + R13
-(200 k), lifting BUCK_EN through D5 and faking VBUS_SENSE. **R23 33 k** holds it near 0 V (at 10 uA leakage: 0.33 V).
+(200 k), lifting BUCK_EN through D5 and faking VBUS_SENSE. **R23 10 k** holds it near 0 V (at 10 uA leakage: 0.1 V).
+With 33 k the simulation (2026-11-12) found the buck starting at VSYS 1.77 V on MIDI power from ~40 uA of leakage
+(25 uA at EN's 0.4 V minimum) and the chip reset-looping; 10 k needs 40 uA for 0.4 V.
+
+**For the firmware (ngspice, 2026-11-12, not board changes):** on MIDI power the boot must stay under ~100 ms at
+~35 mA (a 300 ms boot reset-loops: ~5 mC a start against the bank's 4.9 mC); take PWR_HOLD only above VBANK ~3.9 V,
+else go to deep sleep; on a 4.5 V USB port keep TX bursts short (one 20 ms burst at 340 mA resets the chip via U4).
 
 ## RF
 
@@ -159,7 +172,6 @@ current and length *unmeasured*; at 2 mF it was ~74 ms).
 | C24 | the chip's pi, second shunt | tuning (with a VNA) |
 | C25, C26 | the antenna's pi, both shunts | tuning |
 | R18 | 0 ohm to the chip antenna | to use AE1 (and R19 removed) |
-| U4 | a 3.0 V supervisor on CHIP_PU (SOT-23, e.g. BL8506-30NRM C2763866) | if the slow fall proves fragile |
 
 ## Pin map (for the firmware's board.h: the GPIOs are tiny's, unchanged)
 
@@ -173,7 +185,7 @@ current and length *unmeasured*; at 2 mF it was ~74 ms).
 | **PWR_HOLD** | **4** | 9 | high keeps the buck on; hold it through sleep |
 | USB D- / D+ | 19 / 20 | 25 / 26 | native USB |
 | **MIDI2_TX** | **10** | 15 | the POWER IN port as MIDI OUT 2 (USB power only): Q1's gate, UART TX inverted; R22 pull-down |
-| CHIP_PU | | 4 | R8 10 k / C7 1 uF; no reset button |
+| CHIP_PU | | 4 | R8 10 k / C7 1 uF; SW2 (RST) to ground |
 
 Not used, left open: every other GPIO, including the strapping pins GPIO3, 45, 46 and the console UART (GPIO43 / 44,
 pins 49 / 50: no test pads; flash over USB).
@@ -184,7 +196,7 @@ The user's feature (2026-11-11): with USB plugged, the POWER IN port (J3 jack an
 MIDI. The firmware uses it only while VBUS_SENSE is high.
 
 ```
- +3V3 -- R21 33R -- D6 B5819W -->|-- PIN_R (ring, DIN 4)
+ +3V3 -- R21 // R27 34R -- D6 B5819W -->|-- PIN_R (ring, DIN 4)
  PIN_T (tip, DIN 5) -- R20 10R -- Q1 AO3400A drain; source = GND
  GPIO10 MIDI2_TX -- Q1 gate; R22 100k gate to GND
 ```
@@ -193,7 +205,7 @@ MIDI. The firmware uses it only while VBUS_SENSE is high.
   up to 2.5 V, was the first idea and is marginal at 3.3 V), open drain through R20 10 ohm (CA-033's sink resistor).
   R22 100k holds the gate low in reset, boot and sleep (GPIO10 is high-impedance then; its power-up glitch is a low
   level, harmless). **Off = no current, as if nothing were there:** the port works as the power input as before.
-- **Source:** +3V3 through R21 33 ohm (CA-033's source resistor) and D6, a Schottky: a gear's 5 V on the ring (its MIDI
+- **Source:** +3V3 through R21 // R27 (2 x 68 ohm 1206 = 34 ohm; CA-033's source resistor is 33) and D6, a Schottky: a gear's 5 V on the ring (its MIDI
   OUT powering the board) never reaches +3V3.
 - **Firmware:** MIDI2_TX = GPIO10 (RTC GPIO, not strapping, free), a UART TX with its output inverted in the GPIO matrix:
   idle (1) = gate low = no current; a 0 bit = gate high = current, as MIDI wants. Only while VBUS_SENSE (GPIO2) reads
@@ -202,7 +214,7 @@ MIDI. The firmware uses it only while VBUS_SENSE is high.
   V_LED) / (33 + 220 + 10 + R_DS). D6 at ~5 mA: ~0.2..0.3 V (B5819W, *estimated from its curve, unmeasured*); the opto
   LED 1.2..1.5 V. **I = 5.6..7.2 mA at 3.3 V, 5.1 mA at 3.135 V (-5 %) with the worst diode and LED**: above the 5 mA
   MIDI's current loop is designed round. The Schottky costs ~1 mA. Lowering R21 would win it back but CA-033 fixes 33 ohm
-  (it also limits a shorted ring: 3.3 V / 33 ohm = 100 mA, 0.33 W in a 0.125 W 0805: as on MIDI OUT 1, *do not short it*).
+  (it also limits a shorted ring, a mono plug: ~90 mA, 0.26 W, shared by two 0.25 W 1206s since 2026-11-12, as on MIDI OUT 1).
 - **The power path stays out of the way:** while sending, PIN_R is <= 3.1 V and PIN_T ~0 V, VSYS ~4.6 V on USB: D1 and
   D2 are reversed (microamps). R1 / R2 carry nothing.
 - **Worst case, the firmware sends while a gear's MIDI OUT is plugged in:** the gear's tip (its TX, 5 V through its 220
@@ -214,11 +226,16 @@ MIDI. The firmware uses it only while VBUS_SENSE is high.
 
 ## DIN sockets: an optional hand-solder (J5, J6)
 
-The user's ruling (2026-11-11): keep both 3.5 mm jacks (JLC places them) and add **optional 5-pin DIN sockets on the
+The user's ruling (2026-11-11): keep both 3.5 mm jacks (JLC places them; **through hole since 2026-11-12**, the user's
+ruling: stronger. SHOU HAN PJ-320A-4P DIP, C18185602, the twin of the PJ-320D first used: the same body, its pins at the
+same places within 0.15 mm, pads A = sleeve, C = ring, D = tip, B = the switch, Type A TRS map unchanged. Its legs
+reach 3.5 mm under the board (its 3D model): they stay 1.7 mm or more clear of the DINs' plates and bodies (y 8.7 at
+most, the plates start at y 9.85), so the DINs still sit flat. JLC solders them by hand: *its fee for that is not in
+`fab/cost.md` (unverified, the quote will tell)*) and add **optional 5-pin DIN sockets on the
 bottom side**, wired in parallel with each jack, **for the user to solder by hand**. They are **DNP**: not in the BOM
 or the CPL; JLC drills their holes only.
 
-- **J5, MIDI OUT (left edge):** DIN 4 = MO_R (+3V3 through R14 33 ohm, the jack's ring), DIN 5 = MO_T (R15 10 ohm from
+- **J5, MIDI OUT (left edge):** DIN 4 = MO_R (+3V3 through R14 // R26, 2 x 68 ohm 1206 = 34 ohm: a mono plug's 0.33 W shared, the jack's ring), DIN 5 = MO_T (R15 10 ohm from
   GPIO21, the jack's tip), DIN 2 = GND, the shell = GND (MIDI: the sender grounds its shield). The user asked for a
   **male** DIN that plugs straight into a gear's MIDI IN: **LCSC has no board-mount male 5-pin DIN** (searched
   2026-11-11: "DIN-504B", "DIN 5P male", "MIDI male", "5 pin DIN plug", "circular connector plug 5P": only female
@@ -228,8 +245,12 @@ or the CPL; JLC drills their holes only.
   the shell left open (a receiver does not ground the cable's shield).
 - **The part:** HOOYA DIN-504B-M10 (C2939346, female, right angle, through hole; JLC's own footprint), its face on the
   side edge, its axis at y 20.3 mm (below the jacks), its body under the board. **JLC's pad numbers are not the DIN pin
-  numbers**: pad 1 = DIN 1, pad 2 = DIN 4, pad 3 = DIN 2 (the middle), pad 4 = DIN 5, pad 5 = DIN 3 (hardware/pcb's own footprint for this part has the same holes numbered as DIN pins; *unverified against a
-  part: check with a meter before soldering*). Pads 6 and 7: the shell.
+  numbers**: pad 1 = DIN 3, pad 2 = DIN 5, pad 3 = DIN 2 (the middle), pad 4 = DIN 4, pad 5 = DIN 1. JLC's footprint and
+  hardware/pcb's own table for the part (`HY_PINS` in hardware/pcb/make_footprints.py, the CUI SDS-50J pattern, the same in
+  hardware/pcb/lib) share one frame: the shell pins at the front, the 3-pin row 2.5 mm before the 2-pin row, x the same way;
+  pin 4 is at x +5.0 there and pad 4 at x +5.0 here. (Until 2026-11-12 this README had pads 2 and 4 the other way round:
+  MO_R / MO_T and PIN_R / PIN_T were swapped on the DINs; fixed.) *Unverified against a part: check with a meter before
+  soldering*. Pads 6 and 7: the shell.
 - **Pads for a hand iron:** HOOYA's drawing asks 7 x 1.5 mm holes (kept). JLC's footprint had 2.2 mm pads (a 0.35 mm
   ring); `make_footprints.py` makes them **3.0 mm round on the used pins DIN 4 and 5 (pads 2, 4: 0.75 mm ring),
   4.0 mm on DIN 2 (pad 3, 1.25 mm ring), 3.5 mm on the shell (1.0 mm ring), 2.4 mm on the unused DIN 1 and 3
@@ -243,7 +264,7 @@ or the CPL; JLC drills their holes only.
 - **The iron's room:** no top-side part's courtyard and no via within **0.8 mm of a DIN pad's copper** (the router and
   the stitching keep vias out; `IRON` in `make_board.py`), so a tip reaches each pad from its outer side. Three pads
   have a neighbour closer on one side only, the rest of their ring open: J5 pad 5 and J6 pad 1 (DIN 3 / DIN 1, unused
-  pins) under the jacks' bodies' courtyards (0.6 mm, open below), and J5 pad 2 (DIN 4, MO_R) 0.4 mm from the QFN's
+  pins), clear of the jacks (their through-hole pads more than 1 mm away), and J5 pad 2 (DIN 4, MO_R) 0.4 mm from the QFN's
   body corner (the chip is 0.9 mm tall; open above and to the left). Solder from the top.
 - **The cable pads P2 / P3 are gone:** they sat between the jacks and the DIN shell pins, where the iron needs room. A
   cable now goes on the DIN pads (ring = DIN 4, tip = DIN 5, sleeve = DIN 2).
@@ -252,7 +273,12 @@ or the CPL; JLC drills their holes only.
   rings (the cans 1 mm lower, the middle 1 mm right for the buck's tracks) to **49.6 x 52.5 mm**.
 - **Don't fit both a jack and its DIN to two pieces of gear at once:** they are the same nets.
 
-## Layout (49.6 x 52.5 mm, 2 layers, 1.6 mm, every fitted part on top)
+## Layout (72 x 65 mm, 2 layers, 1.6 mm, every fitted part on top)
+
+**2026-11-12: the board grew to 72 x 65 mm and the groups below the connectors were re-placed by a placer** (simulated
+annealing of rigid groups round the fixed connectors, cans, antenna and chip block: airwire crossings 84 -> 50; its
+result is `PLACED` in `make_board.py`). The notes below describe the earlier 49.6 x 52.5 mm layout where they name
+positions; the connectors, the chip block, the RF path and the antenna strip are as described.
 
 - **Top edge:** the USB-C in the middle, **MIDI OUT (J2) on the left edge, POWER IN (J3) on the right edge** (both
   jacks at the top, their bushings past the side edges).
@@ -267,7 +293,8 @@ or the CPL; JLC drills their holes only.
 - **The button and the antenna:** SW1 is 26.6 mm (centre to centre) from AE1, far from the RF line. YAGEO's datasheet
   gives no keep-out of its own, only its evaluation board: the antenna in a 10 mm wide copper-free area across the board's
   end. A button in that strip (a corner far from AE1) would need copper there (its pads and a track): not done.
-  **MIDI OUT 2's parts** (D6, R21, Q1, R20, R22) lower right, beside C2.
+  **MIDI OUT 2's parts** (D6, Q1, R20, R22, R21 // R27) lower right, beside C2; R14 // R26 top left between J2 and
+  the USB-C; R5 (2010) top right between the USB-C and J3.
 - **The chip** in the lower middle, turned so LNA_IN is at its lower right corner; its decoupling round it, the crystal
   right under its XTAL pins, the VDD3P3 filter to its right (C28 100 nF right at pins 2 / 3), the u.FL (fitted) left of the RF line, ~2 mm from R19.
 - **The antenna strip:** the bottom 10 mm, no copper, track, via or pour on either layer except the antenna's feed and
@@ -275,7 +302,9 @@ or the CPL; JLC drills their holes only.
 - The bottom layer: ground, with some tracks; none under the chip's body (a keep-out 7.6 x 7.6 mm round its centre),
   the crystal or the RF path. VDD3P3 still takes 2 vias (2.3 mm on the bottom, outside the chip) from the buck side to
   its filter; +3V3 runs on the bottom along the chip's and the crystal's edges.
-- **Paste:** none on unfitted pads (DNP parts, the DIN sockets); the chip's exposed pad gets four 1.45 mm windows (53 %).
+- **Paste:** none on unfitted pads (DNP parts, the DIN sockets); the chip's exposed pad gets four 0.8 mm windows between
+  its 9 vias (16 % of the pad: the windows keep 0.05 mm off the via rings, so no solder runs into the vias; *a low
+  figure, unverified*: QFN guides ask 50-80 %; more paste would need plugged vias, a paid option).
 - **Silk:** "MIDI OUT" over J2, "PWR IN / OUT 2" over J3, "BOOT" under SW1.
 - Rules (JLC Economic, 2 layers): tracks 0.2 mm signal / 0.4..0.5 mm power, clearance 0.15 mm (JLC: 0.127), vias 0.3 /
   0.6 mm, the pours 0.2 mm from other nets.
@@ -288,7 +317,12 @@ or the CPL; JLC drills their holes only.
   `fab/drc.rpt`. The one exception in `chip.kicad_dru`: the USB-C's own locating holes, as in hardware/tiny.
 - **Nets:** `check_nets.py`: 248 board pads against the schematic, the pin rules (no strapping pin as an output, the
   senses on ADC1, MIDI_TX and PWR_HOLD on RTC GPIOs, USB on 19 / 20): 0 problems.
-- **Routing notes:** the chip's right-side pins (CHIP_PU, GPIO0, 1, 2, 4) are fanned out by hand in `make_board.py`
+- **Routing (2026-11-12, Freerouting via `freeroute.py`):** keep-outs: no via within 0.8 mm of a DIN pad, DIN nets 0.5 mm
+  from everything, no track in the antenna strip or within 0.5 mm of the edge, no bottom track under the chip block or
+  the RF path. Freerouting is not fully repeatable: each `make_fab.sh` run may route differently (two runs: both 0 errors,
+  0 unconnected). Measured on the committed board: USB D+ 40.7 mm (4 vias, 24.8 mm on the bottom), D- 45.7 mm (2 vias):
+  long and unmatched, *tolerable at full speed, unverified*; crystal and LNA_IN on top, no vias; VDD3P3 2 vias.
+- **Old routing notes (route.py):** the chip's right-side pins (CHIP_PU, GPIO0, 1, 2, 4) are fanned out by hand in `make_board.py`
   (FANOUT: one lane each, 0.8 mm apart, each ending in a via); the RF path, its via fences and the exposed pad's 9 vias
   are drawn there too; route.py does the rest (the ground vias by each pad first, then the signals). Measured on the
   board: the USB pair and the crystal are routed before anything else (`PRIORITY`): **USB D+ 22.1 mm, D- 21.7 mm, both
@@ -320,23 +354,29 @@ EUR at an *assumed* 0.86 a dollar. **Extended parts that pay the $3.09 fee (11) 
 | C76769 | 2.0 nH 0402 (VDD3P3 filter) | $0.015 | 173 735 | no Basic RF inductors |
 | C87532 | 3.3 nH 0402 (RF match) | $0.009 | 5 071 | same; **saving: fit 2.0 nH (C76769) at L3 too** (Espressif's range 2.0..3.0 nH) and drop this type: -$3.09, but not the XIAO value |
 | C2765186 | USB-C 16P | $0.07 | 1.09 M | no Basic USB-C |
-| C431535 | PJ-320D jack (x2) | $0.05 | 62 470 | no Basic jack; see "Unverified" |
+| C18185602 | SHOU HAN PJ-320A-4P DIP jack, through hole (x2) | $0.06 | 21 846 | no Basic jack; through hole since 2026-11-12 |
 | C2873354 | TPS62842 buck | $0.40 | 44 968 | tiny's 60 nA buck |
 | C2909397 | BL8506-40 detector | $0.14 | 3 061 | tiny's start-up detector |
 | C51018335 | 2200 uF 10 V can, 10 x 10.5 (x2) | $0.38 | 1 972 | no Basic aluminium can |
 | C88374 | Hirose U.FL-R-SMT-1 | $0.09 | 326 956 | the u.FL (fitted, the user's ruling) |
+| C7519 | ST USBLC6-2SC6, USB ESD (U5) | $0.16 | 21 884 | no Basic USB ESD array (the user's ruling) |
+| C2763866 | BL8506-30NRM, 3.0 V reset supervisor (U4) | $0.14 | 4 962 | no Basic supervisor (fitted 2026-11-12) |
+| C17976 | 68 ohm 1206 (x4: R14 // R26, R21 // R27) | $0.01 | 75 823 | no Basic 1206 resistor |
+| C474307 | 4.7 ohm 2010 0.75 W (R5) | $0.04 | 3 975 | no Basic 2010 resistor |
 | C79317 | 2.2 uH 0806 | $0.11 | 6 902 | the buck's inductor; no Basic part of that rating |
 
 **One BOM line per LCSC code** (`make_assembly.py`): JLC unticked the jacks when MIDI OUT and POWER IN were two lines
-for the same C431535 ("Multiple lines in the BOM have been matched to the same part"); they are one line now (J2,J3),
+for the same jack part ("Multiple lines in the BOM have been matched to the same part"); they are one line now (J2,J3),
 and the script stops if a code ever lands on two lines. **Fee-free:** C1550 (1 pF) is a *preferred* Extended part; everything else is Basic (0402 / 0603 / 0805 R and C, the
-diodes, the LED, the button). **Not ordered:** the DNP parts (C24, C25, C26, R19, J4, J5, J6). Stock is >= 50 for every
+diodes, the LED, the button). **Not ordered:** the DNP parts (C24, C25, C26, R18, J5, J6). Stock is >= 50 for every
 line (the lowest: the crystal, 2 748).
 
 ## Case (`case/`)
 
-See [case/README.md](case/README.md): `mini_case.scad` reads SW1 and LED1 from `PLACE` in `make_board.py`
-(`place_args.py`); `make_stl.sh` builds both versions (with and without the DINs) and runs their checks.
+See [case/README.md](case/README.md): `place_args.py` reads SW1, SW2, LED1, the size and J5 from `chip.kicad_pcb`;
+`make_stl.sh` builds both versions and runs their checks. **2026-11-12: the no-DIN version passes every check; the DIN
+version fails `check_base`** (its walls hit the through-hole jacks' legs and the DIN plates' slot fit; it fails at the old
+49.6 x 52.5 size too): open.
 
 ## Unverified, all in one place
 
@@ -357,7 +397,9 @@ See [case/README.md](case/README.md): `mini_case.scad` reads SW1 and LED1 from `
 - **The 2200 uF cans and the DIN sockets' iron room (short of 0.8 mm):** C1 / C2 were moved 1 mm lower (the board
   1 mm taller, the antenna strip kept 10 mm): their courtyards are now **0.33 mm** from DIN pad 1 (J5) and pad 5 (J6)
   (the cans' bodies ~0.6 mm), unused pins. Lower would put the cans' pads into the antenna strip.
-- **R5 (4.7 ohm, VBUS):** no Basic 1206 found at JLC; kept 0805 (its pulse rating unmeasured).
+- **R5 (4.7 ohm, VBUS):** a 2010 (C474307, 0.75 W, Extended); its pulse rating against 45 mJ in ~20 ms unmeasured
+  (no anti-surge part found at JLC in stock).
+- **R14 // R26, R21 // R27:** 2 x 68 ohm 1206 (C17976, Extended: no Basic 1206 resistor at JLC); 34 ohm, not 33.
 - **C5 22 uF 0603 6.3 V:** its capacitance at 3.3 V DC bias is well below 22 uF (unmeasured).
 - Stock and prices: one snapshot (`fab/parts-snapshot.json`); fees from earlier quotes (`fab/cost.md`).
 - Everything from hardware/tiny that is unverified there (the cans' leakage, the boot charge, the buck at light load,

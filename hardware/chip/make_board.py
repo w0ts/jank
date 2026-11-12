@@ -29,10 +29,11 @@ MM = pcbnew.FromMM
 OX, OY = 100.0, 100.0
 LIB = os.path.join(HERE, "lib", "chip.pretty")
 NAME = "chip"
-W, H = 49.6, 52.5
-GE = 42.5                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
-S = 2.8                     # (the middle's shift: 44 -> 47.6 mm for the 2200 uF cans, 49.6 for the DIN pads' rings)
-CX, CY = 18.8 + S, 30.4     # the chip's centre (turned 180: LNA_IN at the right side's bottom)
+W, H = 72.0, 65.0
+GE = 55.0                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
+S = 13.7                    # (the middle's shift: 44 -> 47.6 mm for the 2200 uF cans, 49.6 for the DIN pads' rings; 53.2 for RST (the right side), 54.2 and 56.2 for the left side's tracks)
+SB = S - 2.0                # (the buck group's shift: it stays by C1 and J5, the chip moved 2 mm away from it)
+CX, CY = 18.8 + S, 37.9     # the chip's centre (turned 180: LNA_IN at the right side's bottom)
 # the RF path (README "RF"): the line's centre x, its width and gap (grounded coplanar waveguide, 50 ohm: README)
 XA = 27.1 + S               # the line and the antenna on this x
 RF_W, RF_GAP = 1.2, 0.2
@@ -41,7 +42,7 @@ Y_L3 = Y_LINE + 0.6         # L3 and the line's top, 0.6 under LNA_IN: room for 
 ANT_Y = GE + 2.5 + 1.58     # the antenna's centre: its feed pad (S1) 2.0 mm past the ground edge (eval board)
 END_PAD = (1.8, 2.5)        # the copper beyond the antenna's end pad (S2), unconnected (eval board: 1.8 x 2.5)
 DIN_D, DIN_Y = 8.6, 20.3    # the DINs' origins: their faces (8.6 from JLC's origin) on the side edges, their axes at y 20
-CAN_Y = 35.5                # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
+CAN_Y = 43.0                # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
 
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
@@ -51,30 +52,36 @@ PLACE = {
     "J5": (DIN_D, DIN_Y, 90, "B"), "J6": (W - DIN_D, DIN_Y, 270, "B"),
     # between the DINs' holes (every top part keeps 0.8 mm from the DIN pads' copper: the iron's room, README "DIN"):
     # left the MIDI OUT resistors; right the POWER IN resistors and diodes, the detector, the reservoir's sense
-    "R14": (6.3, 17.0, 90), "R15": (8.5, 21.0, 90),
+    "R14": (16.9, 1.8, 0), "R26": (16.9, 4.4, 0),               # MO_R's 2 x 68 ohm 1206, between J2 and the USB-C
+    "R15": (8.5, 21.0, 90),
     "R1": (W - 2.5, 18.5, 0), "R2": (W - 2.5, 21.5, 0), "D1": (W - 8.4, 15.6, 90), "D2": (W - 6.05, 15.6, 90),
-    "U3": (W - 7.7, 21.2, 90), "D5": (W - 7.7, 25.0, 90), "R10": (W - 5.48, 21.2, 90),
+    "R10": (W - 5.48, 21.2, 90),
     # the button: in the middle, 8 mm or more from every tall part (the cans, the jacks, the USB-C), so a finger reaches it
     # through the lid; the LED above it; BUCK_EN's parts beside it
-    "SW1": (21.6 + S, 19.55, 0), "LED1": (19.9 + S, 14.9, 0), "R9": (23.4 + S, 14.9, 0),
-    "C4": (23.7 + S, 16.3, 0), "R6": (26.0 + S, 15.18, 90), "D4": (27.13 + S, 19.2, 0),
+    "SW2": (29.2 + S, 20.1, 0),                                     # RST (CHIP_PU to ground), right of BOOT
+    "SW1": (21.6 + S, 19.55, 0), "LED1": (19.6 + S, 15.2, 0), "R9": (23.4 + S, 15.2, 0),
     # the reservoir: one 2200 uF can down each side, under the DINs' holes
     "C1": (5.5, CAN_Y, 90), "C2": (W - 5.5, CAN_Y, 90),
     # under the USB-C: the CC resistors, the VBUS diode and its resistor, the VBUS sense and pull-down
-    "R3": (W / 2 - 4.2, 9.0, 0), "R13": (W / 2 - 4.2, 10.8, 0), "D3": (W / 2, 10.1, 0), "R12": (W / 2 + 3.6, 9.8, 90),
-    "R4": (W / 2 + 5.4, 9.8, 90), "R5": (W / 2, 12.35, 0), "R23": (W / 2 + 7.2, 9.8, 90),
+    "R3": (W / 2 - 4.2, 9.0, 0), "R13": (W / 2 - 4.2, 10.8, 0), "D3": (28.3 + S, 13.95, 90), "R12": (W / 2 + 3.6, 9.8, 90),
+    "R4": (W / 2 + 5.4, 9.8, 90), "R5": (W - 17.0, 2.4, 0), "R23": (W / 2 + 7.2, 9.8, 90),
     # the buck: lower left beside C1, its 10 uF input ceramic C3 right at VIN / GND (pins 6 / 8), L1 under it
-    "C3": (11.2 + S, 30.68, 180), "U2": (11.2 + S, 34.6, 0), "L1": (11.25 + S, 39.0, 0),
-    "C5": (14.35 + S, 39.4, 90), "C6": (14.35 + S, 35.0, 90), "R7": (13.9 + S, 36.7, 0), "R16": (15.8 + S, 34.85, 0),
+    # the start-up group (BUCK_EN: the detector, the two OR diodes, the hold-on C4 / R6) right above the buck, so BUCK_EN
+    # stays a few mm long (across the board it held the router 14+ min, 2026-11-12)
+    "U3": (19.4, 25.0, 90), "D4": (22.8, 21.0, 90), "D5": (19.4, 21.0, 90), "C4": (22.1, 24.6, 90), "R6": (23.8, 24.6, 90),
+    "C3": (11.2 + SB, 30.68, 180), "U2": (11.2 + SB, 34.6, 0), "L1": (11.25 + SB, 39.0, 0),
+    "C5": (14.35 + SB, 39.4, 90), "C6": (14.35 + SB, 35.0, 90), "R7": (13.9 + SB, 36.7, 0), "R16": (15.8 + S, 34.85, 0),
     # the chip (turned 180: LNA_IN at the bottom of its right side) and its parts round it
     "U1": (CX, CY, 180),
+    "U5": (W / 2, 10.9, 0),                                           # USB ESD, right under the USB-C's data pads
+    "R24": (CX - 0.3, CY - 6.2, 180), "R25": (CX - 0.3, CY - 5.2, 180),   # USB D+ / D- 22 ohm, right of pins 26 / 25 (pin 27 free)
     "C20": (CX + 1.5, CY - 4.45, 0),                                                  # VDD3P3_RTC (pin 20, top)
-    "U4": (23.8 + S, 24.05, 180),                                    # (DNP) a 3.0 V supervisor on CHIP_PU, README "Start-up"
-    "R11": (27.0 + S, 22.0, 90), "C8": (28.0 + S, 21.95, 90), "R8": (27.85 + S, 28.1, 90), "C7": (26.9 + S, 28.0, 90),
+    "U4": (23.3 + S, 24.05, 180),                                    # (DNP) a 3.0 V supervisor on CHIP_PU, README "Start-up"
+    "R11": (31.0 + S, 23.85, 90), "C8": (32.0 + S, 23.85, 90), "R8": (27.85 + S, 28.1, 90), "C7": (26.9 + S, 28.0, 90),
     "C21": (13.9 + S, 30.5, 270), "C22": (13.9 + S, 32.3, 270),                       # VDD_SPI (pin 29, left)
     "C19": (CX - 1.4, CY + 4.85, 90),                                                  # VDD3P3_CPU (pin 46, bottom)
     "C13": (CX + 2.94, CY + 4.9, 270), "C12": (CX + 3.87, CY + 4.9, 270), "C11": (CX + 5.9, CY + 4.6, 90),   # VDDA
-    "C28": (CX + 4.82, CY + 2.0, 0),                                   # 100 nF right at the RF supply's pins (2, 3)
+    "C28": (CX + 5.42, CY + 2.0, 0),         # 100 nF at the RF supply's pins (2, 3), 0.6 mm out: VDD3P3's via between
     "L2": (CX + 9.1, CY - 0.2, 270), "C18": (CX + 9.8, CY + 1.5, 0),                   # VDD3P3: the 2 nH, 100 nF after it
     "C16": (29.0 + S, 30.0, 90), "C14": (30.0 + S, 32.2, 90), "C15": (31.0 + S, 32.2, 90),
     "C17": (32.4 + S, 32.4, 90),                                                         # (10 uF: the checklist)
@@ -88,22 +95,22 @@ PLACE = {
     "R19": (XA - 1.0, 36.8, 180), "J4": (XA - 2.9, GE - 2.55, 180),   # (J4's signal pad up, ~2 mm from R19)
     "AE1": (XA, ANT_Y, 270),
     # MIDI OUT 2 (README "MIDI OUT 2"): the source's 33 ohm and Schottky, the sink's FET, 10 ohm and gate pull-down
-    "D6": (32.15 + S, 35.15, 0), "Q1": (31.4 + S, 37.95, 0), "R21": (31.4 + S, 40.55, 0), "R20": (34.2 + S, 37.8, 90),
-    "R22": (34.2 + S, 39.9, 90),
+    "D6": (32.15 + S, 35.15, 0), "Q1": (31.4 + S, 37.95, 0), "R21": (W - 13.43, 37.9, 0), "R27": (W - 13.43, 40.5, 0), "R20": (31.2 + S, 40.6, 0),
+    "R22": (31.2 + S, 41.7, 0),
 }
-WIDTH = {"VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
-ORDER = ["USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
+WIDTH = {"VDD3P3": 0.5, "VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
+ORDER = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
          "VDD3P3", "MIDI_TX", "MIDI2_TX", "LED_DRV", "SW", "+3V3", "VSYS", "VBUS", "VUSB_D", "BUCK_EN", "DET"]
 # (the chip's signal pins escape first: on its right side they sit between the RF supply's pins and the rest)
 RF_NETS = {"LNA_IN", "RF", "ANT_FEED", "UFL", "ANT_END"}
-PRIORITY = ["USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1"]      # (routed before anything else, ground vias included)      # (drawn here, not routed)
+PRIORITY = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "DET"]      # (routed before anything else, ground vias included)      # (drawn here, not routed)
 # the chip's right-side signal pins (between the RF supply's pins and the rest): drawn fan-out, one lane each, the lowest
 # pin on the outermost lane so they never cross; the router goes on from each lane's end. (net, chip pin y, lane x)
 # (net, chip pin y, lane x, lane end y, a via at the end): 0.8 mm apart, each ending in a via, so the router may take
 # any of them on either layer (BOOT, for one, crosses the others to reach the button on the left)
-FANOUT = [("CHIP_PU", CY + 1.4, CX + 7.3, 26.2, True), ("BOOT", CY + 1.0, CX + 6.5, 26.2, True),
-          ("VBANK_ADC", CY + 0.6, CX + 5.7, 26.2, True), ("VBUS_SENSE", CY + 0.2, CX + 4.9, 26.2, True),
-          ("PWR_HOLD", CY - 0.6, CX + 4.1, 26.2, True)]
+FANOUT = [("CHIP_PU", CY + 1.4, CX + 7.3, CY - 4.2, True), ("BOOT", CY + 1.0, CX + 6.5, CY - 4.2, True),
+          ("VBANK_ADC", CY + 0.6, CX + 5.7, CY - 4.2, True), ("VBUS_SENSE", CY + 0.2, CX + 4.9, CY - 4.2, True),
+          ("PWR_HOLD", CY - 0.6, CX + 4.1, CY - 4.2, True)]
 
 board = pcbnew.BOARD()
 nets = {}
@@ -126,10 +133,39 @@ def in_din_room(x, y):
     return any(math.hypot(x - cx, y - cy) < r + route.VIA_D / 2 for cx, cy, r in DIN_ROOM)
 
 
+# the groups' places found by the placer (worktrees' placer.py, 2026-11-12: simulated annealing of the groups round the
+# fixed connectors, cans, antenna and chip block, for the fewest airwire crossings and the shortest airwires: 84 -> 50
+# crossings), ref: (x, y, rotation); they replace PLACE (and the spread) for these parts
+PLACED = {
+    "U5": (33.460, 16.510, 0), "R3": (29.260, 14.610, 0), "R13": (29.260, 16.410, 0), "R12": (37.060, 15.410, 90),
+    "R4": (38.860, 15.410, 90), "R23": (40.660, 15.410, 90), "D3": (39.460, 19.560, 90), "R5": (52.460, 8.010, 0),
+    "C3": (21.680, 13.550, 180), "U2": (21.680, 17.470, 0), "L1": (21.730, 21.870, 0), "C5": (24.830, 22.270, 90),
+    "C6": (24.830, 17.870, 90), "R7": (24.380, 19.570, 0), "U3": (28.950, 7.660, 270), "D4": (25.550, 11.660, 270),
+    "D5": (28.950, 11.660, 270), "C4": (26.250, 8.060, 270), "R6": (24.550, 8.060, 270), "SW1": (38.643, 29.023, 90),
+    "LED1": (34.293, 31.023, 90), "R9": (34.293, 27.223, 90), "SW2": (24.700, 33.610, 180),
+    "U4": (47.123, 36.120, 0), "R8": (42.573, 28.570, 270), "C7": (43.523, 28.670, 270),
+    "R10": (17.723, 19.890, 180), "R11": (24.373, 41.710, 180), "C8": (24.373, 40.710, 180),
+    "R1": (50.387, 24.427, 90), "R2": (53.387, 24.427, 90), "D1": (47.488, 30.327, 180), "D2": (47.488, 27.978, 180),
+    "R14": (25.470, 46.310, 180), "R26": (25.470, 43.710, 180), "R15": (12.450, 31.900, 90),
+    "R16": (42.000, 31.420, 90), "D6": (45.730, 43.000, 0), "Q1": (44.980, 45.800, 0), "R21": (58.450, 45.750, 0),
+    "R27": (58.450, 48.350, 0), "R20": (44.780, 48.450, 0), "R22": (44.780, 49.550, 0),
+}
+
+# the spread (72 x 65, 2026-11-12): parts placed at absolute y below the chip's top follow the chip down 7.5 mm; the
+# buttons' and the start-up group's row 4 mm; the start-up group (absolute x) follows the middle 5 mm right
+SPREAD_Y = {**{r: 7.5 for r in ("C3", "U2", "L1", "C5", "C6", "R7", "R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10",
+                                "R19", "D6", "Q1", "R21", "R27", "R20", "R22", "R8", "C7")},
+            **{r: 4.0 for r in ("SW1", "SW2", "LED1", "R9", "U4", "R11", "C8", "U3", "D4", "D5", "C4", "R6")}}
+SPREAD_X = {r: 5.0 for r in ("U3", "D4", "D5", "C4", "R6")}
+
+
 def place():
     fps = {}
     for ref, _k, value, fp, _lcsc, pins in P.PARTS:
         x, y, rot, side = (PLACE[ref] + ("T",))[:4]
+        x, y = x + SPREAD_X.get(ref, 0.0), y + SPREAD_Y.get(ref, 0.0)
+        if ref in PLACED:
+            x, y, rot = PLACED[ref]
         f = pcbnew.FootprintLoad(LIB, P.FP[fp])
         f.SetFPID(pcbnew.LIB_ID("chip", P.FP[fp]))
         f.SetReference(ref)
@@ -167,8 +203,8 @@ def place():
     return fps
 
 
-EP_VIAS = [(0.0, 0.0), (1.4, 0.0), (-1.4, 0.0), (0.0, 1.4), (0.0, -1.4)]   # the exposed pad's vias: a cross
-EP_PANE, EP_PANE_AT = 1.45, 1.05          # the paste: 4 squares 1.45 mm at (+-1.05, +-1.05), 53 % of the 4 x 4 pad, off the vias
+EP_VIAS = [(dx, dy) for dx in (-1.3, 0.0, 1.3) for dy in (-1.3, 0.0, 1.3)]   # the exposed pad's 9 vias (Espressif: 9 or more)
+EP_PANE, EP_PANE_AT = 0.8, 0.65           # the paste: 4 squares 0.8 mm between the vias (+-0.65), 16 % of the pad, 0.05 off the via rings
 
 
 def windowpane(f, ep):
@@ -245,19 +281,23 @@ def pad_of(fps, ref, num):
 # ---- the RF path (fixed geometry; the router sees it as copper of its nets)
 RF_SEGS = []      # (net, layer, x0, y0, x1, y1, width)
 FAN_VIAS = []     # (net, x, y): the fan-out's vias
+FIXED_VIAS = []   # (net, x, y): drawn vias of a signal net (VDD3P3's)
 RF_VIAS = []      # GND vias: the fences along the line, the shunt capacitors' ground ends, the exposed pad's
 COPPER = []       # (rect) unconnected copper: the antenna's end pad extension
 
 
 def rf_path(fps):
     """the line from L3 to R18 (net RF), its stubs to C24 / C25 / R19, LNA_IN's stub to C23, the antenna feed"""
-    del RF_SEGS[:], RF_VIAS[:], COPPER[:], FAN_VIAS[:]
+    del RF_SEGS[:], RF_VIAS[:], COPPER[:], FAN_VIAS[:], FIXED_VIAS[:]
     lx, ly = pad_center(pad_of(fps, "U1", "1"))
     c23 = pad_center(pad_of(fps, "C23", "1"))
     l3a, l3b = pad_center(pad_of(fps, "L3", "1")), pad_center(pad_of(fps, "L3", "2"))
     # LNA_IN runs through C23's pad (no stub on the signal side; C23's ground end gets its via: Espressif's stub) to L3
-    RF_SEGS.append(("LNA_IN", 0, lx, ly, c23[0], ly, 0.25))               # (the pin is 0.2 wide)
-    RF_SEGS.append(("LNA_IN", 0, c23[0], ly, c23[0], c23[1], 0.3))
+    # (0.2 as the pin, 1.4 mm; 0.2 from pin 2 and VDD3P3's via, then 0.05 lower under C28's pad: 0.2 from it too)
+    RF_SEGS.append(("LNA_IN", 0, lx, ly, CX + 4.5, ly, 0.2))
+    RF_SEGS.append(("LNA_IN", 0, CX + 4.5, ly, CX + 4.6, ly + 0.05, 0.2))
+    RF_SEGS.append(("LNA_IN", 0, CX + 4.6, ly + 0.05, c23[0], ly + 0.05, 0.2))
+    RF_SEGS.append(("LNA_IN", 0, c23[0], ly + 0.05, c23[0], c23[1], 0.3))
     RF_SEGS.append(("LNA_IN", 0, c23[0], c23[1], l3a[0], l3a[1], 0.3))
     r18 = pad_center(pad_of(fps, "R18", "1"))
     y_turn = Y_L3
@@ -280,23 +320,34 @@ def rf_path(fps):
     RF_SEGS.append(("ANT_END", 0, a2[0], a2[1], a2[0], a2[1] + END_PAD[1] - END_PAD[0] / 2, END_PAD[0]))
     # the fences: GND vias both sides of the line, their rings 0.35 mm from its edge (0.15 inside the pour)
     off = RF_W / 2 + RF_GAP + route.VIA_D / 2 + 0.15
+    rf_pads = [p for ref in ("C24", "C25", "C26", "R18", "R19", "J4") for p in fps[ref].Pads()]
+
+    def clear_of_pads(x, y):                     # (a fence via 0.2 mm or more from the RF parts' pads)
+        c = pcbnew.SHAPE_CIRCLE(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)), MM(route.VIA_D / 2))
+        return not any(p.GetEffectiveShape(pcbnew.F_Cu).Collide(c, MM(0.2)) for p in rf_pads)
     for x in (XA - off, XA + off):
         y = y_turn + 1.2
         while y < GE - 0.6:
-            RF_VIAS.append((x, y))
+            if clear_of_pads(x, y):
+                RF_VIAS.append((x, y))
             y += 0.9
     x = l3b[0] + 1.0
     while x < XA - 0.4:
         RF_VIAS.append((x, y_turn - off))
         x += 0.9
     # the chip's right-side fan-out (FANOUT)
-    for n, y, x, top, via in FANOUT:
+    for n, y, x, top, via in ([] if os.environ.get("NO_LANES") else FANOUT):   # (NO_LANES=1: the outside router fans out)
         RF_SEGS.append((n, 0, CX + 3.41, y, x, y, 0.2))
         RF_SEGS.append((n, 0, x, y, x, top, 0.2))
         if via:
             FAN_VIAS.append((n, x, top))
     # VDD3P3's two pins (2 and 3) joined on top, at their pads' centre line
     RF_SEGS.append(("VDD3P3", 0, CX + 3.41, CY + 1.8, CX + 3.41, CY + 2.2, 0.2))
+    # ... on to C28 through a via between the pins and C28: the only way out of the corner (the fan-out lanes above, LNA_IN
+    # below, C28's ground pad right); the router takes VDD3P3 on from the via on the bottom to L2 / C18
+    c28 = pad_center(pad_of(fps, "C28", "1"))
+    RF_SEGS.append(("VDD3P3", 0, CX + 3.41, CY + 2.0, c28[0], c28[1], 0.2))
+    FIXED_VIAS.append(("VDD3P3", CX + 4.2, CY + 2.0))
     # the exposed pad's vias (EP_VIAS: a cross, clear of the paste windows)
     for dx, dy in EP_VIAS:
         RF_VIAS.append((CX + dx, CY + dy))
@@ -517,8 +568,10 @@ def route_best(fps, attempts=int(os.environ.get("ATTEMPTS", "4"))):
 def draw_rf():
     for n, layer, x0, y0, x1, y1, w in RF_SEGS:
         add_track(n, layer, x0, y0, x1, y1, w)
+    for n, x, y in FIXED_VIAS:
+        add_via(n, x, y)
     for n, x, y in FAN_VIAS:                      # (a fan-out via only where the route went on on the bottom layer)
-        if any(t.GetNetname() == n and t.GetLayer() == pcbnew.B_Cu and t.GetClass() == "PCB_TRACK"
+        if os.environ.get("LANE_VIAS") or any(t.GetNetname() == n and t.GetLayer() == pcbnew.B_Cu and t.GetClass() == "PCB_TRACK"
                and min(abs(pcbnew.ToMM(e.x) - OX - x) + abs(pcbnew.ToMM(e.y) - OY - y) for e in (t.GetStart(), t.GetEnd())) < 0.3
                for t in board.GetTracks()):
             add_via(n, x, y)
@@ -639,6 +692,7 @@ def silk():
     label("MIDI OUT", 6.0, 12.3, 0.7)            # (J2 and J5)
     label("PWR IN / OUT 2", W - 6.1, 12.3, 0.6)  # (J3 and J6: the power input, or MIDI OUT 2 on USB power)
     label("BOOT", 21.6 + S, 23.0, 0.6)
+    label("RST", 31.6 + S, 16.2, 0.6)
     label("jank chip", 12.0, GE + 3.0, 1.0)
     label("antenna strip:", 12.0, GE + 4.6, 0.6)
     label("no copper", 12.0, GE + 5.5, 0.6)
@@ -660,7 +714,9 @@ def main():
     zones()
     silk()
     pts = [(OX + x, OY + y) for x, y in ((0, 0), (W, 0), (W, GE - 0.6), (0, GE - 0.6))]
-    st = stitch(board, lambda x, y: None if in_din_room(x - OX, y - OY) else add_via("GND", x - OX, y - OY), pts)
+    st = []                                       # (NO_STITCH=1: a placement for an outside router, freeroute.py)
+    if not os.environ.get("NO_STITCH"):
+        st = stitch(board, lambda x, y: None if in_din_room(x - OX, y - OY) else add_via("GND", x - OX, y - OY), pts)
     print(f"{len(st)} stitching vias")
     board.GetDesignSettings().SetAuxOrigin(pcbnew.VECTOR2I(MM(OX), MM(OY + H)))
     ds = board.GetDesignSettings()
