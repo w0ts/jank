@@ -22,9 +22,10 @@ JAR = os.path.join(WORK, "freerouting-2.5.0.jar")
 MM = pcbnew.FromMM
 OX = OY = 100.0
 ROUNDS = 3
+EXTRA = 2
 PASSES = "100"
 # net classes (widths in um; clearance 0.2 as the rules: the chip's 0.4 mm pitch leaves exactly 0.2 between 0.2 tracks)
-PWR = {"VDD3P3": 250, "VSYS": 300, "+3V3": 250, "VBUS": 300, "VUSB_D": 300, "SW": 300}   # (0.25 into the chip's pins)
+PWR = {"VDD3P3": 250, "VSYS": 300, "+3V3": 250, "VBUS": 300, "VUSB_D": 300, "SW": 300}   # (0.25 into the chip.s pins)
 DIN_NETS = ["MO_R", "MO_T", "PIN_R", "PIN_T"]   # (0.5 from everything: the iron's room, README "DIN")
 IRON = 0.8                                       # (no via within a DIN pad's copper + 0.8 mm)
 EDGE = 0.3                                       # (+ the 0.2 clearance: the rules' 0.5 from the board's edge)
@@ -113,7 +114,9 @@ def patch_dsn(text, keepouts):
 def route_round(board, k):
     for t in board.GetTracks():
         t.SetLocked(True)
-    dsn, ses, log = (os.path.join(WORK, f"round{k}.{e}") for e in ("dsn", "ses", "log"))
+    work = os.path.splitext(board.GetFileName())[0] + ".freerouting"   # (per board: parallel runs never share files)
+    os.makedirs(work, exist_ok=True)
+    dsn, ses, log = (os.path.join(work, f"round{k}.{e}") for e in ("dsn", "ses", "log"))
     if not pcbnew.ExportSpecctraDSN(board, dsn):
         sys.exit("DSN export failed")
     with open(dsn) as fh:
@@ -132,6 +135,7 @@ def route_round(board, k):
         sys.exit("SES import failed")
     done = re.findall(r"Auto-routing stage completed: .*?\((\d+) unrouted", r.stdout)
     print(f"round {k}: {done[-1] if done else '?'} connections left to Freerouting")
+    return int(done[-1]) if done else -1
 
 
 def collides(board, item, layer, gap):
@@ -253,11 +257,12 @@ def main():
     path = sys.argv[1]
     if not os.path.exists(JAR):
         sys.exit(f"no {JAR}: sh fetch_freerouting.sh")
-    os.makedirs(WORK, exist_ok=True)
     board = pcbnew.LoadBoard(path)
-    for k in range(1, ROUNDS + 1):
-        route_round(board, k)
+    for k in range(1, ROUNDS + EXTRA + 1):       # (EXTRA rounds only while Freerouting still leaves connections)
+        left = route_round(board, k)
         tidy(board)
+        if k >= ROUNDS and left == 0:
+            break
     board.Save(path)
     print("saved", path)
 

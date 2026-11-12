@@ -83,6 +83,10 @@ def inside(one, x, y):
 def main(path):
     b = pcbnew.LoadBoard(path)
     din = [(p.GetPosition(), p.GetSize().x / 2) for f in b.GetFootprints() if f.GetReference() in ("J5", "J6") for p in f.Pads()]
+    # every drilled hole (pads' and vias'): the new via's copper keeps the rules' 0.2 mm hole clearance from each
+    holes = [(p.GetPosition(), max(p.GetDrillSize().x, p.GetDrillSize().y) / 2) for f in b.GetFootprints() for p in f.Pads()
+             if p.GetDrillSize().x > 0]
+    holes += [(t.GetPosition(), t.GetDrillValue() / 2) for t in b.GetTracks() if t.GetClass() == "PCB_VIA"]
     added = 0
     for _ in range(5):
         gs = groups(b)
@@ -100,6 +104,8 @@ def main(path):
                     if not inside(one, x, y) or not any(inside(o, x, y) for o in other):
                         continue
                     if any(((x - c.x) ** 2 + (y - c.y) ** 2) ** 0.5 < r + MM(DIN_ROOM) for c, r in din):
+                        continue
+                    if any(((x - c.x) ** 2 + (y - c.y) ** 2) ** 0.5 < r + MM(VIA_D / 2 + 0.2) for c, r in holes):
                         continue
                     spot = (x, y)
                     break

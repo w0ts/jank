@@ -17,7 +17,7 @@ board for 5**. The user calls it **jank mini**; the files keep the name "chip". 
 | | |
 |---|---|
 | Size | **72 x 65 mm**, 2 layers, 1.6 mm FR-4 |
-| Assembly | JLC **Economic**: every fitted part on the top side; 74 parts on 42 BOM lines, 244 joints |
+| Assembly | JLC **Economic**: every fitted part on the top side; 74 parts on 41 BOM lines, 244 joints |
 | Checks | ERC 0 errors (1 warning: ANT_END, a one-pin net by design); DRC **0 errors, 0 unconnected** (6 warnings: the antenna's end-pad copper ends in the open, as on YAGEO's board; 5 library-footprint notes); every board pad against the schematic: 0 problems; every CPL place against JLC's footprint: within 0.01 mm |
 | Estimate (shipping left out) | **5 boards: $101.40, $20.28 a board; 10 boards: $132.40, $13.24 a board** (`fab/cost.md`, snapshot 2026-11-12) |
 | Files for JLC | `fab/chip-gerbers.zip`, `fab/bom.csv`, `fab/cpl.csv` |
@@ -276,8 +276,9 @@ or the CPL; JLC drills their holes only.
 ## Layout (72 x 65 mm, 2 layers, 1.6 mm, every fitted part on top)
 
 **2026-11-12: the board grew to 72 x 65 mm and the groups below the connectors were re-placed by a placer** (simulated
-annealing of rigid groups round the fixed connectors, cans, antenna and chip block: airwire crossings 84 -> 50; its
-result is `PLACED` in `make_board.py`). The notes below describe the earlier 49.6 x 52.5 mm layout where they name
+annealing of rigid groups round the fixed connectors, cans, antenna and chip block, each group pulled to the part it
+serves, nothing within 3 mm of the RF path; its result is `PLACED` in `make_board.py`). The u.FL selector R19 sits at
+the line's end beside R18, J4 beside it (no stub). The notes below describe the earlier 49.6 x 52.5 mm layout where they name
 positions; the connectors, the chip block, the RF path and the antenna strip are as described.
 
 - **Top edge:** the USB-C in the middle, **MIDI OUT (J2) on the left edge, POWER IN (J3) on the right edge** (both
@@ -319,9 +320,12 @@ positions; the connectors, the chip block, the RF path and the antenna strip are
   senses on ADC1, MIDI_TX and PWR_HOLD on RTC GPIOs, USB on 19 / 20): 0 problems.
 - **Routing (2026-11-12, Freerouting via `freeroute.py`):** keep-outs: no via within 0.8 mm of a DIN pad, DIN nets 0.5 mm
   from everything, no track in the antenna strip or within 0.5 mm of the edge, no bottom track under the chip block or
-  the RF path. Freerouting is not fully repeatable: each `make_fab.sh` run may route differently (two runs: both 0 errors,
-  0 unconnected). Measured on the committed board: USB D+ 40.7 mm (4 vias, 24.8 mm on the bottom), D- 45.7 mm (2 vias):
-  long and unmatched, *tolerable at full speed, unverified*; crystal and LNA_IN on top, no vias; VDD3P3 2 vias.
+  the RF path. Freerouting repeats itself only on a byte-identical input: `make_fab.sh` (ROUTE=1) may route differently
+  from the committed board and must pass the same checks; `ROUTE=0` keeps the committed routing. Measured on the committed
+  board (routed tracks): VSYS C1 -> buck 9.4 mm; +3V3 buck -> chip pin 20 38.4 mm, -> L2 61.8 mm (0.25 mm, a chain through
+  the +3V3 loads); USB D+ connector -> ESD 21.2 mm with 4 vias (the ESD 5.3 mm away in a line: a detour, *open*);
+  CHIP_PU pin -> C7 23.6 mm; MIDI OUT 2's R20 22.6 mm from J6 (*open*); VDD3P3's bottom hop 0.3 mm from the RF line's
+  edge near L3.
 - **Old routing notes (route.py):** the chip's right-side pins (CHIP_PU, GPIO0, 1, 2, 4) are fanned out by hand in `make_board.py`
   (FANOUT: one lane each, 0.8 mm apart, each ending in a via); the RF path, its via fences and the exposed pad's 9 vias
   are drawn there too; route.py does the rest (the ground vias by each pad first, then the signals). Measured on the

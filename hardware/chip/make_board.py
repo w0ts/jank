@@ -92,11 +92,13 @@ PLACE = {
     # stubs as short as the pads allow)
     "C23": (CX + 4.8, Y_LINE + 0.85, 270), "L3": (CX + 6.5, Y_L3, 0), "C24": (XA + 1.0, Y_L3 + 1.0, 0),
     "C25": (XA + 1.0, GE - 3.2, 0), "R18": (XA, GE - 1.6, 270), "C26": (XA + 1.35, GE - 0.9, 0),
-    "R19": (XA - 1.0, 36.8, 180), "J4": (XA - 2.9, GE - 2.55, 180),   # (J4's signal pad up, ~2 mm from R19)
+    # the selector at the line's end, one node with R18 (2026-11-12 review: R19 halfway down left the line past it an open
+    # stub when the u.FL is selected), J4 right beside it
+    "R19": (XA - 1.3, GE - 2.1, 180), "J4": (XA - 3.6, GE - 2.6, 90),
     "AE1": (XA, ANT_Y, 270),
     # MIDI OUT 2 (README "MIDI OUT 2"): the source's 33 ohm and Schottky, the sink's FET, 10 ohm and gate pull-down
     "D6": (32.15 + S, 35.15, 0), "Q1": (31.4 + S, 37.95, 0), "R21": (W - 13.43, 37.9, 0), "R27": (W - 13.43, 40.5, 0), "R20": (31.2 + S, 40.6, 0),
-    "R22": (31.2 + S, 41.7, 0),
+    "R22": (31.2 + S, 42.1, 0),
 }
 WIDTH = {"VDD3P3": 0.5, "VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
 ORDER = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
@@ -134,27 +136,28 @@ def in_din_room(x, y):
 
 
 # the groups' places found by the placer (worktrees' placer.py, 2026-11-12: simulated annealing of the groups round the
-# fixed connectors, cans, antenna and chip block, for the fewest airwire crossings and the shortest airwires: 84 -> 50
-# crossings), ref: (x, y, rotation); they replace PLACE (and the spread) for these parts
+# fixed connectors, cans, antenna and chip block, for the fewest airwire crossings, the shortest airwires, and each group
+# pulled to the part it serves (the buck to C1 and the chip, the USB parts to the USB-C, the MIDI parts to their sockets);
+# no group within 3 mm of the RF path), ref: (x, y, rotation); they replace PLACE (and the spread) for these parts
 PLACED = {
-    "U5": (33.460, 16.510, 0), "R3": (29.260, 14.610, 0), "R13": (29.260, 16.410, 0), "R12": (37.060, 15.410, 90),
-    "R4": (38.860, 15.410, 90), "R23": (40.660, 15.410, 90), "D3": (39.460, 19.560, 90), "R5": (52.460, 8.010, 0),
-    "C3": (21.680, 13.550, 180), "U2": (21.680, 17.470, 0), "L1": (21.730, 21.870, 0), "C5": (24.830, 22.270, 90),
-    "C6": (24.830, 17.870, 90), "R7": (24.380, 19.570, 0), "U3": (28.950, 7.660, 270), "D4": (25.550, 11.660, 270),
-    "D5": (28.950, 11.660, 270), "C4": (26.250, 8.060, 270), "R6": (24.550, 8.060, 270), "SW1": (38.643, 29.023, 90),
-    "LED1": (34.293, 31.023, 90), "R9": (34.293, 27.223, 90), "SW2": (24.700, 33.610, 180),
-    "U4": (47.123, 36.120, 0), "R8": (42.573, 28.570, 270), "C7": (43.523, 28.670, 270),
-    "R10": (17.723, 19.890, 180), "R11": (24.373, 41.710, 180), "C8": (24.373, 40.710, 180),
-    "R1": (50.387, 24.427, 90), "R2": (53.387, 24.427, 90), "D1": (47.488, 30.327, 180), "D2": (47.488, 27.978, 180),
-    "R14": (25.470, 46.310, 180), "R26": (25.470, 43.710, 180), "R15": (12.450, 31.900, 90),
-    "R16": (42.000, 31.420, 90), "D6": (45.730, 43.000, 0), "Q1": (44.980, 45.800, 0), "R21": (58.450, 45.750, 0),
-    "R27": (58.450, 48.350, 0), "R20": (44.780, 48.450, 0), "R22": (44.780, 49.550, 0),
+    "U5": (34.580, 10.860, 0), "R3": (30.380, 8.960, 0), "R13": (30.380, 10.760, 0), "R12": (38.180, 9.760, 90),
+    "R4": (39.980, 9.760, 90), "R23": (41.780, 9.760, 90), "D3": (40.580, 13.910, 90), "R5": (53.580, 2.360, 0),
+    "C3": (11.902, 46.185, 270), "U2": (15.822, 46.185, 90), "L1": (20.222, 46.135, 90), "C5": (20.622, 43.035, 180),
+    "C6": (16.222, 43.035, 180), "R7": (17.922, 43.485, 90), "U3": (15.790, 36.520, 0), "D4": (19.790, 39.920, 0),
+    "D5": (19.790, 36.520, 0), "C4": (16.190, 39.220, 0), "R6": (16.190, 40.920, 0), "SW1": (39.063, 29.033, 90),
+    "LED1": (34.713, 31.033, 90), "R9": (34.713, 27.233, 90), "SW2": (50.940, 44.620, 180),
+    "U4": (44.440, 33.310, 180), "R8": (48.990, 40.860, 90), "C7": (48.040, 40.760, 90), "R10": (25.903, 8.930, 180),
+    "R11": (32.553, 30.750, 180), "C8": (32.553, 29.750, 180), "R1": (61.357, 33.762, 270),
+    "R2": (58.357, 33.762, 270), "D1": (64.257, 27.862, 0), "D2": (64.257, 30.213, 0), "R14": (19.580, 17.370, 180),
+    "R26": (19.580, 14.770, 180), "R15": (18.660, 25.350, 180), "R16": (41.330, 33.770, 90),
+    "D6": (60.012, 37.975, 270), "Q1": (57.212, 37.225, 270), "R21": (57.262, 50.695, 270),
+    "R27": (54.662, 50.695, 270), "R20": (54.562, 37.025, 270), "R22": (53.062, 37.025, 270),
 }
 
 # the spread (72 x 65, 2026-11-12): parts placed at absolute y below the chip's top follow the chip down 7.5 mm; the
 # buttons' and the start-up group's row 4 mm; the start-up group (absolute x) follows the middle 5 mm right
 SPREAD_Y = {**{r: 7.5 for r in ("C3", "U2", "L1", "C5", "C6", "R7", "R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10",
-                                "R19", "D6", "Q1", "R21", "R27", "R20", "R22", "R8", "C7")},
+                                "D6", "Q1", "R21", "R27", "R20", "R22", "R8", "C7")},
             **{r: 4.0 for r in ("SW1", "SW2", "LED1", "R9", "U4", "R11", "C8", "U3", "D4", "D5", "C4", "R6")}}
 SPREAD_X = {r: 5.0 for r in ("U3", "D4", "D5", "C4", "R6")}
 
@@ -164,7 +167,7 @@ def place():
     for ref, _k, value, fp, _lcsc, pins in P.PARTS:
         x, y, rot, side = (PLACE[ref] + ("T",))[:4]
         x, y = x + SPREAD_X.get(ref, 0.0), y + SPREAD_Y.get(ref, 0.0)
-        if ref in PLACED:
+        if ref in PLACED and not os.environ.get("NO_PLACED"):   # (NO_PLACED=1: the spread, the placer's start)
             x, y, rot = PLACED[ref]
         f = pcbnew.FootprintLoad(LIB, P.FP[fp])
         f.SetFPID(pcbnew.LIB_ID("chip", P.FP[fp]))

@@ -3,3 +3,4 @@ __pycache__/
 fp-info-cache
 *-backups/
 .freerouting/
+*.freerouting/
