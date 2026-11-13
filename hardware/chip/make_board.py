@@ -29,11 +29,12 @@ MM = pcbnew.FromMM
 OX, OY = 100.0, 100.0
 LIB = os.path.join(HERE, "lib", "chip.pretty")
 NAME = "chip"
-W, H = 72.0, 65.0
-GE = 55.0                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
-S = 13.7                    # (the middle's shift: 44 -> 47.6 mm for the 2200 uF cans, 49.6 for the DIN pads' rings; 53.2 for RST (the right side), 54.2 and 56.2 for the left side's tracks)
+# the size (2026-11-13: SIZE=WxH tries a smaller board; the parts' spread and the chip's height follow it)
+W, H = (float(v) for v in os.environ.get("SIZE", "66x60").split("x"))   # (PLACED is for 66 x 60)
+GE = H - 10.0                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
+S = (W - 44.6) / 2                # (the middle's shift: 44 -> 47.6 mm for the 2200 uF cans, 49.6 for the DIN pads' rings; 53.2 for RST (the right side), 54.2 and 56.2 for the left side's tracks)
 SB = S - 2.0                # (the buck group's shift: it stays by C1 and J5, the chip moved 2 mm away from it)
-CX, CY = 18.8 + S, 37.9     # the chip's centre (turned 180: LNA_IN at the right side's bottom)
+CX, CY = 18.8 + S, GE - max(13.5, 12.1 + (H - 52.5) * 0.4)   # (13.5 or more: the crystal clear of J4)    # the chip's centre (turned 180: LNA_IN at the right side's bottom)
 # the RF path (README "RF"): the line's centre x, its width and gap (grounded coplanar waveguide, 50 ohm: README)
 XA = 27.1 + S               # the line and the antenna on this x
 RF_W, RF_GAP = 1.2, 0.2
@@ -42,7 +43,7 @@ Y_L3 = Y_LINE + 0.6         # L3 and the line's top, 0.6 under LNA_IN: room for 
 ANT_Y = GE + 2.5 + 1.58     # the antenna's centre: its feed pad (S1) 2.0 mm past the ground edge (eval board)
 END_PAD = (1.8, 2.5)        # the copper beyond the antenna's end pad (S2), unconnected (eval board: 1.8 x 2.5)
 DIN_D, DIN_Y = 8.6, 20.3    # the DINs' origins: their faces (8.6 from JLC's origin) on the side edges, their axes at y 20
-CAN_Y = 43.0                # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
+CAN_Y = 35.5 + (CY - 30.4)               # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
 
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
@@ -63,8 +64,11 @@ PLACE = {
     # the reservoir: one 2200 uF can down each side, under the DINs' holes
     "C1": (5.5, CAN_Y, 90), "C2": (W - 5.5, CAN_Y, 90),
     # under the USB-C: the CC resistors, the VBUS diode and its resistor, the VBUS sense and pull-down
-    "R3": (W / 2 - 4.2, 9.0, 0), "R13": (W / 2 - 4.2, 10.8, 0), "D3": (28.3 + S, 13.95, 90), "R12": (W / 2 + 3.6, 9.8, 90),
-    "R4": (W / 2 + 5.4, 9.8, 90), "R5": (W - 17.0, 2.4, 0), "R23": (W / 2 + 7.2, 9.8, 90),
+    # (2026-11-13: each CC resistor under its own pin's side (CC2 = B5 left, CC1 = A5 right: they used to cross the data
+    # lines), the VBUS parts further out, D3 up by R5; the strip under U5 stays free for D+ / D- to the chip)
+    "R4": (W / 2 - 3.6, 11.0, 90), "R3": (W / 2 + 3.6, 11.0, 90),
+    "R12": (W / 2 - 5.4, 11.0, 90), "R13": (W / 2 - 7.2, 11.0, 90), "R23": (W / 2 + 5.4, 11.0, 90),
+    "D3": (W / 2 + 7.4, 4.6, 90), "R5": (W - 17.0, 2.4, 0),
     # the buck: lower left beside C1, its 10 uF input ceramic C3 right at VIN / GND (pins 6 / 8), L1 under it
     # the start-up group (BUCK_EN: the detector, the two OR diodes, the hold-on C4 / R6) right above the buck, so BUCK_EN
     # stays a few mm long (across the board it held the router 14+ min, 2026-11-12)
@@ -85,7 +89,7 @@ PLACE = {
     "L2": (CX + 9.1, CY - 0.2, 270), "C18": (CX + 9.8, CY + 1.5, 0),                   # VDD3P3: the 2 nH, 100 nF after it
     "C16": (29.0 + S, 30.0, 90), "C14": (30.0 + S, 32.2, 90), "C15": (31.0 + S, 32.2, 90),
     "C17": (32.4 + S, 32.4, 90),                                                         # (10 uF: the checklist)
-    "Y1": (19.5 + S, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.75 + S, 37.7, 270), "C9": (21.0 + S, CY + 10.3, 0),
+    "Y1": (19.5 + S, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.75 + S, 37.7, 270), "C9": (20.6 + S, CY + 10.3, 0),
     # RF (README "RF"): the chip's pi (C23 shunt on the line at the pin, its ground end to a via; L3 series; C24 shunt),
     # the line down to the antenna's pi (C25 shunt, R18 the series 0 ohm: DNP, C26 shunt) at the ground edge; R19 (fitted) / J4
     # (fitted) the u.FL path, the default (the user's ruling 2026-11-11); the unfitted pads right against the line (their
@@ -94,7 +98,8 @@ PLACE = {
     "C25": (XA + 1.0, GE - 3.2, 0), "R18": (XA, GE - 1.6, 270), "C26": (XA + 1.35, GE - 0.9, 0),
     # the selector at the line's end, one node with R18 (2026-11-12 review: R19 halfway down left the line past it an open
     # stub when the u.FL is selected), J4 right beside it
-    "R19": (XA - 1.3, GE - 2.1, 180), "J4": (XA - 3.6, GE - 2.6, 90),
+    "R19": (XA + 1.3, GE - 2.1, 0), "J4": (XA + 4.4, GE - 2.6, 270),   # (right of the line, between C25 and C26: the
+    # crystal's side stays clear on a short board)
     "AE1": (XA, ANT_Y, 270),
     # MIDI OUT 2 (README "MIDI OUT 2"): the source's 33 ohm and Schottky, the sink's FET, 10 ohm and gate pull-down
     "D6": (32.15 + S, 35.15, 0), "Q1": (31.4 + S, 37.95, 0), "R21": (W - 13.43, 37.9, 0), "R27": (W - 13.43, 40.5, 0), "R20": (31.2 + S, 40.6, 0),
@@ -140,26 +145,24 @@ def in_din_room(x, y):
 # pulled to the part it serves (the buck to C1 and the chip, the USB parts to the USB-C, the MIDI parts to their sockets);
 # no group within 3 mm of the RF path), ref: (x, y, rotation); they replace PLACE (and the spread) for these parts
 PLACED = {
-    "R3": (21.540, 9.050, 0), "R13": (21.540, 10.850, 0), "R12": (29.340, 9.850, 90), "R4": (31.140, 9.850, 90),
-    "R23": (32.940, 9.850, 90), "D3": (31.740, 14.000, 90), "R5": (44.740, 2.450, 0), "C3": (11.922, 45.205, 270),
-    "U2": (15.842, 45.205, 90), "L1": (20.242, 45.155, 90), "C5": (20.642, 42.055, 180), "C6": (16.242, 42.055, 180),
-    "R7": (17.942, 42.505, 90), "U3": (24.800, 26.720, 0), "D4": (28.800, 30.120, 0), "D5": (28.800, 26.720, 0),
-    "C4": (25.200, 29.420, 0), "R6": (25.200, 31.120, 0), "SW1": (36.003, 27.233, 90), "LED1": (31.653, 29.233, 90),
-    "R9": (31.653, 25.433, 90), "SW2": (48.850, 21.920, 270), "U4": (42.560, 19.230, 180),
-    "R8": (47.110, 26.780, 90), "C7": (46.160, 26.680, 270), "R10": (25.550, 33.617, 0), "R11": (18.900, 11.797, 0),
-    "C8": (18.900, 12.797, 0), "R1": (68.700, 28.800, 0), "R2": (68.700, 31.800, 0), "D1": (62.800, 25.900, 90),
-    "D2": (65.150, 25.900, 90), "R14": (19.590, 18.400, 180), "R26": (19.590, 15.800, 180),
-    "R15": (18.640, 25.150, 180), "R16": (39.850, 24.030, 180), "D6": (56.702, 30.115, 270),
-    "Q1": (53.902, 29.365, 270), "R21": (53.952, 42.835, 270), "R27": (51.352, 42.835, 270),
-    "R20": (51.252, 29.165, 270), "R22": (49.752, 29.165, 270),
+    "C3": (12.582, 41.845, 270), "U2": (16.502, 41.845, 90), "L1": (20.902, 41.795, 90), "C5": (21.302, 38.695, 180),
+    "C6": (16.902, 38.695, 180), "R7": (18.602, 39.145, 90), "U3": (22.020, 3.755, 0), "D4": (26.020, 7.155, 0),
+    "D5": (26.020, 3.755, 0), "C4": (22.420, 6.455, 0), "R6": (22.420, 8.155, 0), "SW1": (33.013, 24.038, 90),
+    "LED1": (28.663, 26.038, 90), "R9": (28.663, 22.238, 90), "SW2": (45.900, 23.795, 90),
+    "U4": (42.240, 12.915, 180), "R8": (46.790, 19.080, 90), "C7": (45.840, 18.980, 90), "R10": (56.390, 27.730, 90),
+    "R11": (37.570, 32.765, 90), "C8": (38.570, 32.765, 90), "R1": (63.500, 18.780, 0), "R2": (63.500, 21.780, 0),
+    "D1": (57.600, 15.880, 90), "D2": (59.950, 15.880, 90), "R14": (19.580, 15.930, 180),
+    "R26": (19.580, 13.330, 180), "R15": (13.410, 3.980, 270), "R16": (37.280, 20.860, 180),
+    "Q1": (47.210, 13.210, 0), "R20": (47.010, 15.860, 0), "R22": (47.010, 17.360, 0), "D6": (49.120, 28.660, 180),
+    "R21": (39.400, 25.910, 180), "R27": (39.400, 23.310, 180),
 }
 
 # the spread (72 x 65, 2026-11-12): parts placed at absolute y below the chip's top follow the chip down 7.5 mm; the
 # buttons' and the start-up group's row 4 mm; the start-up group (absolute x) follows the middle 5 mm right
-SPREAD_Y = {**{r: 7.5 for r in ("C3", "U2", "L1", "C5", "C6", "R7", "R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10",
+SPREAD_Y = {**{r: CY - 30.4 for r in ("C3", "U2", "L1", "C5", "C6", "R7", "R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10",
                                 "D6", "Q1", "R21", "R27", "R20", "R22", "R8", "C7")},
-            **{r: 4.0 for r in ("SW1", "SW2", "LED1", "R9", "U4", "R11", "C8", "U3", "D4", "D5", "C4", "R6")}}
-SPREAD_X = {r: 5.0 for r in ("U3", "D4", "D5", "C4", "R6")}
+            **{r: (CY - 30.4) * 0.53 for r in ("SW1", "SW2", "LED1", "R9", "U4", "R11", "C8", "U3", "D4", "D5", "C4", "R6")}}
+SPREAD_X = {r: S - 8.7 for r in ("U3", "D4", "D5", "C4", "R6")}
 
 
 def place():
@@ -373,6 +376,22 @@ def rf_path(fps):
     RF_SEGS.append(("UDP", 0, a6[0], a6[1], v1[0], v1[1], 0.2))
     RF_SEGS.append(("UDP", 1, v1[0], v1[1], v2[0], v2[1], 0.2))
     FIXED_VIAS.append(("UDP", v1[0], v1[1]))
+    # C28's ground pad: boxed in by the lanes, VDD3P3 and LNA_IN; its own via right of it (0.36 from the pad, 0.3 from
+    # CHIP_PU's lane, 0.53 from L3)
+    c28g = pad_center(pad_of(fps, "C28", "2"))
+    RF_SEGS.append(("GND", 0, c28g[0], c28g[1], CX + 6.75, CY + 1.95, 0.25))
+    FIXED_VIAS.append(("GND", CX + 6.75, CY + 1.95))
+    # the crystal's load cap C9: its ground pad gets its own via 0.7 mm right of it (the routes boxed it in)
+    c9g = pad_center(pad_of(fps, "C9", "2"))
+    RF_SEGS.append(("GND", 0, c9g[0], c9g[1], c9g[0] + 0.7, c9g[1], 0.25))
+    FIXED_VIAS.append(("GND", c9g[0] + 0.7, c9g[1]))
+    # the analog supply's caps: C12's +3V3 pad straight to C11's (the router left C11..C13 cut off from pins 55 / 56)
+    c12p, c11p = pad_center(pad_of(fps, "C12", "1")), pad_center(pad_of(fps, "C11", "1"))
+    RF_SEGS.append(("+3V3", 0, c12p[0], c12p[1], c11p[0], c11p[1], 0.25))
+    u5v = pad_center(pad_of(fps, "U5", "5"))      # (U5's VBUS pin sits between D+ and D-: fed through a via above it,
+    vb = (u5v[0], u5v[1] - 1.0)                     # from the bottom, so VBUS never crosses the data lines on top)
+    RF_SEGS.append(("VBUS", 0, vb[0], vb[1], u5v[0], u5v[1], 0.25))
+    FIXED_VIAS.append(("VBUS", vb[0], vb[1]))
     u1p, u3p = pad_center(pad_of(fps, "U5", "1")), pad_center(pad_of(fps, "U5", "3"))
     RF_SEGS.append(("UDP", 0, u6[0], u6[1], u1p[0], u1p[1], 0.2))     # (U5's flow-through: pin 6 -> 1, 4 -> 3, under it)
     RF_SEGS.append(("UDN", 0, u4[0], u4[1], u3p[0], u3p[1], 0.2))

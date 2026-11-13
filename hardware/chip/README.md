@@ -16,7 +16,7 @@ board for 5**. The user calls it **jank mini**; the files keep the name "chip". 
 
 | | |
 |---|---|
-| Size | **72 x 65 mm**, 2 layers, 1.6 mm FR-4 |
+| Size | **66 x 60 mm**, 2 layers, 1.6 mm FR-4 |
 | Assembly | JLC **Economic**: every fitted part on the top side; 74 parts on 41 BOM lines, 244 joints |
 | Checks | ERC 0 errors (1 warning: ANT_END, a one-pin net by design); DRC **0 errors, 0 unconnected** (6 warnings: the antenna's end-pad copper ends in the open, as on YAGEO's board; 5 library-footprint notes); every board pad against the schematic: 0 problems; every CPL place against JLC's footprint: within 0.01 mm |
 | Estimate (shipping left out) | **5 boards: $101.40, $20.28 a board; 10 boards: $132.40, $13.24 a board** (`fab/cost.md`, snapshot 2026-11-12) |
@@ -273,7 +273,13 @@ or the CPL; JLC drills their holes only.
   rings (the cans 1 mm lower, the middle 1 mm right for the buck's tracks) to **49.6 x 52.5 mm**.
 - **Don't fit both a jack and its DIN to two pieces of gear at once:** they are the same nets.
 
-## Layout (72 x 65 mm, 2 layers, 1.6 mm, every fitted part on top)
+## Layout (66 x 60 mm, 2 layers, 1.6 mm, every fitted part on top)
+
+**2026-11-13: 66 x 60 mm** (`SIZE=WxH` in `make_board.py` tries other sizes; `PLACED` is for 66 x 60). The USB corner is
+fixed, not placed: U5 under the connector, each CC resistor on its own pin's side (CC2 left, CC1 right: they used to cross
+the data lines), the VBUS parts further out, U5's VBUS pin fed by a via from the bottom; the strip under U5 stays free for
+D+ / D-. Drawn too: the VBUS via, C12 -> C11 (+3V3), the ground vias of C28 and C9. MIDI OUT 2 is two groups (source,
+sink), its R20 3.7 mm of track from J6.
 
 **2026-11-12: the board grew to 72 x 65 mm and the groups below the connectors were re-placed by a placer** (simulated
 annealing of rigid groups round the fixed connectors, cans, antenna and chip block, each group pulled to the part it
@@ -322,11 +328,10 @@ positions; the connectors, the chip block, the RF path and the antenna strip are
   from everything, no track in the antenna strip or within 0.5 mm of the edge, no bottom track under the chip block or
   the RF path. Freerouting repeats itself only on a byte-identical input: `make_fab.sh` (ROUTE=1) may route differently
   from the committed board and must pass the same checks; `ROUTE=0` keeps the committed routing. Measured on the committed
-  board (routed tracks): VSYS C1 -> buck 9.5 mm; +3V3 buck -> chip pin 20 40.4 mm, -> L2 72.3 mm (0.25 mm, a chain through
-  the +3V3 loads); USB drawn in `make_board.py` from the USB-C through U5 (flow-through pins 6 -> 1, 4 -> 3; D- bridged
-  under A6, A6 joined to D+ by 2 vias), U5 fixed under the connector; CHIP_PU pin -> C7 21.2 mm; MIDI OUT 2's R20 26 mm
-  of track from J6 (*open*); 41 signal vias; no via in or touching an SMD pad (the exposed pad's 9 apart); a GND via
-  beside the ground pads of C23..C26, J4 and U5. The exposed pad's paste: 16 windows, 35 % (was 16 %).
+  board (routed tracks): VSYS C1 -> buck 10.5 mm; +3V3 buck -> chip pin 20 36.7 mm, -> L2 72.1 mm (0.25 mm, a chain through
+  the +3V3 loads); USB D+ connector -> U5 9.0 mm; CHIP_PU pin -> C7 31.8 mm; R20 -> J6 3.7 mm; 46 signal vias; no via in
+  or touching an SMD pad (the exposed pad's 9 apart); a GND via beside every SMD ground pad outside the chip block,
+  placed before routing. The exposed pad's paste: 16 windows, 35 % (was 16 %).
 - **Old routing notes (route.py):** the chip's right-side pins (CHIP_PU, GPIO0, 1, 2, 4) are fanned out by hand in `make_board.py`
   (FANOUT: one lane each, 0.8 mm apart, each ending in a via); the RF path, its via fences and the exposed pad's 9 vias
   are drawn there too; route.py does the rest (the ground vias by each pad first, then the signals). Measured on the
@@ -379,8 +384,8 @@ line (the lowest: the crystal, 2 748).
 ## Case (`case/`)
 
 See [case/README.md](case/README.md): `place_args.py` reads SW1, SW2, LED1, the size and J5 from `chip.kicad_pcb`;
-`make_stl.sh` builds both versions and runs their checks. **2026-11-13: both versions fail `check_pipe` (the LED moved
-with the last placement: the light pipe hits a part, open); the DIN version also fails `check_base`** (its walls hit the through-hole jacks' legs and the DIN plates' slot fit; it fails at the old
+`make_stl.sh` builds both versions and runs their checks. **2026-11-13: the no-DIN version passes every check; the DIN version
+fails `check_base`** (its walls hit the through-hole jacks' legs and the DIN plates' slot fit; it fails at the old
 49.6 x 52.5 size too): open.
 
 ## Unverified, all in one place
