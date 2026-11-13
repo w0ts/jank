@@ -185,7 +185,8 @@ module lid_core(pads = true) difference() {
     translate([3.6, by(H - 1.0), z_in - 0.01]) cube([W - 7.2, 7.5, 0.4 + 0.01]);
 }
 module lid() {    // as printed: roof down
-    translate([0, 0, zt]) rotate([180, 0, 0]) translate([W, 0, 0]) mirror([1, 0, 0]) lid_core();
+    translate([0, 0, zt]) rotate([180, 0, 0]) lid_core();   // (turned over about x: a proper rotation. It had a mirror([1, 0, 0]) too, which printed the lid as a
+    //  MIRROR IMAGE: the LED's hole at W - x, LINE IN's slot on the wrong side (2026-11-13). Seen from above the part now lies upside down, y negative)
 }
 
 // ---- the caps ----
@@ -229,8 +230,8 @@ if (part == "open") {
     translate([0, 0, 22]) { color("silver") lid_core(); color("red") cap_in_place(); color("orange") pipe_in_place(); }
 }
 // sections: the closed case cut at the DIN's axis (y = din_y) and at the jacks' axis, half shown
-if (part == "section_din" || part == "section_jack") {
-    cy = part == "section_din" ? by(din_y) : by(jack_y);
+if (part == "section_din" || part == "section_jack" || part == "section_led") {
+    cy = part == "section_din" ? by(din_y) : part == "section_led" ? by(led[1]) : by(jack_y);   // (section_led: through LED1's centre: the pipe over the LED)
     difference() {
         union() {
             color("dimgray") base_core(); color("dimgray") base_pads(); color("silver") lid_core(); color("seagreen") board_all();

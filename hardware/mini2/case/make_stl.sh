@@ -53,6 +53,11 @@ for d in false true; do
 done
 R --imgsize=1400,1000 --camera=33,39.0,-3,90,0,180,200 --projection=ortho -D 'part="section_din"' -D din=true -o "$REN/section_din.png" "$SCAD"
 R --imgsize=1400,1000 --camera=33,61.2,-4,90,0,180,200 --projection=ortho -D 'part="section_jack"' -D din=true -o "$REN/section_jack.png" "$SCAD"
+LX="$(printf '%s' "$POS" | sed -n 's/.*led=\[\([^,]*\),.*/\1/p')"; LY="$(printf '%s' "$POS" | sed -n 's/.*led=\[[^,]*,\([^]]*\)\].*/\1/p')"; HB="$(printf '%s' "$POS" | sed -n 's/.*H=\([0-9.]*\).*/\1/p')"
+LCY="$(python3 -c "print($HB - $LY)")"
+R --imgsize=1400,1000 --camera="$LX,$LCY,6,90,0,180,40" --projection=ortho -D 'part="section_led"' -D din=true -o "$REN/section_led.png" "$SCAD"   # (the section through LED1's centre: the light pipe's axis over the LED)
+R --imgsize=1400,1000 --camera="33,-34,0,180,0,0,230" --projection=ortho -D 'part="lid"' -o "$REN/lid_printed_roof.png" "$SCAD"   # (the printed lid seen from below: the roof's face with the LED window and the buttons' holes)
 set +f       # (the STLs' names: globbing back on)
+python3 "$HERE/check_led.py" "$OUT/mini_lid.stl" "$POS" || fail=1    # (the LED window over LED1, not its mirror image)
 python3 "$HERE/../../check_stl.py" "$OUT"/mini_*.stl || fail=1
 exit $fail

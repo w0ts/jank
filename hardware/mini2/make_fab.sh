@@ -22,6 +22,7 @@ if [ "${ROUTE:-1}" = 1 ]; then       # (the placement, the drawn RF path and lan
     LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 "$KP" make_board.py 2>&1 | Q
     sh fetch_freerouting.sh >/dev/null
     "$KP" freeroute.py mini2.kicad_pcb 2>&1 | Q
+    "$KP" route_fixups.py mini2.kicad_pcb 2>&1 | Q     # (the guarded fix-ups on what the router left; they skip where its geometry differs)
 fi
 "$KP" tie_groups.py mini2.kicad_pcb 2>&1 | Q
 "$KC" pcb drc --severity-all -o fab/drc.rpt mini2.kicad_pcb 2>&1 | Q >/dev/null

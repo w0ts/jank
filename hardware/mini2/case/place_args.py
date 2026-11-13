@@ -4,6 +4,7 @@
 SW1's, SW2's and LED1's places, the outline's size, J5's axis), read as text so KiCad's Python is not needed; the board,
 not make_board.py, so the parts the placer moved (make_board.py's PLACED) come out where they are.
 Usage: place_args.py ../mini2.kicad_pcb"""
+import math
 import re
 import sys
 
@@ -20,7 +21,20 @@ def at(ref):
     return float(m.group(1)) - OX, float(m.group(2)) - OY
 
 
-out = ["%s=[%g,%g]" % ((var,) + at(ref)) for ref, var in (("SW1", "sw"), ("SW2", "sw2"), ("LED1", "led"))]
+def lens(ref):
+    """the LED's light: the middle of its pads (the footprint's origin need not be there), turned with the footprint"""
+    x0, y0 = at(ref)
+    blk = re.search(r'\(footprint "[^"]*"(?:(?!\(footprint ).)*?\(property "Reference" "%s".*?(?=\n\t\(footprint |\Z)' % re.escape(ref), src, re.S).group(0)
+    rot = re.search(r'\(at [-\d.]+ [-\d.]+(?: ([-\d.]+))?\)', blk)
+    a = math.radians(float(rot.group(1) or 0)) if rot else 0.0
+    pads = [(float(m.group(1)), float(m.group(2))) for m in re.finditer(r'\(pad "[^"]*" smd[^\n]*\n\s*\(at ([-\d.]+) ([-\d.]+)', blk)]
+    if not pads:
+        return x0, y0
+    mx, my = sum(p[0] for p in pads) / len(pads), sum(p[1] for p in pads) / len(pads)
+    return x0 + mx * math.cos(a) + my * math.sin(a), y0 - mx * math.sin(a) + my * math.cos(a)
+
+
+out = ["%s=[%g,%g]" % ((var,) + (lens if ref == "LED1" else at)(ref)) for ref, var in (("SW1", "sw"), ("SW2", "sw2"), ("LED1", "led"))]
 xs, ys = [], []
 EDGE = (r'\(gr_(?:line|rect)\s*\(start ([-\d.]+) ([-\d.]+)\)\s*\(end ([-\d.]+) ([-\d.]+)\)'
         r'(?:(?!\(gr_).)*?\(layer "Edge\.Cuts"\)')

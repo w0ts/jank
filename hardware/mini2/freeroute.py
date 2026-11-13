@@ -32,6 +32,7 @@ IRON = 0.8                                       # (no via within a DIN pad's co
 EDGE = 0.3                                       # (+ the 0.2 clearance: the rules' 0.5 from the board's edge)
 # the bottom stays one ground under the chip with its left and lower parts, and under the RF path
 CHIP_BLOCK = ["U1", "Y1", "R17", "R24", "R25", "C9", "C10", "C11", "C12", "C13", "C19", "C20", "C21", "C22"]
+TOP_ONLY = []                                    # (nets kept on the top layer: ["LIN_OUT"] routes it there, but only with 0.10 mm tracks and 4 other nets left open: README "Routing, mini 2")
 RF_NETS = {"LNA_IN", "RF", "ANT_FEED", "UFL"}
 PAD_VIA_PARTS = ("C23", "C24", "C25", "C26", "C28", "J4", "U5")
 STITCH = 6.0                                     # (mm between GND stitching vias; the RF line has its own fence)
@@ -115,10 +116,12 @@ def patch_dsn(text, keepouts):
     text = text[:i] + "\n".join(keepouts) + "\n" + text[i:]
     m = re.search(r"\(class kicad_default (.*?)\(circuit", text, re.S)
     nets = m.group(1).split()
-    rest = [n for n in nets if n not in set(PWR) | set(DIN_NETS)]
+    rest = [n for n in nets if n not in set(PWR) | set(DIN_NETS) | set(TOP_ONLY)]
     tail = text[m.end():]
     end = tail.index("\n    )\n") + len("\n    )\n")
     extra = [net_class(f"pwr{w}", [n for n, v in PWR.items() if v == w and n in nets], w, 200) for w in sorted(set(PWR.values()))]
+    if TOP_ONLY:
+        extra.append(f'    (class top_only {" ".join(n for n in TOP_ONLY if n in nets)}\n      (circuit (use_via "Via[0-1]_600:300_um") (use_layer F.Cu))\n      (rule (width 200) (clearance 200))\n    )\n')
     extra.append(net_class("din", [n for n in DIN_NETS if n in nets], 250, 500))
     return text[:m.start()] + "(class kicad_default " + " ".join(rest) + "\n      (circuit" + tail[:end] + "".join(extra) + tail[end:]
 
