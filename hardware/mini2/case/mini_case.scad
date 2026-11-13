@@ -40,7 +40,9 @@ floor_t = 1.4;
 /* [Under the board] */
 tail = 3.9;       // the longest tail under the board: the through-hole jacks' legs, 3.5 in their 3D model (UNVERIFIED), + margin
 jack_legs = [[11.3, 8.1], [3.2, 3.5], [6.2, 3.5], [10.2, 3.5],               // J2's pads A, B, C, D (board x, y)
-             [W - 11.3, 3.5], [W - 3.2, 8.1], [W - 6.2, 8.1], [W - 10.2, 8.1]];   // J3's (turned 180)
+             [W - 11.3, 3.5], [W - 3.2, 8.1], [W - 6.2, 8.1], [W - 10.2, 8.1],   // J3's (turned 180)
+             [14.1, 11.3], [18.7, 3.2], [18.7, 6.2], [18.7, 10.2]];              // mini 2: J7's (LINE IN, on the top edge, turned -90)
+j7_x = 16.4;   // mini 2: LINE IN's jack on the top edge: its axis, board x (its pegs at board y 1.6 and 8.6)
 din_h = 19.6;  din_gap = 0.35;
 under = din ? din_h + din_gap : tail + 0.4;   // the floor's top under the board
 zbot = -under - floor_t;
@@ -75,9 +77,13 @@ module both() { children(); translate([W, 0, 0]) mirror([1, 0, 0]) children(); }
 
 // ---- the board and what hangs under / stands past it (for the checks and the renders) ----
 module mock() { translate([-100, 100 + H, 0]) import("../mockup.stl"); }
-module jack_fronts() both() translate([-2.25, by(jack_y) - 3.0, bt - 0.2]) cube([2.25, 6.0, 5.5]);
+module jack_fronts() {
+    both() translate([-2.25, by(jack_y) - 3.0, bt - 0.2]) cube([2.25, 6.0, 5.5]);
+    translate([j7_x - 3.0, H, bt - 0.2]) cube([6.0, 2.25, 5.5]);                 // mini 2: J7, out past the top edge
+}
 module tails() {       // under the board: the jacks' legs (3.5) and pegs, the USB-C's legs; tail deep (assumed)
     for (x = [1.6, 8.6]) both() translate([x - 0.5, by(jack_y) - 0.5, -tail]) cube([1, 1, tail + 0.1]);
+    for (y = [1.6, 8.6]) translate([j7_x - 0.5, by(y) - 0.5, -tail]) cube([1, 1, tail + 0.1]);   // J7's pegs
     for (p = jack_legs) translate([p[0] - 1.1, by(p[1]) - 0.6, -tail]) cube([2.2, 1.2, tail + 0.1]);
     for (p = [[W / 2 + 4.32, 6.8], [W / 2 + 4.32, 2.59], [W / 2 - 4.32, 6.8], [W / 2 - 4.32, 2.59]]) translate([p[0] - 0.5, by(p[1]) - 0.5, -tail]) cube([1, 1, tail + 0.1]);
 }
@@ -164,6 +170,11 @@ module lid_core(pads = true) difference() {
         for (y = [0.6, jack_w - 0.6]) translate([0, y, jack_top + 1 - 0.6]) rotate([0, 90, 0]) cylinder(r = 0.6, h = e + 1.2, $fn = 20);
     }
     usb_cut(usb_bot);
+    // mini 2: LINE IN's slot in the top wall at J7 (open downwards like the side jacks' slots)
+    translate([j7_x - jack_w / 2, H - 0.2, -1]) hull() {
+        cube([jack_w, e + 1.2, 1]);
+        for (x = [0.6, jack_w - 0.6]) translate([x, 0, jack_top + 1 - 0.6]) rotate([-90, 0, 0]) cylinder(r = 0.6, h = e + 1.2, $fn = 20);
+    }
     for (p = [sw, sw2]) translate([p[0], by(p[1]), z_in - 1]) cylinder(d = 3.8, h = roof + 2, $fn = 32);   // the button caps' holes (BOOT, RST)
     translate([led[0], by(led[1]), led_top - 1]) cylinder(d = 1.95, h = zt - led_top + 2, $fn = 24);      // the light pipe's bore
     translate([led[0], by(led[1]), zt - 0.8]) cylinder(d = 3.2, h = 1.0, $fn = 32);               // its head's recess

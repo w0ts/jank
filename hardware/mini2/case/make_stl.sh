@@ -47,11 +47,12 @@ done
 R() { O --render --colorscheme=Tomorrow "$@" $POSD >/dev/null 2>&1 || fail=1; }
 for d in false true; do
     s=""; [ "$d" = true ] && s="_din"
-    R --imgsize=1400,1000 --camera=22,26,-2,62,0,28,230 -D 'part="assembly"' -D "din=$d" -o "$REN/closed$s.png" "$SCAD"
-    R --imgsize=1400,1000 --camera=22,26,6,62,0,28,270 -D 'part="open"' -D "din=$d" -o "$REN/open$s.png" "$SCAD"
+    R --imgsize=1400,1000 --camera=33,34,-2,62,0,28,300 -D 'part="assembly"' -D "din=$d" -o "$REN/closed$s.png" "$SCAD"
+    R --imgsize=1400,1000 --camera=33,34,-2,62,0,200,300 -D 'part="assembly"' -D "din=$d" -o "$REN/closed_top$s.png" "$SCAD"   # (mini 2: the top wall with LINE IN's hole)
+    R --imgsize=1400,1000 --camera=33,34,6,62,0,28,330 -D 'part="open"' -D "din=$d" -o "$REN/open$s.png" "$SCAD"
 done
-R --imgsize=1400,1000 --camera=22,31.5,-3,90,0,180,150 --projection=ortho -D 'part="section_din"' -D din=true -o "$REN/section_din.png" "$SCAD"
-R --imgsize=1400,1000 --camera=22,45.7,-4,90,0,180,150 --projection=ortho -D 'part="section_jack"' -D din=true -o "$REN/section_jack.png" "$SCAD"
+R --imgsize=1400,1000 --camera=33,39.0,-3,90,0,180,200 --projection=ortho -D 'part="section_din"' -D din=true -o "$REN/section_din.png" "$SCAD"
+R --imgsize=1400,1000 --camera=33,61.2,-4,90,0,180,200 --projection=ortho -D 'part="section_jack"' -D din=true -o "$REN/section_jack.png" "$SCAD"
 set +f       # (the STLs' names: globbing back on)
 python3 "$HERE/../../check_stl.py" "$OUT"/mini_*.stl || fail=1
 exit $fail
