@@ -71,6 +71,7 @@ One chunk at a time, each acknowledged; a lost or damaged chunk is sent again fr
 costs 25 % (8-to-7 packing would cost 12.5 %, but its bytes would include the line end).
 Flash writes run in the control task; a sector erase stalls the CPU for tens of milliseconds, during which the clock's timer
 interrupt (IRAM) goes on but the clock bytes reach USB late: do not update during a performance.
+Beat-follow bench build only: the device is also a UAC2 speaker, an OUT endpoint, see [beat.md](beat.md).
 
 ## Host mode
 

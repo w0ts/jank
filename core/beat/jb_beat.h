@@ -18,6 +18,7 @@ struct jb_beat {
     struct jb_fe fe;
     struct jb_lstm net;
     struct jb_dbn dbn;
+    int q16;                           /* 1: the network runs on the int16 weights in RAM (jb_beat_init_q16) */
 };
 
 struct jb_frame {
@@ -29,6 +30,7 @@ struct jb_frame {
 typedef void (*jb_frame_fn)(void *ctx, const struct jb_frame *f);
 
 int jb_beat_init(struct jb_beat *b);   /* 0 ok */
+int jb_beat_init_q16(struct jb_beat *b);   /* the same with the network's weights in RAM as int16 (jb_lstm.h); 0 ok */
 void jb_beat_reset(struct jb_beat *b);
 /* Audio in, mono 44.1 kHz in -1..1; fn is called once per completed frame (it may be NULL). */
 void jb_beat_push(struct jb_beat *b, const float *x, size_t n, jb_frame_fn fn, void *ctx);

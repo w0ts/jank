@@ -49,6 +49,9 @@ The box has:
 - [Box](hardware/box/README.md)
 - [Firmware](docs/firmware.md)
 
+**Branch fw/beat-follow only: a bench build, [docs/beat.md](docs/beat.md).** The stick is also a USB speaker called jank
+and follows the beat of what is played to it. Its network weights are madmom's (CC BY-NC-SA 4.0): never push or ship it.
+
 Details: [on the air](docs/air.md), [USB](docs/usb.md), [MIDI clock](docs/midi.md), [boards and pins](docs/boards.md).
 
 ## Licensing

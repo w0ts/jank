@@ -1,2 +1,14 @@
 CONFIG_IDF_TARGET="esp32s3"
 CONFIG_JANK_BOARD_XIAO=y
+# The XIAO module's chip has 8 MB of octal PSRAM (esptool: "Embedded PSRAM 8MB (AP_3v3)", jank-scratch/flash-boot.log).
+# The app initialises it (esp_system cpu_start.c, esp_psram_init), not the bootloader: an app-only OTA turns it on.
+# The beat tracker's static RAM leaves ~90 KiB of internal heap; Wi-Fi and lwIP go to PSRAM first, as do mallocs over 4 KiB.
+# Not found or failing: the app goes on without it (IGNORE_NOTFOUND). The 8 MB memory test is off to keep the start quick.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_SPIRAM_MEMTEST=n

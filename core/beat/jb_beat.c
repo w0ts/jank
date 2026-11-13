@@ -7,7 +7,16 @@ int jb_beat_init(struct jb_beat *b)
 {
     jb_fe_init(&b->fe);
     jb_lstm_init(&b->net);
+    b->q16 = 0;
     return jb_dbn_init(&b->dbn, JB_MIN_BPM, JB_MAX_BPM, JB_FPS);
+}
+
+int jb_beat_init_q16(struct jb_beat *b)
+{
+    int r = jb_beat_init(b);
+    jb_lstm_q16_build();
+    b->q16 = 1;
+    return r;
 }
 
 void jb_beat_reset(struct jb_beat *b)
@@ -28,7 +37,7 @@ void jb_beat_push(struct jb_beat *b, const float *x, size_t n, jb_frame_fn fn, v
         if (!ready)
             continue;
         struct jb_frame f = {.index = jb_fe_last_frame(&b->fe)};
-        f.act = jb_lstm_step(&b->net, feat);
+        f.act = b->q16 ? jb_lstm_q16_step(&b->net, feat) : jb_lstm_step(&b->net, feat);
         f.beat = jb_dbn_step(&b->dbn, f.act, &f.time);
         if (fn)
             fn(ctx, &f);
