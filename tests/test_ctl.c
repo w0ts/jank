@@ -263,9 +263,25 @@ static void test_button(void)
     CHECK(jk_next_group(0) == 1 && jk_next_group(200) == 1);
 }
 
+static void test_beat(void)
+{
+    setup();
+    CHECK(cfg.beat == 1 && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS);
+    CHECK(run("set beat_latency 40") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 40);
+    CHECK(run("set beat_latency 301") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == 40);
+    CHECK(run("set beat_latency -1") == JK_CTL_NONE && cfg.beat_latency_ms == 40);
+    CHECK(run("set beat off") == JK_CTL_CFG_CHANGED && cfg.beat == 0);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "beat=off\nbeat_latency=40\n"));
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .mode = 1, .bpm_x100 = 12345, .heap_min = 90000, .cpu_pct_x10 = 253, .packets = 77};
+    CHECK(run("beat") == JK_CTL_NONE);
+    CHECK(strstr(out, "mode=steady\n") && strstr(out, "bpm=123.45\n") && strstr(out, "heap_min=90000\n"));
+    CHECK(strstr(out, "cpu_pct=25.3\n") && strstr(out, "packets=77\n") && strstr(out, "madmom BENCH ONLY") && ends(out, "ok\n"));
+}
+
 int main(void)
 {
     test_defaults();
+    test_beat();
     test_get();
     test_set();
     test_set_music();

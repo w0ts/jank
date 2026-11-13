@@ -14,6 +14,8 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->peer = 1;
     c->transport = JK_TRANSPORT_LINK;
     c->quantum = 4;
+    c->beat = 1;
+    c->beat_latency_ms = JK_BEAT_LATENCY_DEFAULT_MS;
     strcpy(c->name, "jank");
 }
 
@@ -63,6 +65,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
 {
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_ms);
+    put(w, "beat=%s\nbeat_latency=%d\n", on_off(c->beat), c->beat_latency_ms);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "version=%s\nok\n", JK_VERSION);
@@ -149,6 +152,8 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
         c->quantum = (uint8_t)v;
     else if (!strcmp(key, "offset") && !parse_int(val, -JK_OFFSET_MAX_MS, JK_OFFSET_MAX_MS, &v))
         c->offset_ms = (int16_t)v;
+    else if (!strcmp(key, "beat_latency") && !parse_int(val, 0, JK_BEAT_LATENCY_MAX_MS, &v))
+        c->beat_latency_ms = (int16_t)v;
     else
         return -1;
     return 0;
@@ -187,6 +192,8 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
         return parse_pair(val, "link", "auto", &c->transport);
     if (!strcmp(key, "peer"))
         return parse_on_off(val, &c->peer);
+    if (!strcmp(key, "beat"))
+        return parse_on_off(val, &c->beat);
     return set_number(c, key, val);
 }
 
@@ -205,6 +212,21 @@ static enum jk_ctl_action cmd_set(char *args, struct jk_cfg *cfg, struct writer 
     *cfg = next;
     put(w, "ok\n");
     return JK_CTL_CFG_CHANGED;
+}
+
+static const char *const MODE_NAME[] = {"stopped", "steady", "speeding_up", "slowing_down"};
+
+/* the beat tracker's numbers (the bench build) */
+static void cmd_beat(const struct jk_beat *t, struct writer *w)
+{
+    uint32_t bpm = t->bpm_x100 > 0 ? (uint32_t)t->bpm_x100 : 0u;
+    put(w, "beat=%s\nbeat_weights=madmom BENCH ONLY, CC BY-NC-SA 4.0, never ship\naudio=%u\n", on_off(t->on), t->audio);
+    put(w, "mode=%s\nbpm=%lu.%02lu\n", MODE_NAME[t->mode & 3u], (unsigned long)(bpm / 100u), (unsigned long)(bpm % 100u));
+    put(w, "heap_free=%lu\nheap_min=%lu\nheap_largest=%lu\nstack_free=%lu\n", (unsigned long)t->heap_free, (unsigned long)t->heap_min, (unsigned long)t->heap_largest, (unsigned long)t->stack_free);
+    put(w, "cpu_pct=%lu.%lu\nhop_avg_us=%lu\nhop_max_us=%lu\nhop_avg_cycles=%lu\nhops=%lu\n", (unsigned long)(t->cpu_pct_x10 / 10u), (unsigned long)(t->cpu_pct_x10 % 10u), (unsigned long)t->hop_avg_us, (unsigned long)t->hop_max_us, (unsigned long)t->hop_avg_cycles, (unsigned long)t->hops);
+    put(w, "packets=%lu\ngaps=%lu\noverflows=%lu\nresets=%lu\n", (unsigned long)t->packets, (unsigned long)t->gaps, (unsigned long)t->overflows, (unsigned long)t->resets);
+    put(w, "tempo_sets=%lu\nphase_forces=%lu\nstarts=%lu\nstops=%lu\n", (unsigned long)t->tempo_sets, (unsigned long)t->phase_forces, (unsigned long)t->starts, (unsigned long)t->stops);
+    put(w, "err_us=%ld\noffset_us=%ld\nlatency_us=%ld\nok\n", (long)t->err_us, (long)t->offset_us, (long)t->latency_us);
 }
 
 /* the line without the spaces and CR around it, in buf */
@@ -239,12 +261,14 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         cmd_get(cfg, snap, &w);
     else if (!strcmp(s, "status"))
         cmd_status(snap, now_ms, &w);
+    else if (!strcmp(s, "beat"))
+        cmd_beat(&snap->beat, &w);
     else if (!strncmp(s, "set ", 4))
         return cmd_set(s + 4, cfg, &w);
     else if (!strcmp(s, "scan"))
         return JK_CTL_SCAN;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nscan\nset group|name|filter|peer|transport|quantum|offset|net|ssid|pass <value>\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|net|ssid|pass <value>\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

@@ -353,6 +353,7 @@ void bridge_snapshot(struct jk_snapshot *s)
     }
     xSemaphoreGive(s_lock);
     midi_stats(&s->midi_ticks, &s->midi_resync);
+    beat_stats(&s->beat);
     s->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
 }
 
@@ -384,6 +385,13 @@ int bridge_beat(int64_t *beat_ub, int32_t *mpb)
     }
     xSemaphoreGive(s_lock);
     return joined;
+}
+
+void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), void *ctx)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    fn(&s_peer, midi_now_us(), ctx);
+    xSemaphoreGive(s_lock);
 }
 
 uint32_t bridge_peers_heard(void)
@@ -425,5 +433,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     e = s_on_network ? radio_start_network(mac, cfg->ssid, cfg->pass, on_network) : radio_start(mac, s_b.channel, on_air);
     if (e != ESP_OK)
         return e;
-    return xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    if (xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) != pdPASS)
+        return ESP_ERR_NO_MEM;
+    return beat_start();
 }

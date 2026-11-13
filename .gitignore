@@ -15,3 +15,6 @@ hardware/pcb/fab/**/intended-nets.json
 hardware/pcb/fab/**/*.net.xml
 hardware/pcb/fab/**/gerbers/
 hardware/pcb/mockup*.scad
+
+# esp_tinyusb with the audio class on, made by scripts/patch_tinyusb.sh at build time
+third_party/esp_tinyusb/

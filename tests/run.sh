@@ -25,6 +25,10 @@ if [ -f "$HERE/core/jank_peer.c" ]; then
     "$OUT/test_peer"
 fi
 
+# The beat tracker as the Link session's master.
+"$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_beatlink.c" "$HERE/core/jank_beatlink.c" "$LINK" -lm -o "$OUT/test_beatlink"
+"$OUT/test_beatlink"
+
 # The beat tracker. BEAT_WAV_DIR (mono 44.1 kHz WAVs, see test_beat.c) adds the run on audio against madmom's results.
 "$CC" $FLAGS -std=c11 -I"$HERE/core/beat" "$HERE/tests/test_beat.c" "$HERE"/core/beat/*.c -lm -o "$OUT/test_beat"
 "$OUT/test_beat" "$HERE/tests/beat_ref"

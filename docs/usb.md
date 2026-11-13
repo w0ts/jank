@@ -10,6 +10,8 @@ read-only drive (label JANK) holding `jank.html`, the control page.
   to TinyUSB, which cannot be called from an interrupt.
 - **USB ID.** Espressif's VID with a made-up PID, `0x4A4B`: fine on one's own desk, not for distribution.
 
+Beat-follow bench build only: the device is also a UAC2 speaker, an OUT endpoint, see [beat.md](beat.md).
+
 ## Host mode
 
 With no computer on the port, the stick sends its clock to USB-MIDI gear: up to 4 devices, through a hub too. It starts
