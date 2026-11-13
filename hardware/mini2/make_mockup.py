@@ -62,6 +62,10 @@ def main():
             py = mm(fp.GetPosition().y)
             left = mm(fp.GetPosition().x) < (x0 + x1) / 2
             zc = -BUSH_Z + 0.05 if bottom else T + BUSH_Z - 0.05   # (0.05 into the board: no edge shared with its face)
+            if round(fp.GetOrientationDegrees()) % 180 == 90:      # (mini 2: J7, LINE IN, its bushing out past the TOP edge)
+                px = mm(fp.GetPosition().x)
+                cubes.append(f"translate([{px}, {-(y0 + 0.5)}, {zc}]) rotate([-90, 0, 0]) cylinder(d = {BUSH_D}, h = {BUSH_OUT + 0.5}, $fn = 48);")
+                continue
             sx = x0 - BUSH_OUT if left else x1 - 0.5
             cubes.append(f"translate([{sx}, {-py}, {zc}]) rotate([0, 90, 0]) cylinder(d = {BUSH_D}, h = {BUSH_OUT + 0.5}, $fn = 48);")
     scad = os.path.join(HERE, ".mockup.scad")

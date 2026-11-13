@@ -1,6 +1,6 @@
 # jank mini 2: jank mini (hardware/chip) with a LINE IN
 
-**Stage 1 (2026-11-13): schematic and placement only, not routed, no fab files.** This README is jank mini's, kept for everything unchanged; the sections "LINE IN" and "What changed vs mini 1" below are mini 2's (numbers elsewhere, e.g. "Layout", "DRC", "Parts and cost", are mini 1's until stage 2).
+**Stage 2 (2026-11-13): routed, every check run, fab files, case. Nothing ordered, built or measured.** This README is jank mini's, kept for everything unchanged; the sections "LINE IN", "Routing (mini 2)", "What changed vs mini 1" and "Checks (mini 2)" below are mini 2's (numbers in "Layout", "DRC and ERC", "Parts and cost" further down are mini 1's, kept for reference).
 
 # (mini 1) jank chip ("jank mini"): the tiny board with a bare ESP32-S3 chip, for JLC's cheap assembly
 
@@ -22,8 +22,8 @@ board for 5**. The user calls it **jank mini**; the files keep the name "chip". 
 |---|---|
 | Size | mini 2: **66 x 68 mm** (mini 1: 66 x 60), 2 layers, 1.6 mm FR-4 |
 | Assembly | JLC **Economic**: every fitted part on the top side; mini 2: 91 parts on 50 BOM lines, 285 joints (mini 1: 74 / 41 / 244) |
-| Checks | ERC 0 errors (1 warning: ANT_END, a one-pin net by design); DRC **0 errors, 0 unconnected** (6 warnings: the antenna's end-pad copper ends in the open, as on YAGEO's board; 5 library-footprint notes); every board pad against the schematic: 0 problems; every CPL place against JLC's footprint: within 0.01 mm |
-| Estimate (shipping left out) | **5 boards: $101.40, $20.28 a board; 10 boards: $132.40, $13.24 a board** (`fab/cost.md`, snapshot 2026-11-12) |
+| Checks (mini 2, 2026-11-13) | ERC 0 errors (1 warning: ANT_END, a one-pin net by design); DRC **0 errors, 0 unconnected** (6 warnings: the antenna's end-pad copper ends in the open, as on YAGEO's board; 5 library-footprint notes); every board pad against the schematic: 0 problems; every CPL place against JLC's footprint: within 0.01 mm |
+| Estimate (shipping left out) | mini 2: **5 boards $107.99, 10 boards $141.41 ($14.14 a board)** (`fab/cost.md`, snapshot 2026-11-13); mini 1: $101.40 / $132.40 on the same method |
 | Files for JLC | `fab/chip-gerbers.zip`, `fab/bom.csv`, `fab/cpl.csv` |
 | Pictures | `render-top.png`, `render-bottom.png`, `render-3d.png`, `preview/` (routing with the DIN pads' iron room, 3D, a DIN close-up) |
 
@@ -281,7 +281,8 @@ or the CPL; JLC drills their holes only.
 
 - **+8 mm in height** (`DY` in `make_board.py`): 66 x 68 mm. The top row (USB-C, MIDI OUT jack J2, POWER IN / MIDI OUT 2 jack J3, U5 and its VBUS parts) stays on the top edge; everything else moved down 8 mm, which opens a band for LINE IN. Width, antenna strip (10 mm), reservoir (2 x 2200 uF), start-up chain, RF section, MIDI OUT, MIDI OUT 2, buttons and LED are mini 1's, unchanged.
 - **+17 parts** (J7, D7, U6, U7, 13 passives), 1 more Extended type (C49338, +$3.09); the op-amp (C7972) is a *preferred* Extended part (no fee). GPIO9 = LINE_IN (pin 14).
-- **Case:** `case/` still builds for mini 1's size and has no jack hole: it reads the size from the board (now 66 x 68), but needs a 3.5 mm hole in the top wall at x = 16.4 mm (J7's bushing sticks out past the top edge, as J2 / J3's do past the sides) and a recheck of the walls near J7. Not done in stage 1.
+- **Case (stage 2):** the size is read from the board (66 x 68); a LINE IN slot (6.9 mm wide, rounded top, open downwards like the side jacks') in the lid's top wall at x = 16.4 mm; J7's front block, pegs and legs added to the collision checks; `make_mockup.py` gives J7's bushing past the top edge (it had put it on the left edge). See "Case" below.
+- **C20 turned 180 degrees** (its +3V3 pad now east, `make_board.py` PLACED, y 0.15 mm up): the one placement change stage 2 needed (below).
 
 ## LINE IN (mini 2)
 
@@ -289,9 +290,28 @@ A 3.5 mm stereo jack (J7, C18185602, the jack mini 1 uses) into the chip's ADC: 
 
 **Jack position: the top edge, between the MIDI OUT jack and the USB-C** (x 16.4 mm, bushing out past the edge). Why there: the board's two side edges carry the DIN sockets, the reservoir cans and the MIDI current loops, the bottom edge the antenna (no copper, 10 mm); the top edge is the quiet one (USB only). The front end sits in the new band directly under it, 22 .. 30 mm from the jack, about 35 mm from the buck (bottom left), ~45 mm from the RF section and the antenna, and clear of both MIDI loops (left and right edge). Only the one signal (LINE_IN, ~25 mm) crosses the middle to the chip's top right pin, away from the buck's switch node and the crystal; route it on top over ground with the pour on both sides, no digital track beside it (stage 2). U7 and its capacitors sit by the USB-C's VBUS.
 
-**Placement checks (stage 1, no routing):** ERC 0 errors (3 warnings); DRC placement-only: 0 courtyard overlaps, the only items are the unrouted nets, mini 1's library-footprint notes and its placement-stage stubs; every board pad against the schematic (`check_nets.py`): 305 pins, 0 problems. `render-top-placement.png`.
+**Placement checks (stage 1):** ERC 0 errors; 0 courtyard overlaps; `check_nets.py` 305 pins, 0 problems. `render-top-placement.png`.
 
-**Cost (estimate, `fab/cost.md`, snapshot 2026-11-13, shipping left out):** 5 boards $107.99, 10 boards $141.41 ($14.14 a board), against mini 1's $132.40 for 10 on the same method: **+$9.0 for 10 boards** (+$3.09 one Extended type, +$5.3 parts, +$0.7 joints); on the user's real mini 1 cost ($100 for 10) about **$109**.
+## Routing (mini 2, stage 2)
+
+Freerouting 2.5.0 via `freeroute.py` (5 rounds, one thread, `nice -n 19`), then `tie_groups.py`; the board has 4 hand edits afterwards (`linein_fixup.py`, not part of `make_fab.sh`: `ROUTE=1` re-routes and loses them; `ROUTE=0` keeps the committed board). Antenna keep-out, RF line and fences are mini 1's, untouched.
+
+- **LINE_IN: 3.97 mm, all on the top layer, 0 vias**, pin 14 straight up (drawn in `make_board.py`) to C36, then R35. Nothing runs under it on the bottom layer (the bottom is one ground there); the nearest bottom copper is PWR_HOLD's 0.29 mm beside (not under) the pin-14 run and VBUS_SENSE 1.09 mm.
+- **Nearest foreign tracks on the top layer (edge to edge):** MIDI2_TX 0.25 mm (pin 15's escape, 3.3 V logic, 31250 baud, unavoidable: pin 15 is the neighbour of pin 14 and its track must get past R35 / C20 to the north), PWR_HOLD 0.29 mm (a static level) beside the 2.4 mm run from pin 14 to C36, LIN_OUT 0.66, +3V3 0.94, everything else 1.1 mm or more; **not** the clean "nothing beside it" of the brief: no clock or fast digital track is near it (the buck's SW, the crystal and USB are 15 mm or more away), but two slow digital tracks are within 0.3 mm for a few mm.
+- **LIN_OUT** (U6 -> R35, low impedance): 0.15 .. 0.2 mm tracks, ~10 mm, partly on the bottom layer (via 134.85 / 135.86 and others), which cuts the ground there; it is the op-amp's output, not the high-impedance node.
+- **Analog ground:** U6, U7 and the bias network sit in the band by the USB-C, ~35 mm from the buck and the MIDI loops; their ground returns are the F.Cu / B.Cu pours; by position only (not traced or measured) they share no return path with the buck or the MIDI loops.
+- **Hand edits:** C20 turned (a GND pad boxed in by MIDI2_TX gave an unconnected pour island Freerouting could not tie; the new position frees it and `tie_groups` finds its via at (29.18, 38.65)); MIDI2_TX's corner and the +3V3 hop to pin 20 re-laid; LINE_IN's last 2 mm tidied 0.03 mm away from MIDI2_TX; one LIN_OUT via moved 0.03 mm (hole to hole 0.4987 -> over 0.5).
+- Tracks 0.15 mm narrow where Freerouting squeezed them (VBANK_ADC, LIN_R, LIN_OUT, UDN, MIDI2_TX): above JLC's 0.127 mm, below mini 1's 0.2.
+
+## Checks (mini 2, the last `make_fab.sh ROUTE=0`, 2026-11-13)
+
+- **ERC:** 0 errors, 1 warning (ANT_END: a one-pin label, by design, as mini 1).
+- **DRC:** **0 errors, 0 unconnected**, 6 warnings, all mini 1's: the ANT_END track's open end (by design) and 5 library-footprint notes (a footprint differs from its library copy, as on mini 1). `fab/drc.rpt`.
+- **Pads against the schematic** (`check_nets.py`): 307 pads, 305 schematic pins, 0 problems.
+- **CPL against JLC's footprints:** 91 parts, every one within 0.01 mm; `bom.csv` 50 lines, 285 joints.
+- **Fab files:** `fab/mini2-gerbers.zip`, `fab/bom.csv`, `fab/cpl.csv`, `fab/cost.md`; renders `render-top.png`, `render-bottom.png`, `render-3d.png`, `mockup.stl`.
+
+**Cost (final, `fab/cost.md`, snapshot 2026-11-13, shipping left out):** 5 boards $107.99, 10 boards $141.41 ($14.14 a board), against mini 1's $132.40 for 10 on the same method: **+$9.0 for 10 boards** (+$3.09 one Extended type, +$5.3 parts, +$0.7 joints); on the user's real mini 1 cost ($100 for 10) about **$109**.
 
 ## Layout (66 x 60 mm, 2 layers, 1.6 mm, every fitted part on top)
 
@@ -405,10 +425,7 @@ line (the lowest: the crystal, 2 748).
 
 ## Case (`case/`)
 
-See [case/README.md](case/README.md): `place_args.py` reads SW1, SW2, LED1, the size and J5 from `chip.kicad_pcb`;
-`make_stl.sh` builds both versions and runs their checks. **2026-11-13: the no-DIN version passes every check; the DIN version
-fails `check_base`** (its walls hit the through-hole jacks' legs and the DIN plates' slot fit; it fails at the old
-49.6 x 52.5 size too): open.
+See [case/README.md](case/README.md) (mini 1's text). **Mini 2 (2026-11-13):** 66 x 68 mm board read from the PCB, so the case is 8 mm longer; the lid's top wall has LINE IN's slot at x = 16.4 mm (6.9 mm wide, 5.8 mm over the board, rounded top, open at the lid's bottom edge, like the side jacks'); J7's block, pegs and legs are in the collision checks. **The no-DIN version passes every check** (`check_base`, `check_lid` with 0.3 mm clearance, caps, light pipe, pads); all 5 STLs are one closed solid, 0 open edges (`check_stl.py`). **The DIN version still fails `check_base`** (its walls against the through-hole jacks' legs and the DIN plates' slots; it failed on mini 1 too): open. New renders `case/renders/closed_top.png` (the top wall with the hole), `closed.png`, `open.png`, sections.
 
 ## Unverified, all in one place
 

@@ -89,7 +89,7 @@ PLACE = {
     "U1": (CX, CY, 180),
     "U5": (W / 2, 10.9, 0),                                           # USB ESD, right under the USB-C's data pads
     "R24": (CX - 0.3, CY - 6.2, 180), "R25": (CX - 0.3, CY - 5.2, 180),   # USB D+ / D- 22 ohm, right of pins 26 / 25 (pin 27 free)
-    "C20": (CX + 1.5, CY - 4.45, 0),                                                  # VDD3P3_RTC (pin 20, top)
+    "C20": (CX + 1.5, CY - 4.6, 180),                                                  # VDD3P3_RTC (pin 20, top); mini 2: turned, its +3V3 pad east (the GND pad was boxed in by MIDI2_TX)
     "U4": (23.3 + S, 24.05, 180),                                    # (DNP) a 3.0 V supervisor on CHIP_PU, README "Start-up"
     "R11": (31.0 + S, 23.85, 90), "C8": (32.0 + S, 23.85, 90), "R8": (27.85 + S, 28.1, 90),
     "C7": (CX + 8.5, CY - 4.2, 0),          # (1 uF on CHIP_PU at its lane's via: 6 mm of track from pin 4, review 2026-11-13)
