@@ -25,6 +25,10 @@ if [ -f "$HERE/core/jank_peer.c" ]; then
     "$OUT/test_peer"
 fi
 
+# The beat tracker. BEAT_WAV_DIR (mono 44.1 kHz WAVs, see test_beat.c) adds the run on audio against madmom's results.
+"$CC" $FLAGS -std=c11 -I"$HERE/core/beat" "$HERE/tests/test_beat.c" "$HERE"/core/beat/*.c -lm -o "$OUT/test_beat"
+"$OUT/test_beat" "$HERE/tests/beat_ref"
+
 FM1BASE="${FM1BASE:-$HERE/../optimist/fm1base}"
 if [ ! -f "$FM1BASE/wifi/wifi_jank.c" ]; then echo "crosscheck: no fm1-base Wi-Fi sources at $FM1BASE (set FM1BASE to an Optimist checkout's fm1base)"; exit 1; fi
 OPT="$FM1BASE/wifi"
