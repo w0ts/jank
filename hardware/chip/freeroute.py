@@ -298,11 +298,21 @@ def tidy(board):
     print(f"  {len(st)} stitching vias, {isl} island vias, {pv} pad vias, {gone} one-sided vias removed; narrow kept: {kept or 'none'}")
 
 
+def relabel(board):
+    """the buttons' silk labels under the buttons where they are (the placer moves the buttons after make_board.py's silk)"""
+    for ref, text in (("SW1", "BOOT"), ("SW2", "RST")):
+        p = board.FindFootprintByReference(ref).GetPosition()
+        for t in board.GetDrawings():
+            if t.GetClass() == "PCB_TEXT" and t.GetText() == text:
+                t.SetPosition(pcbnew.VECTOR2I(p.x, p.y + MM(4.2)))
+
+
 def main():
     path = sys.argv[1]
     if not os.path.exists(JAR):
         sys.exit(f"no {JAR}: sh fetch_freerouting.sh")
     board = pcbnew.LoadBoard(path)
+    relabel(board)
     for k in range(1, ROUNDS + EXTRA + 1):       # (EXTRA rounds only while Freerouting still leaves connections)
         left = route_round(board, k)
         tidy(board)
