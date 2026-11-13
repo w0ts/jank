@@ -328,12 +328,12 @@ positions; the connectors, the chip block, the RF path and the antenna strip are
   from everything, no track in the antenna strip or within 0.5 mm of the edge, no bottom track under the chip block or
   the RF path. Freerouting repeats itself only on a byte-identical input: `make_fab.sh` (ROUTE=1) may route differently
   from the committed board and must pass the same checks; `ROUTE=0` keeps the committed routing. Measured on the committed
-  board (routed tracks): VSYS C1 -> buck 12.7 mm; +3V3 buck -> chip pin 20 29.1 mm, -> L2 85.3 mm (0.25 mm, a chain through
-  the +3V3 loads); VDD3P3 L2 -> pins 9.8 mm (drawn: a via at the pins, the bottom under the lanes, a via by C18);
-  CHIP_PU pin 4 -> C7 10.3 mm (C7 fixed at the lane's via); BUCK_EN buck -> D4 9.7 mm; USB D+ connector -> U5 9.0 mm;
-  MIDI OUT 2's R20 27.4 mm of track from J6 (*open, tolerable*); 42 signal vias; no via in or touching an SMD pad; a GND
-  via beside every SMD ground pad outside the chip block, placed before routing; the USB-C's shell legs 0.3 mm clear of
-  tracks; vias 0.5 mm hole to hole. The exposed pad's paste: 16 windows, 35 % (was 16 %).
+  board (routed tracks): VSYS C1 -> buck 13.8 mm; +3V3 buck -> chip pin 20 33.5 mm, -> L2 61.5 mm (0.25 mm, a chain through
+  the +3V3 loads); VDD3P3 L2 -> pins 9.8 mm (drawn); CHIP_PU pin 4 -> C7 10.3 mm; USB D+ connector -> U5 9.0 mm; MIDI
+  OUT 2's R20 3.8 mm of track from J6; 40 signal vias; BOOT and RST in one level row (the placer turns that group by 0 or
+  180 only, room kept for their labels); no via in or touching an SMD pad; a GND via beside every SMD ground pad outside
+  the chip block, placed before routing; the USB-C's shell legs 0.3 mm clear of tracks; vias 0.5 mm hole to hole. The
+  exposed pad's paste: 16 windows, 35 % (was 16 %).
 - **Old routing notes (route.py):** the chip's right-side pins (CHIP_PU, GPIO0, 1, 2, 4) are fanned out by hand in `make_board.py`
   (FANOUT: one lane each, 0.8 mm apart, each ending in a via); the RF path, its via fences and the exposed pad's 9 vias
   are drawn there too; route.py does the rest (the ground vias by each pad first, then the signals). Measured on the

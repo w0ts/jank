@@ -429,13 +429,27 @@ def pre_ground_vias(board):
 
 
 def relabel(board):
-    """the buttons' silk labels under the buttons where they are (the placer moves the buttons after make_board.py's silk)"""
+    """the buttons' silk labels on the same side of both buttons (above or below, the first offset clear of every pad for
+    both), where the placer put the buttons"""
+    pads = [p for f in board.GetFootprints() for p in f.Pads() if p.IsOnLayer(pcbnew.F_Cu)]
+    items = []
     for ref, text in (("SW1", "BOOT"), ("SW2", "RST")):
         p = board.FindFootprintByReference(ref).GetPosition()
-        for t in board.GetDrawings():
-            if t.GetClass() == "PCB_TEXT" and t.GetText() == text:
-                t.SetPosition(pcbnew.VECTOR2I(p.x, p.y + MM(4.2)))
+        items += [(t, p) for t in board.GetDrawings() if t.GetClass() == "PCB_TEXT" and t.GetText() == text]
 
+    def clear(dy):
+        for t, p in items:
+            t.SetPosition(pcbnew.VECTOR2I(p.x, p.y + MM(dy)))
+            bb = t.GetBoundingBox()
+            bb.Inflate(MM(0.2))
+            if any(bb.Intersects(q.GetBoundingBox()) for q in pads):
+                return False
+        return True
+    for dy in (-4.2, 4.2, -4.8, 4.8, -5.4, 5.4, -6.0, 6.0):
+        if clear(dy):
+            return dy
+    clear(-4.2)
+    return None
 
 def main():
     path = sys.argv[1]
