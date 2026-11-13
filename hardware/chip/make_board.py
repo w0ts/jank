@@ -81,7 +81,8 @@ PLACE = {
     "R24": (CX - 0.3, CY - 6.2, 180), "R25": (CX - 0.3, CY - 5.2, 180),   # USB D+ / D- 22 ohm, right of pins 26 / 25 (pin 27 free)
     "C20": (CX + 1.5, CY - 4.45, 0),                                                  # VDD3P3_RTC (pin 20, top)
     "U4": (23.3 + S, 24.05, 180),                                    # (DNP) a 3.0 V supervisor on CHIP_PU, README "Start-up"
-    "R11": (31.0 + S, 23.85, 90), "C8": (32.0 + S, 23.85, 90), "R8": (27.85 + S, 28.1, 90), "C7": (26.9 + S, 28.0, 90),
+    "R11": (31.0 + S, 23.85, 90), "C8": (32.0 + S, 23.85, 90), "R8": (27.85 + S, 28.1, 90),
+    "C7": (CX + 8.5, CY - 4.2, 0),          # (1 uF on CHIP_PU at its lane's via: 6 mm of track from pin 4, review 2026-11-13)
     "C21": (13.9 + S, 30.5, 270), "C22": (13.9 + S, 32.3, 270),                       # VDD_SPI (pin 29, left)
     "C19": (CX - 1.4, CY + 4.85, 270),      # VDD3P3_CPU (pin 46, bottom): its +3V3 pad toward the pin (review 2026-11-13)
     "C13": (CX + 2.94, CY + 4.9, 270), "C12": (CX + 3.87, CY + 4.9, 270), "C11": (CX + 5.9, CY + 4.6, 90),   # VDDA
@@ -145,22 +146,21 @@ def in_din_room(x, y):
 # pulled to the part it serves (the buck to C1 and the chip, the USB parts to the USB-C, the MIDI parts to their sockets);
 # no group within 3 mm of the RF path), ref: (x, y, rotation); they replace PLACE (and the spread) for these parts
 PLACED = {
-    "C3": (12.582, 41.845, 270), "U2": (16.502, 41.845, 90), "L1": (20.902, 41.795, 90), "C5": (21.302, 38.695, 180),
-    "C6": (16.902, 38.695, 180), "R7": (18.602, 39.145, 90), "U3": (22.020, 3.755, 0), "D4": (26.020, 7.155, 0),
-    "D5": (26.020, 3.755, 0), "C4": (22.420, 6.455, 0), "R6": (22.420, 8.155, 0), "SW1": (33.013, 24.038, 90),
-    "LED1": (28.663, 26.038, 90), "R9": (28.663, 22.238, 90), "SW2": (45.900, 23.795, 90),
-    "U4": (42.240, 12.915, 180), "R8": (46.790, 19.080, 90), "C7": (45.840, 18.980, 90), "R10": (56.390, 27.730, 90),
-    "R11": (37.570, 32.765, 90), "C8": (38.570, 32.765, 90), "R1": (63.500, 18.780, 0), "R2": (63.500, 21.780, 0),
-    "D1": (57.600, 15.880, 90), "D2": (59.950, 15.880, 90), "R14": (19.580, 15.930, 180),
-    "R26": (19.580, 13.330, 180), "R15": (13.410, 3.980, 270), "R16": (37.280, 20.860, 180),
-    "Q1": (47.210, 13.210, 0), "R20": (47.010, 15.860, 0), "R22": (47.010, 17.360, 0), "D6": (49.120, 28.660, 180),
-    "R21": (39.400, 25.910, 180), "R27": (39.400, 23.310, 180),
+    "C3": (15.492, 46.905, 270), "U2": (19.412, 46.905, 90), "L1": (23.812, 46.855, 90), "C5": (24.212, 43.755, 180),
+    "C6": (19.812, 43.755, 180), "R7": (21.512, 44.205, 90), "U3": (12.720, 43.885, 90), "D4": (16.120, 39.885, 90),
+    "D5": (12.720, 39.885, 90), "C4": (15.420, 43.485, 90), "R6": (17.120, 43.485, 90), "SW1": (21.750, 31.335, 0),
+    "LED1": (19.750, 26.985, 0), "R9": (23.550, 26.985, 0), "SW2": (41.050, 20.105, 0), "U4": (43.057, 25.132, 90),
+    "R8": (36.892, 29.682, 0), "R10": (57.060, 22.660, 90), "R11": (38.240, 27.695, 90), "C8": (39.240, 27.695, 90),
+    "R1": (62.980, 29.120, 0), "R2": (62.980, 32.120, 0), "D1": (57.080, 26.220, 90), "D2": (59.430, 26.220, 90),
+    "R14": (16.360, 20.160, 90), "R26": (18.960, 20.160, 90), "R15": (10.960, 1.630, 180),
+    "R16": (17.440, 33.660, 90), "Q1": (49.690, 36.793, 90), "R20": (52.340, 36.993, 90),
+    "R22": (53.840, 36.993, 90), "D6": (42.830, 28.360, 0), "R21": (52.550, 31.110, 0), "R27": (52.550, 33.710, 0),
 }
 
 # the spread (72 x 65, 2026-11-12): parts placed at absolute y below the chip's top follow the chip down 7.5 mm; the
 # buttons' and the start-up group's row 4 mm; the start-up group (absolute x) follows the middle 5 mm right
 SPREAD_Y = {**{r: CY - 30.4 for r in ("C3", "U2", "L1", "C5", "C6", "R7", "R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10",
-                                "D6", "Q1", "R21", "R27", "R20", "R22", "R8", "C7")},
+                                "D6", "Q1", "R21", "R27", "R20", "R22", "R8")},
             **{r: (CY - 30.4) * 0.53 for r in ("SW1", "SW2", "LED1", "R9", "U4", "R11", "C8", "U3", "D4", "D5", "C4", "R6")}}
 SPREAD_X = {r: S - 8.7 for r in ("U3", "D4", "D5", "C4", "R6")}
 
@@ -385,6 +385,25 @@ def rf_path(fps):
     c9g = pad_center(pad_of(fps, "C9", "2"))
     RF_SEGS.append(("GND", 0, c9g[0], c9g[1], c9g[0] + 0.7, c9g[1], 0.25))
     FIXED_VIAS.append(("GND", c9g[0] + 0.7, c9g[1]))
+    # VDD3P3 on from its via at the pins: under the fan-out lanes on the bottom (y CY+1.3, clear of C28's ground via) to a
+    # via beside C18, then C18 and L2's pad on top (review 2026-11-13: the router took 22.8 mm for this 6 mm hop)
+    l2b, c18 = pad_center(pad_of(fps, "L2", "2")), pad_center(pad_of(fps, "C18", "1"))
+    vdv = (CX + 8.4, CY + 1.5)
+    for p0, p1 in (((CX + 4.2, CY + 2.0), (CX + 4.9, CY + 1.3)), ((CX + 4.9, CY + 1.3), (CX + 8.4, CY + 1.3)),
+                   ((CX + 8.4, CY + 1.3), vdv)):
+        RF_SEGS.append(("VDD3P3", 1, p0[0], p0[1], p1[0], p1[1], 0.25))
+    FIXED_VIAS.append(("VDD3P3", vdv[0], vdv[1]))
+    RF_SEGS.append(("VDD3P3", 0, vdv[0], vdv[1], c18[0], c18[1], 0.25))
+    RF_SEGS.append(("VDD3P3", 0, c18[0], c18[1], l2b[0], l2b[1], 0.25))
+    # C12 / C13's ground pads: their own via under them (the C12 -> C11 link below cuts their pour off otherwise)
+    c12g, c13g = pad_center(pad_of(fps, "C12", "2")), pad_center(pad_of(fps, "C13", "2"))
+    gv = (CX + 3.4, CY + 6.2)
+    RF_SEGS.append(("GND", 0, c12g[0], c12g[1], gv[0], gv[1], 0.25))
+    RF_SEGS.append(("GND", 0, c13g[0], c13g[1], gv[0], gv[1], 0.25))
+    FIXED_VIAS.append(("GND", gv[0], gv[1]))
+    # C7 (CHIP_PU's 1 uF) to the CHIP_PU lane's via
+    c7p = pad_center(pad_of(fps, "C7", "1"))
+    RF_SEGS.append(("CHIP_PU", 0, CX + 7.3, CY - 4.2, c7p[0], c7p[1], 0.2))
     # the analog supply's caps: C12's +3V3 pad straight to C11's (the router left C11..C13 cut off from pins 55 / 56)
     c12p, c11p = pad_center(pad_of(fps, "C12", "1")), pad_center(pad_of(fps, "C11", "1"))
     RF_SEGS.append(("+3V3", 0, c12p[0], c12p[1], c11p[0], c11p[1], 0.25))

@@ -58,7 +58,13 @@ def din_keepouts(board):
                 x, y = dsn_xy(mm(p.GetPosition().x), mm(p.GetPosition().y))
                 out += [f'    (via_keepout "" (circle {L} {(r + IRON) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
                 if p.GetNetname() in ("", "GND"):
-                    out += [f'    (wire_keepout "" (circle {L} {(r + 0.3) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
+                    out += [f'    (wire_keepout "" (circle {L} {(r + 0.36) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]   # (+0.06: Freerouting's octagons)
+        if f.GetReference() == "J1":             # (the USB-C's soldered shell legs: tracks 0.3 mm off, no solder bridge)
+            for p in f.Pads():
+                if p.GetNumber() in ("13", "14"):
+                    r = max(mm(p.GetSize().x), mm(p.GetSize().y)) / 2
+                    x, y = dsn_xy(mm(p.GetPosition().x), mm(p.GetPosition().y))
+                    out += [f'    (wire_keepout "" (circle {L} {(r + 0.1) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
     return out
 
 
@@ -444,6 +450,8 @@ def main():
         tidy(board)
         if k >= ROUNDS and left == 0:
             break
+    print(f"{space_holes(board)} GND vias moved off another via's drill")
+    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     board.Save(path)
     gaps = close_gaps(board, path)
     if gaps:
@@ -488,6 +496,28 @@ def close_gaps(board, path):
                 closed += 1
                 break
     return closed
+
+
+def space_holes(board):
+    """a GND via whose drill comes within 0.5 mm (edge to edge) of another via's: moved straight away by the shortfall
+    + 0.02 mm when it stays 0.2 mm clear of every other net's copper (Freerouting's octagons leave 0.47-0.49)"""
+    moved = 0
+    vias = [t for t in board.GetTracks() if t.GetClass() == "PCB_VIA"]
+    for v in [v for v in vias if v.GetNetname() == "GND"]:
+        for o in vias:
+            if o is v:
+                continue
+            d = (v.GetPosition() - o.GetPosition()).EuclideanNorm()
+            need = MM(0.5) + (v.GetDrillValue() + o.GetDrillValue()) // 2 + MM(0.02)
+            if 0 < d < need:
+                old = v.GetPosition()
+                step = need - d
+                v.SetPosition(old + pcbnew.VECTOR2I(int((old.x - o.GetPosition().x) * step / d), int((old.y - o.GetPosition().y) * step / d)))
+                if collides(board, v, pcbnew.F_Cu, MM(0.2)) or collides(board, v, pcbnew.B_Cu, MM(0.2)):
+                    v.SetPosition(old)
+                else:
+                    moved += 1
+    return moved
 
 
 def starved_pads(path):
