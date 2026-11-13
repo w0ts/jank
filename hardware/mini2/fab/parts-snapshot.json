@@ -1,0 +1,1842 @@
+{
+ "date": "2026-11-13",
+ "source": "https://jlcpcb.com/api/overseas-pcb-order/v1/shoppingCart/smtGood/selectSmtComponentList",
+ "parts": {
+  "C12530": {
+   "code": "C12530",
+   "mpn": "CL05A225MQ5NSNC",
+   "brand": "Samsung Electro-Mechanics",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 3361359,
+   "loss": 14,
+   "prices": [
+    [
+     1,
+     0.0051
+    ],
+    [
+     1000,
+     0.0038
+    ],
+    [
+     3000,
+     0.0033
+    ],
+    [
+     10000,
+     0.0028
+    ],
+    [
+     50000,
+     0.0027
+    ],
+    [
+     100000,
+     0.0026
+    ]
+   ]
+  },
+  "C15195": {
+   "code": "C15195",
+   "mpn": "CL05B103KB5NNNC",
+   "brand": "Samsung Electro-Mechanics",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 5545703,
+   "loss": 15,
+   "prices": [
+    [
+     1,
+     0.0037
+    ],
+    [
+     1000,
+     0.0028
+    ],
+    [
+     3000,
+     0.0023
+    ],
+    [
+     10000,
+     0.0021
+    ],
+    [
+     50000,
+     0.0018
+    ],
+    [
+     50200,
+     0.0018
+    ]
+   ]
+  },
+  "C1525": {
+   "code": "C1525",
+   "mpn": "CL05B104KO5NNNC",
+   "brand": "Samsung Electro-Mechanics",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 31983058,
+   "loss": 15,
+   "prices": [
+    [
+     1,
+     0.0024
+    ],
+    [
+     1000,
+     0.0018
+    ],
+    [
+     3000,
+     0.0015
+    ],
+    [
+     10000,
+     0.0013
+    ],
+    [
+     50000,
+     0.0012
+    ],
+    [
+     50200,
+     0.0012
+    ]
+   ]
+  },
+  "C1531": {
+   "code": "C1531",
+   "mpn": "0402B222K500NT",
+   "brand": "FH (Guangdong Fenghua Advanced Tech)",
+   "package": "0402",
+   "type": "Extended",
+   "preferred": true,
+   "stock": 553828,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0025
+    ],
+    [
+     1000,
+     0.0019
+    ],
+    [
+     3000,
+     0.0017
+    ],
+    [
+     10000,
+     0.0014
+    ],
+    [
+     50000,
+     0.0012
+    ],
+    [
+     50200,
+     0.0012
+    ]
+   ]
+  },
+  "C1550": {
+   "code": "C1550",
+   "mpn": "0402CG1R0C500NT",
+   "brand": "FH (Guangdong Fenghua Advanced Tech)",
+   "package": "0402",
+   "type": "Extended",
+   "preferred": true,
+   "stock": 694423,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0029
+    ],
+    [
+     1000,
+     0.0023
+    ],
+    [
+     3000,
+     0.0019
+    ],
+    [
+     10000,
+     0.0017
+    ],
+    [
+     50000,
+     0.0015
+    ],
+    [
+     50200,
+     0.0015
+    ]
+   ]
+  },
+  "C17168": {
+   "code": "C17168",
+   "mpn": "0402WGF0000TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 15759383,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0012
+    ],
+    [
+     1000,
+     0.0009
+    ],
+    [
+     3000,
+     0.0008
+    ],
+    [
+     10000,
+     0.0007
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
+    ]
+   ]
+  },
+  "C17976": {
+   "code": "C17976",
+   "mpn": "1206W4F680JT5E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "1206",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 75668,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0136
+    ],
+    [
+     500,
+     0.0111
+    ],
+    [
+     1500,
+     0.0097
+    ],
+    [
+     5000,
+     0.0078
+    ],
+    [
+     25000,
+     0.0071
+    ],
+    [
+     50000,
+     0.0067
+    ]
+   ]
+  },
+  "C18185602": {
+   "code": "C18185602",
+   "mpn": "PJ-320A-4P DIP",
+   "brand": "SHOU HAN",
+   "package": "Plugin",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 19146,
+   "loss": 1,
+   "prices": [
+    [
+     1,
+     0.0553
+    ],
+    [
+     100,
+     0.0444
+    ],
+    [
+     300,
+     0.039
+    ],
+    [
+     1000,
+     0.0347
+    ],
+    [
+     5000,
+     0.0315
+    ],
+    [
+     10000,
+     0.0298
+    ]
+   ]
+  },
+  "C19702": {
+   "code": "C19702",
+   "mpn": "CL10A106KP8NNNC",
+   "brand": "Samsung Electro-Mechanics",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 11726060,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0233
+    ],
+    [
+     200,
+     0.0177
+    ],
+    [
+     600,
+     0.0153
+    ],
+    [
+     4000,
+     0.0134
+    ],
+    [
+     8000,
+     0.0127
+    ],
+    [
+     20000,
+     0.0122
+    ]
+   ]
+  },
+  "C20917": {
+   "code": "C20917",
+   "mpn": "AO3400A",
+   "brand": "Alpha & Omega Semicon",
+   "package": "SOT-23",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 1025607,
+   "loss": 4,
+   "prices": [
+    [
+     1,
+     0.0789
+    ],
+    [
+     50,
+     0.0621
+    ],
+    [
+     150,
+     0.0534
+    ],
+    [
+     500,
+     0.0463
+    ],
+    [
+     3000,
+     0.0437
+    ],
+    [
+     6000,
+     0.0421
+    ]
+   ]
+  },
+  "C22859": {
+   "code": "C22859",
+   "mpn": "0603WAF100JT5E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 5308681,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.002
+    ],
+    [
+     200,
+     0.0016
+    ],
+    [
+     600,
+     0.0013
+    ],
+    [
+     5000,
+     0.0012
+    ],
+    [
+     10000,
+     0.0011
+    ],
+    [
+     10040,
+     0.0011
+    ]
+   ]
+  },
+  "C2286": {
+   "code": "C2286",
+   "mpn": "KT-0603R",
+   "brand": "Hubei KENTO Elec",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 5884703,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0077
+    ],
+    [
+     1000,
+     0.0059
+    ],
+    [
+     4000,
+     0.0046
+    ],
+    [
+     8000,
+     0.004
+    ],
+    [
+     48000,
+     0.0037
+    ],
+    [
+     100000,
+     0.0036
+    ]
+   ]
+  },
+  "C23182": {
+   "code": "C23182",
+   "mpn": "0603WAF470JT5E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 1249516,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0018
+    ],
+    [
+     1000,
+     0.0014
+    ],
+    [
+     5000,
+     0.0011
+    ],
+    [
+     10000,
+     0.001
+    ],
+    [
+     50000,
+     0.0009
+    ],
+    [
+     50200,
+     0.0009
+    ]
+   ]
+  },
+  "C23186": {
+   "code": "C23186",
+   "mpn": "0603WAF5101T5E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 19366976,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0015
+    ],
+    [
+     1000,
+     0.0012
+    ],
+    [
+     5000,
+     0.001
+    ],
+    [
+     10000,
+     0.0008
+    ],
+    [
+     50000,
+     0.0007
+    ],
+    [
+     50200,
+     0.0007
+    ]
+   ]
+  },
+  "C25079": {
+   "code": "C25079",
+   "mpn": "0402WGF1200TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 3420172,
+   "loss": 15,
+   "prices": [
+    [
+     1,
+     0.0012
+    ],
+    [
+     1000,
+     0.0009
+    ],
+    [
+     3000,
+     0.0008
+    ],
+    [
+     10000,
+     0.0007
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
+    ]
+   ]
+  },
+  "C25092": {
+   "code": "C25092",
+   "mpn": "0402WGF220JTCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 4832215,
+   "loss": 15,
+   "prices": [
+    [
+     1,
+     0.0033
+    ],
+    [
+     1000,
+     0.0027
+    ],
+    [
+     3000,
+     0.0023
+    ],
+    [
+     10000,
+     0.0022
+    ],
+    [
+     50000,
+     0.0019
+    ],
+    [
+     50200,
+     0.0019
+    ]
+   ]
+  },
+  "C254377": {
+   "code": "C254377",
+   "mpn": "X3S040000B81H-R",
+   "brand": "HELE(Harmony Elec)",
+   "package": "SMD3225-4P",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 2748,
+   "loss": 0,
+   "prices": [
+    [
+     1,
+     0.166
+    ],
+    [
+     50,
+     0.1265
+    ],
+    [
+     150,
+     0.1095
+    ],
+    [
+     500,
+     0.0884
+    ],
+    [
+     3000,
+     0.0884
+    ],
+    [
+     6000,
+     0.0884
+    ]
+   ]
+  },
+  "C25741": {
+   "code": "C25741",
+   "mpn": "0402WGF1003TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 8505989,
+   "loss": 12,
+   "prices": [
+    [
+     1,
+     0.0011
+    ],
+    [
+     1000,
+     0.0008
+    ],
+    [
+     3000,
+     0.0007
+    ],
+    [
+     10000,
+     0.0006
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
+    ]
+   ]
+  },
+  "C25744": {
+   "code": "C25744",
+   "mpn": "0402WGF1002TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 21256714,
+   "loss": 15,
+   "prices": [
+    [
+     1,
+     0.001
+    ],
+    [
+     1000,
+     0.0008
+    ],
+    [
+     3000,
+     0.0007
+    ],
+    [
+     10000,
+     0.0006
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
+    ]
+   ]
+  },
+  "C25750": {
+   "code": "C25750",
+   "mpn": "0402WGF1203TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Extended",
+   "preferred": true,
+   "stock": 365611,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0012
+    ],
+    [
+     1000,
+     0.0009
+    ],
+    [
+     3000,
+     0.0008
+    ],
+    [
+     10000,
+     0.0007
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
+    ]
+   ]
+  },
+  "C25755": {
+   "code": "C25755",
+   "mpn": "0402WGF1503TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Extended",
+   "preferred": true,
+   "stock": 1037162,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0011
+    ],
+    [
+     1000,
+     0.0009
+    ],
+    [
+     3000,
+     0.0008
+    ],
+    [
+     10000,
+     0.0007
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
+    ]
+   ]
+  },
+  "C25765": {
+   "code": "C25765",
+   "mpn": "0402WGF2002TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 2916011,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.001
+    ],
+    [
+     1000,
+     0.0008
+    ],
+    [
+     3000,
+     0.0007
+    ],
+    [
+     10000,
+     0.0006
+    ],
+    [
+     50000,
+     0.0005
+    ],
+    [
+     50200,
+     0.0005
+    ]
+   ]
+  },
+  "C25794": {
+   "code": "C25794",
+   "mpn": "0402WGF5102TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 1469191,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0019
+    ],
+    [
+     1000,
+     0.0015
+    ],
+    [
+     3000,
+     0.0012
+    ],
+    [
+     10000,
+     0.0011
+    ],
+    [
+     50000,
+     0.001
+    ],
+    [
+     50200,
+     0.001
+    ]
+   ]
+  },
+  "C25803": {
+   "code": "C25803",
+   "mpn": "0603WAF1003T5E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 14904974,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0029
+    ],
+    [
+     1000,
+     0.0023
+    ],
+    [
+     5000,
+     0.002
+    ],
+    [
+     10000,
+     0.0016
+    ],
+    [
+     50000,
+     0.0015
+    ],
+    [
+     50200,
+     0.0015
+    ]
+   ]
+  },
+  "C25804": {
+   "code": "C25804",
+   "mpn": "0603WAF1002T5E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 41343785,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0022
+    ],
+    [
+     1000,
+     0.0018
+    ],
+    [
+     5000,
+     0.0016
+    ],
+    [
+     10000,
+     0.0015
+    ],
+    [
+     50000,
+     0.0014
+    ],
+    [
+     50200,
+     0.0014
+    ]
+   ]
+  },
+  "C25908": {
+   "code": "C25908",
+   "mpn": "0402WGF5601TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Extended",
+   "preferred": true,
+   "stock": 266188,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.001
+    ],
+    [
+     1000,
+     0.0008
+    ],
+    [
+     3000,
+     0.0007
+    ],
+    [
+     10000,
+     0.0006
+    ],
+    [
+     50000,
+     0.0005
+    ],
+    [
+     50200,
+     0.0005
+    ]
+   ]
+  },
+  "C26083": {
+   "code": "C26083",
+   "mpn": "0402WGF1004TCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 2361343,
+   "loss": 15,
+   "prices": [
+    [
+     1,
+     0.0012
+    ],
+    [
+     1000,
+     0.0009
+    ],
+    [
+     3000,
+     0.0008
+    ],
+    [
+     10000,
+     0.0007
+    ],
+    [
+     50000,
+     0.0006
+    ],
+    [
+     50200,
+     0.0006
+    ]
+   ]
+  },
+  "C2763866": {
+   "code": "C2763866",
+   "mpn": "BL8506-30NRM",
+   "brand": "BL(Shanghai Belling)",
+   "package": "SOT-23",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 4917,
+   "loss": 2,
+   "prices": [
+    [
+     1,
+     0.1389
+    ],
+    [
+     50,
+     0.109
+    ],
+    [
+     150,
+     0.0941
+    ],
+    [
+     500,
+     0.0828
+    ],
+    [
+     3000,
+     0.0738
+    ],
+    [
+     6000,
+     0.0693
+    ]
+   ]
+  },
+  "C2765186": {
+   "code": "C2765186",
+   "mpn": "TYPE-C 16PIN 2MD(073)",
+   "brand": "SHOU HAN",
+   "package": "SMD",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 1059341,
+   "loss": 3,
+   "prices": [
+    [
+     1,
+     0.0729
+    ],
+    [
+     200,
+     0.0581
+    ],
+    [
+     1000,
+     0.049
+    ],
+    [
+     2000,
+     0.0427
+    ],
+    [
+     10000,
+     0.0405
+    ],
+    [
+     20000,
+     0.039
+    ]
+   ]
+  },
+  "C2873354": {
+   "code": "C2873354",
+   "mpn": "TPS62842DGRR",
+   "brand": "Texas Instruments",
+   "package": "HVSSOP-8-EP-0.65mm",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 44814,
+   "loss": 0,
+   "prices": [
+    [
+     1,
+     0.3992
+    ],
+    [
+     10,
+     0.3534
+    ],
+    [
+     30,
+     0.3289
+    ],
+    [
+     100,
+     0.306
+    ],
+    [
+     500,
+     0.2929
+    ],
+    [
+     1000,
+     0.2847
+    ]
+   ]
+  },
+  "C2909397": {
+   "code": "C2909397",
+   "mpn": "BL8506-40CRM",
+   "brand": "BL(Shanghai Belling)",
+   "package": "SOT-23",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 3061,
+   "loss": 2,
+   "prices": [
+    [
+     1,
+     0.1435
+    ],
+    [
+     50,
+     0.1146
+    ],
+    [
+     150,
+     0.1
+    ],
+    [
+     500,
+     0.089
+    ],
+    [
+     3000,
+     0.0804
+    ],
+    [
+     6000,
+     0.0761
+    ]
+   ]
+  },
+  "C2913196": {
+   "code": "C2913196",
+   "mpn": "ESP32-S3FN8",
+   "brand": "Espressif Systems",
+   "package": "QFN-56-EP(7x7)",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 4257,
+   "loss": 0,
+   "prices": [
+    [
+     1,
+     3.3473
+    ],
+    [
+     10,
+     2.9972
+    ],
+    [
+     30,
+     2.7894
+    ],
+    [
+     100,
+     2.616
+    ],
+    [
+     500,
+     2.4999
+    ],
+    [
+     1000,
+     2.4459
+    ]
+   ]
+  },
+  "C293767": {
+   "code": "C293767",
+   "mpn": "ANT3216LL00R2400A",
+   "brand": "YAGEO",
+   "package": "1206",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 17083,
+   "loss": 2,
+   "prices": [
+    [
+     1,
+     0.1892
+    ],
+    [
+     50,
+     0.1663
+    ],
+    [
+     150,
+     0.155
+    ],
+    [
+     500,
+     0.1465
+    ],
+    [
+     3000,
+     0.1396
+    ],
+    [
+     6000,
+     0.1362
+    ]
+   ]
+  },
+  "C2939346": {
+   "code": "C2939346",
+   "mpn": "DIN-504B-M10",
+   "brand": "HOOYA",
+   "package": "Plugin",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 4307,
+   "loss": 0,
+   "prices": [
+    [
+     1,
+     0.3729
+    ],
+    [
+     50,
+     0.3027
+    ],
+    [
+     200,
+     0.2387
+    ],
+    [
+     500,
+     0.2013
+    ],
+    [
+     2500,
+     0.1846
+    ],
+    [
+     6000,
+     0.1745
+    ]
+   ]
+  },
+  "C318884": {
+   "code": "C318884",
+   "mpn": "TS-1187A-B-A-B",
+   "brand": "XKB Connection",
+   "package": "SMD-4P,5.1x5.1mm",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 815291,
+   "loss": 8,
+   "prices": [
+    [
+     1,
+     0.0215
+    ],
+    [
+     200,
+     0.0167
+    ],
+    [
+     600,
+     0.0147
+    ],
+    [
+     4000,
+     0.0129
+    ],
+    [
+     8000,
+     0.0123
+    ],
+    [
+     20000,
+     0.0119
+    ]
+   ]
+  },
+  "C32949": {
+   "code": "C32949",
+   "mpn": "CL05C100JB5NNNC",
+   "brand": "Samsung Electro-Mechanics",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 2059422,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0057
+    ],
+    [
+     500,
+     0.0047
+    ],
+    [
+     1500,
+     0.0041
+    ],
+    [
+     10000,
+     0.0037
+    ],
+    [
+     20000,
+     0.0034
+    ],
+    [
+     50000,
+     0.0033
+    ]
+   ]
+  },
+  "C474307": {
+   "code": "C474307",
+   "mpn": "201007J047JT4E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "2010",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 3975,
+   "loss": 8,
+   "prices": [
+    [
+     1,
+     0.0351
+    ],
+    [
+     200,
+     0.0277
+    ],
+    [
+     600,
+     0.0236
+    ],
+    [
+     4000,
+     0.0177
+    ],
+    [
+     8000,
+     0.0155
+    ],
+    [
+     20000,
+     0.0144
+    ]
+   ]
+  },
+  "C49338": {
+   "code": "C49338",
+   "mpn": "PESD5V0S2BT,215",
+   "brand": "Nexperia",
+   "package": "SOT-23",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 13797,
+   "loss": 4,
+   "prices": [
+    [
+     1,
+     0.0827
+    ],
+    [
+     50,
+     0.0648
+    ],
+    [
+     150,
+     0.0558
+    ],
+    [
+     500,
+     0.0491
+    ],
+    [
+     3000,
+     0.0437
+    ],
+    [
+     6000,
+     0.0411
+    ]
+   ]
+  },
+  "C51018335": {
+   "code": "C51018335",
+   "mpn": "JVB10V2200M10X10",
+   "brand": "jieerrui",
+   "package": "SMD,D10xL10.5mm",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 1972,
+   "loss": 0,
+   "prices": [
+    [
+     1,
+     0.3798
+    ],
+    [
+     50,
+     0.3009
+    ],
+    [
+     150,
+     0.267
+    ],
+    [
+     500,
+     0.2248
+    ],
+    [
+     2500,
+     0.206
+    ],
+    [
+     5000,
+     0.1947
+    ]
+   ]
+  },
+  "C52923": {
+   "code": "C52923",
+   "mpn": "CL05A105KA5NQNC",
+   "brand": "Samsung Electro-Mechanics",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 10476533,
+   "loss": 12,
+   "prices": [
+    [
+     1,
+     0.0057
+    ],
+    [
+     1000,
+     0.0043
+    ],
+    [
+     3000,
+     0.0037
+    ],
+    [
+     10000,
+     0.0032
+    ],
+    [
+     50000,
+     0.003
+    ],
+    [
+     100000,
+     0.0029
+    ]
+   ]
+  },
+  "C5446": {
+   "code": "C5446",
+   "mpn": "XC6206P332MR-G",
+   "brand": "Torex Semicon",
+   "package": "SOT-23-3L",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 470964,
+   "loss": 2,
+   "prices": [
+    [
+     1,
+     0.1262
+    ],
+    [
+     50,
+     0.0997
+    ],
+    [
+     150,
+     0.0861
+    ],
+    [
+     500,
+     0.0748
+    ],
+    [
+     3000,
+     0.0709
+    ],
+    [
+     6000,
+     0.0683
+    ]
+   ]
+  },
+  "C59461": {
+   "code": "C59461",
+   "mpn": "CL10A226MQ8NRNC",
+   "brand": "Samsung Electro-Mechanics",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 6284207,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0221
+    ],
+    [
+     200,
+     0.0149
+    ],
+    [
+     600,
+     0.0117
+    ],
+    [
+     4000,
+     0.0093
+    ],
+    [
+     8000,
+     0.0083
+    ],
+    [
+     20000,
+     0.0077
+    ]
+   ]
+  },
+  "C68978": {
+   "code": "C68978",
+   "mpn": "BAV70",
+   "brand": "Jiangsu Changjing Electronics Technology Co., Ltd.",
+   "package": "SOT-23",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 570192,
+   "loss": 8,
+   "prices": [
+    [
+     1,
+     0.0152
+    ],
+    [
+     500,
+     0.0117
+    ],
+    [
+     3000,
+     0.0101
+    ],
+    [
+     6000,
+     0.0089
+    ],
+    [
+     24000,
+     0.0084
+    ],
+    [
+     51000,
+     0.0081
+    ]
+   ]
+  },
+  "C7250": {
+   "code": "C7250",
+   "mpn": "0603WAF1005T5E",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0603",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 1016247,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0022
+    ],
+    [
+     1000,
+     0.0017
+    ],
+    [
+     5000,
+     0.0014
+    ],
+    [
+     10000,
+     0.0011
+    ],
+    [
+     50000,
+     0.001
+    ],
+    [
+     50200,
+     0.001
+    ]
+   ]
+  },
+  "C7519": {
+   "code": "C7519",
+   "mpn": "USBLC6-2SC6",
+   "brand": "STMicroelectronics",
+   "package": "SOT-23-6L",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 42107,
+   "loss": 2,
+   "prices": [
+    [
+     1,
+     0.1568
+    ],
+    [
+     50,
+     0.1198
+    ],
+    [
+     150,
+     0.1018
+    ],
+    [
+     500,
+     0.0858
+    ],
+    [
+     3000,
+     0.0814
+    ],
+    [
+     6000,
+     0.0787
+    ]
+   ]
+  },
+  "C76769": {
+   "code": "C76769",
+   "mpn": "MLG1005S2N0BT000",
+   "brand": "TDK",
+   "package": "0402",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 351535,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.013
+    ],
+    [
+     100,
+     0.0107
+    ],
+    [
+     300,
+     0.0095
+    ],
+    [
+     1000,
+     0.0087
+    ],
+    [
+     5000,
+     0.008
+    ],
+    [
+     10000,
+     0.0077
+    ]
+   ]
+  },
+  "C79317": {
+   "code": "C79317",
+   "mpn": "DFE201612P-2R2M=P2",
+   "brand": "Murata Electronics",
+   "package": "0806",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 7020,
+   "loss": 2,
+   "prices": [
+    [
+     1,
+     0.1059
+    ],
+    [
+     50,
+     0.0872
+    ],
+    [
+     150,
+     0.0779
+    ],
+    [
+     500,
+     0.0709
+    ],
+    [
+     3000,
+     0.0652
+    ],
+    [
+     6000,
+     0.0624
+    ]
+   ]
+  },
+  "C7972": {
+   "code": "C7972",
+   "mpn": "LMV321IDBVR",
+   "brand": "Texas Instruments",
+   "package": "SOT-23-5",
+   "type": "Extended",
+   "preferred": true,
+   "stock": 82156,
+   "loss": 4,
+   "prices": [
+    [
+     1,
+     0.112
+    ],
+    [
+     50,
+     0.0904
+    ],
+    [
+     150,
+     0.0792
+    ],
+    [
+     500,
+     0.0701
+    ],
+    [
+     3000,
+     0.067
+    ],
+    [
+     6000,
+     0.0648
+    ]
+   ]
+  },
+  "C8598": {
+   "code": "C8598",
+   "mpn": "B5819W SL",
+   "brand": "Jiangsu Changjing Electronics Technology Co., Ltd.",
+   "package": "SOD-123",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 360653,
+   "loss": 8,
+   "prices": [
+    [
+     1,
+     0.0262
+    ],
+    [
+     200,
+     0.0202
+    ],
+    [
+     600,
+     0.0174
+    ],
+    [
+     3000,
+     0.0154
+    ],
+    [
+     9000,
+     0.0146
+    ],
+    [
+     21000,
+     0.014
+    ]
+   ]
+  },
+  "C87532": {
+   "code": "C87532",
+   "mpn": "MLG1005S3N3BT000",
+   "brand": "TDK",
+   "package": "0402",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 4431,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0089
+    ],
+    [
+     100,
+     0.007
+    ],
+    [
+     300,
+     0.006
+    ],
+    [
+     1000,
+     0.0053
+    ],
+    [
+     5000,
+     0.0048
+    ],
+    [
+     10000,
+     0.0045
+    ]
+   ]
+  },
+  "C88374": {
+   "code": "C88374",
+   "mpn": "U.FL-R-SMT-1(80)",
+   "brand": "HRS(Hirose)",
+   "package": "SMD",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 295330,
+   "loss": 4,
+   "prices": [
+    [
+     1,
+     0.0923
+    ],
+    [
+     50,
+     0.0722
+    ],
+    [
+     150,
+     0.0619
+    ],
+    [
+     500,
+     0.0534
+    ],
+    [
+     2500,
+     0.0503
+    ],
+    [
+     5000,
+     0.0483
+    ]
+   ]
+  }
+ }
+}

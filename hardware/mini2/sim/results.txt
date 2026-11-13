@@ -1,0 +1,17 @@
+jank mini 2, LINE IN front end: ngspice results (linein.py; generic op-amp model, linein.lib)
+
+mono gain at 1 kHz (both channels the same signal, 100 ohm source): -5.13 dB (0.554 x)
+band (-3 dB from 1 kHz): 7.8 Hz .. 8.48 kHz
+at 22.05 kHz (Nyquist of 44.1 kHz): -11.7 dB; at 40 kHz: -20.3 dB
+
+ +4.0 dBu, stereo, same signal both channels, 600 ohm source: pin 0.529 .. 2.408 V (1.879 Vpp), bias 1.467 V
+ +4.0 dBu, stereo, same signal both channels, 100 ohm source: pin 0.505 .. 2.431 V (1.926 Vpp), bias 1.467 V
+ +4.0 dBu, mono plug (ring grounded), 600 ohm source: pin 0.998 .. 1.937 V (0.939 Vpp), bias 1.467 V
+ -7.8 dBu, stereo, same signal both channels, 600 ohm source: pin 1.226 .. 1.709 V (0.483 Vpp), bias 1.467 V
++10.0 dBu, stereo, same signal both channels, 600 ohm source: pin 0.064 .. 3.268 V (3.204 Vpp), bias 1.467 V
++20.0 dBu, stereo, same signal both channels, 600 ohm source: pin 0.046 .. 3.292 V (3.246 Vpp), bias 1.467 V
+  (-7.8 dBu = -10 dBV, consumer line level)
+
+USB plug-in with +4 dBu on the jack: the pin at most 0.047 V above +3V3 (a diode drop, ~0.5 V, would inject current)
+ADC sampling capacitor (10 pF ASSUMED, reset to 0 V each sample), +4 dBu 5 kHz: sampled value off by at most 0.253 mV = 0.36 LSB (ATTEN3, 0.71 mV)
+

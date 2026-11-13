@@ -1,0 +1,41 @@
+* SPDX-License-Identifier: GPL-3.0-only
+* jank mini 2, LINE IN front end (README "LINE IN"): the circuit as in parts.py, shared by the runs in linein.py.
+* Models are GENERIC, not the vendors' own:
+*  - OPAMP: LMV321 by its datasheet figures (TI SLOS263Y, VCC 2.7 V table): 1 MHz unity gain (one pole), 100 dB DC gain,
+*    output to within 60 mV (low) / 20 mV (high) of the rails, 40 ohm output, inputs not modelled beyond ideal
+*    (the inverting stage keeps both inputs at VB, inside its 0..1.7 V common-mode range).
+*  - TVS: PESD5V0S2BT per line as 35 pF plus a symmetric clamp (two diodes with 6 V breakdown, back to back).
+*  - ADC: the pin as a switched sampling capacitor CS (Espressif publishes no value: ASSUMED 10 pF, reset to 0 V before
+*    every sample, the worst case), closed for TACQ every sample period.
+
+.subckt OPAMP inp inn out vcc vee
+G1 0 n1 inp inn 1m
+R1 n1 0 100Meg
+C1 n1 0 159p
+Bl n2 0 V = min(max(V(n1), V(vee) + 0.06), V(vcc) - 0.02)
+Rout n2 out 40
+.ends
+
+.model DZ6 D(BV=6 IBV=1m CJO=35p)
+.subckt TVS line gnd
+D1 line mid DZ6
+D2 gnd mid DZ6
+.ends
+
+* the front end: tip / ring in, AIN = the ADC pin (GPIO9)
+.subckt FRONTEND tip ring ain avdd gnd
+XD7a tip gnd TVS
+XD7b ring gnd TVS
+R30 tip a1 20k
+C30 a1 inn 1u
+R31 ring a2 20k
+C31 a2 inn 1u
+R32 inn out 5.6k
+C32 inn out 2.2n
+R33 avdd vb 150k
+R34 vb gnd 120k
+C33 vb gnd 1u
+XU6 vb inn out avdd gnd OPAMP
+R35 out ain 120
+C36 ain gnd 100n
+.ends
