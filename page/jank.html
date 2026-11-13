@@ -128,6 +128,17 @@ th { color: var(--dim); font-weight: 500; font-size: 12px; }
   </section>
 
   <section>
+    <h2>Beat follow (bench build)</h2>
+    <p>The stick listens to the computer's audio output named jank and steers the Link session by the beat. Madmom's network
+    weights, CC BY-NC-SA 4.0: this build is for the bench and is never shared.</p>
+    <div class="grid">
+      <label>Steer Link <select id="c-beat"><option value="on">On</option><option value="off">Off</option></select></label>
+      <label>Latency, ms <input id="c-beat_latency" type="number" min="0" max="300"></label>
+    </div>
+    <pre id="beat-out">-</pre>
+  </section>
+
+  <section>
     <h2>Firmware</h2>
     <p>This page does not flash. Download mode restarts the stick so esptool can reach it; the README has the command.</p>
     <button id="bootloader" class="quiet" disabled>Download mode</button>
@@ -223,7 +234,7 @@ function faultDrops(v) {
 /* a setting's command, or null when the value is not one the stick takes */
 function setCommand(key, raw) {
   const value = String(raw).trim();
-  const range = { group: [1, 9], quantum: [1, 16], offset: [-100, 100] }[key];
+  const range = { group: [1, 9], quantum: [1, 16], offset: [-100, 100], beat_latency: [0, 300] }[key];
   if (range) {
     const n = Number(value);
     if (value === "" || !Number.isInteger(n) || n < range[0] || n > range[1]) return null;
@@ -238,7 +249,7 @@ function setCommand(key, raw) {
 <script id="ui">
 const $ = (id) => document.getElementById(id);
 const SCAN_WAIT_MS = 4000;
-const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset"];
+const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency"];
 let port = null, writer = null, poll = null, pendingEnd = null, pendingLines = [], queue = Promise.resolve();
 
 function say(text, bad) {
@@ -279,6 +290,11 @@ function showStatus({ values: v, units }) {
     }
     return row;
   }));
+}
+
+/* the beat tracker's numbers, as the stick says them, one `key=value` a line */
+function showBeat({ values: v }) {
+  $("beat-out").textContent = Object.entries(v).map(([k, x]) => k + " = " + x).join("\n");
 }
 
 function showGroups(scans) {
@@ -330,6 +346,7 @@ async function pollOnce() {
   try {
     const status = await send("status");
     showStatus(status);
+    showBeat(await send("beat"));
     $("net-state").textContent = networkLine({ ...lastGet, ...status.values });
   } catch (e) {
     say(e.message, true);

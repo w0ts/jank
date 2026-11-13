@@ -110,6 +110,7 @@ uint32_t lk_peers(const struct lk_node *k);                      /* peers in our
 /* changes of our own, at host time t (sent to the session) */
 void lk_set_tempo(struct lk_node *k, int32_t mpb, int64_t t);    /* the beat at t kept */
 void lk_set_playing(struct lk_node *k, int play, int64_t ub, int64_t t);   /* play from session beat ub */
+void lk_force_beat(struct lk_node *k, int32_t mpb, int64_t ub, int64_t t); /* jank's addition: beat ub at time t, tempo mpb */
 
 /* helpers (exported for the tests) */
 int64_t lk_us_to_ub(int64_t us, int64_t mpb);                    /* llround(us / mpb * 1e6), as Link */

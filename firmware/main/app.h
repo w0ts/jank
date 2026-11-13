@@ -42,6 +42,11 @@ void usb_midi_host_send(const uint8_t *packets, size_t n);
 bool usb_midi_isr(const uint8_t *bytes, size_t n);                  /* from the timer interrupt -> a task was woken */
 void usb_serial_write(const char *text, size_t n);                 /* the control line, as SysEx on the MIDI port */
 
+/* usb_audio.c, beat.c: the beat-follow bench build (README): the computer's audio into the beat tracker, into the Link session */
+struct jank_peer;
+esp_err_t beat_start(void);
+void beat_stats(struct jk_beat *out);
+
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);
 int64_t midi_now_us(void);
@@ -61,6 +66,8 @@ void bridge_table_start(void);                               /* frames of every 
 void bridge_table_stop(struct js_table *out);                /* .. to here */
 uint32_t bridge_peers_heard(void);
 int bridge_beat(int64_t *beat_ub, int32_t *mpb);    /* 1 in a session, with its beat now */
+/* fn on the Link peer, with the bridge's lock held and the host time now (the beat tracker steers the session through it) */
+void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), void *ctx);
 uint32_t bridge_ms(void);
 
 /* ui.c: button, LED, group scan */

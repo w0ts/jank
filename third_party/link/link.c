@@ -678,6 +678,23 @@ void lk_set_tempo(struct lk_node *k, int32_t mpb, int64_t t)
     changed(k, t);
 }
 
+/* jank's own addition (not in Optimist's port): the beat ub falls at time t, at tempo mpb. Like lk_set_tempo, the beat
+ * origin moves past the old one so that peers take the new timeline; what changes is where the beat grid sits. For a
+ * peer that knows the beat from outside (a tracker listening to the music) and is the session's master. */
+void lk_force_beat(struct lk_node *k, int32_t mpb, int64_t ub, int64_t t)
+{
+    int64_t g = ghost(k, t), o;
+    struct lk_tl n;
+    n.mpb = clamp_mpb(mpb);
+    n.ub0 = ub;
+    n.t0 = g;
+    o = ub > k->tl.ub0 + LK_UBEAT ? ub : k->tl.ub0 + LK_UBEAT;
+    n.t0 = tl_time(&n, o);
+    n.ub0 = o;
+    k->tl = n;
+    changed(k, t);
+}
+
 void lk_set_playing(struct lk_node *k, int play, int64_t ub, int64_t t)
 {
     int64_t g = ghost(k, t);

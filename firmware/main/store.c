@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Settings in NVS: one blob with a version. Anything unreadable falls back to the defaults. */
+#include <stddef.h>
 #include <string.h>
 #include "app.h"
 #include "esp_log.h"
@@ -7,6 +8,10 @@
 
 #define NS "jank"
 #define KEY "cfg1"
+/* what is stored is the struct up to the beat-follow bench settings: a stick flashed with this build keeps its group, name
+ * and Wi-Fi, and one flashed back to the release reads the same blob (no setting of the bench build is saved) */
+#define STORED_SIZE offsetof(struct jk_cfg, beat)
+_Static_assert(STORED_SIZE == 130, "the release's blob was 130 bytes");
 static const char *TAG = "store";
 
 static int valid(const struct jk_cfg *c)
@@ -18,7 +23,7 @@ static int valid(const struct jk_cfg *c)
 void store_load(struct jk_cfg *c)
 {
     struct jk_cfg r;
-    size_t n = sizeof r;
+    size_t n = STORED_SIZE;
     nvs_handle_t h;
     jk_cfg_defaults(c);
     esp_err_t e = nvs_open(NS, NVS_READONLY, &h);
@@ -29,8 +34,8 @@ void store_load(struct jk_cfg *c)
     }
     e = nvs_get_blob(h, KEY, &r, &n);
     nvs_close(h);
-    if (e == ESP_OK && n == sizeof r && valid(&r))
-        *c = r;
+    if (e == ESP_OK && n == STORED_SIZE && valid(&r))
+        memcpy(c, &r, STORED_SIZE);           /* the bench settings keep their defaults */
     else if (e != ESP_ERR_NVS_NOT_FOUND)
         ESP_LOGW(TAG, "stored settings ignored: %s, %u bytes", esp_err_to_name(e), (unsigned)n);
 }
@@ -41,7 +46,7 @@ esp_err_t store_save(const struct jk_cfg *c)
     esp_err_t e = nvs_open(NS, NVS_READWRITE, &h);
     if (e != ESP_OK)
         return e;
-    e = nvs_set_blob(h, KEY, c, sizeof *c);
+    e = nvs_set_blob(h, KEY, c, STORED_SIZE);
     if (e == ESP_OK)
         e = nvs_commit(h);
     nvs_close(h);

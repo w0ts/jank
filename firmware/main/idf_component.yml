@@ -2,6 +2,9 @@ dependencies:
   idf: ">=5.5,<5.6"
   espressif/esp_tinyusb:
     version: "~3.0.0"
+    # esp_tinyusb with its audio class on (CFG_TUD_AUDIO): scripts/patch_tinyusb.sh makes this copy from the registry's
+    # 3.0.0 and third_party/esp_tinyusb-uac2.patch; scripts/build.sh runs it
+    override_path: "../../third_party/esp_tinyusb"
     rules:
       - if: "target == esp32s3"
   espressif/led_strip: "~3.1.1"

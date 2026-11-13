@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* USB: a CDC-NCM network adapter, a USB MIDI port and a read-only drive. The MIDI port carries the clock to the computer and
+/* USB: a CDC-NCM network adapter, a USB MIDI port, a read-only drive and (bench build) a UAC2 speaker for the beat tracker. The MIDI port carries the clock to the computer and
  * the control line in SysEx (core/jank_sysex.h); the drive holds the control page, so there is no link to remember.
  * No CDC-ACM serial: the S3 has 5 IN endpoints, EP0 included (tinyusb dwc2_esp32.h ep_in_count). NCM takes 2, MIDI 1 and
- * the drive 1, which is all of them; more fails when the host configures the device.
+ * the drive 1, which is all of them; more fails when the host configures the device. The speaker (usb_audio.h) is an OUT
+ * endpoint (EP5 of 7), adaptive, with no feedback endpoint for that reason.
  * Device or host is decided at each start and kept: as a device first, and when no computer has spoken within HOST_WAIT_MS
  * it restarts once as host (usb_midi_host.c). A computer on this port is what powers the stick, so it is there from the
  * start; a mode switched later, with no restart, would have to break the clock whenever the port is idle.
@@ -25,6 +26,7 @@
 #include "tinyusb_msc.h"
 #include "tinyusb_net.h"
 #include "tusb.h"
+#include "usb_audio.h"
 #include "wear_levelling.h"
 
 #define RING_SIZE 64u                  /* a power of two; a clock tick is one byte */
@@ -36,14 +38,14 @@
 #define HOST_NEXT 0x4A4B484Fu          /* in RTC memory, for one restart: garbage after power-on is not this */
 
 /* tusb_get_mac_string_id() with CDC off and MSC on: esp_tinyusb writes the MAC there, so STR_MAC has to be that index */
-enum { STR_LANG, STR_MAKER, STR_PRODUCT, STR_SERIAL, STR_DISK, STR_NET, STR_MAC, STR_MIDI, STR_COUNT };
-enum { ITF_NET, ITF_NET_DATA, ITF_MIDI, ITF_MIDI_STREAM, ITF_DISK, ITF_TOTAL };
-enum { EP_NET_NOTIF = 1, EP_NET_DATA, EP_MIDI, EP_DISK };
-#define CONFIG_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_NCM_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_MSC_DESC_LEN)
+enum { STR_LANG, STR_MAKER, STR_PRODUCT, STR_SERIAL, STR_DISK, STR_NET, STR_MAC, STR_MIDI, STR_AUDIO, STR_COUNT };
+enum { ITF_NET, ITF_NET_DATA, ITF_MIDI, ITF_MIDI_STREAM, ITF_DISK, ITF_AUDIO, ITF_AUDIO_STREAM, ITF_TOTAL };
+enum { EP_NET_NOTIF = 1, EP_NET_DATA, EP_MIDI, EP_DISK, EP_AUDIO };
+#define CONFIG_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_NCM_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_MSC_DESC_LEN + UAC_DESC_LEN)
 
 static const char *STRINGS[STR_COUNT] = {
     [STR_LANG] = "\x09\x04", [STR_MAKER] = "jank", [STR_PRODUCT] = "jank", [STR_SERIAL] = NULL,
-    [STR_DISK] = "jank page", [STR_NET] = "jank network", [STR_MAC] = "", [STR_MIDI] = "jank",
+    [STR_DISK] = "jank page", [STR_NET] = "jank network", [STR_MAC] = "", [STR_MIDI] = "jank", [STR_AUDIO] = "jank",
 };
 
 static const uint8_t CONFIG_DESC[] = {
@@ -51,6 +53,7 @@ static const uint8_t CONFIG_DESC[] = {
     TUD_CDC_NCM_DESCRIPTOR(ITF_NET, STR_NET, STR_MAC, 0x80 | EP_NET_NOTIF, 64, EP_NET_DATA, 0x80 | EP_NET_DATA, 64, CFG_TUD_NET_MTU),
     TUD_MIDI_DESCRIPTOR(ITF_MIDI, STR_MIDI, EP_MIDI, 0x80 | EP_MIDI, 64),
     TUD_MSC_DESCRIPTOR(ITF_DISK, STR_DISK, EP_DISK, 0x80 | EP_DISK, 64),
+    UAC_DESCRIPTOR(ITF_AUDIO, STR_AUDIO, EP_AUDIO),
 };
 
 static const char *TAG = "usb";

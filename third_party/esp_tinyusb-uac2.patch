@@ -1,0 +1,17 @@
+diff -ru a/include/tusb_config.h b/include/tusb_config.h
+--- a/include/tusb_config.h	2026-11-13 20:28:17.871163833 +0100
++++ b/include/tusb_config.h	2026-11-13 20:28:18.293635529 +0100
+@@ -260,6 +260,13 @@
+ #define CFG_TUD_NCM_OUT_NTB_MAX_SIZE  CONFIG_TINYUSB_NCM_OUT_NTB_BUFF_MAX_SIZE
+ #define CFG_TUD_NCM_IN_NTB_MAX_SIZE   CONFIG_TINYUSB_NCM_IN_NTB_BUFF_MAX_SIZE
+ 
++// jank: a UAC2 speaker, 44.1 kHz 16-bit stereo: isochronous OUT, adaptive, no feedback endpoint (main/usb_audio.c)
++#define CFG_TUD_AUDIO                         1
++#define CFG_TUD_AUDIO_ENABLE_EP_OUT           1
++#define CFG_TUD_AUDIO_FUNC_1_EP_OUT_SZ_MAX    180                 // 45 frames of 4 bytes: 44.1 kHz is 44 or 45 a millisecond
++#define CFG_TUD_AUDIO_FUNC_1_EP_OUT_SW_BUF_SZ 1440                // 8 packets
++#define CFG_TUD_AUDIO_CTRL_BUF_SZ             64
++
+ #ifdef __cplusplus
+ }
+ #endif
