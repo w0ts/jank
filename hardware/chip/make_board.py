@@ -140,18 +140,18 @@ def in_din_room(x, y):
 # pulled to the part it serves (the buck to C1 and the chip, the USB parts to the USB-C, the MIDI parts to their sockets);
 # no group within 3 mm of the RF path), ref: (x, y, rotation); they replace PLACE (and the spread) for these parts
 PLACED = {
-    "U5": (34.580, 10.860, 0), "R3": (30.380, 8.960, 0), "R13": (30.380, 10.760, 0), "R12": (38.180, 9.760, 90),
-    "R4": (39.980, 9.760, 90), "R23": (41.780, 9.760, 90), "D3": (40.580, 13.910, 90), "R5": (53.580, 2.360, 0),
-    "C3": (11.902, 46.185, 270), "U2": (15.822, 46.185, 90), "L1": (20.222, 46.135, 90), "C5": (20.622, 43.035, 180),
-    "C6": (16.222, 43.035, 180), "R7": (17.922, 43.485, 90), "U3": (15.790, 36.520, 0), "D4": (19.790, 39.920, 0),
-    "D5": (19.790, 36.520, 0), "C4": (16.190, 39.220, 0), "R6": (16.190, 40.920, 0), "SW1": (39.063, 29.033, 90),
-    "LED1": (34.713, 31.033, 90), "R9": (34.713, 27.233, 90), "SW2": (50.940, 44.620, 180),
-    "U4": (44.440, 33.310, 180), "R8": (48.990, 40.860, 90), "C7": (48.040, 40.760, 90), "R10": (25.903, 8.930, 180),
-    "R11": (32.553, 30.750, 180), "C8": (32.553, 29.750, 180), "R1": (61.357, 33.762, 270),
-    "R2": (58.357, 33.762, 270), "D1": (64.257, 27.862, 0), "D2": (64.257, 30.213, 0), "R14": (19.580, 17.370, 180),
-    "R26": (19.580, 14.770, 180), "R15": (18.660, 25.350, 180), "R16": (41.330, 33.770, 90),
-    "D6": (60.012, 37.975, 270), "Q1": (57.212, 37.225, 270), "R21": (57.262, 50.695, 270),
-    "R27": (54.662, 50.695, 270), "R20": (54.562, 37.025, 270), "R22": (53.062, 37.025, 270),
+    "R3": (21.990, 12.140, 0), "R13": (21.990, 13.940, 0), "R12": (29.790, 12.940, 90), "R4": (31.590, 12.940, 90),
+    "R23": (33.390, 12.940, 90), "D3": (32.190, 17.090, 90), "R5": (45.190, 5.540, 0), "C3": (14.302, 48.995, 270),
+    "U2": (18.222, 48.995, 90), "L1": (22.622, 48.945, 90), "C5": (23.022, 45.845, 180), "C6": (18.622, 45.845, 180),
+    "R7": (20.322, 46.295, 90), "U3": (12.730, 44.010, 90), "D4": (16.130, 40.010, 90), "D5": (12.730, 40.010, 90),
+    "C4": (15.430, 43.610, 90), "R6": (17.130, 43.610, 90), "SW1": (32.883, 27.407, 270),
+    "LED1": (37.233, 25.407, 270), "R9": (37.233, 29.207, 270), "SW2": (44.060, 23.070, 0),
+    "U4": (41.287, 29.697, 270), "R8": (48.837, 25.147, 180), "C7": (48.737, 26.097, 180),
+    "R10": (12.370, 50.237, 0), "R11": (5.720, 28.417, 0), "C8": (5.720, 29.417, 0), "R1": (68.710, 28.850, 0),
+    "R2": (68.710, 31.850, 0), "D1": (62.810, 25.950, 90), "D2": (65.160, 25.950, 90), "R14": (16.420, 20.230, 90),
+    "R26": (19.020, 20.230, 90), "R15": (10.960, 1.680, 180), "R16": (27.560, 34.180, 90),
+    "D6": (56.702, 30.185, 270), "Q1": (53.902, 29.435, 270), "R21": (53.952, 42.905, 270),
+    "R27": (51.352, 42.905, 270), "R20": (51.252, 29.235, 270), "R22": (49.752, 29.235, 270),
 }
 
 # the spread (72 x 65, 2026-11-12): parts placed at absolute y below the chip's top follow the chip down 7.5 mm; the
@@ -207,7 +207,9 @@ def place():
 
 
 EP_VIAS = [(dx, dy) for dx in (-1.3, 0.0, 1.3) for dy in (-1.3, 0.0, 1.3)]   # the exposed pad's 9 vias (Espressif: 9 or more)
-EP_PANE, EP_PANE_AT = 0.8, 0.65           # the paste: 4 squares 0.8 mm between the vias (+-0.65), 16 % of the pad, 0.05 off the via rings
+# the paste (2026-11-12 review: 16 % was low): via-free strips between the via columns (x +-0.35..0.95, +-1.65..1.95),
+# each cut in EP_SEGMENTS windows EP_GAP apart, 0.05 off the via rings and the pad's edge
+EP_EDGE, EP_GAP, EP_SEGMENTS = 0.05, 0.25, 4
 
 
 def windowpane(f, ep):
@@ -217,17 +219,25 @@ def windowpane(f, ep):
     ls.RemoveLayer(pcbnew.F_Paste)
     ep.SetLayerSet(ls)
     c = ep.GetPosition()
-    for dx in (-EP_PANE_AT, EP_PANE_AT):
-        for dy in (-EP_PANE_AT, EP_PANE_AT):
+    h = pcbnew.ToMM(min(ep.GetSize().x, ep.GetSize().y)) / 2 - EP_EDGE
+    keep = route.VIA_D / 2 + EP_EDGE              # (the via rings + 0.05)
+    cols = sorted({dx for dx, _ in EP_VIAS})
+    edges = [-h] + [e for x in cols for e in (x - keep, x + keep)] + [h]
+    lanes = [(edges[i], edges[i + 1]) for i in range(0, len(edges), 2) if edges[i + 1] - edges[i] >= 0.25]
+    n = EP_SEGMENTS
+    seg = (2 * h - (n - 1) * EP_GAP) / n
+    for x0, x1 in lanes:                          # (via-free strips between the via columns, each cut in n windows)
+        for k in range(n):
+            y0 = -h + k * (seg + EP_GAP)
             a = pcbnew.PAD(f)
             a.SetAttribute(pcbnew.PAD_ATTRIB_SMD)
             a.SetShape(pcbnew.PAD_SHAPE_RECT)
-            a.SetSize(pcbnew.VECTOR2I(MM(EP_PANE), MM(EP_PANE)))
+            a.SetSize(pcbnew.VECTOR2I(MM(x1 - x0), MM(seg)))
             pl = pcbnew.LSET()
             pl.AddLayer(pcbnew.F_Paste)
             a.SetLayerSet(pl)
             a.SetNumber("")
-            a.SetPosition(pcbnew.VECTOR2I(c.x + MM(dx), c.y + MM(dy)))
+            a.SetPosition(pcbnew.VECTOR2I(c.x + MM((x0 + x1) / 2), c.y + MM(y0 + seg / 2)))
             f.Add(a)
 
 
@@ -344,6 +354,26 @@ def rf_path(fps):
         RF_SEGS.append((n, 0, x, y, x, top, 0.2))
         if via:
             FAN_VIAS.append((n, x, top))
+    # USB (2026-11-12 review: the router looped D+ 21 mm, 4 vias): the USB-C's D+ / D- pads alternate (B6 D+, A7 D-,
+    # A6 D+, B7 D-); D- joins A7 / B7 by a bridge 0.2 under A6 and goes on to U5's pin 4; D+ from B6 through a via to U5's
+    # pin 6; A6 reaches D+ through a via above its pad (under the connector's body) and a hop on the bottom to that via
+    a6, a7 = pad_center(pad_of(fps, "J1", "A6")), pad_center(pad_of(fps, "J1", "A7"))
+    b6, b7 = pad_center(pad_of(fps, "J1", "B6")), pad_center(pad_of(fps, "J1", "B7"))
+    u4, u6 = pad_center(pad_of(fps, "U5", "4")), pad_center(pad_of(fps, "U5", "6"))
+    yb = a6[1] + 0.85                            # (the pads 1.1 long: their ends + 0.2, the track's half)
+    RF_SEGS.append(("UDN", 0, a7[0], a7[1], a7[0], yb, 0.2))
+    RF_SEGS.append(("UDN", 0, b7[0], b7[1], b7[0], yb, 0.2))
+    RF_SEGS.append(("UDN", 0, a7[0], yb, b7[0], yb, 0.2))
+    RF_SEGS.append(("UDN", 0, b7[0], yb, u4[0], u4[1], 0.2))   # (from B7's end of the bridge: clear of U5's VBUS pin)
+    v2 = (b6[0] - 0.95, b6[1] + 1.05)              # (clear of SBU A8 left of B6, of both VBUS pads and of U5's pin 5)
+    RF_SEGS.append(("UDP", 0, b6[0], b6[1], b6[0], yb, 0.2))
+    RF_SEGS.append(("UDP", 0, b6[0], yb, v2[0], v2[1], 0.2))
+    RF_SEGS.append(("UDP", 0, v2[0], v2[1], u6[0], u6[1], 0.2))
+    v1 = (a6[0], a6[1] - 1.75)
+    RF_SEGS.append(("UDP", 0, a6[0], a6[1], v1[0], v1[1], 0.2))
+    RF_SEGS.append(("UDP", 1, v1[0], v1[1], v2[0], v2[1], 0.2))
+    FIXED_VIAS.append(("UDP", v1[0], v1[1]))
+    FIXED_VIAS.append(("UDP", v2[0], v2[1]))
     # VDD3P3's two pins (2 and 3) joined on top, at their pads' centre line
     RF_SEGS.append(("VDD3P3", 0, CX + 3.41, CY + 1.8, CX + 3.41, CY + 2.2, 0.2))
     # ... on to C28 through a via between the pins and C28: the only way out of the corner (the fan-out lanes above, LNA_IN

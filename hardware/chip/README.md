@@ -322,10 +322,10 @@ positions; the connectors, the chip block, the RF path and the antenna strip are
   from everything, no track in the antenna strip or within 0.5 mm of the edge, no bottom track under the chip block or
   the RF path. Freerouting repeats itself only on a byte-identical input: `make_fab.sh` (ROUTE=1) may route differently
   from the committed board and must pass the same checks; `ROUTE=0` keeps the committed routing. Measured on the committed
-  board (routed tracks): VSYS C1 -> buck 9.4 mm; +3V3 buck -> chip pin 20 38.4 mm, -> L2 61.8 mm (0.25 mm, a chain through
-  the +3V3 loads); USB D+ connector -> ESD 21.2 mm with 4 vias (the ESD 5.3 mm away in a line: a detour, *open*);
-  CHIP_PU pin -> C7 23.6 mm; MIDI OUT 2's R20 22.6 mm from J6 (*open*); VDD3P3's bottom hop 0.3 mm from the RF line's
-  edge near L3.
+  board (routed tracks): VSYS C1 -> buck 12.9 mm; +3V3 buck -> chip pin 20 53.4 mm, -> L2 52.8 mm (0.25 mm, a chain through
+  the +3V3 loads); USB drawn in `make_board.py` from the USB-C to U5 (D- bridged under A6, A6 joined to D+ by 2 vias),
+  U5 fixed under the connector; CHIP_PU pin -> C7 28.6 mm; MIDI OUT 2's R20 23.5 mm of track from J6 (*open*); 41 signal
+  vias. The exposed pad's paste: 16 windows, 35 % (was 16 %).
 - **Old routing notes (route.py):** the chip's right-side pins (CHIP_PU, GPIO0, 1, 2, 4) are fanned out by hand in `make_board.py`
   (FANOUT: one lane each, 0.8 mm apart, each ending in a via); the RF path, its via fences and the exposed pad's 9 vias
   are drawn there too; route.py does the rest (the ground vias by each pad first, then the signals). Measured on the
