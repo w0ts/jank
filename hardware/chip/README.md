@@ -322,10 +322,11 @@ positions; the connectors, the chip block, the RF path and the antenna strip are
   from everything, no track in the antenna strip or within 0.5 mm of the edge, no bottom track under the chip block or
   the RF path. Freerouting repeats itself only on a byte-identical input: `make_fab.sh` (ROUTE=1) may route differently
   from the committed board and must pass the same checks; `ROUTE=0` keeps the committed routing. Measured on the committed
-  board (routed tracks): VSYS C1 -> buck 12.9 mm; +3V3 buck -> chip pin 20 53.4 mm, -> L2 52.8 mm (0.25 mm, a chain through
-  the +3V3 loads); USB drawn in `make_board.py` from the USB-C to U5 (D- bridged under A6, A6 joined to D+ by 2 vias),
-  U5 fixed under the connector; CHIP_PU pin -> C7 28.6 mm; MIDI OUT 2's R20 23.5 mm of track from J6 (*open*); 41 signal
-  vias. The exposed pad's paste: 16 windows, 35 % (was 16 %).
+  board (routed tracks): VSYS C1 -> buck 9.5 mm; +3V3 buck -> chip pin 20 40.4 mm, -> L2 72.3 mm (0.25 mm, a chain through
+  the +3V3 loads); USB drawn in `make_board.py` from the USB-C through U5 (flow-through pins 6 -> 1, 4 -> 3; D- bridged
+  under A6, A6 joined to D+ by 2 vias), U5 fixed under the connector; CHIP_PU pin -> C7 21.2 mm; MIDI OUT 2's R20 26 mm
+  of track from J6 (*open*); 41 signal vias; no via in or touching an SMD pad (the exposed pad's 9 apart); a GND via
+  beside the ground pads of C23..C26, J4 and U5. The exposed pad's paste: 16 windows, 35 % (was 16 %).
 - **Old routing notes (route.py):** the chip's right-side pins (CHIP_PU, GPIO0, 1, 2, 4) are fanned out by hand in `make_board.py`
   (FANOUT: one lane each, 0.8 mm apart, each ending in a via); the RF path, its via fences and the exposed pad's 9 vias
   are drawn there too; route.py does the rest (the ground vias by each pad first, then the signals). Measured on the
@@ -378,8 +379,8 @@ line (the lowest: the crystal, 2 748).
 ## Case (`case/`)
 
 See [case/README.md](case/README.md): `place_args.py` reads SW1, SW2, LED1, the size and J5 from `chip.kicad_pcb`;
-`make_stl.sh` builds both versions and runs their checks. **2026-11-12: the no-DIN version passes every check; the DIN
-version fails `check_base`** (its walls hit the through-hole jacks' legs and the DIN plates' slot fit; it fails at the old
+`make_stl.sh` builds both versions and runs their checks. **2026-11-13: both versions fail `check_pipe` (the LED moved
+with the last placement: the light pipe hits a part, open); the DIN version also fails `check_base`** (its walls hit the through-hole jacks' legs and the DIN plates' slot fit; it fails at the old
 49.6 x 52.5 size too): open.
 
 ## Unverified, all in one place

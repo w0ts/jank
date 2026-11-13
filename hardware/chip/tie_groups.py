@@ -87,6 +87,8 @@ def main(path):
     holes = [(p.GetPosition(), max(p.GetDrillSize().x, p.GetDrillSize().y) / 2) for f in b.GetFootprints() for p in f.Pads()
              if p.GetDrillSize().x > 0]
     holes += [(t.GetPosition(), t.GetDrillValue() / 2) for t in b.GetTracks() if t.GetClass() == "PCB_VIA"]
+    smd = [p.GetEffectiveShape(pcbnew.F_Cu) for f in b.GetFootprints() for p in f.Pads()
+           if p.GetAttribute() == pcbnew.PAD_ATTRIB_SMD and p.IsOnLayer(pcbnew.F_Cu)]
     added = 0
     for _ in range(5):
         gs = groups(b)
@@ -106,6 +108,9 @@ def main(path):
                     if any(((x - c.x) ** 2 + (y - c.y) ** 2) ** 0.5 < r + MM(DIN_ROOM) for c, r in din):
                         continue
                     if any(((x - c.x) ** 2 + (y - c.y) ** 2) ** 0.5 < r + MM(VIA_D / 2 + 0.2) for c, r in holes):
+                        continue
+                    circ = pcbnew.SHAPE_CIRCLE(pcbnew.VECTOR2I(x, y), MM(VIA_D / 2))
+                    if any(s.Collide(circ, MM(0.15)) for s in smd):     # (beside a pad, never in it: solder would run down)
                         continue
                     spot = (x, y)
                     break

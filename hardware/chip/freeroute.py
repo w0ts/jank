@@ -19,6 +19,7 @@ from stitch import stitch            # (hardware/pcb/lib/stitch.py)
 
 WORK = os.path.join(HERE, ".freerouting")
 JAR = os.path.join(WORK, "freerouting-2.5.0.jar")
+KICAD_CLI = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
 MM = pcbnew.FromMM
 OX = OY = 100.0
 ROUNDS = 3
@@ -32,6 +33,7 @@ EDGE = 0.3                                       # (+ the 0.2 clearance: the rul
 # the bottom stays one ground under the chip with its left and lower parts, and under the RF path
 CHIP_BLOCK = ["U1", "Y1", "R17", "R24", "R25", "C9", "C10", "C11", "C12", "C13", "C19", "C20", "C21", "C22"]
 RF_NETS = {"LNA_IN", "RF", "ANT_FEED", "UFL"}
+PAD_VIA_PARTS = ("C23", "C24", "C25", "C26", "J4", "U5")
 STITCH = 6.0                                     # (mm between GND stitching vias; the RF line has its own fence)
 VIA_D, VIA_DRILL = 0.6, 0.3
 
@@ -46,13 +48,17 @@ def dsn_xy(x, y):
 
 
 def din_keepouts(board):
+    """no via within a DIN pad's copper + 0.8 mm; no track within 0.5 mm of its ground and unused pins (no track needs
+    them: ground joins through the pours); the signal pins keep 0.5 through their net class"""
     out = []
     for f in board.GetFootprints():
         if f.GetReference() in ("J5", "J6"):
             for p in f.Pads():
-                d = max(mm(p.GetSize().x), mm(p.GetSize().y)) + 2 * IRON
+                r = max(mm(p.GetSize().x), mm(p.GetSize().y)) / 2
                 x, y = dsn_xy(mm(p.GetPosition().x), mm(p.GetPosition().y))
-                out += [f'    (via_keepout "" (circle {L} {d * 1000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
+                out += [f'    (via_keepout "" (circle {L} {(r + IRON) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
+                if p.GetNetname() in ("", "GND"):
+                    out += [f'    (wire_keepout "" (circle {L} {(r + 0.3) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
     return out
 
 
@@ -220,11 +226,13 @@ def island_vias(board, add):
     return added
 
 
-def best_spot(board, ol, layer, others):
+def best_spot(board, ol, layer, others, near=None):
     bb = ol.BBox()
     pads = [p.GetPosition() for f in board.GetFootprints() for p in f.Pads()
             if p.GetNetname() == "GND" and p.IsOnLayer(layer) and ol.PointInside(p.GetPosition())]
-    ref = pads[0] if pads else bb.Centre()
+    ref = near if near is not None else (pads[0] if pads else bb.Centre())
+    if near is not None:                         # (search a 3 mm box round the pad, not the whole pour)
+        bb = pcbnew.BOX2I(pcbnew.VECTOR2I(near.x - MM(1.5), near.y - MM(1.5)), pcbnew.VECTOR2L(MM(3), MM(3)))
     step = MM(0.05)
     cands = [pcbnew.VECTOR2I(x, y) for x in range(bb.GetLeft(), bb.GetRight() + 1, step)
              for y in range(bb.GetTop(), bb.GetBottom() + 1, step)]
@@ -234,9 +242,39 @@ def best_spot(board, ol, layer, others):
         if not all(ol.PointInside(pcbnew.VECTOR2I(c.x + dx, c.y + dy)) for dx, dy in ((0, 0), (r, 0), (-r, 0), (0, r), (0, -r))):
             continue
         circ = pcbnew.SHAPE_CIRCLE(c, r)
-        if not any(o.Collide(circ, MM(0.2)) for o in others):
+        if not any(o.Collide(circ, MM(0.2)) for o in others) and not any(g.Collide(circ, MM(0.15)) for g in gnd_pads(board, layer)):
             return c
     return None
+
+
+def gnd_pads(board, layer):
+    """every GND pad's copper: a via goes beside a pad, never into it (solder would run down the hole)"""
+    return [p.GetEffectiveShape(layer) for f in board.GetFootprints() for p in f.Pads()
+            if p.GetNetname() == "GND" and p.IsOnLayer(layer) and p.GetAttribute() == pcbnew.PAD_ATTRIB_SMD
+            and not (f.GetReference() == "U1" and p.GetNumber() == "57")]
+
+
+def pad_ground_vias(board, add, others):
+    """a GND via within 1.2 mm of every GND pad of the RF parts, the u.FL and the USB ESD (route.py's per-pad vias)"""
+    vias = [t.GetPosition() for t in board.GetTracks() if t.GetClass() == "PCB_VIA" and t.GetNetname() == "GND"]
+    added = 0
+    for f in board.GetFootprints():
+        if f.GetReference() not in PAD_VIA_PARTS:
+            continue
+        for p in f.Pads():
+            if p.GetNetname() != "GND" or any((v - p.GetPosition()).EuclideanNorm() < MM(1.2) for v in vias):
+                continue
+            z = [z for z in board.Zones() if z.GetNetname() == "GND" and z.IsOnLayer(pcbnew.F_Cu)][0]
+            polys = z.GetFilledPolysList(pcbnew.F_Cu)
+            ol = next((polys.Outline(i) for i in range(polys.OutlineCount()) if polys.Outline(i).PointInside(p.GetPosition())), None)
+            if ol is None:                       # (the pad's own pour piece: the outline that touches it)
+                ol = min((polys.Outline(i) for i in range(polys.OutlineCount())),
+                         key=lambda o: o.SquaredDistance(p.GetPosition()))
+            c = best_spot(board, ol, pcbnew.F_Cu, others, near=p.GetPosition())
+            if c is not None and (c - p.GetPosition()).EuclideanNorm() < MM(1.5) and add(mm(c.x), mm(c.y)):
+                vias.append(c)
+                added += 1
+    return added
 
 
 def tidy(board):
@@ -250,7 +288,14 @@ def tidy(board):
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     isl = island_vias(board, add)
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
-    print(f"  {len(st)} stitching vias, {isl} island vias, {gone} one-sided vias removed; narrow kept: {kept or 'none'}")
+    others = []
+    for L in (pcbnew.F_Cu, pcbnew.B_Cu):
+        others += [p.GetEffectiveShape(L) for f in board.GetFootprints() for p in f.Pads() if p.IsOnLayer(L) and p.GetNetname() != "GND"]
+        others += [t.GetEffectiveShape(L) for t in board.GetTracks() if t.IsOnLayer(L) and t.GetNetname() != "GND"]
+    others += [p.GetEffectiveHoleShape() for f in board.GetFootprints() for p in f.Pads() if p.GetDrillSize().x > 0]
+    pv = pad_ground_vias(board, add, others)
+    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+    print(f"  {len(st)} stitching vias, {isl} island vias, {pv} pad vias, {gone} one-sided vias removed; narrow kept: {kept or 'none'}")
 
 
 def main():
@@ -264,7 +309,29 @@ def main():
         if k >= ROUNDS and left == 0:
             break
     board.Save(path)
+    starved = starved_pads(path)
+    if starved:                                  # (spokes that could not reach the pour: those pads joined solid)
+        for f in board.GetFootprints():
+            for p in f.Pads():
+                if f"{f.GetReference()}.{p.GetNumber()}" in starved:
+                    p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
+        pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+        board.Save(path)
+    print(f"solid instead of spokes: {sorted(starved) or 'none'}")
     print("saved", path)
+
+
+def starved_pads(path):
+    """the pads KiCad's DRC finds with fewer thermal spokes than its rule (starved_thermal)"""
+    rpt = os.path.splitext(path)[0] + ".freerouting/starved.rpt"
+    subprocess.run([KICAD_CLI, "pcb", "drc", "--severity-all", "-o", rpt, path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    text = open(rpt).read() if os.path.exists(rpt) else ""
+    out = set()
+    for block in text.split("[starved_thermal]")[1:]:
+        m = re.search(r"Pad (\S+) \[GND\] of (\S+) on", block.split("\n[")[0])
+        if m:
+            out.add(f"{m.group(2)}.{m.group(1)}")
+    return out
 
 
 if __name__ == "__main__":
