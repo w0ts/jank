@@ -5,3 +5,6 @@ fm1-base (`link/`, github.com/w0ts/fm1-base), commit d63efc8 on topic/link-measu
 GPL-3.0-only, Copyright (C) 2026 Henri David. The protocol is Ableton's (Ableton Link, Copyright 2016 Ableton AG).
 
 They build with no FM-1 dependency. Keep them in step with fm1-base's copy: a change to the air format goes to both.
+
+One addition that is jank's own and not in fm1-base: `lk_force_beat` (beat ub at time t, tempo mpb), for the beat tracker as
+the session's master (`core/jank_beatlink.c`, `docs/beat.md`).

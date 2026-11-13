@@ -35,12 +35,19 @@ typedef void (*usb_free_fn)(void *token);
 typedef void (*usb_line_fn)(const uint8_t *data, size_t n);
 esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, usb_line_fn serial_rx);
 int usb_up(void);
+int usb_host_spoke(void);                                            /* a control line came from the computer since the start */
+void usb_beat_line(const char *text, size_t n);                      /* a beat report: SysEx F0 7D 'J' 'B' 0x10 <text> F7, dropped when full */
 esp_err_t usb_send(const uint8_t *eth, size_t len, void *token);   /* tx_done(token) follows when ESP_OK */
 /* usb_midi_host.c: the clock to USB-MIDI devices, when the port started as host */
 esp_err_t usb_midi_host_start(void);
 void usb_midi_host_send(const uint8_t *packets, size_t n);
 bool usb_midi_isr(const uint8_t *bytes, size_t n);                  /* from the timer interrupt -> a task was woken */
 void usb_serial_write(const char *text, size_t n);                 /* the control line, as SysEx on the MIDI port */
+
+/* usb_audio.c, beat.c: the beat-follow bench build (README): the computer's audio into the beat tracker, into the Link session */
+struct jank_peer;
+esp_err_t beat_start(void);
+void beat_stats(struct jk_beat *out);
 
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);
@@ -60,11 +67,13 @@ void bridge_note_scan_groups(struct js_scan *out);
 void bridge_table_start(void);                               /* frames of every group go in a table from here .. */
 void bridge_table_stop(struct js_table *out);                /* .. to here */
 uint32_t bridge_peers_heard(void);
-int bridge_beat(int64_t *beat_ub, int32_t *mpb);
-int bridge_tempo(int32_t mpb);
-void bridge_diag(char *out, size_t cap);                     /* the Link clock filter, for `diag` */
-void app_diag(char *out, size_t cap);                        /* restarts and the last reset's reason, for `diag` */                       /* 0 set; -1 no session to set it in */
-int bridge_play(int play);                           /* 0 started / stopped; -1 no session */    /* 1 in a session, with its beat now */
+int bridge_beat(int64_t *beat_ub, int32_t *mpb);    /* 1 in a session, with its beat now */
+int bridge_tempo(int32_t mpb);                       /* 0 set; -1 no session to set it in */
+int bridge_play(int play);                           /* 0 started / stopped; -1 no session */
+void bridge_diag(char *out, size_t cap);             /* the Link clock filter, for `diag` */
+void app_diag(char *out, size_t cap);                /* restarts and the last reset's reason, for `diag` */
+/* fn on the Link peer, with the bridge's lock held and the host time now (the beat tracker steers the session through it) */
+void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), void *ctx);
 uint32_t bridge_ms(void);
 
 /* ui.c: button, LED, group scan */

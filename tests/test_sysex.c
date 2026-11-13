@@ -72,8 +72,35 @@ static void test_clock_as_usb_midi_packets(void)
     assert(jx_realtime_packets(bytes, 3, p, 3) == 0);
 }
 
+/* the beat report: its own header, which the control line's reader skips, and 7-bit text */
+static void test_beat_report(void)
+{
+    char text[JX_PUSH_TEXT_MAX + 1];
+    uint8_t wire[JX_PUSH_FRAME_MAX];
+    char out[64];
+    struct jx_in in;
+    size_t n = jx_beat_line(text, sizeof text, 'b', 17, 12403, 1, 1);
+    assert(n == strlen("b 17 12403 steady 1") && !memcmp(text, "b 17 12403 steady 1", n));
+    assert(jx_beat_line(text, sizeof text, 't', 0, -5, 0, 0) == strlen("t 0 0 stopped 0"));
+    assert(!memcmp(text, "t 0 0 stopped 0", strlen("t 0 0 stopped 0")));
+    n = jx_beat_line(text, sizeof text, 'b', 4294967295u, 99999, 3, 1);      /* the longest line fits */
+    assert(n > 0 && n <= JX_PUSH_TEXT_MAX);
+    assert(jx_beat_line(text, 8, 'b', 17, 12403, 1, 1) == 0);               /* too small a buffer: nothing */
+    n = jx_beat_line(text, sizeof text, 'b', 17, 12403, 2, 1);
+    size_t w = jx_push_frame(JX_PUSH_BEAT, text, n, wire);
+    assert(w == n + 6 && wire[0] == 0xF0 && wire[1] == 0x7D && wire[2] == 'J' && wire[3] == 'B' && wire[4] == JX_PUSH_BEAT);
+    assert(!memcmp(wire + 5, "b 17 12403 faster 1", n) && wire[w - 1] == 0xF7);
+    for (size_t i = 1; i + 1 < w; ++i)
+        assert(wire[i] < 0x80u);
+    jx_init(&in);
+    assert(feed(&in, wire, w, out) == 0);                                   /* not a control line */
+    assert(jx_push_frame(0x80, text, n, wire) == 0);
+    assert(jx_push_frame(JX_PUSH_BEAT, text, JX_PUSH_TEXT_MAX + 1, wire) == 0);
+}
+
 int main(void)
 {
+    test_beat_report();
     test_round_trip();
     test_no_high_bit_on_the_wire();
     test_clock_inside_a_frame_is_no_text();

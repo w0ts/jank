@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* USB: a CDC-NCM network adapter, a USB MIDI port and a drive. The MIDI port carries the clock to the computer and
- * the control line in SysEx (core/jank_sysex.h); the drive holds the control page (drive.c), so there is no link to remember.
+/* USB: a CDC-NCM network adapter, a USB MIDI port, a drive and (bench build) a UAC2 speaker for the beat tracker. The MIDI
+ * port carries the clock to the computer and the control line in SysEx (core/jank_sysex.h); the drive holds the control
+ * page (drive.c), so there is no link to remember.
  * No CDC-ACM serial: the S3 has 5 IN endpoints, EP0 included (tinyusb dwc2_esp32.h ep_in_count). NCM takes 2, MIDI 1 and
- * the drive 1, which is all of them; more fails when the host configures the device.
+ * the drive 1, which is all of them; more fails when the host configures the device. The speaker (usb_audio.h) is an OUT
+ * endpoint (EP5 of 7), adaptive, with no feedback endpoint for that reason.
  * Device or host is decided at each start and kept: as a device first, and when no computer has spoken within HOST_WAIT_MS
  * it restarts once as host (usb_midi_host.c). A computer on this port is what powers the stick, so it is there from the
  * start; a mode switched later, with no restart, would have to break the clock whenever the port is idle.
@@ -15,6 +17,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/message_buffer.h"
 #include "freertos/semphr.h"
 #include "freertos/stream_buffer.h"
 #include "freertos/task.h"
@@ -23,9 +26,11 @@
 #include "tinyusb_default_config.h"
 #include "tinyusb_net.h"
 #include "tusb.h"
+#include "usb_audio.h"
 
 #define RING_SIZE 64u                  /* a power of two; a clock tick is one byte */
 #define TEXT_OUT_SIZE 2048u
+#define PUSH_OUT_SIZE 512u             /* beat reports: ~25 bytes each, at most a few a second */
 #define WRITE_TRIES 50                 /* milliseconds a full MIDI buffer may hold us up */
 #define MIDI_TASK_CORE 0              /* core 1 is the MIDI clock's alone (midi.c) */
 #define MIDI_TASK_PRIO 24             /* above Wi-Fi (23) on core 0: it runs a few us a tick, straight into the endpoint (measured 2026-11-09: at 6, USB clock sd 220 us) */
@@ -33,14 +38,14 @@
 #define HOST_NEXT 0x4A4B484Fu          /* in RTC memory, for one restart: garbage after power-on is not this */
 
 /* tusb_get_mac_string_id() with CDC off and MSC on: esp_tinyusb writes the MAC there, so STR_MAC has to be that index */
-enum { STR_LANG, STR_MAKER, STR_PRODUCT, STR_SERIAL, STR_DISK, STR_NET, STR_MAC, STR_MIDI, STR_COUNT };
-enum { ITF_NET, ITF_NET_DATA, ITF_MIDI, ITF_MIDI_STREAM, ITF_DISK, ITF_TOTAL };
-enum { EP_NET_NOTIF = 1, EP_NET_DATA, EP_MIDI, EP_DISK };
-#define CONFIG_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_NCM_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_MSC_DESC_LEN)
+enum { STR_LANG, STR_MAKER, STR_PRODUCT, STR_SERIAL, STR_DISK, STR_NET, STR_MAC, STR_MIDI, STR_AUDIO, STR_COUNT };
+enum { ITF_NET, ITF_NET_DATA, ITF_MIDI, ITF_MIDI_STREAM, ITF_DISK, ITF_AUDIO, ITF_AUDIO_STREAM, ITF_TOTAL };
+enum { EP_NET_NOTIF = 1, EP_NET_DATA, EP_MIDI, EP_DISK, EP_AUDIO };
+#define CONFIG_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_NCM_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_MSC_DESC_LEN + UAC_DESC_LEN)
 
 static const char *STRINGS[STR_COUNT] = {
     [STR_LANG] = "\x09\x04", [STR_MAKER] = "jank", [STR_PRODUCT] = "jank", [STR_SERIAL] = NULL,
-    [STR_DISK] = "jank page", [STR_NET] = "jank network", [STR_MAC] = "", [STR_MIDI] = "jank",
+    [STR_DISK] = "jank page", [STR_NET] = "jank network", [STR_MAC] = "", [STR_MIDI] = "jank", [STR_AUDIO] = "jank",
 };
 
 static const uint8_t CONFIG_DESC[] = {
@@ -48,6 +53,7 @@ static const uint8_t CONFIG_DESC[] = {
     TUD_CDC_NCM_DESCRIPTOR(ITF_NET, STR_NET, STR_MAC, 0x80 | EP_NET_NOTIF, 64, EP_NET_DATA, 0x80 | EP_NET_DATA, 64, CFG_TUD_NET_MTU),
     TUD_MIDI_DESCRIPTOR(ITF_MIDI, STR_MIDI, EP_MIDI, 0x80 | EP_MIDI, 64),
     TUD_MSC_DESCRIPTOR(ITF_DISK, STR_DISK, EP_DISK, 0x80 | EP_DISK, 64),
+    UAC_DESCRIPTOR(ITF_AUDIO, STR_AUDIO, EP_AUDIO),
 };
 
 static const char *TAG = "usb";
@@ -57,6 +63,8 @@ static usb_line_fn s_line_rx;
 static DRAM_ATTR TaskHandle_t s_task;
 static StreamBufferHandle_t s_text_out;
 static SemaphoreHandle_t s_text_lock;
+static MessageBufferHandle_t s_push_out;   /* beat reports: the beat task writes, the MIDI task sends */
+static volatile uint8_t s_host_spoke;      /* a control line came from the computer (ota.c confirms a new image on it) */
 
 /* the timer's interrupt fills it, the MIDI task empties it */
 static DRAM_ATTR uint8_t s_ring[RING_SIZE];
@@ -143,8 +151,24 @@ static void read_host(struct jx_in *in)
             if (c >= 0)
                 text[got++] = (uint8_t)c;
         }
-        if (got)
+        if (got) {
+            s_host_spoke = 1;
             s_line_rx(text, got);
+        }
+    }
+}
+
+/* the beat reports (jank_sysex.h JX_PUSH_*): whole SysEx messages, one at a time, the clock first between them */
+static void send_push(void)
+{
+    char text[JX_PUSH_TEXT_MAX];
+    uint8_t frame[JX_PUSH_FRAME_MAX];
+    size_t n;
+    while ((n = xMessageBufferReceive(s_push_out, text, sizeof text, 0)) != 0) {
+        size_t w = jx_push_frame(JX_PUSH_BEAT, text, n, frame);
+        if (w && tud_midi_mounted())
+            write_all(frame, w);
+        send_clock();
     }
 }
 
@@ -173,6 +197,7 @@ static void midi_task(void *arg)
         if (!s_host) {
             read_host(&in);
             send_text();
+            send_push();
         }
     }
 }
@@ -182,7 +207,9 @@ static void wait_for_a_computer(void *arg)
     (void)arg;
     vTaskDelay(pdMS_TO_TICKS(HOST_WAIT_MS));
     if (!tud_connected()) {              /* its first SETUP sets this */
-        ota_mark_valid();                /* a new image that got this far ran for 3 s with every task up: it is not a bad one */
+        /* No ota_mark_valid() here: a new image is confirmed only after a computer spoke to it (ota.c). One that no
+         * computer configured within 3 s may be one whose USB is broken, so this restart puts the old image back; the old
+         * image then starts as host, as asked. */
         s_start_as = HOST_NEXT;
         esp_restart();
     }
@@ -214,7 +241,8 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
     s_line_rx = line_rx;
     s_text_out = xStreamBufferCreate(TEXT_OUT_SIZE, 1);
     s_text_lock = xSemaphoreCreateMutex();
-    if (!s_text_out || !s_text_lock)
+    s_push_out = xMessageBufferCreate(PUSH_OUT_SIZE);
+    if (!s_text_out || !s_text_lock || !s_push_out)
         return ESP_ERR_NO_MEM;
     cfg.descriptor.full_speed_config = CONFIG_DESC;
     cfg.descriptor.string = STRINGS;
@@ -239,6 +267,17 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
 }
 
 int usb_up(void) { return !s_host && tud_mounted(); }
+
+int usb_host_spoke(void) { return s_host_spoke; }
+
+/* from the beat task; never waits: a report that does not fit is dropped (the next one comes within a second) */
+void usb_beat_line(const char *text, size_t n)
+{
+    if (s_host || !s_push_out || !tud_midi_mounted() || n == 0 || n > JX_PUSH_TEXT_MAX)
+        return;
+    if (xMessageBufferSend(s_push_out, text, n, 0) == n)
+        xTaskNotifyGive(s_task);
+}
 
 esp_err_t usb_send(const uint8_t *eth, size_t len, void *token)
 {

@@ -20,6 +20,16 @@ void jx_init(struct jx_in *in);
 /* one byte of the MIDI stream -> a character of text, or -1 */
 int jx_feed(struct jx_in *in, uint8_t byte);
 
+/* Reports the stick sends on its own (never answers to a line), with their own header F0 7D 'J' 'B' <type>, so that the
+ * control line's readers (jx_feed, scripts/ota.py, page/jank.html: all match F0 7D 'J' 'K') never see them. */
+#define JX_PUSH_BEAT 0x10u              /* the beat tracker: "b <n> <bpm x100> <mode> <audio>" on each beat, "t ..." a second */
+#define JX_PUSH_TEXT_MAX 40u
+#define JX_PUSH_FRAME_MAX (JX_PUSH_TEXT_MAX + 6u)
+/* one report of n <= JX_PUSH_TEXT_MAX characters into out -> its length (0: a bad type or too long) */
+size_t jx_push_frame(uint8_t type, const char *text, size_t n, uint8_t *out);
+/* the beat report's text: kind 'b' (a tracked beat) or 't' (the once-a-second state); mode 0..3 as jb_mode_kind -> length */
+size_t jx_beat_line(char *out, size_t cap, char kind, uint32_t n, int32_t bpm_x100, unsigned mode, unsigned audio);
+
 /* single-byte real time messages, the clock's, as USB-MIDI packets (cable 0, code F) -> bytes written, whole packets */
 size_t jx_realtime_packets(const uint8_t *bytes, size_t n, uint8_t *out, size_t cap);
 

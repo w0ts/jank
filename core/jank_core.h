@@ -106,6 +106,8 @@ enum jk_net {
 #define JK_PASS_MAX 63u
 #define JK_QUANTUM_MAX 16u
 #define JK_OFFSET_MAX_10US 10000       /* +-100 ms */
+#define JK_BEAT_LATENCY_MAX_MS 300
+#define JK_BEAT_LATENCY_DEFAULT_MS 25
 struct jk_cfg {
     uint8_t group, filter;
     uint8_t peer;                     /* 1: jank is a Link peer itself */
@@ -116,11 +118,36 @@ struct jk_cfg {
     char name[JK_NAME_MAX + 1];
     char ssid[JK_SSID_MAX + 1];
     char pass[JK_PASS_MAX + 1];       /* never sent back: get says only whether there is one */
+    uint8_t stored_pad;               /* what the compiler padded the release's struct with, so that its size stays 130 */
+    /* The beat-follow bench build's settings come after everything that is stored (store.c keeps only what is above
+     * this line), so they are back at their defaults at every start. */
+    uint8_t beat;                     /* 1: the beat tracker steers the Link session */
+    int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (0..JK_BEAT_LATENCY_MAX_MS) */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
 
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
+/* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
+struct jk_beat {
+    uint8_t on;                       /* the setting */
+    uint8_t audio;                    /* the computer's audio stream is open */
+    uint8_t mode;                     /* 0 stopped, 1 steady, 2 speeding up, 3 slowing down */
+    int32_t bpm_x100;                 /* the tracker's published tempo, 0: none */
+    uint32_t hops;                    /* 10 ms frames computed */
+    uint32_t hop_avg_us, hop_max_us;  /* wall time of the tracker's work for one frame, preemption included */
+    uint32_t hop_avg_cycles;          /* the same in CPU cycles (240 MHz in this build) */
+    uint32_t cpu_pct_x10;             /* the tracker task's share of core 0 over the last second, preemption included */
+    uint32_t packets, gaps, overflows, resets;   /* USB audio packets taken, 1 ms gaps between them, ring overflows, restarts */
+    uint32_t heap_free, heap_min, heap_largest;  /* internal heap: now, lowest ever, largest free block */
+    uint32_t psram_free, psram_min;   /* the PSRAM heap (XIAO): now, lowest ever; 0 0 when there is none */
+    uint32_t stack_free;              /* bytes never used of the tracker task's stack */
+    uint32_t tempo_sets, phase_forces, starts, stops;   /* what the tracker did to the Link session */
+    int32_t err_us;                   /* the session's beat grid against the tracked beat at the last step, before a correction */
+    int32_t offset_us;                /* the clock the audio's samples are mapped to local time with: the offset's value */
+    int32_t latency_us;               /* the setting, in us */
+};
+
 struct jk_snapshot {
     uint8_t usb_up;
     uint32_t uptime_s;
@@ -141,6 +168,7 @@ struct jk_snapshot {
     uint8_t wifi_channel;
     uint32_t midi_ticks;              /* MIDI clocks sent */
     uint32_t midi_resync;             /* the clock had to jump to the session */
+    struct jk_beat beat;
     struct jk_bridge b;
 };
 

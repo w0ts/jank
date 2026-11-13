@@ -254,6 +254,62 @@ static void on_frame(void *ctx, const struct jb_frame *fr)
         r->beats[r->n_beats++] = fr->time;
 }
 
+/* ---- the int16 network against the float one, on the timing bench's audio (no WAV needed) ---- */
+static uint32_t s_rng;
+static float noise(void)
+{
+    s_rng = s_rng * 1664525u + 1013904223u;
+    return (float)(int32_t)s_rng * (1.0f / 2147483648.0f);
+}
+
+/* 124 BPM: a kick on every beat, a hat on the off-beats, a little noise (timing-scratch bench/main/bench.c's synth) */
+static void synth(float *x, size_t n)
+{
+    const double period = 44100.0 * 60.0 / 124.0;
+    for (size_t s = 0; s < n; ++s) {
+        double ph = fmod((double)s, period);
+        double ph2 = fmod((double)s + period / 2.0, period);
+        float kick = ph < 6000.0 ? (float)(0.8 * exp(-ph / 1500.0) * sin(2.0 * PI_D * 55.0 * ph / 44100.0)) : 0.0f;
+        float hat = ph2 < 1500.0 ? (float)(0.2 * exp(-ph2 / 300.0)) * noise() : 0.0f;
+        x[s] = kick + hat + 0.02f * noise();
+    }
+}
+
+static void test_q16(void)
+{
+    enum { SECONDS = 30, N = SECONDS * JB_RATE, MAX_FRAMES = SECONDS * 100 + 16 };
+    static float x[N], act_f[MAX_FRAMES], act_q[MAX_FRAMES];
+    static int16_t x16[N];
+    static double beats_f[512], beats_q[512];
+    static struct jb_beat tf, tq;
+    struct run rf = {act_f, beats_f, 0, 0}, rq = {act_q, beats_q, 0, 0};
+    s_rng = 12345u;
+    synth(x, N);
+    for (size_t i = 0; i < N; ++i)                                    /* what the USB speaker hands the tracker */
+        x16[i] = (int16_t)lrintf(fmaxf(-1.0f, fminf(1.0f, x[i])) * 32767.0f);
+    CHECK(jb_beat_init(&tf) == 0);
+    CHECK(jb_beat_init_q16(&tq) == 0);
+    for (size_t off = 0; off < N; off += 441) {                      /* 441: the firmware's pull, one hop at a time */
+        size_t m = N - off < 441 ? N - off : 441;
+        jb_beat_push_s16(&tf, x16 + off, m, on_frame, &rf);
+        jb_beat_push_s16(&tq, x16 + off, m, on_frame, &rq);
+    }
+    double worst = 0.0;
+    int same = 0;
+    for (int i = 0; i < rf.n_frames && i < rq.n_frames; ++i)
+        worst = fmax(worst, fabs((double)act_f[i] - (double)act_q[i]));
+    for (int i = 0; i < rf.n_beats && i < rq.n_beats; ++i)
+        same += fabs(beats_f[i] - beats_q[i]) < 0.005;
+    double bpm = rq.n_beats > 9 ? 60.0 * (rq.n_beats - 9 - 1) / (beats_q[rq.n_beats - 1] - beats_q[9]) : 0.0;
+    printf("int16 network: %zu B of RAM; %d frames; activation error max %.2g; beats float %d, int16 %d, same frame %d; "
+           "%.2f BPM from the int16 beats (synth 124)\n", jb_lstm_q16_ram(), rq.n_frames, worst, rf.n_beats, rq.n_beats, same, bpm);
+    CHECK(rf.n_frames == rq.n_frames);
+    CHECK(worst < 2e-3);
+    CHECK(rf.n_beats == rq.n_beats && same == rq.n_beats);
+    CHECK(rq.n_beats >= 50);                                         /* 62 beats in 30 s, less the first second or two */
+    CHECK(fabs(bpm - 124.0) < 1.0);
+}
+
 static void test_audio(const char *dir, const char *wav_dir, const char *name)
 {
     char path[512];
@@ -333,6 +389,7 @@ int main(int argc, char **argv)
     test_front_end();
     test_dbn();
     synthetic_modes();
+    test_q16();
     for (size_t i = 0; i < sizeof NAMES / sizeof *NAMES; ++i) {
         test_mode_trace(dir, NAMES[i]);
         if (wavs)
