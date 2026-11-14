@@ -32,7 +32,7 @@ for name, (gpio, _pin) in P.GPIO.items():
 for name in ("VBANK_ADC", "VBUS_SENSE", "LINE_IN"):      # (mini 2.2 simplified: only LINE_IN is left of these)
     if name in P.GPIO and not 1 <= P.GPIO[name][0] <= 10:
         errors.append(f"{name} on GPIO{P.GPIO[name][0]}: not ADC1 (ADC2 is not usable with Wi-Fi on)")
-for name in ("MIDI_TX", "PWR_HOLD", "MIDI2_TX"):
+for name in ("MIDI_TX", "PWR_HOLD", "MIDI2_TX", "MIDI_TX2"):
     if name in P.GPIO and P.GPIO[name][0] > 21:
         errors.append(f"{name} on GPIO{P.GPIO[name][0]}: not an RTC GPIO (the ULP and deep-sleep hold need one)")
 # GPIO0's strap (the user's rule, 2026-11-14): on the BOOT net only the chip's pin, one pull-up and switches; nothing

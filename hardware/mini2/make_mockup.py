@@ -34,6 +34,10 @@ HEIGHT = {   # above (or below) the board face, mm
     "L0806": 1.2, "HVSSOP-8_L3.0-W3.0-P0.65-LS4.9-BL-EP": 1.1, "SOD-123_L2.7-W1.6-LS3.7-RD-1": 1.2,
     "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR": 1.1, "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR": 1.1, "SOT-23-3_L3.0-W1.7-P0.95-LS2.9-BR": 1.1,
     "LED-SMD_L1.6-W0.8-R-RD": 0.8, "R0603": 0.55, "C0603": 0.9, "R0805": 0.6, "R1206": 0.6, "R2010": 0.6, "C0805": 1.3,
+    # mini 2.2 (estimates from the parts' JLC 3D models' names / their usual outlines: *unverified*)
+    "SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR": 1.8, "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR": 1.1, "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL": 1.1,
+    "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR": 1.45, "SOT-23_L2.9-W1.3-P1.90-LS2.4-BR": 1.1, "SMA_L4.3-W2.6-LS5.0-BI": 2.4,
+    "LED0805-R-RD": 0.8, "RF-SMD_FRF05002-JSS103M": 1.25,
 }
 
 

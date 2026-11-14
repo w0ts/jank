@@ -193,9 +193,10 @@ def schematic():
         "CELL (battery order): J8 / J9 PH2.0 in parallel (DNP; pin 1 = +, BAT_C), Q2 AO3401A reverse-polarity FET to BAT_P (R53 100k gate to GND);"
         " Q1 AO3401A BAT_P -> VSYS (gate on VBUS, R50 100k); U8 TP4054-42 (R51 5.1k: ~196 mA; C40 / C41 10u); U9 XB5353A in the minus lead"
         " (VDD via R52 100 ohm = XB_VDD, C42 100n to BAT_N; VM = GND); R10 1M (battery) / R11 1M + C8 100n: BAT_P / 2 on GPIO1 (0 V in the usb order).",
-        "MIDI OUT 1 (J2, DIN J5): ring = +3V3 through R14 // R26 // R48 (3 x 100 ohm = 33.3 ohm), tip = MIDI_TX (GPIO21) through R15 10 ohm."
-        " MIDI OUT 2 (J3, DIN J6): its own R21 // R27 // R49 and R20 from the same +3V3 / GPIO21. J5 / J6: DIN sockets on the bottom (DNP).",
-        "Pins: GPIO21 MIDI_TX, GPIO0 BOOT (SW1; R16 pull-up only), GPIO38 LED_R (LED1 red, R40 1k), GPIO39 LED_G (LED2 green, R41 1k),"
+        "MIDI OUT 1, GPIO21 (MIDI_TX): jack J2 ring = +3V3 through R14 // R26 // R48 (3 x 100 ohm = 33.3 ohm), tip through R15 10 ohm;"
+        " DIN J5 its own R54 33 ohm / R55 10 ohm. MIDI OUT 2, GPIO17 (MIDI_TX2, the same UART): jack J3 R21 // R27 // R49 + R20, DIN J6"
+        " R56 / R57. Jacks and DINs on the bottom (DNP, the user solders them).",
+        "Pins: GPIO21 MIDI_TX, GPIO17 MIDI_TX2, GPIO0 BOOT (SW1 NO; R16 pull-up only; no RST button: CHIP_PU's RC only), GPIO38 LED_R (LED1 red, R40 1k), GPIO39 LED_G (LED2 green, R41 1k),"
         " GPIO9 LINE_IN, GPIO1 VBAT_ADC, GPIO19 / 20 USB D- / D+. GPIO3, 45, 46 (strapping) open: internal defaults (3.3 V flash, SPI boot).",
         "U1 ESP32-S3FN8: VDDA C11-C13; VDD3P3 through L2 2 nH (C14-C17 before, C18 after); VDD3P3_CPU C19, VDD3P3_RTC C20; VDD_SPI C21 + C22;"
         " CHIP_PU R8 10k / C7 1u; Y1 40 MHz, C9 / C10 10 pF, R17 0 ohm on XTAL_P (XIAO ESP32S3 v1.2 values).",

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""The printed lid's LED window must sit where LED1 is: its recess (3.2 mm) round the board's LED position on the roof's outer face
+"""The printed lid's LED window must sit where LED1 is: its recess (4.2 mm, mini 2.2) round the board's LED position (the middle of LED1 and LED2) on the roof's outer face
 (z 0 in the print, the lid turned over about x: y = -(H - led_y)); a mirror image would put it at W - led_x.
-Usage: check_led.py mini_lid.stl "<place_args output>"   (exit 1 when the window is not there)"""
+Usage: check_led.py mini_lid_led.stl "<place_args output>"   (exit 1 when the window is not there)"""
 import re
 import sys
 
@@ -14,8 +14,8 @@ face = [(p[0], p[1]) for p in pts if abs(p[2]) < 0.01]
 
 
 def ring(cx, cy):
-    """vertices of the 3.2 mm recess's circle (radius 1.6 +- 0.05) round (cx, cy) on the roof's outer face"""
-    return [p for p in face if abs(((p[0] - cx) ** 2 + (p[1] - cy) ** 2) ** 0.5 - 1.6) < 0.05]
+    """vertices of the 4.2 mm recess's circle (radius 2.1 +- 0.05) round (cx, cy) on the roof's outer face"""
+    return [p for p in face if abs(((p[0] - cx) ** 2 + (p[1] - cy) ** 2) ** 0.5 - 2.1) < 0.05]
 
 
 here, mirrored = ring(led[0], -(h - led[1])), ring(w - led[0], -(h - led[1]))

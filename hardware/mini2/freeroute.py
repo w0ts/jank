@@ -23,18 +23,20 @@ KICAD_CLI = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
 MM = pcbnew.FromMM
 OX = OY = 100.0
 ROUNDS = 3
-EXTRA = 2
+EXTRA = 4
 PASSES = "100"
 # net classes (widths in um; clearance 0.2 as the rules: the chip's 0.4 mm pitch leaves exactly 0.2 between 0.2 tracks)
-PWR = {"VDD3P3": 250, "VSYS": 300, "+3V3": 250, "VBUS": 300, "VUSB_D": 300, "SW": 300}   # (0.25 into the chip.s pins)
-DIN_NETS = ["MO_R", "MO_T", "PIN_R", "PIN_T"]   # (0.5 from everything: the iron's room, README "DIN")
+# (mini 2.2: +3V3 0.25 into the chip's 0.4 mm-pitch pins; VSYS and VBUS 0.3 (the LDO's input, up to ~0.5 A); the cell's
+#  nets 0.4 (the cell's current, charge and discharge))
+PWR = {"VDD3P3": 250, "+3V3": 250, "VSYS": 300, "VBUS": 300, "BAT_P": 400, "BAT_N": 400, "BAT_C": 400}
+DIN_NETS = ["MO_R", "MO_T", "MO2_R", "MO2_T", "MD_R", "MD_T", "MD2_R", "MD2_T"]   # (0.5 from everything: the iron's room, README "DIN"; mini 2.2: both MIDI OUTs; stage 1f: the jacks' and the DINs' own)
 IRON = 0.8                                       # (no via within a DIN pad's copper + 0.8 mm)
 EDGE = 0.3                                       # (+ the 0.2 clearance: the rules' 0.5 from the board's edge)
 # the bottom stays one ground under the chip with its left and lower parts, and under the RF path
-CHIP_BLOCK = ["U1", "Y1", "R17", "R24", "R25", "C9", "C10", "C11", "C12", "C13", "C19", "C20", "C21", "C22"]
+CHIP_BLOCK = ["U1", "Y1", "R17", "C9", "C10"]   # (mini 2.2 stage 2: the chip and the crystal only: the long vertical routes (VBUS, I2C) need the bottom beside the chip)
 TOP_ONLY = []                                    # (nets kept on the top layer: ["LIN_OUT"] routes it there, but only with 0.10 mm tracks and 4 other nets left open: README "Routing, mini 2")
-RF_NETS = {"LNA_IN", "RF", "ANT_FEED", "UFL"}
-PAD_VIA_PARTS = ("C23", "C24", "C25", "C26", "C28", "J4", "U5")
+RF_NETS = {"LNA_IN", "RF", "UFL"}               # (mini 2.2: the u.FL only)
+PAD_VIA_PARTS = ("C23", "C24", "C28", "J4", "U5")
 STITCH = 6.0                                     # (mm between GND stitching vias; the RF line has its own fence)
 VIA_D, VIA_DRILL = 0.6, 0.3
 
@@ -310,7 +312,7 @@ def tidy(board):
     print(f"  {len(st)} stitching vias, {isl} island vias, {pv} pad vias, {gs} ground stubs, {pd} loose ends cut, {gone} one-sided vias removed; narrow kept: {kept or 'none'}")
 
 
-DIRECT = {"SW": 0.3}                              # (net: width) pads of these nets within 4 mm joined straight first
+DIRECT = {}                                        # (net: width) pads of these nets within 4 mm joined straight first (mini 2.2: none; the buck is gone)
 
 
 def direct_links(board):
@@ -436,7 +438,7 @@ def relabel(board):
     both), where the placer put the buttons"""
     pads = [p for f in board.GetFootprints() for p in f.Pads() if p.IsOnLayer(pcbnew.F_Cu)]
     items = []
-    for ref, text in (("SW1", "BOOT"), ("SW2", "RST")):
+    for ref, text in (("SW1", "NO / BOOT"), ("SW3", "UP"), ("SW4", "DOWN"), ("SW5", "YES")):
         p = board.FindFootprintByReference(ref).GetPosition()
         items += [(t, p) for t in board.GetDrawings() if t.GetClass() == "PCB_TEXT" and t.GetText() == text]
 

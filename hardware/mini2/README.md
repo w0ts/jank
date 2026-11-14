@@ -1,10 +1,89 @@
-# jank mini 2.2: one board, two orders (USB only, or with a 1S cell), two MIDI OUTs, LINE IN, 4 buttons + RST, LEDs or a screen, u.FL (branch hw/mini2.2)
+# jank mini 2.2: one board, two orders (USB only, or with a 1S cell), two MIDI OUTs, LINE IN, 4 buttons in a cross, LEDs or a screen, u.FL (branch hw/mini2.2)
 
-**Stage 1e (2026-11-14): placed, not routed; nothing ordered, built or measured.** `mini2.kicad_pcb` is the *placed*
+**Stage 1f (2026-11-14): placed, not routed; nothing ordered, built or measured.** `mini2.kicad_pcb` is the *placed*
 board (`LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 make_board.py`): `fab/mini2-gerbers.zip`, `render-top.png`,
-`render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/mini_case.scad` are still mini 2's until stage 2. Each
-stage's section supersedes the older ones where they differ (1e, then 1d, then 1c); "mini 2.2 (stage 1)" and "1b" are
+`render-bottom.png`, `render-3d.png` and `mockup.stl` are older until the routing (stage 2, after the user's go). Each
+stage's section supersedes the older ones where they differ (1f, 1e, 1d, then 1c); "mini 2.2 (stage 1)" and "1b" are
 superseded (the encoder and the RGB LEDs are gone); everything after them is mini 2's text.
+
+## mini 2.2, stage 1f (the user's: own resistors per MIDI connector, jacks under the board, no RST, a cross of buttons)
+
+`render-top-placement.png`, `render-bottom-placement.png`, `case/renders/sketch-2.2.png` (the lid's U-tongues, the
+jacks under the board). Stage 2's routing was stopped for this (it had 4 issues left: notes at the end).
+
+**1. Every MIDI connector its own resistors (applied).** The jack and the DIN of one OUT no longer share a loop: a mono
+plug or a short on one stops only that one.
+
+| Connector | Source (ring / DIN 4) from +3V3 | Sink (tip / DIN 5) | TX pin |
+|---|---|---|---|
+| J2, MIDI OUT jack | R14 // R26 // R48, 3 x 100 ohm 1206 = 33.3 ohm (C17901: a mono plug's 0.33 W shared) | R15 10 ohm 0603 | GPIO21 (MIDI_TX) |
+| J5, MIDI OUT DIN | **R54 33 ohm 0805 (C17634, Basic)** | **R55 10 ohm 0603** | GPIO21 |
+| J3, MIDI OUT 2 jack | R21 // R27 // R49 (as J2) | R20 10 ohm | **GPIO17 (MIDI_TX2, chip pin 23)** |
+| J6, MIDI OUT 2 DIN | **R56 33 ohm 0805** | **R57 10 ohm 0603** | GPIO17 |
+
+- **The DINs get one 0805, not three 1206s:** a 5-pin MIDI cable never shorts DIN 4 to ground (only a broken one
+  would: 0.33 W in a 0.125 W part); in use it is the same 33 ohm. One new Basic type (no fee).
+- **Two pins, one UART:** the firmware routes the same UART TX to GPIO21 and GPIO17 through the GPIO matrix (the TRM
+  lets several pins select one peripheral output; not tried on hardware), so both OUTs send the same bytes with no
+  extra code in the sender. Each pin sinks two loops: ~6.5 mA a loop at most ((3.3 - ~1.5 V opto LED) / (33 + 10 +
+  the receiver's 220 ohm), an estimate), ~13 mA a pin. GPIO17 is not a strapping pin and is an RTC GPIO
+  (`check_nets.py`'s rule); its route on the chip's crowded top side is stage 2's to prove (GPIO18, pin 24, is the
+  fallback).
+- **Cost:** +2 x 33 ohm 0805, +2 x 10 ohm 0603, 8 joints a board: ~+$0.18 (5 boards) / ~+$0.31 (10), from the unit
+  prices.
+
+**2. The jacks under the board (applied, LINE IN too).** J2, J3 and J7 (PJ-320A, through hole) are on the bottom,
+**DNP**: out of the BOM and the CPL, soldered by the user from the top like the DINs. Their places are the same (the
+top corners and J7 between J2 and the USB-C, bushings past the edges); the top keeps nothing tall but the USB-C.
+Checked (`court.py`-style box check, both sides): no body touches the DIN bodies (theirs end at y 12.6, the DINs' start
+at 17.6) or the cells' band (y 39 .. 58); every top part keeps 0.8 mm from the jacks' and the DINs' pad copper (the
+iron's room: D7 / D8 moved 0.4 mm right for it). **Cost:** the PJ-320A type (Extended, $3.09) and its 12 joints a
+board leave the order; the user buys 3 jacks a board (C18185602, ~$0.06 each at LCSC, 15 or 30: ~$0.83 / $1.66 +
+shipping). **The case:** the lid loses its three jack slots; the base gets them beside the DIN slots (stage 2).
+
+**3. All MIDI connectors on one side edge: not applied** (the user: only if it simplifies or saves). The cells fill
+the underside's y 39 .. 58 across the whole width, so a side edge's underside has 39 mm for connectors: one DIN (20.9
+mm) and one jack fit, two DINs and two jacks (~54 mm) do not without moving the cells or growing the board: more work,
+no saving.
+
+**4. No RST; the four buttons in a cross (the user's).** SW2 is gone (CHIP_PU keeps R8 10 k / C7 1 uF). SW3 UP (top),
+SW4 DOWN (bottom), SW1 NO / BOOT (left, GPIO0: the strap rule unchanged), SW5 YES (right), each 6.5 mm from the cross's
+middle (55.5, 48.2): 13 mm apart across, 9.2 mm to a neighbour. The cross sits in the lower right, clear of J6's pads'
+iron room (UP's top edge at y 39.0), of the screen module's outline, and inside the walls with the lid's U-tongues
+(`case/README.md` "Buttons"). Each button's label is on the silk (DOWN's on its left: the edge).
+
+**Restarting and recovering without RST** (firmware, except the last):
+
+- **Restart:** a button combination, e.g. hold UP + DOWN (firmware).
+- **Download mode while jank runs:** hold NO 10 s (jank's existing app_bootloader).
+- **A hung firmware:** the chip's hardware watchdog restarts it.
+- **Last resort:** with a cell fitted, unplugging USB does **not** reset the chip (the cell keeps it running). Unplug
+  the cell(s) from the PH2.0, hold NO / BOOT, plug USB in: the chip always starts in ROM download mode. Firmware updates
+  still go by OTA with rollback.
+
+**Costs, both orders (`fab/cost.md`, cost.py with the snapshot and C17634 read 2026-11-14):**
+
+| | usb, 5 boards | usb, 10 | battery, 5 | battery, 10 |
+|---|---|---|---|---|
+| stage 1e, JLC hand-solders the jacks | 71.01 | 97.69 | 81.14 | 110.97 |
+| stage 1e, jacks at the SMD rate (its table) | 66.55 | 92.34 | 76.67 | 105.62 |
+| **stage 1f** (no jacks, 4 more resistors, no SW2) | **62.51** | **87.37** | **72.64** | **100.65** |
+| per board | 12.50 | 8.74 | 14.53 | 10.06 |
+| + 3 jacks a board, bought by the user | +0.83 | +1.66 | +0.83 | +1.66 |
+
+Extended types 6 (usb) / 8 (battery), one fewer each. USD, JLC Economic, no shipping or case; estimates.
+
+**Checks (the placed board):** ERC 0 errors 0 warnings; `check_nets.py` 333 pads, 0 problems (BOOT carries only U1,
+R16 and SW1); 0 courtyard box overlaps on either side (J8 / J9 either way round); 0 top parts in the DINs' or the
+jacks' iron room; the screen module's outline (20.35, 13.3 .. 47.65, 41.1) has no button, LED or tall part under it;
+both CPLs: usb 80 parts / 38 lines / 250 joints, battery 92 / 43 / 283, every part within 0.01 mm of JLC's footprint;
+the cells' band (y 39 .. 58.1, 19.1 mm, the sketch) is unchanged; the antenna seat (inside the bottom wall, x 3 .. 45)
+is clear of the U-tongues (x 46.5 on).
+
+**Stage 2 routing, where it stopped (kept for the next run):** with UP / YES swapped (YES on pin 7's lane, UP on pin
+15), SCL / SDA on pins 16 / 17, C20 upright and R35 over C36, the drawn USB escapes: 4 issues left (a GND pour island
+at (33.86, 33.81) with no room for a via, USB_DN / DP open before the drawn escapes, BTN_YES open). Stage 1f adds
+MIDI_TX2 (pin 23) and the DINs' own nets (MD_R / MD_T, MD2_R / MD2_T, in the router's DIN class).
 
 ## mini 2.2, stage 1e (the user's answers to 1d: the u.FL only, standard parts, LEDs or a screen with 4 buttons)
 

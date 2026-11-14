@@ -66,16 +66,22 @@ CAN_Y = 35.5 + (CY - 30.4)               # the cans' centre y (10 x 10.5 mm, upr
 HDR = (34.0, 14.8)
 MODULE = (HDR[0] - 27.3 / 2, HDR[1] - 1.5, HDR[0] + 27.3 / 2, HDR[1] - 1.5 + 27.8)
 
+BTN_C, BTN_D = (55.5, 48.2), 6.5     # stage 1f: the buttons' cross, its middle and each button's distance from it
+
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
     # top edge: the jacks (bushings past the side edges), the USB-C between them
-    "J1": (W / 2, 4.97, 180), "J2": (7.25, 5.8, 0), "J3": (W - 7.25, 5.8, 180),
+    # stage 1f (the user's): the jacks on the BOTTOM, DNP, soldered by the user as the DINs (flipped, turned 180: the
+    # bushings still past the edges, as on top: a flipped part keeps its angle); the top keeps nothing tall but the USB-C
+    "J1": (W / 2, 4.97, 180), "J2": (7.25, 5.8, 0, "B"), "J3": (W - 7.25, 5.8, 180, "B"),
     # the DIN sockets (DNP, hand-soldered) on the BOTTOM under each side edge, their faces on the edges (README "DIN")
     "J5": (DIN_D, DIN_Y, 90, "B"), "J6": (W - DIN_D, DIN_Y, 270, "B"),
     # between the DINs' holes (every top part keeps 0.8 mm from the DIN pads' copper: the iron's room, README "DIN"):
     # left the MIDI OUT resistors (mini 2.2 simplified: three 100 ohm 1206, R48 the third, under R14 / R26)
     "R14": (16.9, 1.8, 0), "R26": (16.9, 4.4, 0),               # (PLACED's places win for R14, R26, R15)
     "R15": (8.5, 21.0, 90), "R48": (19.56, 27.41, 180),
+    # stage 1f: the DINs' own source (33 ohm 0805) and sink (10 ohm) between each DIN's pads, out of their iron room
+    "R54": (7.2, 26.0, 90), "R55": (7.2, 30.6, 90), "R56": (W - 7.2, 26.0, 90), "R57": (W - 7.2, 30.6, 90),
     # mini 2.2 simplified (README "mini 2.2 simplified"): BOOT (SW1) and RST (SW2) in one row in the middle, 10 mm apart
     # (BOOT under a big cap); the indicator (LED1 red, LED2 green side by side: one window) between them and the USB
     # parts, each LED's 1 k and its DNP twin beside it
@@ -83,8 +89,10 @@ PLACE = {
     # 2 x 2 grid at the lower right, 9.5 mm apart (8 mm caps), clear of the screen and of J6's pads (UP over DOWN on the
     # left, NO / BOOT over YES on the right, as the screen study); RST at the top right under a pinhole; the LEDs (one
     # window) at the top left, out from under the screen; the screen's header in the middle under the USB parts
-    "SW3": (51.5, 44.0, 0), "SW1": (61.0, 44.0, 0), "SW4": (51.5, 53.5, 0), "SW5": (61.0, 53.5, 0),
-    "SW2": (52.5, 14.5, 0),
+    # stage 1f (the user's): no RST; the four in a cross (a D-pad), 6.5 mm from its middle (13 mm apart across): UP top,
+    # DOWN bottom, NO / BOOT left, YES right; the lid's U-tongues (case/README "Buttons") fit round it inside the walls
+    "SW3": (BTN_C[0], BTN_C[1] - BTN_D, 0), "SW4": (BTN_C[0], BTN_C[1] + BTN_D, 0),
+    "SW1": (BTN_C[0] - BTN_D, BTN_C[1], 0), "SW5": (BTN_C[0] + BTN_D, BTN_C[1], 0),
     "LED1": (5.5, 15.0, 0), "LED2": (5.5, 17.2, 0),         # (one above the other, 2.2 mm apart: one window over both)
     "R40": (9.5, 15.0, 0), "RT40": (12.6, 15.0, 0),
     "R41": (9.5, 17.2, 0), "RT41": (12.6, 17.2, 0),
@@ -119,8 +127,8 @@ PLACE = {
     # (stage 1e: the SRV05-4's JLC footprint is the USBLC6's pattern turned 90, its pad rows 0.2 mm further out: at 270
     #  and 0.2 mm lower its top row (VBUS, D-, D+) sits where the USBLC6's did, so the drawn USB tracks and VBUS via hold)
     "R24": (CX - 0.3, CY - 6.2, 180), "R25": (CX - 0.3, CY - 5.2, 180),   # USB D+ / D- 22 ohm, right of pins 26 / 25 (pin 27 free)
-    "C20": (CX + 1.5, CY - 4.6, 180),                                                  # VDD3P3_RTC (pin 20, top); mini 2: turned, its +3V3 pad east (the GND pad was boxed in by MIDI2_TX)
-    "R8": (CX + 8.5, CY - 5.6, 0),          # (mini 2.2 simplified: CHIP_PU's 10 k by C7, chip-relative)
+    "C20": (CX + 1.1, CY - 4.85, 90),       # (stage 2: upright over pins 19 / 20: pins 15..17's channel north stays open)                                                  # VDD3P3_RTC (pin 20, top); mini 2: turned, its +3V3 pad east (the GND pad was boxed in by MIDI2_TX)
+    "R8": (CX + 8.5, CY - 2.9, 0),          # (stage 2: under C7, off BAT_P's way from Q2 to R10; mini 2.2 simplified: CHIP_PU's 10 k by C7, chip-relative)
     "C7": (CX + 8.5, CY - 4.2, 0),          # (1 uF on CHIP_PU at its lane's via: 6 mm of track from pin 4, review 2026-11-13)
     "C21": (13.9 + S, 30.5, 270), "C22": (13.9 + S, 32.3, 270),                       # VDD_SPI (pin 29, left)
     "C19": (CX - 1.4, CY + 4.85, 270),      # VDD3P3_CPU (pin 46, bottom): its +3V3 pad toward the pin (review 2026-11-13)
@@ -141,12 +149,12 @@ PLACE = {
     # right; D7 by them; the summer's inputs (R30 / C30 tip, R31 / C31 ring) to U6 (turned: IN- and IN+ on top, OUT and V+
     # below), R32 // C32 on its left from IN- to OUT, the bias (R33 / R34 / C33) on its right; the LDO (U7, C34 in, C35 out)
     # in the top strip by the USB-C (VBUS); R35 / C36 at the chip's GPIO9 (pin 14), the right side's top corner
-    "J7": (16.4, 7.25, 270), "D7": (23.1, 10.25, 0), "D8": (23.1, 6.95, 0),   # (stage 1e: two SMAJ5.0CA, tip and ring, in two rows right of J7)
+    "J7": (16.4, 7.25, 270, "B"), "D7": (23.5, 10.25, 0), "D8": (23.5, 6.95, 0),   # (stage 1e: two SMAJ5.0CA, tip and ring, in two rows right of J7; stage 1f: 0.4 right, out of the flipped J7's iron room)
     "R30": (19.4, 13.4, 0), "C30": (21.2, 13.4, 0), "R31": (19.4, 14.4, 0), "C31": (21.2, 14.4, 0),
     "U6": (24.6, 15.0, 90), "R32": (22.0, 15.9, 90), "C32": (21.0, 15.9, 90),
     "R33": (27.0, 14.0, 90), "R34": (28.0, 14.0, 90), "C33": (27.5, 15.9, 0), "C37": (26.3, 17.4, 0),
     "U7": (25.6, 3.5, 0), "C34": (22.2, 2.3, 90), "C35": (27.5, 10.5, 90),   # (stage 1e: up 1 mm / out of the TVS rows)
-    "C36": (CX + 3.41, CY - 5.5, 90), "R35": (CX + 2.0, CY - 5.85, 0),
+    "C36": (CX + 3.41, CY - 5.5, 90), "R35": (CX + 3.41, CY - 7.3, 90),   # (stage 2: R35 over C36 in LINE_IN's column)
 }
 WIDTH = {"VDD3P3": 0.5, "VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
 ORDER = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
@@ -159,8 +167,9 @@ PRIORITY = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "DE
 # (net, chip pin y, lane x, lane end y, a via at the end): 0.8 mm apart, each ending in a via, so the router may take
 # any of them on either layer (BOOT, for one, crosses the others to reach the button on the left)
 FANOUT = [("CHIP_PU", CY + 1.4, CX + 7.3, CY - 4.2, True), ("BOOT", CY + 1.0, CX + 6.5, CY - 4.2, True),
-          ("VBAT_ADC", CY + 0.6, CX + 5.7, CY - 4.2, True)]
-# (mini 2.2 simplified: VBUS_SENSE's and PWR_HOLD's lanes gone with their nets; GPIO1's lane carries the cell's level)
+          ("VBAT_ADC", CY + 0.6, CX + 5.7, CY - 4.2, True), ("BTN_YES", CY + 0.2, CX + 4.9, CY - 4.2, True),
+          ("BTN_DOWN", CY - 0.6, CX + 4.1, CY - 4.2, True)]
+# (mini 2.2: GPIO1's lane carries the cell's level; stage 2: mini 2's VBUS_SENSE / PWR_HOLD lanes (pins 7 / 9) carry UP / DOWN)
 
 board = pcbnew.BOARD()
 nets = {}
@@ -446,6 +455,14 @@ def rf_path(fps):
     u1p, u3p = pad_center(pad_of(fps, "U5", "1")), pad_center(pad_of(fps, "U5", "3"))
     RF_SEGS.append(("UDP", 0, u6[0], u6[1], u1p[0], u1p[1], 0.2))     # (U5's flow-through: pin 6 -> 1, 4 -> 3, under it)
     RF_SEGS.append(("UDN", 0, u4[0], u4[1], u3p[0], u3p[1], 0.2))
+    # (stage 2) the chip's USB pins (26 D+, 25 D-, the top side) straight up and over to their 22 ohm (R24 / R25 pad 2):
+    # Freerouting left these 2 mm links open beside the busier pins 15..20; D+ runs left of D-, 0.2 mm apart
+    for ref, pin in (("R24", "26"), ("R25", "25")):
+        px, py = pad_center(pad_of(fps, "U1", pin))
+        rx, ry = pad_center(pad_of(fps, ref, "2"))
+        n = "USB_DP" if pin == "26" else "USB_DN"
+        RF_SEGS.append((n, 0, px, py, px, ry, 0.2))
+        RF_SEGS.append((n, 0, px, ry, rx, ry, 0.2))
     FIXED_VIAS.append(("UDP", v2[0], v2[1]))
     # VDD3P3's two pins (2 and 3) joined on top, at their pads' centre line
     RF_SEGS.append(("VDD3P3", 0, CX + 3.41, CY + 1.8, CX + 3.41, CY + 2.2, 0.2))
@@ -803,10 +820,10 @@ def zones():
 def silk():
     label("MIDI OUT", 6.0, 12.3, 0.7)            # (J2 and J5)
     label("MIDI OUT 2", W - 6.1, 12.3, 0.7)      # (J3 and J6: mini 2.2 simplified, a copy of MIDI OUT)
-    for ref, text, dy in (("SW1", "NO / BOOT", 3.4), ("SW3", "UP", 3.4), ("SW4", "DOWN", 3.4), ("SW5", "YES", 3.4),
-                          ("SW2", "RST", 3.4)):   # (under the buttons)
+    for ref, text, dx, dy in (("SW1", "NO / BOOT", 0, 3.4), ("SW3", "UP", 0, 3.4), ("SW5", "YES", 0, 3.4),
+                              ("SW4", "DOWN", -5.9, 0)):   # (under the buttons; DOWN, at the bottom edge, on its left)
         p = board.FindFootprintByReference(ref).GetPosition()
-        label(text, pcbnew.ToMM(p.x) - OX, pcbnew.ToMM(p.y) - OY + dy, 0.6)
+        label(text, pcbnew.ToMM(p.x) - OX + dx, pcbnew.ToMM(p.y) - OY + dy, 0.6)
     # the screen (stage 1e): the module's outline on F.Fab (not on the silk: it crosses pads); the header's pin names; the
     # jumpers' choices, each pad's net under it (modules differ: GND-VCC-SCL-SDA or VCC-GND-SCL-SDA)
     x0, y0, x1, y1 = MODULE

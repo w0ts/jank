@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""mini 2.2, stage 1d: a SKETCH (not the case: mini_case.scad is stage 2). Reads the placed board (../mini2.kicad_pcb)
+"""mini 2.2, stage 1d / 1f: a SKETCH (not the case: mini_case.scad is stage 2). Reads the placed board (../mini2.kicad_pcb)
 and draws, as SVG then PNG (renders/sketch-2.2.png):
-(1) the lid seen from above: its outline, the openings of the USB-C and the three jacks, BOOT's big cap, RST's small
-    cap, the LED window over the red and the green LED;
+(1) the lid seen from above (stage 1f): its outline, the USB-C's opening (the jacks' are in the base now), the four
+    buttons' U-tongues (TONGUE: a pinwheel round the cross, each tongue's nub over its switch), no RST, the LED window
+    over the red and the green LED, the FPC antenna's seat on the inside of the bottom wall (mini_case.scad);
 (2) the underside seen from above (through the board): the DIN bodies (fitted), the two PH2.0 sockets (either way
     round: the user may solder one turned 180 degrees), and two cells standing on edge in the band between the DIN
     bodies and the ground edge, the largest the user names (GNB 550 mAh: 66 x 18 x 6.2; BT2.0 450 mAh: 62 x 15.5 x
@@ -21,7 +22,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 B = pcbnew.LoadBoard(os.path.join(HERE, "..", "mini2.kicad_pcb"))
 OX = OY = 100.0
 E, CLR, BT = 1.8, 0.4, 1.6      # (mini_case.scad: the lid's outer face from the board's edge; the side play; the board)
-BUTTON_CAP, RST_HOLE, WINDOW = 8.0, 1.5, 4.0   # (stage 1e: 8 mm caps (the screen study), RST behind a 1.5 mm pinhole, one 4 mm LED window)
+WINDOW = 4.0                    # (one 4 mm LED window)
+TONGUE = dict(w=5.0, to_nub=7.5, past_nub=1.5, slot=0.8)   # (stage 1f: case/README "Buttons": width, root to the nub, the
+#  free end past the nub, the U slot's width)
+ANT = (3.0, 45.0)               # (mini_case.scad ant_x0, ant_x0 + ant_l: the FPC antenna's seat along the bottom wall)
 CELLS = {"GNB 550 mAh": (66.0, 18.0, 6.2), "BT2.0 450 mAh": (62.0, 15.5, 6.7)}   # (length, width = height on edge, thickness)
 CELL_LEN, CELL_T = 66.0, 6.7    # (the sketch's cell: the longest and the thickest of the two)
 DIN_UNDER = 19.6 + 0.35         # (mini_case.scad: din_h + din_gap: the DIN base's floor under the board)
@@ -88,8 +92,12 @@ rect(-E, -E, W + E, H + E, 'fill="#e9e6df" stroke="#555" stroke-width="2" rx="14
 rect(0, 0, W, H, 'fill="none" stroke="#999" stroke-dasharray="6,4"')
 for ref in ("J1", "J2", "J3", "J7", "U1"):
     rect(*box(ref), 'fill="none" stroke="#b9b2a5"')
-for ref, s, top in (("J1", "USB-C", True), ("J7", "LINE IN", True), ("J2", "MIDI OUT", False), ("J3", "MIDI OUT 2", False)):
+for ref, s, top in (("J1", "USB-C", True), ("J7", "LINE IN (base)", True), ("J2", "MIDI OUT (base)", False),
+                    ("J3", "MIDI OUT 2 (base)", False)):
     x, y = pos(ref)
+    if ref != "J1":               # (stage 1f: the jacks under the board: their openings are in the base, not the lid)
+        text(x if top else (10 if x < W / 2 else W - 10), (-E - 2.0) if top else y + 6.5, s, 10, "#888")
+        continue
     if top:
         rect(x - 4, -E - 0.6, x + 4, -E + 0.6, 'fill="#555"')
         text(x, -E - 2.0, s, 10)
@@ -105,28 +113,50 @@ rect(x0, y0, x1, y1, 'fill="none" stroke="#557" stroke-dasharray="5,3"')
 wx, wy = (x0 + x1) / 2, y0 + 12.0
 rect(wx - 12.25, wy - 6.5, wx + 12.25, wy + 6.5, 'fill="#1d2a3a" fill-opacity="0.85" stroke="#111"')
 text(wx, wy + 0.5, "screen window 24.5 x 13 (lid variant 2)", 10, "#fff")
-for ref, s in (("SW3", "UP"), ("SW1", "NO / BOOT"), ("SW4", "DOWN"), ("SW5", "YES")):
+# stage 1f: the U-tongues, a pinwheel round the cross (each runs along its side, root -> nub): UP's to the left, NO's
+# down, DOWN's to the right, YES's up; the slot (dark) round three sides of each tongue (light)
+t = TONGUE
+for ref, s, (ux, uy) in (("SW3", "UP", (-1, 0)), ("SW1", "NO", (0, 1)), ("SW4", "DOWN", (1, 0)), ("SW5", "YES", (0, -1))):
     bx, by_ = pos(ref)
-    circ(bx, by_, BUTTON_CAP, 'fill="#3a3a3a" fill-opacity="0.85" stroke="#111" stroke-width="2"')
-    text(bx, by_ + 0.5, s, 9, "#fff")
-rx, ry = pos("SW2")
-circ(rx, ry, RST_HOLE, 'fill="#111"')
-text(rx, ry + 3.0, "RST pinhole", 9, "#246")
+    ends = [(bx - ux * t["past_nub"], by_ - uy * t["past_nub"]), (bx + ux * t["to_nub"], by_ + uy * t["to_nub"])]
+    xs, ys = [e[0] for e in ends], [e[1] for e in ends]
+    hw = t["w"] / 2
+    x0, x1 = (min(xs), max(xs)) if ux else (bx - hw, bx + hw)
+    y0, y1 = (min(ys), max(ys)) if uy else (by_ - hw, by_ + hw)
+    sl = t["slot"]
+    rect(x0 - sl, y0 - sl, x1 + sl, y1 + sl, 'fill="#333"')
+    rx0, ry0, rx1, ry1 = x0, y0, x1, y1   # (the root: no slot on that side)
+    if ux > 0:
+        rx1 = x1 + sl
+    elif ux < 0:
+        rx0 = x0 - sl
+    elif uy > 0:
+        ry1 = y1 + sl
+    else:
+        ry0 = y0 - sl
+    rect(rx0, ry0, rx1, ry1, 'fill="#e9e6df"')
+    circ(bx, by_, 2.5, 'fill="#c84" stroke="#642"')
+    text((x0 + x1 + ux * t["to_nub"] * 0.5) / 2, (y0 + y1 + uy * t["to_nub"] * 0.5) / 2 + 1.0, s, 8, "#222")   # (toward the root)
+text(pos("SW5")[0] - 3.0, H + E + 2.4, "U-tongues: 5 wide, 7.5 root to nub, 0.8 slot", 8, "#333")
 lx, ly = pad_mid("LED1", "LED2")
 circ(lx, ly, WINDOW, 'fill="#fff" stroke="#c33" stroke-width="2"')
 text(lx + 7.5, ly + 0.5, "LED window (variant 1)", 9, "#a22")
-rect(3.0, H - 13.0, 25.0, H - 3.0, 'fill="none" stroke="#2a7" stroke-dasharray="4,2"')
-text(14.0, H - 7.5, "FPC antenna seat (proposed)", 9, "#174")
+rect(ANT[0], H + CLR, ANT[1], H + CLR + 0.4, 'fill="#2a7"')
+text((ANT[0] + ANT[1]) / 2, H - 1.2, "FPC antenna, upright on the bottom wall's inside", 9, "#174")
 jx, jy = pos("J4")
 circ(jx, jy, 1.6, 'fill="#2a7"')
 text(jx, jy + 3.2, "J4 u.FL", 9, "#174")
-text(W / 2, H + E + 5.5, "(1) lid from above (board top view, y down)", 13)
+text(W / 2, H + E + 5.5, "(1) lid from above, stage 1f (board top view, y down)", 13)
 
 # ---- (2) the underside, seen from above through the board
 ox2 = W + 2 * E + 14
 rect, circ, text = view(ox2)
 rect(-CLR, -CLR, W + CLR, H + CLR, 'fill="none" stroke="#999" stroke-dasharray="3,3"')
 rect(0, 0, W, H, 'fill="#f4f4f4" stroke="#555" stroke-width="2"')
+for ref, s in (("J2", "MIDI OUT jack"), ("J3", "MIDI OUT 2 jack"), ("J7", "LINE IN")):   # (stage 1f: under the board)
+    x0, y0, x1, y1 = box(ref)
+    rect(x0, y0, x1, y1, 'fill="#e8e0f8" stroke="#86a"')
+    text((x0 + x1) / 2, y1 + 2.4, s, 8, "#649")
 din_bottom = 0.0
 for ref in ("J5", "J6"):
     x0, y0, x1, y1 = box(ref)

@@ -39,15 +39,23 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
 #   SPICLK_N, SPICLK_P: left open), 38..42 GPIO33..37, 43 GPIO38, 44 MTCK (39), 45 MTDO (40), 46 VDD3P3_CPU, 47 MTDI (41),
 #   48 MTMS (42), 49 U0TXD (43), 50 U0RXD (44), 51 GPIO45, 52 GPIO46, 53 XTAL_N, 54 XTAL_P, 55/56 VDDA, 57 GND (the pad)
 GPIO = {   # firmware's board.h (README "Pin map"): function -> (GPIO, chip pin)
-    "MIDI_TX": (21, "27"),      # UART TX to both MIDI OUTs' tips (one net), through 10 ohm; RTC_GPIO21
+    "MIDI_TX": (21, "27"),      # UART TX, MIDI OUT 1: its jack's and its DIN's tips, each through its own 10 ohm; RTC_GPIO21
+    "MIDI_TX2": (17, "23"),     # stage 1f: MIDI OUT 2 (its jack's and its DIN's tips, each through its own 10 ohm): the
+                                #  same UART TX routed to a second pin by the GPIO matrix (TRM: any number of pins may
+                                #  select one peripheral output; not yet tried on hw), so each pin sinks two loops, not four
     "BOOT": (0, "5"),           # BOOT / user button SW1 to GND (strapping: held low at reset = download mode); R16 its
                                 #  pull-up, nothing else on the net (no capacitor: the strap is read at reset)
     "LED_R": (38, "43"),        # the red LED, active high, through 1 k (GPIO38: mini 2's LED pin)
     "LED_G": (39, "44"),        # the green LED, active high, through 1 k (red + green behind one window: both = yellow)
     "LINE_IN": (9, "14"),       # mini 2: ADC1_CH8, the LINE IN front end's output (README "LINE IN")
     "VBAT_ADC": (1, "6"),       # mini 2.2: ADC1_CH0, the cell through 1 M / 1 M (half its voltage); mini 2's VBANK pin
-    # stage 1e (the screen study's map): the buttons with the chip's internal pull-ups, the screen's I2C (R60 / R61)
-    "BTN_UP": (10, "15"), "BTN_DOWN": (11, "16"), "BTN_YES": (12, "17"), "SCL": (13, "18"), "SDA": (14, "19"),
+    # stage 2 (the routing): the buttons with the chip's internal pull-ups, the screen's I2C (R60 / R61). The study's map
+    #  (GPIO10..14, the chip's top side, pins 15..19) left 9 connections open: that side already carries USB, MIDI_TX,
+    #  +3V3 past R24 / R25 / C20 / R35 / C36. YES / DOWN on the right side's drawn lanes (mini 2's VBUS_SENSE / PWR_HOLD
+    #  lanes, pins 7 / 9); UP, SCL, SDA on pins 15 / 16 / 17 in a channel opened over them (C20 upright over pin 20, R35
+    #  over C36: make_board.py): UP to the nearest button, I2C straight north to the header (pins 45 / 47 crowded the
+    #  crystal). None is a strapping pin
+    "BTN_YES": (2, "7"), "BTN_DOWN": (4, "9"), "BTN_UP": (10, "15"), "SCL": (11, "16"), "SDA": (12, "17"),   # (UP on pin 15: the nearest button; YES, the far corner, on a lane)
     "USB_DN": (19, "25"),
     "USB_DP": (20, "26"),
 }
@@ -60,6 +68,7 @@ U1.update({pin: name for name, (_g, pin) in GPIO.items()})
 
 DNP = {"C24",                        # (pads only: the chip match's second shunt)
        "J5", "J6",                            # (the DIN sockets, bottom side: an optional hand-solder, README "DIN")
+       "J2", "J3", "J7",                      # (stage 1f: the three jacks, bottom side, soldered by the user as the DINs)
        "RT40", "RT41",                        # (mini 2.2: the LED resistors' twins, README "mini 2.2")
        "J8", "J9",                            # (mini 2.2: the cells' PH2.0 sockets: the user fits them from the bottom)
        "J10", "JP1", "JP2"}                   # (stage 1e: the screen's header and its VCC / GND jumpers: the user)
@@ -167,12 +176,12 @@ PARTS = [
     ("J4", "ufl", "U.FL", "ufl", "C88374", {"1": "UFL", "2": "GND", "3": "GND"}),
     # ---- the buttons (stage 1e, the user's "option 1 and 2 on one board"): four under big caps, NO / BACK = BOOT on
     #      GPIO0 (R16 its pull-up, nothing else), UP / DOWN / YES on GPIO10 / 11 / 12 with the chip's internal pull-ups
-    #      (no part); RST under a pinhole. All five the Basic 5.1 mm tactile (C318884)
+    #      (no part). All four the Basic 5.1 mm tactile (C318884). Stage 1f (the user's): no RST button (CHIP_PU keeps its
+    #      10 k / 1 uF), the four in a cross: UP top, DOWN bottom, NO / BOOT left, YES right (README "stage 1f")
     ("SW1", "sw", "NO / BOOT", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BOOT", "4": "BOOT"}),
     ("SW3", "sw", "UP", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BTN_UP", "4": "BTN_UP"}),
     ("SW4", "sw", "DOWN", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BTN_DOWN", "4": "BTN_DOWN"}),
     ("SW5", "sw", "YES", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BTN_YES", "4": "BTN_YES"}),
-    ("SW2", "sw", "RST", "sw", "C318884", {"1": "GND", "2": "GND", "3": "CHIP_PU", "4": "CHIP_PU"}),   # (reset: CHIP_PU to ground)
     # ---- the screen (option 2, stage 1e): a 1 x 4 2.54 mm header, NOT fitted: the user solders a cheap 0.96" 128 x 64
     #      I2C OLED module (SSD1306 / SSD1315) on it. Pins 3 / 4 are SCL / SDA; pins 1 / 2 are GND / VCC or VCC / GND
     #      (modules differ): JP1 / JP2, bare 3-pad solder jumpers (no part), take each to GND or +3V3. 10 k pull-ups on
@@ -195,23 +204,30 @@ PARTS = [
     #      soldered by hand there brightens that LED (1 k // 1 k = 500 ohm). 0603 pads: an 0402 or an 0603 fits
     ("RT40", "R", "twin DNP", "r0603", "", {"1": "LED_R", "2": "LED_RA"}),
     ("RT41", "R", "twin DNP", "r0603", "", {"1": "LED_G", "2": "LED_GA"}),
-    # ---- MIDI OUT 1 and MIDI OUT 2: one UART (GPIO21), each output its own loop (stage 1d, the review's fix: a short or
-    #      a mono plug on one jack no longer stops the other, each receiver gets the full current)
+    # ---- MIDI OUT 1 and MIDI OUT 2: one UART on two pins (GPIO21: OUT 1, GPIO17: OUT 2), every connector its own loop
+    #      (stage 1d: each OUT its own; stage 1f, the user's: each of the four connectors its own source and sink, so a
+    #      short or a mono plug on one stops only that one; two loops a pin, ~6.5 mA each at most: README "stage 1f")
     #      MIDI 1.0 at 3.3 V (CA-033): ring = source through 33 ohm (3 x 100 ohm 1206 in parallel: 33.3 ohm, all Basic;
     #      a mono plug's 0.33 W shared, 0.11 W each), tip = sink through 10 ohm from the UART
     ("J2", "jack", "MIDI OUT", "jack", "C18185602", {"D": "MO_T", "C": "MO_R", "A": "GND"}),
-    ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"4": "MO_R", "2": "MO_T", "3": "GND", "6": "GND", "7": "GND"}),   # (pad 4 = DIN 4, pad 2 = DIN 5)
+    ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"4": "MD_R", "2": "MD_T", "3": "GND", "6": "GND", "7": "GND"}),   # (pad 4 = DIN 4, pad 2 = DIN 5)
     ("R14", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),   # (R14 // R26 // R48 = 33.3 ohm)
     ("R26", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),
     ("R48", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),
     ("R15", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MO_T"}),
-    #      MIDI OUT 2: the same parts, its own nets (MO2_R / MO2_T); the same TX: GPIO21 sinks both loops (~2 x 6 mA)
+    #      the DIN's own (stage 1f): one 33 ohm 0805 (Basic) for the source: a 5-pin cable never shorts DIN 4 (only a
+    #      broken one would: 0.33 W in a 0.125 W part), so the jack's three 1206s are not needed here; 10 ohm sink
+    ("R54", "R", "33", "r0805", "C17634", {"1": "+3V3", "2": "MD_R"}),
+    ("R55", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MD_T"}),
+    #      MIDI OUT 2: the same parts, its own nets (MO2_R / MO2_T, MD2_R / MD2_T), from MIDI_TX2 (GPIO17)
     ("J3", "jack", "MIDI OUT 2", "jack", "C18185602", {"D": "MO2_T", "C": "MO2_R", "A": "GND"}),
-    ("J6", "din", "MIDI OUT 2 DIN", "din", "C2939346", {"4": "MO2_R", "2": "MO2_T", "3": "GND", "6": "GND", "7": "GND"}),
+    ("J6", "din", "MIDI OUT 2 DIN", "din", "C2939346", {"4": "MD2_R", "2": "MD2_T", "3": "GND", "6": "GND", "7": "GND"}),
     ("R21", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),   # (R21 // R27 // R49 = 33.3 ohm)
     ("R27", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),
     ("R49", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),
-    ("R20", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MO2_T"}),
+    ("R20", "R", "10", "r0603", "C22859", {"1": "MIDI_TX2", "2": "MO2_T"}),
+    ("R56", "R", "33", "r0805", "C17634", {"1": "+3V3", "2": "MD2_R"}),
+    ("R57", "R", "10", "r0603", "C22859", {"1": "MIDI_TX2", "2": "MD2_T"}),
     # ---- mini 2: LINE IN (README "LINE IN"): a 3.5 mm stereo jack, tip (L) and ring (R) summed to mono by an inverting
     #      summer (each channel 20 k into the op-amp's virtual ground: >= 20 k input impedance, no crosstalk between the
     #      sources), gain 5.6 k / 20 k = 0.28 a channel, -3 dB at ~8.5 kHz (C32 and R35 / C36), AC coupled (7.8 Hz),
@@ -255,7 +271,7 @@ LCSC = {
     "C2765186": "SHOU HAN TYPE-C 16PIN 2MD(073), USB 2.0 receptacle",
     # (the jacks: the PJ-320D's through-hole twin, same body, the pins at the same places; pads A = sleeve, C = ring,
     #  D = tip, B = the switch; the user's ruling 2026-11-12: stronger, JLC solders it)
-    "C18185602": "SHOU HAN PJ-320A-4P DIP, 3.5 mm jack, through hole",
+    "C18185602": "SHOU HAN PJ-320A-4P DIP, 3.5 mm jack, through hole (DNP since stage 1f: bottom side, the user solders it)",
     "C318884": "XKB TS-1187A-B-A-B, tactile switch 5.1 x 5.1 x 1.5 mm",
     "C2286": "KT-0603R, red LED 0603",
     "C23186": "5.1 k 1% 0603", "C25092": "22 ohm 5% 0402",
@@ -281,7 +297,7 @@ LCSC = {
     "C131337": "JST B2B-PH-K-S, PH2.0 2-pin socket, through hole (DNP: the user fits it from the bottom)",
     "C8598": "CJ B5819W SL, Schottky 40 V 1 A, SOD-123", "C26083": "1 M 1% 0402", "C25741": "100 k 1% 0402",
     "C2297": "KT-0805G, emerald green LED 0805, Vf 2.6..3.1 V at 5 mA (Basic)",
-    "C17901": "100 ohm 1% 1206, 0.25 W (Basic)",
+    "C17901": "100 ohm 1% 1206, 0.25 W (Basic)", "C17634": "33 ohm 1% 0805, 0.125 W (Basic; stage 1f: the DINs' source)",
 }
 
 

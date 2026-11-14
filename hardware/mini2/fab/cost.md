@@ -4,14 +4,14 @@
 
 | | usb: 5 boards | usb: 10 boards | battery: 5 boards | battery: 10 boards |
 |---|---|---|---|---|
-| parts / lines / joints a board | 80 / 38 / 258 | 80 / 38 / 258 | 92 / 43 / 291 | 92 / 43 / 291 |
-| Extended types (fee) | 7 | 7 | 9 | 9 |
-| **total, USD** | **66.55** | **92.34** | **76.67** | **105.62** |
-| per board, USD | 13.31 | 9.23 | 15.33 | 10.56 |
+| parts / lines / joints a board | 80 / 38 / 250 | 80 / 38 / 250 | 92 / 43 / 283 | 92 / 43 / 283 |
+| Extended types (fee) | 6 | 6 | 8 | 8 |
+| **total, USD** | **62.51** | **87.37** | **72.64** | **100.65** |
+| per board, USD | 12.50 | 8.74 | 14.53 | 10.06 |
 
 ## The usb order
 
-80 parts on 38 lines, 258 joints a board.
+80 parts on 38 lines, 250 joints a board.
 
 | | 5 boards, USD | 10 boards, USD |
 |---|---|---|
@@ -19,11 +19,11 @@
 | Economic setup | 8.24 | 8.24 |
 | Economic stencil | 1.55 | 1.55 |
 | nitrogen reflow | 0.91 | 0.91 |
-| Extended part types (7 x 3.09) | 21.63 | 21.63 |
-| solder joints (258 a board) | 2.19 | 4.39 |
-| parts (with JLC's loss) | 28.72 | 50.63 |
-| **total** | **66.55** (EUR 57.23) | **92.34** (EUR 79.42) |
-| **per board** | **13.31** (EUR 11.45) | **9.23** (EUR 7.94) |
+| Extended part types (6 x 3.09) | 18.54 | 18.54 |
+| solder joints (250 a board) | 2.12 | 4.25 |
+| parts (with JLC's loss) | 27.84 | 48.88 |
+| **total** | **62.51** (EUR 53.76) | **87.37** (EUR 75.13) |
+| **per board** | **12.50** (EUR 10.75) | **8.74** (EUR 7.51) |
 
 ### Parts (5 boards)
 
@@ -36,11 +36,11 @@
 | C1531 | 0402B222K500NT | Extended (preferred) | 553828 | 1 | 15 | 0.0025 | 0.04 |
 | C1550 | 0402CG1R0C500NT | Extended (preferred) | 694423 | 1 | 15 | 0.0029 | 0.04 |
 | C17168 | 0402WGF0000TCE | Basic | 15759383 | 2 | 20 | 0.0012 | 0.02 |
+| C17634 | 0805W8F330JT5E | Basic | 1133946 | 2 | 20 | 0.0046 | 0.09 |
 | C17901 | 1206W4F1000T5E | Basic | 2021373 | 6 | 40 | 0.0059 | 0.24 |
-| C18185602 | PJ-320A-4P DIP | Extended | 19146 | 3 | 16 | 0.0553 | 0.88 |
 | C19077524 | SMAJ5.0CA | Extended (preferred) | 612837 | 2 | 12 | 0.0377 | 0.45 |
 | C19702 | CL10A106KP8NNNC | Basic | 11726060 | 3 | 25 | 0.0233 | 0.58 |
-| C22859 | 0603WAF100JT5E | Basic | 5308681 | 2 | 20 | 0.0020 | 0.04 |
+| C22859 | 0603WAF100JT5E | Basic | 5308681 | 4 | 30 | 0.0020 | 0.06 |
 | C2286 | KT-0603R | Basic | 5884703 | 1 | 15 | 0.0077 | 0.12 |
 | C2297 | KT-0805G | Basic | 1725687 | 1 | 15 | 0.0164 | 0.25 |
 | C23186 | 0603WAF5101T5E | Basic | 19366976 | 2 | 20 | 0.0015 | 0.03 |
@@ -55,7 +55,7 @@
 | C26083 | 0402WGF1004TCE | Basic | 2361343 | 1 | 20 | 0.0012 | 0.02 |
 | C2765186 | TYPE-C 16PIN 2MD(073) | Extended | 1059341 | 1 | 8 | 0.0729 | 0.58 |
 | C2913196 | ESP32-S3FN8 | Extended | 4257 | 1 | 5 | 3.3473 | 16.74 |
-| C318884 | TS-1187A-B-A-B | Basic | 815291 | 5 | 33 | 0.0215 | 0.71 |
+| C318884 | TS-1187A-B-A-B | Basic | 815291 | 4 | 28 | 0.0215 | 0.60 |
 | C32949 | CL05C100JB5NNNC | Basic | 2059422 | 2 | 20 | 0.0057 | 0.11 |
 | C52923 | CL05A105KA5NQNC | Basic | 10476533 | 7 | 47 | 0.0057 | 0.27 |
 | C5446 | XC6206P332MR-G | Basic | 470964 | 1 | 7 | 0.1262 | 0.88 |
@@ -68,26 +68,11 @@
 | C87532 | MLG1005S3N3BT000 | Extended | 4431 | 1 | 15 | 0.0089 | 0.13 |
 | C88374 | U.FL-R-SMT-1(80) | Extended | 295330 | 1 | 9 | 0.0923 | 0.83 |
 
-Extended types that pay the fee: C18185602, C254377, C2765186, C2913196, C76769, C87532, C88374
-
-### Through-hole parts: who solders them
-
-Through-hole parts a board: C18185602 x3 (PJ-320A-4P DIP); 12 joints a board.
-
-| | 5 boards, USD | 10 boards, USD |
-|---|---|---|
-| the table above (THT joints at the SMD rate) | 66.55 | 92.34 |
-| **A: JLC hand-solders them** (Economic; manual joints + labour) | 71.01 | 97.69 |
-| A, if JLC moves the order to Standard (+ setup and stencil; Standard's feeder fees not counted) | 94.99 | 121.67 |
-| **B: the user solders them**: the JLC order without them | 62.47 | 87.34 |
-| B: the through-hole parts bought separately (+ shipping) | 0.83 | 1.66 |
-| **B in all** (+ shipping) | **63.30** | **88.99** |
-
-Whether JLC's Economic assembly takes through-hole parts is not settled: JLC's prototype-assembly page lists "SMT, through-hole and mixed-technology assembly" for both kinds, users report the opposite; the online quote decides. Whether a through-hole part pays the Extended fee is not stated either (counted here, as above).
+Extended types that pay the fee: C254377, C2765186, C2913196, C76769, C87532, C88374
 
 ## The battery order
 
-92 parts on 43 lines, 291 joints a board.
+92 parts on 43 lines, 283 joints a board.
 
 | | 5 boards, USD | 10 boards, USD |
 |---|---|---|
@@ -95,11 +80,11 @@ Whether JLC's Economic assembly takes through-hole parts is not settled: JLC's p
 | Economic setup | 8.24 | 8.24 |
 | Economic stencil | 1.55 | 1.55 |
 | nitrogen reflow | 0.91 | 0.91 |
-| Extended part types (9 x 3.09) | 27.81 | 27.81 |
-| solder joints (291 a board) | 2.47 | 4.95 |
-| parts (with JLC's loss) | 32.39 | 57.17 |
-| **total** | **76.67** (EUR 65.94) | **105.62** (EUR 90.84) |
-| **per board** | **15.33** (EUR 13.19) | **10.56** (EUR 9.08) |
+| Extended part types (8 x 3.09) | 24.72 | 24.72 |
+| solder joints (283 a board) | 2.41 | 4.81 |
+| parts (with JLC's loss) | 31.51 | 55.41 |
+| **total** | **72.64** (EUR 62.47) | **100.65** (EUR 86.56) |
+| **per board** | **14.53** (EUR 12.49) | **10.06** (EUR 8.66) |
 
 ### Parts (5 boards)
 
@@ -114,11 +99,11 @@ Whether JLC's Economic assembly takes through-hole parts is not settled: JLC's p
 | C1550 | 0402CG1R0C500NT | Extended (preferred) | 694423 | 1 | 15 | 0.0029 | 0.04 |
 | C164106 | HT7833 | Extended | 4337 | 1 | 5 | 0.3383 | 1.69 |
 | C17168 | 0402WGF0000TCE | Basic | 15759383 | 2 | 20 | 0.0012 | 0.02 |
+| C17634 | 0805W8F330JT5E | Basic | 1133946 | 2 | 20 | 0.0046 | 0.09 |
 | C17901 | 1206W4F1000T5E | Basic | 2021373 | 6 | 40 | 0.0059 | 0.24 |
-| C18185602 | PJ-320A-4P DIP | Extended | 19146 | 3 | 16 | 0.0553 | 0.88 |
 | C19077524 | SMAJ5.0CA | Extended (preferred) | 612837 | 2 | 12 | 0.0377 | 0.45 |
 | C19702 | CL10A106KP8NNNC | Basic | 11726060 | 5 | 35 | 0.0233 | 0.82 |
-| C22859 | 0603WAF100JT5E | Basic | 5308681 | 2 | 20 | 0.0020 | 0.04 |
+| C22859 | 0603WAF100JT5E | Basic | 5308681 | 4 | 30 | 0.0020 | 0.06 |
 | C2286 | KT-0603R | Basic | 5884703 | 1 | 15 | 0.0077 | 0.12 |
 | C2297 | KT-0805G | Basic | 1725687 | 1 | 15 | 0.0164 | 0.25 |
 | C23186 | 0603WAF5101T5E | Basic | 19366976 | 3 | 25 | 0.0015 | 0.04 |
@@ -135,7 +120,7 @@ Whether JLC's Economic assembly takes through-hole parts is not settled: JLC's p
 | C26083 | 0402WGF1004TCE | Basic | 2361343 | 2 | 25 | 0.0012 | 0.03 |
 | C2765186 | TYPE-C 16PIN 2MD(073) | Extended | 1059341 | 1 | 8 | 0.0729 | 0.58 |
 | C2913196 | ESP32-S3FN8 | Extended | 4257 | 1 | 5 | 3.3473 | 16.74 |
-| C318884 | TS-1187A-B-A-B | Basic | 815291 | 5 | 33 | 0.0215 | 0.71 |
+| C318884 | TS-1187A-B-A-B | Basic | 815291 | 4 | 28 | 0.0215 | 0.60 |
 | C32574 | TP4054-42-SOT25R | Extended (preferred) | 69917 | 1 | 7 | 0.1321 | 0.92 |
 | C32949 | CL05C100JB5NNNC | Basic | 2059422 | 2 | 20 | 0.0057 | 0.11 |
 | C52923 | CL05A105KA5NQNC | Basic | 10476533 | 7 | 47 | 0.0057 | 0.27 |
@@ -149,22 +134,7 @@ Whether JLC's Economic assembly takes through-hole parts is not settled: JLC's p
 | C87532 | MLG1005S3N3BT000 | Extended | 4431 | 1 | 15 | 0.0089 | 0.13 |
 | C88374 | U.FL-R-SMT-1(80) | Extended | 295330 | 1 | 9 | 0.0923 | 0.83 |
 
-Extended types that pay the fee: C164106, C18185602, C254377, C2765186, C2913196, C76769, C80628, C87532, C88374
-
-### Through-hole parts: who solders them
-
-Through-hole parts a board: C18185602 x3 (PJ-320A-4P DIP); 12 joints a board.
-
-| | 5 boards, USD | 10 boards, USD |
-|---|---|---|
-| the table above (THT joints at the SMD rate) | 76.67 | 105.62 |
-| **A: JLC hand-solders them** (Economic; manual joints + labour) | 81.14 | 110.97 |
-| A, if JLC moves the order to Standard (+ setup and stencil; Standard's feeder fees not counted) | 105.12 | 134.95 |
-| **B: the user solders them**: the JLC order without them | 72.60 | 100.61 |
-| B: the through-hole parts bought separately (+ shipping) | 0.83 | 1.66 |
-| **B in all** (+ shipping) | **73.43** | **102.27** |
-
-Whether JLC's Economic assembly takes through-hole parts is not settled: JLC's prototype-assembly page lists "SMT, through-hole and mixed-technology assembly" for both kinds, users report the opposite; the online quote decides. Whether a through-hole part pays the Extended fee is not stated either (counted here, as above).
+Extended types that pay the fee: C164106, C254377, C2765186, C2913196, C76769, C80628, C87532, C88374
 
 ## Sources
 
