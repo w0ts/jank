@@ -176,7 +176,7 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
         c->quantum = (uint8_t)v;
     else if (!strcmp(key, "offset") && !parse_hundredths(val, &v) && v >= -JK_OFFSET_MAX_10US && v <= JK_OFFSET_MAX_10US)
         c->offset_10us = (int16_t)v;
-    else if (!strcmp(key, "beat_latency") && !parse_int(val, 0, JK_BEAT_LATENCY_MAX_MS, &v))
+    else if (!strcmp(key, "beat_latency") && !parse_int(val, JK_BEAT_LATENCY_MIN_MS, JK_BEAT_LATENCY_MAX_MS, &v))
         c->beat_latency_ms = (int16_t)v;
     else
         return -1;

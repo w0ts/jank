@@ -49,6 +49,12 @@ static void follow_phase(struct jbl *c, struct lk_node *k, int64_t now, const st
     c->phase_forces++;
 }
 
+int32_t jbl_session_offset_us(int64_t ub_at, int32_t mpb)
+{
+    int64_t whole = floor_div(ub_at + LK_UBEAT / 2, LK_UBEAT) * LK_UBEAT;
+    return (int32_t)llround(-(double)(ub_at - whole) * (double)mpb / (double)LK_UBEAT);
+}
+
 /* Link's start on the next bar line at least JBL_START_LEAD_US ahead */
 static void start_session(struct jbl *c, struct lk_node *k, int64_t now, uint32_t quantum)
 {

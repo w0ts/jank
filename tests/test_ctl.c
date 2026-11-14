@@ -297,7 +297,9 @@ static void test_beat(void)
     CHECK(cfg.beat == 1 && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS);
     CHECK(run("set beat_latency 40") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 40);
     CHECK(run("set beat_latency 301") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == 40);
-    CHECK(run("set beat_latency -1") == JK_CTL_NONE && cfg.beat_latency_ms == 40);
+    CHECK(run("set beat_latency -1") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == -1);      /* the stick may hear it after the speakers */
+    CHECK(run("set beat_latency -301") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == -1);
+    CHECK(run("set beat_latency 40") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 40);
     CHECK(run("set beat off") == JK_CTL_CFG_CHANGED && cfg.beat == 0);
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "beat=off\nbeat_latency=40\n"));
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .mode = 1, .bpm_x100 = 12345, .heap_min = 90000, .cpu_pct_x10 = 253, .packets = 77};

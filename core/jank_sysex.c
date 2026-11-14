@@ -38,11 +38,23 @@ size_t jx_push_frame(uint8_t type, const char *text, size_t n, uint8_t *out)
 
 static const char *const BEAT_MODES[] = {"stopped", "steady", "faster", "slower"};
 
-size_t jx_beat_line(char *out, size_t cap, char kind, uint32_t n, int32_t bpm_x100, unsigned mode, unsigned audio)
+static long clamp_field(int32_t v) { return v > JX_FIELD_MAX ? JX_FIELD_MAX : v < -JX_FIELD_MAX ? -JX_FIELD_MAX : (long)v; }
+
+size_t jx_beat_line(char *out, size_t cap, char kind, uint32_t n, int32_t bpm_x100, unsigned mode, unsigned audio, int32_t extra,
+                    int32_t extra2)
 {
     int r = snprintf(out, cap, "%c %lu %ld %s %u", kind, (unsigned long)n, (long)(bpm_x100 > 0 ? bpm_x100 : 0),
                      BEAT_MODES[mode & 3u], audio ? 1u : 0u);
-    return r < 0 || (size_t)r >= cap ? 0u : (size_t)r;
+    size_t at = r < 0 ? cap : (size_t)r;
+    if (at < cap && extra != JX_NO_EXTRA) {
+        r = snprintf(out + at, cap - at, " %ld", clamp_field(extra));
+        at = r < 0 ? cap : at + (size_t)r;
+    }
+    if (at < cap && extra != JX_NO_EXTRA) {
+        r = extra2 == JX_NO_EXTRA ? snprintf(out + at, cap - at, " -") : snprintf(out + at, cap - at, " %ld", clamp_field(extra2));
+        at = r < 0 ? cap : at + (size_t)r;
+    }
+    return at >= cap ? 0u : at;
 }
 
 size_t jx_realtime_packets(const uint8_t *bytes, size_t n, uint8_t *out, size_t cap)
