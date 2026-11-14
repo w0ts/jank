@@ -34,16 +34,21 @@ the old image back (`main/ota.c`, `main/usb.c`).
 3. Live (or any Link app) with Link on joins over the stick's network adapter as usual. Within some beats the session's
    tempo follows the track, the stick's LED flashes on the beat and Live's Link beat lines up with what is heard. When
    the music stops, Link stops; when it starts again, Link starts on the next bar (quantum 4).
-4. Line up the phase by ear with the page's **Latency, ms** (or `set beat_latency <0..300>`): the music is heard that
-   long after its samples reach the stick (speaker output and USB buffering). Default 25. `set beat off` stops the
+4. Line up the phase by ear with the page's **Latency, ms** (or `set beat_latency <-300..300>`): the music is heard that
+   long after its samples reach the stick (speaker output and USB buffering); negative when the stick gets the audio
+   after the speakers play it. Default 25; not stored (back to 25 at each start; the set itself writes no flash: the
+   stored settings are unchanged and NVS skips an identical blob). `set beat off` stops the
    tracker steering Link and leaves everything else as it was.
 
 ## Beat reports
 
 On its own, with no question asked, the stick sends a SysEx `F0 7D 'J' 'B' 0x10 <text> F7` on the MIDI port: `b <n>
-<bpm x100> <mode> <audio>` on each tracked beat (n counts the beats) and `t ...` once a second (n: the last beat's).
-`mode` is stopped, steady, faster or slower; `audio` is 1 while the computer streams. The control line's readers
-(ota.py, this page) match `F0 7D 'J' 'K'` only and never see them (`core/jank_sysex.h`, `JX_PUSH_*`).
+<bpm x100> <mode> <audio> <lag us>` on each tracked beat (n counts the beats) and `t <n> <bpm x100> <mode> <audio>
+<latency ms>` once a second (n: the last beat's). `mode` is stopped, steady, faster or slower; `audio` is 1 while the
+computer streams. `lag` is how long before the report the beat is taken to be heard (its sample's arrival +
+`beat_latency`, as the Link grid uses it): a reader that stamps the report's arrival subtracts it to get that instant.
+`latency` is the `beat_latency` setting. The control line's readers (ota.py, this page) match `F0 7D 'J' 'K'` only and
+never see them (`core/jank_sysex.h`, `JX_PUSH_*`). beat-listener's `player --xiao` scores them against Traktor's beats.
 
 ## Reading the numbers
 

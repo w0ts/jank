@@ -50,17 +50,48 @@ struct step_ctx {
     uint32_t quantum;
 };
 
+struct session_q {
+    int64_t at;                        /* host us */
+    int32_t us;                        /* the session's nearest beat from `at` */
+    uint8_t ok;                        /* in a session that plays */
+};
+
+/* the bridge's task's lock held: the session's beat near q->at */
+static void session_at(struct jank_peer *p, int64_t now, void *arg)
+{
+    struct session_q *q = arg;
+    (void)now;
+    q->ok = (uint8_t)(jp_joined(p) && jp_playing(p));
+    if (q->ok)
+        q->us = jbl_session_offset_us(jp_beat_at(p, q->at), jp_mpb(p));
+}
+
 /* the beat report on the MIDI port (jank_sysex.h JX_PUSH_BEAT): 'b' on each tracked beat, 't' once a second */
 static void report(char kind, double at_s)
 {
     struct uac_stats u;
+    struct jk_cfg cfg;
     double bpm = 0.0;
     char line[JX_PUSH_TEXT_MAX + 1];
+    int32_t extra = JX_NO_EXTRA, link = JX_NO_EXTRA;
+    int64_t sample_us;
     enum jb_mode_kind mode = jb_mode_at(&s_mode, at_s);
     if (!jb_mode_bpm_at(&s_mode, at_s, &bpm))
         bpm = 0.0;
     uac_stats(&u);
-    size_t n = jx_beat_line(line, sizeof line, kind, s_beat_n, (int32_t)llround(bpm * 100.0), (unsigned)mode, u.open);
+    app_cfg_get(&cfg);
+    if (kind == 't')
+        extra = cfg.beat_latency_ms;
+    else if (uac_sample_time((int64_t)llround(at_s * (double)UAC_RATE), &sample_us)) {
+        /* the beat as the stick takes it to be heard (as the Link grid does: make_input) and how long ago that was */
+        struct session_q q = {.at = sample_us + (int64_t)cfg.beat_latency_ms * 1000};
+        int64_t lag = midi_now_us() - q.at;
+        extra = lag > INT32_MAX ? INT32_MAX : lag <= INT32_MIN ? INT32_MIN + 1 : (int32_t)lag;
+        bridge_with_peer(session_at, &q);          /* the Link session's beat (what Live follows) near that instant */
+        if (q.ok)
+            link = q.us;
+    }
+    size_t n = jx_beat_line(line, sizeof line, kind, s_beat_n, (int32_t)llround(bpm * 100.0), (unsigned)mode, u.open, extra, link);
     if (n)
         usb_beat_line(line, n);
 }

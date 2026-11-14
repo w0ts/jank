@@ -79,14 +79,22 @@ static void test_beat_report(void)
     uint8_t wire[JX_PUSH_FRAME_MAX];
     char out[64];
     struct jx_in in;
-    size_t n = jx_beat_line(text, sizeof text, 'b', 17, 12403, 1, 1);
-    assert(n == strlen("b 17 12403 steady 1") && !memcmp(text, "b 17 12403 steady 1", n));
-    assert(jx_beat_line(text, sizeof text, 't', 0, -5, 0, 0) == strlen("t 0 0 stopped 0"));
-    assert(!memcmp(text, "t 0 0 stopped 0", strlen("t 0 0 stopped 0")));
-    n = jx_beat_line(text, sizeof text, 'b', 4294967295u, 99999, 3, 1);      /* the longest line fits */
+#define SAME(s) (n == strlen(s) && !memcmp(text, s, n))
+    size_t n = jx_beat_line(text, sizeof text, 'b', 17, 12403, 1, 1, JX_NO_EXTRA, JX_NO_EXTRA);
+    assert(SAME("b 17 12403 steady 1"));
+    n = jx_beat_line(text, sizeof text, 'b', 17, 12403, 1, 1, 31250, -4300);  /* the lag and the link offset, us */
+    assert(SAME("b 17 12403 steady 1 31250 -4300"));
+    n = jx_beat_line(text, sizeof text, 'b', 17, 12403, 1, 1, -4000, JX_NO_EXTRA);   /* no session playing */
+    assert(SAME("b 17 12403 steady 1 -4000 -"));
+    n = jx_beat_line(text, sizeof text, 't', 0, -5, 0, 0, 25, JX_NO_EXTRA);  /* the latency, ms */
+    assert(SAME("t 0 0 stopped 0 25 -"));
+    n = jx_beat_line(text, sizeof text, 'b', 1, 100, 1, 1, 123456789, -123456789);   /* clamped */
+    assert(SAME("b 1 100 steady 1 9999999 -9999999"));
+    n = jx_beat_line(text, sizeof text, 'b', 4294967295u, 99999, 3, 1, INT32_MIN + 1, INT32_MIN + 1);   /* the longest fits */
     assert(n > 0 && n <= JX_PUSH_TEXT_MAX);
-    assert(jx_beat_line(text, 8, 'b', 17, 12403, 1, 1) == 0);               /* too small a buffer: nothing */
-    n = jx_beat_line(text, sizeof text, 'b', 17, 12403, 2, 1);
+    assert(jx_beat_line(text, 8, 'b', 17, 12403, 1, 1, JX_NO_EXTRA, JX_NO_EXTRA) == 0);   /* too small a buffer: nothing */
+    assert(jx_beat_line(text, 22, 'b', 17, 12403, 1, 1, 31250, 5) == 0);  /* the extra fields do not fit: nothing */
+    n = jx_beat_line(text, sizeof text, 'b', 17, 12403, 2, 1, JX_NO_EXTRA, JX_NO_EXTRA);
     size_t w = jx_push_frame(JX_PUSH_BEAT, text, n, wire);
     assert(w == n + 6 && wire[0] == 0xF0 && wire[1] == 0x7D && wire[2] == 'J' && wire[3] == 'B' && wire[4] == JX_PUSH_BEAT);
     assert(!memcmp(wire + 5, "b 17 12403 faster 1", n) && wire[w - 1] == 0xF7);

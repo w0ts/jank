@@ -106,6 +106,7 @@ enum jk_net {
 #define JK_PASS_MAX 63u
 #define JK_QUANTUM_MAX 16u
 #define JK_OFFSET_MAX_10US 10000       /* +-100 ms */
+#define JK_BEAT_LATENCY_MIN_MS (-300)   /* negative: the stick hears the audio after the speakers do (player --xiao) */
 #define JK_BEAT_LATENCY_MAX_MS 300
 #define JK_BEAT_LATENCY_DEFAULT_MS 25
 struct jk_cfg {
@@ -122,7 +123,7 @@ struct jk_cfg {
     /* The beat-follow bench build's settings come after everything that is stored (store.c keeps only what is above
      * this line), so they are back at their defaults at every start. */
     uint8_t beat;                     /* 1: the beat tracker steers the Link session */
-    int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (0..JK_BEAT_LATENCY_MAX_MS) */
+    int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX) */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */

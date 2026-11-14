@@ -127,8 +127,21 @@ static void test_drifting_tracked_grid(void)
     CHECK(jbl.phase_forces <= 1);                    /* 200 beats x 5 us = 1 ms in all */
 }
 
+/* the reports' session offset: + when the session's beat comes after the instant */
+static void test_session_offset(void)
+{
+    const int32_t mpb = 500000;                                   /* 120 BPM */
+    CHECK(jbl_session_offset_us(10 * (int64_t)LK_UBEAT, mpb) == 0);
+    CHECK(jbl_session_offset_us(10 * (int64_t)LK_UBEAT - 20000, mpb) == 10000);     /* at 9.98 beats: next beat in 10 ms */
+    CHECK(jbl_session_offset_us(10 * (int64_t)LK_UBEAT + 20000, mpb) == -10000);    /* at 10.02: it was 10 ms ago */
+    CHECK(jbl_session_offset_us(-(int64_t)LK_UBEAT - 20000, mpb) == 10000);         /* at -1.02: beat -1 comes in 10 ms */
+    CHECK(jbl_session_offset_us(10 * (int64_t)LK_UBEAT + 499999, mpb) == -250000);  /* the nearest beat is behind */
+    CHECK(jbl_session_offset_us(10 * (int64_t)LK_UBEAT + 500001, mpb) == 250000);   /* ... ahead */
+}
+
 int main(void)
 {
+    test_session_offset();
     test_phase_forced_past_5ms();
     test_tempo_deadband();
     test_transport();

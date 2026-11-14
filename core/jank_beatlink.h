@@ -31,4 +31,8 @@ struct jbl_in {
 void jbl_init(struct jbl *c);
 /* joined: the node is in a session with peers. now: host time. quantum: beats a bar. */
 void jbl_step(struct jbl *c, struct lk_node *k, int joined, int64_t now, const struct jbl_in *in, uint32_t quantum);
+/* Where the session's nearest beat is from an instant, in us (+: the session's beat comes later), given the session's
+ * beat position at that instant (micro-beats, lk_beat_at) and its microseconds a beat. For the beat reports: what Live
+ * follows against the beat as the stick takes it to be heard. */
+int32_t jbl_session_offset_us(int64_t ub_at, int32_t mpb);
 #endif
