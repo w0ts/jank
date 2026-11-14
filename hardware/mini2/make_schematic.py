@@ -92,6 +92,10 @@ SYMBOLS["chg"] = ([("4", "VCC", "power_in"), ("5", "PROG", PAS)], [("3", "BAT", 
 SYMBOLS["prot"] = ([("3", "VDD", "power_in"), ("1", "VT", PAS)], [("2", "GND", PAS), ("4", "VM", PAS), ("5", "VM", PAS)],
                    "U", 7.62)
 SYMBOLS["ph2"] = ([("1", "1", PAS)], [("2", "2", PAS)], "J", 5.08)
+# stage 1e: a bidirectional TVS (no polarity), the screen's 1 x 4 header, a 3-pad solder jumper (2 = the middle)
+SYMBOLS["tvsbi"] = ([("1", "~", PAS)], [("2", "~", PAS)], "D", 2.54)
+SYMBOLS["hdr4"] = ([("1", "P1", PAS), ("2", "P2", PAS)], [("3", "SCL", PAS), ("4", "SDA", PAS)], "J", 5.08)
+SYMBOLS["sj3"] = ([("1", "A", PAS), ("3", "B", PAS)], [("2", "C", PAS)], "JP", 5.08)
 
 
 def symbol(kind):

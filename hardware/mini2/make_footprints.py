@@ -113,7 +113,27 @@ def write():
         open(os.path.join(OUT, name + ".kicad_mod"), "w").write(body)
         names.append(name)
     open(os.path.join(OUT, "TRS_PADS_SMD.kicad_mod"), "w").write(trs_pads())
-    return names + ["TRS_PADS_SMD"]
+    open(os.path.join(OUT, "SJ3_SMD.kicad_mod"), "w").write(sj3())
+    return names + ["TRS_PADS_SMD", "SJ3_SMD"]
+
+
+SJ_PITCH, SJ_PAD_W, SJ_PAD_H = 1.3, 1.0, 1.5    # (mini 2.2: KiCad's SolderJumper-3_P1.3mm_Open_Pad1.0x1.5mm sizes)
+
+
+def sj3():
+    """mini 2.2: a 3-pad solder jumper (pads 1, 2, 3 in a row, 2 in the middle; 0.3 mm gaps a blob bridges), bare
+    copper, no part: the screen's VCC / GND choice (JP1 / JP2)"""
+    pads = [f'  (pad "{i + 1}" smd rect (at {(i - 1) * SJ_PITCH:.2f} 0) (size {SJ_PAD_W} {SJ_PAD_H}) (layers "F.Cu" "F.Mask"))'
+            for i in range(3)]
+    a, b = SJ_PITCH + SJ_PAD_W / 2 + 0.15, SJ_PAD_H / 2 + 0.15
+    return "\n".join(['(footprint "SJ3_SMD" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
+                      '  (descr "3-pad solder jumper, open: bridge 1-2 or 2-3 with solder; not a part")',
+                      '  (attr smd exclude_from_bom exclude_from_pos_files)',
+                      '  (property "Reference" "JP**" (at 0 -1.6 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      '  (property "Value" "SJ3" (at 0 1.6 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      *pads,
+                      f'  (fp_rect (start {-a:.2f} {-b:.2f}) (end {a:.2f} {b:.2f}) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
+                      ")", ""])
 
 
 if __name__ == "__main__":

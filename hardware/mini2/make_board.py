@@ -45,6 +45,9 @@ DY = float(os.environ.get("DY", "8"))
 H = H0 + DY
 TOP = {"J1", "J2", "J3", "U5", "R3", "R4", "R12", "R13", "R23", "D3", "R5"}
 GE = H - 10.0                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
+# stage 1e (the user's: the u.FL only): the antenna strip is gone, the board ends at the ground's edge; STRIP=10 puts the
+# 10 mm strip back (for a chip antenna). Everything placed from GE and CY stays where it was
+STRIP = float(os.environ.get("STRIP", "0"))
 S = (W - 44.6) / 2                # (the middle's shift: 44 -> 47.6 mm for the 2200 uF cans, 49.6 for the DIN pads' rings; 53.2 for RST (the right side), 54.2 and 56.2 for the left side's tracks)
 SB = S - 2.0                # (the buck group's shift: it stays by C1 and J5, the chip moved 2 mm away from it)
 CX, CY = 18.8 + S, GE - max(13.5, 12.1 + (H0 - 52.5) * 0.4)   # (13.5 or more: the crystal clear of J4)    # the chip's centre (turned 180: LNA_IN at the right side's bottom)
@@ -56,7 +59,12 @@ Y_L3 = Y_LINE + 0.6         # L3 and the line's top, 0.6 under LNA_IN: room for 
 ANT_Y = GE + 2.5 + 1.58     # the antenna's centre: its feed pad (S1) 2.0 mm past the ground edge (eval board)
 END_PAD = (1.8, 2.5)        # the copper beyond the antenna's end pad (S2), unconnected (eval board: 1.8 x 2.5)
 DIN_D, DIN_Y = 8.6, 20.3 + DY    # the DINs' origins: their faces (8.6 from JLC's origin) on the side edges, their axes at y 20
+H = GE + STRIP              # (stage 1e: the board's bottom edge; the parts above were placed from GE and CY)
 CAN_Y = 35.5 + (CY - 30.4)               # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
+# stage 1e: the screen module's outline (a 0.96" 128 x 64 I2C OLED, 27.3 x 27.8 mm, on J10's header ~2.5 mm over the
+# board, the header row 1.5 mm in from its top edge: *typical module, unverified per maker*): only low parts under it
+HDR = (34.0, 14.8)
+MODULE = (HDR[0] - 27.3 / 2, HDR[1] - 1.5, HDR[0] + 27.3 / 2, HDR[1] - 1.5 + 27.8)
 
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
@@ -71,10 +79,17 @@ PLACE = {
     # mini 2.2 simplified (README "mini 2.2 simplified"): BOOT (SW1) and RST (SW2) in one row in the middle, 10 mm apart
     # (BOOT under a big cap); the indicator (LED1 red, LED2 green side by side: one window) between them and the USB
     # parts, each LED's 1 k and its DNP twin beside it
-    "SW1": (W / 2 - 5.0, 25.0, 0), "SW2": (W / 2 + 5.0, 25.0, 0),
-    "LED1": (W / 2, 18.4, 0), "LED2": (W / 2, 20.6, 0),     # (one above the other, 2.2 mm apart: one window over both)
-    "R40": (W / 2 - 4.0, 18.4, 0), "RT40": (W / 2 - 4.2, 20.4, 0),
-    "R41": (W / 2 + 4.0, 20.6, 0), "RT41": (W / 2 + 4.0, 18.4, 0),
+    # stage 1e (the user's "LEDs and buttons, or a cheap screen and 4 buttons", both on one board): the four buttons in a
+    # 2 x 2 grid at the lower right, 9.5 mm apart (8 mm caps), clear of the screen and of J6's pads (UP over DOWN on the
+    # left, NO / BOOT over YES on the right, as the screen study); RST at the top right under a pinhole; the LEDs (one
+    # window) at the top left, out from under the screen; the screen's header in the middle under the USB parts
+    "SW3": (51.5, 44.0, 0), "SW1": (61.0, 44.0, 0), "SW4": (51.5, 53.5, 0), "SW5": (61.0, 53.5, 0),
+    "SW2": (52.5, 14.5, 0),
+    "LED1": (5.5, 15.0, 0), "LED2": (5.5, 17.2, 0),         # (one above the other, 2.2 mm apart: one window over both)
+    "R40": (9.5, 15.0, 0), "RT40": (12.6, 15.0, 0),
+    "R41": (9.5, 17.2, 0), "RT41": (12.6, 17.2, 0),
+    "J10": (HDR[0], HDR[1], 0, "T"), "JP1": (31.0, 18.8, 0), "JP2": (35.2, 18.8, 0),
+    "R60": (40.2, 15.6, 90), "R61": (41.2, 15.6, 90), "C60": (43.2, 15.1, 90), "C61": (44.9, 15.1, 90),
     # under the USB-C: the CC resistors (each under its own pin's side: CC2 = B5 left, CC1 = A5 right); the strip under
     # U5 stays free for D+ / D- to the chip
     "R4": (W / 2 - 3.6, 11.0, 90), "R3": (W / 2 + 3.6, 11.0, 90),
@@ -100,7 +115,9 @@ PLACE = {
     "R16": (15.8 + S, 34.85, 0),
     # the chip (turned 180: LNA_IN at the bottom of its right side) and its parts round it
     "U1": (CX, CY, 180),
-    "U5": (W / 2, 10.9, 0),                                           # USB ESD, right under the USB-C's data pads
+    "U5": (W / 2, 11.1, 270),                                         # USB ESD, right under the USB-C's data pads
+    # (stage 1e: the SRV05-4's JLC footprint is the USBLC6's pattern turned 90, its pad rows 0.2 mm further out: at 270
+    #  and 0.2 mm lower its top row (VBUS, D-, D+) sits where the USBLC6's did, so the drawn USB tracks and VBUS via hold)
     "R24": (CX - 0.3, CY - 6.2, 180), "R25": (CX - 0.3, CY - 5.2, 180),   # USB D+ / D- 22 ohm, right of pins 26 / 25 (pin 27 free)
     "C20": (CX + 1.5, CY - 4.6, 180),                                                  # VDD3P3_RTC (pin 20, top); mini 2: turned, its +3V3 pad east (the GND pad was boxed in by MIDI2_TX)
     "R8": (CX + 8.5, CY - 5.6, 0),          # (mini 2.2 simplified: CHIP_PU's 10 k by C7, chip-relative)
@@ -118,21 +135,17 @@ PLACE = {
     # (fitted) the u.FL path, the default (the user's ruling 2026-11-11); the unfitted pads right against the line (their
     # stubs as short as the pads allow)
     "C23": (CX + 4.8, Y_LINE + 0.85, 270), "L3": (CX + 6.5, Y_L3, 0), "C24": (XA + 1.0, Y_L3 + 1.0, 0),
-    "C25": (XA + 1.0, GE - 3.2, 0), "R18": (XA, GE - 1.6, 270), "C26": (XA + 1.35, GE - 0.9, 0),
-    # the selector at the line's end, one node with R18 (2026-11-12 review: R19 halfway down left the line past it an open
-    # stub when the u.FL is selected), J4 right beside it
-    "R19": (XA + 1.3, GE - 2.1, 0), "J4": (XA + 4.4, GE - 2.6, 270),   # (right of the line, between C25 and C26: the
-    # crystal's side stays clear on a short board)
-    "AE1": (XA, ANT_Y, 270),
+    # R19 at the line's end (stage 1e: the line ends there; the chip antenna, its pi and R18 are gone), J4 right beside it
+    "R19": (XA + 1.3, GE - 2.1, 0), "J4": (XA + 4.4, GE - 2.6, 270),
     # mini 2, LINE IN (README "LINE IN"): J7 on the top edge (its bushing up) between J2 and the USB-C, tip / ring pads on its
     # right; D7 by them; the summer's inputs (R30 / C30 tip, R31 / C31 ring) to U6 (turned: IN- and IN+ on top, OUT and V+
     # below), R32 // C32 on its left from IN- to OUT, the bias (R33 / R34 / C33) on its right; the LDO (U7, C34 in, C35 out)
     # in the top strip by the USB-C (VBUS); R35 / C36 at the chip's GPIO9 (pin 14), the right side's top corner
-    "J7": (16.4, 7.25, 270), "D7": (21.9, 8.6, 180),
+    "J7": (16.4, 7.25, 270), "D7": (23.1, 10.25, 0), "D8": (23.1, 6.95, 0),   # (stage 1e: two SMAJ5.0CA, tip and ring, in two rows right of J7)
     "R30": (19.4, 13.4, 0), "C30": (21.2, 13.4, 0), "R31": (19.4, 14.4, 0), "C31": (21.2, 14.4, 0),
     "U6": (24.6, 15.0, 90), "R32": (22.0, 15.9, 90), "C32": (21.0, 15.9, 90),
     "R33": (27.0, 14.0, 90), "R34": (28.0, 14.0, 90), "C33": (27.5, 15.9, 0), "C37": (26.3, 17.4, 0),
-    "U7": (25.6, 4.5, 0), "C34": (23.2, 2.3, 90), "C35": (27.0, 6.9, 0),
+    "U7": (25.6, 3.5, 0), "C34": (22.2, 2.3, 90), "C35": (27.5, 10.5, 90),   # (stage 1e: up 1 mm / out of the TVS rows)
     "C36": (CX + 3.41, CY - 5.5, 90), "R35": (CX + 2.0, CY - 5.85, 0),
 }
 WIDTH = {"VDD3P3": 0.5, "VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
@@ -339,35 +352,30 @@ def rf_path(fps):
     RF_SEGS.append(("LNA_IN", 0, CX + 4.6, ly + 0.05, c23[0], ly + 0.05, 0.2))
     RF_SEGS.append(("LNA_IN", 0, c23[0], ly + 0.05, c23[0], c23[1], 0.3))
     RF_SEGS.append(("LNA_IN", 0, c23[0], c23[1], l3a[0], l3a[1], 0.3))
-    r18 = pad_center(pad_of(fps, "R18", "1"))
+    # (stage 1e: the u.FL only: the line ends at R19's stub; the chip antenna, its pi and R18 are gone)
+    r19 = pad_center(pad_of(fps, "R19", "1"))
     y_turn = Y_L3
     RF_SEGS.append(("RF", 0, l3b[0], y_turn, l3b[0] + RF_W / 2, y_turn, 0.5))   # (out of L3's pad, narrow)
     RF_SEGS.append(("RF", 0, l3b[0] + RF_W / 2, y_turn, XA, y_turn, RF_W))
-    RF_SEGS.append(("RF", 0, XA, y_turn, XA, r18[1] - RF_W, RF_W))       # (its round end stops clear of R18's pad 2)
-    RF_SEGS.append(("RF", 0, XA, r18[1] - RF_W, XA, r18[1], 0.5))          # (tapering into the 0402's pad)
-    for ref in ("C24", "C25", "R19"):
+    RF_SEGS.append(("RF", 0, XA, y_turn, XA, r19[1], RF_W))                       # (down to R19's row, its round end there)
+    for ref in ("C24", "R19"):
         c = pad_center(pad_of(fps, ref, "1"))
         RF_SEGS.append(("RF", 0, XA, c[1], c[0], c[1], 0.5))
     r19b = pad_center(pad_of(fps, "R19", "2"))
     j4 = pad_center(pad_of(fps, "J4", "1"))
-    RF_SEGS.append(("UFL", 0, r19b[0], r19b[1], j4[0], j4[1], 0.5))         # (the selector straight to J4's signal pad)
-    r18b = pad_center(pad_of(fps, "R18", "2"))
-    a1 = pad_center(pad_of(fps, "AE1", "1"))
-    c26 = pad_center(pad_of(fps, "C26", "1"))
-    RF_SEGS.append(("ANT_FEED", 0, XA, r18b[1], a1[0], a1[1], 0.5))     # (into the antenna's 1.0 mm pad)
-    RF_SEGS.append(("ANT_FEED", 0, XA, c26[1], c26[0], c26[1], 0.5))
-    a2 = pad_center(pad_of(fps, "AE1", "2"))     # (the end pad's extension: its own net, nothing else on it)
-    RF_SEGS.append(("ANT_END", 0, a2[0], a2[1], a2[0], a2[1] + END_PAD[1] - END_PAD[0] / 2, END_PAD[0]))
-    # the fences: GND vias both sides of the line, their rings 0.35 mm from its edge (0.15 inside the pour)
+    RF_SEGS.append(("UFL", 0, r19b[0], r19b[1], j4[0], j4[1], 0.5))         # (R19 straight to J4's signal pad)
+    # the fences: GND vias both sides of the line, their rings 0.35 mm from its edge (0.15 inside the pour), down to
+    # 1 mm past the line's end (the board's edge is the ground's edge now)
     off = RF_W / 2 + RF_GAP + route.VIA_D / 2 + 0.15
-    rf_pads = [p for ref in ("C24", "C25", "C26", "R18", "R19", "J4") for p in fps[ref].Pads()]
+    fence_end = min(GE - 0.6, r19[1] + 1.0)
+    rf_pads = [p for ref in ("C24", "R19", "J4") for p in fps[ref].Pads()]
 
     def clear_of_pads(x, y):                     # (a fence via 0.2 mm or more from the RF parts' pads)
         c = pcbnew.SHAPE_CIRCLE(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)), MM(route.VIA_D / 2))
         return not any(p.GetEffectiveShape(pcbnew.F_Cu).Collide(c, MM(0.2)) for p in rf_pads)
     for x in (XA - off, XA + off):
         y = y_turn + 1.2
-        while y < GE - 0.6:
+        while y < fence_end:
             if clear_of_pads(x, y):
                 RF_VIAS.append((x, y))
             y += 0.9
@@ -771,6 +779,8 @@ def zones():
         for x, y in ((0, 0), (W, 0), (W, GE), (0, GE)):
             o.Append(MM(OX + x), MM(OY + y))
         board.Add(z)
+    if STRIP <= 0:                               # (stage 1e: no antenna strip, no keep-out)
+        return
     k = pcbnew.ZONE(board)                      # the antenna strip: no pour or via on either layer (its feed is a track)
     k.SetIsRuleArea(True)
     k.SetDoNotAllowTracks(False)
@@ -793,9 +803,27 @@ def zones():
 def silk():
     label("MIDI OUT", 6.0, 12.3, 0.7)            # (J2 and J5)
     label("MIDI OUT 2", W - 6.1, 12.3, 0.7)      # (J3 and J6: mini 2.2 simplified, a copy of MIDI OUT)
-    for ref, text, dy in (("SW1", "BOOT", 3.6), ("SW2", "RST", 3.6)):   # (under the buttons)
+    for ref, text, dy in (("SW1", "NO / BOOT", 3.4), ("SW3", "UP", 3.4), ("SW4", "DOWN", 3.4), ("SW5", "YES", 3.4),
+                          ("SW2", "RST", 3.4)):   # (under the buttons)
         p = board.FindFootprintByReference(ref).GetPosition()
         label(text, pcbnew.ToMM(p.x) - OX, pcbnew.ToMM(p.y) - OY + dy, 0.6)
+    # the screen (stage 1e): the module's outline on F.Fab (not on the silk: it crosses pads); the header's pin names; the
+    # jumpers' choices, each pad's net under it (modules differ: GND-VCC-SCL-SDA or VCC-GND-SCL-SDA)
+    x0, y0, x1, y1 = MODULE
+    s = pcbnew.PCB_SHAPE(board)
+    s.SetShape(pcbnew.SHAPE_T_RECT)
+    s.SetStart(pcbnew.VECTOR2I(MM(OX + x0), MM(OY + y0)))
+    s.SetEnd(pcbnew.VECTOR2I(MM(OX + x1), MM(OY + y1)))
+    s.SetWidth(MM(0.1))
+    s.SetLayer(pcbnew.F_Fab)
+    board.Add(s)
+    h = board.FindFootprintByReference("J10")
+    for p in h.Pads():
+        x, y = pad_center(p)
+        label({"1": "P1", "2": "P2", "3": "SCL", "4": "SDA"}[p.GetNumber()], x, y + 1.9, 0.6)
+    for ref, text in (("JP1", "P1 G|V"), ("JP2", "P2 V|G")):
+        p = board.FindFootprintByReference(ref).GetPosition()
+        label(text, pcbnew.ToMM(p.x) - OX, pcbnew.ToMM(p.y) - OY + 1.8, 0.6)
     label("LINE IN", 14.6, 13.6, 0.6)            # (mini 2: J7)
     # the cells' PH2.0 sockets (mini 2.2): "+" and "-" beside each pad on both sides (the user solders from the top, the
     # socket and the cell are under the board); pin 1 (square) = +, pin 2 = - (README: the LOLIN32 Lite reasoning)
@@ -807,9 +835,11 @@ def silk():
             label(text, x, y - 1.9, 1.0)
             label(text, x, y - 1.9, 1.0, layer=pcbnew.B_SilkS)
         label("CELL " + {"J8": "1", "J9": "2"}[ref], pcbnew.ToMM(f.GetPosition().x) - OX, pcbnew.ToMM(f.GetPosition().y) - OY + 2.2, 0.6)
-    label("jank mini 2.2", 12.0, GE + 3.0, 1.0)
-    label("antenna strip:", 12.0, GE + 4.6, 0.6)
-    label("no copper", 12.0, GE + 5.5, 0.6)
+    label("jank mini 2.2", W / 2, 22.5, 1.0, layer=pcbnew.B_SilkS)   # (stage 1e: on the bottom, the strip is gone)
+    label("RF: u.FL J4 -> FPC antenna in the lid", W / 2, 24.3, 0.7, layer=pcbnew.B_SilkS)
+    if STRIP > 0:
+        label("antenna strip:", 12.0, GE + 4.6, 0.6)
+        label("no copper", 12.0, GE + 5.5, 0.6)
 
 
 def main():

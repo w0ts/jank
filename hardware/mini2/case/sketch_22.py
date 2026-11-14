@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 B = pcbnew.LoadBoard(os.path.join(HERE, "..", "mini2.kicad_pcb"))
 OX = OY = 100.0
 E, CLR, BT = 1.8, 0.4, 1.6      # (mini_case.scad: the lid's outer face from the board's edge; the side play; the board)
-BOOT_CAP, RST_CAP, WINDOW = 9.0, 3.8, 4.0      # (proposed: BOOT's cap 9 mm, RST's mini 2's 3.8, one 4 mm window)
+BUTTON_CAP, RST_HOLE, WINDOW = 8.0, 1.5, 4.0   # (stage 1e: 8 mm caps (the screen study), RST behind a 1.5 mm pinhole, one 4 mm LED window)
 CELLS = {"GNB 550 mAh": (66.0, 18.0, 6.2), "BT2.0 450 mAh": (62.0, 15.5, 6.7)}   # (length, width = height on edge, thickness)
 CELL_LEN, CELL_T = 66.0, 6.7    # (the sketch's cell: the longest and the thickest of the two)
 DIN_UNDER = 19.6 + 0.35         # (mini_case.scad: din_h + din_gap: the DIN base's floor under the board)
@@ -60,7 +60,8 @@ def pad_mid(*refs):
 
 bb = B.GetBoardEdgesBoundingBox()
 W, H = mm(bb.GetWidth()), mm(bb.GetHeight())
-GE = H - 10.0
+GE = H                          # (stage 1e: no antenna strip: the ground and the cells' band end at the board's edge)
+MODULE = (34.0 - 27.3 / 2, 14.8 - 1.5, 34.0 + 27.3 / 2, 14.8 - 1.5 + 27.8)   # (make_board.MODULE: HDR (34.0, 14.8))
 INSIDE_W = W + 2 * CLR          # (the case's inside width along x)
 out = []
 M = 14.0
@@ -87,8 +88,6 @@ rect(-E, -E, W + E, H + E, 'fill="#e9e6df" stroke="#555" stroke-width="2" rx="14
 rect(0, 0, W, H, 'fill="none" stroke="#999" stroke-dasharray="6,4"')
 for ref in ("J1", "J2", "J3", "J7", "U1"):
     rect(*box(ref), 'fill="none" stroke="#b9b2a5"')
-rect(0, GE, W, H, 'fill="#d8e6d8" opacity="0.6"')
-text(W / 2, H - 4, "antenna strip (10 mm)", 11, "#476")
 for ref, s, top in (("J1", "USB-C", True), ("J7", "LINE IN", True), ("J2", "MIDI OUT", False), ("J3", "MIDI OUT 2", False)):
     x, y = pos(ref)
     if top:
@@ -98,15 +97,29 @@ for ref, s, top in (("J1", "USB-C", True), ("J7", "LINE IN", True), ("J2", "MIDI
         xx = -E if x < W / 2 else W + E
         rect(xx - 0.6, y - 3.5, xx + 0.6, y + 3.5, 'fill="#555"')
         text(10 if x < W / 2 else W - 10, y + 6.5, s, 10)
-bx, by_ = pos("SW1")
-circ(bx, by_, BOOT_CAP, 'fill="#3a3a3a" fill-opacity="0.85" stroke="#111" stroke-width="2"')
-text(bx, by_ + 0.5, "BOOT", 11, "#fff")
+# stage 1e: the screen module (dashed: lid variant 2 has a window over its display; *the display's place on a module
+# is typical, unverified*), the four button caps (8 mm, 9.5 mm apart), RST's pinhole, the LED window (lid variant 1),
+# the FPC antenna's proposed seat (lower left, off the buttons and the screen)
+x0, y0, x1, y1 = MODULE
+rect(x0, y0, x1, y1, 'fill="none" stroke="#557" stroke-dasharray="5,3"')
+wx, wy = (x0 + x1) / 2, y0 + 12.0
+rect(wx - 12.25, wy - 6.5, wx + 12.25, wy + 6.5, 'fill="#1d2a3a" fill-opacity="0.85" stroke="#111"')
+text(wx, wy + 0.5, "screen window 24.5 x 13 (lid variant 2)", 10, "#fff")
+for ref, s in (("SW3", "UP"), ("SW1", "NO / BOOT"), ("SW4", "DOWN"), ("SW5", "YES")):
+    bx, by_ = pos(ref)
+    circ(bx, by_, BUTTON_CAP, 'fill="#3a3a3a" fill-opacity="0.85" stroke="#111" stroke-width="2"')
+    text(bx, by_ + 0.5, s, 9, "#fff")
 rx, ry = pos("SW2")
-circ(rx, ry, RST_CAP, 'fill="#fff" stroke="#36c" stroke-width="2"')
-text(rx, ry + 4.2, "RST", 10, "#246")
+circ(rx, ry, RST_HOLE, 'fill="#111"')
+text(rx, ry + 3.0, "RST pinhole", 9, "#246")
 lx, ly = pad_mid("LED1", "LED2")
 circ(lx, ly, WINDOW, 'fill="#fff" stroke="#c33" stroke-width="2"')
-text(lx, ly - 3.0, "LED window (red + green)", 10, "#a22")
+text(lx + 7.5, ly + 0.5, "LED window (variant 1)", 9, "#a22")
+rect(3.0, H - 13.0, 25.0, H - 3.0, 'fill="none" stroke="#2a7" stroke-dasharray="4,2"')
+text(14.0, H - 7.5, "FPC antenna seat (proposed)", 9, "#174")
+jx, jy = pos("J4")
+circ(jx, jy, 1.6, 'fill="#2a7"')
+text(jx, jy + 3.2, "J4 u.FL", 9, "#174")
 text(W / 2, H + E + 5.5, "(1) lid from above (board top view, y down)", 13)
 
 # ---- (2) the underside, seen from above through the board
@@ -114,8 +127,6 @@ ox2 = W + 2 * E + 14
 rect, circ, text = view(ox2)
 rect(-CLR, -CLR, W + CLR, H + CLR, 'fill="none" stroke="#999" stroke-dasharray="3,3"')
 rect(0, 0, W, H, 'fill="#f4f4f4" stroke="#555" stroke-width="2"')
-rect(0, GE, W, H, 'fill="#d8e6d8" opacity="0.6"')
-text(W / 2, H - 4, "antenna strip: no cell, no metal", 11, "#476")
 din_bottom = 0.0
 for ref in ("J5", "J6"):
     x0, y0, x1, y1 = box(ref)

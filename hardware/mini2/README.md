@@ -1,10 +1,94 @@
-# jank mini 2.2: one board, two orders (USB only, or with a 1S cell), two MIDI OUTs, LINE IN, BOOT, RST, one LED window (branch hw/mini2.2)
+# jank mini 2.2: one board, two orders (USB only, or with a 1S cell), two MIDI OUTs, LINE IN, 4 buttons + RST, LEDs or a screen, u.FL (branch hw/mini2.2)
 
-**Stage 1d (2026-11-14): placed, not routed; nothing ordered, built or measured.** `mini2.kicad_pcb` is the *placed*
+**Stage 1e (2026-11-14): placed, not routed; nothing ordered, built or measured.** `mini2.kicad_pcb` is the *placed*
 board (`LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 make_board.py`): `fab/mini2-gerbers.zip`, `render-top.png`,
-`render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/mini_case.scad` are still mini 2's until stage 2. Stage 1d
-(next section) supersedes stage 1c where they differ; "mini 2.2 (stage 1)" and "1b" are superseded (the encoder and the
-RGB LEDs are gone); everything after them is mini 2's text.
+`render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/mini_case.scad` are still mini 2's until stage 2. Each
+stage's section supersedes the older ones where they differ (1e, then 1d, then 1c); "mini 2.2 (stage 1)" and "1b" are
+superseded (the encoder and the RGB LEDs are gone); everything after them is mini 2's text.
+
+## mini 2.2, stage 1e (the user's answers to 1d: the u.FL only, standard parts, LEDs or a screen with 4 buttons)
+
+**66 x 58 mm**: the 10 mm antenna strip is gone (`make_board.py` STRIP=0; STRIP=10 puts it back for a chip antenna).
+Everything placed from the ground's edge stays where it was; the board ends there. `render-top-placement.png`,
+`render-bottom-placement.png`, `case/renders/sketch-2.2.png`.
+
+**Antenna: the u.FL only.** AE1 (the chip antenna), its unfitted pi (C25, C26) and its selector R18 are gone. Kept: the
+chip-side match (C23 1 pF, L3 3.3 nH, C24 DNP), the 50 ohm line with its ground fences (now ending 1 mm past R19), R19 0
+ohm (a tuning place), J4 and the bottom layer's keep-out under the line. **The antenna to buy:** an FPC (flex) 2.4 GHz
+antenna with an IPEX (u.FL) lead, stuck inside the lid: JLC lists HJ-2.4G-IPEX1-L=80mm (C1693673, $0.47 at 10, 401 in
+stock; 80 mm lead, 2.45 GHz, VSWR 2: its datasheet could not be read here, so its form and gain are unknown), or an
+LCSC FPC on a 50 mm IPEX lead at ~3 dBi (e.g. MyAntenna AICF002, C22467619, adhesive, 4.2..4.4 dBi listed). **The lead
+reaches:** mini 2's lid seat (over the old strip) is gone with the strip and would sit under the new buttons; the
+proposed seat is the lid's lower left (board x 3..25, y 45..55), ~25..30 mm of lead from J4 (17 mm across, 11 mm up to
+the roof): 50 and 80 mm leads both reach. (Stage 2: the case.)
+
+**Standard parts (the user: "find standard parts for everything").** A second pass over every Extended type with JLC's
+Basic filter and its "preferred" (no-fee) flag, by category and by part numbers (2026-11-14):
+
+| Extended type (1d) | Job | Basic / preferred alternative | Applied? |
+|---|---|---|---|
+| USBLC6-2SC6 (C7519) | USB ESD | **SRV05-4-P-T7, ProTek (C85364), preferred.** ProTek's datasheet (05150.R16; copies at manualmachine.com and datasheetq.com): pin 1 I/O1, 2 GND, 3 I/O2, 4 I/O3, 5 REF, 6 I/O4: D+ on I/O1 + I/O4, D- on I/O2 + I/O3, REF on VBUS: the USBLC6's own pin functions (1 / 6 D+, 3 / 4 D-, 2 GND, 5 VBUS). JLC's footprint is the same SOT-23-6 pattern turned 90 with its rows 0.2 mm further out: at 270 and 0.2 mm lower its VBUS / D- / D+ row is where the USBLC6's was (the drawn USB tracks and VBUS via hold; DRC clean) | **yes** |
+| PESD5V0S2BT (C49338) | LINE IN ESD | **2 x SMAJ5.0CA, Hongjiacheng (C19077524), preferred**, one per line (tip, ring). Its datasheet ("SMAJ series", rev 2.2, 2023-10, read from LCSC's PDF): bidirectional (CA: no polarity), VRWM 5 V, VBR 6.4..7.0 V, VC 9.2 V at 43.5 A, 400 W. It leaks more (up to 1.6 mA at 5 V for a bidirectional 5 V part; far less at line level) and has nF of capacitance: neither matters at line level and audio rates (into a 100..600 ohm line output: a pole above ~60 kHz) | **yes** |
+| ANT3216 chip antenna (C293767) | RF | removed (the user's choice above) | **yes** |
+| 40 MHz crystal (C254377) | the clock | none: JLC's Basic crystals are 8, 12, 16, 25 MHz and 32.768 kHz; no preferred 40 MHz found | no |
+| USB-C 16P (C2765186) | USB | none Basic or preferred found | no |
+| PJ-320A jack (C18185602) | 3 jacks | none Basic or preferred found | no |
+| u.FL (C88374) | RF | none Basic or preferred (the IPEX-1 clone C2987682 is Extended too) | no |
+| 2.0 nH (C76769) | VDD3P3 filter | the preferred 0402 RF inductors (Sunlord SDCL1005C series) are rated 300 mA; Espressif asks 500 mA or more here; no 2.0 nH among them | no |
+| 3.3 nH (C87532) | RF match | no preferred 3.3 nH found (SDCL1005C3N9 3.9 nH is preferred: a different value in an untuned match) | no |
+| HT7833 (C164106) | 3.3 V from the cell (battery order) | none: ME6211, RT9013, AP2112, XC6220, HT78xx: none Basic or preferred | no |
+| XB5353A (C80628) | the cell's protection (battery order) | none (XB53xx, XB80xx, XB60xx, DW01: none Basic or preferred) | no |
+
+A cheaper SRV05-4 (Hongjiacheng C7420376, preferred, $0.075) exists; its datasheet could not be read here (LCSC's link
+gave only a title), so the ProTek part was used. The header J10 (C2691448) is Extended but never fitted: no fee.
+
+**Option 1 and option 2 on one board** (the user: "buttons and LEDs, or a cheap screen and 4 buttons"):
+- **Four buttons on every board**, the Basic 5.1 mm tactile (C318884) under 8 mm caps, a 2 x 2 grid 9.5 mm apart at
+  the lower right: **UP (SW3, GPIO10) over DOWN (SW4, GPIO11) on the left, NO / BACK (SW1 = BOOT, GPIO0) over YES (SW5,
+  GPIO12) on the right**. UP / DOWN / YES use the chip's internal pull-ups (no part); NO / BOOT keeps R16 only (the
+  check_nets rule holds). **RST (SW2)** at the top right, under a pinhole.
+- **Option 1, the LEDs** (red + green, Basic): fitted on every board, moved to the top left (one window), out from under
+  the screen.
+- **Option 2, the screen:** J10, a 1 x 4 2.54 mm header (not fitted) for a cheap 0.96" 128 x 64 I2C OLED (SSD1306 /
+  SSD1315) the user solders. SCL GPIO13, SDA GPIO14, R60 / R61 10 k pull-ups, C60 10 uF + C61 100 nF at the header
+  (all Basic, fitted on every board). **Modules differ in pin order** (GND-VCC-SCL-SDA or VCC-GND-SCL-SDA): pins 1 / 2
+  go through JP1 / JP2, bare 3-pad solder jumpers (no part): bridge JP1 to G and JP2 to V for GND-VCC-SCL-SDA, the other
+  way for VCC-GND; the silk prints P1 P2 SCL SDA and "P1 G|V", "P2 V|G". **Bridge them before the first power-up.**
+- **The module's outline** (27.3 x 27.8, ~2.5 mm over the board on its header, the header row 1.5 mm in from its top
+  edge: *typical, unverified per maker*) is on F.Fab at x 20.4..47.7, y 13.3..41.1: only low parts under it (0402 ..
+  1206, SOT-23, the chip), no button, LED or tall part (checked). **J8 / J9's pins come up under it:** solder and trim
+  the PH2.0 sockets before fitting the screen.
+- The case comes later: lid variant 1 with the LED window, variant 2 with the screen window; both keep the 4 caps and
+  the RST pinhole.
+
+**GPIO map (stage 1e):** GPIO0 NO / BOOT, GPIO10 UP, GPIO11 DOWN, GPIO12 YES, GPIO13 SCL, GPIO14 SDA, GPIO21 MIDI_TX,
+GPIO38 LED red, GPIO39 LED green, GPIO9 LINE_IN, GPIO1 VBAT_ADC (0 V on "usb"), GPIO19 / 20 USB. GPIO10..14 are pins
+15..19, the chip's top side: their way out past R35 / C36 / C20 is tight (stage 2's routing).
+
+**MIDI jacks and DINs on one side (the user allowed it): not used.** The cells lie along the board's width and need 62
+.. 66 mm, so the board cannot get narrower whatever the connectors do; the screen, the 4 buttons and the cell band
+already fit with no overlap; moving both DINs and jacks would redo their iron room, the case's slots and the MIDI
+parts for no size gain. LINE IN and the USB-C stay too.
+
+**Checks (placed board, 2026-11-14):** ERC 0 errors, 0 warnings; `check_nets.py` 329 pads, 0 problems (the BOOT rule
+holds); courtyards as boxes, top and bottom (J8 / J9 either way round): 0 overlaps (mini 2's old touches went with the
+moved parts); no top part in the DIN pads' iron room; DRC: only the unrouted connections and the DNP parts' library
+notes; both CPLs within 0.01 mm of JLC's footprints. The cells' band: y 39.0 .. 58.1 (the board's edge now), 19.1 mm.
+
+**Cost (cost.py's method, `fab/cost.md`; shipping left out):**
+
+| | usb, 5 boards | usb, 10 boards | battery, 5 boards | battery, 10 boards |
+|---|---|---|---|---|
+| parts / lines / joints a board | 80 / 38 / 258 | | 92 / 43 / 291 | |
+| Extended types | **7** (1d: 10) | | **9** (1d: 12) | |
+| **total** | **$66.55** | **$92.34** | **$76.67** | **$105.62** |
+| stage 1d | $76.50 | $102.03 | $86.63 | $115.31 |
+| JLC hand-solders the 3 jacks | $71.01 | $97.69 | $81.14 | $110.97 |
+| the user solders them (+ shipping) | $63.30 | $88.99 | $73.43 | $102.27 |
+
+Left (usb): the chip, the 40 MHz crystal, the USB-C, the PJ-320A jacks, the u.FL, the 2.0 nH and 3.3 nH inductors; the
+battery order adds the HT7833 and the XB5353A. The three new buttons, the screen's support parts and the second TVS
+are included.
 
 ## mini 2.2, stage 1d (the user's answers to 1c, and the review's fixes)
 

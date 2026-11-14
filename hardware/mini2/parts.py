@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""jank mini 2.2 (simplified, stage 1c, the user's 2026-11-14): the one parts table. No MIDI power input (no reservoir,
+"""jank mini 2.2 (stage 1e, 2026-11-14: the u.FL only; 4 buttons; LEDs or a screen; standard parts; earlier: stage 1c) : the one parts table. No MIDI power input (no reservoir,
 no buck, no detectors): USB or a 1S Li-ion cell (two PH2.0 sockets in parallel, a TP4054 charger, an XB5353A protector,
 a P-FET power path) into VSYS, an HT7833 to 3.3 V; MIDI OUT 2 a passive copy of MIDI OUT 1 (J3 / J6
 on the same nets as J2 / J5); BOOT a plain button again (SW1); one indicator: a red and a green LED behind one window;
@@ -26,6 +26,8 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
     "c0805": "C0805", "r0402": "R0402", "c0402": "C0402", "l0402": "L0402", "trs": "TRS_PADS_SMD",
     "din": "CONN-TH_DIN-504B-M10",
     "sot235": "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", "tvs2": "SOT-23_L2.9-W1.3-P1.90-LS2.4-BR",   # (mini 2: LINE IN)
+    "sot236br": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR", "sma": "SMA_L4.3-W2.6-LS5.0-BI",   # (stage 1e: SRV05-4, SMAJ5.0CA)
+    "hdr4": "HDR-TH_4P-P2.54-V-M", "sj3": "SJ3_SMD",   # (stage 1e: the screen's header, DNP; the VCC / GND jumpers)
     "led0805": "LED0805-R-RD", "sot25bl": "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL", "ph2": "CONN-TH_B2B-PH-K-S",
     "sot223": "SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR",   # (stage 1d: the AMS1117, the "usb" order's LDO)
     "sod123": "SOD-123_L2.7-W1.6-LS3.7-RD-1",   # (mini 2.2: the green LED, the charger, the cells' sockets, D3)
@@ -44,6 +46,8 @@ GPIO = {   # firmware's board.h (README "Pin map"): function -> (GPIO, chip pin)
     "LED_G": (39, "44"),        # the green LED, active high, through 1 k (red + green behind one window: both = yellow)
     "LINE_IN": (9, "14"),       # mini 2: ADC1_CH8, the LINE IN front end's output (README "LINE IN")
     "VBAT_ADC": (1, "6"),       # mini 2.2: ADC1_CH0, the cell through 1 M / 1 M (half its voltage); mini 2's VBANK pin
+    # stage 1e (the screen study's map): the buttons with the chip's internal pull-ups, the screen's I2C (R60 / R61)
+    "BTN_UP": (10, "15"), "BTN_DOWN": (11, "16"), "BTN_YES": (12, "17"), "SCL": (13, "18"), "SDA": (14, "19"),
     "USB_DN": (19, "25"),
     "USB_DP": (20, "26"),
 }
@@ -54,10 +58,11 @@ CHIP_PIN = {"1": "LNA_IN", "2": "VDD3P3", "3": "VDD3P3", "4": "CHIP_PU", "20": "
 U1 = dict(CHIP_PIN)
 U1.update({pin: name for name, (_g, pin) in GPIO.items()})
 
-DNP = {"C24", "C25", "C26", "R18",   # (pads only: the matching positions, the chip antenna's 0 ohm)
+DNP = {"C24",                        # (pads only: the chip match's second shunt)
        "J5", "J6",                            # (the DIN sockets, bottom side: an optional hand-solder, README "DIN")
        "RT40", "RT41",                        # (mini 2.2: the LED resistors' twins, README "mini 2.2")
-       "J8", "J9"}                            # (mini 2.2: the cells' PH2.0 sockets: the user fits them from the bottom)
+       "J8", "J9",                            # (mini 2.2: the cells' PH2.0 sockets: the user fits them from the bottom)
+       "J10", "JP1", "JP2"}                   # (stage 1e: the screen's header and its VCC / GND jumpers: the user)
 # JLC's footprint for the DIN-504B-M10 numbers its pads 1..5 along the two rows, not as the DIN pins. Its frame and
 # hardware/pcb's own table for the part (HY_PINS, the CUI SDS-50J pattern; the same in hardware/pcb/lib) agree: the
 # shell pins at the front, the 3-pin row 2.5 mm before the 2-pin row, x the same way. So pad 1 (x -7.5) = DIN 3,
@@ -71,7 +76,11 @@ PARTS = [
       "A6": "UDP", "B6": "UDP", "A7": "UDN", "B7": "UDN"}),
     # (22 ohm in series on D+ / D- by the chip: the edges and ringing on the 22 mm tracks, Espressif's checklist)
     # (ESD on D+ / D- right at the USB-C, before the 22 ohm: the user's ruling 2026-11-12; VBUS only its clamp reference)
-    ("U5", "esd", "USBLC6-2SC6", "sot236", "C7519", {"1": "UDP", "6": "UDP", "3": "UDN", "4": "UDN", "2": "GND", "5": "VBUS"}),
+    # (stage 1e: SRV05-4-P-T7, ProTek, a preferred part (no fee) instead of the USBLC6-2SC6. ProTek's datasheet (05150.R16):
+    #  1 I/O1, 2 GND, 3 I/O2, 4 I/O3, 5 REF, 6 I/O4: D+ on I/O1 + I/O4, D- on I/O2 + I/O3, REF on VBUS, the USBLC6's own
+    #  pin functions (1 / 6 D+, 3 / 4 D-, 2 GND, 5 VBUS). JLC's footprint is the same SOT-23-6 pattern turned 90: placed at
+    #  270 its pads sit where the USBLC6's did)
+    ("U5", "esd", "SRV05-4-P-T7", "sot236br", "C85364", {"1": "UDP", "6": "UDP", "3": "UDN", "4": "UDN", "2": "GND", "5": "VBUS"}),
     ("R24", "R", "22", "r0402", "C25092", {"1": "UDP", "2": "USB_DP"}),
     ("R25", "R", "22", "r0402", "C25092", {"1": "UDN", "2": "USB_DN"}),
     ("R3", "R", "5.1k", "r0603", "C23186", {"1": "CC1", "2": "GND"}),
@@ -148,21 +157,33 @@ PARTS = [
     ("R17", "R", "0", "r0402", "C17168", {"1": "XTAL_X1", "2": "XTAL_P"}),
     ("C9", "C", "10p", "c0402", "C32949", {"1": "XTAL_X1", "2": "GND"}),
     ("C10", "C", "10p", "c0402", "C32949", {"1": "XTAL_N", "2": "GND"}),
-    # ---- RF: the chip's matching (pi: 1 pF shunt at the chip, 3.3 nH series, a second shunt unfitted; XIAO), the 50 ohm
-    #      line, then the antenna's own pi (two shunts unfitted, the series a 0 ohm that selects the chip antenna) or,
-    #      with R18 moved to R19, the u.FL (J4, unfitted)
+    # ---- RF (stage 1e, the user's: the u.FL only, an FPC antenna stuck inside the lid): the chip's matching (pi: 1 pF
+    #      shunt at the chip, 3.3 nH series, a second shunt unfitted; XIAO), the 50 ohm line, R19 0 ohm (a tuning place)
+    #      into J4. The chip antenna AE1, its pi (C25, C26) and its selector R18 are gone, with the 10 mm strip
     ("C23", "C", "1p", "c0402", "C1550", {"1": "LNA_IN", "2": "GND"}),
     ("L3", "L", "3.3nH", "l0402", "C87532", {"1": "LNA_IN", "2": "RF"}),
     ("C24", "C", "DNP", "c0402", "", {"1": "RF", "2": "GND"}),
-    ("C25", "C", "DNP", "c0402", "", {"1": "RF", "2": "GND"}),
-    ("R18", "R", "0 DNP", "r0402", "C17168", {"1": "RF", "2": "ANT_FEED"}),
-    ("C26", "C", "DNP", "c0402", "", {"1": "ANT_FEED", "2": "GND"}),
-    ("AE1", "ant", "ANT3216LL00R2400A", "ant", "C293767", {"1": "ANT_FEED", "2": "ANT_END"}),   # (2: the end pad, its copper extended, unconnected)
     ("R19", "R", "0", "r0402", "C17168", {"1": "RF", "2": "UFL"}),
     ("J4", "ufl", "U.FL", "ufl", "C88374", {"1": "UFL", "2": "GND", "3": "GND"}),
-    # ---- the buttons (mini 2.2 simplified: BOOT a plain button again, a Basic SMD tactile under the case's cap)
-    ("SW1", "sw", "BOOT", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BOOT", "4": "BOOT"}),
+    # ---- the buttons (stage 1e, the user's "option 1 and 2 on one board"): four under big caps, NO / BACK = BOOT on
+    #      GPIO0 (R16 its pull-up, nothing else), UP / DOWN / YES on GPIO10 / 11 / 12 with the chip's internal pull-ups
+    #      (no part); RST under a pinhole. All five the Basic 5.1 mm tactile (C318884)
+    ("SW1", "sw", "NO / BOOT", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BOOT", "4": "BOOT"}),
+    ("SW3", "sw", "UP", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BTN_UP", "4": "BTN_UP"}),
+    ("SW4", "sw", "DOWN", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BTN_DOWN", "4": "BTN_DOWN"}),
+    ("SW5", "sw", "YES", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BTN_YES", "4": "BTN_YES"}),
     ("SW2", "sw", "RST", "sw", "C318884", {"1": "GND", "2": "GND", "3": "CHIP_PU", "4": "CHIP_PU"}),   # (reset: CHIP_PU to ground)
+    # ---- the screen (option 2, stage 1e): a 1 x 4 2.54 mm header, NOT fitted: the user solders a cheap 0.96" 128 x 64
+    #      I2C OLED module (SSD1306 / SSD1315) on it. Pins 3 / 4 are SCL / SDA; pins 1 / 2 are GND / VCC or VCC / GND
+    #      (modules differ): JP1 / JP2, bare 3-pad solder jumpers (no part), take each to GND or +3V3. 10 k pull-ups on
+    #      SCL / SDA and 10 uF + 100 nF at the header, fitted on every board (Basic)
+    ("J10", "hdr4", "OLED 1x4", "hdr4", "C2691448", {"1": "OLED_P1", "2": "OLED_P2", "3": "SCL", "4": "SDA"}),
+    ("JP1", "sj3", "P1: GND | VCC", "sj3", "", {"1": "GND", "2": "OLED_P1", "3": "+3V3"}),
+    ("JP2", "sj3", "P2: VCC | GND", "sj3", "", {"1": "+3V3", "2": "OLED_P2", "3": "GND"}),
+    ("R60", "R", "10k", "r0402", "C25744", {"1": "+3V3", "2": "SCL"}),
+    ("R61", "R", "10k", "r0402", "C25744", {"1": "+3V3", "2": "SDA"}),
+    ("C60", "C", "10u", "c0603", "C19702", {"1": "+3V3", "2": "GND"}),
+    ("C61", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
     # ---- the indicator (mini 2.2 simplified): a red 0603 and a green 0805 LED side by side behind one window (both
     #      Basic: no type fee; both on = yellow), each from its GPIO through 1 k; JLC's pad 1 = anode for both (EasyEDA)
     ("LED1", "led", "red", "led", "C2286", {"1": "LED_RA", "2": "GND"}),
@@ -196,7 +217,12 @@ PARTS = [
     #      sources), gain 5.6 k / 20 k = 0.28 a channel, -3 dB at ~8.5 kHz (C32 and R35 / C36), AC coupled (7.8 Hz),
     #      biased at 1.47 V (the middle of ATTEN3's 0..2.9 V); powered from VBUS by its own LDO
     ("J7", "jack", "LINE IN", "jack", "C18185602", {"D": "LIN_T", "C": "LIN_R", "A": "GND"}),
-    ("D7", "tvs2", "PESD5V0S2BT", "tvs2", "C49338", {"1": "LIN_T", "2": "LIN_R", "3": "GND"}),   # (ESD, both lines, bidirectional 5 V)
+    # (stage 1e: two SMAJ5.0CA, Hongjiacheng, a preferred part (no fee), one per line, instead of the PESD5V0S2BT (two
+    #  lines in one SOT-23, Extended). Its datasheet ("SMAJ series", rev 2.2, 2023-10): bidirectional, VRWM 5 V, VBR
+    #  6.4 .. 7.0 V, VC 9.2 V at 43.5 A, 400 W; no polarity (CA). Its leakage (up to 1.6 mA at 5 V) and capacitance (nF)
+    #  are far above the PESD's but do not matter at line level and audio rates: README "mini 2.2, stage 1e")
+    ("D7", "tvsbi", "SMAJ5.0CA", "sma", "C19077524", {"1": "LIN_T", "2": "GND"}),
+    ("D8", "tvsbi", "SMAJ5.0CA", "sma", "C19077524", {"1": "LIN_R", "2": "GND"}),
     ("R30", "R", "20k", "r0402", "C25765", {"1": "LIN_T", "2": "LIN_A1"}),
     ("C30", "C", "1u", "c0402", "C52923", {"1": "LIN_A1", "2": "LIN_SUM"}),
     ("R31", "R", "20k", "r0402", "C25765", {"1": "LIN_R", "2": "LIN_A2"}),
@@ -219,7 +245,7 @@ PARTS = [
 LCSC = {
     "C2913196": "Espressif ESP32-S3FN8, QFN56 7 x 7, 8 MB flash in the package",
     "C254377": "HELE X3S040000B81H-R, 40 MHz crystal 3225, 8 pF load, +-10 ppm, +-10 ppm over -20..75 C",
-    "C293767": "YAGEO ANT3216LL00R2400A, 2.4 GHz ceramic chip antenna 3.2 x 1.6 mm",
+    "C85364": "ProTek SRV05-4-P-T7, 4-line ESD array + REF, SOT-23-6 (preferred: no fee; the USB ESD since stage 1e)",
     "C7519": "ST USBLC6-2SC6, USB 2.0 ESD protection, 2 lines + VBUS, SOT-23-6",
     "C88374": "Hirose U.FL-R-SMT-1(80), u.FL receptacle (fitted: the default antenna path, the user's ruling 2026-11-11)",
     "C2939346": "HOOYA DIN-504B-M10, 5-pin DIN socket, female, right angle, through hole (DNP: hand-soldered, bottom side)",
@@ -240,7 +266,8 @@ LCSC = {
     # mini 2, LINE IN
     "C7972": "TI LMV321IDBVR, op-amp, rail-to-rail output, 1 MHz, 130 uA, 2.7..5.5 V, SOT-23-5 (a preferred Extended part)",
     "C5446": "Torex XC6206P332MR, 3.3 V LDO, 1 uA, 200 mA, SOT-23",
-    "C49338": "Nexperia PESD5V0S2BT, two-line bidirectional ESD protection, 5 V, 35 pF, SOT-23",
+    "C19077524": "Hongjiacheng SMAJ5.0CA, 400 W bidirectional TVS, VRWM 5 V, SMA (preferred: no fee; the LINE IN ESD since stage 1e)",
+    "C2691448": "XFCN PZ254V-11-04P, 1 x 4 2.54 mm header (DNP: the screen's, fitted by the user)",
     "C25765": "20 k 1% 0402", "C25908": "5.6 k 1% 0402", "C25755": "150 k 1% 0402", "C25750": "120 k 1% 0402",
     "C25079": "120 ohm 1% 0402", "C1531": "2.2 nF 50 V X7R 0402",
     # mini 2.2 simplified

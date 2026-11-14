@@ -1,12 +1,9 @@
-ERC report (2026-11-14T09:40:24, Encoding UTF8)
+ERC report (2026-11-14T10:06:14, Encoding UTF8)
 Report includes: Errors, Warnings, Exclusions
 
 ***** Sheet /
-[isolated_pin_label]: Label connected to only one pin
-    ; warning
-    @(55.88 mm, 281.94 mm): Label 'ANT_END'
 
- ** ERC messages: 1  Errors 0  Warnings 1
+ ** ERC messages: 0  Errors 0  Warnings 0
 
  ** Ignored checks:
     - Global label only appears once in the schematic
