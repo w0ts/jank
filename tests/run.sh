@@ -29,6 +29,10 @@ if [ -f "$HERE/core/jank_peer.c" ]; then
     "$OUT/test_peer"
 fi
 
+# The USB speaker's descriptor (firmware/main/usb_audio.h: macros only).
+"$CC" $FLAGS -I"$HERE/firmware/main" "$HERE/tests/test_uac_desc.c" -o "$OUT/test_uac_desc"
+"$OUT/test_uac_desc"
+
 # The beat tracker as the Link session's master.
 "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_beatlink.c" "$HERE/core/jank_beatlink.c" "$LINK" -lm -o "$OUT/test_beatlink"
 "$OUT/test_beatlink"
