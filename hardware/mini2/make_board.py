@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""jank mini 2's board (mini2.kicad_pcb): jank mini's (hardware/chip) with the LINE IN added (README "LINE IN"): an
+"""jank mini 2.2's board (mini2.kicad_pcb): mini 2's with the encoder and two RGB LEDs (README "mini 2.2"; PLACE, "mini
+2.2"). jank mini 2's board: jank mini's (hardware/chip) with the LINE IN added (README "LINE IN"): an
 8 mm band (DY) under the top row of connectors, everything below it moved down by DY, the jack and its front end in it.
 Below: mini's own words.
 
@@ -69,8 +70,15 @@ PLACE = {
     "R10": (W - 5.48, 21.2, 90),
     # the button: in the middle, 8 mm or more from every tall part (the cans, the jacks, the USB-C), so a finger reaches it
     # through the lid; the LED above it; BUCK_EN's parts beside it
-    "SW2": (29.2 + S, 19.55, 0),            # RST (CHIP_PU to ground), right of BOOT, level with it (one row, 2026-11-13)
-    "SW1": (21.6 + S, 19.55, 0), "LED1": (19.6 + S, 15.2, 0), "R9": (23.4 + S, 15.2, 0),
+    # mini 2.2 (README "mini 2.2"): the encoder in the middle of the width (its shaft at (W / 2, 27.5): JLC's origin is
+    # 0.25 mm below the shaft), where BOOT, RST and the red LED were; an RGB LED 12 mm each side of the shaft, level
+    # with it (LED1 the beat LED left, LED2 the status LED right), their 1 k resistors between them and the encoder;
+    # the encoder's pull-ups and caps by its A (left) and B (right) pins; RST up right, under the USB-C's right side
+    "ENC1": (W / 2, 27.75, 0),
+    "LED1": (W / 2 - 12.0, 27.5, 0), "R40": (W / 2 - 9.0, 26.4, 0), "R41": (W / 2 - 9.0, 27.5, 0), "R42": (W / 2 - 9.0, 28.6, 0),
+    "LED2": (W / 2 + 12.0, 27.5, 0), "R43": (W / 2 + 9.0, 26.4, 0), "R44": (W / 2 + 9.0, 27.5, 0), "R45": (W / 2 + 9.0, 28.6, 0),
+    "R46": (W / 2 - 7.7, 33.4, 0), "C40": (W / 2 - 7.7, 34.5, 0), "R47": (W / 2 + 7.7, 33.4, 0), "C41": (W / 2 + 7.7, 34.5, 0),
+    "SW2": (W / 2 + 8.0, 15.6, 0),          # RST (CHIP_PU to ground)
     # the reservoir: one 2200 uF can down each side, under the DINs' holes
     "C1": (5.5, CAN_Y, 90), "C2": (W - 5.5, CAN_Y, 90),
     # under the USB-C: the CC resistors, the VBUS diode and its resistor, the VBUS sense and pull-down
@@ -128,7 +136,7 @@ PLACE = {
 }
 WIDTH = {"VDD3P3": 0.5, "VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
 ORDER = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
-         "VDD3P3", "MIDI_TX", "MIDI2_TX", "LED_DRV", "SW", "+3V3", "VSYS", "VBUS", "VUSB_D", "BUCK_EN", "DET"]
+         "VDD3P3", "MIDI_TX", "MIDI2_TX", "SW", "+3V3", "VSYS", "VBUS", "VUSB_D", "BUCK_EN", "DET"]
 # (the chip's signal pins escape first: on its right side they sit between the RF supply's pins and the rest)
 RF_NETS = {"LNA_IN", "RF", "ANT_FEED", "UFL", "ANT_END"}
 PRIORITY = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "DET"]      # (routed before anything else, ground vias included)      # (drawn here, not routed)
@@ -168,8 +176,8 @@ def in_din_room(x, y):
 PLACED = {
     "C3": (15.492, 43.935, 270), "U2": (19.412, 43.935, 90), "L1": (23.812, 43.885, 90), "C5": (24.212, 40.785, 180),
     "C6": (19.812, 40.785, 180), "R7": (21.512, 41.235, 90), "U3": (12.670, 40.915, 90), "D4": (16.070, 36.915, 90),
-    "D5": (12.670, 36.915, 90), "C4": (15.370, 40.515, 90), "R6": (17.070, 40.515, 90), "SW1": (27.180, 25.415, 0),
-    "LED1": (25.180, 21.065, 0), "R9": (28.980, 21.065, 0), "SW2": (34.780, 25.415, 0), "U4": (44.087, 24.652, 90),
+    "D5": (12.670, 36.915, 90), "C4": (15.370, 40.515, 90), "R6": (17.070, 40.515, 90),
+    "U4": (44.087, 24.652, 90),     # (mini 2.2: SW1, LED1, R9 gone, SW2 in PLACE)
     "R8": (37.922, 29.202, 0), "R10": (57.460, 27.220, 90), "R11": (38.640, 32.255, 90), "C8": (39.640, 32.255, 90),
     "R1": (63.500, 18.810, 0), "R2": (63.500, 21.810, 0), "D1": (57.600, 15.910, 90), "D2": (59.950, 15.910, 90),
     "R14": (19.560, 16.810, 180), "R26": (19.560, 14.210, 180), "R15": (18.640, 25.950, 180),
@@ -181,7 +189,7 @@ PLACED = {
 # buttons' and the start-up group's row 4 mm; the start-up group (absolute x) follows the middle 5 mm right
 SPREAD_Y = {**{r: CY - 30.4 for r in ("C3", "U2", "L1", "C5", "C6", "R7", "R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10",
                                 "D6", "Q1", "R21", "R27", "R20", "R22", "R8")},
-            **{r: (CY - 30.4) * 0.53 for r in ("SW1", "SW2", "LED1", "R9", "U4", "R11", "C8", "U3", "D4", "D5", "C4", "R6")}}
+            **{r: (CY - 30.4) * 0.53 for r in ("U4", "R11", "C8", "U3", "D4", "D5", "C4", "R6")}}
 SPREAD_X = {r: S - 8.7 for r in ("U3", "D4", "D5", "C4", "R6")}
 
 
@@ -790,11 +798,12 @@ def zones():
 def silk():
     label("MIDI OUT", 6.0, 12.3, 0.7)            # (J2 and J5)
     label("PWR IN / OUT 2", W - 6.1, 12.3, 0.6)  # (J3 and J6: the power input, or MIDI OUT 2 on USB power)
-    for ref, text in (("SW1", "BOOT"), ("SW2", "RST")):   # (under the buttons where they ended up: PLACED)
+    for ref, text, dy in (("SW2", "RST", 3.6), ("LED1", "BEAT", 2.4), ("LED2", "STATUS", 2.4)):   # (mini 2.2)
         p = board.FindFootprintByReference(ref).GetPosition()
-        label(text, pcbnew.ToMM(p.x) - OX, pcbnew.ToMM(p.y) - OY + 4.2, 0.6)
+        label(text, pcbnew.ToMM(p.x) - OX, pcbnew.ToMM(p.y) - OY + dy, 0.6)
+    label("PUSH = BOOT", W / 2, 18.6, 0.6)       # (mini 2.2: above the encoder's push pins)
     label("LINE IN", 14.6, 13.6, 0.6)            # (mini 2: J7)
-    label("jank mini 2", 12.0, GE + 3.0, 1.0)
+    label("jank mini 2.2", 12.0, GE + 3.0, 1.0)
     label("antenna strip:", 12.0, GE + 4.6, 0.6)
     label("no copper", 12.0, GE + 5.5, 0.6)
 

@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""jank mini 2: the one parts table. jank mini (hardware/chip) unchanged, plus a LINE IN (README "LINE IN"). Below: mini's own words.
+"""jank mini 2.2: the one parts table. jank mini 2 plus a push encoder (the encoder's push replaces BOOT's SW1) and two
+RGB LEDs (they replace the red LED1); README "mini 2.2". jank mini 2: jank mini (hardware/chip) unchanged, plus a LINE IN
+(README "LINE IN"). Below: mini's own words.
 
 jank chip: the one parts table (README "Schematic"). The jank tiny circuit (hardware/tiny) with the ESP32-S3-MINI-1
 module replaced by the bare ESP32-S3FN8 (QFN56, 8 MB flash in the package), its crystal, its supply filters and
@@ -24,6 +26,7 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
     "sot23fet": "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR",
     "din": "CONN-TH_DIN-504B-M10",
     "sot235": "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", "tvs2": "SOT-23_L2.9-W1.3-P1.90-LS2.4-BR",   # (mini 2: LINE IN)
+    "enc": "SW-TH_EC11XXXXXXXX", "rgb": "LED-ARRAY-SMD_4P-L1.6-W1.5_SZYY1615RGB-A",   # (mini 2.2: the encoder, the RGB LEDs)
 }
 
 # ESP32-S3FN8, QFN56 (ESP32-S3 datasheet, "Pin Overview"; Espressif's checklist "IO Pin Default Configuration"):
@@ -33,8 +36,15 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
 #   48 MTMS (42), 49 U0TXD (43), 50 U0RXD (44), 51 GPIO45, 52 GPIO46, 53 XTAL_N, 54 XTAL_P, 55/56 VDDA, 57 GND (the pad)
 GPIO = {   # firmware's board.h (README "Pin map"): function -> (GPIO, chip pin); the GPIOs are tiny's, unchanged
     "MIDI_TX": (21, "27"),      # UART TX to the MIDI OUT jack's tip, through 10 ohm; RTC_GPIO21 (the ULP can drive it)
-    "LED_DRV": (38, "43"),      # the LED, active high, through 5.1 k
-    "BOOT": (0, "5"),           # BOOT / user button to GND (strapping: held low at reset = download mode)
+    "BOOT": (0, "5"),           # mini 2.2: the encoder's push (was SW1) to GND (strapping: held low at reset = download mode)
+    # mini 2.2 (README "mini 2.2"): two RGB LEDs, common cathode, each anode from its own GPIO through 1 k (active high,
+    #  LEDC PWM); the colour on each anode pad (1..3) is UNVERIFIED (datasheet not read), the firmware maps it
+    "LEDA_1": (38, "43"), "LEDA_2": (39, "44"), "LEDA_3": (40, "45"),   # LED1, the beat LED (lock / search / lost); GPIO38
+                                                                         #  was mini 2's LED; the chip's bottom-left corner
+    "LEDB_1": (11, "16"), "LEDB_2": (12, "17"), "LEDB_3": (13, "18"),   # LED2, the status LED; the chip's top side, by
+                                                                         #  MIDI2_TX (pin 15), towards LED2 (upper right)
+    "ENC_A": (33, "38"), "ENC_B": (34, "39"),   # the encoder's A / B, 100 k pull-ups, 10 nF; the chip's left side
+                                                #  (VDD_SPI domain: inputs only here, microamps)
     "VBANK_ADC": (1, "6"),      # ADC1_CH0: the reservoir through 1 M / 1 M (half its voltage)
     "VBUS_SENSE": (2, "7"),     # ADC1_CH1: USB VBUS through 100 k / 100 k (2.5 V when USB is plugged)
     "PWR_HOLD": (4, "9"),       # RTC_GPIO4: high keeps the buck on below the detector's threshold (hold it in sleep)
@@ -151,11 +161,29 @@ PARTS = [
     ("AE1", "ant", "ANT3216LL00R2400A", "ant", "C293767", {"1": "ANT_FEED", "2": "ANT_END"}),   # (2: the end pad, its copper extended, unconnected)
     ("R19", "R", "0", "r0402", "C17168", {"1": "RF", "2": "UFL"}),
     ("J4", "ufl", "U.FL", "ufl", "C88374", {"1": "UFL", "2": "GND", "3": "GND"}),
-    # ---- the button, the LED
-    ("SW1", "sw", "BOOT", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BOOT", "4": "BOOT"}),
+    # ---- the RST button (mini 2.2: SW1 BOOT, LED1 red and R9 are gone: the encoder's push is BOOT, two RGB LEDs below)
     ("SW2", "sw", "RST", "sw", "C318884", {"1": "GND", "2": "GND", "3": "CHIP_PU", "4": "CHIP_PU"}),   # (reset: CHIP_PU to ground)
-    ("LED1", "led", "red", "led", "C2286", {"1": "LED_A", "2": "GND"}),
-    ("R9", "R", "5.1k", "r0603", "C23186", {"1": "LED_DRV", "2": "LED_A"}),
+    # ---- mini 2.2: the encoder (ALPS EC11E09244BS, the big board's part: 18 detents / 9 pulses, push, 20 mm D shaft,
+    #      through hole: JLC solders it by hand like the jacks). A / B to C = GND; the push (D / E) = BOOT on GPIO0 (R16
+    #      its pull-up); the two mounting tabs (6, 7) to GND. A / B: 100 k pull-ups (a contact may rest closed at a detent:
+    #      33 uA each, not 0.33 mA as with 10 k) and 10 nF (1 ms)
+    ("ENC1", "enc", "EC11E09244BS", "enc", "C470742",
+     {"A": "ENC_A", "B": "ENC_B", "C": "GND", "D": "BOOT", "E": "GND", "6": "GND", "7": "GND"}),
+    ("R46", "R", "100k", "r0402", "C25741", {"1": "+3V3", "2": "ENC_A"}),
+    ("C40", "C", "10n", "c0402", "C15195", {"1": "ENC_A", "2": "GND"}),
+    ("R47", "R", "100k", "r0402", "C25741", {"1": "+3V3", "2": "ENC_B"}),
+    ("C41", "C", "10n", "c0402", "C15195", {"1": "ENC_B", "2": "GND"}),
+    # ---- mini 2.2: two RGB LEDs, common cathode (EasyEDA's symbol: pad 4 = K, pads 1..3 = the anodes; which colour on
+    #      which pad UNVERIFIED), each anode through 1 k from a GPIO: red ~1.3 mA, green / blue ~0.4..0.8 mA when full on
+    #      (ESTIMATES from the Vf ratings), 0 when off; the same 1 k on every anode, so the colour map is firmware only
+    ("LED1", "rgb", "RGB beat", "rgb", "C3029072", {"1": "LA1", "2": "LA2", "3": "LA3", "4": "GND"}),
+    ("R40", "R", "1k", "r0402", "C11702", {"1": "LEDA_1", "2": "LA1"}),
+    ("R41", "R", "1k", "r0402", "C11702", {"1": "LEDA_2", "2": "LA2"}),
+    ("R42", "R", "1k", "r0402", "C11702", {"1": "LEDA_3", "2": "LA3"}),
+    ("LED2", "rgb", "RGB status", "rgb", "C3029072", {"1": "LB1", "2": "LB2", "3": "LB3", "4": "GND"}),
+    ("R43", "R", "1k", "r0402", "C11702", {"1": "LEDB_1", "2": "LB1"}),
+    ("R44", "R", "1k", "r0402", "C11702", {"1": "LEDB_2", "2": "LB2"}),
+    ("R45", "R", "1k", "r0402", "C11702", {"1": "LEDB_3", "2": "LB3"}),
     # ---- the firmware's senses: the reservoir (1 M / 1 M, 100 nF) and VBUS (100 k / 100 k)
     ("R10", "R", "1M", "r0402", "C26083", {"1": "VSYS", "2": "VBANK_ADC"}),
     ("R11", "R", "1M", "r0402", "C26083", {"1": "VBANK_ADC", "2": "GND"}),
@@ -232,6 +260,11 @@ LCSC = {
     "C49338": "Nexperia PESD5V0S2BT, two-line bidirectional ESD protection, 5 V, 35 pF, SOT-23",
     "C25765": "20 k 1% 0402", "C25908": "5.6 k 1% 0402", "C25755": "150 k 1% 0402", "C25750": "120 k 1% 0402",
     "C25079": "120 ohm 1% 0402", "C1531": "2.2 nF 50 V X7R 0402",
+    # mini 2.2, the encoder and the RGB LEDs
+    "C470742": "ALPS EC11E09244BS, rotary encoder, vertical, 18 detents / 9 pulses, push 0.5 mm, 20 mm D shaft, through hole"
+               " (the big board's SW7)",
+    "C3029072": "Yongyu SZYY1615RGB-A, RGB LED 1.6 x 1.5 mm, common cathode, Vf R 2.0..2.4 V, G / B 2.6..3.0 V",
+    "C11702": "1 k 1% 0402",
 }
 
 

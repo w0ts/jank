@@ -436,7 +436,7 @@ def relabel(board):
     both), where the placer put the buttons"""
     pads = [p for f in board.GetFootprints() for p in f.Pads() if p.IsOnLayer(pcbnew.F_Cu)]
     items = []
-    for ref, text in (("SW1", "BOOT"), ("SW2", "RST")):
+    for ref, text in (("SW2", "RST"),):   # (mini 2.2: SW1 gone, the encoder is BOOT)
         p = board.FindFootprintByReference(ref).GetPosition()
         items += [(t, p) for t in board.GetDrawings() if t.GetClass() == "PCB_TEXT" and t.GetText() == text]
 

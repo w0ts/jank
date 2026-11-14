@@ -1,4 +1,69 @@
-# jank mini 2: jank mini (hardware/chip) with a LINE IN
+# jank mini 2.2: jank mini 2 with a push encoder and two RGB LEDs (branch hw/mini2.2)
+
+**Stage 1 (2026-11-14): parts, GPIO map, placement, cost. Not routed; nothing ordered, built or measured.** The board
+file `mini2.kicad_pcb` is now the *placed* board (`LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 make_board.py`), not a routed
+one: `fab/mini2-gerbers.zip`, `render-top.png`, `render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/` are
+still mini 2's until stage 2. Everything below this section is mini 2's text.
+
+## mini 2.2 (stage 1)
+
+**What changed (parts.py):** SW1 (BOOT), LED1 (red) and R9 are gone. New: **ENC1**, the big board's encoder
+(**ALPS EC11E09244BS, C470742**: 18 detents / 9 pulses, push 0.5 mm, 20 mm D shaft, through hole; JLC solders it by
+hand, like the jacks; its fee for that is not in `fab/cost.md`); **LED1 / LED2**, two RGB LEDs **SZYY1615RGB-A
+(C3029072)**, 1.6 x 1.5 mm, common cathode, G / B Vf 2.6..3.0 V (low enough for 3.3 V); **R40..R45** 1 k (C11702, Basic),
+one per anode; **R46 / R47** 100 k pull-ups and **C40 / C41** 10 nF on A / B (codes already on the board). 107 parts
+in the schematic, 101 fitted, 52 BOM lines, 312 joints.
+
+**Why discrete RGB, not addressable:** 0 mA when off. Every addressable part JLC stocks (SK6805-EC15, SK6812MINI-E,
+WS2812...) needs 3.5..3.7 V or more, so it cannot run from +3V3; on VSYS (the bank, 3.0..4.8 V on MIDI power) it browns out below
+3.5..3.7 V, needs a level shifter (VIH 0.7 x VDD), and draws **0.25..0.6 mA idle each** (JLC listing) unless a FET
+switches it. On MIDI power the LED budget is ~1..2 mA in all (the MIDI-power study), so two idle addressable LEDs would
+take most of it. The price: 6 GPIOs instead of 1.
+
+**LED current (ESTIMATES from the Vf ratings, unmeasured):** 3.3 V GPIO, 1 k: red ~1.3 mA, green / blue ~0.4..0.8 mA
+each when full on; **0 when off** (no idle draw). Both LEDs fully white: ~5 mA peak. The firmware dims with LEDC PWM (6
+of the S3's 8 channels) and keeps them off or very dim on MIDI power. Brightness through the lid at these currents is
+unmeasured (mini 2's red LED ran ~0.3 mA through 5.1 k).
+
+**Encoder current:** at a detent the A contact may rest closed (ALPS: 18-detent types; B unspecified), so up to
+**2 x 33 uA = 66 uA** with the 100 k pull-ups (10 k would be 0.66 mA). The push closes only while pressed.
+
+**GPIO map (new / changed):**
+
+| Function | GPIO | Chip pin | Notes |
+|---|---|---|---|
+| BOOT = the encoder's push (D / E) | 0 | 5 | replaces SW1; R16 10 k pull-up; push + RST = download mode |
+| ENC_A / ENC_B | 33 / 34 | 38 / 39 | left side; VDD_SPI domain (inputs only here); *free on the FN8 (quad flash in package, no PSRAM): confirm in the datasheet's in-package flash pin table before stage 2* |
+| LED1 (beat) anodes 1 / 2 / 3 | 38 / 39 / 40 | 43 / 44 / 45 | bottom-left corner, VDD3P3_CPU domain; GPIO38 was mini 2's LED |
+| LED2 (status) anodes 1 / 2 / 3 | 11 / 12 / 13 | 16 / 17 / 18 | top side, by MIDI2_TX (pin 15), towards LED2; *the way out past R35 / C36 / C20 is tight: stage 2 may move them, or use GPIO41 / 42 / 44 instead* |
+
+Unchanged: everything else in "Pin map" below (GPIO38's LED_DRV is now LED1's anode 1). Still free: GPIO5..8 (ADC1,
+closed in by the fan-out lanes), 14..18, 35..37, 41..44; strapping 3, 45, 46. **Which colour sits on which anode pad is
+UNVERIFIED** (EasyEDA's symbol: pad 4 = common cathode, pads 1..3 anodes; the datasheet could not be read here): all
+anodes have the same 1 k, so the colour map is firmware only.
+
+**Placement (`render-top-placement.png`):** the encoder's shaft at **(33.0, 27.5)**, the middle of the width, where
+BOOT, RST and the red LED were; **LED1 (BEAT) at (21.0, 27.5) and LED2 (STATUS) at (45.0, 27.5)**, 12 mm each side of the
+shaft (5 mm outside a 14 mm knob), their resistors between them and the encoder; R46 / C40 by pin A, R47 / C41 by pin B;
+**SW2 (RST) at (41.0, 15.6)**, under the USB-C's right side, 14 mm from the shaft. The board stays **66 x 68 mm**.
+Checks on the placed board: ERC 0 errors (1 warning, ANT_END as before); `check_nets.py` 334 pads, 0 problems; DRC 0
+courtyard overlaps (only the expected unconnected items: not routed). No top part entered the DIN pads' iron room.
+
+**Case (sketch only: `case/sketch_22.py` -> `case/renders/sketch-2.2.png`):** the lid stays 12.4 mm over the board (the
+cans); the shaft top is **24.5 mm** over the board (ALPS drawing, *unverified*), so ~12 mm stands above the lid: the big
+box's 14 x 12 knob (10 mm bore) sits ~2 mm over the lid. Shaft hole ~7.6 mm (the 7 mm bushing reaches ~11.5 mm,
+*unverified*, into the 11.0..12.4 mm roof). Two LED light pipes as mini 2's LED1 window; RST a cap or a pin hole. A post
+in the base under the encoder (the push loads the middle of the board) is for stage 2.
+
+**Cost (cost.py's method, `fab/cost.md`; mini 2's 2026-11-13 snapshot, the 3 new codes read 2026-11-14):** **10 boards
+$168.64 ($16.86 a board) against mini 2's $141.41: +$27.23**: the encoder $19.68 (10 x $1.97), 2 more Extended types
+(encoder, RGB LED) +$6.18, the LEDs $1.11, joints +$0.46, minus SW1 / LED1 / R9. 5 boards $126.43. Not in it: JLC's
+hand-soldering fee for the through-hole encoder (as for the jacks). No cheaper EC11 with the same 18 / 9 detents was in
+stock at JLC on 2026-11-14; the SMD EC11J1525402 (C209762, $3.06, 30 / 15 detents) is the fallback if JLC will not
+hand-solder.
+
+**Power note (from the MIDI-power study, 2026-11-14):** beat follow needs USB power anyway (23..41 mA against
+4.6..9.2 mA from a MIDI OUT); the LINE IN's front end (U7, from VBUS) is off without USB, which fits.
 
 **Stage 2 (2026-11-13): routed, every check run, fab files, case. Nothing ordered, built or measured.** This README is jank mini's, kept for everything unchanged; the sections "LINE IN", "Routing (mini 2)", "What changed vs mini 1" and "Checks (mini 2)" below are mini 2's (numbers in "Layout", "DRC and ERC", "Parts and cost" further down are mini 1's, kept for reference).
 
