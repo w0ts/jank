@@ -41,6 +41,9 @@ SYMBOLS = {
     "sw": ([("1", "A", PAS), ("2", "B", PAS)], [("3", "C", PAS), ("4", "D", PAS)], "SW", 5.08),
     "jack": ([("D", "T", PAS), ("C", "R", PAS)], [("A", "S", PAS), ("B", "SW", PAS)], "J", 5.08),
     "trs": ([("T", "T", PAS), ("R", "R", PAS)], [("S", "S", PAS)], "P", 5.08),
+    "jack5": ([("5", "T", PAS), ("4", "TSW", PAS), ("2", "R", PAS), ("3", "RSW", PAS)], [("1", "S", PAS)], "J", 5.08),   # (PJ-307C)
+    "pads2": ([("1", "A", PAS)], [("2", "B", PAS)], "J", 2.54),   # (the power switch's wire pads)
+    "pads6": ([("1", "TX", PAS), ("2", "RX", PAS), ("3", "3V3", PAS)], [("4", "GND", PAS), ("5", "EN", PAS), ("6", "BOOT", PAS)], "J", 5.08),
     "det": ([("3", "VDD", "power_in")], [("1", "VOUT", "output"), ("2", "VSS", "power_in")], "U", 7.62),
     "buck": ([("6", "VIN", "power_in"), ("5", "EN", "input"), ("3", "MODE", "input"), ("4", "VSET", PAS)],
              [("2", "SW", PAS), ("1", "VOS", "power_in"), ("8", "GND", "power_in"), ("9", "EP", "power_in"),
@@ -86,6 +89,8 @@ SYMBOLS["ldo5"] = ([("1", "VIN", "power_in"), ("3", "CE", "input")], [("5", "VOU
 #  net for the ERC.) The AMS1117-3.3 (EasyEDA's symbol for C6186: 1 GND, 2 VOUT, 3 VIN, 4 the tab = VOUT)
 SYMBOLS["ldo223"] = ([("3", "VIN", "power_in")], [("2", "VOUT", "power_out"), ("4", "TAB", PAS), ("1", "GND", "power_in")],
                      "U", 7.62)
+SYMBOLS["nfet"] = ([("1", "G", "input")], [("3", "D", PAS), ("2", "S", PAS)], "Q", 5.08)   # (stage 2: CLOCK / RESET)
+SYMBOLS["bav99"] = ([("1", "A1", PAS)], [("3", "K1A2", PAS), ("2", "K2", PAS)], "D", 5.08)
 SYMBOLS["pfet"] = ([("1", "G", "input")], [("2", "S", PAS), ("3", "D", PAS)], "Q", 5.08)
 SYMBOLS["chg"] = ([("4", "VCC", "power_in"), ("5", "PROG", PAS)], [("3", "BAT", PAS), ("1", "CHRG", "open_collector"),
                                                                   ("2", "GND", "power_in")], "U", 7.62)
@@ -130,7 +135,7 @@ def pin_xy(kind):
     return out
 
 
-FLAGS = ["GND", "VBUS", "VDD3P3", "VSYS", "XB_VDD"]   # (power_in pins on these nets need a driver for the ERC; +3V3: U2's VOUT)
+FLAGS = ["GND", "VUSB", "VBUS", "VDD3P3", "VSYS", "XB_VDD", "VREG"]   # (power_in pins on these nets need a driver for the ERC; +3V3: U2's VOUT)
 
 
 def placed():
@@ -191,12 +196,12 @@ def schematic():
         "jank mini 2.2 (hardware/mini2/README.md). Two orders, one board: usb (U2 AMS1117-3.3) / battery (U10 HT7833 and the CELL parts, parts.ONLY)."
         " POWER: VBUS through D3 into VSYS; VSYS -> U2 or U10 -> +3V3 (C3 10u in, C5 22u + C6 100n out). No MIDI power input.",
         "CELL (battery order): J8 / J9 PH2.0 in parallel (DNP; pin 1 = +, BAT_C), Q2 AO3401A reverse-polarity FET to BAT_P (R53 100k gate to GND);"
-        " Q1 AO3401A BAT_P -> VSYS (gate on VBUS, R50 100k); U8 TP4054-42 (R51 5.1k: ~196 mA; C40 / C41 10u); U9 XB5353A in the minus lead"
+        " Q1 AO3401A BAT_P -> VSYS (gate on VBUS, R50 10k) and D9 B5819W beside it (stage 2: sim/power.py); U8 TP4054-42 (R51 5.1k: ~196 mA; C40 / C41 10u); U9 XB5353A in the minus lead"
         " (VDD via R52 100 ohm = XB_VDD, C42 100n to BAT_N; VM = GND); R10 1M (battery) / R11 1M + C8 100n: BAT_P / 2 on GPIO1 (0 V in the usb order).",
-        "MIDI OUT 1, GPIO21 (MIDI_TX): jack J2 ring = +3V3 through R14 // R26 // R48 (3 x 100 ohm = 33.3 ohm), tip through R15 10 ohm;"
-        " DIN J5 its own R54 33 ohm / R55 10 ohm. MIDI OUT 2, GPIO17 (MIDI_TX2, the same UART): jack J3 R21 // R27 // R49 + R20, DIN J6"
-        " R56 / R57. Jacks and DINs on the bottom (DNP, the user solders them).",
-        "Pins: GPIO21 MIDI_TX, GPIO17 MIDI_TX2, GPIO0 BOOT (SW1 NO; R16 pull-up only; no RST button: CHIP_PU's RC only), GPIO38 LED_R (LED1 red, R40 1k), GPIO39 LED_G (LED2 green, R41 1k),"
+        "MIDI OUT 1, GPIO21 (MIDI_TX): jack J2 ring = +3V3 through R14 // R26 // R48 (3 x 100 ohm = 33.3 ohm), tip through R15 68 ohm;"
+        " DIN J5 R54 // R58 (2 x 100 ohm) / R55 68 ohm. MIDI OUT 2, GPIO17 (MIDI_TX2, the same UART): jack J3 R21 // R27 // R49 + R20,"
+        " DIN J6 R56 // R59 / R57. Jacks and DINs on the bottom (DNP, the user solders them). J11 (the power switch's wire pads, DNP) VSYS -> VREG, R62 0 ohm (usb order).",
+        "Pins: GPIO21 MIDI_TX, GPIO17 MIDI_TX2, GPIO16 LIN_DET (J7's ring switch, R38 1M up; R36 / R37 100k tip / ring down), GPIO0 BOOT (SW1 NO; R16 pull-up only; no RST button: CHIP_PU's RC only), GPIO38 LED_R (LED1 red, R40 1k), GPIO39 LED_G (LED2 green, R41 1k),"
         " GPIO9 LINE_IN, GPIO1 VBAT_ADC, GPIO19 / 20 USB D- / D+. GPIO3, 45, 46 (strapping) open: internal defaults (3.3 V flash, SPI boot).",
         "U1 ESP32-S3FN8: VDDA C11-C13; VDD3P3 through L2 2 nH (C14-C17 before, C18 after); VDD3P3_CPU C19, VDD3P3_RTC C20; VDD_SPI C21 + C22;"
         " CHIP_PU R8 10k / C7 1u; Y1 40 MHz, C9 / C10 10 pF, R17 0 ohm on XTAL_P (XIAO ESP32S3 v1.2 values).",

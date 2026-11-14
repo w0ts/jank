@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>/Users/mots/GitHub/jank/worktrees/mini2-2/hardware/mini2/mini2.kicad_sch</source>
-    <date>2026-11-14T11:09:25</date>
+    <date>2026-11-14T19:22:53</date>
     <tool>Eeschema 10.0.8</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -530,6 +530,58 @@
         </unit>
       </units>
     </comp>
+    <comp ref="C26">
+      <value>DNP</value>
+      <footprint>chip:C0402</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>71bfd13c-95eb-5fbf-b06b-2af4c3b24020</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C27">
+      <value>DNP</value>
+      <footprint>chip:C0805</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C0805</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>246981aa-f91d-558c-a6be-20905ca0d9fa</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
     <comp ref="C28">
       <value>100n</value>
       <footprint>chip:C0402</footprint>
@@ -627,16 +679,16 @@
       </units>
     </comp>
     <comp ref="C33">
-      <value>1u</value>
+      <value>220n</value>
       <footprint>chip:C0402</footprint>
       <fields>
-        <field name="LCSC">C52923</field>
+        <field name="LCSC">C16772</field>
         <field name="Footprint">chip:C0402</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="C" description="jank chip: C"/>
-      <property name="LCSC" value="C52923"/>
+      <property name="LCSC" value="C16772"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -842,6 +894,340 @@
         </unit>
       </units>
     </comp>
+    <comp ref="C67">
+      <value>DNP</value>
+      <footprint>chip:C0402</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>cd16b3d9-c359-5c27-b528-a1c5b70eb2f8</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C72">
+      <value>VSYS bulk</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>886f8a48-6da2-5e17-8b79-f0d3d3f491c5</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C80">
+      <value>DNP</value>
+      <footprint>chip:C0603</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C0603</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>29f026ae-f72c-5013-b47e-625405c92fda</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C81">
+      <value>DNP</value>
+      <footprint>chip:C0603</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C0603</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>bdcda962-b0ef-5e07-bd50-0450ae180294</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C82">
+      <value>DNP</value>
+      <footprint>chip:C0603</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C0603</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>7e5c47b2-b39d-52d4-878e-a2de4ac43173</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C83">
+      <value>DNP</value>
+      <footprint>chip:C0603</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C0603</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>69c68c71-d2a4-5df0-9959-aa5de3910ecb</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C84">
+      <value>1u</value>
+      <footprint>chip:C0402</footprint>
+      <fields>
+        <field name="LCSC">C52923</field>
+        <field name="Footprint">chip:C0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value="C52923"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>6f484eea-368b-52dd-b5b5-95cc6425fee4</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C85">
+      <value>10u 25V</value>
+      <footprint>chip:C0805</footprint>
+      <fields>
+        <field name="LCSC">C15850</field>
+        <field name="Footprint">chip:C0805</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value="C15850"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>80e4b248-a57b-57d8-aa28-67a7ce7d57f0</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="C86">
+      <value>OLED bulk</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>27e97254-2897-5902-8743-1584306446b0</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="CT3">
+      <value>twin DNP</value>
+      <footprint>chip:C_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>43df7cc2-d5c9-5ccd-9dca-32c6d46bf854</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="CT8">
+      <value>twin DNP</value>
+      <footprint>chip:C_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>a5e5428c-78ba-560d-9f00-3cf4b4e9e2de</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="CT9">
+      <value>twin DNP</value>
+      <footprint>chip:C_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>c2700015-b6ab-5bfd-97fc-9fb9d91b2d6e</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="CT10">
+      <value>twin DNP</value>
+      <footprint>chip:C_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:C_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="C" description="jank chip: C"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>05eab14a-452c-5867-8406-aefe2e48f4a3</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
     <comp ref="D3">
       <value>B5819W</value>
       <footprint>chip:SOD-123_L2.7-W1.6-LS3.7-RD-1</footprint>
@@ -914,6 +1300,128 @@
         </unit>
       </units>
     </comp>
+    <comp ref="D9">
+      <value>B5819W</value>
+      <footprint>chip:SOD-123_L2.7-W1.6-LS3.7-RD-1</footprint>
+      <fields>
+        <field name="LCSC">C8598</field>
+        <field name="Footprint">chip:SOD-123_L2.7-W1.6-LS3.7-RD-1</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="D" description="jank chip: D"/>
+      <property name="LCSC" value="C8598"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>710b5552-dc8a-5bb1-8c52-93c9e6cdd4a5</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="2"/>
+            <pin num="1"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="D10">
+      <value>BAV99</value>
+      <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
+      <fields>
+        <field name="LCSC">C2500</field>
+        <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="bav99" description="jank chip: bav99"/>
+      <property name="LCSC" value="C2500"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9687976e-b323-5a5f-9ecb-f3a0c4077351</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="3"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="D11">
+      <value>BAV99</value>
+      <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
+      <fields>
+        <field name="LCSC">C2500</field>
+        <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="bav99" description="jank chip: bav99"/>
+      <property name="LCSC" value="C2500"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9603bd06-8d37-5b7c-b78c-3ebea41e6149</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="3"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="D12">
+      <value>B5819W</value>
+      <footprint>chip:SOD-123_L2.7-W1.6-LS3.7-RD-1</footprint>
+      <fields>
+        <field name="LCSC">C8598</field>
+        <field name="Footprint">chip:SOD-123_L2.7-W1.6-LS3.7-RD-1</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="D" description="jank chip: D"/>
+      <property name="LCSC" value="C8598"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>4991b1e5-5b21-56bd-8498-98c23ec6c6ec</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="2"/>
+            <pin num="1"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="D13">
+      <value>B5819W</value>
+      <footprint>chip:SOD-123_L2.7-W1.6-LS3.7-RD-1</footprint>
+      <fields>
+        <field name="LCSC">C8598</field>
+        <field name="Footprint">chip:SOD-123_L2.7-W1.6-LS3.7-RD-1</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="D" description="jank chip: D"/>
+      <property name="LCSC" value="C8598"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>51bb9cd6-1d60-55a5-853d-b3fd880329c6</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="2"/>
+            <pin num="1"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
     <comp ref="J1">
       <value>USB-C 16P</value>
       <footprint>chip:USB-C-SMD_TYPE-C-16PIN-2MD-073</footprint>
@@ -952,15 +1460,15 @@
     </comp>
     <comp ref="J2">
       <value>MIDI OUT</value>
-      <footprint>chip:AUDIO-TH_PJ-320A-4P-DIP</footprint>
+      <footprint>chip:AUDIO-TH_PJ307C</footprint>
       <fields>
-        <field name="LCSC">C18185602</field>
-        <field name="Footprint">chip:AUDIO-TH_PJ-320A-4P-DIP</field>
+        <field name="LCSC">C16684</field>
+        <field name="Footprint">chip:AUDIO-TH_PJ307C</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
-      <libsource lib="chip" part="jack" description="jank chip: jack"/>
-      <property name="LCSC" value="C18185602"/>
+      <libsource lib="chip" part="jack5" description="jank chip: jack5"/>
+      <property name="LCSC" value="C16684"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <property name="exclude_from_bom"/>
@@ -970,25 +1478,26 @@
       <units>
         <unit name="A">
           <pins>
-            <pin num="D"/>
-            <pin num="C"/>
-            <pin num="A"/>
-            <pin num="B"/>
+            <pin num="5"/>
+            <pin num="4"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="1"/>
           </pins>
         </unit>
       </units>
     </comp>
     <comp ref="J3">
       <value>MIDI OUT 2</value>
-      <footprint>chip:AUDIO-TH_PJ-320A-4P-DIP</footprint>
+      <footprint>chip:AUDIO-TH_PJ307C</footprint>
       <fields>
-        <field name="LCSC">C18185602</field>
-        <field name="Footprint">chip:AUDIO-TH_PJ-320A-4P-DIP</field>
+        <field name="LCSC">C16684</field>
+        <field name="Footprint">chip:AUDIO-TH_PJ307C</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
-      <libsource lib="chip" part="jack" description="jank chip: jack"/>
-      <property name="LCSC" value="C18185602"/>
+      <libsource lib="chip" part="jack5" description="jank chip: jack5"/>
+      <property name="LCSC" value="C16684"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <property name="exclude_from_bom"/>
@@ -998,10 +1507,11 @@
       <units>
         <unit name="A">
           <pins>
-            <pin num="D"/>
-            <pin num="C"/>
-            <pin num="A"/>
-            <pin num="B"/>
+            <pin num="5"/>
+            <pin num="4"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="1"/>
           </pins>
         </unit>
       </units>
@@ -1095,15 +1605,15 @@
     </comp>
     <comp ref="J7">
       <value>LINE IN</value>
-      <footprint>chip:AUDIO-TH_PJ-320A-4P-DIP</footprint>
+      <footprint>chip:AUDIO-TH_PJ307C</footprint>
       <fields>
-        <field name="LCSC">C18185602</field>
-        <field name="Footprint">chip:AUDIO-TH_PJ-320A-4P-DIP</field>
+        <field name="LCSC">C16684</field>
+        <field name="Footprint">chip:AUDIO-TH_PJ307C</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
-      <libsource lib="chip" part="jack" description="jank chip: jack"/>
-      <property name="LCSC" value="C18185602"/>
+      <libsource lib="chip" part="jack5" description="jank chip: jack5"/>
+      <property name="LCSC" value="C16684"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <property name="exclude_from_bom"/>
@@ -1113,10 +1623,11 @@
       <units>
         <unit name="A">
           <pins>
-            <pin num="D"/>
-            <pin num="C"/>
-            <pin num="A"/>
-            <pin num="B"/>
+            <pin num="5"/>
+            <pin num="4"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="1"/>
           </pins>
         </unit>
       </units>
@@ -1197,6 +1708,146 @@
             <pin num="2"/>
             <pin num="3"/>
             <pin num="4"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="J10B">
+      <value>OLED 2.42 LEAD</value>
+      <footprint>chip:PADS4_SMD</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:PADS4_SMD</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="hdr4" description="jank chip: hdr4"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>7f1bd0e4-83a8-5fc8-9d21-f719289e7bd0</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="4"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="J11">
+      <value>POWER SW</value>
+      <footprint>chip:PADS2_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:PADS2_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="pads2" description="jank chip: pads2"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>14df3891-ea65-5da6-89fe-ecf2d3b07648</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="J12">
+      <value>RECOVERY</value>
+      <footprint>chip:PADS6_SMD</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:PADS6_SMD</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="pads6" description="jank chip: pads6"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>a21594ad-8c3a-5a15-9f26-2466a83aabfe</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="4"/>
+            <pin num="5"/>
+            <pin num="6"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="J13">
+      <value>CLOCK</value>
+      <footprint>chip:AUDIO-TH_PJ-320A-4P-DIP</footprint>
+      <fields>
+        <field name="LCSC">C18185602</field>
+        <field name="Footprint">chip:AUDIO-TH_PJ-320A-4P-DIP</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="jack" description="jank chip: jack"/>
+      <property name="LCSC" value="C18185602"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>de099567-9ce5-55a9-a14e-278b976d7792</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="D"/>
+            <pin num="C"/>
+            <pin num="A"/>
+            <pin num="B"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="J14">
+      <value>RESET</value>
+      <footprint>chip:AUDIO-TH_PJ-320A-4P-DIP</footprint>
+      <fields>
+        <field name="LCSC">C18185602</field>
+        <field name="Footprint">chip:AUDIO-TH_PJ-320A-4P-DIP</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="jack" description="jank chip: jack"/>
+      <property name="LCSC" value="C18185602"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>157f384a-64e3-5295-8b56-6752d5591e31</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="D"/>
+            <pin num="C"/>
+            <pin num="A"/>
+            <pin num="B"/>
           </pins>
         </unit>
       </units>
@@ -1401,6 +2052,106 @@
         </unit>
       </units>
     </comp>
+    <comp ref="Q3">
+      <value>2N7002</value>
+      <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
+      <fields>
+        <field name="LCSC">C8545</field>
+        <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="nfet" description="jank chip: nfet"/>
+      <property name="LCSC" value="C8545"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>2d369ef2-6ec3-505c-9b62-d0a231619484</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="3"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="Q4">
+      <value>AO3401A</value>
+      <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
+      <fields>
+        <field name="LCSC">C15127</field>
+        <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="pfet" description="jank chip: pfet"/>
+      <property name="LCSC" value="C15127"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>8c89ef30-125c-5e2e-afd5-c0a1f2964708</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+            <pin num="3"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="Q5">
+      <value>2N7002</value>
+      <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
+      <fields>
+        <field name="LCSC">C8545</field>
+        <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="nfet" description="jank chip: nfet"/>
+      <property name="LCSC" value="C8545"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>5abaabde-e7ce-5e79-bf70-929d1cad69e3</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="3"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="Q6">
+      <value>AO3401A</value>
+      <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
+      <fields>
+        <field name="LCSC">C15127</field>
+        <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="pfet" description="jank chip: pfet"/>
+      <property name="LCSC" value="C15127"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f8a88d31-d357-5814-b69d-ec5820f67e5f</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+            <pin num="3"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
     <comp ref="R3">
       <value>5.1k</value>
       <footprint>chip:R0603</footprint>
@@ -1546,16 +2297,16 @@
       </units>
     </comp>
     <comp ref="R15">
-      <value>10</value>
-      <footprint>chip:R0603</footprint>
+      <value>68</value>
+      <footprint>chip:R0805</footprint>
       <fields>
-        <field name="LCSC">C22859</field>
-        <field name="Footprint">chip:R0603</field>
+        <field name="LCSC">C17802</field>
+        <field name="Footprint">chip:R0805</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C22859"/>
+      <property name="LCSC" value="C17802"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -1642,16 +2393,16 @@
       </units>
     </comp>
     <comp ref="R20">
-      <value>10</value>
-      <footprint>chip:R0603</footprint>
+      <value>68</value>
+      <footprint>chip:R0805</footprint>
       <fields>
-        <field name="LCSC">C22859</field>
-        <field name="Footprint">chip:R0603</field>
+        <field name="LCSC">C17802</field>
+        <field name="Footprint">chip:R0805</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C22859"/>
+      <property name="LCSC" value="C17802"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -1929,6 +2680,102 @@
         </unit>
       </units>
     </comp>
+    <comp ref="R36">
+      <value>100k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25741</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25741"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>facfd026-3339-5620-bcae-267142e99980</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R37">
+      <value>100k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25741</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25741"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>5ab53633-c137-5d4d-9b6e-d3bebe8da316</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R38">
+      <value>1M</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C26083</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C26083"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>03cbf5e3-4cae-5ff2-bc4e-9039c07ea544</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R39">
+      <value>22</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25092</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25092"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b000cab9-86fd-5ed7-837f-de5fe9fdc270</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
     <comp ref="R40">
       <value>1k</value>
       <footprint>chip:R0402</footprint>
@@ -2026,16 +2873,16 @@
       </units>
     </comp>
     <comp ref="R50">
-      <value>100k</value>
+      <value>10k</value>
       <footprint>chip:R0402</footprint>
       <fields>
-        <field name="LCSC">C25741</field>
+        <field name="LCSC">C25744</field>
         <field name="Footprint">chip:R0402</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C25741"/>
+      <property name="LCSC" value="C25744"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2122,16 +2969,16 @@
       </units>
     </comp>
     <comp ref="R54">
-      <value>33</value>
-      <footprint>chip:R0805</footprint>
+      <value>100</value>
+      <footprint>chip:R1206</footprint>
       <fields>
-        <field name="LCSC">C17634</field>
-        <field name="Footprint">chip:R0805</field>
+        <field name="LCSC">C17901</field>
+        <field name="Footprint">chip:R1206</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C17634"/>
+      <property name="LCSC" value="C17901"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2146,16 +2993,16 @@
       </units>
     </comp>
     <comp ref="R55">
-      <value>10</value>
-      <footprint>chip:R0603</footprint>
+      <value>68</value>
+      <footprint>chip:R0805</footprint>
       <fields>
-        <field name="LCSC">C22859</field>
-        <field name="Footprint">chip:R0603</field>
+        <field name="LCSC">C17802</field>
+        <field name="Footprint">chip:R0805</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C22859"/>
+      <property name="LCSC" value="C17802"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2170,16 +3017,16 @@
       </units>
     </comp>
     <comp ref="R56">
-      <value>33</value>
-      <footprint>chip:R0805</footprint>
+      <value>100</value>
+      <footprint>chip:R1206</footprint>
       <fields>
-        <field name="LCSC">C17634</field>
-        <field name="Footprint">chip:R0805</field>
+        <field name="LCSC">C17901</field>
+        <field name="Footprint">chip:R1206</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C17634"/>
+      <property name="LCSC" value="C17901"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2194,20 +3041,68 @@
       </units>
     </comp>
     <comp ref="R57">
-      <value>10</value>
-      <footprint>chip:R0603</footprint>
+      <value>68</value>
+      <footprint>chip:R0805</footprint>
       <fields>
-        <field name="LCSC">C22859</field>
-        <field name="Footprint">chip:R0603</field>
+        <field name="LCSC">C17802</field>
+        <field name="Footprint">chip:R0805</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C22859"/>
+      <property name="LCSC" value="C17802"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>205d9587-dd47-58d3-a742-8bac198142e2</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R58">
+      <value>100</value>
+      <footprint>chip:R1206</footprint>
+      <fields>
+        <field name="LCSC">C17901</field>
+        <field name="Footprint">chip:R1206</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C17901"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>3edcb253-3871-50e4-b41b-1a1449f9f79a</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R59">
+      <value>100</value>
+      <footprint>chip:R1206</footprint>
+      <fields>
+        <field name="LCSC">C17901</field>
+        <field name="Footprint">chip:R1206</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C17901"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>c58f7efe-25e9-5564-9e23-8e4f7d355250</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -2265,12 +3160,734 @@
         </unit>
       </units>
     </comp>
-    <comp ref="RT40">
-      <value>twin DNP</value>
+    <comp ref="R62">
+      <value>0</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C17168</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C17168"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>cd434eca-4b46-578b-90bd-ae7afc60ff02</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R63">
+      <value>0</value>
       <footprint>chip:R0603</footprint>
       <fields>
-        <field name="LCSC"/>
+        <field name="LCSC">C21189</field>
         <field name="Footprint">chip:R0603</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C21189"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>49af93c3-cdde-57d2-a19f-3b6bf07b6b14</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R65">
+      <value>10k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25744</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25744"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>586369c0-a44e-52fe-870b-07cc39f7422a</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R66">
+      <value>5.6k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25908</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25908"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ee4b565e-466a-5f44-b023-2aa6ccf14f2b</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R71">
+      <value>100k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25741</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25741"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>46df0ef5-9753-5278-a61f-901685fbd04b</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R73">
+      <value>10k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25744</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25744"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>08db8415-69e2-5c01-863f-b13bbb2bd517</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R74">
+      <value>10k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25744</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25744"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>e09ba9e4-3ff4-5218-8dab-a7b1a296a3e8</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R75">
+      <value>2k</value>
+      <footprint>chip:R1206</footprint>
+      <fields>
+        <field name="LCSC">C17944</field>
+        <field name="Footprint">chip:R1206</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C17944"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>cf06697b-000c-55e7-856f-e2e397ee7a1e</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R76">
+      <value>2k</value>
+      <footprint>chip:R1206</footprint>
+      <fields>
+        <field name="LCSC">C17944</field>
+        <field name="Footprint">chip:R1206</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C17944"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>e13d18d7-99aa-5770-9240-46ef0ede8cac</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R77">
+      <value>100k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25741</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25741"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f371c81d-f666-5c08-92f4-1a45ff8dda98</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R79">
+      <value>10k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25744</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25744"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>a0b3512b-44d0-5119-b2b6-897953bd39f2</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R80">
+      <value>10k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25744</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25744"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>e5ab9670-0bad-5c8c-ba38-41659bf46eab</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R81">
+      <value>2k</value>
+      <footprint>chip:R1206</footprint>
+      <fields>
+        <field name="LCSC">C17944</field>
+        <field name="Footprint">chip:R1206</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C17944"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b2c5fbe0-a586-51ae-ad87-eac77a065198</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R82">
+      <value>2k</value>
+      <footprint>chip:R1206</footprint>
+      <fields>
+        <field name="LCSC">C17944</field>
+        <field name="Footprint">chip:R1206</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C17944"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b4c39506-f732-5f40-afac-56e53f34c986</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R83">
+      <value>22</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25092</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25092"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>34963dc7-81e1-5056-bc53-09da43c82fb7</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R84">
+      <value>100k</value>
+      <footprint>chip:R0402</footprint>
+      <fields>
+        <field name="LCSC">C25741</field>
+        <field name="Footprint">chip:R0402</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25741"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d24b3f1d-2c22-5acd-bbe7-a1755eedc08c</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT10">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d9ac40d5-53de-5fc5-b443-12b8ce365336</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT11">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>766e2e77-e3a3-501f-9c94-796327b90ccc</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT15">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>2bf90c38-c23b-5a13-9d40-9ff874b4b2cb</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT20">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>3cb5d92c-0f4b-5297-acd8-87d58cd915e5</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT30">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>80d557b7-1915-5562-a490-6d460ddce272</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT31">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>cb042a85-bae0-54d1-8606-0da5825b08f0</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT32">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9ff07b1d-6061-5d95-a163-3860bb9d49fe</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT33">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ee451904-46c9-5d6d-9794-cfecee1b1d27</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT34">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>59b31c45-93fd-5ca9-a5c2-b84671a1c710</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT36">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ca952ac2-b9d0-5184-a989-2c64194d631d</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT37">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>59b983e7-35cf-5fe4-a22f-b41579a05ba7</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT38">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>efd0f40d-8f17-55d5-89a5-f1383bc70595</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT39">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>38c133e8-98b8-555a-9736-5c0ff21162c9</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT40">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -2293,10 +3910,10 @@
     </comp>
     <comp ref="RT41">
       <value>twin DNP</value>
-      <footprint>chip:R0603</footprint>
+      <footprint>chip:R_TWIN_HAND</footprint>
       <fields>
         <field name="LCSC"/>
-        <field name="Footprint">chip:R0603</field>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -2308,6 +3925,188 @@
       <property name="dnp"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>8060e3ba-8de8-5b83-9cd8-19e3cc477fad</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT51">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>63fabfaf-b415-59f7-85fc-2d8a5f03352a</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT55">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b492da8a-6cb0-5ac4-94ae-83dedbec9b96</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT57">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>4a791b99-10f2-56da-b8bf-5d05fc1c063d</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT60">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>253e0201-dbeb-56e1-8321-fa82ca2aec48</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT61">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9a166840-e945-5794-8860-daef1d5b64e1</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT73">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ce2ca28f-5ee2-5ccf-be63-756b4a217e21</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="RT79">
+      <value>twin DNP</value>
+      <footprint>chip:R_TWIN_HAND</footprint>
+      <fields>
+        <field name="LCSC"/>
+        <field name="Footprint">chip:R_TWIN_HAND</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value=""/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="dnp"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>82ef5432-7c5c-522a-9cf7-2990e6d14551</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -2771,6 +4570,21 @@
         <pin num="2" name="" type="passive"/>
       </pins>
     </libpart>
+    <libpart lib="chip" part="bav99">
+      <description>jank chip: bav99</description>
+      <fields>
+        <field name="Reference">D</field>
+        <field name="Value">bav99</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">jank chip: bav99</field>
+      </fields>
+      <pins>
+        <pin num="1" name="A1" type="passive"/>
+        <pin num="2" name="K2" type="passive"/>
+        <pin num="3" name="K1A2" type="passive"/>
+      </pins>
+    </libpart>
     <libpart lib="chip" part="chg">
       <description>jank chip: chg</description>
       <fields>
@@ -2926,6 +4740,23 @@
         <pin num="D" name="T" type="passive"/>
       </pins>
     </libpart>
+    <libpart lib="chip" part="jack5">
+      <description>jank chip: jack5</description>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">jack5</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">jank chip: jack5</field>
+      </fields>
+      <pins>
+        <pin num="1" name="S" type="passive"/>
+        <pin num="2" name="R" type="passive"/>
+        <pin num="3" name="RSW" type="passive"/>
+        <pin num="4" name="TSW" type="passive"/>
+        <pin num="5" name="T" type="passive"/>
+      </pins>
+    </libpart>
     <libpart lib="chip" part="ldo">
       <description>jank chip: ldo</description>
       <fields>
@@ -2988,6 +4819,21 @@
         <pin num="2" name="K" type="passive"/>
       </pins>
     </libpart>
+    <libpart lib="chip" part="nfet">
+      <description>jank chip: nfet</description>
+      <fields>
+        <field name="Reference">Q</field>
+        <field name="Value">nfet</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">jank chip: nfet</field>
+      </fields>
+      <pins>
+        <pin num="1" name="G" type="input"/>
+        <pin num="2" name="S" type="passive"/>
+        <pin num="3" name="D" type="passive"/>
+      </pins>
+    </libpart>
     <libpart lib="chip" part="opamp">
       <description>jank chip: opamp</description>
       <fields>
@@ -3003,6 +4849,38 @@
         <pin num="3" name="IN-" type="input"/>
         <pin num="4" name="OUT" type="output"/>
         <pin num="5" name="V+" type="power_in"/>
+      </pins>
+    </libpart>
+    <libpart lib="chip" part="pads2">
+      <description>jank chip: pads2</description>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">pads2</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">jank chip: pads2</field>
+      </fields>
+      <pins>
+        <pin num="1" name="A" type="passive"/>
+        <pin num="2" name="B" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="chip" part="pads6">
+      <description>jank chip: pads6</description>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">pads6</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">jank chip: pads6</field>
+      </fields>
+      <pins>
+        <pin num="1" name="TX" type="passive"/>
+        <pin num="2" name="RX" type="passive"/>
+        <pin num="3" name="3V3" type="passive"/>
+        <pin num="4" name="GND" type="passive"/>
+        <pin num="5" name="EN" type="passive"/>
+        <pin num="6" name="BOOT" type="passive"/>
       </pins>
     </libpart>
     <libpart lib="chip" part="pfet">
@@ -3174,6 +5052,8 @@
       <node ref="C6" pin="1" pintype="passive"/>
       <node ref="C60" pin="1" pintype="passive"/>
       <node ref="C61" pin="1" pintype="passive"/>
+      <node ref="C86" pin="1" pintype="passive"/>
+      <node ref="J12" pin="3" pinfunction="3V3_3" pintype="passive"/>
       <node ref="JP1" pin="3" pinfunction="B_3" pintype="passive"/>
       <node ref="JP2" pin="1" pinfunction="A_1" pintype="passive"/>
       <node ref="L2" pin="1" pintype="passive"/>
@@ -3182,13 +5062,19 @@
       <node ref="R21" pin="1" pintype="passive"/>
       <node ref="R26" pin="1" pintype="passive"/>
       <node ref="R27" pin="1" pintype="passive"/>
+      <node ref="R38" pin="1" pintype="passive"/>
       <node ref="R48" pin="1" pintype="passive"/>
       <node ref="R49" pin="1" pintype="passive"/>
       <node ref="R54" pin="1" pintype="passive"/>
       <node ref="R56" pin="1" pintype="passive"/>
+      <node ref="R58" pin="1" pintype="passive"/>
+      <node ref="R59" pin="1" pintype="passive"/>
       <node ref="R60" pin="1" pintype="passive"/>
       <node ref="R61" pin="1" pintype="passive"/>
       <node ref="R8" pin="1" pintype="passive"/>
+      <node ref="RT38" pin="1" pintype="passive"/>
+      <node ref="RT60" pin="1" pintype="passive"/>
+      <node ref="RT61" pin="1" pintype="passive"/>
       <node ref="U1" pin="20" pinfunction="VDD3P3_RTC_20" pintype="power_in"/>
       <node ref="U1" pin="46" pinfunction="VDD3P3_CPU_46" pintype="power_in"/>
       <node ref="U1" pin="55" pinfunction="VDDA_55" pintype="power_in"/>
@@ -3200,6 +5086,7 @@
     <net code="2" name="/AVDD" class="Default">
       <node ref="C35" pin="1" pintype="passive"/>
       <node ref="R33" pin="1" pintype="passive"/>
+      <node ref="RT33" pin="1" pintype="passive"/>
       <node ref="U6" pin="5" pinfunction="V+_5" pintype="power_in"/>
       <node ref="U7" pin="2" pinfunction="VOUT_2" pintype="power_out"/>
     </net>
@@ -3216,32 +5103,39 @@
     </net>
     <net code="5" name="/BAT_P" class="Default">
       <node ref="C41" pin="1" pintype="passive"/>
+      <node ref="D9" pin="2" pinfunction="A_2" pintype="passive"/>
       <node ref="Q1" pin="3" pinfunction="D_3" pintype="passive"/>
       <node ref="Q2" pin="2" pinfunction="S_2" pintype="passive"/>
       <node ref="R10" pin="1" pintype="passive"/>
       <node ref="R52" pin="1" pintype="passive"/>
+      <node ref="RT10" pin="1" pintype="passive"/>
       <node ref="U8" pin="3" pinfunction="BAT_3" pintype="passive"/>
     </net>
     <net code="6" name="/BOOT" class="Default">
+      <node ref="C82" pin="1" pintype="passive"/>
+      <node ref="J12" pin="6" pinfunction="BOOT_6" pintype="passive"/>
       <node ref="R16" pin="2" pintype="passive"/>
       <node ref="SW1" pin="3" pinfunction="C_3" pintype="passive"/>
       <node ref="SW1" pin="4" pinfunction="D_4" pintype="passive"/>
       <node ref="U1" pin="5" pinfunction="GPIO0_5" pintype="bidirectional"/>
     </net>
     <net code="7" name="/BTN_DOWN" class="Default">
+      <node ref="C81" pin="1" pintype="passive"/>
       <node ref="SW4" pin="3" pinfunction="C_3" pintype="passive"/>
       <node ref="SW4" pin="4" pinfunction="D_4" pintype="passive"/>
-      <node ref="U1" pin="9" pinfunction="GPIO4_9" pintype="bidirectional"/>
+      <node ref="U1" pin="42" pinfunction="GPIO37_42" pintype="bidirectional"/>
     </net>
     <net code="8" name="/BTN_UP" class="Default">
+      <node ref="C80" pin="1" pintype="passive"/>
       <node ref="SW3" pin="3" pinfunction="C_3" pintype="passive"/>
       <node ref="SW3" pin="4" pinfunction="D_4" pintype="passive"/>
       <node ref="U1" pin="15" pinfunction="GPIO10_15" pintype="bidirectional"/>
     </net>
     <net code="9" name="/BTN_YES" class="Default">
+      <node ref="C83" pin="1" pintype="passive"/>
       <node ref="SW5" pin="3" pinfunction="C_3" pintype="passive"/>
       <node ref="SW5" pin="4" pinfunction="D_4" pintype="passive"/>
-      <node ref="U1" pin="7" pinfunction="GPIO2_7" pintype="bidirectional"/>
+      <node ref="U1" pin="41" pinfunction="GPIO36_41" pintype="bidirectional"/>
     </net>
     <net code="10" name="/CC1" class="Default">
       <node ref="J1" pin="A5" pinfunction="CC1_A5" pintype="passive"/>
@@ -3253,10 +5147,47 @@
     </net>
     <net code="12" name="/CHIP_PU" class="Default">
       <node ref="C7" pin="1" pintype="passive"/>
+      <node ref="J12" pin="5" pinfunction="EN_5" pintype="passive"/>
       <node ref="R8" pin="2" pintype="passive"/>
       <node ref="U1" pin="4" pinfunction="CHIP_PU_4" pintype="input"/>
     </net>
-    <net code="13" name="/GND" class="Default">
+    <net code="13" name="/CLK_IO" class="Default">
+      <node ref="Q3" pin="1" pinfunction="G_1" pintype="input"/>
+      <node ref="R71" pin="1" pintype="passive"/>
+      <node ref="U1" pin="7" pinfunction="GPIO2_7" pintype="bidirectional"/>
+    </net>
+    <net code="14" name="/CLK_N" class="Default">
+      <node ref="D10" pin="3" pinfunction="K1A2_3" pintype="passive"/>
+      <node ref="Q4" pin="3" pinfunction="D_3" pintype="passive"/>
+      <node ref="R74" pin="1" pintype="passive"/>
+      <node ref="R75" pin="1" pintype="passive"/>
+      <node ref="R76" pin="1" pintype="passive"/>
+    </net>
+    <net code="15" name="/CLK_OUT" class="Default">
+      <node ref="J13" pin="D" pinfunction="T_D" pintype="passive"/>
+      <node ref="R75" pin="2" pintype="passive"/>
+      <node ref="R76" pin="2" pintype="passive"/>
+    </net>
+    <net code="16" name="/CLK_PG" class="Default">
+      <node ref="Q3" pin="3" pinfunction="D_3" pintype="passive"/>
+      <node ref="Q4" pin="1" pinfunction="G_1" pintype="input"/>
+      <node ref="R73" pin="2" pintype="passive"/>
+      <node ref="RT73" pin="2" pintype="passive"/>
+    </net>
+    <net code="17" name="/CV_RAIL" class="Default">
+      <node ref="C85" pin="1" pintype="passive"/>
+      <node ref="D10" pin="2" pinfunction="K2_2" pintype="passive"/>
+      <node ref="D11" pin="2" pinfunction="K2_2" pintype="passive"/>
+      <node ref="D13" pin="1" pinfunction="K_1" pintype="passive"/>
+      <node ref="Q4" pin="2" pinfunction="S_2" pintype="passive"/>
+      <node ref="Q6" pin="2" pinfunction="S_2" pintype="passive"/>
+      <node ref="R73" pin="1" pintype="passive"/>
+      <node ref="R79" pin="1" pintype="passive"/>
+      <node ref="R84" pin="1" pintype="passive"/>
+      <node ref="RT73" pin="1" pintype="passive"/>
+      <node ref="RT79" pin="1" pintype="passive"/>
+    </net>
+    <net code="18" name="/GND" class="Default">
       <node ref="C10" pin="2" pintype="passive"/>
       <node ref="C11" pin="2" pintype="passive"/>
       <node ref="C12" pin="2" pintype="passive"/>
@@ -3272,9 +5203,10 @@
       <node ref="C22" pin="2" pintype="passive"/>
       <node ref="C23" pin="2" pintype="passive"/>
       <node ref="C24" pin="2" pintype="passive"/>
+      <node ref="C26" pin="2" pintype="passive"/>
+      <node ref="C27" pin="2" pintype="passive"/>
       <node ref="C28" pin="2" pintype="passive"/>
       <node ref="C3" pin="2" pintype="passive"/>
-      <node ref="C33" pin="2" pintype="passive"/>
       <node ref="C34" pin="2" pintype="passive"/>
       <node ref="C35" pin="2" pintype="passive"/>
       <node ref="C36" pin="2" pintype="passive"/>
@@ -3284,17 +5216,34 @@
       <node ref="C6" pin="2" pintype="passive"/>
       <node ref="C60" pin="2" pintype="passive"/>
       <node ref="C61" pin="2" pintype="passive"/>
+      <node ref="C67" pin="2" pintype="passive"/>
       <node ref="C7" pin="2" pintype="passive"/>
+      <node ref="C72" pin="2" pintype="passive"/>
       <node ref="C8" pin="2" pintype="passive"/>
+      <node ref="C80" pin="2" pintype="passive"/>
+      <node ref="C81" pin="2" pintype="passive"/>
+      <node ref="C82" pin="2" pintype="passive"/>
+      <node ref="C83" pin="2" pintype="passive"/>
+      <node ref="C85" pin="2" pintype="passive"/>
+      <node ref="C86" pin="2" pintype="passive"/>
       <node ref="C9" pin="2" pintype="passive"/>
+      <node ref="CT10" pin="2" pintype="passive"/>
+      <node ref="CT3" pin="2" pintype="passive"/>
+      <node ref="CT8" pin="2" pintype="passive"/>
+      <node ref="CT9" pin="2" pintype="passive"/>
+      <node ref="D10" pin="1" pinfunction="A1_1" pintype="passive"/>
+      <node ref="D11" pin="1" pinfunction="A1_1" pintype="passive"/>
       <node ref="D7" pin="2" pintype="passive"/>
       <node ref="D8" pin="2" pintype="passive"/>
       <node ref="J1" pin="13" pinfunction="SHELL_13" pintype="passive"/>
       <node ref="J1" pin="14" pinfunction="SHELL_14" pintype="passive"/>
       <node ref="J1" pin="A1B12" pinfunction="GND_A1B12" pintype="passive"/>
       <node ref="J1" pin="B1A12" pinfunction="GND_B1A12" pintype="passive"/>
-      <node ref="J2" pin="A" pinfunction="S_A" pintype="passive"/>
-      <node ref="J3" pin="A" pinfunction="S_A" pintype="passive"/>
+      <node ref="J12" pin="4" pinfunction="GND_4" pintype="passive"/>
+      <node ref="J13" pin="A" pinfunction="S_A" pintype="passive"/>
+      <node ref="J14" pin="A" pinfunction="S_A" pintype="passive"/>
+      <node ref="J2" pin="1" pinfunction="S_1" pintype="passive"/>
+      <node ref="J3" pin="1" pinfunction="S_1" pintype="passive"/>
       <node ref="J4" pin="2" pinfunction="GND_2" pintype="passive"/>
       <node ref="J4" pin="3" pinfunction="GND_3" pintype="passive"/>
       <node ref="J5" pin="3" pinfunction="DIN2_3" pintype="passive"/>
@@ -3303,18 +5252,32 @@
       <node ref="J6" pin="3" pinfunction="DIN2_3" pintype="passive"/>
       <node ref="J6" pin="6" pinfunction="SHELL_6" pintype="passive"/>
       <node ref="J6" pin="7" pinfunction="SHELL_7" pintype="passive"/>
-      <node ref="J7" pin="A" pinfunction="S_A" pintype="passive"/>
       <node ref="JP1" pin="1" pinfunction="A_1" pintype="passive"/>
       <node ref="JP2" pin="3" pinfunction="B_3" pintype="passive"/>
       <node ref="LED1" pin="2" pinfunction="K_2" pintype="passive"/>
       <node ref="LED2" pin="2" pinfunction="K_2" pintype="passive"/>
+      <node ref="Q3" pin="2" pinfunction="S_2" pintype="passive"/>
+      <node ref="Q5" pin="2" pinfunction="S_2" pintype="passive"/>
       <node ref="R11" pin="2" pintype="passive"/>
       <node ref="R3" pin="2" pintype="passive"/>
-      <node ref="R34" pin="2" pintype="passive"/>
+      <node ref="R36" pin="2" pintype="passive"/>
+      <node ref="R37" pin="2" pintype="passive"/>
+      <node ref="R39" pin="2" pintype="passive"/>
       <node ref="R4" pin="2" pintype="passive"/>
       <node ref="R50" pin="2" pintype="passive"/>
       <node ref="R51" pin="2" pintype="passive"/>
       <node ref="R53" pin="2" pintype="passive"/>
+      <node ref="R66" pin="2" pintype="passive"/>
+      <node ref="R71" pin="2" pintype="passive"/>
+      <node ref="R74" pin="2" pintype="passive"/>
+      <node ref="R77" pin="2" pintype="passive"/>
+      <node ref="R80" pin="2" pintype="passive"/>
+      <node ref="R84" pin="2" pintype="passive"/>
+      <node ref="RT11" pin="2" pintype="passive"/>
+      <node ref="RT36" pin="2" pintype="passive"/>
+      <node ref="RT37" pin="2" pintype="passive"/>
+      <node ref="RT39" pin="2" pintype="passive"/>
+      <node ref="RT51" pin="2" pintype="passive"/>
       <node ref="SW1" pin="1" pinfunction="A_1" pintype="passive"/>
       <node ref="SW1" pin="2" pinfunction="B_2" pintype="passive"/>
       <node ref="SW3" pin="1" pinfunction="A_1" pintype="passive"/>
@@ -3335,360 +5298,474 @@
       <node ref="Y1" pin="2" pinfunction="GND_2" pintype="passive"/>
       <node ref="Y1" pin="4" pinfunction="GND_4" pintype="passive"/>
     </net>
-    <net code="14" name="/LED_G" class="Default">
+    <net code="19" name="/LED_G" class="Default">
       <node ref="R41" pin="1" pintype="passive"/>
       <node ref="RT41" pin="1" pintype="passive"/>
-      <node ref="U1" pin="44" pinfunction="GPIO39_44" pintype="bidirectional"/>
+      <node ref="U1" pin="39" pinfunction="GPIO34_39" pintype="bidirectional"/>
     </net>
-    <net code="15" name="/LED_GA" class="Default">
+    <net code="20" name="/LED_GA" class="Default">
       <node ref="LED2" pin="1" pinfunction="A_1" pintype="passive"/>
       <node ref="R41" pin="2" pintype="passive"/>
       <node ref="RT41" pin="2" pintype="passive"/>
     </net>
-    <net code="16" name="/LED_R" class="Default">
+    <net code="21" name="/LED_R" class="Default">
       <node ref="R40" pin="1" pintype="passive"/>
       <node ref="RT40" pin="1" pintype="passive"/>
-      <node ref="U1" pin="43" pinfunction="GPIO38_43" pintype="bidirectional"/>
+      <node ref="U1" pin="38" pinfunction="GPIO33_38" pintype="bidirectional"/>
     </net>
-    <net code="17" name="/LED_RA" class="Default">
+    <net code="22" name="/LED_RA" class="Default">
       <node ref="LED1" pin="1" pinfunction="A_1" pintype="passive"/>
       <node ref="R40" pin="2" pintype="passive"/>
       <node ref="RT40" pin="2" pintype="passive"/>
     </net>
-    <net code="18" name="/LINE_IN" class="Default">
+    <net code="23" name="/LINE_IN" class="Default">
       <node ref="C36" pin="1" pintype="passive"/>
       <node ref="R35" pin="2" pintype="passive"/>
       <node ref="U1" pin="14" pinfunction="GPIO9_14" pintype="bidirectional"/>
     </net>
-    <net code="19" name="/LIN_A1" class="Default">
+    <net code="24" name="/LIN_A1" class="Default">
       <node ref="C30" pin="1" pintype="passive"/>
       <node ref="R30" pin="2" pintype="passive"/>
+      <node ref="RT30" pin="2" pintype="passive"/>
     </net>
-    <net code="20" name="/LIN_A2" class="Default">
+    <net code="25" name="/LIN_A2" class="Default">
       <node ref="C31" pin="1" pintype="passive"/>
       <node ref="R31" pin="2" pintype="passive"/>
+      <node ref="RT31" pin="2" pintype="passive"/>
     </net>
-    <net code="21" name="/LIN_OUT" class="Default">
+    <net code="26" name="/LIN_DET" class="Default">
+      <node ref="J7" pin="3" pinfunction="RSW_3" pintype="passive"/>
+      <node ref="R38" pin="2" pintype="passive"/>
+      <node ref="RT38" pin="2" pintype="passive"/>
+      <node ref="U1" pin="22" pinfunction="GPIO16_22" pintype="bidirectional"/>
+    </net>
+    <net code="27" name="/LIN_GS" class="Default">
+      <node ref="C33" pin="2" pintype="passive"/>
+      <node ref="C67" pin="1" pintype="passive"/>
+      <node ref="R34" pin="2" pintype="passive"/>
+      <node ref="R65" pin="2" pintype="passive"/>
+      <node ref="R66" pin="1" pintype="passive"/>
+      <node ref="RT34" pin="2" pintype="passive"/>
+    </net>
+    <net code="28" name="/LIN_OUT" class="Default">
       <node ref="C32" pin="2" pintype="passive"/>
       <node ref="R32" pin="2" pintype="passive"/>
       <node ref="R35" pin="1" pintype="passive"/>
+      <node ref="RT32" pin="2" pintype="passive"/>
       <node ref="U6" pin="4" pinfunction="OUT_4" pintype="output"/>
     </net>
-    <net code="22" name="/LIN_R" class="Default">
+    <net code="29" name="/LIN_R" class="Default">
       <node ref="D8" pin="1" pintype="passive"/>
-      <node ref="J7" pin="C" pinfunction="R_C" pintype="passive"/>
+      <node ref="J7" pin="2" pinfunction="R_2" pintype="passive"/>
       <node ref="R31" pin="1" pintype="passive"/>
+      <node ref="R37" pin="1" pintype="passive"/>
+      <node ref="RT31" pin="1" pintype="passive"/>
+      <node ref="RT37" pin="1" pintype="passive"/>
     </net>
-    <net code="23" name="/LIN_SUM" class="Default">
+    <net code="30" name="/LIN_S" class="Default">
+      <node ref="J7" pin="1" pinfunction="S_1" pintype="passive"/>
+      <node ref="R39" pin="1" pintype="passive"/>
+      <node ref="R65" pin="1" pintype="passive"/>
+      <node ref="RT39" pin="1" pintype="passive"/>
+    </net>
+    <net code="31" name="/LIN_SUM" class="Default">
       <node ref="C30" pin="2" pintype="passive"/>
       <node ref="C31" pin="2" pintype="passive"/>
       <node ref="C32" pin="1" pintype="passive"/>
       <node ref="R32" pin="1" pintype="passive"/>
+      <node ref="RT32" pin="1" pintype="passive"/>
       <node ref="U6" pin="3" pinfunction="IN-_3" pintype="input"/>
     </net>
-    <net code="24" name="/LIN_T" class="Default">
+    <net code="32" name="/LIN_T" class="Default">
       <node ref="D7" pin="1" pintype="passive"/>
-      <node ref="J7" pin="D" pinfunction="T_D" pintype="passive"/>
+      <node ref="J7" pin="5" pinfunction="T_5" pintype="passive"/>
       <node ref="R30" pin="1" pintype="passive"/>
+      <node ref="R36" pin="1" pintype="passive"/>
+      <node ref="RT30" pin="1" pintype="passive"/>
+      <node ref="RT36" pin="1" pintype="passive"/>
     </net>
-    <net code="25" name="/LIN_VB" class="Default">
+    <net code="33" name="/LIN_VB" class="Default">
       <node ref="C33" pin="1" pintype="passive"/>
       <node ref="R33" pin="2" pintype="passive"/>
       <node ref="R34" pin="1" pintype="passive"/>
+      <node ref="RT33" pin="2" pintype="passive"/>
+      <node ref="RT34" pin="1" pintype="passive"/>
       <node ref="U6" pin="1" pinfunction="IN+_1" pintype="input"/>
     </net>
-    <net code="26" name="/LNA_IN" class="Default">
+    <net code="34" name="/LNA_IN" class="Default">
       <node ref="C23" pin="1" pintype="passive"/>
       <node ref="L3" pin="1" pintype="passive"/>
       <node ref="U1" pin="1" pinfunction="LNA_IN_1" pintype="passive"/>
     </net>
-    <net code="27" name="/MD2_R" class="Default">
+    <net code="35" name="/MD2_R" class="Default">
       <node ref="J6" pin="4" pinfunction="DIN5_4" pintype="passive"/>
       <node ref="R56" pin="2" pintype="passive"/>
+      <node ref="R59" pin="2" pintype="passive"/>
     </net>
-    <net code="28" name="/MD2_T" class="Default">
+    <net code="36" name="/MD2_T" class="Default">
       <node ref="J6" pin="2" pinfunction="DIN4_2" pintype="passive"/>
       <node ref="R57" pin="2" pintype="passive"/>
+      <node ref="RT57" pin="2" pintype="passive"/>
     </net>
-    <net code="29" name="/MD_R" class="Default">
+    <net code="37" name="/MD_R" class="Default">
       <node ref="J5" pin="4" pinfunction="DIN5_4" pintype="passive"/>
       <node ref="R54" pin="2" pintype="passive"/>
+      <node ref="R58" pin="2" pintype="passive"/>
     </net>
-    <net code="30" name="/MD_T" class="Default">
+    <net code="38" name="/MD_T" class="Default">
       <node ref="J5" pin="2" pinfunction="DIN4_2" pintype="passive"/>
       <node ref="R55" pin="2" pintype="passive"/>
+      <node ref="RT55" pin="2" pintype="passive"/>
     </net>
-    <net code="31" name="/MIDI_TX" class="Default">
+    <net code="39" name="/MIDI_TX" class="Default">
       <node ref="R15" pin="1" pintype="passive"/>
       <node ref="R55" pin="1" pintype="passive"/>
+      <node ref="RT15" pin="1" pintype="passive"/>
+      <node ref="RT55" pin="1" pintype="passive"/>
       <node ref="U1" pin="27" pinfunction="GPIO21_27" pintype="bidirectional"/>
     </net>
-    <net code="32" name="/MIDI_TX2" class="Default">
+    <net code="40" name="/MIDI_TX2" class="Default">
       <node ref="R20" pin="1" pintype="passive"/>
       <node ref="R57" pin="1" pintype="passive"/>
+      <node ref="RT20" pin="1" pintype="passive"/>
+      <node ref="RT57" pin="1" pintype="passive"/>
       <node ref="U1" pin="23" pinfunction="GPIO17_23" pintype="bidirectional"/>
     </net>
-    <net code="33" name="/MO2_R" class="Default">
-      <node ref="J3" pin="C" pinfunction="R_C" pintype="passive"/>
+    <net code="41" name="/MO2_R" class="Default">
+      <node ref="J3" pin="2" pinfunction="R_2" pintype="passive"/>
       <node ref="R21" pin="2" pintype="passive"/>
       <node ref="R27" pin="2" pintype="passive"/>
       <node ref="R49" pin="2" pintype="passive"/>
     </net>
-    <net code="34" name="/MO2_T" class="Default">
-      <node ref="J3" pin="D" pinfunction="T_D" pintype="passive"/>
+    <net code="42" name="/MO2_T" class="Default">
+      <node ref="J3" pin="5" pinfunction="T_5" pintype="passive"/>
       <node ref="R20" pin="2" pintype="passive"/>
+      <node ref="RT20" pin="2" pintype="passive"/>
     </net>
-    <net code="35" name="/MO_R" class="Default">
-      <node ref="J2" pin="C" pinfunction="R_C" pintype="passive"/>
+    <net code="43" name="/MO_R" class="Default">
+      <node ref="J2" pin="2" pinfunction="R_2" pintype="passive"/>
       <node ref="R14" pin="2" pintype="passive"/>
       <node ref="R26" pin="2" pintype="passive"/>
       <node ref="R48" pin="2" pintype="passive"/>
     </net>
-    <net code="36" name="/MO_T" class="Default">
-      <node ref="J2" pin="D" pinfunction="T_D" pintype="passive"/>
+    <net code="44" name="/MO_T" class="Default">
+      <node ref="J2" pin="5" pinfunction="T_5" pintype="passive"/>
       <node ref="R15" pin="2" pintype="passive"/>
+      <node ref="RT15" pin="2" pintype="passive"/>
     </net>
-    <net code="37" name="/OLED_P1" class="Default">
+    <net code="45" name="/OLED_P1" class="Default">
       <node ref="J10" pin="1" pinfunction="P1_1" pintype="passive"/>
+      <node ref="J10B" pin="1" pinfunction="P1_1" pintype="passive"/>
       <node ref="JP1" pin="2" pinfunction="C_2" pintype="passive"/>
     </net>
-    <net code="38" name="/OLED_P2" class="Default">
+    <net code="46" name="/OLED_P2" class="Default">
       <node ref="J10" pin="2" pinfunction="P2_2" pintype="passive"/>
+      <node ref="J10B" pin="2" pinfunction="P2_2" pintype="passive"/>
       <node ref="JP2" pin="2" pinfunction="C_2" pintype="passive"/>
     </net>
-    <net code="39" name="/PROG" class="Default">
+    <net code="47" name="/PROG" class="Default">
       <node ref="R51" pin="1" pintype="passive"/>
+      <node ref="RT51" pin="1" pintype="passive"/>
       <node ref="U8" pin="5" pinfunction="PROG_5" pintype="passive"/>
     </net>
-    <net code="40" name="/Q2_G" class="Default">
+    <net code="48" name="/PUMP_D" class="Default">
+      <node ref="C84" pin="1" pintype="passive"/>
+      <node ref="R83" pin="2" pintype="passive"/>
+    </net>
+    <net code="49" name="/PUMP_IO" class="Default">
+      <node ref="R83" pin="1" pintype="passive"/>
+      <node ref="U1" pin="40" pinfunction="GPIO35_40" pintype="bidirectional"/>
+    </net>
+    <net code="50" name="/PUMP_X" class="Default">
+      <node ref="C84" pin="2" pintype="passive"/>
+      <node ref="D12" pin="1" pinfunction="K_1" pintype="passive"/>
+      <node ref="D13" pin="2" pinfunction="A_2" pintype="passive"/>
+    </net>
+    <net code="51" name="/Q2_G" class="Default">
       <node ref="Q2" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="R53" pin="1" pintype="passive"/>
     </net>
-    <net code="41" name="/RF" class="Default">
+    <net code="52" name="/RF" class="Default">
       <node ref="C24" pin="1" pintype="passive"/>
       <node ref="L3" pin="2" pintype="passive"/>
       <node ref="R19" pin="1" pintype="passive"/>
     </net>
-    <net code="42" name="/SCL" class="Default">
+    <net code="53" name="/RST_IO" class="Default">
+      <node ref="Q5" pin="1" pinfunction="G_1" pintype="input"/>
+      <node ref="R77" pin="1" pintype="passive"/>
+      <node ref="U1" pin="6" pinfunction="GPIO1_6" pintype="bidirectional"/>
+    </net>
+    <net code="54" name="/RST_N" class="Default">
+      <node ref="D11" pin="3" pinfunction="K1A2_3" pintype="passive"/>
+      <node ref="Q6" pin="3" pinfunction="D_3" pintype="passive"/>
+      <node ref="R80" pin="1" pintype="passive"/>
+      <node ref="R81" pin="1" pintype="passive"/>
+      <node ref="R82" pin="1" pintype="passive"/>
+    </net>
+    <net code="55" name="/RST_OUT" class="Default">
+      <node ref="J14" pin="D" pinfunction="T_D" pintype="passive"/>
+      <node ref="R81" pin="2" pintype="passive"/>
+      <node ref="R82" pin="2" pintype="passive"/>
+    </net>
+    <net code="56" name="/RST_PG" class="Default">
+      <node ref="Q5" pin="3" pinfunction="D_3" pintype="passive"/>
+      <node ref="Q6" pin="1" pinfunction="G_1" pintype="input"/>
+      <node ref="R79" pin="2" pintype="passive"/>
+      <node ref="RT79" pin="2" pintype="passive"/>
+    </net>
+    <net code="57" name="/SCL" class="Default">
       <node ref="J10" pin="3" pinfunction="SCL_3" pintype="passive"/>
+      <node ref="J10B" pin="3" pinfunction="SCL_3" pintype="passive"/>
       <node ref="R60" pin="2" pintype="passive"/>
+      <node ref="RT60" pin="2" pintype="passive"/>
       <node ref="U1" pin="16" pinfunction="GPIO11_16" pintype="bidirectional"/>
     </net>
-    <net code="43" name="/SDA" class="Default">
+    <net code="58" name="/SDA" class="Default">
       <node ref="J10" pin="4" pinfunction="SDA_4" pintype="passive"/>
+      <node ref="J10B" pin="4" pinfunction="SDA_4" pintype="passive"/>
       <node ref="R61" pin="2" pintype="passive"/>
+      <node ref="RT61" pin="2" pintype="passive"/>
       <node ref="U1" pin="17" pinfunction="GPIO12_17" pintype="bidirectional"/>
     </net>
-    <net code="44" name="/UDN" class="Default">
+    <net code="59" name="/U0RXD" class="Default">
+      <node ref="J12" pin="2" pinfunction="RX_2" pintype="passive"/>
+      <node ref="U1" pin="50" pinfunction="GPIO44_50" pintype="bidirectional"/>
+    </net>
+    <net code="60" name="/U0TXD" class="Default">
+      <node ref="J12" pin="1" pinfunction="TX_1" pintype="passive"/>
+      <node ref="U1" pin="49" pinfunction="GPIO43_49" pintype="bidirectional"/>
+    </net>
+    <net code="61" name="/UDN" class="Default">
       <node ref="J1" pin="A7" pinfunction="DN1_A7" pintype="passive"/>
       <node ref="J1" pin="B7" pinfunction="DN2_B7" pintype="passive"/>
       <node ref="R25" pin="1" pintype="passive"/>
       <node ref="U5" pin="3" pinfunction="IO2_3" pintype="passive"/>
       <node ref="U5" pin="4" pinfunction="IO2_4" pintype="passive"/>
     </net>
-    <net code="45" name="/UDP" class="Default">
+    <net code="62" name="/UDP" class="Default">
       <node ref="J1" pin="A6" pinfunction="DP1_A6" pintype="passive"/>
       <node ref="J1" pin="B6" pinfunction="DP2_B6" pintype="passive"/>
       <node ref="R24" pin="1" pintype="passive"/>
       <node ref="U5" pin="1" pinfunction="IO1_1" pintype="passive"/>
       <node ref="U5" pin="6" pinfunction="IO1_6" pintype="passive"/>
     </net>
-    <net code="46" name="/UFL" class="Default">
+    <net code="63" name="/UFL" class="Default">
+      <node ref="C26" pin="1" pintype="passive"/>
       <node ref="J4" pin="1" pinfunction="SIG_1" pintype="passive"/>
       <node ref="R19" pin="2" pintype="passive"/>
     </net>
-    <net code="47" name="/USB_DN" class="Default">
+    <net code="64" name="/USB_DN" class="Default">
       <node ref="R25" pin="2" pintype="passive"/>
       <node ref="U1" pin="25" pinfunction="GPIO19_25" pintype="bidirectional"/>
     </net>
-    <net code="48" name="/USB_DP" class="Default">
+    <net code="65" name="/USB_DP" class="Default">
       <node ref="R24" pin="2" pintype="passive"/>
       <node ref="U1" pin="26" pinfunction="GPIO20_26" pintype="bidirectional"/>
     </net>
-    <net code="49" name="/VBAT_ADC" class="Default">
+    <net code="66" name="/VBAT_ADC" class="Default">
       <node ref="C8" pin="1" pintype="passive"/>
+      <node ref="CT8" pin="1" pintype="passive"/>
       <node ref="R10" pin="2" pintype="passive"/>
       <node ref="R11" pin="1" pintype="passive"/>
-      <node ref="U1" pin="6" pinfunction="GPIO1_6" pintype="bidirectional"/>
+      <node ref="RT10" pin="2" pintype="passive"/>
+      <node ref="RT11" pin="1" pintype="passive"/>
+      <node ref="U1" pin="9" pinfunction="GPIO4_9" pintype="bidirectional"/>
     </net>
-    <net code="50" name="/VBUS" class="Default">
+    <net code="67" name="/VBUS" class="Default">
+      <node ref="C27" pin="1" pintype="passive"/>
       <node ref="C40" pin="1" pintype="passive"/>
       <node ref="D3" pin="2" pinfunction="A_2" pintype="passive"/>
-      <node ref="J1" pin="A4B9" pinfunction="VBUS_A4B9" pintype="passive"/>
-      <node ref="J1" pin="B4A9" pinfunction="VBUS_B4A9" pintype="passive"/>
       <node ref="Q1" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="R50" pin="1" pintype="passive"/>
-      <node ref="U5" pin="5" pinfunction="VBUS_5" pintype="passive"/>
+      <node ref="R63" pin="2" pintype="passive"/>
       <node ref="U8" pin="4" pinfunction="VCC_4" pintype="power_in"/>
     </net>
-    <net code="51" name="/VDD3P3" class="Default">
+    <net code="68" name="/VDD3P3" class="Default">
       <node ref="C18" pin="1" pintype="passive"/>
       <node ref="C28" pin="1" pintype="passive"/>
       <node ref="L2" pin="2" pintype="passive"/>
       <node ref="U1" pin="2" pinfunction="VDD3P3_2" pintype="power_in"/>
       <node ref="U1" pin="3" pinfunction="VDD3P3_3" pintype="power_in"/>
     </net>
-    <net code="52" name="/VDD_SPI" class="Default">
+    <net code="69" name="/VDD_SPI" class="Default">
       <node ref="C21" pin="1" pintype="passive"/>
       <node ref="C22" pin="1" pintype="passive"/>
       <node ref="U1" pin="29" pinfunction="VDD_SPI_29" pintype="power_out"/>
     </net>
-    <net code="53" name="/VSYS" class="Default">
+    <net code="70" name="/VREG" class="Default">
       <node ref="C3" pin="1" pintype="passive"/>
       <node ref="C34" pin="1" pintype="passive"/>
-      <node ref="D3" pin="1" pinfunction="K_1" pintype="passive"/>
-      <node ref="Q1" pin="2" pinfunction="S_2" pintype="passive"/>
+      <node ref="CT3" pin="1" pintype="passive"/>
+      <node ref="D12" pin="2" pinfunction="A_2" pintype="passive"/>
+      <node ref="J11" pin="2" pinfunction="B_2" pintype="passive"/>
+      <node ref="R62" pin="2" pintype="passive"/>
       <node ref="U10" pin="1" pinfunction="VIN_1" pintype="power_in"/>
       <node ref="U10" pin="3" pinfunction="CE_3" pintype="input"/>
       <node ref="U2" pin="3" pinfunction="VIN_3" pintype="power_in"/>
       <node ref="U7" pin="3" pinfunction="VIN_3" pintype="power_in"/>
     </net>
-    <net code="54" name="/XB_VDD" class="Default">
+    <net code="71" name="/VSYS" class="Default">
+      <node ref="C72" pin="1" pintype="passive"/>
+      <node ref="D3" pin="1" pinfunction="K_1" pintype="passive"/>
+      <node ref="D9" pin="1" pinfunction="K_1" pintype="passive"/>
+      <node ref="J11" pin="1" pinfunction="A_1" pintype="passive"/>
+      <node ref="Q1" pin="2" pinfunction="S_2" pintype="passive"/>
+      <node ref="R62" pin="1" pintype="passive"/>
+    </net>
+    <net code="72" name="/VUSB" class="Default">
+      <node ref="J1" pin="A4B9" pinfunction="VBUS_A4B9" pintype="passive"/>
+      <node ref="J1" pin="B4A9" pinfunction="VBUS_B4A9" pintype="passive"/>
+      <node ref="R63" pin="1" pintype="passive"/>
+      <node ref="U5" pin="5" pinfunction="VBUS_5" pintype="passive"/>
+    </net>
+    <net code="73" name="/XB_VDD" class="Default">
       <node ref="C42" pin="1" pintype="passive"/>
       <node ref="R52" pin="2" pintype="passive"/>
       <node ref="U9" pin="3" pinfunction="VDD_3" pintype="power_in"/>
     </net>
-    <net code="55" name="/XTAL_N" class="Default">
+    <net code="74" name="/XTAL_N" class="Default">
       <node ref="C10" pin="1" pintype="passive"/>
+      <node ref="CT10" pin="1" pintype="passive"/>
       <node ref="U1" pin="53" pinfunction="XTAL_N_53" pintype="passive"/>
       <node ref="Y1" pin="3" pinfunction="X2_3" pintype="passive"/>
     </net>
-    <net code="56" name="/XTAL_P" class="Default">
+    <net code="75" name="/XTAL_P" class="Default">
       <node ref="R17" pin="2" pintype="passive"/>
       <node ref="U1" pin="54" pinfunction="XTAL_P_54" pintype="passive"/>
     </net>
-    <net code="57" name="/XTAL_X1" class="Default">
+    <net code="76" name="/XTAL_X1" class="Default">
       <node ref="C9" pin="1" pintype="passive"/>
+      <node ref="CT9" pin="1" pintype="passive"/>
       <node ref="R17" pin="1" pintype="passive"/>
       <node ref="Y1" pin="1" pinfunction="X1_1" pintype="passive"/>
     </net>
-    <net code="58" name="unconnected-(J1-SBU1-PadA8)" class="Default">
+    <net code="77" name="unconnected-(J1-SBU1-PadA8)" class="Default">
       <node ref="J1" pin="A8" pinfunction="SBU1_A8" pintype="passive+no_connect"/>
     </net>
-    <net code="59" name="unconnected-(J1-SBU2-PadB8)" class="Default">
+    <net code="78" name="unconnected-(J1-SBU2-PadB8)" class="Default">
       <node ref="J1" pin="B8" pinfunction="SBU2_B8" pintype="passive+no_connect"/>
     </net>
-    <net code="60" name="unconnected-(J2-SW-PadB)" class="Default">
-      <node ref="J2" pin="B" pinfunction="SW_B" pintype="passive+no_connect"/>
+    <net code="79" name="unconnected-(J2-RSW-Pad3)" class="Default">
+      <node ref="J2" pin="3" pinfunction="RSW_3" pintype="passive+no_connect"/>
     </net>
-    <net code="61" name="unconnected-(J3-SW-PadB)" class="Default">
-      <node ref="J3" pin="B" pinfunction="SW_B" pintype="passive+no_connect"/>
+    <net code="80" name="unconnected-(J2-TSW-Pad4)" class="Default">
+      <node ref="J2" pin="4" pinfunction="TSW_4" pintype="passive+no_connect"/>
     </net>
-    <net code="62" name="unconnected-(J5-DIN1-Pad1)" class="Default">
+    <net code="81" name="unconnected-(J3-RSW-Pad3)" class="Default">
+      <node ref="J3" pin="3" pinfunction="RSW_3" pintype="passive+no_connect"/>
+    </net>
+    <net code="82" name="unconnected-(J3-TSW-Pad4)" class="Default">
+      <node ref="J3" pin="4" pinfunction="TSW_4" pintype="passive+no_connect"/>
+    </net>
+    <net code="83" name="unconnected-(J5-DIN1-Pad1)" class="Default">
       <node ref="J5" pin="1" pinfunction="DIN1_1" pintype="passive+no_connect"/>
     </net>
-    <net code="63" name="unconnected-(J5-DIN3-Pad5)" class="Default">
+    <net code="84" name="unconnected-(J5-DIN3-Pad5)" class="Default">
       <node ref="J5" pin="5" pinfunction="DIN3_5" pintype="passive+no_connect"/>
     </net>
-    <net code="64" name="unconnected-(J6-DIN1-Pad1)" class="Default">
+    <net code="85" name="unconnected-(J6-DIN1-Pad1)" class="Default">
       <node ref="J6" pin="1" pinfunction="DIN1_1" pintype="passive+no_connect"/>
     </net>
-    <net code="65" name="unconnected-(J6-DIN3-Pad5)" class="Default">
+    <net code="86" name="unconnected-(J6-DIN3-Pad5)" class="Default">
       <node ref="J6" pin="5" pinfunction="DIN3_5" pintype="passive+no_connect"/>
     </net>
-    <net code="66" name="unconnected-(J7-SW-PadB)" class="Default">
-      <node ref="J7" pin="B" pinfunction="SW_B" pintype="passive+no_connect"/>
+    <net code="87" name="unconnected-(J7-TSW-Pad4)" class="Default">
+      <node ref="J7" pin="4" pinfunction="TSW_4" pintype="passive+no_connect"/>
     </net>
-    <net code="67" name="unconnected-(U1-GPIO3-Pad8)" class="Default">
+    <net code="88" name="unconnected-(J13-R-PadC)" class="Default">
+      <node ref="J13" pin="C" pinfunction="R_C" pintype="passive+no_connect"/>
+    </net>
+    <net code="89" name="unconnected-(J13-SW-PadB)" class="Default">
+      <node ref="J13" pin="B" pinfunction="SW_B" pintype="passive+no_connect"/>
+    </net>
+    <net code="90" name="unconnected-(J14-R-PadC)" class="Default">
+      <node ref="J14" pin="C" pinfunction="R_C" pintype="passive+no_connect"/>
+    </net>
+    <net code="91" name="unconnected-(J14-SW-PadB)" class="Default">
+      <node ref="J14" pin="B" pinfunction="SW_B" pintype="passive+no_connect"/>
+    </net>
+    <net code="92" name="unconnected-(U1-GPIO3-Pad8)" class="Default">
       <node ref="U1" pin="8" pinfunction="GPIO3_8" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="68" name="unconnected-(U1-GPIO5-Pad10)" class="Default">
+    <net code="93" name="unconnected-(U1-GPIO5-Pad10)" class="Default">
       <node ref="U1" pin="10" pinfunction="GPIO5_10" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="69" name="unconnected-(U1-GPIO6-Pad11)" class="Default">
+    <net code="94" name="unconnected-(U1-GPIO6-Pad11)" class="Default">
       <node ref="U1" pin="11" pinfunction="GPIO6_11" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="70" name="unconnected-(U1-GPIO7-Pad12)" class="Default">
+    <net code="95" name="unconnected-(U1-GPIO7-Pad12)" class="Default">
       <node ref="U1" pin="12" pinfunction="GPIO7_12" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="71" name="unconnected-(U1-GPIO8-Pad13)" class="Default">
+    <net code="96" name="unconnected-(U1-GPIO8-Pad13)" class="Default">
       <node ref="U1" pin="13" pinfunction="GPIO8_13" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="72" name="unconnected-(U1-GPIO13-Pad18)" class="Default">
+    <net code="97" name="unconnected-(U1-GPIO13-Pad18)" class="Default">
       <node ref="U1" pin="18" pinfunction="GPIO13_18" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="73" name="unconnected-(U1-GPIO14-Pad19)" class="Default">
+    <net code="98" name="unconnected-(U1-GPIO14-Pad19)" class="Default">
       <node ref="U1" pin="19" pinfunction="GPIO14_19" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="74" name="unconnected-(U1-GPIO15-Pad21)" class="Default">
+    <net code="99" name="unconnected-(U1-GPIO15-Pad21)" class="Default">
       <node ref="U1" pin="21" pinfunction="GPIO15_21" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="75" name="unconnected-(U1-GPIO16-Pad22)" class="Default">
-      <node ref="U1" pin="22" pinfunction="GPIO16_22" pintype="bidirectional+no_connect"/>
-    </net>
-    <net code="76" name="unconnected-(U1-GPIO18-Pad24)" class="Default">
+    <net code="100" name="unconnected-(U1-GPIO18-Pad24)" class="Default">
       <node ref="U1" pin="24" pinfunction="GPIO18_24" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="77" name="unconnected-(U1-GPIO33-Pad38)" class="Default">
-      <node ref="U1" pin="38" pinfunction="GPIO33_38" pintype="bidirectional+no_connect"/>
+    <net code="101" name="unconnected-(U1-GPIO38-Pad43)" class="Default">
+      <node ref="U1" pin="43" pinfunction="GPIO38_43" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="78" name="unconnected-(U1-GPIO34-Pad39)" class="Default">
-      <node ref="U1" pin="39" pinfunction="GPIO34_39" pintype="bidirectional+no_connect"/>
+    <net code="102" name="unconnected-(U1-GPIO39-Pad44)" class="Default">
+      <node ref="U1" pin="44" pinfunction="GPIO39_44" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="79" name="unconnected-(U1-GPIO35-Pad40)" class="Default">
-      <node ref="U1" pin="40" pinfunction="GPIO35_40" pintype="bidirectional+no_connect"/>
-    </net>
-    <net code="80" name="unconnected-(U1-GPIO36-Pad41)" class="Default">
-      <node ref="U1" pin="41" pinfunction="GPIO36_41" pintype="bidirectional+no_connect"/>
-    </net>
-    <net code="81" name="unconnected-(U1-GPIO37-Pad42)" class="Default">
-      <node ref="U1" pin="42" pinfunction="GPIO37_42" pintype="bidirectional+no_connect"/>
-    </net>
-    <net code="82" name="unconnected-(U1-GPIO40-Pad45)" class="Default">
+    <net code="103" name="unconnected-(U1-GPIO40-Pad45)" class="Default">
       <node ref="U1" pin="45" pinfunction="GPIO40_45" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="83" name="unconnected-(U1-GPIO41-Pad47)" class="Default">
+    <net code="104" name="unconnected-(U1-GPIO41-Pad47)" class="Default">
       <node ref="U1" pin="47" pinfunction="GPIO41_47" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="84" name="unconnected-(U1-GPIO42-Pad48)" class="Default">
+    <net code="105" name="unconnected-(U1-GPIO42-Pad48)" class="Default">
       <node ref="U1" pin="48" pinfunction="GPIO42_48" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="85" name="unconnected-(U1-GPIO43-Pad49)" class="Default">
-      <node ref="U1" pin="49" pinfunction="GPIO43_49" pintype="bidirectional+no_connect"/>
-    </net>
-    <net code="86" name="unconnected-(U1-GPIO44-Pad50)" class="Default">
-      <node ref="U1" pin="50" pinfunction="GPIO44_50" pintype="bidirectional+no_connect"/>
-    </net>
-    <net code="87" name="unconnected-(U1-GPIO45-Pad51)" class="Default">
+    <net code="106" name="unconnected-(U1-GPIO45-Pad51)" class="Default">
       <node ref="U1" pin="51" pinfunction="GPIO45_51" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="88" name="unconnected-(U1-GPIO46-Pad52)" class="Default">
+    <net code="107" name="unconnected-(U1-GPIO46-Pad52)" class="Default">
       <node ref="U1" pin="52" pinfunction="GPIO46_52" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="89" name="unconnected-(U1-SPICLK-Pad33)" class="Default">
+    <net code="108" name="unconnected-(U1-SPICLK-Pad33)" class="Default">
       <node ref="U1" pin="33" pinfunction="SPICLK_33" pintype="no_connect"/>
     </net>
-    <net code="90" name="unconnected-(U1-SPICLK_N-Pad36)" class="Default">
+    <net code="109" name="unconnected-(U1-SPICLK_N-Pad36)" class="Default">
       <node ref="U1" pin="36" pinfunction="SPICLK_N_36" pintype="no_connect"/>
     </net>
-    <net code="91" name="unconnected-(U1-SPICLK_P-Pad37)" class="Default">
+    <net code="110" name="unconnected-(U1-SPICLK_P-Pad37)" class="Default">
       <node ref="U1" pin="37" pinfunction="SPICLK_P_37" pintype="no_connect"/>
     </net>
-    <net code="92" name="unconnected-(U1-SPICS0-Pad32)" class="Default">
+    <net code="111" name="unconnected-(U1-SPICS0-Pad32)" class="Default">
       <node ref="U1" pin="32" pinfunction="SPICS0_32" pintype="no_connect"/>
     </net>
-    <net code="93" name="unconnected-(U1-SPICS1-Pad28)" class="Default">
+    <net code="112" name="unconnected-(U1-SPICS1-Pad28)" class="Default">
       <node ref="U1" pin="28" pinfunction="SPICS1_28" pintype="no_connect"/>
     </net>
-    <net code="94" name="unconnected-(U1-SPID-Pad35)" class="Default">
+    <net code="113" name="unconnected-(U1-SPID-Pad35)" class="Default">
       <node ref="U1" pin="35" pinfunction="SPID_35" pintype="no_connect"/>
     </net>
-    <net code="95" name="unconnected-(U1-SPIHD-Pad30)" class="Default">
+    <net code="114" name="unconnected-(U1-SPIHD-Pad30)" class="Default">
       <node ref="U1" pin="30" pinfunction="SPIHD_30" pintype="no_connect"/>
     </net>
-    <net code="96" name="unconnected-(U1-SPIQ-Pad34)" class="Default">
+    <net code="115" name="unconnected-(U1-SPIQ-Pad34)" class="Default">
       <node ref="U1" pin="34" pinfunction="SPIQ_34" pintype="no_connect"/>
     </net>
-    <net code="97" name="unconnected-(U1-SPIWP-Pad31)" class="Default">
+    <net code="116" name="unconnected-(U1-SPIWP-Pad31)" class="Default">
       <node ref="U1" pin="31" pinfunction="SPIWP_31" pintype="no_connect"/>
     </net>
-    <net code="98" name="unconnected-(U8-CHRG-Pad1)" class="Default">
+    <net code="117" name="unconnected-(U8-CHRG-Pad1)" class="Default">
       <node ref="U8" pin="1" pinfunction="CHRG_1" pintype="open_collector+no_connect"/>
     </net>
-    <net code="99" name="unconnected-(U9-VT-Pad1)" class="Default">
+    <net code="118" name="unconnected-(U9-VT-Pad1)" class="Default">
       <node ref="U9" pin="1" pinfunction="VT_1" pintype="passive+no_connect"/>
     </net>
-    <net code="100" name="unconnected-(U10-NC-Pad4)" class="Default">
+    <net code="119" name="unconnected-(U10-NC-Pad4)" class="Default">
       <node ref="U10" pin="4" pinfunction="NC_4" pintype="no_connect"/>
     </net>
   </nets>

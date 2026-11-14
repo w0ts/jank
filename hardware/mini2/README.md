@@ -1,10 +1,375 @@
-# jank mini 2.2: one board, two orders (USB only, or with a 1S cell), two MIDI OUTs, LINE IN, 4 buttons in a cross, LEDs or a screen, u.FL (branch hw/mini2.2)
+# jank mini 2.2: one board, two orders (USB only, or with a 1S cell), two MIDI OUTs, LINE IN with plug detect, CLOCK / RESET outs, a D-pad over 4 buttons, LEDs or a screen, u.FL (branch hw/mini2.2)
 
-**Stage 1f (2026-11-14): placed, not routed; nothing ordered, built or measured.** `mini2.kicad_pcb` is the *placed*
-board (`LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 make_board.py`): `fab/mini2-gerbers.zip`, `render-top.png`,
-`render-bottom.png`, `render-3d.png` and `mockup.stl` are older until the routing (stage 2, after the user's go). Each
-stage's section supersedes the older ones where they differ (1f, 1e, 1d, then 1c); "mini 2.2 (stage 1)" and "1b" are
-superseded (the encoder and the RGB LEDs are gone); everything after them is mini 2's text.
+**Stage 2 (2026-11-14, 72 x 72 mm): placed, routed, simulated, the fab files written; NOT ordered, NOT built, NOT measured.**
+`mini2.kicad_pcb` is the routed board; `fab/` holds the Gerbers and both orders' BOM / CPL; `sim/` the simulations;
+`case/` the case. Each stage's section supersedes the older ones where they differ (2, 1f, 1e, 1d, then 1c); "mini 2.2
+(stage 1)" and "1b" are superseded (the encoder and the RGB LEDs are gone); everything after them is mini 2's text.
+
+## mini 2.2, stage 2 (2026-11-14): placed, routed, simulated, fab files; NOT ordered, NOT built, NOT measured
+
+The user's go: "time to build the board, place the components cleverly, route, and simulate", then the additions in
+the order they came (twins, LINE IN pull-downs and plug detect, the switched jacks, the MIDI shorts, the u.FL, the
+power toggle, the D-pad, the spare pads, the silkscreen, the ground sensing, the VBUS ferrite, the CLOCK / RESET
+outputs and, for them, 66 x 64 mm, then **72 x 72 mm** for "one board, different screens"). Everything below was made and checked in software only.
+Pictures: `render-top.png`, `render-bottom.png`, `render-3d.png`, **`render-3d-full.png` / `render-bottom-full.png`**
+(every part the user solders fitted, the screen module, the cells, the FPC lead and the toggle as plain boxes),
+**`render-silk-top-0..3.png` / `render-silk-bottom-0..3.png`** (the silk in quarters, readable on a phone),
+`case/renders/` (`closed_*`, `open_full.png`, `section_button.png`: the D-pad cut through its pivot and two arms).
+
+### What changed from stage 1f
+
+| Change | Why |
+|---|---|
+| **72 x 72 mm** (was 66 x 58; 66 x 64 on the way): the 66 mm design stretched (`make_board.py`): a 14 mm band at y 36 (BAND / BAND_Y: the chip block, the power / charger block, the cross and the cells' band moved down 14 mm), 3 mm more in the middle and 6 mm more on the right (DX2: the chip's block and the parts placed at fixed x in the middle +3, the right side +6, the left third as it was); the top rows, the DINs, the LINE IN front end and the cell's protection keep their places relative to their edges | the user: "one board, different screens, as many versions as possible, with the pins in the same place", the 2.42" screen's 72 mm (screen-study.md); at 66 x 64 the routing stalled at 6 .. 8 open connections round the chip's corners (four runs) |
+| **Screens: J10 and J10B**, all DNP, on the same four nets (OLED_P1, OLED_P2, SCL, SDA; JP1 / JP2 pick GND / VCC for P1 / P2). **J10** (1 x 4, 2.54 mm, at (38.0, 15.9), pin 1 at x 34.19) takes the **1.3" and 1.54"** modules straight on their headers (the 0.96" is out: unreadable) (each centred on its 4 pins, hanging down from the row). **J10B** (four SMD pads, 2.54 mm, at (5.5, 44.6)) takes the **2.42"** on a short 4-wire lead: its own header (down its left side at board x 2.5, y 18.7 .. 26.3 when the module lies across the top) lands on J5's DIN pads, so no header can go there. C86, a 1206 land by J10B for a bulk cap (the 2.42"'s boost inrush) | "pins in the same place"; the per-module positions are in "Screens" below |
+| **The power toggle on the LEFT wall** (J11 at (5.0, 49.5), its axis at y 54.5), under the screen band; VSYS / VREG now ~10 mm from the power block | the 2.42" covers the top band, where the toggle's body was |
+| **CLOCK and RESET outputs, 5 V+** (J13 CLK, J14 RST): two PJ-320A (SHOU HAN, C18185602) under the board at the top edge between the USB-C and J3, noses up through the case's top wall. **A charge pump** makes CV_RAIL: GPIO35 drives 416.7 kHz through R83 22 ohm into C84 1 uF, D12 / D13 (B5819W) from VREG, C85 10 uF 25 V (C15850), R84 100 k bleed: ~5.7 V from a 3.4 V cell, ~6.8 V on USB. Per output: a 2N7002 (C8545) with a 100 k gate pull-down, an AO3401A (C15127) from CV_RAIL with a 10 k gate pull-up to the rail (twinned), 10 k from the node to GND, a BAV99 (C2500) clamp to GND / CV_RAIL, **two 2 k 1206 (C17944) in parallel** (1 k, 0.5 W) to the tip; GPIO2 (CLK) / GPIO1 (RST); all Basic | the user's ruling: "a real 5 V+ output or no modular outputs at all". PASS in `sim/cv.py`: 5.18 V into 10 k from a 3.4 V cell (>= 5.0 asked), rise 0.20 us (< 10 us), 0.03 mV with the pump off. PJ-320A, not PJ-307C: two PJ-307C need 24 mm of edge, 17 mm were free. The gate pull-up goes to the rail, so the P-FET is fully off with its gate at the rail (a 3.3 V gate would leave it on). The node's 10 k: without it the switch-on put 0.77 V on the outputs |
+| The **LEDs** (LED1, LED2) and R40 / R41 with their twins moved to the band's left end (x 4 .. 19, y 38 .. 42), outside the screen module's outline | the CLK / RST jacks took their top-edge spot; the LED lid's window follows them (`place_args.py`) |
+| The jacks: **PJ-307C** (BOOMELE, C16684, switched TRS) for MIDI OUT 1, MIDI OUT 2 and LINE IN, under the board, DNP (the user solders them; bought with the order) | a switched jack for LINE IN's plug detect, the same part for all three |
+| LINE IN **pull-downs** R36 / R37 100 k, **plug detect** on GPIO16 (J7's ring switch, R38 1 M up) | an open input is quiet; "something plugged in". Audio vs silence is firmware (RMS under -60 dBFS for 0.5 s = silence) |
+| **LINE IN ground sensing**: the sleeve to GND through R39 22 ohm (twin RT39: a 0 ohm there grounds it solid), a matched divider R65 10 k / R66 5.6 k from the sleeve into the op-amp's reference side (R34's foot, C33's foot), C67 a DNP pad across R66; 3 parts, all Basic | the user's: hum from USB ground loops. sim: 39.6 dB rejected at 50 Hz, **25.4 dB at 1 kHz** (under the 30 dB asked, over the 20 dB floor), 5.4 dB at 10 kHz; with 2.2 nF on C67: 38.5 / 45.6 / 25.8 dB |
+| **VBUS ferrite option**: R63 0 ohm 0603 (C21189) in VBUS after the ESD (VUSB -> VBUS), before the charger and the power path; C27 a DNP 0805 pad after it | swap R63 for a BLM18PG121SN1D (C14709, Basic, 2 A, 50 mohm: 25 mV at 500 mA) if USB noise shows; C27 for a bulk cap after it |
+| **Twins** (the user's rule): 26 hand-solder lands, each joined to its part by two short top tracks, no via (the three under the board, CT8 / CT9 / CT10, by one bottom track and one via off their pads, the user's allowance), 1.0 mm or more of copper-free room round each: resistors `R_TWIN_HAND` (1.4 x 2.0 mm pads, 1.2 mm apart), the capacitors' `C_TWIN_HAND` (1.0 x 1.4 mm, 0.9 mm apart: an 0603 / 0805 by hand) | a batch is fixed with an iron, not a re-order: "Twins" below |
+| **Spare pads** (the user's list, in order): J12 recovery pads, crystal load twins, regulator in / out lands, VSYS bulk, a pi at the u.FL, debounce pads, the LINE IN filter's and C7's twins, a +3V3 spare: "Spare pads" below says which fit | pads that could save a batch |
+| **The u.FL (J4) beside the chip's match** | the RF line as routed: LNA_IN 3.1 mm (0.2 mm, the pin to C23), RF 5.5 mm (0.5 mm, the match to R19), UFL 4.0 mm (0.2 mm, R19 / C26 to J4: **not** a 50 ohm width; ~1/17 of the wavelength on FR-4 at 2.4 GHz, unverified, check on review); R19 (0 ohm) kept, C24 / C26 a pi round it |
+| **D9** (B5819W) BAT_P -> VSYS beside Q1, **R50 10 k** | +3V3 at the USB unplug with a cell: "Simulations" |
+| **The power toggle** (the user's: "off = off, still charges", then "a bigger flip / toggle through a round hole"): an MTS-102 panel toggle (CAX-MTS102-YB-10.5JL, C55159907, M6 x 0.75 bushing) in the case's left wall, two wires to **J11** (two 2 x 3 mm through-hole pads, 4 mm apart: VSYS, VREG); it cuts VREG (the regulators', U7's and the CLK / RST drivers' input) from VSYS after the charger and the power path. **R62** (0 ohm 0402) bridges J11 in the usb order only ("J11 = the power toggle; R62 ... bridges it" on the bottom's cheat sheet: the top had no room) | off, the board is dead even on USB; the cell still charges |
+| **MIDI shorts** (the coordinator's decision on `sim/midi_faults.md`): every sink 68 ohm 0805 (C17802) with its twin, each DIN's source 2 x 100 ohm 1206 | every sustained single fault inside each part's rating |
+| **The case: a D-pad** (one PETG cross rocker on a pivot) instead of the U-tongues; the toggle's hole and its nut's seat; the CLK / RST jacks' U-slots | `case/README.md` |
+| **Silkscreen** (`silk.py`, on the routed board): references, purposes, pin names, block outlines; on the bottom the name, the date, a wordmark, a cheat sheet and the cell polarity warning | "Silkscreen" below |
+
+### Screens (72 x 72: one board, three sizes (the 0.96" is out: unreadable, the user); hardware/mini2/screen-study.md has the modules' data and sources)
+
+The modules' drawings (HanSheng / LCSC sheets, page 6; QDtech MC242GX for the 2.42"): every one has GND VCC SCL SDA.
+Board coordinates (mm, y down from the top edge); "pin 1" = GND on the module = J10's / J10B's pin 1 (OLED_P1: JP1 on
+G, JP2 on V).
+
+| | 1.3" (C7465997) | 1.54" (C7465999) | 2.42" (C7466000) |
+|---|---|---|---|
+| on | J10, plugged | J10, plugged | **J10B, a 4-wire lead** (~3 cm: from its header at x 2.5, y 18.7 .. 26.3, 6 mm up, to the pads) |
+| its pin row from its top edge | 2.0 | 2.5 | (down its left side, 2.5 mm in, pins 17.7 .. 25.3 from its top) |
+| module outline on the board | x 20.3 .. 55.7, y 13.9 .. 47.4 | x 16.8 .. 59.2, y 13.4 .. 51.4 | x 0 .. 72, y 1 .. 44 (hung from the lid's roof) |
+| active area | x 23.25 .. 52.67, y 21.25 .. 35.95 | x 20.48 .. 55.53, y 21.55 .. 39.07 | x 8.5 .. 63.51, y 6.11 .. 33.6 |
+| lid window (`mini_lid_*.stl`), centre / size | (38.0, 28.6), 32.2 x 16.8 | (38.0, 30.3), 37.8 x 19.7 | (36.0, 19.9), 57.5 x 29.5 |
+| height | on J10's 2.5 mm plastic: every part under it is lower (SOT-23 / SOD-123 1.1 mm, 0805 1.25, the QFN 0.9; the jacks' legs ~1.8 from the bottom side) | as the 1.3"; its lower edge 1.4 mm above the D-pad's hole | its back parts 4.25 mm over the board, its glass 0.5 under the roof: over the USB-C (3.2) by 1.05; no top part taller than 2.3 mm (D7 / D8) in its area |
+
+J10's pin 1 is at (34.19, 15.9), the four pins 2.54 mm apart along x; J10B's pins at y 44.6, x 1.69 / 4.23 / 6.77 /
+9.31. The modules' header positions and active areas are the makers' drawings (V in screen-study.md); the parts on the
+modules' backs are not drawn by the makers (the 2.42"'s 2.2 mm: QDtech's): unverified for the HanSheng parts.
+
+**Power:** the 2.42" draws up to ~196 mA with every pixel white (Waveshare's measurement, screen-study.md); with a
+Wi-Fi peak (340 mA, assumed) that is over the HT7833's 500 mA: **firmware caps lit area x contrast at ~100 mA** (a dark
+UI). C86 (a 1206 land by J10B) takes a bulk cap (10 .. 22 uF) for the module's boost converter's inrush.
+
+### Placement
+
+(The 72 x 72 stretch moved everything as the table above says; the coordinates quoted in this list are the 66 x 64
+layout's. `make_board.py` and `render-top.png` hold the board's. On 72 x 72 also: J12 (recovery) left of the chip at
+(19.5, 49.0), J10B / C86 below the left DIN, J11 / R62 by the left wall, R63 / C27 between J12 and the power block, the
+LEDs and R40 / R41 with their twins at the band's left end.)
+
+- **The band** (BAND 6 mm at y 36): moved down 6 mm: the chip and its block, the RF line and the u.FL, the power path
+  (D3, Q1, D9, R50, C40, C41), the regulators (U2, U10, C3, C5, C6), the charger (U8, R51), R16, R63 / C27, C72, J12,
+  the debounce pads and the four buttons (the cross's middle now (55.5, 54.2)). **Not moved:** the top rows (USB-C,
+  the jacks, the MIDI resistors, the screen's header), the DINs, the LINE IN front end, the cell's protection (U9, C42,
+  R52, Q2, R53: by the sockets as before), the cells' sockets J8 / J9 (y 33; the cells' band, now y 47 .. 64, is 6 mm
+  further: their leads are 6 mm longer).
+- **CLK / RST:** two rows of three SOT-23 (the 2N7002, the AO3401A, the BAV99) right of the cell's protection
+  (y 38 .. 45); the four 2 k series resistors stacked on the right edge; the gate pull-downs (R71 / R77) between the
+  rows and Q2, the nodes' pull-downs (R74 / R80) over them; R73 / RT73 left of the rows, R79 / RT79 on the right edge
+  under the 2 k stack. **The charge pump** (R83, C84, D12, D13, C85, R84) between the chip's right side and the cross,
+  ~6 mm from the pump's lane via; CV_RAIL runs to the drivers. **The pins:** the right side's pins 10 .. 13 (GPIO5 .. 8)
+  cannot be routed (the fan-out lanes of pins 4 .. 9 rise past them: the first routing tries stalled there), so the
+  RESET (GPIO1) and CLOCK (GPIO2) took the lanes of pins 6 / 7 toward their drivers, the cell's level (GPIO4) the
+  innermost lane beside LINE_IN's way up; the free left side takes the LEDs (GPIO33 / 34, pins 38 / 39), the charge
+  pump (GPIO35, pin 40: its parts at the board's lower left, far from LINE IN) and YES / DOWN (GPIO36 / 37, pins 41 /
+  42, round the chip's foot; the LEDs left pins 43 / 44 to free the chip's bottom-left corner). From the left side
+  RESET had run 6.7 mm beside LINE_IN (72 x 72 run 1). (the crystal's load twins CT9 / CT10 moved under the board, below). On the top side (tried:
+  GPIO13 / 14 / 15) the top side's escapes ran out (UP, SDA, YES, DOWN, LIN_DET left open) and RESET ran 3.5 mm beside
+  LIN_OUT. C80 (UP's debounce pad) on BTN_UP's way, left of U9.
+- **J3's source trio** (R21 / R27 / R49) 3.2 mm up and R20 / RT20 0.6 mm down: out of J14's iron room.
+- Everything else as stage 2's first placement (below in this section's history): the LINE IN front end in two blocks
+  under the screen module, each MIDI connector's resistors by its legs, the USB pair drawn, J10 and its jumpers.
+
+### Routing
+
+Freerouting 2.5.0 (`freeroute.py`, `nice -n 19`, `-mt 1`), on the placed board, then `repair.py` and `fatten.py`
+(`make_fab.sh`, ROUTE=1). **Result: 0 connections open, KiCad's DRC 0 errors** (the committed board). How it got there
+(the user's "2-layer targeted fixes", at most 3 runs; 2 used):
+- **Before the runs:** via keep-outs on every twin's pads (both layers, the pad + 0.35 mm, `freeroute.py`); LED_R /
+  LED_G off pins 43 / 44 to GPIO33 / 34 (pins 38 / 39), freeing the chip's bottom-left corner; the RF parts' bottom kept
+  1.0 mm clear of vias (was 0.4; BOOT's track had passed 0.4 mm from the u.FL's path); the hole-to-hole via, the
+  dangling stubs: cleaned after routing (below).
+- **The clear ring round U1** (the coordinator's "move parts away from the chip"): within ~4 mm only the decoupling, the
+  crystal and its load caps, the RF match (C23 / L3 / C24), the VDD3P3 parts, R24 / R25 (the drawn USB pair's series
+  resistors) and C8 / R35 / C36 (the ADC pins' RC, close by the timing study's request) stay; R8 / C7 (the reset RC)
+  went 10 mm right of the chip's centre, J12 and C27 out to the power block.
+- **U1's rotation** (a one-off script, not kept: the placed board's ratsnest length / crossings per rotation): 0 deg 505 mm / 167,
+  90 deg 492 / 131, **180 deg (kept) 411 / 39**, 270 deg 460 / 99.
+- **The seeded pass** (the open nets routed first, then the rest): worse than the plain order (more nets open), so off
+  (`freeroute.SEED = []`, the code kept).
+- **Run 1:** 11 connections open. **Run 2** (CT9 / CT10 under the board, RT39 placed by hand, the ring): 4 open
+  (VBUS, +3V3, SDA, U0RXD).
+- **`repair.py`** (new): KiCad's DRC lists the open pairs; each joined by route.py's grid router on the routed board
+  (every other net's copper an obstacle, no via on or touching any pad, none in the hand-soldered parts' iron rooms or
+  under the RF parts): VBUS 6.8 mm / 2 vias, +3V3 22.6 mm / 3 vias, SDA 6.8 mm / 1 via, U0RXD 26.8 mm / 4 vias (none
+  under the crystal or across the RF keep-out). Then the twins' courtyards cut back to their pads (a twin abuts its own
+  part by design; five hand-placed twins moved 0.15 .. 0.3 mm to clear their resistor's courtyard), stubs with a free
+  end removed, a GND via moved off CT8's pad (to (38.65, 50.18)).
+- **`fatten.py`** (new): VBUS / VUSB / +3V3 widened in steps (0.5, 0.4, 0.3 mm) wherever KiCad's DRC still passes:
+  VBUS 18.9 mm at 0.5 + 14.3 mm at 0.4 (narrowest **0.4 mm**), VUSB 22.7 at 0.5 + 42.8 at 0.4 (narrowest **0.4 mm**),
+  +3V3 141.1 at 0.5 + 108.4 at 0.4 + 79.2 at 0.3 (narrowest **0.3 mm**, at the pins; was 0.2 .. 0.25). One via size
+  on the board, 0.6 / 0.3 mm, for every net.
+- **CLK / RST and LIN_DET:** no CLK_ / RST_ track crosses LIN_DET or any other LINE IN net (LIN_*, LINE_IN, AVDD) on
+  either layer (every segment pair tested for an intersection); the nearest CLK / RST copper to LINE IN's front end is
+  1.06 mm (below).
+- **Moats** (`moats.py`): a piece of GND pour ringed by tracks on both layers gets a short GND track to the main
+  ground, the tracks it crosses are rerouted (up to 6 rounds); every twin's tracks are kept.
+- **The USB pair is drawn** (`make_board.py`): U5 to R24 / R25, a coupled 0.2 / 0.2 mm pair on top, no via; 6 mm
+  longer than at 66 x 58 (the band).
+- Widths: VSYS / VREG 0.5 mm, VBUS / VUSB 0.3 mm and +3V3 0.25 mm as routed (then widened by `fatten.py`: above), BAT_P / BAT_N / BAT_C 0.4 mm; the MIDI connector nets
+  0.5 mm from everything; every hand-soldered part's pads (DINs, jacks, sockets, header, J11, J13 / J14) with the
+  0.8 mm via keep-out; the D-pad's pivot circle without vias.
+
+### Checks (the routed board, the committed one)
+
+`make_fab.sh` (ROUTE=0) on the committed board: ERC 0; **DRC 0 errors, 0 unconnected**, 35 warnings, all
+`lib_footprint_mismatch` (the generated footprints differ from the library copies by design); `check_nets.py` 492
+schematic pins, 449 intended connections, 0 problems; `check_board.py` 177 parts, 248 vias, 26 twins, **0 problems**
+(courtyards both ways, the iron's rooms, no via on a pad or a twin, ground islands, RF). Separations (check_board):
+CLK / RST to LINE IN's ADC path 1.11 mm (CLK_IO to LINE_IN, same layer, no parallel run within 1 mm); CLK / RST to the
+front end (LIN_*, LINE_IN, AVDD) 1.06 mm; the pump 5.68 mm; the RF / u.FL 5.00 mm. Both orders' BOM / CPL: every part
+within 0.01 mm of JLC's footprint.
+
+### Simulations (ngspice 47; `sim/`; each model's source in its script's docstring)
+
+**a) LINE IN** (`sim/linein.py` -> `sim/results.txt`): mono gain -5.14 dB (0.553 x) at 1 kHz, band 7.8 Hz .. 8.48 kHz
+(-11.7 dB at 22.05 kHz). +4 dBu: the pin 0.53 .. 2.45 V inside the ADC's 0 .. 2.9 V (ATTEN3); consumer -10 dBV: 0.48
+Vpp; it clips at about +10 dBu. The pull-downs: -0.05 dB (600 ohm source), -0.08 dB (1 k), -0.56 dB (10 k). Plug
+detect: 0.30 V without a plug, 3.25 V with one. **Ground sensing**: a 100 mV ground loop between the plug's sleeve and
+the board: 39.6 dB rejected at 50 Hz, 25.4 dB at 1 kHz, 5.4 dB at 10 kHz (with 2.2 nF on C67: 38.5 / 45.6 / 25.8 dB).
+The supply (U7 on VSYS, Wi-Fi bursts): 0.07 LSB pp with USB; with the cell nearly flat (U7 in dropout) 12 LSB pp. USB
+plug-in with +4 dBu on the jack: the pin never above +3V3. The ADC's sampling cap: 0.36 LSB.
+**b) MIDI** (`sim/midi.py` -> `sim/midi.txt`): 6.0 mA (jacks) / 5.7 mA (DINs) in each receiver with a 1.2 V opto LED,
+4.6 / 4.4 mA with a 1.7 V one, at 3.3 V; each TX pin sinks two receivers: 9 .. 12.7 mA. A mono plug in a jack: its trio
+360 mW (120 mW each, 250 mW parts). A DIN pin-4 short: 240 mW (120 mW in each 1206). A tip short with the pin high:
+41 mA.
+**MIDI shorts** (`sim/midi_faults.py` -> `sim/midi_faults.md`, the board's table first): verified safe by the
+datasheet: **no** (no per-pin limit in it); protected by resistors (the coordinator's compromise, applied): every
+sustained single fault stays inside each part's rating, a tip short draws ~41 mA (Table 5-4's IOH, 40 mA typ); the
+receivers get 5.5 mA (jacks) / 5.1 mA (DINs) at 3.3 V, 4.7 / 4.1 mA at 3.0 V into 220 ohm + a 1.5 V opto, 2.9 / 2.7
+mA with a series diode in the receiver (some have one).
+**c) Power** (`sim/power.py` -> `sim/power.txt`): USB pulled with a cell and a Wi-Fi burst: +3V3 3.27 / 2.88 / 2.58 V
+(cell 4.2 / 3.7 / 3.4 V) for 17 .. 24 ms (stage 1f's circuit: 3.02 / 2.52 / 2.22 V for 122 .. 163 ms; the S3's minimum
+is 3.0 V, Table 5-2: the brown-out detector decides). The cell alone at the 340 mA peak: 3.27 V from 4.2 V, 3.22 V at
+3.7 V, 2.92 V at 3.4 V. The usb order: 3.27 V from a 5.0 V host, **2.93 V at 4.5 V**. A reversed cell: 0 uA. The
+charger: 196 mA (R51 5.1 k). **The power toggle:** closed with a 4.2 V cell alone ~11 A for microseconds through the
+switch (C41 into C3 / C34; the wires' and tracks' 0.1 ohm / 50 nH each way are ESTIMATES), 4.5 A from the cell, above
+2.1 A for 12 us: the XB5353A (2.1 A after 10 ms, 10 A after 75 us) trips on neither. Off, no USB: 8.9 uA from the
+cell. The detour (VSYS to J11 at the right edge and VREG back, plus the toggle's two wires) is modelled as 0.1 ohm /
+50 nH each way: on 72 x 72 J11 sits at the left wall (5.0, 49.5), ~10 mm from the power block, so VSYS / VREG's
+detour is short; all of VSYS's and VREG's copper in series is ~0.14 ohm at their routed widths (0.5 mm, a few 0.38 /
+0.25 mm pieces), under the usb order's 0.2 ohm estimate, kept as the upper bound. The toggle's 30 mohm is the old
+SW6's figure (ASSUMED; the MTS-102's sheet not read).
+**d) Reset** (`sim/reset.py` -> `sim/reset.txt`): CHIP_PU reaches VIH 11.9 .. 13.8 ms after +3V3 (Espressif: >= 0.05
+ms); a cut of 1 ms or more resets cleanly (under VIL 2.6 ms or more); the USB unplug with a cell does not reset.
+**e) CLOCK / RESET** (`sim/cv.py` -> `sim/cv.txt`, the pump at 416.7 kHz): **PASS** (the user's test: >= 5.0 V into 10 k
+from a 3.4 V cell, a rise under 10 us, 0 V with the pump off). Both outputs high into 10 k: CV_RAIL 5.70 V (22 mV pp
+ripple), the outputs **5.18 V** from a 3.4 V cell; 6.79 / 6.17 V on USB (VREG 4.6 V); into 100 k: 5.78 V / 6.89 V.
+Edges into 10 k // 100 pF: rise **0.20 us**, fall 8 .. 9 us, 72 ns after the GPIO. The pump off (or not yet started),
+the GPIOs low or floating (boot, reset): **0.03 mV**; CV_RAIL then sits at VREG less the diodes (4.5 V on USB), so a
+GPIO driven high before the pump runs gives ~3.9 V: the firmware starts the pump first. Switching the toggle on (VREG
+0 -> 4.6 V in 0.1 ms) with the GPIOs floating: a 92 mV blip for microseconds (0.77 V without the node's 10 k: the
+P-FET's drain capacitance). The pump pin: 52 mA spikes at the edges, steady (the diodes' and C84's charge, nanoseconds),
+78 mA at its start (C85 empty): above the datasheet's typical IOH (40 mA; no maximum given): start it softly (a few ms at
+a low duty, then 50 %: firmware), unverified. **R83 at 47 ohm instead of 22** (the coordinator's question): the spikes
+fall to 35 mA steady / 48 mA at the start, but the outputs from a 3.4 V cell into 10 k drop to **4.78 V** (fails the 5.0
+V asked; 5.73 V on USB): R83 stays 22 ohm. Faults: +12 V into an output: ~2 mA, the clamp lifts CV_RAIL to 10.4 V
+(both outputs: 10.0 V; the AO3401A's VGS then -10 V of its +-12, C85 25 V, D13 40 V); -12 V: 11.3 mA (64 mW in each 2 k),
+with the output high 16.6 mA (138 mW in each, of 250). A short to GND: ~6 mA.
+**Not modelled (unverified):** the LDOs' real loop and PSRR curves, the cell's real resistance, the S3's pin drive
+and brown-out behaviour, the receivers' real opto LEDs, the XB5353A's internals, the TVS's real capacitance, the
+MOSFETs' and the BAV99's makers' models, any layout parasitics.
+
+### Twins (the user's rule): what a part soldered on each does
+
+A part on a resistor's twin is in parallel with it: it can only **lower** the value (to raise one, replace the
+resistor); on a capacitor's twin it **adds** capacitance.
+
+| Twin | Its part | Soldering e.g. ... | gives |
+|---|---|---|---|
+| RT30 / RT31 | R30 / R31 20 k (LINE IN tip / ring input) | 20 k | 10 k: that channel +6 dB |
+| RT32 | R32 5.6 k (the gain; C32 2.2 nF sits across it: **RT32 also takes a capacitor**) | 5.6 k / 22 k / 2.2 nF | 2.8 k: -6 dB / 4.5 k: -2 dB / the pole 12.9 -> 6.5 kHz |
+| RT33 | R33 150 k (bias, upper) | 1 M | 130 k: the bias 1.47 -> 1.58 V |
+| RT34 | R34 120 k (bias, lower) | 1 M | 107 k: the bias 1.47 -> 1.38 V |
+| RT36 / RT37 | R36 / R37 100 k (the pull-downs) | 100 k | 50 k: a firmer quiet input |
+| RT38 | R38 1 M (plug detect pull-up) | 1 M | 500 k: no plug 0.55 V (still low) |
+| RT39 | R39 22 ohm (LINE IN's sleeve to GND, the ground sensing) | 0 ohm | the sleeve on GND solid (ground sensing off) |
+| RT51 | R51 5.1 k (RPROG: the charge current) | 10 k / 5.1 k | ~296 mA / ~392 mA (TP4054's max 500) |
+| RT10 / RT11 | R10 / R11 1 M (the cell's divider) | 1 M on RT11 | VBAT / 3 at GPIO4 (firmware's factor) |
+| RT60 / RT61 | R60 / R61 10 k (I2C pull-ups) | 10 k | 5 k: faster edges |
+| RT40 / RT41 | R40 / R41 1 k (the LEDs) | 1 k | 500 ohm: brighter |
+| RT15 / RT20 | R15 / R20 68 ohm (the jacks' sinks) | 68 ohm | 34 ohm: +0.6 mA a receiver, a tip short ~68 mA |
+| RT55 / RT57 | R55 / R57 68 ohm (the DINs' sinks) | 68 ohm | 34 ohm (as above) |
+| RT73 / RT79 | R73 / R79 10 k (CLK / RST: the P-FET's gate pull-up to CV_RAIL) | 10 k | 5 k: the P-FET turns off faster (a shorter fall; 0.7 mA more from the pump while high) |
+| CT3 | C3 10 uF (the regulators' input) | 10 .. 22 uF 0805 | more bulk on VREG |
+
+Not twinned: the jacks' three and the DINs' two 100 ohm sources and the CV outputs' two 2 k (several pads already:
+swap one), FET gate pull-downs, the XB5353A's 100 ohm, the CC resistors, 0 ohm links, the USB 22 ohm, the pump's parts.
+
+### Spare pads (the user's list, in its order): what fit
+
+| # | Asked | Done | |
+|---|---|---|---|
+| 1 | Recovery pads: U0TXD, U0RXD, GND, +3V3, CHIP_PU, GPIO0 | **J12**, six SMD pads 1.5 x 2.5 mm at 2.54 mm on the bottom edge, top side: TX RX 3V3 GND EN BOOT | a USB-UART at 3.3 V: hold BOOT to GND, pulse EN to GND |
+| 2 | Crystal load caps' twins | **dropped on 72 x 72** (CT9 / CT10 closed the way round the crystal that XTAL_N, U0TXD and the left side's nets need) | |
+| 3 | Regulator in / out spare 1206 pads (the AMS1117's sheet: "22 uF solid tantalum on the output will ensure stability"; the board has a 22 uF ceramic, outside that rule) | **CT3** (VREG, input) fits; **the output's (C5's) did not** fit beside C5: **J12's pads 3-4 (+3V3, GND)** take an 0805 (or a 3216 tantalum, if pads 4-5 are left empty) | the output spare is ~15 mm from U2 (unverified for the AMS1117's stability) |
+| 4 | VSYS bulk | **C72**, a 1206 land by the power path | |
+| 5 | An antenna pi at the u.FL | **C26** (UFL to GND, 0402) with C24 (DNP) and R19 (0 ohm): a pi | |
+| 6 | Spare GPIO pads | **skipped**: the chip's escapes are full (every side carries lanes; a pad row would block them) | |
+| 7 | Debounce caps by the buttons | **C80 .. C83** (0603, DNP) on UP, DOWN, BOOT, YES. C82 on BOOT: fitted, it slows the strap pin: keep it under 100 nF | |
+| 8 | LINE IN filter twins, a C7 twin | C32's: **RT32's land** (C32 sits across R32); R35 / C36's: **skipped** (in the chip's escape area, nothing free within 8 mm, a longer stub on the ADC pin is worse than none); C7's: **J12's pads 4-5 (GND, CHIP_PU)** take an 0805 | |
+| 9 | A spare +3V3 decoupling pad | **J12's pads 3-4** (as #3; one part there) | |
+
+### Silkscreen (`silk.py`, on the routed board; JLCPCB's 0.8 mm text, 0.15 mm stroke; nothing over pads or untented vias)
+
+Top: every reference that fits (120 of 177; the rest, mostly in the chip's block and the LINE IN front end, are in
+`render-top.png` and the CPL files), the twins' and spares' purposes, J12's pin names,
+"GND LIFT" (R39), "FB" (R63), "<- ON/OFF" (J11, toward the toggle on the left wall), the screen's header and jumpers, the buttons, and
+outlines with titles round each block (POWER, CHARGE, LINE IN, MIDI OUT 1, MIDI OUT 2, RF, MCU, CLK / RST), each line
+broken where it would cross a pad. Bottom: "jank mini 2.2", the date, a wordmark (three clock pulses into a sine), the
+cheat sheet (twins, the screen's jumpers and J10B's 2.42" lead, J11 / R62, MIDI's TRS map, the D-pad's GPIOs, the recovery pads, CLK / RST / LINE IN
+GPIOs), the cells' + / - and "CHECK CELL POLARITY BEFORE PLUGGING". **The cells' polarity** is on both fab silk layers at each socket: top "-" / "+"
+flanking J8 and J9, bottom "+" / "-" over their pads, "+" at the square pad 1 (BAT_C) (`render-cells-polarity.png`).
+`make_board.py`'s own labels that touched a pad moved to the nearest free spot (`silk.fix_labels`); the top's "CELL 1" /
+"CELL 2" had none and sit on User.Comments (not made; the bottom names the sockets J8 / J9). The lid has "ON ^ / OFF v" by the toggle.
+
+### Restarting and recovering (no RST: stage 1f), plus J12
+
+As stage 1f, and: J12 (TX RX 3V3 GND EN BOOT) for a USB-UART adapter at 3.3 V if the USB port is dead.
+
+### The GPIO map
+
+| GPIO (pin) | Net | |
+|---|---|---|
+| 0 (5) | BOOT | SW1 NO / BOOT, R16 pull-up (the strap rule); J12's BOOT pad, C82 DNP |
+| **1 (6)** | **RST_IO** (stage 2) | RESET out, active high, R77 100 k pull-down (the lane of pin 6) |
+| **2 (7)** | **CLK_IO** (stage 2) | CLOCK out, active high, R71 100 k pull-down (the lane of pin 7) |
+| **4 (9)** | VBAT_ADC (was GPIO1) | ADC1_CH3: the cell / 2 (R10 / R11), C8 100 nF at the pin |
+| 10 (15) | BTN_UP | internal pull-up |
+| **33 (38), 34 (39)** | LED_R, LED_G (were GPIO38 / 39) | the LEDs, active high, through 1 k |
+| **35 (40)** | **PUMP_IO** (stage 2) | the charge pump: LEDC 416,667 Hz (10 x the ADC's rate per channel: below), 50 % |
+| **36 (41), 37 (42)** | BTN_YES, BTN_DOWN (were GPIO2 / 4) | internal pull-ups |
+| 9 (14) | LINE_IN | ADC1_CH8 |
+| 11 (16), 12 (17) | SCL, SDA | R60 / R61 10 k |
+| 16 (22) | LIN_DET | J7's ring switch, R38 1 M up; low = no plug |
+| 17 (23) | MIDI_TX2 | UART2's TX (MIDI OUT 2; its own offset: TIMING.md) |
+| 19 (25), 20 (26) | USB D- / D+ | |
+| 21 (27) | MIDI_TX | UART1's TX (MIDI OUT 1) |
+| 43 (49), 44 (50) | U0TXD, U0RXD | J12 (recovery) |
+
+**CLK / RST / the pump vs LINE IN** (the coordinator's check): LINE IN is GPIO9 (pin 14). The pump's continuous square
+wave is on the chip's far side (pin 40, its parts at the lower left), RESET on pin 6 (3.2 mm from pin 14 along the
+pad row), CLOCK on pin 7 (2.8 mm), the quiet cell level on pin 9 (2.0 mm, the lane nearest LINE_IN's way up); LINE_IN leaves pin 14 upward to R35 / C36, the
+lanes rise beside it 0.7 .. 2.3 mm to its right and turn right at their vias. **Measured on the routed board:** the nearest CLK / RST copper to LINE IN's front end
+1.06 mm (to LINE_IN), to the ADC path 1.11 mm with no parallel run within 1 mm; no CLK / RST track crosses any LINE IN
+net on either layer; the pump's copper 5.68 mm from it.
+**The pump's frequency against the ADC (aliasing; the firmware timing study, worktrees/timing-scratch/TIMING.md):**
+LINE IN (ADC1_CH8) and the cell (ADC1_CH3) share one continuous ADC pattern at 83,333 Hz (APB / 32 / 30, exact), so
+each channel is sampled at 41,667 Hz. Pump ripple that reaches the ADC pin folds into the band unless the pump runs at an
+integer multiple of that: **416,667 Hz = 10 x 41,667 = 5 x 83,333** (LEDC on the 80 MHz APB, 1-bit duty, **divider
+exactly 96**: check `ledc_get_freq` == 416,666; a rounded 96 - 1/256 folds to ~17 Hz) folds to DC. (400 kHz against
+41,667 Hz would fold to 16.7 kHz; against 44.1 kHz to 3.1 kHz.) Keep APB fixed (no DFS, no light sleep while
+sampling). The 41.7 kHz stream is resampled to 44.1 kHz for the tracker in firmware.
+
+**Firmware notes:** the MIDI pins at drive strength 2 (20 mA nominal; GPIO17's default is 10 mA). **The pump: GPIO35,
+LEDC at 416,667 Hz (divider 96: above), 50 %, drive strength 3, started softly; the
+outputs stay 0 V until the pump runs** (start the pump,
+wait ~10 ms, then drive CLK / RST). CLK / RST: high = the output high (non-inverting; the pull-downs hold them low at
+boot). LIN_DET low = no plug; audio vs silence by RMS. MIDI OUT 1 / 2 on two UARTs (UART1 GPIO21, UART2 GPIO17), each
+with its own offset (TIMING.md). The cell's level (GPIO4, ADC1_CH3) shares the ADC pattern with LINE IN: its divider is
+R10 / R11 1 M / 1 M (500 k Thevenin) with **C8 100 nF at the pin** (no twin: no room in the chip's fan-out lanes): the SAR's sampling cap (~10 pF,
+assumed) takes ~0.2 mV from C8 per conversion after a LINE IN sample, not the ~0.1 V an unbuffered 500 k would lose; C8
+recharges through 500 k in 50 ms (the cell's level is averaged). LINE IN's pin is driven by U6's output (a rail-to-rail
+op-amp, low impedance) through R35 120 ohm with C36 100 nF at the pin: it settles within a sample after the channel
+switch.
+
+### Costs (`fab/cost.md`)
+
+JLC Economic, 2 layers, top-side assembly, 72.1 x 72.1 mm (`cost.py`, parts snapshot 2026-11-14; shipping, taxes
+and the case not included; every fee an estimate):
+
+| | usb: 5 boards | usb: 10 boards | battery: 5 boards | battery: 10 boards |
+|---|---|---|---|---|
+| parts / lines / joints a board | 112 / 45 / 320 | 112 / 45 / 320 | 124 / 48 / 353 | 124 / 48 / 353 |
+| Extended types (fee) | 6 | 6 | 8 | 8 |
+| **total, USD** | **66.11** | **93.55** | **76.03** | **106.73** |
+| per board, USD | 13.22 | 9.35 | 15.21 | 10.67 |
+
+
+**The screen modules** (one per board, the user's choice):
+
+| LCSC | module | 5 boards: USD each | 10 boards: USD each | vs the 1.3 in, 10 |
+|---|---|---|---|---|
+| C7465997 | 1.3 in, SH1106, HS13L03W2C01 (J10) | 4.86 | 4.20 | +0.00 |
+| C7465999 | 1.54 in, SSD1309, HS154L03W2C01 (J10) | 6.97 | 5.99 | +1.80 |
+| C7466000 | 2.42 in, SSD1309, HS242L03B2C01 (J10B, a 4-wire lead; colour unclear: screen-study.md) | 13.14 | 11.29 | +7.10 |
+
+The full-options rows below take the 1.3 in (the 1.3 inch module, HS13L03W2C01 (C7465997), LCSC's 1-piece price on the snapshot's day).
+
+**Full options, a board (USD)**:
+
+| | usb: 5 | usb: 10 | battery: 5 | battery: 10 |
+|---|---|---|---|---|
+| JLC board only | 13.22 | 9.35 | 15.21 | 10.67 |
+| + the five jacks (3 PJ-307C, 2 PJ-320A) and the FPC antenna (battery: + 2 PH2.0 and the toggle): the minimum to use it | 14.06 | 10.09 | 16.93 | 12.13 |
+| + the DINs | 14.81 | 10.83 | 17.67 | 12.88 |
+| + the DINs + the screen (header, module) | 19.70 | 15.72 | 22.56 | 17.77 |
+
+(The battery order's cells are not included: the user's own.)
+
+**10 boards: 5 full + 5 MIDI-only (USD)**:
+
+| | JLC | bought with the order (the user solders) | total | a board |
+|---|---|---|---|---|
+| **one battery order of 10**, 5 of them finished by hand as MIDI-only (no cells, no toggle: R62's pads bridged, no CV jacks; their charger, cell parts and CLK / RST drivers fitted but unused) | 106.73 | 11.19 | **117.93** | 11.79 |
+| **two orders**: usb x 5 (MIDI-only) + battery x 5 (full) | 142.14 | 11.19 | **153.33** | 15.33 |
+
+One order saves 35.41 USD (one set of setup / stencil / Extended fees instead of two). The MIDI-only boards from the battery order run from USB through the power path and the HT7833 (no cell needed); R62 is a DNP 0402 land in that order: a blob or a 0 ohm 0402 bridges it. Shipping: one parcel either way (not counted).
+
+### Assumptions and everything unverified (for the review)
+
+- **Nothing is ordered, built or measured.** Every number is a calculation, a simulation with generic models, or a
+  datasheet figure.
+- PJ-307C: its pin functions (1 sleeve, 2 ring, 3 ring's switch, 5 tip, 4 tip's switch) are read from LCSC's drawing:
+  **check with a meter and a plug before soldering**. PJ-320A (CLK / RST): pads A = sleeve, D = tip (the chip board's
+  reading of the same part; check with a meter); its height under the board (5.0 mm) is the jank box's XKB part's.
+- The jacks' noses: PJ-307C 5 mm round, 3 mm long; PJ-320A 5 mm round, 2 mm long; centred 2.5 mm under the board.
+- GPIO1 / 2 / 4 / 16 / 17 / 33 .. 37 free and usable on the ESP32-S3FN8 (GPIO33 .. 37: the datasheet: GPIOs when the flash is not octal; the FN8 is quad), no pull at reset (its pin table); one UART TX on
+  two UARTs (TIMING.md), not tried on hardware.
+- The S3's GPIO drive: fitted to Table 5-4's typical IOH / IOL, not limits; its brown-out level: not looked up.
+- The CLK / RST drivers and the pump: the AO3401A modelled as a generic P-channel MOSFET (its threshold and
+  on-resistance only); the 2N7002 from LTspice's library entry (copied by hand); the B5819W as the common 1N5819 card;
+  the BAV99 as a 1N4148-class diode. The pump pin's edge currents (52 .. 78 mA, ns) against an S3 pad: no limit in the
+  datasheet, unverified.
+- **KNOWN RISK: the cell margin.** From a 3.4 V cell into 10 k the outputs reach 5.18 V, only 0.18 V over the 5.0 V
+  asked, on generic models (into 100 k, the usual Eurorack input, 0.78 V over). Fix paths with an iron: **R83 has no twin**
+  (asked; no room within 6 mm: the chip's decoupling, RT73, the diodes and C84 box it in): swap R83 (0402) for 10 ohm
+  or 0 ohm by hand (more rail: ~+0.2 V / +0.3 V from a cell, sim/cv.py with CV_RS=10 / 0; larger edge spikes); a 0 ohm on one of
+  each output's two 2 k (the series resistance 2 k // 0 = 0: the full rail on the jack, no fault protection: only if
+  the loads need it); a stronger gate pull-up on RT73 / RT79 does NOT raise the level (it speeds the turn-off and
+  costs pump current).
+- The power toggle: the MTS-102's two pins wired to J11 decide which lever position is ON (the lid says lever up =
+  ON: wire it so, check with a meter); its rating (2 A 250 VAC / 5 A 120 VAC) has no DC figure; the ~11 A microsecond
+  inrush is the capacitors' (no surge rating in its drawing). The detour's 0.1 ohm / 50 nH each way: an estimate.
+- TS-1187A travel 0.2 +- 0.1 mm (its drawing) / 0.25 mm (its specification); the D-pad's tilt check uses these.
+- The FPC antenna's size (~40 x 10 mm) and the screen module's outline (27.3 x 27.8) are typical, not measured.
+- The cells' resistance (0.15 ohm), the USB cable's (0.25 ohm), the chip's Wi-Fi peak (340 mA): assumed.
+- The XB5353A's internals in a reversed-cell case: modelled as a body diode (the worst case).
+- The screen module's price (~2 USD, marketplace): assumed; not stocked at LCSC / JLC.
+- JLC's fees: as in `fab/cost.md` (quotes from 2026-11-09 / 11-10, a help page read 2026-11-14); the parts' prices:
+  `fab/parts-snapshot.json`, read 2026-11-14.
+- HT7833: no datasheet available from JLC this session (its 8 V maximum is from LCSC's listing).
 
 ## mini 2.2, stage 1f (the user's: own resistors per MIDI connector, jacks under the board, no RST, a cross of buttons)
 

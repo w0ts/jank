@@ -1,32 +1,55 @@
 # jank mini case
 
-## mini 2.2, stage 1f: the plan for stage 2 (not built yet)
+## mini 2.2, stage 2 (2026-11-14, 72 x 72 board): built in OpenSCAD and checked; not printed, not fitted
 
-The STLs and renders below are stage 2's draft on the **older** placement (RST, the 2 x 2 buttons, the jacks on top).
-`mini_case.scad` has lost RST's pinhole and tube (and `place_args.py` its `rst`) so it still builds; everything else is
-redone in stage 2 against stage 1f's board:
+`mini_case.scad`, built by `make_stl.sh` from the routed board (`place_args.py` reads every position from
+`../mini2.kicad_pcb`: the buttons, the LEDs, the jacks, the toggle's pads, the board's size). The case grew with the
+board (72 x 72, outside 75.6 x 75.6): nothing in it is fixed to the old size.
 
-- **The jacks** (J2, J3, J7) are under the board now: their three slots move from the lid's skirt to the base, beside
-  the DIN slots (MIDI OUT at the side edges' top corners, LINE IN on the top edge under the USB-C). The lid's only
-  opening in a wall is the USB-C's.
-- **Buttons: U-tongues in the roof, no caps** (the user's). Each button is a tongue cut free on three sides by a
-  0.8 mm U slot, its root joined to the roof; a stalk under its free end stops 0.15 mm over the switch's plunger. The
-  four tongues make a pinwheel round the cross (`../case/renders/sketch-2.2.png`, panel 1): UP's runs left, NO's down,
-  DOWN's right, YES's up, so no two slots meet and all four stay inside the walls (DOWN's slot ends 0.4 mm from the
-  bottom wall's inside, YES's root at y 40.7, UP's root at x 48, right of the screen module's outline) and clear of the
-  antenna's seat (x 3 .. 45).
-- **The tongue:** 5 mm wide, **7.5 mm from the root to the nub**, the free end 1.5 mm past it; the roof (1.4 mm)
-  thinned to **0.8 mm** from the inside over the tongue. The stalk is long (the roof is 11 mm over the board for the
-  upright antenna): ~10 mm (11 mm roof + 0.6 thinned - 1.5 switch - 0.15), 2.5 mm across, a 3 mm flat foot (the tongue's end turns ~5 degrees at full travel, so the
-  foot slides ~0.9 mm on the plunger: an estimate).
-- **Does it flex enough? (beam estimate, not printed):** the free end moves 0.15 mm (the gap) + 0.3 mm (the switch's
-  travel, the brief's figure; JLC lists the TS-1187A at 1.6 N, no travel) = 0.45 mm. A cantilever's surface strain is
-  1.5 x t x deflection / L^2 = 1.5 x 0.8 x 0.45 / 7.5^2 = **0.96 %**. **PETG** (E ~2 GPa: ~19 MPa, far under its ~45
-  MPa): fine; the spring adds ~0.45 N (k = 3EI/L^3 ~3 N/mm) to the switch's 1.6 N, ~2.1 N to click. **PLA** (E ~3.5
-  GPa: ~34 MPa, near its printed strength, brittle): likely to crack or take a set over many presses. **Print the lid
-  in PETG**; PLA would need ~9.5 mm tongues (they no longer fit round the cross). The lid prints roof down, so the
-  tongue's extrusion lines run along it (the strong way). Test one tongue first.
-- **No RST:** no pinhole. Recovery is in `../README.md` "Restarting and recovering without RST".
+| STL | What | Print |
+|---|---|---|
+| `stl/mini_base.stl` | the base without the DINs: the cells' room under the board, the five jacks' U-slots, the posts under the cross | floor down |
+| `stl/mini_base_din.stl` | the same with the DINs' slots | floor down |
+| `stl/mini_lid_led.stl` | the LED lid: the LED window (over LED1 / LED2 at the left end of the board's band), the D-pad's cross hole, the toggle's hole, "ON ^ / OFF v" | roof down, **PETG** |
+| `stl/mini_lid_s130.stl`, `_s154` | one lid per screen on J10 (1.3", 1.54"; the 0.96" is out: unreadable): the window over that module's active area and its bezel pocket (`SCREENS` in the scad: the makers' drawings), the D-pad's hole, the toggle's hole | roof down, **PETG** |
+| `stl/mini_lid_s242.stl` | the 2.42" lid: a 57.5 x 29.5 window, four 5 mm posts on the module's 68 x 39 holes (2.5 mm pilot holes: M3 self-tapping screws from below, UNVERIFIED), the module hung 0.5 mm under the roof | roof down, **PETG** |
+| `stl/mini_dpad_cap.stl` | **the D-pad**: one cross rocker | face down, **PETG**, no supports |
+| `stl/mini_led_pipe.stl` | the LED window's light pipe (variant 1 only) | head down |
+
+- **The D-pad** (the user's, instead of the U-tongues): one PETG cross (arms 5.0 mm wide, tips 8.5 mm from the middle)
+  in a cross-shaped hole in the roof, 0.6 mm proud. A centre column (2.0 mm, a 1.0 mm round tip) rests on the board
+  in the **3 mm pivot circle** (no part, no via, a silk ring: `make_board.py` PIVOT_R, `check_board.py`). A boss under
+  each arm 6.5 mm out, **0.15 mm over its switch's actuator** at rest (`check_dpad_near`: within 0.2; `check_dpad`: not
+  touching at 0.1). A flange 1.2 mm past the arms' sides, 1.0 mm under the roof, its outer edge chamfered 45 degrees
+  so it prints face down without supports; the tips have none (the walls). **The hole's gaps are 0.9 mm** (sides and
+  tips), not the 0.3 mm asked: a full press tilts the cap 3.5 degrees about the pivot, and its top, 13 mm over the
+  board, moves 0.79 mm sideways (`check_dpad.py`): a 0.3 mm gap would jam it. **The tilt check** (`check_dpad.py`): a
+  full press (0.15 gap + 0.25 travel) tilts 3.50 degrees; the far flange rises 0.50 mm (1.0 under the roof: no jam);
+  a press near the tip and near the middle both bottom the pressed switch (the middle one needs 2.2 x the force);
+  pressed on the arm's centre line a neighbour drops 0.003 mm: **UP does not press NO or YES**. Off the centre line
+  by 1.0 mm or more near the middle (1.5 at 3 mm, 2.0 at 5 mm) a neighbour can click too ("BOTH" in its table).
+- **The power toggle** (the user's: a panel MTS-102, CAX-MTS102-YB-10.5JL): through a **6.3 mm round hole** in the
+  lid's **left** wall (72 x 72: under the screen band, the right wall's design mirrored; `pwr_left`) (its drawing: a 6.0 mm panel hole, +0.3 for the print), its axis 5 mm below the board's J11 pads
+  and 7 mm over the board's underside; a flat seat round it for the nut (M6 x 0.75, ~9 mm across flats ASSUMED); the
+  lever outside. `check_pwr`: its body inside clears the board's parts and the D-pad by 0.3 mm; `check_pwr_lid`: it
+  passes the lid only through its hole. Two wires from J11 (VSYS, VREG) to its pins (README "Power switch").
+  "ON ^ / OFF v" engraved in the roof beside it (lever up = ON: wire it so).
+- **The jacks** under the board: the three PJ-307C (MIDI OUT 1, MIDI OUT 2 out of the side walls, LINE IN out of the
+  top wall) and **the two PJ-320A (CLK, RST) out of the top wall** between the USB-C and J3: each nose in a U-slot in
+  the base's wall (6 mm, round at the bottom, open to the top: the board drops in); the lid's skirt notched over each.
+- **The cells:** the band is the board's last 17 mm (y 55 .. 72 now: `cell_y0 = H - 17`), the divider rib between
+  the two slots carries the board under the cross; the bar under UP moved with the band.
+- **The lid's feet:** the right-hand two moved to the bottom right corner (board (70.4, 67.6) and (67.0, 71.0)): the 2.42"
+  covers y 1 .. 44 at full width.
+- **Renders:** `closed_led.png`, `closed_s130.png` .. `closed_s242.png` (+ `closed_s242_din.png`), `open_full.png` (the
+  2.42" lid), `section_button.png` (the D-pad through its pivot), and `screen-sizes-closed.png` (`screen_sizes.py`: the
+  three sizes from above with the emulator's HOME frame in each window, `home_frame.txt`).
+- The antenna seat, the base's pads, the DIN version: as before.
+
+Checks (`make_stl.sh`, both bases x every lid): **not re-run on the final routed board** (paused 2026-11-14 for the
+machine's load and the user's priority change); the STLs and renders here are from the last run before the routing
+fixes. The fixes moved only SMD parts, twins and tracks, none of the parts the case holds (`place_args.py` reads the
+jacks, DINs, toggle pads, sockets, buttons and header), but run `sh case/make_stl.sh` before printing.
 
 ## mini 2.2 (stage 2, 2026-11-14): not printed, not fitted
 

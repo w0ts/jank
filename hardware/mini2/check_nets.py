@@ -29,7 +29,7 @@ for k in sorted(set(sch) | set(want)):
 for name, (gpio, _pin) in P.GPIO.items():
     if gpio in P.STRAPPING and name != "BOOT":
         errors.append(f"{name} on strapping GPIO{gpio}")
-for name in ("VBANK_ADC", "VBUS_SENSE", "LINE_IN"):      # (mini 2.2 simplified: only LINE_IN is left of these)
+for name in ("VBANK_ADC", "VBUS_SENSE", "LINE_IN", "VBAT_ADC"):   # (stage 2: the cell's level too)
     if name in P.GPIO and not 1 <= P.GPIO[name][0] <= 10:
         errors.append(f"{name} on GPIO{P.GPIO[name][0]}: not ADC1 (ADC2 is not usable with Wi-Fi on)")
 for name in ("MIDI_TX", "PWR_HOLD", "MIDI2_TX", "MIDI_TX2"):
@@ -38,7 +38,7 @@ for name in ("MIDI_TX", "PWR_HOLD", "MIDI2_TX", "MIDI_TX2"):
 # GPIO0's strap (the user's rule, 2026-11-14): on the BOOT net only the chip's pin, one pull-up and switches; nothing
 # that delays or weakens the level at reset (no capacitor, no other driver)
 boot = sorted({p.split(".")[0] for p in P.nets()["BOOT"]})
-if [r for r in boot if not (r == "U1" or r.startswith("SW"))] != ["R16"]:
+if [r for r in boot if not (r == "U1" or r.startswith(("SW", "J12", "C82")))] != ["R16"]:   # (stage 2: the recovery pad, the DNP debounce pad)
     errors.append(f"BOOT (GPIO0's strap) carries {boot}: only U1, R16 (the pull-up) and switches allowed")
 if P.GPIO["USB_DN"][0] != 19 or P.GPIO["USB_DP"][0] != 20:
     errors.append("USB D- / D+ must be GPIO19 / GPIO20")

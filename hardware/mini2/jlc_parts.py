@@ -35,7 +35,8 @@ def lookup(code):
 
 
 def main():
-    codes = sorted({p[4] for p in P.PARTS if p[4]})
+    import cost                                   # (stage 2: the parts the user solders, bought with the order, too)
+    codes = sorted({p[4] for p in P.PARTS if p[4]} | set(cost.USER_PARTS) | set(cost.SCREEN_PARTS))
     snap = {"date": datetime.date.today().isoformat(), "source": URL, "parts": {c: lookup(c) for c in codes}}
     json.dump(snap, open(os.path.join(HERE, "fab", "parts-snapshot.json"), "w"), indent=1)
     for c in codes:

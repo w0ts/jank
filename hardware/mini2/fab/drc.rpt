@@ -1,26 +1,113 @@
 ** Drc report for mini2.kicad_pcb **
-** Created on 2026-11-13T19:58:36 **
+** Created on 2026-11-14T19:23:01 **
 ** Report includes: Errors, Warnings, Exclusions **
 
-** Found 6 DRC violations **
-[track_dangling]: Track has unconnected end
+** Found 35 DRC violations **
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
     Local override; warning
-    @(137.8000 mm, 163.6600 mm): Track [ANT_END] on F.Cu, length 1.6000 mm
+    @(119.9500 mm, 133.1500 mm): Footprint RT37
+[lib_footprint_mismatch]: Footprint 'C0805' does not match copy in library 'chip'
+    Local override; warning
+    @(124.4000 mm, 152.8000 mm): Footprint C27
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(119.9500 mm, 125.1500 mm): Footprint RT31
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(139.6000 mm, 124.2500 mm): Footprint RT32
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(127.0000 mm, 106.6500 mm): Footprint RT39
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(163.4500 mm, 134.1000 mm): Footprint RT57
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(153.5000 mm, 115.2500 mm): Footprint RT60
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(119.9500 mm, 129.1500 mm): Footprint RT36
+[lib_footprint_mismatch]: Footprint 'C_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(123.0000 mm, 170.0500 mm): Footprint CT3
 [lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
     Local override; warning
-    @(138.8000 mm, 147.1000 mm): Footprint C24
+    @(134.4000 mm, 132.5000 mm): Footprint C67
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(112.2000 mm, 115.9000 mm): Footprint RT15
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(110.0000 mm, 140.7500 mm): Footprint RT40
+[lib_footprint_mismatch]: Footprint 'C0603' does not match copy in library 'chip'
+    Local override; warning
+    @(139.5000 mm, 139.6000 mm): Footprint C80
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(116.0000 mm, 140.7500 mm): Footprint RT41
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(147.7000 mm, 124.4500 mm): Footprint RT11
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(147.7000 mm, 120.4500 mm): Footprint RT10
 [lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
     Local override; warning
-    @(139.1500 mm, 157.1000 mm): Footprint C26
-[lib_footprint_mismatch]: Footprint 'R0402' does not match copy in library 'chip'
+    @(141.8000 mm, 161.1000 mm): Footprint C24
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
     Local override; warning
-    @(137.8000 mm, 156.4000 mm): Footprint R18
+    @(160.0000 mm, 142.6000 mm): Footprint RT73
+[lib_footprint_mismatch]: Footprint 'C0603' does not match copy in library 'chip'
+    Local override; warning
+    @(166.4000 mm, 170.4000 mm): Footprint C81
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(107.5000 mm, 162.4500 mm): Footprint RT51
+[lib_footprint_mismatch]: Footprint 'C0603' does not match copy in library 'chip'
+    Local override; warning
+    @(152.0000 mm, 169.5000 mm): Footprint C83
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(153.5000 mm, 119.2500 mm): Footprint RT61
 [lib_footprint_mismatch]: Footprint 'C0402' does not match copy in library 'chip'
     Local override; warning
-    @(138.8000 mm, 154.8000 mm): Footprint C25
+    @(142.1000 mm, 164.6000 mm): Footprint C26
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(119.9500 mm, 121.1500 mm): Footprint RT30
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(168.9000 mm, 156.5000 mm): Footprint RT79
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(139.6000 mm, 128.2500 mm): Footprint RT33
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(108.5500 mm, 134.1000 mm): Footprint RT55
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(119.9500 mm, 137.1500 mm): Footprint RT38
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(147.7000 mm, 128.5500 mm): Footprint RT34
 [lib_footprint_mismatch]: Footprint 'QFN-56_L7.0-W7.0-P0.40-TL-EP4.0' does not match copy in library 'chip'
     Local override; warning
-    @(129.5000 mm, 142.9000 mm): Footprint U1
+    @(132.5000 mm, 156.9000 mm): Footprint U1
+[lib_footprint_mismatch]: Footprint 'R_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(158.6000 mm, 116.7000 mm): Footprint RT20
+[lib_footprint_mismatch]: Footprint 'C0603' does not match copy in library 'chip'
+    Local override; warning
+    @(155.0000 mm, 165.9000 mm): Footprint C82
+[lib_footprint_mismatch]: Footprint 'C_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(134.3000 mm, 169.0000 mm): Footprint CT9
+[lib_footprint_mismatch]: Footprint 'C_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(137.6000 mm, 150.6000 mm): Footprint CT8
+[lib_footprint_mismatch]: Footprint 'C_TWIN_HAND' does not match copy in library 'chip'
+    Local override; warning
+    @(130.4500 mm, 164.2000 mm): Footprint CT10
 
 ** Found 0 unconnected pads **
 

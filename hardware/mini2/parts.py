@@ -30,6 +30,10 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
     "hdr4": "HDR-TH_4P-P2.54-V-M", "sj3": "SJ3_SMD",   # (stage 1e: the screen's header, DNP; the VCC / GND jumpers)
     "led0805": "LED0805-R-RD", "sot25bl": "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL", "ph2": "CONN-TH_B2B-PH-K-S",
     "sot223": "SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR",   # (stage 1d: the AMS1117, the "usb" order's LDO)
+    "jack5": "AUDIO-TH_PJ307C",   # (stage 2: the switched TRS jack, all three jacks)
+    "pads2": "PADS2_HAND",        # (stage 2: the power switch's two wire pads, make_footprints.py)
+    "pads6": "PADS6_SMD", "pads4": "PADS4_SMD",         # (stage 2: the recovery pads, make_footprints.py)
+    "twin": "R_TWIN_HAND", "twin_c": "C_TWIN_HAND",        # (stage 2: the twins' hand-solder lands, make_footprints.py)
     "sod123": "SOD-123_L2.7-W1.6-LS3.7-RD-1",   # (mini 2.2: the green LED, the charger, the cells' sockets, D3)
 }
 
@@ -40,24 +44,43 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
 #   48 MTMS (42), 49 U0TXD (43), 50 U0RXD (44), 51 GPIO45, 52 GPIO46, 53 XTAL_N, 54 XTAL_P, 55/56 VDDA, 57 GND (the pad)
 GPIO = {   # firmware's board.h (README "Pin map"): function -> (GPIO, chip pin)
     "MIDI_TX": (21, "27"),      # UART TX, MIDI OUT 1: its jack's and its DIN's tips, each through its own 10 ohm; RTC_GPIO21
-    "MIDI_TX2": (17, "23"),     # stage 1f: MIDI OUT 2 (its jack's and its DIN's tips, each through its own 10 ohm): the
+    "MIDI_TX2": (17, "23"),
+    "U0TXD": (43, "49"), "U0RXD": (44, "50"),   # stage 2: to J12, the recovery pads (a USB-UART adapter)
+    "LIN_DET": (16, "22"),      # stage 2 (the user's "something plugged in"): LINE IN's ring switch (J7 pin 3, closed to
+                                #  the ring with no plug): R38 1 M to +3V3, the ring's R37 100 k to GND: no plug = ~0.3 V
+                                #  (low), a plug lifts the ring spring off it = high. Not a strapping pin     # stage 1f: MIDI OUT 2 (its jack's and its DIN's tips, each through its own 10 ohm): the
                                 #  same UART TX routed to a second pin by the GPIO matrix (TRM: any number of pins may
                                 #  select one peripheral output; not yet tried on hw), so each pin sinks two loops, not four
     "BOOT": (0, "5"),           # BOOT / user button SW1 to GND (strapping: held low at reset = download mode); R16 its
                                 #  pull-up, nothing else on the net (no capacitor: the strap is read at reset)
-    "LED_R": (38, "43"),        # the red LED, active high, through 1 k (GPIO38: mini 2's LED pin)
-    "LED_G": (39, "44"),        # the green LED, active high, through 1 k (red + green behind one window: both = yellow)
+    "LED_R": (33, "38"),        # the red LED, active high, through 1 k (72 x 72: GPIO33, the left side's upper free pin,
+    "LED_G": (34, "39"),        #  up to the LEDs at the band's left end; GPIO38 / 39 (pins 43 / 44) crowded the chip's
+                                #  bottom-left corner: route 9 left LED_R open there) red + green behind one window
     "LINE_IN": (9, "14"),       # mini 2: ADC1_CH8, the LINE IN front end's output (README "LINE IN")
-    "VBAT_ADC": (1, "6"),       # mini 2.2: ADC1_CH0, the cell through 1 M / 1 M (half its voltage); mini 2's VBANK pin
+    "VBAT_ADC": (4, "9"),       # mini 2.2: the cell through 1 M / 1 M (half its voltage); stage 2: ADC1_CH3 on GPIO4, the
+                                #  innermost fan-out lane (pin 9), beside LINE_IN's way up: a quiet DC net there
     # stage 2 (the routing): the buttons with the chip's internal pull-ups, the screen's I2C (R60 / R61). The study's map
     #  (GPIO10..14, the chip's top side, pins 15..19) left 9 connections open: that side already carries USB, MIDI_TX,
     #  +3V3 past R24 / R25 / C20 / R35 / C36. YES / DOWN on the right side's drawn lanes (mini 2's VBUS_SENSE / PWR_HOLD
     #  lanes, pins 7 / 9); UP, SCL, SDA on pins 15 / 16 / 17 in a channel opened over them (C20 upright over pin 20, R35
     #  over C36: make_board.py): UP to the nearest button, I2C straight north to the header (pins 45 / 47 crowded the
     #  crystal). None is a strapping pin
-    "BTN_YES": (2, "7"), "BTN_DOWN": (4, "9"), "BTN_UP": (10, "15"), "SCL": (11, "16"), "SDA": (12, "17"),   # (UP on pin 15: the nearest button; YES, the far corner, on a lane)
+    "BTN_UP": (10, "15"), "SCL": (11, "16"), "SDA": (12, "17"),   # (UP on pin 15: the nearest button)
+    # stage 2: YES / DOWN off the right side's lanes (the pump and CLOCK took them) to the free left side, GPIO34 / GPIO35
+    #  (pins 39 / 40; usable as GPIOs: the datasheet's GPIO33..37 note, the FN8's flash is quad SPI, not octal); round
+    #  the chip's foot and under the crystal to the cross (the top side cannot take them: a routing run with them there
+    #  left UP, SDA, YES, DOWN and LIN_DET open at the top side's pins)
+    "BTN_YES": (36, "41"), "BTN_DOWN": (37, "42"),   # (72 x 72: the left side's lower pins, round the foot; the LEDs above)
     "USB_DN": (19, "25"),
     "USB_DP": (20, "26"),
+    # stage 2 (the user's Eurorack CLOCK / RESET outputs, 5 V+ from a charge pump). The right side's pins 10 .. 13
+    #  (GPIO5 .. 8) cannot be routed: the fan-out lanes of pins 4 .. 9 rise past them (make_board.py FANOUT); so RESET on
+    #  GPIO1 (pin 6, 3.2 mm from LINE_IN's pin 14) and CLOCK on GPIO2 (pin 7, 2.8 mm) take the lanes of pins 6 / 7 toward
+    #  their drivers, the cell's level (quiet) the innermost one beside LINE_IN's way up; the charge pump on GPIO35 (pin
+    #  40, the left side) with its parts at the board's lower left, far from LINE IN (from the left side, RESET had
+    #  routed 6.7 mm beside LINE_IN: 72 x 72 run 1). None has a pull at reset (the datasheet's pin table, p. 16): the
+    #  gate pull-downs hold the outputs at 0 V. Not strapping, flash or USB pins
+    "PUMP_IO": (35, "40"), "CLK_IO": (2, "7"), "RST_IO": (1, "6"),
 }
 STRAPPING = {0, 3, 45, 46}
 CHIP_PIN = {"1": "LNA_IN", "2": "VDD3P3", "3": "VDD3P3", "4": "CHIP_PU", "20": "+3V3", "29": "VDD_SPI", "46": "+3V3",
@@ -71,7 +94,8 @@ DNP = {"C24",                        # (pads only: the chip match's second shunt
        "J2", "J3", "J7",                      # (stage 1f: the three jacks, bottom side, soldered by the user as the DINs)
        "RT40", "RT41",                        # (mini 2.2: the LED resistors' twins, README "mini 2.2")
        "J8", "J9",                            # (mini 2.2: the cells' PH2.0 sockets: the user fits them from the bottom)
-       "J10", "JP1", "JP2"}                   # (stage 1e: the screen's header and its VCC / GND jumpers: the user)
+       "J10", "JP1", "JP2",                   # (stage 1e: the screen's header and its VCC / GND jumpers: the user)
+       "J11"}                                 # (stage 2: the power switch's pads: the user wires the switch, battery order)
 # JLC's footprint for the DIN-504B-M10 numbers its pads 1..5 along the two rows, not as the DIN pins. Its frame and
 # hardware/pcb's own table for the part (HY_PINS, the CUI SDS-50J pattern; the same in hardware/pcb/lib) agree: the
 # shell pins at the front, the 3-pin row 2.5 mm before the 2-pin row, x the same way. So pad 1 (x -7.5) = DIN 3,
@@ -81,7 +105,7 @@ DNP = {"C24",                        # (pads only: the chip match's second shunt
 PARTS = [
     # ---- USB-C: data + VBUS; 5.1 k on each CC (a sink); VBUS straight to the LDO (mini 2.2 simplified: USB power only)
     ("J1", "usbc", "USB-C 16P", "usbc", "C2765186",
-     {"A1B12": "GND", "B1A12": "GND", "13": "GND", "14": "GND", "A4B9": "VBUS", "B4A9": "VBUS", "A5": "CC1", "B5": "CC2",
+     {"A1B12": "GND", "B1A12": "GND", "13": "GND", "14": "GND", "A4B9": "VUSB", "B4A9": "VUSB", "A5": "CC1", "B5": "CC2",
       "A6": "UDP", "B6": "UDP", "A7": "UDN", "B7": "UDN"}),
     # (22 ohm in series on D+ / D- by the chip: the edges and ringing on the 22 mm tracks, Espressif's checklist)
     # (ESD on D+ / D- right at the USB-C, before the 22 ohm: the user's ruling 2026-11-12; VBUS only its clamp reference)
@@ -89,7 +113,12 @@ PARTS = [
     #  1 I/O1, 2 GND, 3 I/O2, 4 I/O3, 5 REF, 6 I/O4: D+ on I/O1 + I/O4, D- on I/O2 + I/O3, REF on VBUS, the USBLC6's own
     #  pin functions (1 / 6 D+, 3 / 4 D-, 2 GND, 5 VBUS). JLC's footprint is the same SOT-23-6 pattern turned 90: placed at
     #  270 its pads sit where the USBLC6's did)
-    ("U5", "esd", "SRV05-4-P-T7", "sot236br", "C85364", {"1": "UDP", "6": "UDP", "3": "UDN", "4": "UDN", "2": "GND", "5": "VBUS"}),
+    ("U5", "esd", "SRV05-4-P-T7", "sot236br", "C85364", {"1": "UDP", "6": "UDP", "3": "UDN", "4": "UDN", "2": "GND", "5": "VUSB"}),
+    #      stage 2 (the user's USB noise): R63, 0 ohm 0603 in VBUS after the USB-C and its ESD, before the charger and the
+    #      power path: its land takes a ferrite bead later (BLM18PG121SN1D, C14709, Basic: 120 ohm at 100 MHz, 2 A, 50
+    #      mohm: 25 mV at 500 mA); C27 a DNP 0805 after it to GND
+    ("R63", "R", "0", "r0603", "C21189", {"1": "VUSB", "2": "VBUS"}),
+    ("C27", "C", "DNP", "c0805", "", {"1": "VBUS", "2": "GND"}),
     ("R24", "R", "22", "r0402", "C25092", {"1": "UDP", "2": "USB_DP"}),
     ("R25", "R", "22", "r0402", "C25092", {"1": "UDN", "2": "USB_DN"}),
     ("R3", "R", "5.1k", "r0603", "C23186", {"1": "CC1", "2": "GND"}),
@@ -99,15 +128,27 @@ PARTS = [
     #      U2 AMS1117-3.3 (Basic, "usb": 1 A, dropout 1.1 V) or U10 HT7833 ("battery": 500 mA, 4 uA, dropout 360 mV at
     #      500 mA, runs from the cell; CE tied to VIN). C3 / C5 / C6 serve both
     ("D3", "D", "B5819W", "sod123", "C8598", {"1": "VSYS", "2": "VBUS"}),
-    ("U2", "ldo223", "AMS1117-3.3", "sot223", "C6186", {"3": "VSYS", "2": "+3V3", "4": "+3V3", "1": "GND"}),
-    ("U10", "ldo5", "HT7833", "sot235", "C164106", {"1": "VSYS", "3": "VSYS", "2": "GND", "5": "+3V3"}),
-    ("C3", "C", "10u", "c0603", "C19702", {"1": "VSYS", "2": "GND"}),
+    #      stage 2 (the user's: "off = off, still charges"): the power switch cuts VREG, the regulators' input (and U7's,
+    #      LINE IN's LDO) from VSYS, after the charger and the power path: off, the board is dead even on USB while the
+    #      cell still charges (U8 from VBUS). The switch (the user's: a toggle, not a slide): a panel-mount MTS-102 (CAX
+    #      CAX-MTS102-YB-10.5JL, C55159907, M6 x 0.75 bushing, 2 A 250 VAC / 5 A 120 VAC: its drawing) in the lid's right
+    #      wall, two short wires (its common S1 and one throw) to J11's two hand-solder pads (2 x 3 mm, 1.0 mm holes,
+    #      4 mm apart): pad 1 VSYS, pad 2 VREG. R62, 0 ohm, across them, fitted in the usb order only (always on)
+    ("J11", "pads2", "POWER SW", "pads2", "", {"1": "VSYS", "2": "VREG"}),
+    ("R62", "R", "0", "r0402", "C17168", {"1": "VSYS", "2": "VREG"}),
+    ("U2", "ldo223", "AMS1117-3.3", "sot223", "C6186", {"3": "VREG", "2": "+3V3", "4": "+3V3", "1": "GND"}),
+    ("U10", "ldo5", "HT7833", "sot235", "C164106", {"1": "VREG", "3": "VREG", "2": "GND", "5": "+3V3"}),
+    ("C3", "C", "10u", "c0603", "C19702", {"1": "VREG", "2": "GND"}),
     ("C5", "C", "22u", "c0603", "C59461", {"1": "+3V3", "2": "GND"}),
     ("C6", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
     #      the power path ("battery"): Q1 AO3401A, drain on the cell (BAT_P), source on VSYS, gate on VBUS (R50 100 k
     #      down): no USB = gate low, on (its body diode conducts the same way); USB = gate 5 V, VSYS ~4.7 V over the cell: off
     ("Q1", "pfet", "AO3401A", "tvs2", "C15127", {"1": "VBUS", "2": "VSYS", "3": "BAT_P"}),
-    ("R50", "R", "100k", "r0402", "C25741", {"1": "VBUS", "2": "GND"}),
+    ("R50", "R", "10k", "r0402", "C25744", {"1": "VBUS", "2": "GND"}),   # (stage 2: 10 k, was 100 k: sim/power.py)
+    #      stage 2 (sim/power.py): USB pulled with a cell fitted, VBUS stays near VSYS (D3) and Q1 stays off until VBUS
+    #      drains: VSYS hung on Q1's body diode (0.7 V) and +3V3 fell to 2.62 V (a 3.7 V cell, a Wi-Fi burst). D9, a
+    #      second B5819W beside the body diode (0.3 V), and R50 10 k (VBUS drained 10 x faster) give 2.98 V, 21 ms
+    ("D9", "D", "B5819W", "sod123", "C8598", {"1": "VSYS", "2": "BAT_P"}),
     #      the charger ("battery"): U8 TP4054-42 (4.2 V) from VBUS, R51 5.1 k on PROG = ~196 mA (1000 V / R_PROG), CHRG
     #      left open; 10 uF at VCC and at BAT
     ("U8", "chg", "TP4054-42", "sot25bl", "C32574", {"4": "VBUS", "3": "BAT_P", "2": "GND", "5": "PROG"}),
@@ -202,37 +243,55 @@ PARTS = [
     #      the twins (the user, 2026-11-14; as hardware/sd-board's in the optimist repo): a bare pad pair in parallel with
     #      each LED resistor, not fitted (no part, no paste, out of the BOM and the CPL: no cost): a second resistor
     #      soldered by hand there brightens that LED (1 k // 1 k = 500 ohm). 0603 pads: an 0402 or an 0603 fits
-    ("RT40", "R", "twin DNP", "r0603", "", {"1": "LED_R", "2": "LED_RA"}),
-    ("RT41", "R", "twin DNP", "r0603", "", {"1": "LED_G", "2": "LED_GA"}),
+    #      (RT40 / RT41: in TWINS below since stage 2)
     # ---- MIDI OUT 1 and MIDI OUT 2: one UART on two pins (GPIO21: OUT 1, GPIO17: OUT 2), every connector its own loop
     #      (stage 1d: each OUT its own; stage 1f, the user's: each of the four connectors its own source and sink, so a
     #      short or a mono plug on one stops only that one; two loops a pin, ~6.5 mA each at most: README "stage 1f")
     #      MIDI 1.0 at 3.3 V (CA-033): ring = source through 33 ohm (3 x 100 ohm 1206 in parallel: 33.3 ohm, all Basic;
     #      a mono plug's 0.33 W shared, 0.11 W each), tip = sink through 10 ohm from the UART
-    ("J2", "jack", "MIDI OUT", "jack", "C18185602", {"D": "MO_T", "C": "MO_R", "A": "GND"}),
+    ("J2", "jack5", "MIDI OUT", "jack5", "C16684", {"5": "MO_T", "2": "MO_R", "1": "GND"}),
     ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"4": "MD_R", "2": "MD_T", "3": "GND", "6": "GND", "7": "GND"}),   # (pad 4 = DIN 4, pad 2 = DIN 5)
     ("R14", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),   # (R14 // R26 // R48 = 33.3 ohm)
     ("R26", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),
     ("R48", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),
-    ("R15", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MO_T"}),
+    #      stage 2 (the coordinator's decision on the shorts, sim/midi_faults.md): every sink 68 ohm 0805 (a tip short
+    #      ~41 mA from the GPIO, 0.113 W in a 0.125 W part), the DINs' source two 100 ohm 1206 in parallel (50 ohm: a pin-4
+    #      short 0.12 W in each 0.25 W part; three do not fit between the DIN's pads)
+    ("R15", "R", "68", "r0805", "C17802", {"1": "MIDI_TX", "2": "MO_T"}),
     #      the DIN's own (stage 1f): one 33 ohm 0805 (Basic) for the source: a 5-pin cable never shorts DIN 4 (only a
     #      broken one would: 0.33 W in a 0.125 W part), so the jack's three 1206s are not needed here; 10 ohm sink
-    ("R54", "R", "33", "r0805", "C17634", {"1": "+3V3", "2": "MD_R"}),
-    ("R55", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MD_T"}),
+    ("R54", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MD_R"}),
+    ("R58", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MD_R"}),
+    ("R55", "R", "68", "r0805", "C17802", {"1": "MIDI_TX", "2": "MD_T"}),
     #      MIDI OUT 2: the same parts, its own nets (MO2_R / MO2_T, MD2_R / MD2_T), from MIDI_TX2 (GPIO17)
-    ("J3", "jack", "MIDI OUT 2", "jack", "C18185602", {"D": "MO2_T", "C": "MO2_R", "A": "GND"}),
+    ("J3", "jack5", "MIDI OUT 2", "jack5", "C16684", {"5": "MO2_T", "2": "MO2_R", "1": "GND"}),
     ("J6", "din", "MIDI OUT 2 DIN", "din", "C2939346", {"4": "MD2_R", "2": "MD2_T", "3": "GND", "6": "GND", "7": "GND"}),
     ("R21", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),   # (R21 // R27 // R49 = 33.3 ohm)
     ("R27", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),
     ("R49", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),
-    ("R20", "R", "10", "r0603", "C22859", {"1": "MIDI_TX2", "2": "MO2_T"}),
-    ("R56", "R", "33", "r0805", "C17634", {"1": "+3V3", "2": "MD2_R"}),
-    ("R57", "R", "10", "r0603", "C22859", {"1": "MIDI_TX2", "2": "MD2_T"}),
+    ("R20", "R", "68", "r0805", "C17802", {"1": "MIDI_TX2", "2": "MO2_T"}),
+    ("R56", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MD2_R"}),
+    ("R59", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MD2_R"}),
+    ("R57", "R", "68", "r0805", "C17802", {"1": "MIDI_TX2", "2": "MD2_T"}),
     # ---- mini 2: LINE IN (README "LINE IN"): a 3.5 mm stereo jack, tip (L) and ring (R) summed to mono by an inverting
     #      summer (each channel 20 k into the op-amp's virtual ground: >= 20 k input impedance, no crosstalk between the
     #      sources), gain 5.6 k / 20 k = 0.28 a channel, -3 dB at ~8.5 kHz (C32 and R35 / C36), AC coupled (7.8 Hz),
     #      biased at 1.47 V (the middle of ATTEN3's 0..2.9 V); powered from VBUS by its own LDO
-    ("J7", "jack", "LINE IN", "jack", "C18185602", {"D": "LIN_T", "C": "LIN_R", "A": "GND"}),
+    ("J7", "jack5", "LINE IN", "jack5", "C16684", {"5": "LIN_T", "2": "LIN_R", "1": "LIN_S", "3": "LIN_DET"}),
+    #      stage 2 (the user's ground loops): the sleeve (LIN_S) to GND through R39 22 ohm (a 0 ohm on its twin grounds it
+    #      solid), sensed by R65 10 k / R66 5.6 k (= R30 / 2 and R32: the summer's own ratio) into the bias's return
+    #      (LIN_GS: R34 and C33): a voltage between the sleeve and GND cancels at the output (sim/linein.py: 40 dB at 50 Hz,
+    #      25 dB at 1 kHz; with 2.2 nF on C67, a DNP pad across R66 matching C32: 46 dB at 1 kHz)
+    ("R39", "R", "22", "r0402", "C25092", {"1": "LIN_S", "2": "GND"}),
+    ("R65", "R", "10k", "r0402", "C25744", {"1": "LIN_S", "2": "LIN_GS"}),
+    ("R66", "R", "5.6k", "r0402", "C25908", {"1": "LIN_GS", "2": "GND"}),
+    ("C67", "C", "DNP", "c0402", "", {"1": "LIN_GS", "2": "GND"}),
+    #      stage 2 (the user's): a 100 k pull-down on tip and ring (an open input is defined and quiet, not floating;
+    #      100 k // the 20 k summer input moves a 1 k source's level by < 0.1 dB: sim/linein.py) and the plug detect
+    #      (LIN_DET above; the tip's switch, pin 4, left open)
+    ("R36", "R", "100k", "r0402", "C25741", {"1": "LIN_T", "2": "GND"}),
+    ("R37", "R", "100k", "r0402", "C25741", {"1": "LIN_R", "2": "GND"}),
+    ("R38", "R", "1M", "r0402", "C26083", {"1": "+3V3", "2": "LIN_DET"}),
     # (stage 1e: two SMAJ5.0CA, Hongjiacheng, a preferred part (no fee), one per line, instead of the PESD5V0S2BT (two
     #  lines in one SOT-23, Extended). Its datasheet ("SMAJ series", rev 2.2, 2023-10): bidirectional, VRWM 5 V, VBR
     #  6.4 .. 7.0 V, VC 9.2 V at 43.5 A, 400 W; no polarity (CA). Its leakage (up to 1.6 mA at 5 V) and capacitance (nF)
@@ -248,14 +307,52 @@ PARTS = [
     ("U6", "opamp", "LMV321IDBVR", "sot235", "C7972",
      {"1": "LIN_VB", "2": "GND", "3": "LIN_SUM", "4": "LIN_OUT", "5": "AVDD"}),   # (TI DBV: 1 IN+, 2 GND, 3 IN-, 4 OUT, 5 V+)
     ("R33", "R", "150k", "r0402", "C25755", {"1": "AVDD", "2": "LIN_VB"}),        # (the bias: 3.3 V x 120 / 270 = 1.47 V)
-    ("R34", "R", "120k", "r0402", "C25750", {"1": "LIN_VB", "2": "GND"}),
-    ("C33", "C", "1u", "c0402", "C52923", {"1": "LIN_VB", "2": "GND"}),
-    ("U7", "ldo", "XC6206P332MR", "det", "C5446", {"3": "VSYS", "2": "AVDD", "1": "GND"}),   # (Torex SOT-23: 1 VSS, 2 VOUT, 3 VIN; mini 2.2: on VSYS, so the LINE IN works on the cell too)
-    ("C34", "C", "1u", "c0402", "C52923", {"1": "VSYS", "2": "GND"}),
+    ("R34", "R", "120k", "r0402", "C25750", {"1": "LIN_VB", "2": "LIN_GS"}),
+    ("C33", "C", "220n", "c0402", "C16772", {"1": "LIN_VB", "2": "LIN_GS"}),   # (stage 2: 220 nF, its corner near C30's)
+    ("U7", "ldo", "XC6206P332MR", "det", "C5446", {"3": "VREG", "2": "AVDD", "1": "GND"}),   # (Torex SOT-23: 1 VSS, 2 VOUT, 3 VIN; mini 2.2: on VSYS, so the LINE IN works on the cell too; stage 2: after the power switch)
+    ("C34", "C", "1u", "c0402", "C52923", {"1": "VREG", "2": "GND"}),
     ("C35", "C", "1u", "c0402", "C52923", {"1": "AVDD", "2": "GND"}),
     ("R35", "R", "120", "r0402", "C25079", {"1": "LIN_OUT", "2": "LINE_IN"}),     # (the second pole, 13.3 kHz, with C36)
     ("C36", "C", "100n", "c0402", "C1525", {"1": "LINE_IN", "2": "GND"}),          # (at the pin: Espressif's 100 nF)
 ]
+
+# ---- stage 2: CLOCK / RESET outputs for Eurorack (the user's: "a real 5 V+ output or none", a charge pump). CV_RAIL:
+#      GPIO35 drives a 416.7 kHz square wave (LEDC) through R83 22 ohm into C84 1 uF; D12 / D13 (B5819W) VREG -> flying node
+#      -> CV_RAIL; C85 10 uF 25 V, R84 100 k bleed: VREG + 3.3 V less two Schottky drops, ~6 V from a 3.4 V cell, ~7 V on
+#      USB (sim/cv.py). Per output: the GPIO on a 2N7002's gate (100 k gate pull-down: 0 V out while the GPIO floats at
+#      boot and reset), its drain pulls an AO3401A's gate (10 k up to CV_RAIL, twinned: off when the gate sits at the
+#      rail, not at 3.3 V), the AO3401A's drain is the node N (10 k to GND: no switch-on blip), two 2 k 1206 in parallel
+#      (1 k, 0.5 W: -12 V into a high output puts 132 mW in each) to the jack's tip, a BAV99 clamping N to GND and
+#      CV_RAIL (a wrong +12 V lifts the rail to ~10.4 V: under the AO3401A's 12 V VGS, C85's 25 V). The outputs stay
+#      0 V until the firmware drives them; the firmware starts the pump first. Jacks: PJ-320A (no switch: none needed),
+#      bottom side at the top edge, user-soldered as the other jacks.
+PUMP = [
+    ("R83", "R", "22", "r0402", "C25092", {"1": "PUMP_IO", "2": "PUMP_D"}),
+    ("C84", "C", "1u", "c0402", "C52923", {"1": "PUMP_D", "2": "PUMP_X"}),
+    ("D12", "D", "B5819W", "sod123", "C8598", {"2": "VREG", "1": "PUMP_X"}),
+    ("D13", "D", "B5819W", "sod123", "C8598", {"2": "PUMP_X", "1": "CV_RAIL"}),
+    ("C85", "C", "10u 25V", "c0805", "C15850", {"1": "CV_RAIL", "2": "GND"}),
+    ("R84", "R", "100k", "r0402", "C25741", {"1": "CV_RAIL", "2": "GND"}),
+]
+
+
+def _cv(n, io, q1, q2, d, r):
+    return [
+        (f"R{r + 1}", "R", "100k", "r0402", "C25741", {"1": io, "2": "GND"}),
+        (q1, "nfet", "2N7002", "tvs2", "C8545", {"1": io, "2": "GND", "3": f"{n}_PG"}),
+        (f"R{r + 3}", "R", "10k", "r0402", "C25744", {"1": "CV_RAIL", "2": f"{n}_PG"}),
+        (q2, "pfet", "AO3401A", "tvs2", "C15127", {"1": f"{n}_PG", "2": "CV_RAIL", "3": f"{n}_N"}),
+        (f"R{r + 4}", "R", "10k", "r0402", "C25744", {"1": f"{n}_N", "2": "GND"}),
+        (d, "bav99", "BAV99", "tvs2", "C2500", {"1": "GND", "3": f"{n}_N", "2": "CV_RAIL"}),
+        (f"R{r + 5}", "R", "2k", "r1206", "C17944", {"1": f"{n}_N", "2": f"{n}_OUT"}),
+        (f"R{r + 6}", "R", "2k", "r1206", "C17944", {"1": f"{n}_N", "2": f"{n}_OUT"}),
+    ]
+
+
+PARTS += PUMP + _cv("CLK", "CLK_IO", "Q3", "Q4", "D10", 70) + _cv("RST", "RST_IO", "Q5", "Q6", "D11", 76)
+PARTS += [("J13", "jack", "CLOCK", "jack", "C18185602", {"D": "CLK_OUT", "A": "GND"}),
+          ("J14", "jack", "RESET", "jack", "C18185602", {"D": "RST_OUT", "A": "GND"})]
+DNP |= {"J13", "J14"}
 
 # what each LCSC code is (README part list; jlc_parts.py adds stock, price and Basic / Extended as read on a day)
 LCSC = {
@@ -271,7 +368,18 @@ LCSC = {
     "C2765186": "SHOU HAN TYPE-C 16PIN 2MD(073), USB 2.0 receptacle",
     # (the jacks: the PJ-320D's through-hole twin, same body, the pins at the same places; pads A = sleeve, C = ring,
     #  D = tip, B = the switch; the user's ruling 2026-11-12: stronger, JLC solders it)
-    "C18185602": "SHOU HAN PJ-320A-4P DIP, 3.5 mm jack, through hole (DNP since stage 1f: bottom side, the user solders it)",
+    "C18185602": "SHOU HAN PJ-320A-4P DIP, 3.5 mm jack, through hole, 6.2 mm wide (stage 2: the CLOCK / RESET outputs; DNP: "
+                 "bottom side, the user solders it; bought with the order)",
+    "C8545": "2N7002, N-MOSFET 60 V 115 mA, SOT-23 (Basic)",
+    "C15850": "10 uF 25 V X5R 0805 (Basic; the CV rail)",
+    "C2500": "Nexperia BAV99, two switching diodes in series 100 V 215 mA, SOT-23 (Basic)",
+    "C17944": "2 k 1% 1206, 0.25 W (Basic)",
+    "C55159907": "CAX CAX-MTS102-YB-10.5JL, MTS-102 toggle switch, SPDT ON-ON, panel mount, M6 x 0.75 bushing, 2 A 250 VAC "
+                 "/ 5 A 120 VAC (its drawing; no DC figure); in the lid's wall, wired to J11 (battery order; bought with the order)",
+    "C21189": "0 ohm 0603 (stage 2: R63, the ferrite bead's place in VBUS)", "C16772": "220 nF 16 V X7R 0402",
+    "C17802": "68 ohm 1% 0805, 0.125 W (preferred: no fee; stage 2: the MIDI sinks)",
+    "C16684": "BOOMELE PJ-307C, 3.5 mm stereo (TRS) jack with two switch contacts, through hole, right angle (DNP: "
+              "bottom side, the user solders it; bought with the order: cost.md)",
     "C318884": "XKB TS-1187A-B-A-B, tactile switch 5.1 x 5.1 x 1.5 mm",
     "C2286": "KT-0603R, red LED 0603",
     "C23186": "5.1 k 1% 0603", "C25092": "22 ohm 5% 0402",
@@ -301,12 +409,67 @@ LCSC = {
 }
 
 
+# ---- stage 2 (the user's "pads that could save the batch"): spare lands, DNP (no part, no paste, no cost)
+SPARES = [
+    ("J12", "pads6", "RECOVERY", "pads6", "", {"1": "U0TXD", "2": "U0RXD", "3": "+3V3", "4": "GND", "5": "CHIP_PU", "6": "BOOT"}),
+    ("C72", "C", "VSYS bulk", "twin", "", {"1": "VSYS", "2": "GND"}),
+    # (72 x 72, the user's "one board, different screens": J10B, the 2.42" module's lead (its header is down its left
+    #  side, over J5's DIN: no header there), on the screen's four nets; C86 a 1206 land for a bulk cap by it, the
+    #  2.42" module's boost converter's inrush)
+    ("J10B", "hdr4", "OLED 2.42 LEAD", "pads4", "", {"1": "OLED_P1", "2": "OLED_P2", "3": "SCL", "4": "SDA"}),
+    ("C86", "C", "OLED bulk", "twin", "", {"1": "+3V3", "2": "GND"}),       # (a 1206 / tantalum land on VSYS by the power path)
+    ("C26", "C", "DNP", "c0402", "", {"1": "UFL", "2": "GND"}),             # (the u.FL side's shunt: with C24 and R19 a pi)
+    ("C80", "C", "DNP", "c0603", "", {"1": "BTN_UP", "2": "GND"}),          # (debounce caps by the buttons)
+    ("C81", "C", "DNP", "c0603", "", {"1": "BTN_DOWN", "2": "GND"}),
+    ("C82", "C", "DNP", "c0603", "", {"1": "BOOT", "2": "GND"}),
+    ("C83", "C", "DNP", "c0603", "", {"1": "BTN_YES", "2": "GND"}),
+]
+PARTS += SPARES
+DNP |= {p[0] for p in SPARES} | {"C27", "C67"}
+
+# ---- the twins (stage 2, the user's standing rule, as hardware/sd-board's in the optimist repo): every resistor whose
+#      value may need changing after the boards arrive gets a bare hand-solder pad pair in parallel (1.4 x 2.0 mm pads
+#      1.2 mm apart since stage 2's review: an 0603 .. 1206 or a leaded part; no part, no paste, out of
+#      the BOM and the CPL, joined to its resistor by two short top tracks drawn in make_board.py: no via of its own), so a
+#      batch is fixed with an iron, not a re-order. A part soldered on a twin LOWERS the value (R // R_twin); README
+#      "Twins" lists what each does. RT40 / RT41 (the LEDs') are in PARTS above. Not twinned: the jacks' 3 x 100 ohm
+#      sources (three pads already: swap one), the fixed parts (pull-downs of FET gates, the XB5353A's 100 ohm, the CC
+#      resistors, 0 ohm links, the USB 22 ohm)
+TWINS = {   # twin: (its resistor, the reason)
+    "RT40": ("R40", "red LED current"), "RT41": ("R41", "green LED current"),
+    "RT15": ("R15", "MIDI OUT jack sink"), "RT55": ("R55", "MIDI OUT DIN sink"),
+    "RT20": ("R20", "MIDI OUT 2 jack sink"), "RT57": ("R57", "MIDI OUT 2 DIN sink"),
+    "RT30": ("R30", "LINE IN tip input"), "RT31": ("R31", "LINE IN ring input"), "RT32": ("R32", "LINE IN gain (feedback)"),
+    "RT33": ("R33", "LINE IN bias, upper"), "RT34": ("R34", "LINE IN bias, lower"),
+    "RT36": ("R36", "LINE IN tip pull-down"), "RT37": ("R37", "LINE IN ring pull-down"), "RT38": ("R38", "plug detect pull-up"),
+    "RT51": ("R51", "charge current (RPROG)"), "RT10": ("R10", "cell divider, upper"), "RT11": ("R11", "cell divider, lower"),
+    "RT60": ("R60", "I2C SCL pull-up"), "RT61": ("R61", "I2C SDA pull-up"),
+    "RT39": ("R39", "LINE IN sleeve to GND: a 0 ohm here grounds it solid"),
+    "RT73": ("R73", "CLOCK driver's P-FET gate pull-up"), "RT79": ("R79", "RESET driver's P-FET gate pull-up"),
+    # (the outputs' 2 k series pairs R75 // R76, R81 // R82: two pads already, swap one: not twinned)
+    # (stage 2, spare lands as twins of capacitors: the crystal's load, the LINE IN filter, CHIP_PU's delay, the
+    #  regulators' input / output (a 1206 or a 3216 tantalum: the AMS1117's sheet asks 22 uF tantalum), +3V3 by the chip)
+    "CT3": ("C3", "regulator input"),
+    # (72 x 72: these three on the BOTTOM under their parts, make_board.BOTTOM_TWINS: on top CT9 / CT10 closed the way
+    #  round the crystal, CT8 had no room in the fan-out lanes)
+    "CT9": ("C9", "crystal load XTAL_P"), "CT10": ("C10", "crystal load XTAL_N"),
+    "CT8": ("C8", "the cell level's ADC cap (TIMING.md: the shared ADC pattern)"),
+    # (did not fit beside their parts, README "spare pads": CT7, CT17, CT5 -> J12's pads 3-4 (+3V3, GND) and 4-5 (GND,
+    #  CHIP_PU) take an 0805 across them; CT32 -> RT32's land (C32 sits across R32: the same two nets) takes a capacitor;
+    #  RT35, CT36 left out: R35 / C36 sit in the chip's escape area, no room within 8 mm, a longer stub on the ADC pin
+    #  would pick up noise)
+}
+_main = {p[0]: p for p in PARTS}
+PARTS += [(t, _main[m][1], "twin DNP", "twin_c" if t.startswith("CT") else "twin", "", dict(_main[m][5]))
+          for t, (m, _why) in TWINS.items()]
+DNP |= set(TWINS)
+
 # the two orders (stage 1d, the user's 2026-11-14): one board; "usb" = USB power only, "battery" = the cell circuit
 # fitted. A part named here is fitted in that order only; every other part (not DNP) in both. make_assembly.py writes one
 # BOM / CPL pair per order (fab/usb/, fab/battery/), cost.py prices both.
 VARIANTS = ("usb", "battery")
-ONLY = {"U2": "usb",                                                         # (the AMS1117: Basic, USB only)
-        **{r: "battery" for r in ("U10", "Q1", "R50", "U8", "R51", "C40", "C41", "U9", "R52", "C42", "Q2", "R53",
+ONLY = {"U2": "usb", "R62": "usb",                                                         # (the AMS1117: Basic, USB only)
+        **{r: "battery" for r in ("U10", "Q1", "R50", "D9", "U8", "R51", "C40", "C41", "U9", "R52", "C42", "Q2", "R53",
                                   "R10")}}
 
 

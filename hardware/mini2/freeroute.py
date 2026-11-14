@@ -16,6 +16,9 @@ import pcbnew
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "pcb", "lib"))
 from stitch import stitch            # (hardware/pcb/lib/stitch.py)
+import moats                         # (stage 2: ground pieces cut off by tracks on both layers)
+sys.path.insert(0, HERE)
+from parts import TWINS              # (72 x 72: no via on any twin's pad, top or bottom)
 
 WORK = os.path.join(HERE, ".freerouting")
 JAR = os.path.join(WORK, "freerouting-2.5.0.jar")
@@ -24,18 +27,21 @@ MM = pcbnew.FromMM
 OX = OY = 100.0
 ROUNDS = 3
 EXTRA = 4
+MOAT_ROUNDS = 6
 PASSES = "100"
 # net classes (widths in um; clearance 0.2 as the rules: the chip's 0.4 mm pitch leaves exactly 0.2 between 0.2 tracks)
 # (mini 2.2: +3V3 0.25 into the chip's 0.4 mm-pitch pins; VSYS and VBUS 0.3 (the LDO's input, up to ~0.5 A); the cell's
 #  nets 0.4 (the cell's current, charge and discharge))
-PWR = {"VDD3P3": 250, "+3V3": 250, "VSYS": 300, "VBUS": 300, "BAT_P": 400, "BAT_N": 400, "BAT_C": 400}
+PWR = {"VDD3P3": 250, "+3V3": 250, "VSYS": 500, "VREG": 500, "CV_RAIL": 300, "VBUS": 300, "VUSB": 300, "BAT_P": 400, "BAT_N": 400, "BAT_C": 400}
 DIN_NETS = ["MO_R", "MO_T", "MO2_R", "MO2_T", "MD_R", "MD_T", "MD2_R", "MD2_T"]   # (0.5 from everything: the iron's room, README "DIN"; mini 2.2: both MIDI OUTs; stage 1f: the jacks' and the DINs' own)
 IRON = 0.8                                       # (no via within a DIN pad's copper + 0.8 mm)
+IRON_PARTS = ("J5", "J6", "J2", "J3", "J7", "J8", "J9", "J10", "J11", "J13", "J14")   # (stage 2: every part the user solders from the top)
 EDGE = 0.3                                       # (+ the 0.2 clearance: the rules' 0.5 from the board's edge)
 # the bottom stays one ground under the chip with its left and lower parts, and under the RF path
 CHIP_BLOCK = ["U1", "Y1", "R17", "C9", "C10"]   # (mini 2.2 stage 2: the chip and the crystal only: the long vertical routes (VBUS, I2C) need the bottom beside the chip)
 TOP_ONLY = []                                    # (nets kept on the top layer: ["LIN_OUT"] routes it there, but only with 0.10 mm tracks and 4 other nets left open: README "Routing, mini 2")
 RF_NETS = {"LNA_IN", "RF", "UFL"}               # (mini 2.2: the u.FL only)
+RF_TOP_ROOM = 0.6                                # (stage 2: no other net's track on top within this of the line's edge)
 PAD_VIA_PARTS = ("C23", "C24", "C28", "J4", "U5")
 STITCH = 6.0                                     # (mm between GND stitching vias; the RF line has its own fence)
 VIA_D, VIA_DRILL = 0.6, 0.3
@@ -50,12 +56,20 @@ def dsn_xy(x, y):
     return x * 1000, -y * 1000
 
 
+PIVOT = ((61.5, 62.2), 1.5)                      # (stage 2: make_board.BTN_C / PIVOT_R: the D-pad's pivot, no via)
+
+
 def din_keepouts(board):
     """no via within a DIN pad's copper + 0.8 mm; no track within 0.5 mm of its ground and unused pins (no track needs
     them: ground joins through the pours); the signal pins keep 0.5 through their net class"""
     out = []
     for f in board.GetFootprints():
-        if f.GetReference() in ("J5", "J6"):
+        if f.GetReference() in TWINS:            # (72 x 72: no via on a twin's pad, either side: the router put one on CT8's)
+            for p in f.Pads():
+                r = max(mm(p.GetSize().x), mm(p.GetSize().y)) / 2
+                x, y = dsn_xy(mm(p.GetPosition().x), mm(p.GetPosition().y))
+                out += [f'    (via_keepout "" (circle {L} {(r + 0.35) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
+        if f.GetReference() in IRON_PARTS:       # (stage 2: every hand-soldered part)
             for p in f.Pads():
                 r = max(mm(p.GetSize().x), mm(p.GetSize().y)) / 2
                 x, y = dsn_xy(mm(p.GetPosition().x), mm(p.GetPosition().y))
@@ -68,6 +82,9 @@ def din_keepouts(board):
                     r = max(mm(p.GetSize().x), mm(p.GetSize().y)) / 2
                     x, y = dsn_xy(mm(p.GetPosition().x), mm(p.GetPosition().y))
                     out += [f'    (wire_keepout "" (circle {L} {(r + 0.1) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
+    (px, py), pr = PIVOT
+    x, y = dsn_xy(OX + px, OY + py)
+    out += [f'    (via_keepout "" (circle {L} {(pr + 0.3) * 2000:.0f} {x:.0f} {y:.0f}))' for L in ("F.Cu", "B.Cu")]
     return out
 
 
@@ -88,9 +105,16 @@ def chip_keepouts(board):
     chip = [(min(x, right - 0.6), y) for x, y in pts(p for r in CHIP_BLOCK if r in fps for p in fps[r].Pads())]
     rf = pts(p for f in fps.values() if f.GetReference() != "U1" for p in f.Pads() if p.GetNetname() in RF_NETS)
     out = []
-    for ps, m in ((chip, 0.6), (rf, 0.4)):
+    for ps, m in ((chip, 0.6), (rf, RF_BOTTOM_ROOM)):
         xs, ys = [p[0] for p in ps], [p[1] for p in ps]
         out.append(rect("B.Cu", min(xs) - m, min(ys) - m, max(xs) + m, max(ys) + m))
+    # stage 2: on top, a box over the 50 ohm line's start (its 1.2 mm track's top end, L3, C24): BOOT had been routed
+    # 0.15 mm past it (a box over the whole line blocked other routes: 1 open)
+    line = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() == "RF" and mm(t.GetWidth()) > 1.0]
+    x0 = min(mm(q.x) for t in line for q in (t.GetStart(), t.GetEnd()))
+    y0 = min(mm(q.y) for t in line for q in (t.GetStart(), t.GetEnd()))
+    w = max(mm(t.GetWidth()) for t in line) / 2 + RF_TOP_ROOM
+    out.append(rect("F.Cu", x0 - w, y0 - w, x0 + w, y0 + 1.2))
     return out
 
 
@@ -128,7 +152,31 @@ def patch_dsn(text, keepouts):
     return text[:m.start()] + "(class kicad_default " + " ".join(rest) + "\n      (circuit" + tail[:end] + "".join(extra) + tail[end:]
 
 
-def route_round(board, k):
+def unconnected(board):
+    """KiCad's own count of open connections (the ratsnest), after a fill"""
+    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+    board.BuildConnectivity()
+    return board.GetConnectivity().GetUnconnectedCount(True)
+
+
+RF_BOTTOM_ROOM = 1.0      # (72 x 72: the RF parts' bottom box 1.0 mm out, was 0.4: BOOT had run 0.4 mm from the path)
+# (72 x 72: the nets the earlier runs left open at the chip's pads: routed first, alone, before every other net)
+SEED = []   # (tried on 72 x 72 run 1 with the twelve nets the earlier runs left open: they all routed, then the top
+#  side's (UP, SDA, LIN_DET, MIDI_TX, MIDI_TX2) and power (VUSB, VBUS, VREG) failed: 11 open, worse than run 9's 6)
+
+
+def seed_only(text, keep):
+    """the DSN with only the nets in keep to route (every other net's pins stay as obstacles)"""
+    def drop(m):
+        return m.group(0) if m.group(1).strip('"') in keep else ""
+    text = re.sub(r"\n    \(net (\S+)\n      \(pins .*?\)\n    \)", drop, text, flags=re.S)
+    def cls(m):
+        names = [n for n in m.group(2).split() if n.strip('"') in keep]
+        return f"\n    (class {m.group(1)} " + " ".join(names) + m.group(3) if names else ""
+    return re.sub(r"\n    \(class (\S+) (.*?)(\n      \(circuit.*?\n    \))", cls, text, flags=re.S)
+
+
+def route_round(board, k, only=None):
     for t in board.GetTracks():
         t.SetLocked(True)
     work = os.path.splitext(board.GetFileName())[0] + ".freerouting"   # (per board: parallel runs never share files)
@@ -138,6 +186,8 @@ def route_round(board, k):
         sys.exit("DSN export failed")
     with open(dsn) as fh:
         text = patch_dsn(fh.read(), din_keepouts(board) + edge_keepouts(board) + chip_keepouts(board))
+    if only:
+        text = seed_only(text, set(only))
     with open(dsn, "w") as fh:
         fh.write(text)
     if os.path.exists(ses):
@@ -193,7 +243,8 @@ def drop_one_sided_vias(board):
 
 def din_rooms(board):
     return [(mm(p.GetPosition().x), mm(p.GetPosition().y), max(mm(p.GetSize().x), mm(p.GetSize().y)) / 2 + IRON + VIA_D / 2)
-            for f in board.GetFootprints() if f.GetReference() in ("J5", "J6") for p in f.Pads()]
+            for f in board.GetFootprints() if f.GetReference() in IRON_PARTS for p in f.Pads()
+            if p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH]
 
 
 def via_adder(board):
@@ -230,14 +281,16 @@ def island_vias(board, add):
                 ol = polys.Outline(i)
                 if any(ol.PointInside(a) for a in anchors):
                     continue
-                c = best_spot(board, ol, L, others)
+                rooms = din_rooms(board)
+                c = best_spot(board, ol, L, others,
+                              ok=lambda c: not any((mm(c.x) - a) ** 2 + (mm(c.y) - b) ** 2 < r * r for a, b, r in rooms))
                 if c is not None and add(mm(c.x), mm(c.y)):
                     anchors.append(c)
                     added += 1
     return added
 
 
-def best_spot(board, ol, layer, others, near=None):
+def best_spot(board, ol, layer, others, near=None, ok=None):
     bb = ol.BBox()
     pads = [p.GetPosition() for f in board.GetFootprints() for p in f.Pads()
             if p.GetNetname() == "GND" and p.IsOnLayer(layer) and ol.PointInside(p.GetPosition())]
@@ -251,6 +304,8 @@ def best_spot(board, ol, layer, others, near=None):
     r = MM(VIA_D / 2)
     for c in cands:
         if not all(ol.PointInside(pcbnew.VECTOR2I(c.x + dx, c.y + dy)) for dx, dy in ((0, 0), (r, 0), (-r, 0), (0, r), (0, -r))):
+            continue
+        if ok is not None and not ok(c):        # (stage 2: e.g. out of the iron's rooms: try the next spot)
             continue
         circ = pcbnew.SHAPE_CIRCLE(c, r)
         if not any(o.Collide(circ, MM(0.21)) for o in others) and not any(g.Collide(circ, MM(0.15)) for g in gnd_pads(board, layer)):
@@ -312,7 +367,8 @@ def tidy(board):
     print(f"  {len(st)} stitching vias, {isl} island vias, {pv} pad vias, {gs} ground stubs, {pd} loose ends cut, {gone} one-sided vias removed; narrow kept: {kept or 'none'}")
 
 
-DIRECT = {}                                        # (net: width) pads of these nets within 4 mm joined straight first (mini 2.2: none; the buck is gone)
+DIRECT = {"VSYS": 0.3}                             # (net: width) pads of these nets within 4 mm joined straight first (stage 2: C34 -> U7, which Freerouting left open twice)
+DIRECT_ONLY = {("C34", "U7"), ("U7", "C34")}       # (stage 2: only these pairs: a C3 -> U10 link changed the rest of the routing)
 
 
 def direct_links(board):
@@ -324,6 +380,8 @@ def direct_links(board):
             for j in range(i + 1, len(pads)):
                 a, c = pads[i].GetPosition(), pads[j].GetPosition()
                 if (a - c).EuclideanNorm() > MM(4) or pads[i].GetParentFootprint() == pads[j].GetParentFootprint():
+                    continue
+                if (pads[i].GetParentFootprint().GetReference(), pads[j].GetParentFootprint().GetReference()) not in DIRECT_ONLY:
                     continue
                 for path in ([a, c], [a, pcbnew.VECTOR2I(c.x, a.y), c], [a, pcbnew.VECTOR2I(a.x, c.y), c]):
                     if add_path(board, n, path, w):   # (straight, else L-shaped: out of the pin sideways first)
@@ -464,12 +522,29 @@ def main():
     relabel(board)
     direct_links(board)
     print(f"{pre_ground_vias(board)} ground vias beside the SMD ground pads before routing")
+    if SEED:
+        print(f"round 0 (the seed nets alone): {route_round(board, 0, SEED)} left")
+        tidy(board)
     for k in range(1, ROUNDS + EXTRA + 1):       # (EXTRA rounds only while Freerouting still leaves connections)
         left = route_round(board, k)
         tidy(board)
         if k >= ROUNDS and left == 0:
             break
+    left = unconnected(board)
+    for j in range(MOAT_ROUNDS):                 # (stage 2: bridge every cut-off ground piece, reroute what the bridge
+        pcbnew.ZONE_FILLER(board).Fill(board.Zones())   #  crossed, until no piece is cut off and nothing is left open)
+        groups, main_vias = moats.isolated(board)
+        print(f"moats: {len(groups)} cut-off ground groups, {left} connections open")
+        if not groups and left == 0:
+            break
+        if groups and not moats.bridge(board, groups, main_vias) and left == 0:
+            break
+        route_round(board, ROUNDS + EXTRA + 1 + j)
+        tidy(board)
+        left = unconnected(board)
+    print(f"{unconnected(board)} connections open (KiCad's count)")
     print(f"{space_holes(board)} GND vias moved off another via's drill")
+    print(f"{drop_close_gnd_vias(board)} GND vias too close to another removed; {drop_stubs(board)} stubs removed")
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     board.Save(path)
     gaps = close_gaps(board, path)
@@ -537,6 +612,45 @@ def space_holes(board):
                 else:
                     moved += 1
     return moved
+
+
+def drop_close_gnd_vias(board):
+    """72 x 72: a GND via still within 0.5 mm (drill to drill) of another after space_holes: removed if the board's open
+    count stays the same without it (a stitching via; route 9 left one 0.49 mm from an SDA via)"""
+    gone = 0
+    vias = [t for t in board.GetTracks() if t.GetClass() == "PCB_VIA"]
+    for v in [v for v in vias if v.GetNetname() == "GND"]:
+        if any(o is not v and 0 < (v.GetPosition() - o.GetPosition()).EuclideanNorm() <
+               MM(0.5) + (v.GetDrillValue() + o.GetDrillValue()) // 2 for o in vias):
+            before = unconnected(board)
+            board.Remove(v)
+            if unconnected(board) > before:
+                board.Add(v)
+            else:
+                gone += 1
+    return gone
+
+
+def drop_stubs(board):
+    """72 x 72: tracks under 0.2 mm long with an end touching nothing (route 9 left two: BTN_YES, U0TXD)"""
+    ends = []
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_VIA":
+            ends.append((t.GetPosition(), None, t))
+        else:
+            ends += [(t.GetStart(), t.GetLayer(), t), (t.GetEnd(), t.GetLayer(), t)]
+    pads = [(p, p.GetPosition()) for f in board.GetFootprints() for p in f.Pads()]
+    gone = 0
+    for t in [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetLength() < MM(0.2)]:
+        for e in (t.GetStart(), t.GetEnd()):
+            touch = any(o is not t and (lay is None or lay == t.GetLayer()) and (q - e).EuclideanNorm() < MM(0.01)
+                        for q, lay, o in ends)
+            touch = touch or any(p.IsOnLayer(t.GetLayer()) and p.HitTest(e) for p, _ in pads)
+            if not touch:
+                board.Remove(t)
+                gone += 1
+                break
+    return gone
 
 
 def starved_pads(path):

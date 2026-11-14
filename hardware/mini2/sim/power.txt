@@ -1,0 +1,38 @@
+jank mini 2.2, the power path: ngspice results (power.py; generic models: its docstring)
+
+battery order, USB unplugged at 50 ms during a Wi-Fi burst; stage 1f's circuit (R50 100 k, no D9):
+  cell 4.2 V: VSYS min 3.39 V, +3V3 min 3.02 V (before: 3.27); VSYS back on Q1's channel 0.122 s after the unplug
+  cell 3.7 V: VSYS min 2.88 V, +3V3 min 2.52 V (before: 3.27); VSYS back on Q1's channel 0.144 s after the unplug
+  cell 3.4 V: VSYS min 2.58 V, +3V3 min 2.22 V (before: 3.27); VSYS back on Q1's channel 0.163 s after the unplug
+the same with R50 10 k (VBUS drains 10 x faster, Q1 turns on sooner):
+  cell 4.2 V: VSYS min 3.39 V, +3V3 min 3.02 V; VSYS back 0.012 s after the unplug
+  cell 3.7 V: VSYS min 2.88 V, +3V3 min 2.52 V; VSYS back 0.015 s after the unplug
+  cell 3.4 V: VSYS min 2.58 V, +3V3 min 2.22 V; VSYS back 0.017 s after the unplug
+the board (stage 2): R50 10 k and D9 (a second B5819W, BAT_P -> VSYS, beside Q1's body diode):
+  cell 4.2 V: VSYS min 3.75 V, +3V3 min 3.27 V; VSYS back 0.017 s after the unplug
+  cell 3.7 V: VSYS min 3.24 V, +3V3 min 2.88 V; VSYS back 0.022 s after the unplug
+  cell 3.4 V: VSYS min 2.94 V, +3V3 min 2.58 V; VSYS back 0.024 s after the unplug
+
+battery order, USB plugged in at 50 ms (a burst at 51 ms):
+  cell 3.4 V: VSYS min 3.35 V, +3V3 min 3.27 V, then VSYS 4.62 V; the cell's current after it +196 mA (+ = charging: ngspice's current into the cell's + end)
+  cell 4.2 V: VSYS min 4.15 V, +3V3 min 3.27 V, then VSYS 4.65 V; the cell's current after it +46 mA (+ = charging: ngspice's current into the cell's + end)
+
+battery order, the cell alone, 340 mA Wi-Fi peak:
+  cell 4.2 V: VSYS min 4.093 V, +3V3 min 3.265 V
+  cell 3.7 V: VSYS min 3.588 V, +3V3 min 3.224 V
+  cell 3.5 V: VSYS min 3.385 V, +3V3 min 3.021 V
+  cell 3.4 V: VSYS min 3.283 V, +3V3 min 2.920 V
+usb order (AMS1117), 340 mA Wi-Fi peak (VSYS to VREG through R62 and the copper: 0.2 ohm, an upper bound: all of VSYS and VREG's tracks in series are ~0.14 ohm at their routed widths):
+  host 5.0 V: VSYS min 4.546 V, +3V3 min 3.265 V
+  host 4.75 V: VSYS min 4.300 V, +3V3 min 3.183 V
+  host 4.5 V: VSYS min 4.050 V, +3V3 min 2.933 V
+
+the power toggle (J11, stage 2) closed with the cell alone (C3 10 uF + C34 1 uF on VREG, C5 + the chip's 34 uF on +3V3):
+  cell 4.2 V: 11.11 A peak through the switch, 4.45 A from the cell (above 2.1 A for 11.8 us); under 0.5 A after 198 us; VSYS min 2.54 V; +3V3 then 3.294 V
+  cell 3.7 V: 9.59 A peak through the switch, 3.72 A from the cell (above 2.1 A for 10.7 us); under 0.5 A after 178 us; VSYS min 2.19 V; +3V3 then 3.294 V
+  the XB5353A (its datasheet): overcurrent 1 at 2.1 A min / 3 A typ after 10 ms typ, load short at 10 A min / 20 A typ after 75 us typ: the inrush trips neither. The switch's 0.5 A is its continuous rating; the ~11 A peak lasts microseconds (C41 into C3 / C34 through the tracks: the model's 0.1 ohm / 50 nH estimates)
+switched off, no USB, a 4.2 V cell: 8.9 uA from the cell (R10 / R11 2.1 uA, D3's leakage, the XB5353A 2.8 uA typ, the TP4054 1 uA ASSUMED): a 550 mAh cell lasts years on it (self-discharge first)
+
+a reversed cell (+ on BAT_N, - on BAT_C), no USB: the cell's current 0.00 uA, 3.67 V across Q2 (blocked; Q2's 30 V rating)
+
+the charger (TP4054, I = 1000 V / RPROG, its datasheet's formula): R51 5.1 k -> 196 mA; with a twin on RT51: 10 k -> 296 mA, 5.1 k -> 392 mA (TP4054's 500 mA maximum; its own thermal regulation cuts the current when hot: at 5 V in and a 3.6 V cell, 196 mA = 0.27 W in the SOT-23-5)

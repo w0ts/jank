@@ -15,6 +15,7 @@ Board frame: x right, y down, origin the top left corner (KiCad's page = (100 + 
 USB-C, the left edge the MIDI OUT jack, the right edge the POWER IN jack, the bottom edge the chip antenna in a strip
 with no ground (GE to H). Every part is on the top side (JLC Economic assembly: one side, SMD only).
 """
+import collections
 import math
 import os
 import sys
@@ -35,7 +36,7 @@ OX, OY = 100.0, 100.0
 LIB = os.path.join(HERE, "lib", "chip.pretty")
 NAME = "mini2"
 # the size (2026-11-13: SIZE=WxH tries a smaller board; the parts' spread and the chip's height follow it)
-W, H0 = (float(v) for v in os.environ.get("SIZE", "66x60").split("x"))   # (mini 2.2: 66 x 68 kept. Without the cells
+W, H0 = (float(v) for v in os.environ.get("SIZE", "72x60").split("x"))   # (mini 2.2: 66 x 68 kept. Without the cells
 #  66 x 60.5 (SIZE=66x52.5) placed clean; the cells under the board need the band under the DIN bodies, y 37..58, which
 #  a 60.5 mm board puts into the antenna strip)
 # mini 2: the LINE IN band (README "LINE IN"): the top row (TOP: the USB-C, both jacks, the USB and VBUS parts under the
@@ -44,7 +45,15 @@ W, H0 = (float(v) for v in os.environ.get("SIZE", "66x60").split("x"))   # (mini
 DY = float(os.environ.get("DY", "8"))
 H = H0 + DY
 TOP = {"J1", "J2", "J3", "U5", "R3", "R4", "R12", "R13", "R23", "D3", "R5"}
-GE = H - 10.0                   # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
+# stage 2, 72 x 72 (the user's "one board, different screens"): the 66 mm design stretched: parts placed at fixed x
+# (not from S, W or HDR) move right by DX2 (3 mm) in the middle (x 20 .. 41) and 2 x DX2 on the right (x 41 on), the
+# left third stays (place(), XS_SKIP: the ones that follow S, W, HDR or BTN_C already)
+DX2 = (W - 66.0) / 2
+# stage 2 (the user's 66 x 64 for the CLOCK / RESET outputs): a BAND mm band at BAND_Y: everything placed below that line
+# moves down BAND (the chip block with CY, the lower block's fixed spots through LOWER in place()); the top rows, the DINs
+# and the LINE IN front end stay
+BAND, BAND_Y = float(os.environ.get("BAND", "14")), 36.0
+GE = H - 10.0 + BAND            # the ground's bottom edge: from here to H no copper but the antenna's (YAGEO eval board: 10 mm)
 # stage 1e (the user's: the u.FL only): the antenna strip is gone, the board ends at the ground's edge; STRIP=10 puts the
 # 10 mm strip back (for a chip antenna). Everything placed from GE and CY stays where it was
 STRIP = float(os.environ.get("STRIP", "0"))
@@ -63,25 +72,33 @@ H = GE + STRIP              # (stage 1e: the board's bottom edge; the parts abov
 CAN_Y = 35.5 + (CY - 30.4)               # the cans' centre y (10 x 10.5 mm, upright: under the DINs' last holes, over the ground edge)
 # stage 1e: the screen module's outline (a 0.96" 128 x 64 I2C OLED, 27.3 x 27.8 mm, on J10's header ~2.5 mm over the
 # board, the header row 1.5 mm in from its top edge: *typical module, unverified per maker*): only low parts under it
-HDR = (34.0, 14.8)
+HDR = (35.0 + (W - 66.0) / 2, 15.9)          # (stage 2: 1.1 lower, 1 mm right: the USB pair's way from U5 round its left end, under R4)
 MODULE = (HDR[0] - 27.3 / 2, HDR[1] - 1.5, HDR[0] + 27.3 / 2, HDR[1] - 1.5 + 27.8)
 
-BTN_C, BTN_D = (55.5, 48.2), 6.5     # stage 1f: the buttons' cross, its middle and each button's distance from it
+BTN_C, BTN_D = (55.5 + (W - 66.0), 48.2 + BAND), 6.5     # stage 1f: the buttons' cross, its middle and each button's distance from it
+PIVOT_R = 1.5                        # stage 2: the D-pad's pivot circle at BTN_C: no part, no via (freeroute.py, check_board.py)
+# stage 2: where no twin goes (place_twins): the chip with its lanes and match, the drawn USB pair, the RF line and the u.FL
+FORBID = [(CX - 4.6, CY - 6.0, CX + 9.0, CY + 4.6), (27.9 + DX2, 12.3, 34.6 + DX2, 14.4), (28.2 + DX2, 13.5, 29.8 + DX2, 36.8 + BAND),
+          (XA - 1.8, Y_L3 - 1.2, XA + 7.0, Y_L3 + 5.6)]
 
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
     # top edge: the jacks (bushings past the side edges), the USB-C between them
     # stage 1f (the user's): the jacks on the BOTTOM, DNP, soldered by the user as the DINs (flipped, turned 180: the
     # bushings still past the edges, as on top: a flipped part keeps its angle); the top keeps nothing tall but the USB-C
-    "J1": (W / 2, 4.97, 180), "J2": (7.25, 5.8, 0, "B"), "J3": (W - 7.25, 5.8, 180, "B"),
+    # stage 2: the PJ-307C (switched TRS, 12 wide): each body's front face on its edge, the nose (3 mm) past it
+    "J1": (W / 2, 4.97, 180), "J2": (6.0, 6.4, 270, "B"), "J3": (W - 6.0, 6.4, 90, "B"),
     # the DIN sockets (DNP, hand-soldered) on the BOTTOM under each side edge, their faces on the edges (README "DIN")
     "J5": (DIN_D, DIN_Y, 90, "B"), "J6": (W - DIN_D, DIN_Y, 270, "B"),
     # between the DINs' holes (every top part keeps 0.8 mm from the DIN pads' copper: the iron's room, README "DIN"):
     # left the MIDI OUT resistors (mini 2.2 simplified: three 100 ohm 1206, R48 the third, under R14 / R26)
-    "R14": (16.9, 1.8, 0), "R26": (16.9, 4.4, 0),               # (PLACED's places win for R14, R26, R15)
-    "R15": (8.5, 21.0, 90), "R48": (19.56, 27.41, 180),
+    # (stage 2: J2's source trio and sink in the top left band, by J2's legs: the jack's lines short)
+    "R14": (2.4, 15.9, 90), "R26": (5.0, 15.9, 90), "R48": (7.6, 15.9, 90), "R15": (10.0, 15.9, 90), "RT15": (12.2, 15.9, 90),
     # stage 1f: the DINs' own source (33 ohm 0805) and sink (10 ohm) between each DIN's pads, out of their iron room
-    "R54": (7.2, 26.0, 90), "R55": (7.2, 30.6, 90), "R56": (W - 7.2, 26.0, 90), "R57": (W - 7.2, 30.6, 90),
+    # (stage 2: upright, each with its hand-solder twin beside it, inside the DIN's pads' iron rooms)
+    # (stage 2: the DIN's source two 100 ohm 1206 side by side between its pads, its 68 ohm sink upright with its twin)
+    "R54": (6.7, 27.25, 0), "R58": (6.7, 29.85, 0), "R55": (6.3, 34.1, 90), "RT55": (8.55, 34.1, 90),
+    "R56": (W - 6.7, 27.25, 0), "R59": (W - 6.7, 29.85, 0), "R57": (W - 6.3, 34.1, 90), "RT57": (W - 8.55, 34.1, 90),
     # mini 2.2 simplified (README "mini 2.2 simplified"): BOOT (SW1) and RST (SW2) in one row in the middle, 10 mm apart
     # (BOOT under a big cap); the indicator (LED1 red, LED2 green side by side: one window) between them and the USB
     # parts, each LED's 1 k and its DNP twin beside it
@@ -93,44 +110,84 @@ PLACE = {
     # DOWN bottom, NO / BOOT left, YES right; the lid's U-tongues (case/README "Buttons") fit round it inside the walls
     "SW3": (BTN_C[0], BTN_C[1] - BTN_D, 0), "SW4": (BTN_C[0], BTN_C[1] + BTN_D, 0),
     "SW1": (BTN_C[0] - BTN_D, BTN_C[1], 0), "SW5": (BTN_C[0] + BTN_D, BTN_C[1], 0),
-    "LED1": (5.5, 15.0, 0), "LED2": (5.5, 17.2, 0),         # (one above the other, 2.2 mm apart: one window over both)
-    "R40": (9.5, 15.0, 0), "RT40": (12.6, 15.0, 0),
-    "R41": (9.5, 17.2, 0), "RT41": (12.6, 17.2, 0),
-    "J10": (HDR[0], HDR[1], 0, "T"), "JP1": (31.0, 18.8, 0), "JP2": (35.2, 18.8, 0),
-    "R60": (40.2, 15.6, 90), "R61": (41.2, 15.6, 90), "C60": (43.2, 15.1, 90), "C61": (44.9, 15.1, 90),
+    # (stage 2: the indicator in the top right, between the USB-C and J3's resistors, out from under the screen)
+    "LED1": (4.2, 38.3, 0), "LED2": (4.2, 40.7, 0),       # (stage 2: one over the other at the left end of the band
+    #  (BAND_Y), outside the screen module's outline: the jacks took their top-edge spot; one window over both)
+    "R40": (80, 8.0, 0), "R41": (86, 8.0, 0),   # (auto_place)
+    # stage 2, CLOCK / RESET (parts.py "_cv"): the PJ-320A jacks under the board at the top edge, their fronts on it
+    "J13": (42.3, 7.25, 270, "B"), "J14": (49.0, 7.25, 270, "B"),
+    # (stage 2, CLOCK / RESET: the drivers in two rows of three SOT-23 right of the cell's protection (2N7002, AO3401A,
+    #  BAV99), the outputs' 2 k pairs on the right edge, the gate pull-downs between the rows and Q2, the nodes'
+    #  pull-downs over the rows; the charge pump (R83, C84, D12, D13, C85, R84) between the chip's right side and the
+    #  cross, by GPIO5's pin; the gate pull-ups with their twins beside them; README "CLOCK / RESET")
+    "Q3": (50.4, 39.6, 0), "Q4": (54.2, 39.6, 0), "D10": (58.1, 39.6, 0),
+    "Q5": (50.4, 43.15, 0), "Q6": (54.2, 43.15, 0), "D11": (58.1, 43.15, 0),
+    "R75": (62.9, 37.5, 0), "R76": (62.9, 40.1, 0), "R81": (62.9, 42.7, 0), "R82": (62.9, 45.3, 0),
+    "R74": (49.0, 36.75, 0), "R80": (46.0, 35.4, 0), "R71": (47.9, 42.0, 90), "R77": (47.9, 44.0, 90),
+    # (72 x 72: the pump in a row and R73 / RT73 up in the band, off the chip's decoupling (C7, R8, L2, C16, C17), which
+    #  boxed VDD3P3 and CHIP_PU in: the 72 x 72 routing's first try; these are raw: + DX2 and + BAND - 6 in place())
+    "RT73": (57.0, 34.6, 0), "R73": (57.0, 36.7, 0), "RT79": (62.9, 48.5, 0), "R79": (62.9, 50.6, 0),
+    # (the pump at the board's lower left, by GPIO35's pin and VREG, far from LINE IN; raw: + DX2, + BAND - 6)
+    "R83": (14.0, 52.3, 0), "C84": (16.2, 52.3, 0), "R84": (18.4, 52.3, 0), "D12": (15.4, 54.2, 0), "D13": (15.4, 56.6, 0),
+    "C85": (15.4, 59.0, 0),
+    "C80": (36.5, 39.6, 0),                                   # (UP's debounce pad, on BTN_UP's way to UP)
+    "J10": (HDR[0], HDR[1], 0, "T"), "JP1": (32.0, 19.8, 0), "JP2": (36.2, 19.8, 0),
+    "C60": (42.4, 15.1, 90), "C61": (44.0, 15.1, 90),
+    # (stage 2: the I2C pull-ups and their twins right of the header's caps; SCL / SDA come along the header)
+    "R60": (47.5, 13.6, 0), "RT60": (47.5, 15.25, 0), "R61": (47.5, 17.6, 0), "RT61": (47.5, 19.25, 0),
     # under the USB-C: the CC resistors (each under its own pin's side: CC2 = B5 left, CC1 = A5 right); the strip under
     # U5 stays free for D+ / D- to the chip
     "R4": (W / 2 - 3.6, 11.0, 90), "R3": (W / 2 + 3.6, 11.0, 90),
     # mini 2.2, the power and the cell (README "mini 2.2 simplified"): the lower left, where the buck and C1 were, under
     # the DIN pads' iron room (y 39 on): the two PH2.0 sockets (bottom side, DNP) on one row near the ground edge, the
     # protector (U9) and the charger (U8) above them, the power path (D3, Q1) and the 3.3 V LDO (U2) towards the chip;
-    # the cell's divider (R10 / R11 / C8) at GPIO1's fan-out lane, above the chip's right side
+    # the cell's divider (R10 / R11 / C8) at its fan-out lane (GPIO4 since stage 2), above the chip's right side
     # (stage 1d: the cells stand on edge under the board in y 39..58, beside the DIN bodies: the two sockets moved out of
     #  that band to the middle, y 33, between the DIN bodies; their bodies hang under the board there)
     "J8": (36.5, 33.0, 0, "B"), "J9": (43.0, 33.0, 0, "B"),
-    "Q2": (43.0, 38.5, 0), "R53": (46.0, 38.5, 90),          # (reverse polarity, right by the sockets: BAT_C stays short)
-    "R52": (5.5, 45.0, 90),                                   # (the XB5353A's 100 ohm, by U9 and C42)
+    "Q2": (44.9, 38.6, 0), "R53": (47.6, 38.6, 90),          # (reverse polarity, right by the sockets: BAT_C stays short)
+    "R52": (42.5, 38.9, 90),                                  # (the XB5353A's 100 ohm, by U9 and C42)
     # MIDI OUT 2's own resistors: R14 / R26 / R48 / R15 mirrored to the right side (the same rooms by J6's pads)
-    "R21": (W - 19.56, 22.21, 0), "R27": (W - 19.56, 24.81, 0), "R49": (W - 19.56, 27.41, 0), "R20": (W - 18.64, 33.95, 0),
-    "U9": (7.0, 48.0, 0), "C42": (10.0, 48.0, 90),
-    "U8": (14.0, 48.0, 0), "R51": (17.0, 48.0, 90), "C41": (14.0, 44.5, 0), "C40": (10.0, 44.5, 0),
+    # (stage 2: by J3, in the top right corner left of its legs: the jack's lines short, MIDI_TX2 the long one)
+    # (stage 2: J3's source trio and sink in the top right, by J3's legs)
+    # (the power switch is in the lid's right wall, its wires to J11 under it; R62 between them and J6's pads)
+    # (72 x 72: the toggle on the left wall under the screen band, J11 by it: VSYS / VREG short to the power block)
+    "J11": (5.0, 49.5, 0), "R62": (5.0, 52.6, 0), "J10B": (5.5, 44.6, 0), "C86": (13.3, 44.6, 0),
+    # (stage 2: the spare lands and the recovery pads (parts.SPARES); R63 / C27, VBUS's ferrite place, by D3 and the
+    #  charger; R39 / R65 / R66 / C67, the LINE IN's ground sensing: R39 by J7's sleeve leg, the divider by C33)
+    # (stage 2: J12 left of the chip in the band, not on the bottom edge: U0TXD / U0RXD no longer cross the crystal's
+    #  corner, which RESET, YES and DOWN now pass round)
+    "J12": (18.0, 49.0, 0), "C72": (2.6, 48.0, 90), "C26": (39.1, 50.6, 0),
+    "C81": (60.4, 56.4, 90), "C82": (49.0, 51.9, 0), "C83": (46.0, 55.5, 0),
+    "R63": (19.0, 38.8, 90), "C27": (21.4, 38.8, 90),   # (+ BAND: between J12 and the power block)
+    "R39": (24.0, 5.0, 0), "RT39": (24.0, 6.65, 0),   # (72 x 72: right of J7, its twin under it)
+    "R66": (31.4, 31.1, 0), "C67": (31.4, 32.5, 0), "R65": (31.4, 33.9, 0),
+    "R21": (52.6, 2.8, 0), "R27": (52.6, 5.4, 0), "R49": (52.6, 8.0, 0), "R20": (52.6, 14.5, 0), "RT20": (52.6, 16.7, 0),
+    # (stage 2: the XB5353A by the sockets, in the cell's minus lead: BAT_N stays 5 mm long)
+    "U9": (39.9, 36.45, 0), "C42": (40.0, 38.9, 0),
+    "U8": (14.0, 48.0, 0), "R51": (7.5, 46.5, 0), "RT51": (7.5, 48.45, 0), "C41": (14.0, 44.5, 0), "C40": (10.0, 44.5, 0),
     "D3": (6.0, 42.0, 0), "Q1": (19.5, 44.0, 0), "R50": (19.5, 41.0, 0),
+    "D9": (13.0, 41.6, 0),                 # (stage 2: the Schottky beside Q1's body diode, BAT_P -> VSYS)
     # the 3.3 V LDO, two footprints (stage 1d): U10 HT7833 ("battery") and U2 AMS1117-3.3 ("usb", SOT-223) left of it,
     # where the sockets were; C3 / C5 / C6 between them serve both
     "U10": (20.0, 51.0, 0), "U2": (10.0, 54.0, 0),
     "C3": (20.0, 54.3, 0), "C5": (23.2, 51.0, 90), "C6": (23.2, 54.0, 90),
-    "C8": (CX + 5.1, CY - 6.3, 90), "R11": (CX + 6.1, CY - 6.3, 90), "R10": (CX + 7.1, CY - 6.3, 90),
-    "R16": (15.8 + S, 34.85, 0),
+    "C8": (CX + 5.1, CY - 6.3, 90),     # (at the cell level's lane; stage 2: the divider and its twins in the LINE IN block's column)
+    # (stage 2: the cell's divider and its twins in the middle, between the header and the sockets)
+    "R10": (41.7, 18.8, 0), "RT10": (41.7, 20.45, 0), "R11": (41.7, 22.8, 0), "RT11": (41.7, 24.45, 0),
+    "R16": (44.0, 52.5, 90),                 # (stage 2: by SW1 / NO, off the LINE IN block and the moved u.FL)
     # the chip (turned 180: LNA_IN at the bottom of its right side) and its parts round it
     "U1": (CX, CY, 180),
     "U5": (W / 2, 11.1, 270),                                         # USB ESD, right under the USB-C's data pads
     # (stage 1e: the SRV05-4's JLC footprint is the USBLC6's pattern turned 90, its pad rows 0.2 mm further out: at 270
     #  and 0.2 mm lower its top row (VBUS, D-, D+) sits where the USBLC6's did, so the drawn USB tracks and VBUS via hold)
-    "R24": (CX - 0.3, CY - 6.2, 180), "R25": (CX - 0.3, CY - 5.2, 180),   # USB D+ / D- 22 ohm, right of pins 26 / 25 (pin 27 free)
+    # USB D+ / D- 22 ohm (stage 2: upright side by side over pins 27 / 25, their chip pads down: the channel over pins
+    # 21 .. 24 stays open for LIN_DET and MIDI_TX2, both on the top side)
+    "R24": (CX - 2.3, CY - 6.3, 270), "R25": (CX - 1.3, CY - 6.3, 270),
     "C20": (CX + 1.1, CY - 4.85, 90),       # (stage 2: upright over pins 19 / 20: pins 15..17's channel north stays open)                                                  # VDD3P3_RTC (pin 20, top); mini 2: turned, its +3V3 pad east (the GND pad was boxed in by MIDI2_TX)
-    "R8": (CX + 8.5, CY - 2.9, 0),          # (stage 2: under C7, off BAT_P's way from Q2 to R10; mini 2.2 simplified: CHIP_PU's 10 k by C7, chip-relative)
-    "C7": (CX + 8.5, CY - 4.2, 0),          # (1 uF on CHIP_PU at its lane's via: 6 mm of track from pin 4, review 2026-11-13)
-    "C21": (13.9 + S, 30.5, 270), "C22": (13.9 + S, 32.3, 270),                       # VDD_SPI (pin 29, left)
+    "R8": (CX + 10.0, CY - 2.9, 0),         # (72 x 72: 1.5 mm out, the fan-out ring round U1)          # (stage 2: under C7, off BAT_P's way from Q2 to R10; mini 2.2 simplified: CHIP_PU's 10 k by C7, chip-relative)
+    "C7": (CX + 10.0, CY - 4.2, 0),          # (1 uF on CHIP_PU at its lane's via: 6 mm of track from pin 4, review 2026-11-13)
+    "C21": (13.9 + S, 27.1, 270), "C22": (13.9 + S, 28.9, 270),   # (72 x 72: up by pin 29, off pins 38 .. 42's way out)                       # VDD_SPI (pin 29, left)
     "C19": (CX - 1.4, CY + 4.85, 270),      # VDD3P3_CPU (pin 46, bottom): its +3V3 pad toward the pin (review 2026-11-13)
     "C13": (CX + 2.94, CY + 4.9, 270), "C12": (CX + 3.87, CY + 4.9, 270), "C11": (CX + 5.9, CY + 4.6, 90),   # VDDA
     "C28": (CX + 5.42, CY + 2.0, 0),         # 100 nF at the RF supply's pins (2, 3), 0.6 mm out: VDD3P3's via between
@@ -144,16 +201,28 @@ PLACE = {
     # stubs as short as the pads allow)
     "C23": (CX + 4.8, Y_LINE + 0.85, 270), "L3": (CX + 6.5, Y_L3, 0), "C24": (XA + 1.0, Y_L3 + 1.0, 0),
     # R19 at the line's end (stage 1e: the line ends there; the chip antenna, its pi and R18 are gone), J4 right beside it
-    "R19": (XA + 1.3, GE - 2.1, 0), "J4": (XA + 4.4, GE - 2.6, 270),
+    # (stage 2, the user's: the u.FL right after the match, not at the old antenna strip's edge: a ~4 mm line)
+    "R19": (XA + 1.3, Y_L3 + 3.2, 0), "J4": (XA + 4.4, Y_L3 + 2.7, 270),
     # mini 2, LINE IN (README "LINE IN"): J7 on the top edge (its bushing up) between J2 and the USB-C, tip / ring pads on its
     # right; D7 by them; the summer's inputs (R30 / C30 tip, R31 / C31 ring) to U6 (turned: IN- and IN+ on top, OUT and V+
     # below), R32 // C32 on its left from IN- to OUT, the bias (R33 / R34 / C33) on its right; the LDO (U7, C34 in, C35 out)
     # in the top strip by the USB-C (VBUS); R35 / C36 at the chip's GPIO9 (pin 14), the right side's top corner
-    "J7": (16.4, 7.25, 270, "B"), "D7": (23.5, 10.25, 0), "D8": (23.5, 6.95, 0),   # (stage 1e: two SMAJ5.0CA, tip and ring, in two rows right of J7; stage 1f: 0.4 right, out of the flipped J7's iron room)
-    "R30": (19.4, 13.4, 0), "C30": (21.2, 13.4, 0), "R31": (19.4, 14.4, 0), "C31": (21.2, 14.4, 0),
-    "U6": (24.6, 15.0, 90), "R32": (22.0, 15.9, 90), "C32": (21.0, 15.9, 90),
-    "R33": (27.0, 14.0, 90), "R34": (28.0, 14.0, 90), "C33": (27.5, 15.9, 0), "C37": (26.3, 17.4, 0),
-    "U7": (25.6, 3.5, 0), "C34": (22.2, 2.3, 90), "C35": (27.5, 10.5, 90),   # (stage 1e: up 1 mm / out of the TVS rows)
+    # stage 2: J7 a PJ-307C (tip pin 5 on the right, ring pin 2 on the left, the ring's switch pin 3: LIN_DET); each TVS
+    # by its pin (D7 tip, upright right of J7; D8 ring, under J2 / J7's legs); the front end in a block of its own in the
+    # board's empty middle-left (x 21.5 .. 29.5, y 16.5 .. 31: under the screen module, all low parts), 12 mm from the
+    # chip, away from the RF corner, each resistor with its twin pads; its LDO (U7) in the block (VSYS in, AVDD short)
+    "J7": (17.6, 6.0, 180, "B"), "D7": (17.4, 15.3, 0), "D8": (17.4, 11.95, 0),
+    # (stage 2, the hand-solder twins: the inputs, pull-downs and detect with their twins in a column left of the USB
+    #  pair, AVDD's LDO beside them; the summer, its gain and bias with their twins right of the pair, by the chip's
+    #  LINE_IN pin: only LIN_SUM and AVDD cross the pair)
+    "R30": (19.95, 19.5, 0), "RT30": (19.95, 21.15, 0), "R31": (19.95, 23.5, 0), "RT31": (19.95, 25.15, 0),
+    "R36": (19.95, 27.5, 0), "RT36": (19.95, 29.15, 0), "R37": (19.95, 31.5, 0), "RT37": (19.95, 33.15, 0),
+    "R38": (19.95, 35.5, 0), "RT38": (19.95, 37.15, 0),
+    "C30": (24.4, 19.5, 0), "C31": (24.4, 23.5, 0), "C34": (24.4, 27.6, 0), "U7": (25.0, 31.0, 0), "C35": (25.0, 34.0, 0),
+    "C37": (26.3, 17.4, 0),
+    "U6": (31.4, 24.8, 90), "C32": (31.4, 28.3, 0), "C33": (31.4, 29.7, 0),
+    "R32": (36.6, 22.6, 0), "RT32": (36.6, 24.25, 0), "R33": (36.6, 26.6, 0), "RT33": (36.6, 28.25, 0),
+    "R34": (41.7, 26.9, 0), "RT34": (41.7, 28.55, 0),
     "C36": (CX + 3.41, CY - 5.5, 90), "R35": (CX + 3.41, CY - 7.3, 90),   # (stage 2: R35 over C36 in LINE_IN's column)
 }
 WIDTH = {"VDD3P3": 0.5, "VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
@@ -167,8 +236,10 @@ PRIORITY = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "DE
 # (net, chip pin y, lane x, lane end y, a via at the end): 0.8 mm apart, each ending in a via, so the router may take
 # any of them on either layer (BOOT, for one, crosses the others to reach the button on the left)
 FANOUT = [("CHIP_PU", CY + 1.4, CX + 7.3, CY - 4.2, True), ("BOOT", CY + 1.0, CX + 6.5, CY - 4.2, True),
-          ("VBAT_ADC", CY + 0.6, CX + 5.7, CY - 4.2, True), ("BTN_YES", CY + 0.2, CX + 4.9, CY - 4.2, True),
-          ("BTN_DOWN", CY - 0.6, CX + 4.1, CY - 4.2, True)]
+          ("RST_IO", CY + 0.6, CX + 5.7, CY - 4.2, True), ("CLK_IO", CY + 0.2, CX + 4.9, CY - 4.2, True),
+          ("VBAT_ADC", CY - 0.6, CX + 4.1, CY - 4.2, True)]
+# (stage 2: pins 6 / 7 / 9 carry the charge pump, CLOCK and the cell's level: parts.py GPIO; YES / DOWN moved to the
+#  chip's left side)
 # (mini 2.2: GPIO1's lane carries the cell's level; stage 2: mini 2's VBUS_SENSE / PWR_HOLD lanes (pins 7 / 9) carry UP / DOWN)
 
 board = pcbnew.BOARD()
@@ -197,22 +268,44 @@ def in_din_room(x, y):
 # pulled to the part it serves (the buck to C1 and the chip, the USB parts to the USB-C, the MIDI parts to their sockets);
 # no group within 3 mm of the RF path), ref: (x, y, rotation); they replace PLACE (and the spread) for these parts
 PLACED = {   # (mini 2.2 simplified: only the MIDI OUT resistors and BOOT's pull-up are left of the placer's groups)
-    "R14": (19.560, 16.810, 180), "R26": (19.560, 14.210, 180), "R15": (18.640, 25.950, 180),
-    "R16": (22.380, 26.770, 0),
 }
 
 # the spread (72 x 65, 2026-11-12): parts placed at absolute y below the chip's top follow the chip down 7.5 mm; the
 # buttons' and the start-up group's row 4 mm; the start-up group (absolute x) follows the middle 5 mm right
-SPREAD_Y = {r: CY - 30.4 for r in ("R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10")}   # (mini 2.2 simplified: the
+SPREAD_Y = {r: CY - 30.4 for r in ("C21", "C22", "C16", "C14", "C15", "C17", "C10")}   # (mini 2.2 simplified: the
 #  chip block's parts only; the buck, the start-up group and MIDI OUT 2's driver are gone)
 SPREAD_X = {}
+
+
+# stage 2: the lower block's parts placed at fixed spots (not from CY or BTN_C): they move down the band with the chip
+LOWER = {"C26", "C27", "C3", "C40", "C41", "C5", "C6", "C72", "C81", "C82", "C83", "D3", "D9", "Q1",
+         "R16", "R50", "R51", "R63", "RT51", "U10", "U2", "U8"}
+# (the cell's protection, U9 / C42 / R52 / Q2 / R53, stays by the sockets above the band; C80 moves by hand)
+
+
+XS_SKIP = {"J11", "R62", "J10B", "C86", "C10", "C11", "C12", "C13", "C14", "C15", "C16", "C17", "C18", "C19", "C20", "C21", "C22", "C23", "C24",
+           "C28", "C36", "C7", "C8", "C9", "J1", "J4", "L2", "L3", "R17", "R19", "R24", "R25", "R3", "R35", "R4", "R8",
+           "U1", "U5", "Y1", "J3", "J6", "R56", "R57", "R59", "RT57", "J10", "SW1", "SW3", "SW4", "SW5"}
+# the parts placed by hand round the chip for the 6 mm band (the pump, CLOCK / RESET, J12): with the chip down BAND - 6
+# more, and right by their x shift (the pump with the chip's DX2, the drivers with the right side's 2 x DX2)
+MID = {**{r: DX2 for r in ("R83", "C84", "D12", "D13", "C85", "R84", "R73", "RT73")},
+       **{r: 2 * DX2 for r in ("Q3", "Q4", "D10", "Q5", "Q6", "D11", "R75", "R76", "R81", "R82", "R74", "R80", "R71", "R77",
+                                "RT79", "R79")}}
 
 
 def place():
     fps = {}
     for ref, _k, value, fp, _lcsc, pins in P.PARTS:
+        if ref in P.TWINS and ref not in PLACE:  # (stage 2: the twins go beside their resistors, place_twins())
+            continue
         x, y, rot, side = (PLACE[ref] + ("T",))[:4]
         x, y = x + SPREAD_X.get(ref, 0.0), y + SPREAD_Y.get(ref, 0.0)
+        if ref in LOWER:                         # (stage 2: the band, BAND_Y)
+            y += BAND
+        if ref in MID:                           # (stage 2: placed by hand for the 6 mm band: they keep their place
+            x, y = x + MID[ref], y + BAND - 6.0  #  over the chip's block)
+        elif ref not in XS_SKIP:
+            x += 0.0 if x < 20.0 else (DX2 if x < 41.0 else 2 * DX2)
         if ref in PLACED and not os.environ.get("NO_PLACED"):   # (NO_PLACED=1: the spread, the placer's start)
             x, y, rot = PLACED[ref]
             y += DY                              # (mini 2: below the LINE IN band)
@@ -250,7 +343,250 @@ def place():
         if p.GetNumber() == "57":
             p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
             windowpane(fps["U1"], p)
+    auto_place(fps)
+    place_twins(fps)
     return fps
+
+
+# stage 2 (the CLOCK / RESET drivers, the LED resistors moved off the top edge for the jacks): no fixed spot; each goes,
+# in this order, to the free spot nearest its target (its courtyard 0.15 mm from the others', 0.35 from a twin's, out
+# of the iron rooms, FORBID, the pivot circle and 0.6 mm inside the edges), its twin at once beside it (place_twins)
+AUTO = [("R40", (10.0, 39.0)), ("R41", (16.0, 39.0))]           # (each with its twin)
+AUTO_REACH = 16.0
+
+
+def _fits(b, fps, rooms, skip, gap=0.15):
+    if b[0] < 0.6 or b[1] < 0.6 or b[2] > W - 0.6 or b[3] > H - 0.6:
+        return False
+    for r, f in fps.items():
+        if r == skip or f.IsFlipped():
+            continue
+        if _box_dist(b, top_box(f)) < (0.35 if r in P.TWINS else gap):
+            return False
+    if any(_box_dist(b, fb) < 0.05 for fb in FORBID):
+        return False
+    if math.hypot(max(b[0] - BTN_C[0], 0, BTN_C[0] - b[2]), max(b[1] - BTN_C[1], 0, BTN_C[1] - b[3])) < PIVOT_R + 0.3:
+        return False
+    return not any(math.hypot(max(b[0] - px, 0, px - b[2]), max(b[1] - py, 0, py - b[3])) < pr for px, py, pr in rooms)
+
+
+def auto_place(fps):
+    if os.environ.get("NO_AUTO"):                # (NO_AUTO=1: leave them off the board, to see the room)
+        return
+    rooms = iron_rooms(fps)
+    for ref, (tx, ty) in AUTO:
+        f = fps[ref]
+        best = None
+        for rot in (0, 90):
+            f.SetOrientationDegrees(rot)
+            f.SetPosition(pcbnew.VECTOR2I(MM(OX), MM(OY)))
+            b0 = top_box(f)
+            n = int(AUTO_REACH / 0.25)
+            for i in range(-n, n + 1):
+                for j in range(-n, n + 1):
+                    d = math.hypot(i, j) * 0.25
+                    if d > AUTO_REACH or (best and d >= best[0]):
+                        continue
+                    x, y = tx + i * 0.25, ty + j * 0.25
+                    if _fits((b0[0] + x, b0[1] + y, b0[2] + x, b0[3] + y), fps, rooms, ref):
+                        best = (d, x, y, rot)
+        if best is None:
+            print(f"AUTO: no room for {ref} within {AUTO_REACH} mm of {tx, ty}")
+            continue
+        _d, x, y, rot = best
+        f.SetOrientationDegrees(rot)
+        f.SetPosition(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)))
+        twins = [t for t, (m, _w) in P.TWINS.items() if m == ref]
+        if twins:
+            place_twins(fps, only=set(twins))
+
+
+TWIN_TRACK = 0.25           # (the two tracks joining a twin to its resistor)
+
+
+def top_box(f):
+    b = f.GetCourtyard(pcbnew.B_CrtYd if f.IsFlipped() else pcbnew.F_CrtYd).BBox()
+    return (pcbnew.ToMM(b.GetLeft()) - OX, pcbnew.ToMM(b.GetTop()) - OY, pcbnew.ToMM(b.GetRight()) - OX,
+            pcbnew.ToMM(b.GetBottom()) - OY)
+
+
+def iron_rooms(fps):
+    """(x, y, r): every through-hole pad's copper + IRON (the DINs, the jacks, the sockets, the header): no top part there"""
+    out = []
+    for f in fps.values():
+        for p in f.Pads():
+            if p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH:
+                out.append((*pad_center(p), max(pcbnew.ToMM(p.GetSize().x), pcbnew.ToMM(p.GetSize().y)) / 2 + IRON))
+            elif p.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH:        # (stage 2: a jack's plastic peg's hole: no part on it)
+                out.append((*pad_center(p), pcbnew.ToMM(p.GetDrillSize().x) / 2 + 0.5))
+    return out
+
+
+def _box_dist(a, b):
+    return math.hypot(max(a[0] - b[2], b[0] - a[2], 0), max(a[1] - b[3], b[1] - a[3], 0))
+
+
+def _seg_hits_box(p, q, b, pad=0.0):
+    for k in range(21):
+        x, y = p[0] + (q[0] - p[0]) * k / 20, p[1] + (q[1] - p[1]) * k / 20
+        if b[0] - pad < x < b[2] + pad and b[1] - pad < y < b[3] + pad:
+            return True
+    return False
+
+
+def _pad_box(q):
+    b = q.GetBoundingBox()
+    return (pcbnew.ToMM(b.GetLeft()) - OX, pcbnew.ToMM(b.GetTop()) - OY, pcbnew.ToMM(b.GetRight()) - OX,
+            pcbnew.ToMM(b.GetBottom()) - OY)
+
+
+def _new_twin(t, x, y, rot, pins):
+    fp = P.FP["twin_c" if t.startswith("CT") else "twin"]
+    f = pcbnew.FootprintLoad(LIB, fp)
+    f.SetFPID(pcbnew.LIB_ID("chip", fp))
+    f.SetReference(t)
+    f.SetValue("twin DNP")
+    f.Reference().SetVisible(False)
+    f.Value().SetVisible(False)
+    f.SetPosition(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)))
+    f.SetOrientationDegrees(rot)
+    for q in f.Pads():
+        q.SetNet(net(pins[q.GetNumber()]))
+    return f
+
+
+TWIN_REACH = {"RT39": 9.0}   # (mm per twin; the default 6: a longer stub, on XTAL_P / XTAL_N or the ADC pin, is worse than none)
+
+
+TWINS_DONE = set()
+# 72 x 72 (the coordinator's: DNP twins may go on the BOTTOM: nothing there is assembled): these sit under their part on
+# the bottom, the same way round; GND by the bottom pour, the other pad by a bottom track to a via TWIN_VIA mm out
+# along the part's axis past the twin's pad (no via on a twin's pad) and a top track from the via to the part's pad
+BOTTOM_TWINS = {"CT8", "CT9", "CT10"}
+TWIN_VIA = 2.0
+BOTTOM_SHIFT = {"CT9": (0.0, 1.8)}
+# the via beside the pad instead of out along the axis (mm from the part's pad): C8's would sit on the fan-out lanes'
+# vias, C10's on C19's ground pad
+BOTTOM_VIA = {"CT8": (1.3, 0.0), "CT10": (-1.3, 0.0)}   # (mm: C9's own ground via, 0.7 mm right of its pad, would sit on CT9's pad)
+
+
+def bottom_twin(fps, t, m, pins):
+    fm = fps[m]
+    cx, cy = pcbnew.ToMM(fm.GetPosition().x) - OX, pcbnew.ToMM(fm.GetPosition().y) - OY
+    sx, sy = BOTTOM_SHIFT.get(t, (0.0, 0.0))
+    f = _new_twin(t, cx + sx, cy + sy, 0, pins)
+    board.Add(f)
+    f.Flip(f.GetPosition(), pcbnew.FLIP_DIRECTION_LEFT_RIGHT)
+    f.SetOrientationDegrees(fm.GetOrientationDegrees())
+    f.SetDNP(True)
+    f.SetExcludedFromBOM(True)
+    f.SetExcludedFromPosFiles(True)
+    fps[t] = f
+    for q in fm.Pads():
+        n = pins[q.GetNumber()]
+        if n == "GND":
+            continue                                  # (the bottom pour)
+        tq = next(z for z in f.Pads() if z.GetNumber() == q.GetNumber())
+        px, py = pad_center(q)
+        tx, ty = pad_center(tq)
+        ux, uy = px - cx, py - cy
+        L = math.hypot(ux, uy) or 1.0
+        vx, vy = cx + ux / L * TWIN_VIA, cy + uy / L * TWIN_VIA
+        if t in BOTTOM_VIA:
+            vx, vy = px + BOTTOM_VIA[t][0], py + BOTTOM_VIA[t][1]
+        add_track(n, 0, px, py, vx, vy, TWIN_TRACK)
+        add_via(n, vx, vy)
+        add_track(n, 1, vx, vy, tx, ty, TWIN_TRACK)
+
+
+def place_twins(fps, only=None):
+    """stage 2: each twin (parts.TWINS, a hand-solder land: make_footprints.twin) not placed from PLACE goes to the
+    nearest free spot within 6 mm of its resistor (turned as it or 90 more): its copper 1.0 mm or more from every other
+    part (their courtyards + 0.35: the twin's own courtyard is its pads + 0.5), out of every through-hole pad's iron
+    room and FORBID, 0.6 mm inside the edges; its two top tracks to the resistor's pads (pad n to pad n) cross no
+    other part and keep 0.45 mm from each other. Every twin then gets its two tracks (no via): parts.py, the twins"""
+    rooms = iron_rooms(fps)
+    boxes = {r: top_box(f) for r, f in fps.items() if not f.IsFlipped()}
+    for t, (m, _why) in P.TWINS.items():
+        if t in TWINS_DONE or (only is not None and t not in only):
+            continue
+        if t in BOTTOM_TWINS:
+            TWINS_DONE.add(t)
+            bottom_twin(fps, t, m, dict(next(q[5] for q in P.PARTS if q[0] == t)))
+            continue
+        if only is None and m in dict(AUTO):
+            continue                             # (placed with its resistor by auto_place)
+        TWINS_DONE.add(t)
+        fm = fps[m]
+        pins = dict(next(q[5] for q in P.PARTS if q[0] == t))
+        if t not in fps:
+            best = None
+            why = collections.Counter()
+            cx, cy = pcbnew.ToMM(fm.GetPosition().x) - OX, pcbnew.ToMM(fm.GetPosition().y) - OY
+            mp = {q.GetNumber(): pad_center(q) for q in fm.Pads()}
+            mpb = {q.GetNumber(): _pad_box(q) for q in fm.Pads()}
+            mbox = top_box(fm)
+            for rot in (fm.GetOrientationDegrees(), fm.GetOrientationDegrees() + 90):
+                probe = _new_twin(t, 0, 0, rot, pins)
+                pb0 = top_box(probe)
+                pads0 = {q.GetNumber(): (pad_center(q), _pad_box(q)) for q in probe.Pads()}
+                n = int(TWIN_REACH.get(t, 6.0) / 0.25)
+                for i in range(-n, n + 1):
+                    for j in range(-n, n + 1):
+                        x, y = cx + i * 0.25, cy + j * 0.25
+                        b = (pb0[0] + x, pb0[1] + y, pb0[2] + x, pb0[3] + y)
+                        if b[0] < 0.6 or b[1] < 0.6 or b[2] > W - 0.6 or b[3] > H - 0.6:
+                            why["edge"] += 1
+                            continue
+                        if any(r != m and _box_dist(b, o) < 0.35 for r, o in boxes.items()):
+                            why["parts"] += 1
+                            continue
+                        if any(_box_dist(b, fb) < 0.05 for fb in FORBID):
+                            why["forbid"] += 1
+                            continue
+                        if any(math.hypot(max(b[0] - px, 0, px - b[2]), max(b[1] - py, 0, py - b[3])) < pr for px, py, pr in rooms):
+                            why["iron"] += 1
+                            continue
+                        tp = {n: ((c[0] + x, c[1] + y), (bb[0] + x, bb[1] + y, bb[2] + x, bb[3] + y)) for n, (c, bb) in pads0.items()}
+                        if any(_box_dist(tp[n][1], mpb[k]) < 0.3 for n in tp for k in mpb if k != n):
+                            why["own pads"] += 1
+                            continue
+                        mc = ((mbox[0] + mbox[2]) / 2, (mbox[1] + mbox[3]) / 2)
+                        if any(_box_dist(tp[n][1], mbox) < 0.1 for n in tp) or (b[0] < mc[0] < b[2] and b[1] < mc[1] < b[3]):
+                            why["on its resistor"] += 1      # (never over its own part: a part on the twin must sit flat)
+                            continue
+                        segs = [(mp[n], tp[n][0]) for n in ("1", "2")]
+                        if any(_seg_hits_box(s[0], s[1], o) for s in segs for r, o in boxes.items() if r != m):
+                            why["track hits a part"] += 1
+                            continue
+                        if any(_seg_hits_box(s[0], s[1], fb) for s in segs for fb in FORBID):
+                            why["track in forbid"] += 1
+                            continue
+                        if any(_seg_hits_box(s[0], s[1], (px - pr, py - pr, px + pr, py + pr)) for s in segs
+                               for px, py, pr in rooms):
+                            why["track over a through-hole pad"] += 1     # (72 x 72: RT39's crossed J7's tip pad)
+                            continue
+                        if any(_seg_hits_box(segs[a][0], segs[a][1], bx, 0.33) for a, n in ((0, "2"), (1, "1"))
+                               for bx in (mpb[n], tp[n][1])):
+                            why["tracks cross"] += 1
+                            continue
+                        cost = math.hypot(i, j) * 0.25 + sum(math.dist(*s) for s in segs)
+                        if best is None or cost < best[0]:
+                            best = (cost, x, y, rot, b)
+            if best is None:
+                print("TWIN NOT PLACED", t, "beside", m, f"({cx:.1f}, {cy:.1f}):", dict(why.most_common()))
+                continue
+            _c, x, y, rot, b = best
+            f = _new_twin(t, x, y, rot, pins)
+            board.Add(f)
+            f.SetDNP(True)
+            f.SetExcludedFromBOM(True)
+            f.SetExcludedFromPosFiles(True)
+            fps[t] = f
+            boxes[t] = b
+        for q in fm.Pads():                          # (pad n to pad n)
+            tq = next(z for z in fps[t].Pads() if z.GetNumber() == q.GetNumber())
+            add_track(pins[q.GetNumber()], 0, *pad_center(q), *pad_center(tq), TWIN_TRACK)
 
 
 EP_VIAS = [(dx, dy) for dx in (-1.3, 0.0, 1.3) for dy in (-1.3, 0.0, 1.3)]   # the exposed pad's 9 vias (Espressif: 9 or more)
@@ -327,8 +663,9 @@ def label(text, x, y, size=0.8, rot=0.0, layer=pcbnew.F_SilkS):
     t.SetLayer(layer)
     if layer == pcbnew.B_SilkS:                   # (bottom silk reads right way round from below)
         t.SetMirrored(True)
+    size = max(size, 0.8)                         # (stage 2: JLCPCB's minimum, 0.8 mm text with a 0.15 mm stroke)
     t.SetTextSize(pcbnew.VECTOR2I(MM(size), MM(size)))
-    t.SetTextThickness(MM(0.12))
+    t.SetTextThickness(MM(0.15))
     board.Add(t)
 
 
@@ -450,8 +787,8 @@ def rf_path(fps):
     RF_SEGS.append(("+3V3", 0, c12p[0], c12p[1], c11p[0], c11p[1], 0.25))
     u5v = pad_center(pad_of(fps, "U5", "5"))      # (U5's VBUS pin sits between D+ and D-: fed through a via above it,
     vb = (u5v[0], u5v[1] - 1.0)                     # from the bottom, so VBUS never crosses the data lines on top)
-    RF_SEGS.append(("VBUS", 0, vb[0], vb[1], u5v[0], u5v[1], 0.25))
-    FIXED_VIAS.append(("VBUS", vb[0], vb[1]))
+    RF_SEGS.append(("VUSB", 0, vb[0], vb[1], u5v[0], u5v[1], 0.25))
+    FIXED_VIAS.append(("VUSB", vb[0], vb[1]))
     u1p, u3p = pad_center(pad_of(fps, "U5", "1")), pad_center(pad_of(fps, "U5", "3"))
     RF_SEGS.append(("UDP", 0, u6[0], u6[1], u1p[0], u1p[1], 0.2))     # (U5's flow-through: pin 6 -> 1, 4 -> 3, under it)
     RF_SEGS.append(("UDN", 0, u4[0], u4[1], u3p[0], u3p[1], 0.2))
@@ -461,8 +798,21 @@ def rf_path(fps):
         px, py = pad_center(pad_of(fps, "U1", pin))
         rx, ry = pad_center(pad_of(fps, ref, "2"))
         n = "USB_DP" if pin == "26" else "USB_DN"
-        RF_SEGS.append((n, 0, px, py, px, ry, 0.2))
-        RF_SEGS.append((n, 0, px, ry, rx, ry, 0.2))
+        RF_SEGS.append((n, 0, px, py, px, ry + 0.75, 0.2))      # (stage 2: up, then a short slant into the pad)
+        RF_SEGS.append((n, 0, px, ry + 0.75, rx, ry, 0.2))
+    # stage 2: the pair from U5's chip-side pins (1 D+, 3 D-) to R24 / R25's pad 1, drawn as a coupled pair (0.2 mm,
+    # 0.2 mm apart) on top: down under U5, west under R4 and the screen header's left end, down the corridor between
+    # the LINE IN block and the header (x 28.75 / 29.15), slanting into the pads (Freerouting took it 37 .. 44 mm round
+    # the LINE IN block on the bottom, 3 vias)
+    r24 = pad_center(pad_of(fps, "R24", "1"))
+    r25 = pad_center(pad_of(fps, "R25", "1"))
+    dy = 1.9                                                    # (the slants' height: clear of R25's pad)
+    xp, xn, yp, yn, yd = 28.75 + DX2, 29.15 + DX2, 13.6, 14.0, r24[1] - dy   # (72 x 72: the corridor moved with the middle)
+    ydn = r25[1] - (xn - r25[0]) * dy / (xp - r24[0])       # (D-'s slant parallel to D+'s)
+    for n, pts in (("UDP", [u1p, (u1p[0], yp), (xp, yp), (xp, yd), r24]),
+                   ("UDN", [u3p, (u3p[0], yn), (xn, yn), (xn, ydn), r25])):
+        for a, c in zip(pts, pts[1:]):
+            RF_SEGS.append((n, 0, a[0], a[1], c[0], c[1], 0.2))
     FIXED_VIAS.append(("UDP", v2[0], v2[1]))
     # VDD3P3's two pins (2 and 3) joined on top, at their pads' centre line
     RF_SEGS.append(("VDD3P3", 0, CX + 3.41, CY + 1.8, CX + 3.41, CY + 2.2, 0.2))
@@ -818,8 +1168,17 @@ def zones():
 
 
 def silk():
-    label("MIDI OUT", 6.0, 12.3, 0.7)            # (J2 and J5)
-    label("MIDI OUT 2", W - 6.1, 12.3, 0.7)      # (J3 and J6: mini 2.2 simplified, a copy of MIDI OUT)
+    # stage 2: the D-pad's pivot (case/README "Buttons"): a 3 mm circle at the cross's middle kept free of parts and vias,
+    # a silk ring round it
+    r = pcbnew.PCB_SHAPE(board)
+    r.SetShape(pcbnew.SHAPE_T_CIRCLE)
+    r.SetCenter(pcbnew.VECTOR2I(MM(OX + BTN_C[0]), MM(OY + BTN_C[1])))
+    r.SetEnd(pcbnew.VECTOR2I(MM(OX + BTN_C[0] + PIVOT_R + 0.2), MM(OY + BTN_C[1])))
+    r.SetWidth(MM(0.15))
+    r.SetLayer(pcbnew.F_SilkS)
+    board.Add(r)
+    label("MIDI OUT", 6.0, 19.6, 0.7)            # (J2 and J5)
+    label("MIDI OUT 2", W - 6.1, 19.6, 0.7)      # (J3 and J6: mini 2.2 simplified, a copy of MIDI OUT)
     for ref, text, dx, dy in (("SW1", "NO / BOOT", 0, 3.4), ("SW3", "UP", 0, 3.4), ("SW5", "YES", 0, 3.4),
                               ("SW4", "DOWN", -5.9, 0)):   # (under the buttons; DOWN, at the bottom edge, on its left)
         p = board.FindFootprintByReference(ref).GetPosition()
@@ -841,7 +1200,7 @@ def silk():
     for ref, text in (("JP1", "P1 G|V"), ("JP2", "P2 V|G")):
         p = board.FindFootprintByReference(ref).GetPosition()
         label(text, pcbnew.ToMM(p.x) - OX, pcbnew.ToMM(p.y) - OY + 1.8, 0.6)
-    label("LINE IN", 14.6, 13.6, 0.6)            # (mini 2: J7)
+    label("LINE IN", 14.7, 18.3, 0.6)            # (mini 2: J7)
     # the cells' PH2.0 sockets (mini 2.2): "+" and "-" beside each pad on both sides (the user solders from the top, the
     # socket and the cell are under the board); pin 1 (square) = +, pin 2 = - (README: the LOLIN32 Lite reasoning)
     for ref in ("J8", "J9"):
@@ -851,9 +1210,8 @@ def silk():
             text = "+" if p.GetNetname() == "BAT_C" else "-"
             label(text, x, y - 1.9, 1.0)
             label(text, x, y - 1.9, 1.0, layer=pcbnew.B_SilkS)
-        label("CELL " + {"J8": "1", "J9": "2"}[ref], pcbnew.ToMM(f.GetPosition().x) - OX, pcbnew.ToMM(f.GetPosition().y) - OY + 2.2, 0.6)
-    label("jank mini 2.2", W / 2, 22.5, 1.0, layer=pcbnew.B_SilkS)   # (stage 1e: on the bottom, the strip is gone)
-    label("RF: u.FL J4 -> FPC antenna in the lid", W / 2, 24.3, 0.7, layer=pcbnew.B_SilkS)
+        label("CELL " + {"J8": "1", "J9": "2"}[ref], pcbnew.ToMM(f.GetPosition().x) - OX, pcbnew.ToMM(f.GetPosition().y) - OY - 3.3, 0.6)   # (stage 2: above the signs: U9 is under them)
+    # (stage 2: the bottom's name, date, wordmark and cheat sheet: silk.py, on the routed board)
     if STRIP > 0:
         label("antenna strip:", 12.0, GE + 4.6, 0.6)
         label("no copper", 12.0, GE + 5.5, 0.6)

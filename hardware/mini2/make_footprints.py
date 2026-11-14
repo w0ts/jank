@@ -114,9 +114,80 @@ def write():
         names.append(name)
     open(os.path.join(OUT, "TRS_PADS_SMD.kicad_mod"), "w").write(trs_pads())
     open(os.path.join(OUT, "SJ3_SMD.kicad_mod"), "w").write(sj3())
-    return names + ["TRS_PADS_SMD", "SJ3_SMD"]
+    open(os.path.join(OUT, "R_TWIN_HAND.kicad_mod"), "w").write(twin())
+    open(os.path.join(OUT, "PADS4_SMD.kicad_mod"), "w").write(pads4())
+    open(os.path.join(OUT, "C_TWIN_HAND.kicad_mod"), "w").write(twin("C_TWIN_HAND", CTWIN_PAD, CTWIN_GAP))
+    open(os.path.join(OUT, "PADS2_HAND.kicad_mod"), "w").write(pads2())
+    open(os.path.join(OUT, "PADS6_SMD.kicad_mod"), "w").write(pads6())
+    return names + ["TRS_PADS_SMD", "SJ3_SMD", "R_TWIN_HAND", "C_TWIN_HAND", "PADS4_SMD", "PADS2_HAND", "PADS6_SMD"]
 
 
+def pads6():
+    """stage 2: the recovery pads: six bare top pads 1.5 x 2.5 mm, 2.54 mm apart (a USB-UART adapter's wires or a
+    pogo / header strip held on them): TX, RX, GND, 3V3, EN (CHIP_PU), BOOT (GPIO0)"""
+    pads = [f'  (pad "{i + 1}" smd rect (at {(i - 2.5) * 2.54:.2f} 0) (size 1.5 2.5) (layers "F.Cu" "F.Mask"))' for i in range(6)]
+    a, b = 2.5 * 2.54 + 0.75 + 0.2, 1.25 + 0.2
+    return "\n".join(['(footprint "PADS6_SMD" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
+                      '  (descr "six recovery pads, 2.54 mm pitch, not a part")',
+                      '  (attr smd exclude_from_bom exclude_from_pos_files)',
+                      '  (property "Reference" "J**" (at 0 -2.2 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      '  (property "Value" "pads" (at 0 2.2 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      *pads,
+                      f'  (fp_rect (start {-a:.2f} {-b:.2f}) (end {a:.2f} {b:.2f}) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
+                      ")", ""])
+
+
+def pads4():
+    """stage 2, 72 x 72: J10B, the 2.42" screen's lead pads: four bare top pads as J12's (1.5 x 2.5 mm, 2.54 mm apart)"""
+    pads = [f'  (pad "{i + 1}" smd rect (at {(i - 1.5) * 2.54:.2f} 0) (size 1.5 2.5) (layers "F.Cu" "F.Mask"))' for i in range(4)]
+    a, b = 1.5 * 2.54 + 0.75 + 0.2, 1.25 + 0.2
+    return "\n".join(['(footprint "PADS4_SMD" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
+                      '  (descr "four lead pads, 2.54 mm pitch, not a part")',
+                      '  (attr smd exclude_from_bom exclude_from_pos_files)',
+                      '  (property "Reference" "J**" (at 0 -2.2 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      '  (property "Value" "pads" (at 0 2.2 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      *pads,
+                      f'  (fp_rect (start {-a:.2f} {-b:.2f}) (end {a:.2f} {b:.2f}) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
+                      ")", ""])
+
+
+def pads2():
+    """stage 2: two hand-solder pads for a wired part (the power switch in the lid): 2 x 3 mm copper both sides round a
+    1.0 mm hole (a wire goes through), 4 mm apart, a silk box"""
+    pads = [f'  (pad "{n}" thru_hole rect (at {x:.2f} 0) (size 2.0 3.0) (drill 1.0) (layers "*.Cu" "*.Mask"))'
+            for n, x in (("1", -2.0), ("2", 2.0))]
+    return "\n".join(['(footprint "PADS2_HAND" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
+                      '  (descr "two wire pads (a panel-mount switch), not a part")',
+                      '  (attr through_hole exclude_from_bom exclude_from_pos_files)',
+                      '  (property "Reference" "J**" (at 0 -2.4 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      '  (property "Value" "pads" (at 0 2.4 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      *pads,
+                      '  (fp_rect (start -3.15 -1.65) (end 3.15 1.65) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
+                      '  (fp_rect (start -3.15 -1.65) (end 3.15 1.65) (stroke (width 0.05) (type solid)) (fill none) (layer "B.CrtYd"))',
+                      ")", ""])
+
+
+def twin(name="R_TWIN_HAND", pad=None, gap=None):
+    """stage 2 (the user's): a twin as a hand-solder land, as the SD board's: two bare pads 1.4 x 2.0 mm, 1.2 mm apart
+    (a 0603, 0805 or 1206, or a leaded resistor's legs, soldered with an iron), no paste, not a part. C_TWIN_HAND: the
+    capacitors' spare lands (the "extra DNP pads"), an 0805 hand land 1.0 x 1.4 mm, 0.9 mm apart (an 0603 or 0805 part)"""
+    w, h = pad or TWIN_PAD
+    x = (gap or TWIN_GAP) / 2 + w / 2
+    pads = [f'  (pad "{n}" smd rect (at {s * x:.2f} 0) (size {w} {h}) (layers "F.Cu" "F.Mask"))' for n, s in (("1", -1), ("2", 1))]
+    a, b = x + w / 2 + TWIN_ROOM, h / 2 + TWIN_ROOM
+    return "\n".join([f'(footprint "{name}" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
+                      '  (descr "a twin: hand-solder pads for a resistor in parallel with its neighbour; not a part, no paste")',
+                      '  (attr smd exclude_from_bom exclude_from_pos_files)',
+                      '  (property "Reference" "RT**" (at 0 -1.8 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      '  (property "Value" "twin" (at 0 1.8 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      *pads,
+                      f'  (fp_rect (start {-a:.2f} {-b:.2f}) (end {a:.2f} {b:.2f}) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
+                      ")", ""])
+
+
+CTWIN_PAD, CTWIN_GAP = (1.0, 1.4), 0.9
+TWIN_PAD, TWIN_GAP, TWIN_ROOM = (1.4, 2.0), 1.2, 0.5   # (stage 2: the twins' hand-solder lands; the courtyard 0.5 out:
+#  two twins' copper 1.0 mm apart or more; make_board.py keeps other parts 1.0 mm off too)
 SJ_PITCH, SJ_PAD_W, SJ_PAD_H = 1.3, 1.0, 1.5    # (mini 2.2: KiCad's SolderJumper-3_P1.3mm_Open_Pad1.0x1.5mm sizes)
 
 

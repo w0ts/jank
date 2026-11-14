@@ -23,7 +23,7 @@ B = pcbnew.LoadBoard(os.path.join(HERE, "..", "mini2.kicad_pcb"))
 OX = OY = 100.0
 E, CLR, BT = 1.8, 0.4, 1.6      # (mini_case.scad: the lid's outer face from the board's edge; the side play; the board)
 WINDOW = 4.0                    # (one 4 mm LED window)
-TONGUE = dict(w=5.0, to_nub=7.5, past_nub=1.5, slot=0.8)   # (stage 1f: case/README "Buttons": width, root to the nub, the
+TONGUE = dict(w=4.5, to_nub=7.5, past_nub=1.5, slot=0.8)   # (stage 1f: case/README "Buttons": width, root to the nub, the
 #  free end past the nub, the U slot's width)
 ANT = (3.0, 45.0)               # (mini_case.scad ant_x0, ant_x0 + ant_l: the FPC antenna's seat along the bottom wall)
 CELLS = {"GNB 550 mAh": (66.0, 18.0, 6.2), "BT2.0 450 mAh": (62.0, 15.5, 6.7)}   # (length, width = height on edge, thickness)
@@ -65,7 +65,7 @@ def pad_mid(*refs):
 bb = B.GetBoardEdgesBoundingBox()
 W, H = mm(bb.GetWidth()), mm(bb.GetHeight())
 GE = H                          # (stage 1e: no antenna strip: the ground and the cells' band end at the board's edge)
-MODULE = (34.0 - 27.3 / 2, 14.8 - 1.5, 34.0 + 27.3 / 2, 14.8 - 1.5 + 27.8)   # (make_board.MODULE: HDR (34.0, 14.8))
+MODULE = (35.0 - 27.3 / 2, 15.9 - 1.5, 35.0 + 27.3 / 2, 15.9 - 1.5 + 27.8)   # (make_board.MODULE: HDR (35.0, 15.9))
 INSIDE_W = W + 2 * CLR          # (the case's inside width along x)
 out = []
 M = 14.0
@@ -113,10 +113,10 @@ rect(x0, y0, x1, y1, 'fill="none" stroke="#557" stroke-dasharray="5,3"')
 wx, wy = (x0 + x1) / 2, y0 + 12.0
 rect(wx - 12.25, wy - 6.5, wx + 12.25, wy + 6.5, 'fill="#1d2a3a" fill-opacity="0.85" stroke="#111"')
 text(wx, wy + 0.5, "screen window 24.5 x 13 (lid variant 2)", 10, "#fff")
-# stage 1f: the U-tongues, a pinwheel round the cross (each runs along its side, root -> nub): UP's to the left, NO's
-# down, DOWN's to the right, YES's up; the slot (dark) round three sides of each tongue (light)
+# stage 2: the U-tongues, all four rooted on their left (stage 1f's pinwheel looked like a hooked cross); the slot
+# (dark) round three sides of each tongue (light)
 t = TONGUE
-for ref, s, (ux, uy) in (("SW3", "UP", (-1, 0)), ("SW1", "NO", (0, 1)), ("SW4", "DOWN", (1, 0)), ("SW5", "YES", (0, -1))):
+for ref, s, (ux, uy) in (("SW3", "UP", (-1, 0)), ("SW1", "NO", (-1, 0)), ("SW4", "DOWN", (-1, 0)), ("SW5", "YES", (-1, 0))):
     bx, by_ = pos(ref)
     ends = [(bx - ux * t["past_nub"], by_ - uy * t["past_nub"]), (bx + ux * t["to_nub"], by_ + uy * t["to_nub"])]
     xs, ys = [e[0] for e in ends], [e[1] for e in ends]
@@ -137,7 +137,7 @@ for ref, s, (ux, uy) in (("SW3", "UP", (-1, 0)), ("SW1", "NO", (0, 1)), ("SW4", 
     rect(rx0, ry0, rx1, ry1, 'fill="#e9e6df"')
     circ(bx, by_, 2.5, 'fill="#c84" stroke="#642"')
     text((x0 + x1 + ux * t["to_nub"] * 0.5) / 2, (y0 + y1 + uy * t["to_nub"] * 0.5) / 2 + 1.0, s, 8, "#222")   # (toward the root)
-text(pos("SW5")[0] - 3.0, H + E + 2.4, "U-tongues: 5 wide, 7.5 root to nub, 0.8 slot", 8, "#333")
+text(pos("SW5")[0] - 3.0, H + E + 2.4, "U-tongues: 4.5 wide, 7.5 root to nub, 0.8 slot", 8, "#333")
 lx, ly = pad_mid("LED1", "LED2")
 circ(lx, ly, WINDOW, 'fill="#fff" stroke="#c33" stroke-width="2"')
 text(lx + 7.5, ly + 0.5, "LED window (variant 1)", 9, "#a22")

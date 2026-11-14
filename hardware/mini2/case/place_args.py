@@ -3,7 +3,8 @@
 """Prints the OpenSCAD -D arguments for mini_case.scad from the finished board (mini2.kicad_pcb), read as text so KiCad's
 Python is not needed; the board, not make_board.py, so every part comes out where it is.
 mini 2.2: btn (the four buttons SW3 UP, SW1 NO / BOOT, SW4 DOWN, SW5 YES; stage 1f: no RST), led (the middle of LED1 and LED2:
-one window), hdr (J10, the screen's header), j4 (the u.FL), ph (J8, J9, the cells' sockets, on the bottom), W, H, din_y
+one window), hdr (J10, the screen's header), j4 (the u.FL), ph (J8, J9, the cells' sockets, on the bottom), j2 / j3 / j7 (the
+jacks' origins, on the bottom), W, H, din_y
 (J5's axis).
 Usage: place_args.py ../mini2.kicad_pcb"""
 import math
@@ -49,7 +50,10 @@ out = ["btn=" + vec([at(r) for r in ("SW3", "SW1", "SW4", "SW5")]),
        "led=[%g,%g]" % ((l1[0] + l2[0]) / 2, (l1[1] + l2[1]) / 2),
        "hdr=[%g,%g]" % at("J10"),
        "j4=[%g,%g]" % at("J4"),
-       "ph=" + vec([at(r) for r in ("J8", "J9")])]
+       "ph=" + vec([at(r) for r in ("J8", "J9")]),
+       "j2=[%g,%g]" % at("J2"), "j3=[%g,%g]" % at("J3"), "j7=[%g,%g]" % at("J7"),   # (stage 2: the jacks under the board)
+       "pwr=[%g,%g]" % at("J11"),
+       "j13=[%g,%g]" % at("J13"), "j14=[%g,%g]" % at("J14")]                          # (stage 2: CLOCK / RESET, PJ-320A)                                                     # (stage 2: the power switch's pads)
 xs, ys = [], []
 EDGE = (r'\(gr_(?:line|rect)\s*\(start ([-\d.]+) ([-\d.]+)\)\s*\(end ([-\d.]+) ([-\d.]+)\)'
         r'(?:(?!\(gr_).)*?\(layer "Edge\.Cuts"\)')
