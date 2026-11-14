@@ -77,7 +77,11 @@ PLACE = {
     "ENC1": (W / 2, 27.75, 0),
     "LED1": (W / 2 - 12.0, 27.5, 0), "R40": (W / 2 - 9.0, 26.4, 0), "R41": (W / 2 - 9.0, 27.5, 0), "R42": (W / 2 - 9.0, 28.6, 0),
     "LED2": (W / 2 + 12.0, 27.5, 0), "R43": (W / 2 + 9.0, 26.4, 0), "R44": (W / 2 + 9.0, 27.5, 0), "R45": (W / 2 + 9.0, 28.6, 0),
-    "R46": (W / 2 - 7.7, 33.4, 0), "C40": (W / 2 - 7.7, 34.5, 0), "R47": (W / 2 + 7.7, 33.4, 0), "C41": (W / 2 + 7.7, 34.5, 0),
+    "R46": (W / 2 - 7.9, 33.4, 0), "C40": (W / 2 - 7.9, 34.5, 0), "R47": (W / 2 + 7.9, 33.4, 0), "C41": (W / 2 + 7.9, 34.5, 0),
+    # the twins (DNP 0603 pads in parallel with R40..R45, README "mini 2.2"): a column above each resistor column, between
+    # the encoder and R14 / R26 (left) or Q1 / R20 (right); RT40 / RT43 nearest their resistor rows
+    "RT40": (W / 2 - 8.6, 24.9, 0), "RT41": (W / 2 - 8.6, 23.15, 0), "RT42": (W / 2 - 8.6, 21.4, 0),
+    "RT43": (W / 2 + 8.6, 24.9, 0), "RT44": (W / 2 + 8.6, 23.15, 0), "RT45": (W / 2 + 8.6, 21.4, 0),
     "SW2": (W / 2 + 8.0, 15.6, 0),          # RST (CHIP_PU to ground)
     # the reservoir: one 2200 uF can down each side, under the DINs' holes
     "C1": (5.5, CAN_Y, 90), "C2": (W - 5.5, CAN_Y, 90),

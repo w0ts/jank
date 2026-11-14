@@ -73,6 +73,21 @@
 
 Extended types that pay the fee: C17976, C18185602, C254377, C2763866, C2765186, C2873354, C2909397, C2913196, C293767, C3029072, C470742, C474307, C49338, C51018335, C7519, C76769, C79317, C87532, C88374
 
+## Through-hole parts: who solders them
+
+Through-hole parts a board: C18185602 x3 (PJ-320A-4P DIP), C470742 x1 (EC11E09244BS); 19 joints a board.
+
+| | 5 boards, USD | 10 boards, USD |
+|---|---|---|
+| the table above (THT joints at the SMD rate) | 126.43 | 168.64 |
+| **A: JLC hand-solders them** (Economic; manual joints + labour) | 131.40 | 175.01 |
+| A, if JLC moves the order to Standard (+ setup and stencil; Standard's feeder fees not counted) | 155.38 | 198.99 |
+| **B: the user solders them**: the JLC order without them | 107.69 | 140.74 |
+| B: the through-hole parts bought separately (+ shipping) | 12.34 | 21.34 |
+| **B in all** (+ shipping) | **120.03** | **162.08** |
+
+Whether JLC's Economic assembly takes through-hole parts is not settled: JLC's prototype-assembly page lists "SMT, through-hole and mixed-technology assembly" for both kinds, users report the opposite; the online quote decides. Whether a through-hole part pays the Extended fee is not stated either (counted here, as above).
+
 ## Sources
 
 - econ_setup: USD 8.24, Economic setup fee, JLCONE test quote with the bare ESP32-S3FN8 (2026-11-10)
@@ -82,4 +97,8 @@ Extended types that pay the fee: C17976, C18185602, C254377, C2763866, C2765186,
 - joint: USD 0.0017, per solder joint (JLCPCB's published Economic rate)
 - pcb_5: USD 3.3, bare 2-layer 1.6 mm board, 5 pieces, as in the 2026-11-09 quote (87 x 79.5 mm; a smaller board is not dearer)
 - pcb_10: USD 5, bare 2-layer 1.6 mm board, 10 pieces: an ESTIMATE, not seen in a quote
+- manual_joint: USD 0.0164, manual assembly per joint (1..10,000 joints), Economic and Standard alike, JLCPCB help page updated 2026-10-22
+- hand_labor: USD 3.58, hand-soldering labour per order, same page
+- std_setup: USD 25.56, Standard PCBA setup, single side, same page (if JLC will not take through-hole parts on Economic)
+- std_stencil: USD 8.21, Standard PCBA stencil, single side, same page
 - USD to EUR, an ASSUMED rate (not read on the day): check it: 0.86

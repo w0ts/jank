@@ -1,6 +1,7 @@
 # jank mini 2.2: jank mini 2 with a push encoder and two RGB LEDs (branch hw/mini2.2)
 
-**Stage 1 (2026-11-14): parts, GPIO map, placement, cost. Not routed; nothing ordered, built or measured.** The board
+**Stage 1 and 1b (2026-11-14): parts, GPIO map, placement, the LED resistors' twins, cost, the through-hole prices. Not
+routed; nothing ordered, built or measured.** The board
 file `mini2.kicad_pcb` is now the *placed* board (`LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 make_board.py`), not a routed
 one: `fab/mini2-gerbers.zip`, `render-top.png`, `render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/` are
 still mini 2's until stage 2. Everything below this section is mini 2's text.
@@ -11,7 +12,7 @@ still mini 2's until stage 2. Everything below this section is mini 2's text.
 (**ALPS EC11E09244BS, C470742**: 18 detents / 9 pulses, push 0.5 mm, 20 mm D shaft, through hole; JLC solders it by
 hand, like the jacks; its fee for that is not in `fab/cost.md`); **LED1 / LED2**, two RGB LEDs **SZYY1615RGB-A
 (C3029072)**, 1.6 x 1.5 mm, common cathode, G / B Vf 2.6..3.0 V (low enough for 3.3 V); **R40..R45** 1 k (C11702, Basic),
-one per anode; **R46 / R47** 100 k pull-ups and **C40 / C41** 10 nF on A / B (codes already on the board). 107 parts
+one per anode, each with a DNP twin (RT40..RT45, below); **R46 / R47** 100 k pull-ups and **C40 / C41** 10 nF on A / B (codes already on the board). 113 parts
 in the schematic, 101 fitted, 52 BOM lines, 312 joints.
 
 **Why discrete RGB, not addressable:** 0 mA when off. Every addressable part JLC stocks (SK6805-EC15, SK6812MINI-E,
@@ -32,10 +33,15 @@ unmeasured (mini 2's red LED ran ~0.3 mA through 5.1 k).
 
 | Function | GPIO | Chip pin | Notes |
 |---|---|---|---|
-| BOOT = the encoder's push (D / E) | 0 | 5 | replaces SW1; R16 10 k pull-up; push + RST = download mode |
+| BOOT = the encoder's push (D / E) | 0 | 5 | replaces SW1; R16 10 k pull-up; push + RST = download mode (the user's ruling 2026-11-14: kept) |
 | ENC_A / ENC_B | 33 / 34 | 38 / 39 | left side; VDD_SPI domain (inputs only here); *free on the FN8 (quad flash in package, no PSRAM): confirm in the datasheet's in-package flash pin table before stage 2* |
 | LED1 (beat) anodes 1 / 2 / 3 | 38 / 39 / 40 | 43 / 44 / 45 | bottom-left corner, VDD3P3_CPU domain; GPIO38 was mini 2's LED |
 | LED2 (status) anodes 1 / 2 / 3 | 11 / 12 / 13 | 16 / 17 / 18 | top side, by MIDI2_TX (pin 15), towards LED2; *the way out past R35 / C36 / C20 is tight: stage 2 may move them, or use GPIO41 / 42 / 44 instead* |
+
+**GPIO0's strap is untouched:** the BOOT net is the chip's pin 5, R16 (10 k to +3V3) and the encoder's D pin, nothing
+else (the netlist, `fab/mini2.net.xml`, 2026-11-14): no capacitor to slow it, no other driver; it is read only at
+reset, a normal input after it. Holding the knob down through RST or a replug always enters the ROM's download mode,
+whatever the firmware does.
 
 Unchanged: everything else in "Pin map" below (GPIO38's LED_DRV is now LED1's anode 1). Still free: GPIO5..8 (ADC1,
 closed in by the fan-out lanes), 14..18, 35..37, 41..44; strapping 3, 45, 46. **Which colour sits on which anode pad is
@@ -46,13 +52,24 @@ anodes have the same 1 k, so the colour map is firmware only.
 BOOT, RST and the red LED were; **LED1 (BEAT) at (21.0, 27.5) and LED2 (STATUS) at (45.0, 27.5)**, 12 mm each side of the
 shaft (5 mm outside a 14 mm knob), their resistors between them and the encoder; R46 / C40 by pin A, R47 / C41 by pin B;
 **SW2 (RST) at (41.0, 15.6)**, under the USB-C's right side, 14 mm from the shaft. The board stays **66 x 68 mm**.
-Checks on the placed board: ERC 0 errors (1 warning, ANT_END as before); `check_nets.py` 334 pads, 0 problems; DRC 0
-courtyard overlaps (only the expected unconnected items: not routed). No top part entered the DIN pads' iron room.
+**The twins (stage 1b, the user's 2026-11-14):** RT40..RT45, a bare 0603 pad pair in parallel with each LED resistor
+(R40..R45), as hardware/sd-board's twins in the optimist repo: not fitted (no part, no paste, out of the BOM and the
+CPL), no via and no track of their own (stage 2 joins each pad to the net it shares with its resistor, on the top). A
+second resistor soldered there brightens that colour (1 k // 1 k = 500 ohm). A column of three above each resistor
+column, between the encoder and R14 / R26 (left) or Q1 / R20 (right); RT40 / RT43 nearest their resistors.
+
+**Checks on the placed board (stage 1b, 2026-11-14):** ERC 0 errors (1 warning, ANT_END as before); `check_nets.py` 346
+pads, 0 problems; courtyards measured as boxes on every top part pair: **no new overlap**. (The stage-1 note "DRC 0
+courtyard overlaps" was not enough: KiCad's DRC let 0.01..0.05 mm touches through, R46 / R47 / C40 / C41 on the
+encoder's; they are 0.2 mm further out now. mini 2's own five touches remain: D4 / D5 0.05, R18 / R19 0.07, C34 / U7
+0.04 mm, C12 with C13 and C23 0.00.) DRC: only the expected unconnected items (not routed) and the library notes of the
+DNP parts. No top part entered the DIN pads' iron room. `fab/cost.md` regenerated: the twins are DNP, so the cost does
+not change.
 
 **Case (sketch only: `case/sketch_22.py` -> `case/renders/sketch-2.2.png`):** the lid stays 12.4 mm over the board (the
 cans); the shaft top is **24.5 mm** over the board (ALPS drawing, *unverified*), so ~12 mm stands above the lid: the big
 box's 14 x 12 knob (10 mm bore) sits ~2 mm over the lid. Shaft hole ~7.6 mm (the 7 mm bushing reaches ~11.5 mm,
-*unverified*, into the 11.0..12.4 mm roof). Two LED light pipes as mini 2's LED1 window; RST a cap or a pin hole. A post
+*unverified*, into the 11.0..12.4 mm roof). Two LED light pipes as mini 2's LED1 window; RST a button cap like mini 2 (the user's default, 2026-11-14). A post
 in the base under the encoder (the push loads the middle of the board) is for stage 2.
 
 **Cost (cost.py's method, `fab/cost.md`; mini 2's 2026-11-13 snapshot, the 3 new codes read 2026-11-14):** **10 boards
@@ -61,6 +78,36 @@ $168.64 ($16.86 a board) against mini 2's $141.41: +$27.23**: the encoder $19.68
 hand-soldering fee for the through-hole encoder (as for the jacks). No cheaper EC11 with the same 18 / 9 detents was in
 stock at JLC on 2026-11-14; the SMD EC11J1525402 (C209762, $3.06, 30 / 15 detents) is the fallback if JLC will not
 hand-solder.
+
+**Through-hole parts: who solders them (stage 1b; `fab/cost.md` "Through-hole parts", from `make_assembly.py`'s new
+`tht` / `tht_joints`).** Through hole on mini 2.2 today: the three jacks (J2, J3, J7: PJ-320A-4P DIP, 4 joints each),
+the encoder (7 joints), the DINs (DNP: the user solders them): **19 joints a board for JLC**. JLC's prices (help page
+"PCB Assembly Cost", updated 2026-10-22, read 2026-11-14): **manual soldering $0.0164 a joint** (1..10,000 joints) and
+**$3.58 labour an order**, the same for Economic and Standard; Economic's setup $8.18 / stencil $1.53, Standard's $25.56
+/ $8.21 (one side). **Does Economic take through-hole parts?** Not settled: JLC's prototype-assembly page lists "SMT,
+through-hole and mixed-technology assembly" for both kinds; forum users report a through-hole part moving the order out
+of Economic; only the online quote decides. **mini 2's jacks have never been quoted**: the design assumed JLC solders them by
+hand (README "DIN").
+
+| 10 boards (USD, parts snapshot 2026-11-13 + 2026-11-14) | total |
+|---|---|
+| cost.py's table (through-hole joints at the SMD rate, as mini 2's $141.41) | 168.64 |
+| **A: JLC hand-solders the jacks and the encoder** (Economic: 190 joints x $0.0164 + $3.58) | **175.01** |
+| A, if JLC moves the order to Standard (+ setup and stencil; Standard's feeder fees not counted) | 198.99 |
+| **B: the user solders them**: the JLC order without them (parts, 2 Extended fees, joints) | 140.74 |
+| B: the jacks and encoders bought separately (same unit prices, no JLC loss; + shipping) | 21.34 |
+| **B in all** (+ shipping) | **162.08** |
+
+**The connectors and controls, SMD or through hole (JLC parts search, 2026-11-14; prices at 10 pieces):**
+
+| Part | Now | Through-hole option | Fits? |
+|---|---|---|---|
+| Encoder ENC1 | ALPS EC11E09244BS, THT (C470742) $1.97: 10 boards $19.68; A +$1.15 joints, B: the user solders 7 | (SMD instead: EC11J1525402, C209762, $2.60, 30 / 15 detents, 11 SMD pads: $25.98 for 10, machine placed) | THT kept: cheaper, the big board's part, the user's preference |
+| Jacks J2, J3, J7 | PJ-320A-4P DIP, THT (C18185602) $0.055 | already through hole | as is |
+| DINs J5, J6 | DIN-504B-M10, THT (C2939346) $0.37, DNP | already through hole, the user solders | as is |
+| USB-C J1 | TYPE-C 16PIN 2MD(073) (C2765186) $0.073: SMD contacts, **4 through-hole shell legs** (the plug's force goes into them) | TYPE-C-31-D-09 (C7463258) $0.29, 16 pins + 4 legs all through hole (1.1 mm pitch, 0.8 mm pads): +$2.18 for 10, +20 joints a board (A: +$3.28 for 10) | **not a drop-in**: about the same width (pins +-3.85 mm, legs +-2.5 mm against +-4.32 mm now), but the USB corner (U5 under the connector, the drawn D+ / D- bridge, the VBUS via) must be redrawn round its two rows of holes; its height and how far it stands past the edge are unverified (no 3D model read) |
+| u.FL J4 | Hirose U.FL-R-SMT-1, SMD | **none**: u.FL exists only as SMD | as is |
+| RST SW2 | TS-1187A 5.1 x 5.1 SMD (C318884, Basic) $0.022 | 6 x 6 THT: HRO K2-1102DP-C4SW-04 (C110153) $0.059, 5 mm (JLC refused the K2-1102DP family for the big board on 2026-11-09); TS-6645DD-6x6x5-100 (C53431127) $0.041, stock 519 | the spot (41.0, 15.6) has 7.4 x 5.5 mm: a 6 x 6 with its legs about 6.5 x 4.5 should fit (*unverified*); Basic -> Extended (+$3.09 under A, nothing under B) |
 
 **Power note (from the MIDI-power study, 2026-11-14):** beat follow needs USB power anyway (23..41 mA against
 4.6..9.2 mA from a MIDI OUT); the LINE IN's front end (U7, from VBUS) is off without USB, which fits.

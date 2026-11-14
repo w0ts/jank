@@ -63,7 +63,8 @@ U1 = dict(CHIP_PIN)
 U1.update({pin: name for name, (_g, pin) in GPIO.items()})
 
 DNP = {"C24", "C25", "C26", "R18",   # (pads only: the matching positions, the chip antenna's 0 ohm)
-       "J5", "J6"}                            # (the DIN sockets, bottom side: an optional hand-solder, README "DIN")
+       "J5", "J6",                            # (the DIN sockets, bottom side: an optional hand-solder, README "DIN")
+       "RT40", "RT41", "RT42", "RT43", "RT44", "RT45"}   # (mini 2.2: the LED resistors' twins, README "mini 2.2")
 # JLC's footprint for the DIN-504B-M10 numbers its pads 1..5 along the two rows, not as the DIN pins. Its frame and
 # hardware/pcb's own table for the part (HY_PINS, the CUI SDS-50J pattern; the same in hardware/pcb/lib) agree: the
 # shell pins at the front, the 3-pin row 2.5 mm before the 2-pin row, x the same way. So pad 1 (x -7.5) = DIN 3,
@@ -184,6 +185,15 @@ PARTS = [
     ("R43", "R", "1k", "r0402", "C11702", {"1": "LEDB_1", "2": "LB1"}),
     ("R44", "R", "1k", "r0402", "C11702", {"1": "LEDB_2", "2": "LB2"}),
     ("R45", "R", "1k", "r0402", "C11702", {"1": "LEDB_3", "2": "LB3"}),
+    #      the twins (the user, 2026-11-14; as hardware/sd-board's in the optimist repo): a bare pad pair in parallel with
+    #      each LED resistor, not fitted (no part, no paste, out of the BOM and the CPL): a second resistor soldered by
+    #      hand there lowers the total and brightens that colour (1 k // 1 k = 500 ohm). 0603 pads: an 0402 or an 0603 fits
+    ("RT40", "R", "twin DNP", "r0603", "", {"1": "LEDA_1", "2": "LA1"}),
+    ("RT41", "R", "twin DNP", "r0603", "", {"1": "LEDA_2", "2": "LA2"}),
+    ("RT42", "R", "twin DNP", "r0603", "", {"1": "LEDA_3", "2": "LA3"}),
+    ("RT43", "R", "twin DNP", "r0603", "", {"1": "LEDB_1", "2": "LB1"}),
+    ("RT44", "R", "twin DNP", "r0603", "", {"1": "LEDB_2", "2": "LB2"}),
+    ("RT45", "R", "twin DNP", "r0603", "", {"1": "LEDB_3", "2": "LB3"}),
     # ---- the firmware's senses: the reservoir (1 M / 1 M, 100 nF) and VBUS (100 k / 100 k)
     ("R10", "R", "1M", "r0402", "C26083", {"1": "VSYS", "2": "VBANK_ADC"}),
     ("R11", "R", "1M", "r0402", "C26083", {"1": "VBANK_ADC", "2": "GND"}),

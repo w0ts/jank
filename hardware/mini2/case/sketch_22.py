@@ -104,7 +104,7 @@ for name, (x, y) in leds.items():
     text(x, y - 3.0, f"{name} LED", 11, fill="#a22")
     text(x + (-2.0 if x < shaft[0] else 2.0), y + 4.6, f"{d:.1f} mm from the shaft", 9)
 circ(*rst, 3.8, 'fill="#fff" stroke="#36c" stroke-width="2"')
-text(rst[0], rst[1] - 3.0, "RST (cap or pin hole?)", 10, fill="#246")
+text(rst[0], rst[1] - 3.0, "RST (button cap, as mini 2)", 10, fill="#246")
 text(W / 2, H + E + 5.5, "jank mini 2.2: lid from above (stage 1 sketch, board top view, y down)", 13)
 
 # ---- (2) the section through the shaft (x along the board, z up), drawn right of the top view

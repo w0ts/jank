@@ -56,6 +56,7 @@ def main():
     ox, oy = (pcbnew.ToMM(v) for v in (b.GetDesignSettings().GetAuxOrigin().x, b.GetDesignSettings().GetAuxOrigin().y))
     info = {p[0]: p for p in P.PARTS}
     rows, places, joints, sides = [], [], 0, set()
+    tht, tht_joints = {}, 0
     for fp in b.GetFootprints():
         ref = fp.GetReference()
         lcsc = info[ref][4]
@@ -72,6 +73,9 @@ def main():
         places.append((ref, x - ox, oy - y, "Bottom" if bottom else "Top", rot))
         joints += sum(1 for p in fp.Pads() if p.GetNumber())
         sides.add("Bottom" if bottom else "Top")
+        if "TH_" in name:                                # (mini 2.2: a through-hole part, soldered by hand: cost.py)
+            tht[lcsc] = tht.get(lcsc, 0) + 1
+            tht_joints += sum(1 for p in fp.Pads() if p.GetNumber())
     refs = [p[0] for p in places]
     assert len(refs) == len(set(refs))
     W = pcbnew.ToMM(b.GetBoardEdgesBoundingBox().GetWidth())
@@ -100,7 +104,7 @@ def main():
         for ref, x, y, side, rot in sorted(places, key=lambda p: nat(p[0])):
             f.write(f"{ref},{x:.3f}mm,{y:.3f}mm,{side},{rot}\n")
     summary = {"variant": NAME, "board_mm": [round(W, 2), round(H, 2)], "parts": len(rows), "lines": len(groups),
-               "joints": joints, "sides": sorted(sides),
+               "joints": joints, "sides": sorted(sides), "tht": tht, "tht_joints": tht_joints,
                "qty": {code: len(rs) for (_n, code), rs in groups.items()}}
     json.dump(summary, open(os.path.join(FAB, "summary.json"), "w"), indent=1)
     print(f"{os.path.relpath(FAB, HERE)}/bom.csv {len(groups)} lines, cpl.csv {len(rows)} parts ({', '.join(sorted(sides))}),"
