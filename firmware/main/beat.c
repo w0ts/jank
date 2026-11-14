@@ -24,7 +24,7 @@
 #include "usb_audio.h"
 
 #define BEAT_PRIO 3
-#define BEAT_STACK 8192
+#define BEAT_STACK 16384               /* measured in QEMU with a synthetic loop: 8192 left < 300 bytes free (ModeBpm, the reports) */
 #define POLL_MS 5
 #define STEP_EVERY_US 250000           /* the Link session is looked after this often, and at each tracked beat */
 #define WINDOW_US 1000000              /* the CPU share is over this long */
