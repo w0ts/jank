@@ -52,7 +52,14 @@ def fit_error(fp, x, y, rot, bottom):
 
 
 def main():
+    """one BOM / CPL / summary per order (mini 2.2: parts.VARIANTS, fab/<variant>/)"""
     b = pcbnew.LoadBoard(os.path.join(HERE, f"{NAME}.kicad_pcb"))
+    for variant in P.VARIANTS:
+        write(b, variant)
+
+
+def write(b, variant):
+    out = os.path.join(FAB, variant)
     ox, oy = (pcbnew.ToMM(v) for v in (b.GetDesignSettings().GetAuxOrigin().x, b.GetDesignSettings().GetAuxOrigin().y))
     info = {p[0]: p for p in P.PARTS}
     rows, places, joints, sides = [], [], 0, set()
@@ -60,8 +67,8 @@ def main():
     for fp in b.GetFootprints():
         ref = fp.GetReference()
         lcsc = info[ref][4]
-        if not lcsc or not P.fitted(ref):
-            continue                                     # (the cable pads; the unfitted positions)
+        if not lcsc or not P.fitted(ref, variant):
+            continue                                     # (the cable pads; the unfitted positions; the other order's parts)
         x, y = pcbnew.ToMM(fp.GetPosition().x), pcbnew.ToMM(fp.GetPosition().y)
         bottom = fp.IsFlipped()
         rot = round(fp.GetOrientationDegrees()) % 360
@@ -93,21 +100,21 @@ def main():
             values[(name, code)].append(value)
     codes = [code for _n, code in groups]
     assert len(codes) == len(set(codes)), "one LCSC code on two footprints"
-    os.makedirs(FAB, exist_ok=True)
-    with open(os.path.join(FAB, "bom.csv"), "w", newline="") as f:
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, "bom.csv"), "w", newline="") as f:
         w = csv.writer(f, quoting=csv.QUOTE_ALL, lineterminator="\n")
         w.writerow(["Comment", "Designator", "Footprint", "LCSC Part #"])
         for (name, code), rs in sorted(groups.items(), key=lambda g: nat(sorted(g[1], key=nat)[0])):
             w.writerow([" / ".join(values[(name, code)]), ",".join(sorted(rs, key=nat)), name, code])
-    with open(os.path.join(FAB, "cpl.csv"), "w") as f:
+    with open(os.path.join(out, "cpl.csv"), "w") as f:
         f.write("Designator,Mid X,Mid Y,Layer,Rotation\n")
         for ref, x, y, side, rot in sorted(places, key=lambda p: nat(p[0])):
             f.write(f"{ref},{x:.3f}mm,{y:.3f}mm,{side},{rot}\n")
-    summary = {"variant": NAME, "board_mm": [round(W, 2), round(H, 2)], "parts": len(rows), "lines": len(groups),
+    summary = {"variant": variant, "board_mm": [round(W, 2), round(H, 2)], "parts": len(rows), "lines": len(groups),
                "joints": joints, "sides": sorted(sides), "tht": tht, "tht_joints": tht_joints,
                "qty": {code: len(rs) for (_n, code), rs in groups.items()}}
-    json.dump(summary, open(os.path.join(FAB, "summary.json"), "w"), indent=1)
-    print(f"{os.path.relpath(FAB, HERE)}/bom.csv {len(groups)} lines, cpl.csv {len(rows)} parts ({', '.join(sorted(sides))}),"
+    json.dump(summary, open(os.path.join(out, "summary.json"), "w"), indent=1)
+    print(f"{os.path.relpath(out, HERE)}/bom.csv {len(groups)} lines, cpl.csv {len(rows)} parts ({', '.join(sorted(sides))}),"
           f" {joints} joints; every part within 0.01 mm of JLC's footprint")
 
 

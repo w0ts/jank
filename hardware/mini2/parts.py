@@ -27,6 +27,7 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
     "din": "CONN-TH_DIN-504B-M10",
     "sot235": "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", "tvs2": "SOT-23_L2.9-W1.3-P1.90-LS2.4-BR",   # (mini 2: LINE IN)
     "led0805": "LED0805-R-RD", "sot25bl": "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL", "ph2": "CONN-TH_B2B-PH-K-S",
+    "sot223": "SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR",   # (stage 1d: the AMS1117, the "usb" order's LDO)
     "sod123": "SOD-123_L2.7-W1.6-LS3.7-RD-1",   # (mini 2.2: the green LED, the charger, the cells' sockets, D3)
 }
 
@@ -75,35 +76,44 @@ PARTS = [
     ("R25", "R", "22", "r0402", "C25092", {"1": "UDN", "2": "USB_DN"}),
     ("R3", "R", "5.1k", "r0603", "C23186", {"1": "CC1", "2": "GND"}),
     ("R4", "R", "5.1k", "r0603", "C23186", {"1": "CC2", "2": "GND"}),
-    # ---- power (mini 2.2 simplified with the battery, the user's 2026-11-14): VBUS through D3 into VSYS; the cell into
-    #      VSYS through Q1 (a P-FET, on while VBUS is absent); VSYS into U2 HT7833 (3.3 V, 500 mA, 4 uA, dropout 360 mV at
-    #      500 mA: runs from USB and from the cell down to ~3.6 V at full load); CE tied to VIN
+    # ---- power (stage 1d: one board, two orders, VARIANT below): VBUS through D3 into VSYS (both); in "battery" the cell
+    #      into VSYS through Q1 (a P-FET, on while VBUS is absent); VSYS into the 3.3 V LDO, two footprints side by side:
+    #      U2 AMS1117-3.3 (Basic, "usb": 1 A, dropout 1.1 V) or U10 HT7833 ("battery": 500 mA, 4 uA, dropout 360 mV at
+    #      500 mA, runs from the cell; CE tied to VIN). C3 / C5 / C6 serve both
     ("D3", "D", "B5819W", "sod123", "C8598", {"1": "VSYS", "2": "VBUS"}),
-    ("U2", "ldo5", "HT7833", "sot235", "C164106", {"1": "VSYS", "3": "VSYS", "2": "GND", "5": "+3V3"}),
+    ("U2", "ldo223", "AMS1117-3.3", "sot223", "C6186", {"3": "VSYS", "2": "+3V3", "4": "+3V3", "1": "GND"}),
+    ("U10", "ldo5", "HT7833", "sot235", "C164106", {"1": "VSYS", "3": "VSYS", "2": "GND", "5": "+3V3"}),
     ("C3", "C", "10u", "c0603", "C19702", {"1": "VSYS", "2": "GND"}),
     ("C5", "C", "22u", "c0603", "C59461", {"1": "+3V3", "2": "GND"}),
     ("C6", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
-    #      the power path: Q1 AO3401A, drain on the cell (BAT_P), source on VSYS, gate on VBUS (R50 100 k down): no USB =
-    #      gate low, on (its body diode already conducts the same way); USB = gate 5 V, VSYS ~4.7 V above the cell: off
+    #      the power path ("battery"): Q1 AO3401A, drain on the cell (BAT_P), source on VSYS, gate on VBUS (R50 100 k
+    #      down): no USB = gate low, on (its body diode conducts the same way); USB = gate 5 V, VSYS ~4.7 V over the cell: off
     ("Q1", "pfet", "AO3401A", "tvs2", "C15127", {"1": "VBUS", "2": "VSYS", "3": "BAT_P"}),
     ("R50", "R", "100k", "r0402", "C25741", {"1": "VBUS", "2": "GND"}),
-    #      the charger: U8 TP4054-42 (4.2 V) from VBUS, R51 5.1 k on PROG = ~196 mA (1000 V / R_PROG), CHRG left open;
-    #      10 uF at VCC and at BAT
+    #      the charger ("battery"): U8 TP4054-42 (4.2 V) from VBUS, R51 5.1 k on PROG = ~196 mA (1000 V / R_PROG), CHRG
+    #      left open; 10 uF at VCC and at BAT
     ("U8", "chg", "TP4054-42", "sot25bl", "C32574", {"4": "VBUS", "3": "BAT_P", "2": "GND", "5": "PROG"}),
     ("R51", "R", "5.1k", "r0603", "C23186", {"1": "PROG", "2": "GND"}),
     ("C40", "C", "10u", "c0603", "C19702", {"1": "VBUS", "2": "GND"}),
     ("C41", "C", "10u", "c0603", "C19702", {"1": "BAT_P", "2": "GND"}),
-    #      the cell's protection: U9 XB5353A (over-charge, over-discharge, over-current, its own FET in the minus lead):
-    #      VDD on the cell's +, its GND on the cell's minus (BAT_N), VM (4, 5) on the board's GND; 100 nF VDD to BAT_N;
-    #      pin 1 (VT) left open (EasyEDA's symbol; its datasheet not read: UNVERIFIED)
-    ("U9", "prot", "XB5353A", "sot235", "C80628", {"3": "BAT_P", "2": "BAT_N", "4": "GND", "5": "GND"}),
-    ("C42", "C", "100n", "c0402", "C1525", {"1": "BAT_P", "2": "BAT_N"}),
-    #      the cells: two PH2.0 sockets in parallel (the user's choice, risk accepted), not fitted: the user inserts them
-    #      from the bottom (the cells under the board) and solders them on top. Pin 1 = -, pin 2 = + (UNVERIFIED against
-    #      whoop PH2.0 leads: the silk marks + and - on both sides; check a lead with a meter first)
-    ("J8", "ph2", "PH2.0 cell 1", "ph2", "C131337", {"1": "BAT_N", "2": "BAT_P"}),
-    ("J9", "ph2", "PH2.0 cell 2", "ph2", "C131337", {"1": "BAT_N", "2": "BAT_P"}),
-    #      the cell's level: 1 M / 1 M + 100 nF on GPIO1 (ADC1_CH0), from the cell's + (mini 2's R10 / R11 / C8)
+    #      the cell's protection ("battery"): U9 XB5353A (over-charge, over-discharge, over-current, its own FETs in the
+    #      minus lead): its datasheet's application circuit: VDD through R52 100 ohm from the cell's + (XB_VDD), C42 100 nF
+    #      from XB_VDD to its GND (the cell's minus, BAT_N) right at the IC; VM (4, 5) on the board's GND; pin 1 VT open
+    ("U9", "prot", "XB5353A", "sot235", "C80628", {"3": "XB_VDD", "2": "BAT_N", "4": "GND", "5": "GND"}),
+    ("R52", "R", "100", "r0402", "C25076", {"1": "BAT_P", "2": "XB_VDD"}),
+    ("C42", "C", "100n", "c0402", "C1525", {"1": "XB_VDD", "2": "BAT_N"}),
+    #      reverse polarity ("battery", stage 1d): Q2 AO3401A in the cell's + lead, drain on the sockets' + (BAT_C), source
+    #      on BAT_P, gate to GND through R53 100 k: a cell the right way round turns it on (its body diode first), a cell
+    #      the wrong way round meets the body diode reversed and a gate above the source: off
+    ("Q2", "pfet", "AO3401A", "tvs2", "C15127", {"1": "Q2_G", "2": "BAT_P", "3": "BAT_C"}),
+    ("R53", "R", "100k", "r0402", "C25741", {"1": "Q2_G", "2": "GND"}),
+    #      the cells: two PH2.0 sockets in parallel (the user's choice, risk accepted), never fitted: the user inserts them
+    #      from the bottom (the cells under the board) and solders them on top. Pin 1 (square) = +, pin 2 = - (stage 1d:
+    #      the common convention, SparkFun / Adafruit); whoop leads vary between vendors: check every cell with a meter
+    ("J8", "ph2", "PH2.0 cell 1", "ph2", "C131337", {"1": "BAT_C", "2": "BAT_N"}),
+    ("J9", "ph2", "PH2.0 cell 2", "ph2", "C131337", {"1": "BAT_C", "2": "BAT_N"}),
+    #      the cell's level: 1 M / 1 M + 100 nF on GPIO1 (ADC1_CH0). R10 ("battery" only) from the cell's +; R11 and C8 in
+    #      both orders: in "usb" GPIO1 is held at 0 V (not floating), which also tells the firmware which board it runs on
     ("R10", "R", "1M", "r0402", "C26083", {"1": "BAT_P", "2": "VBAT_ADC"}),
     ("R11", "R", "1M", "r0402", "C26083", {"1": "VBAT_ADC", "2": "GND"}),
     ("C8", "C", "100n", "c0402", "C1525", {"1": "VBAT_ADC", "2": "GND"}),
@@ -164,17 +174,23 @@ PARTS = [
     #      soldered by hand there brightens that LED (1 k // 1 k = 500 ohm). 0603 pads: an 0402 or an 0603 fits
     ("RT40", "R", "twin DNP", "r0603", "", {"1": "LED_R", "2": "LED_RA"}),
     ("RT41", "R", "twin DNP", "r0603", "", {"1": "LED_G", "2": "LED_GA"}),
-    # ---- MIDI OUT 1 and MIDI OUT 2 (mini 2.2 simplified: OUT 2 is a passive copy: J3 / J6 on the same nets as J2 / J5)
+    # ---- MIDI OUT 1 and MIDI OUT 2: one UART (GPIO21), each output its own loop (stage 1d, the review's fix: a short or
+    #      a mono plug on one jack no longer stops the other, each receiver gets the full current)
     #      MIDI 1.0 at 3.3 V (CA-033): ring = source through 33 ohm (3 x 100 ohm 1206 in parallel: 33.3 ohm, all Basic;
     #      a mono plug's 0.33 W shared, 0.11 W each), tip = sink through 10 ohm from the UART
     ("J2", "jack", "MIDI OUT", "jack", "C18185602", {"D": "MO_T", "C": "MO_R", "A": "GND"}),
     ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"4": "MO_R", "2": "MO_T", "3": "GND", "6": "GND", "7": "GND"}),   # (pad 4 = DIN 4, pad 2 = DIN 5)
-    ("J3", "jack", "MIDI OUT 2", "jack", "C18185602", {"D": "MO_T", "C": "MO_R", "A": "GND"}),
-    ("J6", "din", "MIDI OUT 2 DIN", "din", "C2939346", {"4": "MO_R", "2": "MO_T", "3": "GND", "6": "GND", "7": "GND"}),
     ("R14", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),   # (R14 // R26 // R48 = 33.3 ohm)
     ("R26", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),
     ("R48", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),
     ("R15", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MO_T"}),
+    #      MIDI OUT 2: the same parts, its own nets (MO2_R / MO2_T); the same TX: GPIO21 sinks both loops (~2 x 6 mA)
+    ("J3", "jack", "MIDI OUT 2", "jack", "C18185602", {"D": "MO2_T", "C": "MO2_R", "A": "GND"}),
+    ("J6", "din", "MIDI OUT 2 DIN", "din", "C2939346", {"4": "MO2_R", "2": "MO2_T", "3": "GND", "6": "GND", "7": "GND"}),
+    ("R21", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),   # (R21 // R27 // R49 = 33.3 ohm)
+    ("R27", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),
+    ("R49", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO2_R"}),
+    ("R20", "R", "10", "r0603", "C22859", {"1": "MIDI_TX", "2": "MO2_T"}),
     # ---- mini 2: LINE IN (README "LINE IN"): a 3.5 mm stereo jack, tip (L) and ring (R) summed to mono by an inverting
     #      summer (each channel 20 k into the op-amp's virtual ground: >= 20 k input impedance, no crosstalk between the
     #      sources), gain 5.6 k / 20 k = 0.28 a channel, -3 dB at ~8.5 kHz (C32 and R35 / C36), AC coupled (7.8 Hz),
@@ -229,7 +245,9 @@ LCSC = {
     "C25079": "120 ohm 1% 0402", "C1531": "2.2 nF 50 V X7R 0402",
     # mini 2.2 simplified
     "C11702": "1 k 1% 0402",
-    "C164106": "Holtek HT7833, 3.3 V LDO, 500 mA, dropout 360 mV at 500 mA, 4 uA, 8 V max, SOT-23-5",
+    "C164106": "Holtek HT7833, 3.3 V LDO, 500 mA, dropout 360 mV at 500 mA, 4 uA, 8 V max, SOT-23-5 (the battery order)",
+    "C6186": "AMS1117-3.3, 3.3 V LDO, 1 A, dropout 1.1 V at 800 mA, 5 mA quiescent, SOT-223 (Basic; the USB order)",
+    "C25076": "100 ohm 1% 0402 (the XB5353A's VDD resistor)",
     "C32574": "TP4054-42-SOT25R, 1-cell Li-ion charger 4.2 V, up to 500 mA, SOT-23-5 (a preferred Extended part)",
     "C15127": "AOS AO3401A, P-MOSFET 30 V 4 A, SOT-23 (the power path)",
     "C80628": "Xysemi XB5353A, 1-cell Li-ion protection with its own MOSFET, SOT-23-5",
@@ -240,8 +258,20 @@ LCSC = {
 }
 
 
-def fitted(ref):
-    return ref not in DNP
+# the two orders (stage 1d, the user's 2026-11-14): one board; "usb" = USB power only, "battery" = the cell circuit
+# fitted. A part named here is fitted in that order only; every other part (not DNP) in both. make_assembly.py writes one
+# BOM / CPL pair per order (fab/usb/, fab/battery/), cost.py prices both.
+VARIANTS = ("usb", "battery")
+ONLY = {"U2": "usb",                                                         # (the AMS1117: Basic, USB only)
+        **{r: "battery" for r in ("U10", "Q1", "R50", "U8", "R51", "C40", "C41", "U9", "R52", "C42", "Q2", "R53",
+                                  "R10")}}
+
+
+def fitted(ref, variant=None):
+    """on the board as a part (not pads only); with a variant: fitted in that order"""
+    if ref in DNP:
+        return False
+    return variant is None or ONLY.get(ref, variant) == variant
 
 
 def nets():

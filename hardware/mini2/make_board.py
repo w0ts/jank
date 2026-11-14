@@ -82,11 +82,20 @@ PLACE = {
     # the DIN pads' iron room (y 39 on): the two PH2.0 sockets (bottom side, DNP) on one row near the ground edge, the
     # protector (U9) and the charger (U8) above them, the power path (D3, Q1) and the 3.3 V LDO (U2) towards the chip;
     # the cell's divider (R10 / R11 / C8) at GPIO1's fan-out lane, above the chip's right side
-    "J8": (7.0, 54.6, 0, "B"), "J9": (15.0, 54.6, 0, "B"),   # (low: the cells take y 13 .. 52 above them)
+    # (stage 1d: the cells stand on edge under the board in y 39..58, beside the DIN bodies: the two sockets moved out of
+    #  that band to the middle, y 33, between the DIN bodies; their bodies hang under the board there)
+    "J8": (36.5, 33.0, 0, "B"), "J9": (43.0, 33.0, 0, "B"),
+    "Q2": (43.0, 38.5, 0), "R53": (46.0, 38.5, 90),          # (reverse polarity, right by the sockets: BAT_C stays short)
+    "R52": (5.5, 45.0, 90),                                   # (the XB5353A's 100 ohm, by U9 and C42)
+    # MIDI OUT 2's own resistors: R14 / R26 / R48 / R15 mirrored to the right side (the same rooms by J6's pads)
+    "R21": (W - 19.56, 22.21, 0), "R27": (W - 19.56, 24.81, 0), "R49": (W - 19.56, 27.41, 0), "R20": (W - 18.64, 33.95, 0),
     "U9": (7.0, 48.0, 0), "C42": (10.0, 48.0, 90),
     "U8": (14.0, 48.0, 0), "R51": (17.0, 48.0, 90), "C41": (14.0, 44.5, 0), "C40": (10.0, 44.5, 0),
     "D3": (6.0, 42.0, 0), "Q1": (19.5, 44.0, 0), "R50": (19.5, 41.0, 0),
-    "U2": (20.0, 51.0, 0), "C3": (20.0, 54.3, 0), "C5": (23.2, 51.0, 90), "C6": (23.2, 54.0, 90),
+    # the 3.3 V LDO, two footprints (stage 1d): U10 HT7833 ("battery") and U2 AMS1117-3.3 ("usb", SOT-223) left of it,
+    # where the sockets were; C3 / C5 / C6 between them serve both
+    "U10": (20.0, 51.0, 0), "U2": (10.0, 54.0, 0),
+    "C3": (20.0, 54.3, 0), "C5": (23.2, 51.0, 90), "C6": (23.2, 54.0, 90),
     "C8": (CX + 5.1, CY - 6.3, 90), "R11": (CX + 6.1, CY - 6.3, 90), "R10": (CX + 7.1, CY - 6.3, 90),
     "R16": (15.8 + S, 34.85, 0),
     # the chip (turned 180: LNA_IN at the bottom of its right side) and its parts round it
@@ -789,12 +798,12 @@ def silk():
         label(text, pcbnew.ToMM(p.x) - OX, pcbnew.ToMM(p.y) - OY + dy, 0.6)
     label("LINE IN", 14.6, 13.6, 0.6)            # (mini 2: J7)
     # the cells' PH2.0 sockets (mini 2.2): "+" and "-" beside each pad on both sides (the user solders from the top, the
-    # socket and the cell are under the board); pin 1 = -, pin 2 = + (parts.py: UNVERIFIED against whoop leads)
+    # socket and the cell are under the board); pin 1 (square) = +, pin 2 = - (README: the LOLIN32 Lite reasoning)
     for ref in ("J8", "J9"):
         f = board.FindFootprintByReference(ref)
         for p in f.Pads():
             x, y = pad_center(p)
-            text = "+" if p.GetNetname() == "BAT_P" else "-"
+            text = "+" if p.GetNetname() == "BAT_C" else "-"
             label(text, x, y - 1.9, 1.0)
             label(text, x, y - 1.9, 1.0, layer=pcbnew.B_SilkS)
         label("CELL " + {"J8": "1", "J9": "2"}[ref], pcbnew.ToMM(f.GetPosition().x) - OX, pcbnew.ToMM(f.GetPosition().y) - OY + 2.2, 0.6)

@@ -41,6 +41,6 @@ rm -rf fab/gerbers
 "$KC" pcb render --side bottom --width 1400 --height 1400 --quality high --zoom 0.9 -o render-bottom.png mini2.kicad_pcb 2>&1 | Q >/dev/null
 "$KC" pcb render --width 1600 --height 1200 --quality high --perspective --rotate "-40,0,-25" --zoom 0.85 -o render-3d.png mini2.kicad_pcb 2>&1 | Q >/dev/null
 "$KP" make_mockup.py 2>&1 | Q
-echo "fab/mini2-gerbers.zip fab/bom.csv fab/cpl.csv render-top.png render-bottom.png render-3d.png mockup.stl"
+echo "fab/mini2-gerbers.zip fab/usb/{bom,cpl}.csv fab/battery/{bom,cpl}.csv render-top.png render-bottom.png render-3d.png mockup.stl"
 python3 cost.py
 sh case/make_stl.sh

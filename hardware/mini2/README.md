@@ -1,10 +1,125 @@
-# jank mini 2.2 simplified: jank mini 2 with USB or a 1S cell, two MIDI OUTs on one signal, BOOT, RST and one LED window (branch hw/mini2.2)
+# jank mini 2.2: one board, two orders (USB only, or with a 1S cell), two MIDI OUTs, LINE IN, BOOT, RST, one LED window (branch hw/mini2.2)
 
-**Stage 1c (2026-11-14): placed, not routed; nothing ordered, built or measured.** `mini2.kicad_pcb` is the *placed*
+**Stage 1d (2026-11-14): placed, not routed; nothing ordered, built or measured.** `mini2.kicad_pcb` is the *placed*
 board (`LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 make_board.py`): `fab/mini2-gerbers.zip`, `render-top.png`,
-`render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/mini_case.scad` are still mini 2's until stage 2. The
-sections "mini 2.2 (stage 1)" and "1b" below are superseded (the encoder and the RGB LEDs are gone); everything after
-them is mini 2's text.
+`render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/mini_case.scad` are still mini 2's until stage 2. Stage 1d
+(next section) supersedes stage 1c where they differ; "mini 2.2 (stage 1)" and "1b" are superseded (the encoder and the
+RGB LEDs are gone); everything after them is mini 2's text.
+
+## mini 2.2, stage 1d (the user's answers to 1c, and the review's fixes)
+
+**One board, two orders** (`parts.VARIANTS`, `parts.ONLY`): `make_assembly.py` writes `fab/usb/{bom,cpl}.csv` and
+`fab/battery/{bom,cpl}.csv` (and each order's `summary.json`); `cost.py` prices both in `fab/cost.md`.
+
+| Fitted in | Parts |
+|---|---|
+| both | everything else, D3 (VBUS -> VSYS), C3 / C5 / C6, R11 + C8 (GPIO1 held at 0 V in "usb": not floating, and the firmware can tell the orders apart) |
+| **usb** only | U2 **AMS1117-3.3** (C6186, Basic, SOT-223) |
+| **battery** only | U10 **HT7833** (C164106), Q1 + R50 (power path), U8 + R51 + C40 + C41 (charger), U9 + R52 + C42 (protection), Q2 + R53 (reverse polarity), R10 (the divider's top) |
+| never | J8 / J9 (the PH2.0 sockets: the user fits them), J5 / J6 (DINs), the twins, the RF DNP pads |
+
+The two LDOs are alternative footprints on the same VSYS / +3V3 (U2 left of U10). Checked in "usb" with the battery
+parts missing: VSYS = D3 + C3 + U2 + U7 + C34 (complete); VBUS = U5 + D3 (+ nothing of the cell); GPIO1 = R11 + C8 to
+GND; Q1's and Q2's gates are on nets that carry only battery parts (VBUS-R50, Q2_G-R53), so no fitted gate floats;
+BAT_P / BAT_C / BAT_N / XB_VDD / PROG are copper only. In "battery": U2 out, U10 in; every gate has its resistor.
+
+**MIDI OUT 2 has its own loop** (the review's fix): J3 / J6 on MO2_R / MO2_T, R21 // R27 // R49 (3 x 100 ohm 1206,
+C17901, as OUT 1) from +3V3 and R20 10 ohm (C22859, as R15) from GPIO21; no new part type. A short or a mono plug on
+one output no longer stops the other, and each receiver gets the full ~5-7 mA (GPIO21 sinks both: ~2 x 6 mA).
+
+**The XB5353A as its datasheet's application circuit:** VDD (pin 3) through R52 100 ohm (C25076, Basic 0402) from the
+cell's + (net XB_VDD), C42 100 nF from XB_VDD to the IC's GND (BAT_N) right at the IC; VT (pin 1) open.
+
+**Reverse polarity:** Q2 AO3401A in the cell's + lead (drain on the sockets' + BAT_C, source on BAT_P, gate to GND
+through R53 100 k: a cell the right way round turns it on through its body diode, a reversed cell finds it off). Both
+types are already on the board (no fee).
+
+**The sockets' polarity: pin 1 (square pad) = +, pin 2 = -**, printed "+" / "-" on both sides. The reasoning:
+- The user's Wemos LOLIN32 Lite has the opposite polarity to his whoop cells.
+- The LOLIN32 Lite's schematic ("LOLIN32_Lite", rev V1.0.0, 2017-08-30, EAGLE; the PDF Zephyr's board page links,
+  done.land/assets/files/lolin32_lite.pdf, read 2026-11-14): its battery socket **P1 has pin 1 on GND and pin 2 on
+  VBAT** (the TP4054's BAT).
+- So a whoop lead puts its + on pin 1: mini 2.2's J8 / J9 have pin 1 = +, which is also the common SparkFun / Adafruit
+  convention.
+- *Assumed, not verified:* that LOLIN's footprint numbers the socket as JST does (pin 1 at the same physical end), and
+  that the user's board is that revision. JLC's PH2.0 footprint (C131337) has its pad 1 at the end make_footprints.py
+  now makes square.
+- **Check one cell with a meter before the first plug-in.** If the polarity is wrong, **solder the socket turned 180
+  degrees: that swaps + and -.** Both sockets keep room for that: their underside boxes either way round touch nothing
+  (`case/renders/sketch-2.2.png`). Q2 stays as the safety net either way.
+
+**The cells on edge under the board, beside the fitted DINs** (the user: "I would put the battery on their side"),
+`case/renders/sketch-2.2.png`:
+- The sockets moved out of the cell band to the middle (J8 at x 36.5, J9 at x 43.0, y 33, between the DIN bodies; their
+  bodies y 30..36 either way round). The band is then **y 39.0 (the DIN bodies' end) .. 58.1 (the ground edge) = 19.1 mm**
+  across the full width.
+- Two cells standing on edge: **BT2.0 450 mAh (62 x 15.5 x 6.7): 2 x 6.7 = 13.4 mm, 5.7 mm spare; GNB 550 mAh (65..66 x
+  18 x 6..6.2): 12.4 mm, 6.7 mm spare.** No cell in the antenna strip.
+- Length against the case's inside width (66.1 + 2 x 0.4 = 66.9 mm): BT2.0 62 leaves 4.9 mm, GNB 66 only 0.9 mm (its
+  lead leaves one end: a 66 mm cell may not fit with its lead bent; 65 mm leaves 1.9).
+- Depth: the DIN base's floor is 19.95 mm under the board: 18 mm cells leave 1.65 mm, 15.5 mm cells 4.15 mm. Today's
+  no-DIN base (4.3 mm) needs the DIN base's depth.
+- Leads: from a cell's end (x ~0.5 or ~65.5) to the sockets (x 35.5 .. 44) is ~25 .. 45 mm of lead: *the cells' lead
+  lengths are not known here*.
+- **BT2.0 is BetaFPV's own connector, not PH2.0**: a BT2.0 cell does not mate with these sockets (an adapter lead, or
+  the sockets swapped for BT2.0 ones).
+
+**Battery level, firmware (no part):** the LED window blinks to show the cell's level: the emptier, the faster.
+
+**Checks (placed board, 2026-11-14):** ERC 0 errors (1 warning, ANT_END); `check_nets.py` 306 pads, 0 problems;
+courtyards as boxes, top and bottom, J8 / J9 counted either way round: no new overlap (mini 2's C34 / U7 0.04 and
+R18 / R19 0.07 mm touches remain); no top part in the DIN pads' iron room; DRC: unrouted connections and the DNP parts'
+library notes only; both CPLs within 0.01 mm of JLC's footprints. `render-top-placement.png` shows the parts of both
+orders.
+
+**Cost (cost.py's method, `fab/cost.md`; snapshot 2026-11-13, newer parts read 2026-11-14; shipping left out):**
+
+| | usb, 5 boards | usb, 10 boards | battery, 5 boards | battery, 10 boards |
+|---|---|---|---|---|
+| parts / lines / joints a board | 73 / 39 / 239 | | 85 / 44 / 272 | |
+| Extended types | 10 | | 12 (+ HT7833, XB5353A) | |
+| **total** | **$76.50** | **$102.03** | **$86.63** | **$115.31** |
+| per board | $15.30 | $10.20 | $17.33 | $11.53 |
+
+(Stage 1c: $101.07 / $114.00 for 10; +$0.96 / +$1.31 for MIDI OUT 2's loop, R11 + C8 in "usb", R52, Q2 + R53.)
+Through-hole: the 3 jacks, by JLC by hand (+ $5.34 for 10: 120 joints x $0.0164 + $3.58) or by the user ($1.66 of
+jacks bought separately): `fab/cost.md`, per order.
+
+### To evaluate (not applied)
+
+**Antenna: the u.FL only, no chip antenna (AE1)?**
+- **Saves** $3.09 (one Extended type) + AE1 $2.27 for 10 boards (12 x $0.189) = **$5.36 an order**. An external antenna
+  costs about as much: JLC's parts search (2026-11-14) lists HJ-2.4G-IPEX1-L=80mm (C1693673) at $0.47 (10+), 401 in
+  stock, and KH-FPC2.4G-1.13IPEX1-50mm-F022 (C56127484) at $0.33 / $0.26 (50+), 50 in stock; LCSC sells FPC 2.4 GHz
+  antennas on a 50 mm IPEX lead at ~$0.44 (3 dBi listed) and MyAntenna AICF002 (C22467619, adhesive, 4.2..4.4 dBi
+  listed). 10 antennas: ~$2.6 .. 4.7: **net ~$0.7 .. 2.8 an order.**
+- **Gain:** the chip antenna's datasheet gives 5.05 dBi peak, 70.7 % efficiency, **on YAGEO's evaluation board**
+  (fcc.report / components.ru copies, 2013 v0); FPC antennas list 2 .. 4.4 dBi. On paper the chip antenna is not worse.
+  On this board it sits right beside the cells' metal (the band ends at the ground edge): *unmeasured*, it may detune.
+  An FPC antenna stuck inside the lid is away from the cells and the board's ground.
+- **Matching:** the chip side stays (C23 1 pF, L3 3.3 nH, C24 DNP: the S3's own match); the antenna side goes (AE1, the
+  DNP pi C25 / C26 / R18); R19 can stay or become a track. Untuned either way (no VNA).
+- **The strip can go:** the board 10 mm shorter (66 x 58); J4 at the new bottom edge; the cell band (y 39 .. 58) is
+  unchanged. **The board's price does not change** (JLC's 2-layer price is flat up to 100 x 100 mm); the case is 10 mm
+  shorter.
+- **Case:** an FPC antenna sticks inside the lid (mini 2's case already has a seat for one over the strip; it would
+  move): no cable exit, the 50..80 mm lead stays inside. A stick antenna would need an RP-SMA bulkhead and a pigtail
+  (more parts, a hole).
+
+**More cost-down (Extended types that are left; JLC's parts search with the Basic filter, 2026-11-14):**
+
+| Part | Basic / preferred alternative | Saves (10 boards) | Risk |
+|---|---|---|---|
+| 40 MHz crystal (C254377) | none: JLC's Basic crystals are 8, 12, 16, 25 MHz and 32.768 kHz; the S3 needs 40 MHz | - | keep |
+| USBLC6-2SC6 (C7519) | **SRV05-4-P-T7 (C85364), Extended *preferred* (no fee)**, SOT-23-6, 4 lines + VDD; $0.28 against $0.16 | ~$3.09 - $1.4 = **~$1.7** | its pin functions match USBLC6's (1 / 3 / 4 / 6 the lines, 2 GND, 5 VDD) per JLC's listing: *the pinout and its footprint unverified*; 3.5 pF a line, fine at full speed |
+| USB-C (C2765186) | none Basic or preferred found | - | keep |
+| PJ-320A jacks (C18185602) | none Basic or preferred found | - | keep |
+| PESD5V0S2BT (C49338) | kept (the user: must-have) | - | - |
+| HT7833 (battery) | none Basic that runs from a cell | - | only in the battery order |
+| XB5353A (battery) | DW01A + FS8205A: both Extended too (two types) | none | keep |
+| PCB size | flat price to 100 x 100 mm (2 layers); a shorter board saves no PCB money | 0 | - |
+| PCB thickness | 0.8 .. 1.6 mm cost the same at JLC; **the RF line's 1.2 mm width is for 1.6 mm** (README "RF") | 0 | don't |
+| 5 or 10 boards | the order's fixed part (setup $8.24, stencil $1.55, nitrogen $0.91, the types: usb 10 x $3.09, battery 12) is ~46 % of a 10-board order: 10 boards cost a board $10.20 / $11.53 against $15.30 / $17.33 for 5 | - | - |
 
 ## mini 2.2 simplified (stage 1c, the user's decisions of 2026-11-14)
 

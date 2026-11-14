@@ -80,8 +80,12 @@ SYMBOLS["ldo"] = ([("3", "VIN", "power_in")], [("2", "VOUT", "power_out"), ("1",
 SYMBOLS["tvs2"] = ([("1", "IO1", PAS), ("2", "IO2", PAS)], [("3", "COM", PAS)], "D", 5.08)
 # mini 2.2 simplified, with the battery (pins from EasyEDA's symbols): HT7833 (C164106), the P-FET AO3401A (C15127),
 # TP4054 (C32574), XB5353A (C80628: GND = the cell's minus, VM = the load's), the PH2.0 socket (C131337)
-SYMBOLS["ldo5"] = ([("1", "VIN", "power_in"), ("3", "CE", "input")], [("5", "VOUT", "power_out"), ("2", "GND", "power_in"),
+SYMBOLS["ldo5"] = ([("1", "VIN", "power_in"), ("3", "CE", "input")], [("5", "VOUT", PAS), ("2", "GND", "power_in"),
                                                                      ("4", "NC", "no_connect")], "U", 7.62)
+# (HT7833's VOUT passive: it and the AMS1117 are alternatives on one +3V3, one per order; the AMS1117's VOUT drives the
+#  net for the ERC.) The AMS1117-3.3 (EasyEDA's symbol for C6186: 1 GND, 2 VOUT, 3 VIN, 4 the tab = VOUT)
+SYMBOLS["ldo223"] = ([("3", "VIN", "power_in")], [("2", "VOUT", "power_out"), ("4", "TAB", PAS), ("1", "GND", "power_in")],
+                     "U", 7.62)
 SYMBOLS["pfet"] = ([("1", "G", "input")], [("2", "S", PAS), ("3", "D", PAS)], "Q", 5.08)
 SYMBOLS["chg"] = ([("4", "VCC", "power_in"), ("5", "PROG", PAS)], [("3", "BAT", PAS), ("1", "CHRG", "open_collector"),
                                                                   ("2", "GND", "power_in")], "U", 7.62)
@@ -122,7 +126,7 @@ def pin_xy(kind):
     return out
 
 
-FLAGS = ["GND", "VBUS", "VDD3P3", "VSYS", "BAT_P"]   # (power_in pins on these nets need a driver for the ERC; +3V3: U2's VOUT)
+FLAGS = ["GND", "VBUS", "VDD3P3", "VSYS", "XB_VDD"]   # (power_in pins on these nets need a driver for the ERC; +3V3: U2's VOUT)
 
 
 def placed():
@@ -180,12 +184,13 @@ def schematic():
             elif typ != "no_connect":
                 out.append(f'(no_connect (at {lx} {ly}) (uuid "{uid(ref, "nc", num)}"))')
     notes = [
-        "jank mini 2.2 simplified (hardware/mini2/README.md). POWER: VBUS through D3 into VSYS; the cell (BAT_P, J8 / J9 PH2.0 in parallel, DNP)"
-        " through Q1 AO3401A (gate on VBUS, R50 100k) into VSYS; U2 HT7833 VSYS -> +3V3 (C3 10u in, C5 22u + C6 100n out). No MIDI power input.",
-        "CELL: U8 TP4054-42 charges BAT_P from VBUS (R51 5.1k: ~196 mA; C40 / C41 10u); U9 XB5353A protects the cell in its minus lead"
-        " (GND = BAT_N, VM = GND; C42 100n). R10 / R11 1M / 1M + C8 100n: BAT_P / 2 on GPIO1 (VBAT_ADC).",
-        "MIDI OUT 1 (J2, DIN J5) and MIDI OUT 2 (J3, DIN J6) on the same nets (type A): ring = +3V3 through R14 // R26 // R48 (3 x 100 ohm = 33.3 ohm),"
-        " tip = MIDI_TX (GPIO21) through R15 10 ohm, sleeve = GND. J5 / J6: DIN sockets on the bottom (DNP, hand-soldered).",
+        "jank mini 2.2 (hardware/mini2/README.md). Two orders, one board: usb (U2 AMS1117-3.3) / battery (U10 HT7833 and the CELL parts, parts.ONLY)."
+        " POWER: VBUS through D3 into VSYS; VSYS -> U2 or U10 -> +3V3 (C3 10u in, C5 22u + C6 100n out). No MIDI power input.",
+        "CELL (battery order): J8 / J9 PH2.0 in parallel (DNP; pin 1 = +, BAT_C), Q2 AO3401A reverse-polarity FET to BAT_P (R53 100k gate to GND);"
+        " Q1 AO3401A BAT_P -> VSYS (gate on VBUS, R50 100k); U8 TP4054-42 (R51 5.1k: ~196 mA; C40 / C41 10u); U9 XB5353A in the minus lead"
+        " (VDD via R52 100 ohm = XB_VDD, C42 100n to BAT_N; VM = GND); R10 1M (battery) / R11 1M + C8 100n: BAT_P / 2 on GPIO1 (0 V in the usb order).",
+        "MIDI OUT 1 (J2, DIN J5): ring = +3V3 through R14 // R26 // R48 (3 x 100 ohm = 33.3 ohm), tip = MIDI_TX (GPIO21) through R15 10 ohm."
+        " MIDI OUT 2 (J3, DIN J6): its own R21 // R27 // R49 and R20 from the same +3V3 / GPIO21. J5 / J6: DIN sockets on the bottom (DNP).",
         "Pins: GPIO21 MIDI_TX, GPIO0 BOOT (SW1; R16 pull-up only), GPIO38 LED_R (LED1 red, R40 1k), GPIO39 LED_G (LED2 green, R41 1k),"
         " GPIO9 LINE_IN, GPIO1 VBAT_ADC, GPIO19 / 20 USB D- / D+. GPIO3, 45, 46 (strapping) open: internal defaults (3.3 V flash, SPI boot).",
         "U1 ESP32-S3FN8: VDDA C11-C13; VDD3P3 through L2 2 nH (C14-C17 before, C18 after); VDD3P3_CPU C19, VDD3P3_RTC C20; VDD_SPI C21 + C22;"

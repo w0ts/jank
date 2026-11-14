@@ -51,6 +51,8 @@ def jlc(path):
     name = os.path.basename(path)[:-len(".kicad_mod")]
     if name == DIN:
         src = din_pads(src)
+    if name == PH2:                               # (mini 2.2: pin 1 square, the usual mark of pin 1 = + on a PH2.0)
+        src = src.replace("(pad 1 thru_hole circle", "(pad 1 thru_hole rect", 1)
     x0, y0, x1, y1 = bbox(src, name in PADS_ONLY)                 # (the courtyard takes the drawing before the silk goes)
     src = re.sub(r"\n\t\(fp_(?:line|circle|arc|poly|text user) [^\n]*F\.SilkS[^\n]*", "", src)   # (EasyEDA's silk runs over pads and past
     #  the board edge; the board's own labels say what matters)
@@ -85,6 +87,7 @@ def trs_pads():
 # middle, 5.6 mm from its neighbours) and the shell's two pins get 4.0 mm round pads. (pad: angle of the oval's long axis
 # in KiCad's sense, or None for a round pad; size)
 DIN = "CONN-TH_DIN-504B-M10"
+PH2 = "CONN-TH_B2B-PH-K-S"                        # (mini 2.2: the cells' sockets)
 DIN_PADS = {"1": (None, 2.4), "2": (None, 3.0), "4": (None, 3.0), "5": (None, 2.4), "3": (None, 4.0), "6": (None, 3.5),
             "7": (None, 3.5)}
 DIN_STRETCH = 1.2

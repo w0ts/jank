@@ -11,7 +11,7 @@
 	)
 	(property "LCSC Part" "C131337")
 	(pad 2 thru_hole circle (at -1.00 0.00 180.00) (size 1.600 1.600) (layers *.Cu *.Mask)(drill 0.900024))
-	(pad 1 thru_hole circle (at 1.00 0.00 180.00) (size 1.600 1.600) (layers *.Cu *.Mask)(drill 0.900024))
+	(pad 1 thru_hole rect (at 1.00 0.00 180.00) (size 1.600 1.600) (layers *.Cu *.Mask)(drill 0.900024))
 	(model "${KIPRJMOD}/lib/3d/CONN-TH_PH2.00-LI-2P.wrl"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
