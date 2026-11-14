@@ -1,12 +1,111 @@
-# jank mini 2.2: jank mini 2 with a push encoder and two RGB LEDs (branch hw/mini2.2)
+# jank mini 2.2 simplified: jank mini 2 with USB or a 1S cell, two MIDI OUTs on one signal, BOOT, RST and one LED window (branch hw/mini2.2)
 
-**Stage 1 and 1b (2026-11-14): parts, GPIO map, placement, the LED resistors' twins, cost, the through-hole prices. Not
-routed; nothing ordered, built or measured.** The board
-file `mini2.kicad_pcb` is now the *placed* board (`LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 make_board.py`), not a routed
-one: `fab/mini2-gerbers.zip`, `render-top.png`, `render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/` are
-still mini 2's until stage 2. Everything below this section is mini 2's text.
+**Stage 1c (2026-11-14): placed, not routed; nothing ordered, built or measured.** `mini2.kicad_pcb` is the *placed*
+board (`LANE_VIAS=1 NO_STITCH=1 PLACE_ONLY=1 make_board.py`): `fab/mini2-gerbers.zip`, `render-top.png`,
+`render-bottom.png`, `render-3d.png`, `mockup.stl` and `case/mini_case.scad` are still mini 2's until stage 2. The
+sections "mini 2.2 (stage 1)" and "1b" below are superseded (the encoder and the RGB LEDs are gone); everything after
+them is mini 2's text.
 
-## mini 2.2 (stage 1)
+## mini 2.2 simplified (stage 1c, the user's decisions of 2026-11-14)
+
+"We must drive cost down and simplify a lot. Everything we add is a risk for a bug." What the board is now:
+
+- **Power: no MIDI power input.** Gone: the 2 x 2200 uF reservoir, the TPS62842 buck and its inductor, both BL8506
+  detectors, the power-in resistors and diodes, the BUCK_EN / PWR_HOLD logic, the VBUS sense, R5 / R23. **VBUS -> D3
+  (B5819W) -> VSYS -> U2 HT7833 (3.3 V, 500 mA, 4 uA) -> +3V3.** CHIP_PU keeps Espressif's 10 k / 1 uF RC (no
+  supervisor: +3V3 now rises with the LDO).
+- **The cell (fitted by JLC, the sockets by the user):** U8 TP4054-42 charges from VBUS (R51 5.1 k: ~196 mA); Q1 AO3401A
+  connects the cell to VSYS while VBUS is absent (gate on VBUS, R50 100 k down; with USB, VSYS ~4.7 V keeps it off); U9
+  XB5353A protects the cell in its minus lead (its GND = the cell's minus BAT_N, VM = the board's GND; pin 1 VT open,
+  *its datasheet not read*). **Two PH2.0 sockets J8 / J9 (B2B-PH-K-S, C131337) in parallel, not fitted**: the user
+  inserts them from the bottom (the cells under the board) and solders them on top; "+" and "-" on both silkscreens.
+  Pin 1 = -, pin 2 = + is **UNVERIFIED** against whoop PH2.0 leads: check a lead with a meter first. (Two cells in
+  parallel: the user's choice, the risk accepted.) U7 (the LINE IN's LDO) now runs from VSYS: the LINE IN works on
+  the cell too.
+- **Battery level:** hardware is only R10 / R11 1 M / 1 M + C8 100 nF from the cell's + to GPIO1 (VBAT_ADC, ADC1_CH0,
+  ~2 uA). No extra LED or part: the LED window shows it in firmware (green / yellow / red at power-on and on a button
+  hold, a low-battery blink); **the LED blinks to show the level, the emptier the cell, the faster it blinks.**
+- **MIDI OUT 2 = a passive copy of MIDI OUT 1:** J3 (jack) and J6 (DIN, DNP) on the same nets as J2 / J5: the ring on
+  MO_R (+3V3 through R14 // R26 // R48, 3 x 100 ohm 1206 = 33.3 ohm, all Basic: CA-033's 33 ohm, a mono plug's 0.33 W
+  shared 0.11 W each), the tip on MO_T (GPIO21 through R15 10 ohm). Two receivers' opto LEDs sit in parallel on one
+  source and one sink; MIDI OUT 2's own driver (Q1 AO3400A, D6, R20, R21 / R27, R22) is gone.
+- **BOOT is a plain button again:** SW1, the Basic 5.1 mm SMD tactile (C318884), under a big cap (~9 mm, stage 2),
+  RST (SW2) the same part under a small cap, 10 mm apart in the middle. GPIO0 carries only pin 5, R16 (10 k pull-up)
+  and SW1: `check_nets.py` now fails if anything else lands on BOOT. A through-hole 6 x 6 tactile instead
+  (K2-1102DP-C4SW-04 C110153 $0.059 or TS-6645DD C53431127 $0.041) adds one Extended type, +$3.09 an order: not done.
+- **One indicator:** a red 0603 (C2286) above a green 0805 (C2297), 2.2 mm apart under one window (both on = yellow),
+  both Basic (the RGB LED would add a $3.09 type): GPIO38 red, GPIO39 green, each through 1 k (R40 / R41) with its DNP
+  twin pad pair (RT40 / RT41: no cost). Shows beat (a flash) and lock (green locked, yellow searching, red lost).
+- **Kept:** the LINE IN (J7, D7, the LMV321 summer, U7), the chip, crystal, RF and antenna, the USB-C and its ESD.
+- **Size: 66 x 68 mm kept.** Without the cells the removals allowed 66 x 60.5 (SIZE=66x52.5 placed clean: the chip
+  block and the antenna strip move up 7.5 mm, the top row and the DINs stay); the cells need the band under the DIN
+  bodies (y 37..58), which a 60.5 mm board would put into the antenna strip.
+- **The cells' room under the board** (`case/renders/sketch-2.2.png`): the underside is free from y 13 (above it the
+  jacks' and USB-C's legs) to the sockets' bodies at y 52.7 (they sit low, just over the antenna strip at 58). **Two
+  65 x 18 mm cells side by side along the width: y 13..49, 3.7 mm left. Only without the DINs:** fitted DIN bodies take
+  y 17.6..39.0 at both side edges, leaving 13.7 mm (y 39.0..52.7) at full width: no 18 mm cell fits then. The case is
+  not changed yet (stage 2): the no-DIN base needs ~18 mm of depth for the cells (it is 4.3 mm today).
+
+**GPIO map (stage 1c):** GPIO21 MIDI_TX (both OUTs), GPIO0 BOOT, GPIO38 LED red, GPIO39 LED green, GPIO9 LINE_IN,
+GPIO1 VBAT_ADC (its old fan-out lane), GPIO19 / 20 USB. Gone: GPIO2 VBUS_SENSE, GPIO4 PWR_HOLD, GPIO10 MIDI2_TX, the
+encoder's and the RGB LEDs' pins.
+
+**Checks (placed board, 2026-11-14):** ERC 0 errors (1 warning: ANT_END, as before); `check_nets.py` 287 pads, 0
+problems (with the new BOOT rule); courtyards as boxes, every top pair: no new overlap (mini 2's four touches of 0.00 ..
+0.07 mm remain: C12 / C13, C12 / C23, C34 / U7, R18 / R19); no top part in the DIN pads' iron room; DRC: only the
+unrouted connections and the DNP parts' library notes. `render-top-placement.png`, `render-bottom-placement.png`.
+
+**Cost (cost.py's method, `fab/cost.md`; snapshot 2026-11-13, the new parts read 2026-11-14; shipping left out):**
+
+| | option 1: USB only (AMS1117-3.3, no cell circuit) | **option 2: the cell (built)** |
+|---|---|---|
+| parts fitted a board / BOM lines / joints | 66 / 37 / 225 | 78 / 43 / 257 |
+| Extended types (x $3.09) | 10 | 12 (+ HT7833, XB5353A) |
+| **10 boards** (cost.py's table) | **$101.07** ($10.11 a board) | **$114.00** ($11.40 a board) |
+| 5 boards | $75.90 ($15.18) | $85.96 ($17.19) |
+| 10 boards, A: JLC hand-solders the 3 jacks | $106.41 | $119.34 |
+| 10 boards, B: the user solders the jacks (+ $1.66 jacks, + shipping) | $97.72 | $110.65 |
+
+(Stage 1b's encoder board: $168.64, $175.01 with JLC's hand-soldering.) Option 1 is computed from option 2's summary
+(the cell parts out, the AMS1117 C6186, Basic, in place of the HT7833), the same snapshot. The PH2.0 sockets are not in
+it (DNP; $0.036 each in JLC's listing).
+
+**Extended types left (12) and the sweep:**
+
+| LCSC | Part | Job | Basic instead? |
+|---|---|---|---|
+| C2913196 | ESP32-S3FN8 | the chip | not touched |
+| C254377 | 40 MHz crystal | the clock | not touched (no Basic 40 MHz) |
+| C293767 | ANT3216 chip antenna | RF | not touched; proposal below |
+| C88374 | u.FL | RF (selected) | not touched; proposal below |
+| C87532 | 3.3 nH 0402 | RF match | not touched; proposal below |
+| C76769 | 2.0 nH 0402 | VDD3P3 filter | not touched (no Basic RF inductor) |
+| C7519 | USBLC6-2SC6 | USB ESD | not touched (no Basic USB ESD found) |
+| C2765186 | USB-C 16P | USB | none Basic at JLC (searched with the Basic filter, 2026-11-14) |
+| C18185602 | PJ-320A jack x3 | MIDI OUT 1, 2, LINE IN | none Basic |
+| C49338 | PESD5V0S2BT | LINE IN ESD | none Basic found; proposal below |
+| C164106 | HT7833 | 3.3 V from USB or the cell | option 1's AMS1117 is Basic but cannot run from a cell (1.1 V dropout) |
+| C80628 | XB5353A | the cell's protection | kept (whoop cells may have none) |
+
+**Applied:** the 68 ohm 1206 pair (C17976, Extended) -> 3 x 100 ohm 1206 (C17901, Basic): -$3.09, 33.3 ohm instead of
+34. **Gone with the removals:** C2763866, C2873354, C2909397, C3029072, C470742, C474307, C51018335, C79317 (8 types).
+
+**Proposals, not applied:**
+
+| Change | Saves (10 boards) | Risk |
+|---|---|---|
+| One antenna path only: drop AE1 (u.FL only) or J4 (chip antenna only) | $3.09 + $2.27 (AE1) or $1.29 (J4) | the other path is gone; the chip antenna's range on this ground is unmeasured |
+| L3 = 2.0 nH (C76769, as L2) instead of 3.3 nH | $3.09 | the RF match moves (Espressif's range 2.0..3.0 nH; untuned either way) |
+| Drop D7 (LINE IN ESD): the 20 k / 1 uF in front of the op-amp limit a pulse | $3.09 + $1.16 | a static discharge at the jack reaches the op-amp's inputs |
+| U7 -> AVDD from +3V3 through an RC (22 ohm + 10 uF): U7 is Basic | ~$1.5 (U7 $1.51 for 10, less the RC) | Wi-Fi bursts on +3V3 reach the summer (its PSRR, unmeasured) |
+| MIDI OUT 2 with its own source / sink resistors (+3V3 and GPIO21; the review's suggestion: e.g. 3 x 100 ohm 0805, C17408, + a 10 ohm; unchecked here): the passive copy gives ~4 mA a receiver worst case with two, and a short or a mono plug on one jack stops both | costs ~$0.3..0.6, no new type | none known; one more resistor group |
+| Battery-ready regulator vs USB only: option 1 above | option 1 is $12.93 cheaper | no cell at all |
+
+**For stage 2:** `route_fixups.py`'s MIDI2_TX / +3V3 fix-ups are mini 2's routing and must go; `freeroute.py`'s power
+widths need VSYS / BAT_P / BAT_N (DIN_NETS' PIN_R / PIN_T are gone, MO_* covers J6 now); the case (cells, BOOT's big
+cap, the LED window over both LEDs, the no-DIN base's depth).
+
+## mini 2.2 (stage 1, superseded by stage 1c)
 
 **What changed (parts.py):** SW1 (BOOT), LED1 (red) and R9 are gone. New: **ENC1**, the big board's encoder
 (**ALPS EC11E09244BS, C470742**: 18 detents / 9 pulses, push 0.5 mm, 20 mm D shaft, through hole; JLC solders it by

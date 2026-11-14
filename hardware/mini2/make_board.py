@@ -35,7 +35,9 @@ OX, OY = 100.0, 100.0
 LIB = os.path.join(HERE, "lib", "chip.pretty")
 NAME = "mini2"
 # the size (2026-11-13: SIZE=WxH tries a smaller board; the parts' spread and the chip's height follow it)
-W, H0 = (float(v) for v in os.environ.get("SIZE", "66x60").split("x"))   # (PLACED is for 66 x 60)
+W, H0 = (float(v) for v in os.environ.get("SIZE", "66x60").split("x"))   # (mini 2.2: 66 x 68 kept. Without the cells
+#  66 x 60.5 (SIZE=66x52.5) placed clean; the cells under the board need the band under the DIN bodies, y 37..58, which
+#  a 60.5 mm board puts into the antenna strip)
 # mini 2: the LINE IN band (README "LINE IN"): the top row (TOP: the USB-C, both jacks, the USB and VBUS parts under the
 # USB-C) stays at the top edge; everything else moves down DY, which opens a band for the LINE IN jack (J7, on the top
 # edge between MIDI OUT and the USB-C) and its front end; the DIN sockets go down with it, clear of J7's legs
@@ -63,47 +65,36 @@ PLACE = {
     # the DIN sockets (DNP, hand-soldered) on the BOTTOM under each side edge, their faces on the edges (README "DIN")
     "J5": (DIN_D, DIN_Y, 90, "B"), "J6": (W - DIN_D, DIN_Y, 270, "B"),
     # between the DINs' holes (every top part keeps 0.8 mm from the DIN pads' copper: the iron's room, README "DIN"):
-    # left the MIDI OUT resistors; right the POWER IN resistors and diodes, the detector, the reservoir's sense
-    "R14": (16.9, 1.8, 0), "R26": (16.9, 4.4, 0),               # MO_R's 2 x 68 ohm 1206, between J2 and the USB-C
-    "R15": (8.5, 21.0, 90),
-    "R1": (W - 2.5, 18.5, 0), "R2": (W - 2.5, 21.5, 0), "D1": (W - 8.4, 15.6, 90), "D2": (W - 6.05, 15.6, 90),
-    "R10": (W - 5.48, 21.2, 90),
-    # the button: in the middle, 8 mm or more from every tall part (the cans, the jacks, the USB-C), so a finger reaches it
-    # through the lid; the LED above it; BUCK_EN's parts beside it
-    # mini 2.2 (README "mini 2.2"): the encoder in the middle of the width (its shaft at (W / 2, 27.5): JLC's origin is
-    # 0.25 mm below the shaft), where BOOT, RST and the red LED were; an RGB LED 12 mm each side of the shaft, level
-    # with it (LED1 the beat LED left, LED2 the status LED right), their 1 k resistors between them and the encoder;
-    # the encoder's pull-ups and caps by its A (left) and B (right) pins; RST up right, under the USB-C's right side
-    "ENC1": (W / 2, 27.75, 0),
-    "LED1": (W / 2 - 12.0, 27.5, 0), "R40": (W / 2 - 9.0, 26.4, 0), "R41": (W / 2 - 9.0, 27.5, 0), "R42": (W / 2 - 9.0, 28.6, 0),
-    "LED2": (W / 2 + 12.0, 27.5, 0), "R43": (W / 2 + 9.0, 26.4, 0), "R44": (W / 2 + 9.0, 27.5, 0), "R45": (W / 2 + 9.0, 28.6, 0),
-    "R46": (W / 2 - 7.9, 33.4, 0), "C40": (W / 2 - 7.9, 34.5, 0), "R47": (W / 2 + 7.9, 33.4, 0), "C41": (W / 2 + 7.9, 34.5, 0),
-    # the twins (DNP 0603 pads in parallel with R40..R45, README "mini 2.2"): a column above each resistor column, between
-    # the encoder and R14 / R26 (left) or Q1 / R20 (right); RT40 / RT43 nearest their resistor rows
-    "RT40": (W / 2 - 8.6, 24.9, 0), "RT41": (W / 2 - 8.6, 23.15, 0), "RT42": (W / 2 - 8.6, 21.4, 0),
-    "RT43": (W / 2 + 8.6, 24.9, 0), "RT44": (W / 2 + 8.6, 23.15, 0), "RT45": (W / 2 + 8.6, 21.4, 0),
-    "SW2": (W / 2 + 8.0, 15.6, 0),          # RST (CHIP_PU to ground)
-    # the reservoir: one 2200 uF can down each side, under the DINs' holes
-    "C1": (5.5, CAN_Y, 90), "C2": (W - 5.5, CAN_Y, 90),
-    # under the USB-C: the CC resistors, the VBUS diode and its resistor, the VBUS sense and pull-down
-    # (2026-11-13: each CC resistor under its own pin's side (CC2 = B5 left, CC1 = A5 right: they used to cross the data
-    # lines), the VBUS parts further out, D3 up by R5; the strip under U5 stays free for D+ / D- to the chip)
+    # left the MIDI OUT resistors (mini 2.2 simplified: three 100 ohm 1206, R48 the third, under R14 / R26)
+    "R14": (16.9, 1.8, 0), "R26": (16.9, 4.4, 0),               # (PLACED's places win for R14, R26, R15)
+    "R15": (8.5, 21.0, 90), "R48": (19.56, 27.41, 180),
+    # mini 2.2 simplified (README "mini 2.2 simplified"): BOOT (SW1) and RST (SW2) in one row in the middle, 10 mm apart
+    # (BOOT under a big cap); the indicator (LED1 red, LED2 green side by side: one window) between them and the USB
+    # parts, each LED's 1 k and its DNP twin beside it
+    "SW1": (W / 2 - 5.0, 25.0, 0), "SW2": (W / 2 + 5.0, 25.0, 0),
+    "LED1": (W / 2, 18.4, 0), "LED2": (W / 2, 20.6, 0),     # (one above the other, 2.2 mm apart: one window over both)
+    "R40": (W / 2 - 4.0, 18.4, 0), "RT40": (W / 2 - 4.2, 20.4, 0),
+    "R41": (W / 2 + 4.0, 20.6, 0), "RT41": (W / 2 + 4.0, 18.4, 0),
+    # under the USB-C: the CC resistors (each under its own pin's side: CC2 = B5 left, CC1 = A5 right); the strip under
+    # U5 stays free for D+ / D- to the chip
     "R4": (W / 2 - 3.6, 11.0, 90), "R3": (W / 2 + 3.6, 11.0, 90),
-    "R12": (W / 2 - 5.4, 11.0, 90), "R13": (W / 2 - 7.2, 11.0, 90), "R23": (W / 2 + 5.4, 11.0, 90),
-    "D3": (W / 2 + 7.4, 4.6, 90), "R5": (W - 17.0, 5.4, 0),
-    # the buck: lower left beside C1, its 10 uF input ceramic C3 right at VIN / GND (pins 6 / 8), L1 under it
-    # the start-up group (BUCK_EN: the detector, the two OR diodes, the hold-on C4 / R6) right above the buck, so BUCK_EN
-    # stays a few mm long (across the board it held the router 14+ min, 2026-11-12)
-    "U3": (19.4, 25.0, 90), "D4": (22.8, 21.0, 90), "D5": (19.4, 21.0, 90), "C4": (22.1, 24.6, 90), "R6": (23.8, 24.6, 90),
-    "C3": (11.2 + SB, 30.68, 180), "U2": (11.2 + SB, 34.6, 0), "L1": (11.25 + SB, 39.0, 0),
-    "C5": (14.35 + SB, 39.4, 90), "C6": (14.35 + SB, 35.0, 90), "R7": (13.9 + SB, 36.7, 0), "R16": (15.8 + S, 34.85, 0),
+    # mini 2.2, the power and the cell (README "mini 2.2 simplified"): the lower left, where the buck and C1 were, under
+    # the DIN pads' iron room (y 39 on): the two PH2.0 sockets (bottom side, DNP) on one row near the ground edge, the
+    # protector (U9) and the charger (U8) above them, the power path (D3, Q1) and the 3.3 V LDO (U2) towards the chip;
+    # the cell's divider (R10 / R11 / C8) at GPIO1's fan-out lane, above the chip's right side
+    "J8": (7.0, 54.6, 0, "B"), "J9": (15.0, 54.6, 0, "B"),   # (low: the cells take y 13 .. 52 above them)
+    "U9": (7.0, 48.0, 0), "C42": (10.0, 48.0, 90),
+    "U8": (14.0, 48.0, 0), "R51": (17.0, 48.0, 90), "C41": (14.0, 44.5, 0), "C40": (10.0, 44.5, 0),
+    "D3": (6.0, 42.0, 0), "Q1": (19.5, 44.0, 0), "R50": (19.5, 41.0, 0),
+    "U2": (20.0, 51.0, 0), "C3": (20.0, 54.3, 0), "C5": (23.2, 51.0, 90), "C6": (23.2, 54.0, 90),
+    "C8": (CX + 5.1, CY - 6.3, 90), "R11": (CX + 6.1, CY - 6.3, 90), "R10": (CX + 7.1, CY - 6.3, 90),
+    "R16": (15.8 + S, 34.85, 0),
     # the chip (turned 180: LNA_IN at the bottom of its right side) and its parts round it
     "U1": (CX, CY, 180),
     "U5": (W / 2, 10.9, 0),                                           # USB ESD, right under the USB-C's data pads
     "R24": (CX - 0.3, CY - 6.2, 180), "R25": (CX - 0.3, CY - 5.2, 180),   # USB D+ / D- 22 ohm, right of pins 26 / 25 (pin 27 free)
     "C20": (CX + 1.5, CY - 4.6, 180),                                                  # VDD3P3_RTC (pin 20, top); mini 2: turned, its +3V3 pad east (the GND pad was boxed in by MIDI2_TX)
-    "U4": (23.3 + S, 24.05, 180),                                    # (DNP) a 3.0 V supervisor on CHIP_PU, README "Start-up"
-    "R11": (31.0 + S, 23.85, 90), "C8": (32.0 + S, 23.85, 90), "R8": (27.85 + S, 28.1, 90),
+    "R8": (CX + 8.5, CY - 5.6, 0),          # (mini 2.2 simplified: CHIP_PU's 10 k by C7, chip-relative)
     "C7": (CX + 8.5, CY - 4.2, 0),          # (1 uF on CHIP_PU at its lane's via: 6 mm of track from pin 4, review 2026-11-13)
     "C21": (13.9 + S, 30.5, 270), "C22": (13.9 + S, 32.3, 270),                       # VDD_SPI (pin 29, left)
     "C19": (CX - 1.4, CY + 4.85, 270),      # VDD3P3_CPU (pin 46, bottom): its +3V3 pad toward the pin (review 2026-11-13)
@@ -124,9 +115,6 @@ PLACE = {
     "R19": (XA + 1.3, GE - 2.1, 0), "J4": (XA + 4.4, GE - 2.6, 270),   # (right of the line, between C25 and C26: the
     # crystal's side stays clear on a short board)
     "AE1": (XA, ANT_Y, 270),
-    # MIDI OUT 2 (README "MIDI OUT 2"): the source's 33 ohm and Schottky, the sink's FET, 10 ohm and gate pull-down
-    "D6": (32.15 + S, 35.15, 0), "Q1": (31.4 + S, 37.95, 0), "R21": (W - 13.43, 37.9, 0), "R27": (W - 13.43, 40.5, 0), "R20": (31.2 + S, 40.6, 0),
-    "R22": (31.2 + S, 42.1, 0),
     # mini 2, LINE IN (README "LINE IN"): J7 on the top edge (its bushing up) between J2 and the USB-C, tip / ring pads on its
     # right; D7 by them; the summer's inputs (R30 / C30 tip, R31 / C31 ring) to U6 (turned: IN- and IN+ on top, OUT and V+
     # below), R32 // C32 on its left from IN- to OUT, the bias (R33 / R34 / C33) on its right; the LDO (U7, C34 in, C35 out)
@@ -149,8 +137,8 @@ PRIORITY = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "DE
 # (net, chip pin y, lane x, lane end y, a via at the end): 0.8 mm apart, each ending in a via, so the router may take
 # any of them on either layer (BOOT, for one, crosses the others to reach the button on the left)
 FANOUT = [("CHIP_PU", CY + 1.4, CX + 7.3, CY - 4.2, True), ("BOOT", CY + 1.0, CX + 6.5, CY - 4.2, True),
-          ("VBANK_ADC", CY + 0.6, CX + 5.7, CY - 4.2, True), ("VBUS_SENSE", CY + 0.2, CX + 4.9, CY - 4.2, True),
-          ("PWR_HOLD", CY - 0.6, CX + 4.1, CY - 4.2, True)]
+          ("VBAT_ADC", CY + 0.6, CX + 5.7, CY - 4.2, True)]
+# (mini 2.2 simplified: VBUS_SENSE's and PWR_HOLD's lanes gone with their nets; GPIO1's lane carries the cell's level)
 
 board = pcbnew.BOARD()
 nets = {}
@@ -177,24 +165,16 @@ def in_din_room(x, y):
 # fixed connectors, cans, antenna and chip block, for the fewest airwire crossings, the shortest airwires, and each group
 # pulled to the part it serves (the buck to C1 and the chip, the USB parts to the USB-C, the MIDI parts to their sockets);
 # no group within 3 mm of the RF path), ref: (x, y, rotation); they replace PLACE (and the spread) for these parts
-PLACED = {
-    "C3": (15.492, 43.935, 270), "U2": (19.412, 43.935, 90), "L1": (23.812, 43.885, 90), "C5": (24.212, 40.785, 180),
-    "C6": (19.812, 40.785, 180), "R7": (21.512, 41.235, 90), "U3": (12.670, 40.915, 90), "D4": (16.070, 36.915, 90),
-    "D5": (12.670, 36.915, 90), "C4": (15.370, 40.515, 90), "R6": (17.070, 40.515, 90),
-    "U4": (44.087, 24.652, 90),     # (mini 2.2: SW1, LED1, R9 gone, SW2 in PLACE)
-    "R8": (37.922, 29.202, 0), "R10": (57.460, 27.220, 90), "R11": (38.640, 32.255, 90), "C8": (39.640, 32.255, 90),
-    "R1": (63.500, 18.810, 0), "R2": (63.500, 21.810, 0), "D1": (57.600, 15.910, 90), "D2": (59.950, 15.910, 90),
+PLACED = {   # (mini 2.2 simplified: only the MIDI OUT resistors and BOOT's pull-up are left of the placer's groups)
     "R14": (19.560, 16.810, 180), "R26": (19.560, 14.210, 180), "R15": (18.640, 25.950, 180),
-    "R16": (22.380, 26.770, 0), "Q1": (46.050, 13.540, 0), "R20": (45.850, 16.190, 0), "R22": (45.850, 17.690, 0),
-    "D6": (47.720, 22.260, 270), "R21": (44.970, 31.980, 270), "R27": (42.370, 31.980, 270),
+    "R16": (22.380, 26.770, 0),
 }
 
 # the spread (72 x 65, 2026-11-12): parts placed at absolute y below the chip's top follow the chip down 7.5 mm; the
 # buttons' and the start-up group's row 4 mm; the start-up group (absolute x) follows the middle 5 mm right
-SPREAD_Y = {**{r: CY - 30.4 for r in ("C3", "U2", "L1", "C5", "C6", "R7", "R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10",
-                                "D6", "Q1", "R21", "R27", "R20", "R22", "R8")},
-            **{r: (CY - 30.4) * 0.53 for r in ("U4", "R11", "C8", "U3", "D4", "D5", "C4", "R6")}}
-SPREAD_X = {r: S - 8.7 for r in ("U3", "D4", "D5", "C4", "R6")}
+SPREAD_Y = {r: CY - 30.4 for r in ("R16", "C21", "C22", "C16", "C14", "C15", "C17", "C10")}   # (mini 2.2 simplified: the
+#  chip block's parts only; the buck, the start-up group and MIDI OUT 2's driver are gone)
+SPREAD_X = {}
 
 
 def place():
@@ -308,12 +288,14 @@ def add_via(name, x, y):
     board.Add(v)
 
 
-def label(text, x, y, size=0.8, rot=0.0):
+def label(text, x, y, size=0.8, rot=0.0, layer=pcbnew.F_SilkS):
     t = pcbnew.PCB_TEXT(board)
     t.SetText(text)
     t.SetPosition(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)))
     t.SetTextAngleDegrees(rot)
-    t.SetLayer(pcbnew.F_SilkS)
+    t.SetLayer(layer)
+    if layer == pcbnew.B_SilkS:                   # (bottom silk reads right way round from below)
+        t.SetMirrored(True)
     t.SetTextSize(pcbnew.VECTOR2I(MM(size), MM(size)))
     t.SetTextThickness(MM(0.12))
     board.Add(t)
@@ -801,12 +783,21 @@ def zones():
 
 def silk():
     label("MIDI OUT", 6.0, 12.3, 0.7)            # (J2 and J5)
-    label("PWR IN / OUT 2", W - 6.1, 12.3, 0.6)  # (J3 and J6: the power input, or MIDI OUT 2 on USB power)
-    for ref, text, dy in (("SW2", "RST", 3.6), ("LED1", "BEAT", 2.4), ("LED2", "STATUS", 2.4)):   # (mini 2.2)
+    label("MIDI OUT 2", W - 6.1, 12.3, 0.7)      # (J3 and J6: mini 2.2 simplified, a copy of MIDI OUT)
+    for ref, text, dy in (("SW1", "BOOT", 3.6), ("SW2", "RST", 3.6)):   # (under the buttons)
         p = board.FindFootprintByReference(ref).GetPosition()
         label(text, pcbnew.ToMM(p.x) - OX, pcbnew.ToMM(p.y) - OY + dy, 0.6)
-    label("PUSH = BOOT", W / 2, 18.6, 0.6)       # (mini 2.2: above the encoder's push pins)
     label("LINE IN", 14.6, 13.6, 0.6)            # (mini 2: J7)
+    # the cells' PH2.0 sockets (mini 2.2): "+" and "-" beside each pad on both sides (the user solders from the top, the
+    # socket and the cell are under the board); pin 1 = -, pin 2 = + (parts.py: UNVERIFIED against whoop leads)
+    for ref in ("J8", "J9"):
+        f = board.FindFootprintByReference(ref)
+        for p in f.Pads():
+            x, y = pad_center(p)
+            text = "+" if p.GetNetname() == "BAT_P" else "-"
+            label(text, x, y - 1.9, 1.0)
+            label(text, x, y - 1.9, 1.0, layer=pcbnew.B_SilkS)
+        label("CELL " + {"J8": "1", "J9": "2"}[ref], pcbnew.ToMM(f.GetPosition().x) - OX, pcbnew.ToMM(f.GetPosition().y) - OY + 2.2, 0.6)
     label("jank mini 2.2", 12.0, GE + 3.0, 1.0)
     label("antenna strip:", 12.0, GE + 4.6, 0.6)
     label("no copper", 12.0, GE + 5.5, 0.6)
