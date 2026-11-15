@@ -41,6 +41,7 @@ class LinkController:
         self.pending_start = True
         self._last_force_us = -1e18
         self.beat_offset = 0.0      # the user's NUDGE BEAT, in beats (halves): Link's beats sit this far from the tracked ones
+        self.phase = 0.0            # the user's PHASE (jank M2h): NUDGE BEAT's total alone (beat_offset has AUTO BAR's moves too)
         self.bar_moves = 0          # whole-beat moves made for the downbeat estimator
         self._bar_seq = -1          # its last decision acted on
         self._start_us: float | None = None     # when the session's scheduled start is reached
@@ -94,7 +95,8 @@ class LinkController:
         self._bar_seq = bar.seq
         if once:
             self._once = False
-        n = link_shift(bar.count, bar.phi, self.link.beat_at(self.clock.to_link_us(bar.t_beat)))
+        # the user's PHASE rides on AUTO BAR's bar (jank M2h): the 1 placed with its whole beats kept, never undone
+        n = link_shift(bar.count, bar.phi - math.floor(self.phase + 0.25), self.link.beat_at(self.clock.to_link_us(bar.t_beat)))
         if n:
             self.shift_beats(n)
             self.bar_moves += 1
@@ -139,6 +141,12 @@ class LinkController:
         now = self.link.now_us()
         self.link.force_beat(self.link.beat_at(now) + n, now)
         self.beat_offset += n
+
+    def nudge_phase(self, n: float) -> None:
+        """The user's NUDGE BEAT: the PHASE (jank M2h, two layers): Link's beats move n (shift_beats) and the offset rides on
+        AUTO BAR's bar from then on; nothing automatic changes it; back to 0 is AUTO."""
+        self.shift_beats(n)
+        self.phase += n
 
     def set_session_playing(self, playing: bool) -> None:
         """LINK mode with the transport set to FOLLOW + LEAD: the device's Stop / Start also starts the Link session's

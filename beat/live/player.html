@@ -415,13 +415,14 @@ const QR = (() => {
                 TRANSPORT ICON  triangle = running, square = stopped, blinking triangle = armed: a start asked for and
                             not reached yet, one that resolves by itself (the next bar line, the tracker locking on
                             music it hears) or by YES; never shown for a session that is merely stopped
-                NO + UP/DOWN   AUDIO mode: NUDGE BEAT, half a beat relative to the tracked phase (1 s overlay "NUDGE BEAT +1/2"):
-                               one step fixes an off-beat lock, two move the bar's 1 by a beat. AUTO BAR goes MANUAL
-                               (an M under the boxes) until AUTO BAR is picked again or the tempo starts over
+                NO + UP/DOWN   AUDIO mode: PHASE, half a beat relative to the tracked phase (1 s overlay "PHASE +1/2", "AUTO"
+                               at 0): one step fixes an off-beat lock, two move the bar's 1 by a beat. Two layers (jank
+                               M2h): the user's PHASE rides on AUTO BAR's bar, which stays in charge; 0 is AUTO
                 BAR MARKS   AUDIO mode, AUTO BAR on: a bar under the first box = LOCKED (the bar's 1 is the music's 1),
                             the line under the boxes = how sure; nothing under the boxes = still listening
-                YES + UP/DOWN  AUDIO mode: nudge the timing 1 ms (the AUDIO IN offset: every output; repeats while held;
-                               1 s overlay "NUDGE MS +3"). A combo cancels the NO / YES release action.
+                YES + UP/DOWN  AUDIO mode: AUDIO SHIFT, the timing 1 ms (every output; repeats while held; 1 s overlay
+                               "AUDIO SHIFT +3 MS", "AUTO" at 0): the user's shift on top of the auto latency (jank M2h).
+                               A combo cancels the NO / YES release action.
      MENU     AUDIO, LINK TRANSPORT (LINK mode: IGNORE = the clocks run on Link's tempo and beat, own Start / Stop only;
               FOLLOW = they also start / stop with the session; FOLLOW+LEAD = and our Start / Stop starts / stops the session),
               AUTO BAR (AUDIO mode: OFF = the bar left where it is; AT START = the bar's 1 found in the music and Link's bar moved onto it
@@ -1129,8 +1130,8 @@ async function poll() {
    nothing. The device's YES in LINK and AUDIO sends `play` / `stop` by the transport icon (linkStartStop), UP / DOWN in LINK
    `tempo <bpm>` (tempoStep); the source choice `set source auto|line|usb|link`, the Bluetooth choice `set ble pair|auto|off`
    and the pair window `ble pair` (YES on PAIR NOW, or the triple NO) go out only on the user's choice on the device
-   screen or its buttons; the Calibrate button sends `set beat_latency`, only when pressed (not stored: back to 25 at the
-   XIAO's next start). Only asked for when the player runs with --xiao. */
+   screen or its buttons; the Calibrate button sends `set lat_trim` (the AUDIO SHIFT on top of the auto latency, M2h;
+   an older firmware `set beat_latency`), only when pressed. Only asked for when the player runs with --xiao. */
 const XIAO = { asked: false, port: null, out: null, portMsg: 'asking for MIDI access', lastBeatAt: 0, lastLineAt: 0,
                latency: null, text: '', lines: [], answerAt: 0, stats: null, statsAt: 0, status: null, statusAt: 0, statusAskedAt: 0,
                cfg: null, cfgAskedAt: 0, rep: null, repAt: 0, sent: null, err: '', errAt: 0,
@@ -1412,13 +1413,16 @@ function showAccuracy(b) {
   ] : [['XIAO', 'no `beat` numbers yet'], ['', '']]);
   const sug = m.suggested_latency_ms;
   $('calib').disabled = sug === null || sug === undefined || !XIAO.out || b.link.n < 8;
+  const trim = calibTrim(sug, xiaoLat());
   $('calibmsg').textContent = sug === null || sug === undefined ? 'needs 8+ Link beats and the XIAO\'s latency'
-    : 'Link is ' + f1(b.link.mean_ms) + ' ms off: set beat_latency ' + f1(m.beat_latency_ms, 0) + ' -> ' + sug + ' ms (not stored on the XIAO)';
+    : 'Link is ' + f1(b.link.mean_ms) + ' ms off: ' + (trim === null ? 'set beat_latency ' + f1(m.beat_latency_ms, 0) + ' -> ' + sug + ' ms'
+      : 'the audio shift ' + trim + ' ms on top of the auto ' + xiaoLat().auto + ' ms');
 }
 /* Auto latency: the player works out the XIAO's beat_latency from the two output paths (live/latency.py: speaker path -
    jank path, in /api/status) and sends `set beat_latency` when --xiao starts, when the XIAO's audio source turns to USB
    (a new stream, or a restart) and whenever the suggestion moves by more than AUTOLAT_MIN_CHANGE_MS (at most one send per
-   AUTOLAT_MIN_GAP_MS). Calibrate and NUDGE MS are the user's: they switch it off for the session ("manual"). */
+   AUTOLAT_MIN_GAP_MS). Two layers (jank M2h): this is the AUTO base; the user's AUDIO SHIFT (NUDGE MS, Calibrate's
+   `set lat_trim`) rides on top on the XIAO and never turns it off. Only the checkbox does ("manual"). */
 const AUTOLAT_MIN_CHANGE_MS = 2;
 const AUTOLAT_MIN_GAP_MS = 2000;
 const TAB_PATH_CONSTANT_MS = 0;        // Tab audio: both sinks are delayed to the same reported latency, so the paths differ by this
@@ -1446,12 +1450,25 @@ function autoLatSuggestion(pane, tabState, tabToJank, statusSug) {
   if (pane === 'tab') return tabState === 'listening' && tabToJank ? TAB_PATH_CONSTANT_MS : null;
   return Number.isFinite(statusSug) ? statusSug : null;
 }
-function autoLatLabel(st, sug, usb, sentNow) {
+function autoLatLabel(st, sug, usb, sentNow, trim = null) {
   if (st.manual) return 'manual' + (st.sent === null ? '' : ' (auto had sent ' + st.sent + ' ms)');
   if (!st.on) return 'off';
   if (!usb) return 'waiting: the XIAO\'s source is not USB';
   if (!Number.isFinite(sug)) return 'waiting for a suggestion';
-  return 'auto: ' + (st.sent === null ? sug : st.sent) + ' ms' + (sentNow ? ' (sent)' : '');
+  const auto = st.sent === null ? sug : st.sent;
+  return (Number.isFinite(trim) ? 'auto ' + auto + ' ms + trim ' + trim + ' ms' : 'auto: ' + auto + ' ms') + (sentNow ? ' (sent)' : '');
+}
+/* --xiao: the XIAO's latency layers from a fresh `status` (M2h: lat_auto=, lat_trim=); null: none, or an older firmware */
+function xiaoLat() {
+  const st = XIAO.status;
+  if (!st || performance.now() - XIAO.statusAt > XIAO_STATUS_FRESH_MS || !Number.isFinite(st.lat_auto)) return null;
+  return { auto: st.lat_auto, trim: Number.isFinite(st.lat_trim) ? st.lat_trim : 0 };
+}
+/* Calibrate (M2h): the AUDIO SHIFT that makes auto + shift the suggested latency, so it composes with Auto latency; null:
+   the XIAO's layers not known (an older firmware: the whole value goes to `set beat_latency`) */
+function calibTrim(sug, lat) {
+  if (sug === null || sug === undefined || !lat) return null;
+  return Math.round(sug) - lat.auto;
 }
 const AL = { st: autoLatNew(), out: null, sentNow: 0 };
 function autoLatApply(ev) { const r = autoLatStep(AL.st, ev); AL.st = r.st; $('autolat').checked = AL.st.on; return r.send; }
@@ -1463,7 +1480,8 @@ function autoLatencyTick(now) {
   const sug = autoLatSuggestion(pane, TAB.state, toJank, S ? S.suggested_beat_latency_ms : null);
   const send = autoLatApply({ type: 'tick', sug, usb, now });
   if (send !== null) { xiaoSend('set beat_latency ' + send); AL.sentNow = now; }
-  $('autolatmsg').textContent = autoLatLabel(AL.st, sug, usb, now - AL.sentNow < 3000);
+  const lat = xiaoLat();
+  $('autolatmsg').textContent = autoLatLabel(AL.st, sug, usb, now - AL.sentNow < 3000, lat ? lat.trim : null);
   const sp = S && S.speaker;
   $('autolathint').hidden = !(sp && sp.wireless);
   $('autolathint').textContent = sp && sp.wireless ? 'wireless output (' + sp.device + ', ' + sp.latency_ms + ' ms): auto latency may be off, use Calibrate' : '';
@@ -1472,9 +1490,14 @@ $('autolat').onchange = () => autoLatApply({ type: $('autolat').checked ? 'auto'
 $('calib').onclick = () => {
   const sug = S && S.bench && S.bench.model ? S.bench.model.suggested_latency_ms : null;
   if (sug === null || sug === undefined) return;
-  autoLatApply({ type: 'manual' });
-  xiaoSend('set beat_latency ' + sug);
-  $('calibmsg').textContent = 'sent: set beat_latency ' + sug + ' (the next 16 beats show the result)';
+  const trim = calibTrim(sug, xiaoLat());
+  if (trim === null) {                                    // an older firmware: no layers, the whole value (and no auto)
+    autoLatApply({ type: 'manual' });
+    xiaoSend('set beat_latency ' + sug);
+  } else {
+    xiaoSend('set lat_trim ' + trim);                     // M2h: the AUDIO SHIFT, Auto latency stays on underneath
+  }
+  $('calibmsg').textContent = 'sent: ' + (trim === null ? 'set beat_latency ' + sug : 'set lat_trim ' + trim) + ' (the next 16 beats show the result)';
 };
 function showXiao(x, bench) {
   $('xiaocard').hidden = !x;
@@ -2057,16 +2080,18 @@ function halvesText(b) {
   const h = Math.round(Math.abs(b) * 2), w = Math.floor(h / 2), half = h % 2 ? '1/2' : '';
   return h === 0 ? '0' : (b < 0 ? '-' : '+') + (w ? w + (half ? ' ' + half : '') : half);
 }
-/* --xiao: the overlay from the XIAO's answer: mod 'no' (`nudge beat`): nudge_beats, the user's nudges in all (+-3);
-   'yes' (`nudge ms`): beat_latency, the AUDIO IN offset of the source heard */
+/* --xiao: the overlay from the XIAO's answer, two layers each (jank M2h), 0 = AUTO: mod 'no' (`nudge beat`): the PHASE,
+   nudge_beats, the user's nudges in all (+-3) on top of AUTO BAR's bar; 'yes' (`nudge ms`): the AUDIO SHIFT, lat_trim, on top
+   of the auto latency (an older firmware, no lat_trim: beat_latency, the AUDIO IN offset) */
 function nudgeOverlay(mod, stats) {
-  if (mod === 'no') return { title: 'NUDGE BEAT', value: halvesText(stats.nudge_beats) + ' BEAT' };
-  return { title: 'NUDGE MS', value: 'AUDIO IN ' + (stats.beat_latency > 0 ? '+' : '') + stats.beat_latency + ' MS' };
+  if (mod === 'no') return { title: 'PHASE', value: Number(stats.nudge_beats) ? halvesText(stats.nudge_beats) : 'AUTO' };
+  if (!('lat_trim' in stats)) return { title: 'NUDGE MS', value: 'AUDIO IN ' + (stats.beat_latency > 0 ? '+' : '') + stats.beat_latency + ' MS' };
+  return { title: 'AUDIO SHIFT', value: stats.lat_trim ? (stats.lat_trim > 0 ? '+' : '') + stats.lat_trim + ' MS' : 'AUTO' };
 }
 /* --xiao: a nudge refused: the reason as an overlay, null for an err that is not a nudge's */
 function nudgeErrOverlay(line) {
-  if (/^err nudge beat at its limit/.test(line)) return { title: 'NUDGE BEAT', value: 'MAX 3 BEATS' };
-  if (line === 'err no beat yet') return { title: 'NUDGE BEAT', value: 'NO BEAT YET' };
+  if (/^err nudge beat at its limit/.test(line)) return { title: 'PHASE', value: 'MAX 3 BEATS' };
+  if (line === 'err no beat yet') return { title: 'PHASE', value: 'NO BEAT YET' };
   if (line === 'err link mode') return { title: 'LINK MODE', value: '' };
   if (line === 'err busy') return { title: 'NUDGE', value: 'BUSY' };
   return null;
@@ -2084,8 +2109,8 @@ function showOverlay(title, value) { ui.hint = null; ui.overlay = { until: perfo
 // NO / YES held on HOME (AUDIO mode) longer than HINT_MS without UP / DOWN: a hint says what UP / DOWN will do
 const HINT_MS = 400;
 // (UP adds half a beat to Link's count, so its beats come half a beat earlier; a + offset makes every output later)
-const HINTS = { no: { title: 'NUDGE BEAT', up: 'UP: 1/2 BEAT EARLY', down: 'DOWN: 1/2 BEAT LATE' },
-                yes: { title: 'NUDGE MS', up: 'UP: 1 MS LATER', down: 'DOWN: 1 MS EARLIER' } };
+const HINTS = { no: { title: 'PHASE', up: 'UP: 1/2 BEAT EARLY', down: 'DOWN: 1/2 BEAT LATE' },
+                yes: { title: 'AUDIO SHIFT', up: 'UP: 1 MS LATER', down: 'DOWN: 1 MS EARLIER' } };
 function armHint(b) {
   clearTimeout(dev.hintTimer);
   dev.hintTimer = setTimeout(() => { if (dev.held[b] && !dev.combo && !dev.link && onHome()) ui.hint = HINTS[b]; }, HINT_MS);
@@ -2093,16 +2118,18 @@ function armHint(b) {
 function dropHint() { clearTimeout(dev.hintTimer); ui.hint = null; }
 function comboStep(mod, d) {
   if (dev.link) return;                                          // LINK mode: the session owns the bar and the timing
-  if (mod === 'yes') autoLatApply({ type: 'manual' });           // NUDGE MS is the user's own latency: Auto latency off
   if (S && S.xiao) {                                             // --xiao: the XIAO's nudges (M2d); the overlay from its answer
     xiaoSend(mod === 'no' ? 'nudge beat ' + (d > 0 ? '+0.5' : '-0.5') : 'nudge ms ' + (d > 0 ? '+1' : '-1'));
     XIAO.nudgeAt = performance.now();
     return;
   }
-  if (mod === 'no') { api('shift', { beats: d * NUDGE_BEATS }); showOverlay('NUDGE BEAT', d > 0 ? '+1/2' : '-1/2'); }
-  else {
-    const ms = clampN(dev.inOff + d * NUDGE_MS, -100, 100);         // the nudge moves the audio input offset: every output
-    setField('inoff', ms); showOverlay('NUDGE MS', (ms > 0 ? '+' : '') + ms);
+  if (mod === 'no') {                                            // the PHASE (M2h): AUTO at 0
+    api('shift', { beats: d * NUDGE_BEATS });
+    dev.phase = (dev.phase || 0) + d * NUDGE_BEATS;
+    showOverlay('PHASE', dev.phase ? halvesText(dev.phase) : 'AUTO');
+  } else {
+    const ms = clampN(dev.inOff + d * NUDGE_MS, -100, 100);         // the AUDIO SHIFT (here the audio input offset): every output
+    setField('inoff', ms); showOverlay('AUDIO SHIFT', ms ? (ms > 0 ? '+' : '') + ms + ' MS' : 'AUTO');
   }
 }
 function btnDown(b) {

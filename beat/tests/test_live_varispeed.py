@@ -265,15 +265,17 @@ def test_shift_command_moves_the_link_bar_and_rejects_bad_values(source):
             app.command("shift", bad)
 
 
-def test_a_nudge_makes_the_bar_manual_and_is_logged_as_a_hand_label(source, tmp_path):
+def test_a_nudge_is_the_phase_on_top_of_auto_bar_and_is_logged_as_a_hand_label(source, tmp_path):
+    """jank M2h: a nudge is the user's PHASE, riding on AUTO BAR's bar: AUTO BAR stays in charge (no MANUAL)."""
     app, link = make_app(source)
     logs = tmp_path / "nudges"
     app.command("shift", {"beats": 1})                                 # no log folder: nothing written
-    assert app.status()["bar"]["state"] == "manual" and not logs.exists()
+    assert app.status()["bar"]["state"] == "listening" and not logs.exists() and app.controller.phase == 1.0
     app.nudge_dir = logs
     app.command("shift", {"beats": -0.5})
     rows = [json.loads(x) for x in next(logs.glob("nudges-*.jsonl")).read_text().splitlines()]
-    assert len(rows) == 1 and rows[0]["nudge_beats"] == -0.5 and rows[0]["state"] == "manual"
+    assert len(rows) == 1 and rows[0]["nudge_beats"] == -0.5 and rows[0]["state"] == "listening"
+    assert app.controller.phase == 0.5
     assert {"scores", "phi", "lead", "count", "t_beat", "user_phi", "track", "position_s"} <= rows[0].keys()
 
 
