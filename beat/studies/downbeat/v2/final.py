@@ -7,6 +7,12 @@ cross-fitted), Link's confident-only moves tuned on dev, then the test half, the
 simulation, GTZAN, and the weights export.
 
     PYTHONPATH=..:$BL_REPO python final.py --cache ../cache --jobs 6
+
+Half-beat-off references (eval.ref_phase, studies/halfbeat): --ref-fix FIXES --exclude unclear|off leaves out the
+unclear tracks (and with 'off' the Traktor-off ones too) from both halves (--scope test: the test half only, the
+training unchanged), keeping the even/odd split of the full list;
+--desc names the descriptor pickle (build.py --ref-fix shifts the Traktor-off grids there); --tag writes
+v2_tables<tag>.md and v2_weights<tag>.json instead of the shipped files.
 """
 from __future__ import annotations
 
@@ -27,6 +33,7 @@ from rules import MATCH_S, SKIP_BEATS, ref_positions, score
 HERE = Path(__file__).resolve().parent
 RES = HERE.parent / "results"
 LOG: list[str] = []
+TAG = ""                  # --tag: a variant's outputs beside the shipped ones
 SPECS = {"a5": xl.VARIANTS["a5"], "d5": xl.VARIANTS["d5"]}
 MARGINS = (0.0, 0.5, 1.0, 1.5, 2.0)
 
@@ -211,7 +218,7 @@ def export(v, w, margin, f, trained_on) -> None:
     if "Dp" in v.feats.split("+"):
         from feats import NAMES
         feats += [NAMES[i] for i in xl.POS_D] + [f"dE{g}+" for g in range(8)] + [f"dE{g}-" for g in range(8)] + ["|tr-1|"]
-    (RES / "v2_weights.json").write_text(json.dumps({
+    (RES / f"v2_weights{TAG}.json").write_text(json.dumps({
         "about": "downbeat linear accumulator rule (first study's structure); REPORT2.md; derived from the user's "
                  "Traktor grids and audio only (reference beats, no madmom output)",
         "trained_on": trained_on, "features": feats, "bars": list(v.scales), "mode": "exp", "l2": v.l2, "delay": v.delay,
@@ -224,11 +231,20 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", type=Path, required=True)
     ap.add_argument("--jobs", type=int, default=6)
+    ap.add_argument("--desc", default="{ds}_desc.pkl", help="descriptor pickle name in the cache, {ds} = dataset")
+    ap.add_argument("--ref-fix", type=Path, help="eval.ref_phase fix file (studies/halfbeat/fixes.json)")
+    ap.add_argument("--exclude", choices=("unclear", "off"), default="unclear",
+                    help="with --ref-fix: leave out the unclear tracks, or the unclear and the Traktor-off ones")
+    ap.add_argument("--scope", choices=("both", "test"), default="both",
+                    help="with --ref-fix: leave the tracks out of both halves, or of the test half only (same training)")
+    ap.add_argument("--tag", default="", help="suffix of the output files (v2_tables<tag>.md, v2_weights<tag>.json)")
     a = ap.parse_args()
+    global TAG
+    TAG = a.tag
     t0 = time.time()
     names = {}
     for ds in ("traktor", "gtzan"):
-        rows = [r for r in pickle.loads((a.cache / f"{ds}_desc.pkl").read_bytes())["rows"] if "error" not in r]
+        rows = [r for r in pickle.loads((a.cache / a.desc.format(ds=ds)).read_bytes())["rows"] if "error" not in r]
         names[ds] = [r["name"] for r in rows]
         for r in rows:
             xl.ROWS[r["name"]] = r
@@ -243,6 +259,17 @@ def main() -> None:
     agree = agreement(names["traktor"], a.cache / "mmdb_traktor")
     lab = Final(a.jobs)
     dev, test = names["traktor"][0::2], names["traktor"][1::2]
+    if a.ref_fix:
+        fixes = json.loads(a.ref_fix.read_text())
+        out = {"unclear"} | ({"traktor_off"} if a.exclude == "off" else set())
+        gone = {n for n, f in fixes.items() if f["verdict"] in out}
+        if a.scope == "both":
+            dev = [n for n in dev if n not in gone]
+        test = [n for n in test if n not in gone]
+        say(f"Half-beat references ({a.ref_fix.name}, desc {a.desc}): left out {sorted(out)}: "
+            f"{sum(n in gone for n in names['traktor'])} tracks; Traktor-off tracks kept (shifted if the pickle was built "
+            f"with --ref-fix): "
+            f"{sum(1 for n in names['traktor'] if fixes.get(n, {}).get('verdict') == 'traktor_off' and n not in gone)}\n")
     say(f"## Traktor: {len(names['traktor'])} tracks, dev = even {len(dev)}, test = odd {len(test)}. madmom offline "
         f"measured on {len(agree)}; Traktor and madmom agree (>= 90 % of beats) on {sum(x >= 0.9 for x in agree.values())}"
         f" (dev {sum(agree.get(n, 0) >= 0.9 for n in dev)}, test {sum(agree.get(n, 0) >= 0.9 for n in test)})\n")
@@ -365,7 +392,7 @@ def main() -> None:
     say("- NEW (Traktor-trained), Link beats, by genre: " + "; ".join(
         f"{k} {100 * x[0]:.0f}" for k, x in split_pooled(res, lambda r, t: r["genre"]).items()))
     say(f"\n{len(w)} weights. Run time {time.time() - t0:.0f} s.")
-    (RES / "v2_tables.md").write_text("\n".join(LOG) + "\n")
+    (RES / f"v2_tables{TAG}.md").write_text("\n".join(LOG) + "\n")
 
 
 if __name__ == "__main__":

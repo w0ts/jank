@@ -3,10 +3,15 @@ beat counts, the reference bar positions, and the first study's 22 features at t
 baseline from the same cache). One pickle per dataset.
 
     python build.py --dataset traktor --jobs 14 --cache CACHE_DIR --out CACHE_DIR/traktor_desc.pkl [--ref-lag 0.0]
+                    [--ref-fix studies/halfbeat/fixes.json]
+
+--ref-fix: the Traktor grids found half a beat out (eval.ref_phase) moved by half a period; their '1' moves with the
+marker by the fix's down_shift (+-0.5 beat, the side madmom's downbeats favour: a measurement, never shipped weights).
 """
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import pickle
 import sys
@@ -22,16 +27,28 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, os.environ.get("BL_REPO", str(HERE.parents[2])))
 
 
+def shifted_ref(t_ref: np.ndarray, ref_pos: np.ndarray, shift: float, down_shift: float) -> tuple[np.ndarray, np.ndarray]:
+    """The grid moved by `shift` periods; the bar positions counted from the old marker moved by `down_shift`."""
+    from eval.ref_phase import grid_period, shift_grid
+    from extract import traktor_positions
+    period = grid_period(t_ref)
+    marker = t_ref[int(np.flatnonzero(ref_pos == 1)[0])] + down_shift * period
+    new = shift_grid(t_ref, shift)
+    return new, traktor_positions(new, np.array([marker]))
+
+
 def one(job) -> dict:
     from extract import beat_features, frame_curves
     from feats import describe
     from linkbeats import link_beats
     from rules import count_beats, ref_positions, valid_4
-    path, ref_lag = job
+    path, ref_lag, fix = job
     try:
         z = np.load(path)
         L = z["L"].astype(np.float32)
         t_on, t_ref, ref_pos = np.asarray(z["online"]), np.asarray(z["ref_beats"]), np.asarray(z["ref_pos"])
+        if fix.get("verdict") == "traktor_off":
+            t_ref, ref_pos = shifted_ref(t_ref, ref_pos, float(fix["shift"]), float(fix.get("down_shift", 0.5)))
         valid, bars, non4 = valid_4(ref_pos)
         c_on = count_beats(t_on) if len(t_on) else np.zeros(0, int)
         rp_on = ref_positions(t_on, t_ref, ref_pos, valid)
@@ -67,8 +84,10 @@ def main() -> None:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--ref-lag", type=float, default=0.0, help="s added to the reference beats before describing them")
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--ref-fix", type=Path, help="eval.ref_phase fix file: half-beat-off Traktor grids shifted")
     a = ap.parse_args()
     os.nice(19)
+    fixes = json.loads(a.ref_fix.read_text()) if a.ref_fix else {}
     from eval import data
     order = [p.name for p in (data.traktor() if a.dataset == "traktor" else data.gtzan())]
     files = [a.cache / a.dataset / f"{n}.npz" for n in order]
@@ -76,7 +95,7 @@ def main() -> None:
     print(f"load {os.getloadavg()[0]:.1f}, {len(files)} tracks, {a.jobs} workers", flush=True)
     t0 = time.time()
     with ProcessPoolExecutor(a.jobs) as pool:
-        rows = list(pool.map(one, [(f, a.ref_lag) for f in files], chunksize=2))
+        rows = list(pool.map(one, [(f, a.ref_lag, fixes.get(f.stem, {})) for f in files], chunksize=2))
     for r in rows:
         if "error" in r:
             print("ERROR", r["name"], r["error"][-300:], flush=True)
