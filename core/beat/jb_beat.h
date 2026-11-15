@@ -26,6 +26,7 @@ struct jb_frame {
     float act;                         /* the network's beat activation */
     int beat;                          /* the DBN calls this frame a beat */
     double time;                       /* its time in seconds, when beat */
+    const float *bands;                /* the frame's 81 log bands (jb_fe), valid during the callback: the downbeat tap */
 };
 typedef void (*jb_frame_fn)(void *ctx, const struct jb_frame *f);
 

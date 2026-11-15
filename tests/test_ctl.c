@@ -269,6 +269,8 @@ static void test_led(void)
     CHECK(jk_led_lit(JK_NET_JANK, 1, BEAT + flash, mpb, 4) == 0);
     CHECK(jk_led_lit(JK_NET_JANK, 1, 7 * (int64_t)BEAT + 10, mpb, 4) == 1);
     CHECK(jk_led_lit(JK_NET_JANK, 1, -BEAT + 10, mpb, 4) == 1);           /* before the session's beat 0 too */
+    CHECK(jk_led_bar_one(0, 4) && jk_led_bar_one(4 * (int64_t)BEAT + 10, 4) && !jk_led_bar_one(BEAT + 10, 4));
+    CHECK(jk_led_bar_one(-4 * (int64_t)BEAT + 10, 4) && !jk_led_bar_one(-BEAT + 10, 4) && jk_led_bar_one(-3 * (int64_t)BEAT, 3));
     CHECK(jk_led_lit(JK_NET_JANK, 1, -10, mpb, 4) == 0);
     /* station: the other way round, lit and off on each beat */
     CHECK(jk_led_lit(JK_NET_WIFI, 1, 0, mpb, 4) == 0);
@@ -315,10 +317,32 @@ static void test_beat(void)
     CHECK(strstr(out, "cpu_pct=25.3\n") && strstr(out, "packets=77\n") && strstr(out, "madmom BENCH ONLY") && ends(out, "ok\n"));
 }
 
+/* AUTO BAR: the setting (on by default; `on` again counts as picked again) and the estimator in status and beat */
+static void test_autobar(void)
+{
+    setup();
+    CHECK(cfg.autobar == 1 && cfg.autobar_picks == 0);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=on\n"));
+    CHECK(run("set autobar off") == JK_CTL_CFG_CHANGED && cfg.autobar == 0 && cfg.autobar_picks == 0);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=off\n"));
+    CHECK(run("set autobar on") == JK_CTL_CFG_CHANGED && cfg.autobar == 1 && cfg.autobar_picks == 1);
+    CHECK(run("set autobar on") == JK_CTL_CFG_CHANGED && cfg.autobar_picks == 2);      /* picked again */
+    CHECK(run("set autobar yes") == JK_CTL_NONE && strstr(out, "err") && cfg.autobar == 1);
+    snap.beat = (struct jk_beat){.bar = 2, .bar_phi = 3, .bar_lead_x100 = 241, .bar_moves = 4};
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "bar=locked\nbar_phi=3\nbar_lead=2.41\n") && ends(out, "ok\n"));
+    snap.beat = (struct jk_beat){.bar = 1, .bar_phi = -1, .bar_lead_x100 = -5};
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "bar=listening\nbar_phi=-1\nbar_lead=-0.05\n"));
+    snap.beat.bar = 3;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "bar=manual\n"));
+    snap.beat = (struct jk_beat){.bar = 0, .bar_phi = -1, .bar_moves = 7};
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "bar=off\n") && strstr(out, "bar_moves=7\n") && ends(out, "ok\n"));
+}
+
 int main(void)
 {
     test_defaults();
     test_beat();
+    test_autobar();
     test_get();
     test_set();
     test_set_music();

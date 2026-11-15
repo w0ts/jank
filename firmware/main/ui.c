@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The button, the LED and the group scan.
  * Click: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air. Held 1.5 s and let go: MODE JANK <-> the Wi-Fi network, a restart.
- * Held 10 s: download mode, for flashing. The LED: the session's beat, inverted on the Wi-Fi network. */
+ * Held 10 s: download mode, for flashing. The LED: the session's beat, inverted on the Wi-Fi network; with AUTO BAR locked the bar's 1 flashes amber. */
 #include <string.h>
 #include "app.h"
 #include "board.h"
@@ -53,7 +53,7 @@ static void led_step(uint32_t now)
     struct jk_cfg cfg;
     int64_t beat = 0;
     int32_t mpb = 0;
-    int joined;
+    int joined, lit;
     if (now - last < LED_EVERY_MS)
         return;
     last = now;
@@ -64,7 +64,10 @@ static void led_step(uint32_t now)
     s_event = JL_NONE;
     app_cfg_get(&cfg);
     joined = bridge_beat(&beat, &mpb);
-    if (!jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum))
+    lit = jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum);
+    if (joined && lit != (cfg.net == JK_NET_WIFI) && beat_bar_state() == 2 && jk_led_bar_one(beat, cfg.quantum))
+        led_show(JK_LED_ONE_RGB);        /* AUTO BAR locked: the bar's 1 flashes amber (the music's 1) */
+    else if (!lit)
         led_show(0, 0, 0);
     else if (cfg.net == JK_NET_WIFI)
         led_show(0, 0, 40);              /* (an RGB LED: blue on a network, green in MODE JANK) */

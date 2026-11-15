@@ -18,7 +18,7 @@ The app image is `$JANK_SCRATCH/build-xiao/jank.bin`. The build makes `third_par
 with `third_party/esp_tinyusb-uac2.patch` (the audio class on) and sets the CPU to 240 MHz (`firmware/sdkconfig.beat`;
 the release runs 160). It installs over a stick running fw/ota with `python scripts/ota.py <jank.bin>` (app only: the
 bootloader and the partition table stay). Settings in NVS are kept; the beat settings are not stored and start at their
-defaults (`beat on`, `beat_latency 25`).
+defaults (`beat on`, `beat_latency 25`, `autobar on`).
 
 **Rollback.** The new image confirms itself only after the computer has configured USB *and* spoken on the MIDI control
 line (ota.py's `get` after the restart does that, as does a control page), and it has run 20 s. Not confirmed within
@@ -67,6 +67,7 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
 | `tempo_sets`, `phase_forces`, `starts`, `stops` | what the tracker did to the Link session |
 | `err_us` | the session's beat grid against the tracked beat before the last correction; stays within 5 ms when they agree |
 | `offset_us`, `latency_us` | the sample-count-to-local-time offset (µs since the timer started) and the latency setting |
+| `bar`, `bar_phi`, `bar_lead`, `bar_moves` | AUTO BAR (also in `status`): off / listening / locked / manual, the 1's count position (-1 none), the best phase's lead (the first move at 2.00), the session's bar moves |
 
 ## How it works
 
@@ -85,3 +86,10 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
 - **Link master.** Tempo is set when it differs from the session's by more than 0.02 BPM; the beat grid is forced
   (`lk_force_beat`, new in `third_party/link`) only when more than 5 ms from the tracked beat; stopped: Link stop; running
   again: Link start at the next bar line at least 150 ms ahead.
+- **AUTO BAR** (`set autobar on|off`, on by default). The downbeat estimator (`core/beat/jb_down.c`, a port of
+  beat-listener's `live/downbeat.py`; weights from the user's Traktor grids and audio, `core/beat/down_model.c`) counts the
+  grid's beats, scores the 4 phases from 22 accent features of the tracker's own 81 bands, and once the best phase leads
+  by 2.0 the session's bar moves onto it in whole beats (`jbl_bar_step`, the tempo untouched; an armed start re-targets the
+  moved grid's next bar line). A later move needs a lead of 3.0 held 8 beats. Reset (listening again, the bar left where
+  it is): the tracker stopped, a tempo jump, a new audio stream. MANUAL comes with a beat nudge (none on the XIAO yet);
+  `set autobar on` again ends it. The LED's bar flash turns amber while locked. RAM: 2.2 KB plus a 2.9 KB segment ring in PSRAM.

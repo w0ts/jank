@@ -36,7 +36,7 @@ void jb_beat_push(struct jb_beat *b, const float *x, size_t n, jb_frame_fn fn, v
         n -= took;
         if (!ready)
             continue;
-        struct jb_frame f = {.index = jb_fe_last_frame(&b->fe)};
+        struct jb_frame f = {.index = jb_fe_last_frame(&b->fe), .bands = feat};
         f.act = b->q16 ? jb_lstm_q16_step(&b->net, feat) : jb_lstm_step(&b->net, feat);
         f.beat = jb_dbn_step(&b->dbn, f.act, &f.time);
         if (fn)

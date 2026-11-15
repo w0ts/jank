@@ -35,6 +35,9 @@ int64_t jst_bar_at_or_after(int64_t ub, uint32_t quantum);
 /* a start on the first bar line at least JST_LEAD_US ahead; armed already: kept as it is */
 void jst_arm(struct jst *s, const struct lk_node *k, int64_t now, uint32_t quantum);
 void jst_cancel(struct jst *s);
+/* the session's beats were moved (AUTO BAR's whole-beat move): an armed start takes the first bar line of the moved grid
+ * at least JST_LEAD_US ahead, as jst_arm would now; not armed: nothing */
+void jst_retarget(struct jst *s, const struct lk_node *k, int64_t now);
 /* every few ms: sends the start when its time has come and allowed is set (1 sent). Not allowed, or too late: the next
  * bar line. The session playing already (another peer started it): nothing more to do */
 int jst_poll(struct jst *s, struct lk_node *k, int64_t now, int allowed);

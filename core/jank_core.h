@@ -124,6 +124,8 @@ struct jk_cfg {
      * this line), so they are back at their defaults at every start. */
     uint8_t beat;                     /* 1: the beat tracker steers the Link session */
     int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX) */
+    uint8_t autobar;                  /* 1: the downbeat estimator moves the session's bar onto the music's 1 (AUTO BAR) */
+    uint8_t autobar_picks;            /* counts `set autobar on`: picked again, it leaves MANUAL even when already on */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
@@ -147,6 +149,10 @@ struct jk_beat {
     int32_t err_us;                   /* the session's beat grid against the tracked beat at the last step, before a correction */
     int32_t offset_us;                /* the clock the audio's samples are mapped to local time with: the offset's value */
     int32_t latency_us;               /* the setting, in us */
+    uint8_t bar;                      /* the downbeat estimator: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
+    int8_t bar_phi;                   /* locked: the count position of the 1; else -1 */
+    int32_t bar_lead_x100;            /* its lead, score units x 100 */
+    uint32_t bar_moves;               /* whole-beat moves of the session's bar */
 };
 
 struct jk_snapshot {
@@ -198,6 +204,9 @@ int jk_ctl_tempo(const char *line, int32_t *mpb);
 #define JK_BAR_FLASH_MS 150u           /* the bar's first beat, by quantum, on Link's beat count as MIDI start uses */
 #define JK_FLASH_CAP_DIV 3             /* no flash is longer than a third of a beat: they stay apart at fast tempos */
 int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum);
+/* the session's beat at beat_ub is its bar's first (by quantum): with AUTO BAR locked, that flash shows the music's 1 */
+int jk_led_bar_one(int64_t beat_ub, uint32_t quantum);
+#define JK_LED_ONE_RGB 40, 18, 0       /* the locked 1's flash: amber (the other flashes keep the network's colour) */
 
 /* the GROUP after this one, 9 wraps to 1 */
 uint32_t jk_next_group(uint32_t group);

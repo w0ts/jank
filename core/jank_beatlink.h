@@ -21,6 +21,18 @@ struct jbl {
     uint8_t playing;                    /* we asked the session to play and have not asked it to stop */
     uint32_t tempo_sets, phase_forces, starts, stops, releases;
     int32_t err_us;                     /* the last grid error seen against the tracked beat, before any correction */
+    uint32_t bar_seq;                   /* the downbeat estimator's last decision acted on */
+    uint8_t bar_seen;                   /* bar_seq holds one */
+    uint32_t bar_moves;                 /* whole-beat moves of the session's bar */
+};
+
+/* the downbeat estimator (core/beat/jb_down.h) as the bar step wants it */
+struct jbl_bar {
+    uint8_t locked;                     /* it knows the bar's 1 */
+    uint32_t seq;                       /* its decision (one a counted beat) */
+    int32_t count;                      /* the count of that beat ... */
+    int8_t phi;                         /* ... and the count position (mod 4) of the 1 */
+    int64_t beat_us;                    /* that beat, Link host time (as jbl_in's beat_us) */
 };
 
 struct jbl_in {
@@ -38,4 +50,17 @@ void jbl_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, 
  * beat position at that instant (micro-beats, lk_beat_at) and its microseconds a beat. For the beat reports: what Live
  * follows against the beat as the stick takes it to be heard. */
 int32_t jbl_session_offset_us(int64_t ub_at, int32_t mpb);
+
+/* AUTO BAR. The whole-beat move that puts the session's bar on the 1: the session's beat at the counted beat's moment
+ * (ub_at, micro-beats; half a beat off after a half-beat nudge counts as the same beat) should sit at bar position
+ * (count - phi) mod 4. Returns n in -1..2. */
+int jbl_bar_shift(int64_t ub_at, int32_t count, int phi);
+/* the session's beats jump n whole beats at t (a force; the tempo untouched); an armed start re-targets the next bar
+ * line of the moved grid (jank_start.h). Called under the Link node owner's lock. */
+void jbl_shift_bar(struct jbl *c, struct lk_node *k, struct jst *start, int n, int64_t t);
+/* after jbl_step, with the same lock: at each new LOCKED decision, the bar onto the 1 if it is not there. Only while
+ * the tracker leads (settled, not passive, running) and the phase is within JBL_PHASE_US (then the session's beat at
+ * the counted beat is unambiguous; otherwise the decision waits for the next step). Returns the move made, 0 none. */
+int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, int64_t now, const struct jbl_in *in,
+                 const struct jbl_bar *bar);
 #endif
