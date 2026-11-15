@@ -217,7 +217,6 @@
       <button id="tabbtn" class="primary">Listen to a tab</button>
       <button id="tabstop" hidden>Stop listening</button>
     </div>
-    <div class="muted" style="font-size:12px;margin:4px 0">Pick a Chrome tab (YouTube, say) and tick "Share tab audio". The tab goes quiet and this page plays it instead: to the speakers (the Volume slider) and, with --xiao, to the "jank" USB audio output at full level; without --xiao, to the speakers and this player's tracker.</div>
     <div id="tabstat" class="num" style="font-size:13px"></div>
     <div id="tablat" class="num muted" style="font-size:12px"></div>
     <div class="muted" style="font-size:12px;margin-top:4px">The accuracy numbers (the CSV log, Calibrate) need annotated tracks: a tab has no reference beat grid, so they show nothing for a tab.</div>
@@ -571,6 +570,9 @@ const OLED = (() => {
     // the USB port's role; MIDI and USB audio work in both (host: battery units, the gear has its own power)
     usbrole: { title: 'USB', opts: ['DEVICE', 'HOST'], get: c => c.usbRole,
                help: [['TO A COMPUTER', 'MIDI + AUDIO'], ['TO SELF-POWERED', 'MIDI + AUDIO GEAR']] },
+    // the MIDI clock over USB-MIDI (to the computer, or to the gear in HOST), M2d's usbmidi; the MIDI outs always have it
+    usbmidi: { title: 'USB MIDI CLOCK', opts: ['ON', 'OFF'], get: c => c.usbMidi,
+               help: [['CLOCK ALSO OVER USB', 'TO COMPUTER OR GEAR'], ['CLOCK ON MIDI OUTS', 'ONLY, NOT OVER USB']] },
     // the downbeat estimator (AUDIO mode): ON finds the bar's 1 in the music and moves Link's bar onto it. A NUDGE BEAT
     // makes it MANUAL (an M on HOME) until AUTO BAR is picked again (YES on ON, even unchanged) or the tempo starts over
     // OFF: no placement. AT START (default): the 1 is placed while the session is stopped or its start is not reached, or
@@ -580,7 +582,7 @@ const OLED = (() => {
   };
   const helpOf = (sp, v) => (sp.opts ? sp.help[v] : sp.help) || ['', ''];
   const MENU = [                                                    // the top-level menu, in order
-    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'BLUETOOTH', edit: 'ble' }, { name: 'OFFSET', sub: 'offsets' },
+    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'BLUETOOTH', edit: 'ble' }, { name: 'USB MIDI CLOCK', edit: 'usbmidi' }, { name: 'OFFSET', sub: 'offsets' },
     { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
   ];
   // sub-menus: a title and the EDITS they list
@@ -872,7 +874,7 @@ const OLED = (() => {
   function drawMenu(fb, ui, c) {
     titleBar(fb, 'MENU', (ui.cursor + 1) + '/' + MENU.length);
     const vals = { 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': AUTOBAR_SHORT[autoBarIndex(c.autoBar)], NETWORK: NET_SHORT[c.net.mode],
-                   USB: EDITS.usbrole.opts[c.usbRole], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' };
+                   USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' };
     for (let k = 0; k < VISIBLE; k++) {
       const i = ui.top + k; if (i >= MENU.length) break;
       const y = 11 + k * 9, sel = i === ui.cursor, v = sel ? 0 : 1;
@@ -1235,7 +1237,7 @@ function beatStats(lines) {
   for (const l of lines) {
     const m = /^([a-z_]+)=(-?[0-9.]+)$/.exec(l.trim());
     if (m) out[m[1]] = Number(m[2]);
-    const w = /^(bar|audio_source|ble_state|outputs|source|autobar)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting
+    const w = /^(bar|audio_source|ble_state|outputs|source|autobar|usbmidi)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting, USB MIDI CLOCK
     if (w) out[w[1]] = w[2];
   }
   return out;
@@ -1254,10 +1256,12 @@ function onXiaoLineText(t, at) {
       const homeLine = XIAO.lines.find(l => l.startsWith('home=h'));
       XIAO.lines = [];
       if (homeLine && line === 'ok') { XIAO.home = parseHome(homeLine); XIAO.homeAt = XIAO.answerAt; }       // `home`: the meter's numbers
-      else if (line.startsWith('err')) { XIAO.err = line; XIAO.errAt = performance.now(); }
+      else if (line.startsWith('err')) { XIAO.err = line; XIAO.errAt = performance.now(); xiaoNudgeErr(line); }
       else if ('phase_forces' in stats) { XIAO.stats = stats; api('xiao_stats', stats); }
       else if ('link_peers' in stats) { XIAO.status = stats; XIAO.statusAt = XIAO.answerAt; }
       else if ('quantum' in stats) XIAO.cfg = stats;
+      else if ('nudge_beats' in stats) xiaoNudged('no', stats);           // `nudge beat`'s answer: the user's nudges in all
+      else if ('beat_latency' in stats) xiaoNudged('yes', stats);         // `nudge ms`'s: the AUDIO IN offset (beat_latency)
       XIAO.answerAt = at;
     } else XIAO.lines.push(line);
   }
@@ -1424,7 +1428,7 @@ const VIEW_KEY = 'beatEmuView';
 const view = { scr: '1.54' };                     // the user's choice (2026-11-14): 1.54 inch
 try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')); } catch (e) { /* storage blocked: the default */ }
 const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: false, no: false, yes: false },
-              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, autoBar: 1, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1, bleMode: 1, bleEnd: 0, srcFlash: null,
+              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, usbMidi: 0, autoBar: 1, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1, bleMode: 1, bleEnd: 0, srcFlash: null,
               repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
               net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
 /* remembered in this browser (localStorage; a blocked storage only means nothing is remembered): the test panel
@@ -1432,7 +1436,7 @@ const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: fal
    (threshold, low confidence, input offset, fold, hold) come back from the player itself. Passwords are not kept. */
 const PANEL_KEY = 'beatEmuPanel', DEV_KEY = 'beatEmuDevice';
 const PANEL_IDS = ['wifi', 'usb', 'bat', 'battlvl', 'linein', 'usbaudio', 'blephone'];
-const DEV_FIELDS = ['ltMode', 'gain', 'bright', 'sleep', 'offs', 'rate', 'inSrc', 'usbRole', 'bleMode'];
+const DEV_FIELDS = ['ltMode', 'gain', 'bright', 'sleep', 'offs', 'rate', 'inSrc', 'usbRole', 'usbMidi', 'bleMode'];
 const NET_FIELDS = ['mode', 'group', 'ssid', 'apName'];
 const loadJson = key => { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; } };
 const saveJson = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { /* not remembered */ } };
@@ -1514,6 +1518,8 @@ function syncFromStatus(s) {
 const hold = key => { holdUntil[key] = performance.now() + 1200; };
 
 // what the screen UI changes goes out through here; "emu" = kept in the emulator only, nothing on the server
+/* USB MIDI CLOCK's index (0 ON, 1 OFF): --xiao the XIAO's `get` usbmidi= once known, else the page's own */
+function usbMidiNow() { return S && S.xiao && XIAO.cfg && (XIAO.cfg.usbmidi === 'on' || XIAO.cfg.usbmidi === 'off') ? (XIAO.cfg.usbmidi === 'on' ? 0 : 1) : dev.usbMidi; }
 function setField(field, val) {
   if (field === 'threshold') { dev.th = val; sendThreshold(); }
   else if (field === 'lowconf') { dev.confStop = val === 1; sendThreshold(); }
@@ -1545,6 +1551,10 @@ function setField(field, val) {
     if (val === 0) pairNow(performance.now());
   }
   else if (field === 'usbrole') dev.usbRole = val;          // emu: DEVICE (to a computer) / HOST (self-powered gear)
+  else if (field === 'usbmidi') {                           // ON / OFF; --xiao: the XIAO's `set usbmidi`, read back from `get`
+    dev.usbMidi = val;
+    if (S && S.xiao) { xiaoSend('set usbmidi ' + (val === 0 ? 'on' : 'off')); setTimeout(askGet, 300); }
+  }
   else if (field === 'autobar') {                           // the player's downbeat estimator, or the XIAO's (--xiao)
     dev.autoBar = val; hold('autobar');
     const word = AUTOBAR_WORDS[val];
@@ -1709,7 +1719,7 @@ function buildCtx(now, beat) {
     batt: battLevel(), lineIn, bright: dev.bright, sleep: dev.sleep, inOff: dev.inOff, offs: dev.offs, rate: dev.rate, boot: dev.boot, splash: now - dev.powerOnAt < 800,
     net: netCtx(now), wifiQ: wifiQuality(now), groupPeers: $('wifi').value === 'none' ? 0 : xp ? xp.group : 3, setup: dev.net.mode === 3, qr: QR_CODE, saved: now < dev.savedUntil,
     ble: { mode: dev.bleMode, left: ble.left, phone: ble.phone },
-    inSrc: dev.inSrc, usbRole: dev.usbRole, autoBar: dev.autoBar, bar: barNow(s, now),
+    inSrc: dev.inSrc, usbRole: dev.usbRole, usbMidi: usbMidiNow(), autoBar: dev.autoBar, bar: barNow(s, now),
     tempoStep, setField, setHold, linkStartStop,
   };
 }
@@ -1938,6 +1948,35 @@ function noEvent(e, now) {
 const onHome = () => ui.screen === 'home' && dev.net.mode !== 3;
 const NUDGE_MS = 1;
 const NUDGE_BEATS = 0.5;           // half a beat: fixes an off-beat lock; two steps move the bar's 1 by a beat
+const XIAO_NUDGE_ANSWER_MS = 2000; // an answer this soon after a nudge is its own (the overlay shows it)
+/* beats in halves for the overlay: 0.5 -> "+1/2", -1.5 -> "-1 1/2", 2 -> "+2", 0 -> "0" */
+function halvesText(b) {
+  const h = Math.round(Math.abs(b) * 2), w = Math.floor(h / 2), half = h % 2 ? '1/2' : '';
+  return h === 0 ? '0' : (b < 0 ? '-' : '+') + (w ? w + (half ? ' ' + half : '') : half);
+}
+/* --xiao: the overlay from the XIAO's answer: mod 'no' (`nudge beat`): nudge_beats, the user's nudges in all (+-3);
+   'yes' (`nudge ms`): beat_latency, the AUDIO IN offset of the source heard */
+function nudgeOverlay(mod, stats) {
+  if (mod === 'no') return { title: 'NUDGE BEAT', value: halvesText(stats.nudge_beats) + ' BEAT' };
+  return { title: 'NUDGE MS', value: 'AUDIO IN ' + (stats.beat_latency > 0 ? '+' : '') + stats.beat_latency + ' MS' };
+}
+/* --xiao: a nudge refused: the reason as an overlay, null for an err that is not a nudge's */
+function nudgeErrOverlay(line) {
+  if (/^err nudge beat at its limit/.test(line)) return { title: 'NUDGE BEAT', value: 'MAX 3 BEATS' };
+  if (line === 'err no beat yet') return { title: 'NUDGE BEAT', value: 'NO BEAT YET' };
+  if (line === 'err link mode') return { title: 'LINK MODE', value: '' };
+  if (line === 'err busy') return { title: 'NUDGE', value: 'BUSY' };
+  return null;
+}
+function xiaoNudged(mod, stats) {
+  if (performance.now() - (XIAO.nudgeAt || -1e9) > XIAO_NUDGE_ANSWER_MS) return;
+  const o = nudgeOverlay(mod, stats);
+  showOverlay(o.title, o.value);
+}
+function xiaoNudgeErr(line) {
+  const o = performance.now() - (XIAO.nudgeAt || -1e9) <= XIAO_NUDGE_ANSWER_MS ? nudgeErrOverlay(line) : null;
+  if (o) showOverlay(o.title, o.value);
+}
 function showOverlay(title, value) { ui.hint = null; ui.overlay = { until: performance.now() + 1000, title, value }; }
 // NO / YES held on HOME (AUDIO mode) longer than HINT_MS without UP / DOWN: a hint says what UP / DOWN will do
 const HINT_MS = 400;
@@ -1952,7 +1991,11 @@ function dropHint() { clearTimeout(dev.hintTimer); ui.hint = null; }
 function comboStep(mod, d) {
   if (dev.link) return;                                          // LINK mode: the session owns the bar and the timing
   if (mod === 'yes') autoLatApply({ type: 'manual' });           // NUDGE MS is the user's own latency: Auto latency off
-  if (S && S.xiao) { showOverlay('TRACKER LEADS', ''); return; } // --xiao: the nudges are the XIAO tracker's (not on it yet)
+  if (S && S.xiao) {                                             // --xiao: the XIAO's nudges (M2d); the overlay from its answer
+    xiaoSend(mod === 'no' ? 'nudge beat ' + (d > 0 ? '+0.5' : '-0.5') : 'nudge ms ' + (d > 0 ? '+1' : '-1'));
+    XIAO.nudgeAt = performance.now();
+    return;
+  }
   if (mod === 'no') { api('shift', { beats: d * NUDGE_BEATS }); showOverlay('NUDGE BEAT', d > 0 ? '+1/2' : '-1/2'); }
   else {
     const ms = clampN(dev.inOff + d * NUDGE_MS, -100, 100);         // the nudge moves the audio input offset: every output

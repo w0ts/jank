@@ -94,4 +94,5 @@ const box = html.slice(html.indexOf('<div class="ctl">'), html.indexOf('</main>'
 for (const id of ['play', 'auto', 'time', 'seek', 'pitchval', 'pitch', 'vol']) { assert.ok(box.includes('id="' + id + '"'), id); checks++; }   // one box
 assert.strictEqual((html.match(/class="now"/g) || []).length, 1); checks++;
 assert.ok(!html.includes('what you hear')); checks++;
+assert.ok(!html.includes('Pick a Chrome tab (YouTube')); checks++;
 console.log(checks + ' checks passed');
