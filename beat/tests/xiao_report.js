@@ -12,13 +12,14 @@ let checks = 0;
 const ok = (c, msg) => { assert.ok(c, msg); checks++; };
 const eq = (a, b) => { assert.deepStrictEqual(a, b); checks++; };
 
-eq(xiaoReport(frame('b 17 12403 steady 1')), { kind: 'b', n: 17, bpm: 124.03, mode: 'steady', audio: true });
-eq(xiaoReport(frame('b 17 12403 steady 1 31250')), { kind: 'b', n: 17, bpm: 124.03, mode: 'steady', audio: true, lagUs: 31250 });
+eq(xiaoReport(frame('b 17 12403 steady 1')), { kind: 'b', n: 17, bpm: 124.03, mode: 'steady', audio: true, live: false });   // 1: open, no sound
+eq(xiaoReport(frame('b 17 12403 steady 2 31250')), { kind: 'b', n: 17, bpm: 124.03, mode: 'steady', audio: true, live: true, lagUs: 31250 });   // 2: sound
+eq(xiaoReport(frame('b 17 12403 steady 0')), { kind: 'b', n: 17, bpm: 124.03, mode: 'steady', audio: false, live: false });   // 0: not open
 eq(xiaoReport(frame('b 2 12403 steady 1 -4000')).lagUs, -4000);
 eq(xiaoReport(frame('b 3 12403 steady 1 31250 -4300')).linkUs, -4300);       // the Link session's beat from it
 eq(xiaoReport(frame('b 3 12403 steady 1 31250 -')).linkUs, undefined);        // no session playing
 eq(xiaoReport(frame('t 0 0 stopped 0 25 -')).latencyMs, 25);
-eq(xiaoReport(frame('t 0 0 stopped 0 25')), { kind: 't', n: 0, bpm: 0, mode: 'stopped', audio: false, latencyMs: 25 });
+eq(xiaoReport(frame('t 0 0 stopped 0 25')), { kind: 't', n: 0, bpm: 0, mode: 'stopped', audio: false, live: false, latencyMs: 25 });
 eq(xiaoReport(frame('get', 0x10, 0x4b)), null);            // a control line is not a report
 eq(xiaoReport(frame('b 1 2 steady 1', 0x11)), null);       // another report type
 eq(xiaoReport(frame('x 1 2 steady 1')), null);
@@ -66,8 +67,9 @@ eq([x.playing, x.armed, x.running], [false, false, false]);
 eq(xiaoLink(st({ playing: 1 }), 1000, 1500, 4, null).running, true);
 eq(xiaoHearing(null), { on: false, text: 'no report yet' });
 eq(xiaoHearing({ audio: false, mode: 'stopped' }).text, 'no audio');
-eq(xiaoHearing({ audio: true, mode: 'stopped' }), { on: false, text: 'audio stream open, no beat heard' });
-eq(xiaoHearing({ audio: true, mode: 'steady' }), { on: true, text: 'hearing audio' });
+eq(xiaoHearing({ audio: true, live: false, mode: 'stopped' }), { on: false, text: 'stream open, no sound' });     // LINK mode
+eq(xiaoHearing({ audio: true, live: false, mode: 'steady' }), { on: false, text: 'stream open, no sound' });
+eq(xiaoHearing({ audio: true, live: true, mode: 'stopped' }), { on: true, text: 'hearing music' });             // AUDIO mode, whatever the tracker says
 
 // the control line's answers: dated by their first frame; `status`, `get` and `beat` told apart; an err kept
 {
