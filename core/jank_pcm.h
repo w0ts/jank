@@ -22,7 +22,7 @@ struct jp_rs {
     uint32_t up, down;                   /* L, M: out = in x L / M */
     uint32_t phase;                      /* n x M - i x L of the next output, 0 .. L + M */
     uint32_t pos;                        /* where the next input goes in hist */
-    int16_t hist[JP_TAPS];
+    int16_t hist[2u * JP_TAPS];          /* each sample twice (at pos and pos + TAPS): the last TAPS are one straight run */
     int16_t coef[JP_PHASES_MAX][JP_TAPS];
 };
 

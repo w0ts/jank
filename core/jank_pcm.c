@@ -92,12 +92,10 @@ void jp_rs_reset(struct jp_rs *r)
 static int16_t one(const struct jp_rs *r, uint32_t phase)
 {
     const int16_t *c = r->coef[phase];
-    int32_t acc = 1 << 14;              /* rounding; sum |c| < 2 for these filters, so 16 products fit in 32 bits */
-    uint32_t at = r->pos;               /* hist[pos - 1] is the newest sample: coef[.][0] goes with it */
-    for (uint32_t k = 0; k < JP_TAPS; k++) {
-        at = (at + JP_TAPS - 1u) % JP_TAPS;
-        acc += (int32_t)c[k] * r->hist[at];
-    }
+    const int16_t *x = r->hist + r->pos + JP_TAPS - 1u;   /* the newest sample: coef[.][0] goes with it */
+    int32_t acc = 1 << 14;              /* rounding; sum |c| < 2 for these filters, so the products fit in 32 bits */
+    for (uint32_t k = 0; k < JP_TAPS; k++)
+        acc += (int32_t)c[k] * x[-(int32_t)k];
     acc >>= 15;
     return (int16_t)(acc > 32767 ? 32767 : acc < -32768 ? -32768 : acc);
 }
@@ -113,7 +111,9 @@ size_t jp_rs_run(struct jp_rs *r, const int16_t *in, size_t n, int16_t *out, siz
     }
     for (size_t i = 0; i < n; i++) {
         r->hist[r->pos] = in[i];
-        r->pos = (r->pos + 1u) % JP_TAPS;
+        r->hist[r->pos + JP_TAPS] = in[i];
+        if (++r->pos == JP_TAPS)
+            r->pos = 0;
         /* every output whose input index is this one: phase n x M - i x L in [0, L) */
         while (r->phase < r->up) {
             if (w < cap)
