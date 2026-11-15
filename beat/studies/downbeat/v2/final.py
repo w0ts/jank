@@ -76,6 +76,7 @@ def decide_link(sc, ready, commit, switch, hold, wait=0, early=0, switch2=None, 
         if cur < 0:
             if i - rd[0] >= wait and s[b] - np.sort(s)[-2] >= commit:
                 cur, moved[i], first = b, True, i
+            off[i] = cur
             continue
         late = switch2 is not None and i - first >= early
         sw, hd = (switch2, hold2) if late else (switch, hold)
@@ -213,7 +214,7 @@ def export(v, w, margin, f, trained_on) -> None:
     (RES / "v2_weights.json").write_text(json.dumps({
         "about": "downbeat linear accumulator rule (first study's structure); REPORT2.md; derived from the user's "
                  "Traktor grids and audio only (reference beats, no madmom output)",
-        "trained_on": trained_on, "features": feats, "bars": list(v.scales), "mode": "exp", "l2": v.l2,
+        "trained_on": trained_on, "features": feats, "bars": list(v.scales), "mode": "exp", "l2": v.l2, "delay": v.delay,
         "rel": "(acc - mean4) / (|mean4| + 1e-6)", "w_layout": "w[f * 4 + p]: feature f at bar position p from the "
                                                                 "candidate 1", "w": [float(x) for x in w],
         "margin": margin, "link": dict(zip(("commit", "switch", "hold", "wait", "early", "switch2", "hold2"), f))}, indent=1))
@@ -265,6 +266,18 @@ def main() -> None:
                 best = (sc_acc, key, v, m, keep if clean else dev, s_)
     _, key, v, margin, train_set, dev_scs = best
     say(f"\nChosen on dev: {key} ({v.name}), margin {margin:g}, training on {len(train_set)} dev tracks")
+    ag_dev = {n for n in dev if agree.get(n, 0) >= 0.9}
+    say(f"\nNoisy reference, dev half, Link beats (cross-fitted; madmom selects tracks: a measurement, not for shipping)"
+        f"\n\n{HEAD}")
+
+    def ag_sub(s: dict) -> dict:
+        return {n: s[n] for n in ag_dev if n in s}
+    say(f"| chosen training, scored on the {len(ag_dev)} dev tracks where Traktor and madmom agree "
+        f"{fmt(summarize(results(ag_sub(dev_scs), margin)))}")
+    if len(ag_dev) >= 30:
+        s_ag = lab.crossfit_scores(v, dev, only=ag_dev)
+        say(f"| trained on the agreeing dev tracks only ({len(ag_dev)}), all dev {fmt(summarize(results(s_ag, margin)))}")
+        say(f"| trained on the agreeing dev tracks only, agreeing dev {fmt(summarize(results(ag_sub(s_ag), margin)))}")
 
     say(f"\n### Link's bar: moves only when confident, dev half, Link beats (cross-fitted)\n\n{LINK_HEAD}")
     grid_rows = []
