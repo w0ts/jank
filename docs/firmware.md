@@ -68,8 +68,20 @@ set quantum 1..16 | offset -100.00..100.00 (ms, 10 us steps) | net jank|wifi | s
 
 `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
 nothing. `net jank` is the protocol's name for jank mode. `tempo`, `play` and `stop` change the whole Link session, as
-any Link app may (play and stop from the session's beat now); with no session they answer `err no session`: alone, the
-stick has no session of its own.
+any Link app may; with no settled session they answer `err no session`: alone, the stick has no session of its own.
+
+- **`play` starts on the next bar line** (`quantum` beats). The start goes out 150 ms before that bar, as "playing from
+  bar B" (Link's isPlaying, beats B, time stamp now), so every peer starts on B: Live and LinkHut read B, the FM-1 and the
+  stick's own MIDI clock start on the next bar line they have not sent yet (`core/jank_start.h`). The session playing
+  already: nothing changes. `stop` stops at once.
+- **AUDIO mode** (the speaker's stream open, `beat on`): the tracker starts the session when it has the beat and stops it
+  on silence; `play` and `stop` answer `err audio mode`. Closing the stream (LINK mode) leaves the session as it is.
+- **Settled first.** After joining a session (start-up, a replug, another group) the stick waits until it has been in the
+  same session for 1 s with no other session left to measure (`jp_settled`): until then it sends no MIDI clock and no
+  start, sets no tempo, and the tracker steers nothing. With no Link peer at all it has no session: no clock, nothing to
+  start.
+- `status` says `settled=0|1`, `armed=0|1` and, while armed, `start=<beat>`: armed is a start not reached yet, either
+  waiting to be sent, sent for a bar still ahead, or the session playing while the MIDI start waits for its bar line.
 
 ## The `bootloader` command
 

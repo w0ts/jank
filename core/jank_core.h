@@ -159,6 +159,9 @@ struct jk_snapshot {
     uint32_t lat_usb_us, lat_usb_max_us;   /* USB -> radio handed over, in the stick: last, highest */
     uint8_t link_on;                  /* the Link peer is in the session's traffic */
     uint8_t playing;                  /* the session plays (Start Stop Sync) */
+    uint8_t settled;                  /* joined long enough to have the session's state (jank_peer.h jp_settled) */
+    uint8_t armed;                    /* a start not reached yet: its bar line is start_ub */
+    int64_t start_ub;
     uint32_t link_ip;                 /* the peer's own address, host order; 0: none yet */
     uint32_t link_peers;              /* Link peers in the session, the stick not counted */
     int32_t mpb;                      /* us a beat; 0: no session */

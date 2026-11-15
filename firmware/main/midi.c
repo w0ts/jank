@@ -191,6 +191,15 @@ void midi_publish(const struct jc_map *m)
     }
 }
 
+int midi_start_pending(void)
+{
+    int r;
+    portENTER_CRITICAL(&s_mux);
+    r = s_tick.want_start || s_tick.resync;
+    portEXIT_CRITICAL(&s_mux);
+    return r;
+}
+
 void midi_want(int play)
 {
     portENTER_CRITICAL(&s_mux);

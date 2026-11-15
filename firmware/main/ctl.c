@@ -78,7 +78,7 @@ static void run_line(const char *line)
     if (a == JK_CTL_TEMPO || a == JK_CTL_PLAY || a == JK_CTL_STOP) {
         int32_t mpb = 0;
         int r = a == JK_CTL_TEMPO ? (jk_ctl_tempo(line, &mpb) ? -1 : bridge_tempo(mpb)) : bridge_play(a == JK_CTL_PLAY);
-        strcpy(s_out, r ? "err no session\n" : "ok\n");
+        strcpy(s_out, r == -2 ? "err audio mode\n" : r ? "err no session\n" : "ok\n");
     }
     usb_serial_write(s_out, strlen(s_out));
     if (a == JK_CTL_REBOOT || a == JK_CTL_BOOTLOADER) {

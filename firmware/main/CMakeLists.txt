@@ -7,7 +7,7 @@ message(NOTICE "jank: BEAT-FOLLOW BENCH BUILD with madmom's weights (CC BY-NC-SA
 idf_component_register(
     SRCS "main.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c"
          "usb_audio.c" "beat.c"
-         "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c"
+         "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c" "${core}/jank_start.c"
          "${beat}/jb_beat.c" "${beat}/jb_dbn.c" "${beat}/jb_fe.c" "${beat}/jb_lstm.c" "${beat}/jb_lstm_q16.c" "${beat}/jb_mode.c" "${beat}/beat_model.c"
          "${link}/link.c"
     INCLUDE_DIRS "." "${core}" "${link}" "${beat}"

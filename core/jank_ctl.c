@@ -78,14 +78,23 @@ static void put_bridge_stats(const struct jk_stats *t, struct writer *w)
     put(w, "drop_own=%lu\ndrop_other=%lu\ndrop_foreign=%lu\nmac_adopted=%lu\n", (unsigned long)t->drop_own, (unsigned long)t->drop_other, (unsigned long)t->drop_foreign, (unsigned long)t->mac_adopted);
 }
 
+/* session micro-beats as beats with three decimals, truncated: "beat=-1.500" */
+static void put_beats(struct writer *w, const char *key, int64_t ub)
+{
+    uint64_t mag = ub < 0 ? (uint64_t)-ub : (uint64_t)ub;
+    put(w, "%s=%s%llu.%03llu\n", key, ub < 0 ? "-" : "", (unsigned long long)(mag / 1000000u), (unsigned long long)(mag / 1000u % 1000u));
+}
+
 static void put_link(const struct jk_snapshot *s, struct writer *w)
 {
     uint32_t ip = s->link_ip;
-    int64_t ub = s->beat_ub;
-    uint64_t mag = ub < 0 ? (uint64_t)-ub : (uint64_t)ub;
     uint32_t bpm_x100 = s->mpb > 0 ? (uint32_t)((6000000000ull + (uint64_t)s->mpb / 2u) / (uint32_t)s->mpb) : 0u;
     put(w, "link=%u\nlink_ip=%u.%u.%u.%u\nlink_peers=%lu\n", s->link_on, (unsigned)(ip >> 24), (unsigned)(ip >> 16 & 255u), (unsigned)(ip >> 8 & 255u), (unsigned)(ip & 255u), (unsigned long)s->link_peers);
-    put(w, "bpm=%lu.%02lu\nbeat=%s%llu.%03llu\nplaying=%u\n", (unsigned long)(bpm_x100 / 100u), (unsigned long)(bpm_x100 % 100u), ub < 0 ? "-" : "", (unsigned long long)(mag / 1000000u), (unsigned long long)(mag / 1000u % 1000u), s->playing);
+    put(w, "bpm=%lu.%02lu\n", (unsigned long)(bpm_x100 / 100u), (unsigned long)(bpm_x100 % 100u));
+    put_beats(w, "beat", s->beat_ub);
+    put(w, "playing=%u\nsettled=%u\narmed=%u\n", s->playing, s->settled, s->armed);
+    if (s->armed)
+        put_beats(w, "start", s->start_ub);       /* the bar line the transport starts on */
     put(w, "midi_ticks=%lu\nmidi_resync=%lu\n", (unsigned long)s->midi_ticks, (unsigned long)s->midi_resync);
 }
 
