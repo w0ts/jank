@@ -188,6 +188,7 @@ def test_xiao_mode_never_constructs_real_link(monkeypatch):
     monkeypatch.setattr(player, "RealLink", no_link)
     monkeypatch.setattr(player, "VarispeedSource", FakeSource)
     monkeypatch.setattr(player, "make_xiao", lambda: FakeXiao())
+    monkeypatch.setattr(player, "speaker_device_name", lambda source: "Fake Speakers")
     monkeypatch.setattr(player, "serve", lambda port, app: FakeServer())          # port 8791 is never touched
     monkeypatch.setattr(player, "run", lambda *a, **k: None)
     monkeypatch.setattr(player, "Engine", lambda *a, **k: SimpleNamespace(beats=[], status=lambda: SimpleNamespace(bpm=None)))
