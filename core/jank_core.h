@@ -203,6 +203,7 @@ struct jk_beat {
     uint8_t act_pct;                  /* the network's beat activation peak over the last second, percent (M2d's conf=) */
     uint8_t gated;                    /* LOW CONFIDENCE's gate: the confidence under the threshold (STOP / START) */
     uint8_t silent;                   /* 0.5 s under -60 dBFS: the outputs stopped too (jank_conf.h SILENCE) */
+    uint8_t conf_open;                /* the confidence at the threshold + 5 (where the gate opens): a Start's disarm ends */
     uint32_t tempo_sets, phase_forces, starts, stops;   /* what the tracker did to the Link session */
     int32_t err_us;                   /* the session's beat grid against the tracked beat at the last step, before a correction */
     int32_t offset_us;                /* the clock the audio's samples are mapped to local time with: the offset's value */

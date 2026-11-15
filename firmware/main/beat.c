@@ -75,6 +75,7 @@ static int16_t s_peak_db = -99;        /* the last window's: dBFS, and the activ
 static uint8_t s_act_pct;
 static struct jcf s_conf;              /* LOW CONFIDENCE: the tracked beats kept and the silence (core/jank_conf.h) */
 static uint8_t s_conf_pct;             /* the confidence at the last step, percent */
+static uint8_t s_conf_open;            /* ... at the threshold + 5, where the gate opens (core/jank_hold.h jho_in.conf_open) */
 static uint8_t s_gated;                /* its gate (STOP / START under the threshold), at the last step */
 static struct jlv s_live;              /* sound on the source (AUDIO mode) and the input meter: the tracker's own samples */
 static int64_t s_fed_us;               /* when samples last came ... */
@@ -363,6 +364,7 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.conf_pct = s_conf_pct;
     b.gated = s_gated;
     b.silent = s_conf.silent;
+    b.conf_open = s_conf_open;
     portENTER_CRITICAL(&s_mux);
     s_pub = b;
     portEXIT_CRITICAL(&s_mux);
@@ -379,6 +381,7 @@ static void follow_conf(const struct jk_cfg *cfg)
     }
     s_conf_pct = jcf_pct(conf);
     s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
+    s_conf_open = (uint8_t)!jcf_gate(1, conf, JCF_STOP, cfg->threshold);   /* (a closed gate's test: open at threshold + 5) */
 }
 
 /* the tracker's work on one pass's samples; the time it took is the figure for the CPU */
@@ -625,13 +628,13 @@ void beat_state(uint8_t *audio, uint8_t *locked)
     portEXIT_CRITICAL(&s_mux);
 }
 
-uint8_t beat_gated(void)
+void beat_gate(uint8_t *gated, uint8_t *silent, uint8_t *conf_open)
 {
-    uint8_t g;
     portENTER_CRITICAL(&s_mux);
-    g = (uint8_t)(s_pub.on && s_pub.audio_live && (s_pub.gated || s_pub.silent));
+    *gated = (uint8_t)(s_pub.on && s_pub.audio_live && s_pub.gated);
+    *silent = (uint8_t)(s_pub.on && s_pub.audio_live && s_pub.silent);
+    *conf_open = s_pub.conf_open;
     portEXIT_CRITICAL(&s_mux);
-    return g;
 }
 
 uint8_t beat_bar_state(void)

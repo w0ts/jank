@@ -152,7 +152,8 @@ static struct jho_in hin(uint8_t lt, uint8_t base, uint8_t locked)
     return in;
 }
 
-/* Stop stops the outputs at once whatever the transport says; the hold lasts through tracker stops and LINK mode */
+/* Stop stops the outputs at once whatever the transport says; the hold lasts through tracker stops and LINK mode (the
+ * user's layer, 2026-11-15: nothing automatic starts them again, LINK mode included) */
 static void test_hold_stops_all_outputs(void)
 {
     for (uint8_t lt = JHO_IGNORE; lt <= JHO_LEAD; lt++) {
@@ -168,8 +169,8 @@ static void test_hold_stops_all_outputs(void)
         CHECK(jho_outputs(&h, &in) == 0);
         in.locked = 1;
         CHECK(jho_outputs(&h, &in) == 0 && h.hold);
-        in.audio = 0;                                           /* LINK mode: the transport's rule, the hold kept */
-        CHECK(jho_outputs(&h, &in) == 1 && h.hold && !jho_session_held(&h, &in));
+        in.audio = 0;                                           /* LINK mode (the sound gone): still stopped */
+        CHECK(jho_outputs(&h, &in) == 0 && h.hold && !jho_session_held(&h, &in));
         in.audio = 1;
         CHECK(jho_outputs(&h, &in) == 0);
         jho_set(&h, 1);                                         /* Stop again: nothing more */
@@ -194,7 +195,7 @@ static void test_release_arms_until_locked(void)
     CHECK(jho_outputs(&h, &in) == 1);
     in.base = 0;                                                /* FOLLOW: the session stopped -> the clocks stop */
     CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_ARMED);
-    jho_set(&h, 0);                                             /* Start while not held: nothing */
+    jho_set(&h, 0);                                             /* Start while not held: no arming (it disarms the gate) */
     CHECK(!h.arming && h.releases == 1);
 }
 
@@ -229,7 +230,7 @@ static void test_link_play_ends_hold(void)
 }
 
 /* LINK mode's own `stop`: the clocks stay stopped whatever the transport wants (another peer starts the session, AUTO
- * sees a peer), until `play` or a change of mode; AUDIO mode is not touched by it */
+ * sees a peer) and through the sound coming and going (the mode is automatic), until the user's `play` */
 static void test_link_stop_holds(void)
 {
     struct jho h;
@@ -242,10 +243,55 @@ static void test_link_stop_holds(void)
     jho_link_play(&h);
     CHECK(jho_outputs(&h, &in) == 1);
     jho_link_stop(&h);
-    in.audio = 1;                                               /* sound: AUDIO mode, its own rules */
+    in.audio = 1;                                               /* sound: AUDIO mode, still the user's Stop */
     in.locked = 1;
+    CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED);
+    in.audio = 0;                                               /* back to LINK mode: still stopped */
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.audio = 1;
+    jho_set(&h, 0);                                             /* the user's Start in AUDIO mode: on the lock */
     CHECK(jho_outputs(&h, &in) == 1);
-    in.audio = 0;                                               /* back to LINK mode: its clocks on again */
+}
+
+/* the two layers (the user, 2026-11-15: "if I manually stopped, don't start again automatically"): after the user's Stop
+ * no automatic event starts the outputs (the gate opening, silence then sound, a re-lock, the mode going and coming, the
+ * session started by a peer); the user's Start does; then an automatic stop (the gate) may restart automatically */
+static void test_user_layer(void)
+{
+    struct jho h;
+    struct jho_in in = hin(JHO_LEAD, 1, 1);
+    jho_init(&h);
+    jho_set(&h, 1);
+    in.gated = 1;                                               /* the gate closes and opens */
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.gated = 0;
+    in.conf_open = 1;
+    CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in));
+    in.silent = 1;                                              /* silence, then sound */
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.silent = 0;
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.locked = 0;                                              /* a new track: the lock lost and found */
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.locked = 1;
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.audio = 0;                                               /* the 4.75 s rule: LINK mode, then AUDIO again */
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.audio = 1;
+    in.base = 1;                                                /* a peer starts the shared session */
+    CHECK(jho_outputs(&h, &in) == 0 && h.hold);
+    jho_set(&h, 0);                                             /* the user's Start */
+    CHECK(jho_outputs(&h, &in) == 1 && !h.hold);
+    in.conf_open = 1;                                           /* the gate re-armed ... */
+    CHECK(jho_outputs(&h, &in) == 1 && !h.gate_off);
+    in.conf_open = 0;
+    in.gated = 1;                                               /* ... an automatic stop ... */
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.gated = 0;                                               /* ... and an automatic start */
+    CHECK(jho_outputs(&h, &in) == 1);
+    in.silent = 1;
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.silent = 0;
     CHECK(jho_outputs(&h, &in) == 1);
 }
 
@@ -274,8 +320,8 @@ static void test_gate_stops_outputs(void)
     }
 }
 
-/* the user's hold wins over the gate: held, nothing starts when the gate lifts; Start while gated arms, and the outputs
- * wait for the gate and the lock both */
+/* the user's hold wins over the gate: held, nothing starts when the gate lifts; Start while gated (M2g): the gate is
+ * disarmed, the outputs wait for the lock alone */
 static void test_hold_wins_over_gate(void)
 {
     struct jho h;
@@ -286,14 +332,59 @@ static void test_hold_wins_over_gate(void)
     in.gated = 0;
     CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in));
     in.gated = 1;
-    jho_set(&h, 0);                                             /* Start while gated */
-    CHECK(h.arming && jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in));
-    CHECK(h.arming);                                            /* still waiting: the gate is not the lock */
-    in.gated = 0;
     in.locked = 0;
-    CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_ARMED && !jho_session_held(&h, &in));
+    jho_set(&h, 0);                                             /* Start while gated */
+    CHECK(h.arming && h.gate_off && jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_ARMED && !jho_session_held(&h, &in));
     in.locked = 1;
     CHECK(jho_outputs(&h, &in) == 1 && !h.arming);
+}
+
+/* M2g, the user's Start wins over LOW CONFIDENCE (2026-11-15: a Start at conf 49 started nothing until 95): the Start
+ * disarms the gate, the outputs start (on the session's bar line) once the tracker is locked; the gate re-arms once the
+ * confidence has reached the threshold + 5, then stops and starts as before. The icon: armed until running */
+static void test_start_wins_over_gate(void)
+{
+    for (uint8_t lt = JHO_IGNORE; lt <= JHO_LEAD; lt++) {
+        struct jho h;
+        struct jho_in in = hin(lt, 1, 1);
+        jho_init(&h);
+        in.gated = 1;                                           /* conf 49 under 80 */
+        CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in) == (lt == JHO_LEAD));
+        jho_set(&h, 0);                                         /* Start, not held */
+        CHECK(h.gate_off && h.holds == 0);
+        CHECK(jho_outputs(&h, &in) == 1 && jho_icon(&h, &in) == JHO_ARMED && !jho_session_held(&h, &in));
+        in.clock_running = 1;                                   /* the bar line came */
+        CHECK(jho_outputs(&h, &in) == 1 && jho_icon(&h, &in) == JHO_RUNNING);
+        in.gated = 0;                                           /* up to the threshold, not threshold + 5 */
+        CHECK(jho_outputs(&h, &in) == 1 && h.gate_off);
+        in.gated = 1;                                           /* a drop before the re-arm: no stop */
+        CHECK(jho_outputs(&h, &in) == 1 && jho_icon(&h, &in) == JHO_RUNNING && !jho_session_held(&h, &in));
+        in.gated = 0;
+        in.conf_open = 1;                                       /* threshold + 5 reached once: re-armed */
+        CHECK(jho_outputs(&h, &in) == 1 && !h.gate_off);
+        in.conf_open = 0;
+        in.gated = 1;                                           /* a drop now stops, as before */
+        CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in) == (lt == JHO_LEAD));
+    }
+}
+
+/* silence stops at once, Start or not; the Start's disarm stays (the confidence re-arms it); Stop ends it */
+static void test_silence_after_start(void)
+{
+    struct jho h;
+    struct jho_in in = hin(JHO_LEAD, 1, 1);
+    jho_init(&h);
+    in.gated = 1;
+    jho_set(&h, 0);
+    CHECK(jho_outputs(&h, &in) == 1);
+    in.silent = 1;
+    CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in));
+    in.silent = 0;
+    CHECK(jho_outputs(&h, &in) == 1 && h.gate_off);
+    jho_set(&h, 1);                                             /* Stop: held, the disarm gone */
+    CHECK(jho_outputs(&h, &in) == 0 && !h.gate_off);
+    jho_set(&h, 0);                                             /* Start again: disarmed again */
+    CHECK(h.gate_off && jho_outputs(&h, &in) == 1);
 }
 
 int main(void)
@@ -308,8 +399,11 @@ int main(void)
     test_session_by_option();
     test_link_play_ends_hold();
     test_link_stop_holds();
+    test_user_layer();
     test_gate_stops_outputs();
     test_hold_wins_over_gate();
+    test_start_wins_over_gate();
+    test_silence_after_start();
     printf("live: %d checks, %d failed\n", checks, fails);
     return fails;
 }
