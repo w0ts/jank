@@ -259,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_browser:
         webbrowser.open(url)
     try:
-        run(source, engine, clock, link, controller)
+        run(source, engine, clock, link, controller, prefix="local model (the XIAO is on Link: its tempo and peers are on the page)  " if xiao is not None else "")
     except KeyboardInterrupt:
         pass
     finally:

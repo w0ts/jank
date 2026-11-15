@@ -39,7 +39,7 @@ class _ControlThread(threading.Thread):
 
 
 def run(source, engine: Engine, clock: ClockMap, link: LinkPort | None, controller: LinkController | None,
-        out: TextIO = sys.stdout) -> None:
+        out: TextIO = sys.stdout, prefix: str = "") -> None:
     control = _ControlThread(engine, controller) if controller else None
     if control:
         control.start()
@@ -52,7 +52,7 @@ def run(source, engine: Engine, clock: ClockMap, link: LinkPort | None, controll
             second = int(engine.stream_time)
             if second != last_printed:
                 last_printed = second
-                print(format_line(second, engine, link, controller), file=out, flush=True)
+                print(prefix + format_line(second, engine, link, controller), file=out, flush=True)
             if control and control.error:
                 raise RuntimeError("Link control failed") from control.error
     finally:
