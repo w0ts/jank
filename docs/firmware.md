@@ -86,6 +86,13 @@ any Link app may; with no settled session they answer `err no session`: alone, t
   start.
 - `status` says `settled=0|1`, `armed=0|1` and, while armed, `start=<beat>`: armed is a start not reached yet, either
   waiting to be sent, sent for a bar still ahead, or the session playing while the MIDI start waits for its bar line.
+- **No flash writes while playing** (the session plays, or the MIDI clock has a start out): a flash erase stops USB,
+  Wi-Fi and the tracker for tens of ms. An update over MIDI answers `err playing` (`scripts/ota.py`: stop first), a
+  jank.bin copied onto the drive is refused (`drive` and UPDATE.TXT say why), and a changed setting is saved once
+  stopped (`diag` says `save_pending=1` until then; a restart saves it first). `set usb` is saved at once: its restart
+  follows.
+- `diag intr` lists the interrupts in use on each core (`c<core> <int> L<level> Used: <source>`): core 1 should have the
+  MIDI clock's timer alone.
 
 ## The `bootloader` command
 

@@ -3,8 +3,10 @@
  * and each answer back to where its line came from. Each source has its own line buffer, so lines from two at once never
  * mix; the input is one message buffer of chunks tagged with their source. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "app.h"
+#include "esp_intr_alloc.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/message_buffer.h"
@@ -89,6 +91,28 @@ static void run_diag(void)
     reply_out();
 }
 
+/* `diag intr`: which interrupts each core has (esp_intr_dump, cut to those in use). With BLE on, core 1 should show the
+ * MIDI clock's gptimer alone (and the CPU-internal ones the dump leaves out): anything else there delays the clock. */
+static void run_diag_intr(void)
+{
+    const size_t cap = 8192u;
+    char *dump = malloc(cap);
+    FILE *f = dump ? fmemopen(dump, cap, "w") : NULL;
+    if (!f) {
+        free(dump);
+        strcpy(s_out, "err no memory for the dump\n");
+        reply_out();
+        return;
+    }
+    esp_intr_dump(f);
+    fclose(f);
+    dump[cap - 1u] = 0;
+    if (!jk_intr_summary(dump, s_out, sizeof s_out))
+        strcpy(s_out, "err interrupt list too long\n");
+    free(dump);
+    reply_out();
+}
+
 /* Lines a phone may not send (docs/ble.md): an update (a dropped link would leave a slot half written), download mode
  * (only USB can use it), and the Wi-Fi password (the BLE link is not encrypted: no pairing, by the ruling's design, so it
  * would cross the air in clear text). -> the refusal, or NULL */
@@ -134,6 +158,10 @@ static void run_line(const char *line)
         return;
     if (!strcmp(line, "diag")) {
         run_diag();
+        return;
+    }
+    if (!strcmp(line, "diag intr")) {
+        run_diag_intr();
         return;
     }
     if (!strcmp(line, "drive")) {

@@ -150,6 +150,10 @@ enum jk_save { JK_SAVE_NONE, JK_SAVE_NOW, JK_SAVE_LATER };
 enum jk_save jk_save_on_change(uint8_t *pending, int changed, int playing, int restart_follows);
 /* called often (and before a restart with playing 0): 1 when the deferred save is due now (*pending cleared) */
 int jk_save_due(uint8_t *pending, int playing);
+/* `diag intr`: ESP-IDF's esp_intr_dump text cut to the interrupts in use, one short line each ("c1 27 L3 Used: TG0_T0"),
+ * then ok; the free and reserved lines left out so it fits an answer. Returns the bytes written (0: out too small) */
+size_t jk_intr_summary(const char *dump, char *out, size_t cap);
+
 /* drive and MIDI updates: refused while playing ("stop first"): flash erases would stall USB, Wi-Fi and the tracker */
 #define JK_STOP_FIRST "the session or the MIDI clock is playing: stop first"
 
