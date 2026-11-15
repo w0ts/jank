@@ -93,7 +93,7 @@
 
   <div class="card device">
     <div class="devpanel" id="viewbar">
-      <label>Screen <select id="scr"><option value="1.3">1.3 in</option><option value="1.54">1.54 in</option></select></label>
+      <label>Screen <select id="scr"><option value="1.54">1.54 in</option><option value="2.42">2.42 in</option></select></label>
       <span id="srcbadge" class="srcbadge" title="LOCAL: the Mac player's own tracker draws this screen. XIAO: the player runs with --xiao; tempo, peers and the beat come from the jank XIAO">LOCAL</span>
     </div>
     
@@ -1551,7 +1551,6 @@ const VIEW_MM = { w: 116, h: 89 };                           // the SVG's viewBo
 const PX_PER_MM = 1728 / 345.6;
 // each module: active area (aw x ah) and the lid window (ww x wh), both centred on (cx, cy); board mm, y down
 const SCREENS = {
-  '1.3':  { aw: 29.42, ah: 14.70, cx: 38.0, cy: 28.6, ww: 32.2, wh: 16.8 },
   '1.54': { aw: 35.05, ah: 17.52, cx: 38.0, cy: 30.3, ww: 37.8, wh: 19.7 },
   '2.42': { aw: 55.01, ah: 27.49, cx: 36.0, cy: 19.9, ww: 57.5, wh: 29.5 },
 };
