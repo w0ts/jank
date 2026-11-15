@@ -104,6 +104,7 @@ int jcf_samples(struct jcf *c, uint64_t sumsq, size_t n)
     if (!c->silent || was)
         return 0;
     c->n = 0;                           /* new music after silence: start over */
+    c->lines = 0;
     c->silences++;
     return 1;
 }
@@ -126,6 +127,78 @@ double jcf_confidence(const struct jcf *c, int has_grid, double t0, double perio
     if (c->silent)
         return 0.0;
     return jcf_grid_confidence(c->t, c->n, has_grid, t0, period, now, JCF_WINDOW_S, JCF_DELAY_S, JCF_TOL);
+}
+
+/* LineLog.tick: Python's line arithmetic (the latest line at or before now, then whole periods back one subtraction at a
+ * time), the new lines appended oldest first, then those older than JCF_LINES_S dropped */
+void jcf_line_tick(struct jcf *c, int has_grid, double t0, double period, double now)
+{
+    double first, line, floor_line;
+    size_t m = 0, drop;
+    if (!has_grid || !(period > 0.0))
+        return;
+    floor_line = t0 + floor((now - t0) / period) * period;
+    first = c->lines ? c->line[c->lines - 1u] + 0.5 * period : now - JCF_LINES_S;
+    for (line = floor_line; line > first && line <= now && m < JCF_LINES; line -= period)
+        m++;                            /* how many: the same walk as below */
+    if (c->lines + m > JCF_LINES) {     /* (never at a period over 0.2 s: the trim below keeps it short) */
+        drop = c->lines + m - JCF_LINES;
+        memmove(c->line, c->line + drop, sizeof c->line[0] * (c->lines - drop));
+        c->lines = (uint16_t)(c->lines - drop);
+    }
+    line = floor_line;
+    for (size_t i = 0; i < m; i++, line -= period)
+        c->line[c->lines + m - 1u - i] = line;
+    c->lines = (uint16_t)(c->lines + m);
+    for (drop = 0; drop < c->lines && c->line[drop] < now - JCF_LINES_S; drop++)
+        ;
+    if (drop) {
+        memmove(c->line, c->line + drop, sizeof c->line[0] * (c->lines - drop));
+        c->lines = (uint16_t)(c->lines - drop);
+    }
+}
+
+/* the distance from x to the nearest of v[a..b) (ascending) is within margin: only the neighbours of x can be nearest
+ * (a rounded difference grows with the distance) */
+static int near_one(const double *v, size_t a, size_t b, double x, double margin)
+{
+    size_t i = a + lower_bound(v + a, b - a, x);
+    return (i < b && fabs(v[i] - x) <= margin) || (i > a && fabs(v[i - 1u] - x) <= margin);
+}
+
+double jcf_lines_confidence(const double *beats, size_t n, const double *lines, size_t m, int has_period, double period,
+                            double now, double window_s, double delay_s, double tol)
+{
+    double lo = now - window_s, hi = now - delay_s, margin, recall, precision;
+    size_t la, lb, a, b, hits = 0, on = 0;
+    if (!has_period || !(period > 0.0))
+        return 0.0;
+    la = lower_bound(lines, m, lo);     /* the lines lo <= x <= hi */
+    for (lb = la; lb < m && lines[lb] <= hi; lb++)
+        ;
+    if (lb <= la)
+        return 0.0;
+    margin = tol * period;
+    a = lower_bound(beats, n, lo - margin);
+    b = lower_bound(beats, n, hi + margin);
+    if (b <= a)
+        return 0.0;
+    for (size_t i = la; i < lb; i++)    /* a line is hit: some recent beat within the margin */
+        hits += (size_t)near_one(beats, a, b, lines[i], margin);
+    for (size_t i = a; i < b; i++)      /* a beat is on a line: some line within the margin */
+        on += (size_t)near_one(lines, la, lb, beats[i], margin);
+    recall = (double)hits / (double)(lb - la);
+    precision = (double)on / (double)(b - a);
+    return recall + precision == 0.0 ? 0.0 : 2.0 * recall * precision / (recall + precision);
+}
+
+double jcf_line_confidence(struct jcf *c, int tick, int has_grid, double t0, double period, double now)
+{
+    if (c->silent)
+        return 0.0;
+    if (tick)
+        jcf_line_tick(c, has_grid, t0, period, now);
+    return jcf_lines_confidence(c->t, c->n, c->line, c->lines, has_grid, period, now, JCF_WINDOW_S, JCF_DELAY_S, JCF_TOL);
 }
 
 uint8_t jcf_pct(double conf)

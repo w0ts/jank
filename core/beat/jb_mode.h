@@ -54,4 +54,12 @@ int jb_mode_bpm_at(struct jb_mode *m, double now, double *bpm);
 /* The published beat grid: a beat at *t_beat, the next ones every *period seconds. 0 when there is none. */
 int jb_mode_grid(const struct jb_mode *m, double *t_beat, double *period);
 
+/* The pieces the follower (jb_follow.h, eval/follow_bpm.py) calls on its ModeBpm: */
+void jb_dq_push(struct jb_dq *q, double t);            /* deque.append: the oldest goes when full */
+double jb_short_period(const double *b, int n);        /* locked_bpm.short_period; < 0 for None */
+void jb_mode_restart(struct jb_mode *m);                /* LockedBpm._restart: a new segment from the recent beats */
+int jb_mode_recent_consistent(const struct jb_mode *m); /* ModeBpm._recent_consistent */
+double jb_mode_period(const struct jb_mode *m);         /* ModeBpm.period; < 0 for None */
+int jb_mode_line(const struct jb_mode *m, double *t_beat, double *period);   /* LockedBpm.grid: the fit's line */
+
 #endif

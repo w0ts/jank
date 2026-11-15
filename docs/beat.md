@@ -69,6 +69,12 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
 | `err_us` | the session's beat grid against the tracked beat before the last correction; stays within 5 ms when they agree |
 | `offset_us`, `latency_us` | the sample-count-to-local-time offset (µs since the timer started) and the latency setting |
 | `bar`, `bar_phi`, `bar_lead`, `bar_moves` | AUTO BAR (also in `status`): off / listening / locked / manual, the 1's count position (-1 none), the best phase's lead (the first move at 2.00), the session's bar moves |
+| `conf` | LOW CONFIDENCE's confidence (also in `status`): since M2i against the grid lines the outputs published, not the grid extended back |
+| `follow`, `drift_ppm`, `rate_ratio` | the follower (also in `status`): stopped / lock (ModeBpm's grid) / glide (the Kalman follower); the glide's period change a beat in ppm; the last rate ratio it took from the spectrum (1.0000: none yet) |
+| `manoeuvres` | tempo moves the glide took from the beats |
+| `rate`, `rate_active` | the spectral rate: the setting (`set rate on\|off`; off also without PSRAM) and whether it runs now (only while gliding) |
+| `rate_events`, `rate_taken`, `rate_refused`, `rate_ignored` | rate steps proposed; taken, refused by the next beat, not judged (the glide not trusted yet) |
+| `rate_us`, `rate_max_us` | the rate's work over the last second in µs (1000 = 0.1 % of core 0) and its longest frame |
 
 ## How it works
 
@@ -94,3 +100,19 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   moved grid's next bar line). A later move needs a lead of 3.0 held 8 beats. Reset (listening again, the bar left where
   it is): the tracker stopped, a new audio stream (a tempo jump is not one: `DOWN_JUMP_RESET` in beat.c). A beat nudge (`nudge beat`, the PHASE) no longer makes it
   MANUAL (M2h): AUTO BAR keeps placing the 1 and the PHASE rides on it (docs/firmware.md). The LED's bar flash turns amber while locked. RAM: 2.2 KB plus a 2.9 KB segment ring in PSRAM.
+- **ADVANCED FOLLOW** (M2i; beat-listener `studies/advanced-follow`, golden vectors in `tests/follow_ref`). Three parts,
+  each a port checked against the Python:
+  - the **glide** (`core/beat/jb_follow.c`, `eval/follow_bpm.py`): ModeBpm locks; then a 3-state Kalman filter (phase,
+    period, drift) follows each beat. Three beats in a row past 3σ open it, so a pitch move is taken in a few beats with
+    the phase kept, with no stop and no relock. 12 misses on a new consistent grid, or the beats' own tempo 4 % away for
+    8 beats (a 4:3 lock), start over.
+  - the **line confidence** (`core/jank_conf.c`, `live/follow.py`): LOW CONFIDENCE judges the beats against the lines the
+    outputs published (up to 64 kept). Extending today's grid backwards made any tempo change look like a bad grid.
+  - the **spectral rate** (`core/beat/jb_rate.c`, `live/rate.py`; `set rate on|off`, on): while gliding, the
+    log-frequency |FFT| of the tracker's own frames (every 2nd frame) is matched every 0.2 s: the last 0.5 s against the
+    4 s before, ±10 %. A step goes to the follower, which takes it only if the next beat backs it.
+  - Measured offline on the user's tracks (beat-listener): a ±2 % step stopped the outputs 96 % of the time before, 24 %
+    with these (the no-step level). Convergence went from 13 to 3 beats.
+  - Cost: the glide is a few hundred double operations a beat. The rate is ~0.7 % of core 0 (the S3 code's instruction
+    count, CPI 1.45; PSRAM misses on top: read `rate_us`) and runs only while gliding. RAM: under 1 KB internal; the
+    rate's 58 KB in PSRAM.

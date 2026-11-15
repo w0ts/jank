@@ -540,6 +540,27 @@ int jb_mode_bpm_at(struct jb_mode *m, double now, double *bpm)
     return 1;
 }
 
+/* ---- for the follower (jb_follow.c): LockedBpm's pieces it calls ---- */
+void jb_dq_push(struct jb_dq *q, double t) { dq_push(q, t); }
+
+double jb_short_period(const double *b, int n) { return short_period(b, n); }
+
+void jb_mode_restart(struct jb_mode *m) { restart(m); }
+
+int jb_mode_recent_consistent(const struct jb_mode *m) { return recent_consistent(m); }
+
+double jb_mode_period(const struct jb_mode *m) { return period_now(m); }
+
+int jb_mode_line(const struct jb_mode *m, double *t_beat, double *period)       /* LockedBpm.grid */
+{
+    double t0, p;
+    if (!fit_line(m, &t0, &p) || !m->has_t_last)
+        return 0;
+    *t_beat = t0 + p * m->k_last;
+    *period = p;
+    return 1;
+}
+
 int jb_mode_grid(const struct jb_mode *m, double *t_beat, double *period)
 {
     if (is_ramp(m) && m->has_ramp_period && m->ramp_period != 0.0) {
@@ -547,10 +568,5 @@ int jb_mode_grid(const struct jb_mode *m, double *t_beat, double *period)
         *period = m->ramp_period;
         return 1;
     }
-    double t0, p;
-    if (!fit_line(m, &t0, &p) || !m->has_t_last)
-        return 0;
-    *t_beat = t0 + p * m->k_last;
-    *period = p;
-    return 1;
+    return jb_mode_line(m, t_beat, period);
 }
