@@ -37,7 +37,8 @@ One button (`BOARD_BUTTON_GPIO`; debounce 20 ms, double-click window 350 ms, `co
 | Action | What it does |
 |---|---|
 | Click | Resync: stop now, start on the next bar line ([docs/midi.md](midi.md)) |
-| Double click | Scan the other channels and join the next group heard; none heard: stay (jank mode only) |
+| Double click | Scan the other channels and join the next group heard; none heard: stay (jank mode only). Said 350 ms after the second release (a third press may follow) |
+| Three clicks | Open Bluetooth for a phone for 2 minutes (BLE builds, [ble.md](ble.md)): the LED blinks blue 4 times a second until a phone connects. Setting `ble off` or no Bluetooth: 3 red pulses |
 | Held 1.5 s, let go | Switch between jank mode and the saved Wi-Fi network, with a restart. None saved: 3 red pulses |
 | Held 10 s | Restart into download mode (`bootloader`, see below; unproven) |
 
@@ -50,23 +51,26 @@ The PCB's ladder, encoder, second LED, MIDI IN mode and power cut have no firmwa
 
 ## Control page and protocol
 
-The stick's USB drive (label JANK) holds `page/jank.html`; open it in Chrome or Edge and press Connect. It talks Web
-MIDI to the stick's MIDI port, with the control line as SysEx (`core/jank_sysex.h`), and asks for SysEx permission. It
-shows what a player uses on top: the groups heard with a Join button each, the group, the tempo with a new-tempo box,
-the beat in the bar, Play / Stop, beats a bar, clock offset, MIDI start / stop and the network (MODE JANK or a Wi-Fi
-network). Under Details, folded: the air, Link and frame counters, the peers heard, name, air filter, Link peer and
-download mode. It does not flash.
+The stick's USB drive (label JANK) holds `page/jank.html`; open it in Chrome or Edge and press MIDI port. The same page
+serves a phone over Bluetooth ([ble.md](ble.md)): one SysEx line layer with two transports, Web MIDI (the USB port, or a
+jank an iPhone MIDI browser app connected) and Web Bluetooth (Chrome, straight to the BLE-MIDI service). It shows HOME
+(tempo, the beat in the bar, play / stop, network, peers, battery, input level and beat confidence: the `home` line) and
+the settings (`get` / `set`); over USB also the details (`status`: air and frame counters, peers heard) and download
+mode. It does not flash.
 
 One command a line; each answer ends with `ok` or `err <why>`:
 
 ```
-get | status | scan | help | reboot | bootloader
-tempo 20..999 (BPM, up to two decimals) | play | stop
-set group 1..9 | name <text> | filter link|all | peer on|off | transport link|auto
+get | status | home | scan | help | reboot | bootloader
+tempo 20..999 (BPM, up to two decimals) | play | stop | ble pair | ble close
+set group 1..9 | name <text> | filter link|all | peer on|off | transport link|auto | ble pair|auto|off
 set quantum 1..16 | offset -100.00..100.00 (ms, 10 us steps) | net jank|wifi | ssid <name> | pass <8..63 chars>
 ```
 
-`scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
+`home` answers `home=h ...`, the HOME line a phone gets by itself over Bluetooth (`core/jank_phone.h`). `ble pair` opens a
+pair window (`err ble is off` with the setting off), `ble close` ends the window and the phone's link; `status` says
+`ble_state=off|window|connected` and `ble_left=<s>`. Over Bluetooth, `ota`, `bootloader` and `set pass` are refused
+(`err ... over USB only`). `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
 nothing. `net jank` is the protocol's name for jank mode. `tempo`, `play` and `stop` change the whole Link session, as
 any Link app may; with no settled session they answer `err no session`: alone, the stick has no session of its own.
 
@@ -102,7 +106,7 @@ FM1BASE=../optimist/fm1base tests/run.sh
 
 Host tests, built with address and undefined-behaviour sanitizers into `$JANK_SCRATCH/hosttest`: frame vectors, the
 filter and MAC handling, the control protocol, button and scan logic, the clock maths (no drift over an hour at any
-tempo), the Link peer, SysEx framing, the update protocol (C logic and `scripts/ota.py` against it, over a line that loses, damages and repeats lines; needs python3) and the control page's logic (needs node). `tests/crosscheck_optimist.c` compiles
+tempo), the Link peer, SysEx framing, the update protocol (C logic and `scripts/ota.py` against it, over a line that loses, damages and repeats lines; needs python3), BLE-MIDI packets (`test_blemidi`, which also writes the vectors the page is checked against), the phone link's on/off and HOME line (`test_phone`), the made-up JANK drive and the image streaming into a modelled slot (`test_vdrive`; `JANK_TEST_IMAGE=<jank.bin>` adds a real image) and the control page's logic (needs node). `tests/crosscheck_optimist.c` compiles
 the FM-1's own `wifi_jank.c`, `wifi_ip.c` and `link.c` from `FM1BASE` and swaps frames with jank. These prove that both
 sides agree on bytes and logic, nothing about radios: delays in the models are made up.
 
