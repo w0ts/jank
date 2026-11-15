@@ -782,14 +782,19 @@ const OLED = (() => {
   // Wi-Fi quality, as Optimist's Wi-Fi page shows it (op_wifi.c wf_q_text): the signal and the rate, then the share of
   // the frames sent over the last 10 s that needed a retry and that were never acknowledged. Optimist colours them (good /
   // warn / bad); a 1-bit screen draws a BAD value inverted instead. Same thresholds as Optimist.
+  // one line (the user: "retry, loss % and wifi stats could fit on one status line"): "-58dBm 24M R3% L0%", each part
+  // inverted on its own when BAD; the worst case "-100dBm 72M R99% L99%" is 21 characters, the line's width
   function wifiItems(q) {
     if (!q) return [];
+    if (!q.rssi) return [{ segs: [{ t: 'NO SIGNAL', bad: true }] }];
     const pct = n => (q.tx ? Math.round(100 * n / q.tx) : null), retry = pct(q.retried), lost = pct(q.lost);
-    return [
-      { t: q.rssi ? q.rssi + ' dBm  ' + Math.round(q.kbps / 1000) + 'M' : 'NO SIGNAL', bad: !q.rssi || q.rssi < -80 },
-      { t: 'RETRY ' + (retry == null ? '--' : retry + '%'), bad: retry != null && retry >= 30 },
-      { t: 'LOST ' + (lost == null ? '--' : lost + '%'), bad: lost != null && lost >= 10 },
-    ];
+    return [{ segs: [
+      { t: q.rssi + 'dBm ' + Math.round(q.kbps / 1000) + 'M', bad: q.rssi < -80 },
+      { t: ' ', bad: false },
+      { t: 'R' + (retry == null ? '--' : retry + '%'), bad: retry != null && retry >= 30 },
+      { t: ' ', bad: false },
+      { t: 'L' + (lost == null ? '--' : lost + '%'), bad: lost != null && lost >= 10 },
+    ] }];
   }
   function statusLine(fb, c, now, y) {
     const items = [];                                                // the mode is not listed: the meters (or their absence) say it
@@ -800,8 +805,14 @@ const OLED = (() => {
     if (c.ble && c.ble.left != null && !c.ble.phone) { text(fb, 'BT PAIR ' + mmss(c.ble.left), 2, y, 1, 1); return; }   // the open window: shown alone, its count runs
     if (!items.length) return;
     const it = items[Math.floor(now / STATUS_CYCLE_MS) % items.length];
-    if (it.bad) { rect(fb, 0, y - 1, textW(it.t, 1) + 4, 9, 1); text(fb, it.t, 2, y, 1, 0); }
-    else text(fb, it.t, 2, y, 1, 1);
+    const segs = it.segs || [{ t: it.t, bad: it.bad }];
+    let x = 2;
+    for (const s of segs) {                                            // each part inverted on its own when BAD
+      const w = textW(s.t, 1);
+      if (s.bad) { rect(fb, x - 2, y - 1, w + 4, 9, 1); text(fb, s.t, x, y, 1, 0); }
+      else text(fb, s.t, x, y, 1, 1);
+      x += w + 1;                                                      // textW drops the last glyph's 1 px gap: put it back
+    }
   }
   function beatBoxes(fb, c, x0, y, w, h, gap) {          // the current beat's box is filled for the whole beat; no beat: all empty
     for (let i = 0; i < 4; i++) {
