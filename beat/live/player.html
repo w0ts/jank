@@ -1478,9 +1478,9 @@ function showXiao(x, bench) {
   // the Mac's side, not the XIAO's (the user: "it sits in the XIAO audio beat tracker section"): the player's buffer that
   // feeds the "jank" USB output; its underruns are the Mac running late (silence sent), the XIAO's own counters are `gaps`
   const ms = n => f1(n / 44.1, 0);
-  const audio = x.device + ' USB audio: buffer ' + f1(x.fifo_ms) + ' ms (aim ' + ms(x.fifo_target) + ' ms), slips ' + (x.dropped + x.repeated) + ', Mac underruns ' + x.underruns;
+  const audio = 'buffer ' + f1(x.fifo_ms) + ' ms (aim ' + ms(x.fifo_target) + '), slips ' + (x.dropped + x.repeated) + ', underruns ' + x.underruns;
   const err = XIAO.err && now - XIAO.errAt < 5000 ? ' | XIAO: ' + XIAO.err : '';
-  setLines('xmsg', [['MIDI', XIAO.portMsg + stale + err], ['Mac → jank', audio]]);
+  setLines('xmsg', [['MIDI', XIAO.portMsg + stale + err], ['Mac → ' + x.device + ' audio', audio]]);
   showAccuracy(bench);
 }
 
