@@ -26,8 +26,9 @@ States: OFF (AUTO BAR off), LISTENING (until every bar position has features, ab
 phase leads the second by COMMIT), LOCKED(phi), MANUAL (the user nudged the beat: no more moves until a reset or until
 AUTO BAR is picked again). Moves (whole beats, the tempo untouched): the first when the best phase leads by COMMIT; later
 ones when another phase has led the current one by SWITCH for HOLD beats in a row (the "stable" policy). A reset (the
-estimator stopped, a tempo jump, a resync, silence) clears the count, the accumulators and the state, and listens again;
-Link's bar stays where it is until the new bar is known.
+estimator stopped, a resync, silence) clears the count, the accumulators and the state, and listens again; Link's
+bar stays where it is until the new bar is known. A tempo jump (ModeBpm.jumps) is not a reset by default: those are
+mostly short excursions in breaks, and resetting on them cost 3 points mean and 2.4x the moves (results/v2_stream_check.md).
 """
 from __future__ import annotations
 
@@ -104,6 +105,8 @@ def frame_curves(L: np.ndarray, prev: np.ndarray | None) -> np.ndarray:
 
 
 class Downbeat:
+    promote_first = True                               # count the shadow beat played on the frame counting starts at
+
     def __init__(self, model: Model | None = None) -> None:
         self.model = model or load_model()
         self.decay = math.exp(-1.0 / self.model.bars)
@@ -121,8 +124,10 @@ class Downbeat:
         self._running = False                          # the grid is ModeBpm's running one: its beats are counted
         self._k = 0                                    # the grid's index of the next candidate beat
         self._next: float | None = None                # its time
-        self._b_last: float | None = None              # the last grid beat played
-        self._sn = 0                                   # segments opened so far; segment m at m % SEGS
+        self._b_last: float | None = None              # the last grid beat played ...
+        self._b_last_frame = -1                        # ... at this frame
+        self._index = -1                               # the last frame taken
+        self._sn = 0                                 # segments opened so far; segment m at m % SEGS
         self._open = False                             # a segment takes frames
         self._seg = np.zeros((SEGS, BANDS))            # band sums
         self._seg_n = np.zeros(SEGS, int)              # frames
@@ -195,7 +200,12 @@ class Downbeat:
         that only keep the segments going."""
         if not period > 0:
             raise ValueError(f"grid period {period}")
+        # counting starts on a beat played on this very frame as a shadow beat (frames come before their tracked beat):
+        # that is the first beat Link plays from the running grid (linkbeats.py), so it is counted (beat 0)
+        first = running and not self._running and self._n == 0 and self.promote_first
         self._grid, self._running = (tb, period), bool(running)
+        if first and self._b_last is not None and self._b_last_frame == self._index:
+            self._count(self._b_last_frame, self._b_last, None)
         k = math.ceil((t - tb) / period - 1e-9)
         while self._b_last is not None and tb + k * period <= self._b_last + 0.5 * period:
             k += 1
@@ -211,6 +221,7 @@ class Downbeat:
     def frame(self, index: int, L: np.ndarray) -> None:
         """One frame of the tracker's 81 log bands (log10(1 + filterbank)), frame `index` at index / FPS s."""
         L = np.asarray(L, np.float64)
+        self._index = index
         if self._first_frame < 0:
             self._first_frame = index
         self._ring[index % RING] = frame_curves(L, self._prev)
@@ -235,15 +246,18 @@ class Downbeat:
     def _beat(self, index: int, grid: tuple[float, float], b: float) -> None:
         tb, p = grid
         gap = None if self._b_last is None else max(1, math.floor((b - self._b_last) / p + 0.5))
-        self._b_last = b
+        self._b_last, self._b_last_frame = b, index
         self._k += 1
         self._next = tb + self._k * p
         s = self._sn % SEGS                            # a new segment from this frame on (the frame is added after)
         self._seg[s], self._seg_n[s], self._seg_start[s] = 0.0, 0, index
         self._sn += 1
         self._open = True
-        if not self._running:
-            return                                     # a shadow beat: segments only
+        if self._running:                              # (a shadow beat: segments only)
+            self._count(index, b, gap)
+
+    def _count(self, index: int, b: float, gap: int | None) -> None:
+        """A counted beat (its segment is the newest): a decision, then beat i - 4 enters."""
         c = 0 if self._n == 0 or gap is None else self._c_last + gap
         self._c_last = c
         i = self._n
@@ -397,10 +411,11 @@ def frame_of(t: float) -> int:
 class Driver:
     """Feeds a Downbeat from a tracker's stream the way the engine does: each frame, and after its own frame each tracked
     beat through ModeBpm (`estimator`, the caller's: the engine replaces it on silence and resync), then the grid
-    (counted while ModeBpm runs, shadow beats while it is not steady yet) or a stop; a tempo jump (ModeBpm.jumps) is a
-    reset. `trace`, when a list, gets every event as (kind, frame, *args): the golden vectors replay them in C."""
+    (counted while ModeBpm runs, shadow beats while it is not steady yet) or a stop; with jump_reset a tempo jump
+    (ModeBpm.jumps) is a reset too (off by default: see the module's docstring). `trace`, when a list, gets every event
+    as (kind, frame, *args): the golden vectors replay them in C."""
 
-    def __init__(self, downbeat: Downbeat, jump_reset: bool = True) -> None:
+    def __init__(self, downbeat: Downbeat, jump_reset: bool = False) -> None:
         self.db = downbeat
         self.jump_reset = jump_reset             # a tempo jump (ModeBpm.jumps) resets the bar
         self.trace: list[tuple] | None = None

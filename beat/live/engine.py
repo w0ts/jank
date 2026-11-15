@@ -8,7 +8,7 @@ Two gates on top of the estimator decide whether Link runs:
 
 The downbeat estimator (live.downbeat) runs beside them on the same frames: the tracker's 81 bands (BandTap) and, after
 each tracked beat, ModeBpm's grid. Its reset events: silence, the estimator stopped (30 s without a steady beat), a
-tempo jump (ModeBpm.jumps), a resync."""
+resync (not a tempo jump: live.downbeat.Driver)."""
 from __future__ import annotations
 
 import threading
