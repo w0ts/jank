@@ -57,6 +57,9 @@ fi
 # Sound on the source (AUDIO mode) and the input meter; AUDIO mode's Stop / Start of the outputs.
 "$CC" $FLAGS "$HERE/tests/test_live.c" "$HERE/core/jank_live.c" "$HERE/core/jank_hold.c" -lm -o "$OUT/test_live"
 "$CC" $FLAGS "$HERE/tests/test_fold.c" "$HERE/core/jank_fold.c" -lm -o "$OUT/test_fold"
+# LOW CONFIDENCE: the grid-fit confidence and its gate against beat-listener's live/confidence.py (golden vectors, tests/conf_ref).
+"$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_conf.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_mode.c" -lm -o "$OUT/test_conf"
+"$OUT/test_conf" "$HERE/tests/conf_ref"
 "$OUT/test_fold"
 "$OUT/test_live"
 

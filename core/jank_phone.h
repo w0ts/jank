@@ -56,7 +56,8 @@ const char *jph_state_name(const struct jph *p);                       /* "off",
  *   air peers  units heard on the group's channel (MODE JANK; 0 on Wi-Fi)
  *   battery    percent, "-" with no gauge (no board measures one yet)
  *   level      the input meter: RMS over 0.3 s, a value every 250 ms, dBFS (-99 .. 0); "-" with no audio stream
- *   conf       the tracker's beat activation peak over the last second, percent; "-" with no audio stream
+ *   conf       the confidence: the last 8 s of tracked beats against the published grid (jank_conf.h), percent; "-"
+ *              with no audio stream
  *   min max    the lowest and highest meter values over the last 3 s (the meter's lines); "-" with no audio stream
  *   mode       1 AUDIO (the source has sound: the tracker leads, YES / play / stop are the hold), 0 LINK; AUDIO folded
  *              (core/jank_fold.h): x2 x4 /2 /4

@@ -117,6 +117,30 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   eq(box.nudgeError("err odd"), "err odd");
   for (const id of ["nudges", "n-beat-down", "n-beat-up", "n-ms-down", "n-ms-up", "c-usbmidi", "c-beat_latency_src"])
     ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
+  // M2e: LOW CONFIDENCE and THRESHOLD, the confidence meter's tick and note
+  eq(box.setCommand("lowconf", "stop"), "set lowconf stop");
+  eq(box.setCommand("lowconf", "run"), "set lowconf run");
+  eq(box.setCommand("lowconf", "keep"), null);
+  eq(box.setCommand("threshold", "80"), "set threshold 80");
+  eq(box.setCommand("threshold", "0"), "set threshold 0");
+  eq(box.setCommand("threshold", "101"), null);
+  eq(box.setCommand("threshold", "7.5"), null);
+  eq(box.setCommand("threshold", ""), null);
+  eq(box.confView({ lowconf: "stop", threshold: "80", gated: "0", silent: "0", audio_live: "1" }),
+     { tick: 80, note: "confidence (stops under 80 %)", gated: false });
+  eq(box.confView({ lowconf: "stop", threshold: "80", gated: "1", silent: "0", audio_live: "1" }),
+     { tick: 80, note: "confidence: under 80 %, outputs stopped", gated: true });
+  eq(box.confView({ lowconf: "stop", threshold: "80", gated: "1", silent: "0", audio_live: "0" }).gated, false);   // LINK mode: no gate
+  eq(box.confView({ lowconf: "run", threshold: "80", gated: "0", silent: "1", audio_live: "1" }),
+     { tick: null, note: "confidence: silence, outputs stopped", gated: true });
+  eq(box.confView({ lowconf: "run", threshold: "80" }), { tick: null, note: "confidence (keeps running)", gated: false });
+  eq(box.confView({ lowconf: "stop", threshold: "0" }).tick, null);
+  eq(box.confView({ lowconf: "stop", threshold: "65" }), { tick: 65, note: "confidence (stops under 65 %)", gated: false });   // a `get`
+  eq(box.confView(null), { tick: null, note: "confidence", gated: false });
+  eq(box.confView({ group: "1" }).note, "confidence");                                           // an older firmware
+  for (const id of ["c-lowconf", "c-threshold", "h-conf-note", "h-conf-tick", "h-conf-meter"])
+    ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
+  ok(/"lowconf",\s*"threshold"/.test(ui), "both in the settings read back from get");
 }
 eq(box.parseHome("h 12000 w1 2 150 3 2 0 - - -").transport, "armed");
 eq(box.parseHome("h 12000 x3 1 275 4 2 0 - - -"), null);

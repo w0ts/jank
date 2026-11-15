@@ -28,8 +28,8 @@ int jho_outputs(struct jho *h, const struct jho_in *in)
 {
     if (!in->audio)
         return in->base;               /* LINK mode: the hold does not apply (it stays for when sound returns) */
-    if (h->hold)
-        return 0;
+    if (h->hold || in->gated)
+        return 0;                      /* (gated: an arming waits on: it ends with the lock once the gate lifts) */
     if (h->arming) {
         if (!in->locked)
             return 0;
@@ -38,11 +38,14 @@ int jho_outputs(struct jho *h, const struct jho_in *in)
     return in->base;
 }
 
-int jho_session_held(const struct jho *h, const struct jho_in *in) { return in->audio && in->lt == JHO_LEAD && h->hold; }
+int jho_session_held(const struct jho *h, const struct jho_in *in)
+{
+    return in->audio && in->lt == JHO_LEAD && (h->hold || in->gated);
+}
 
 uint8_t jho_icon(const struct jho *h, const struct jho_in *in)
 {
-    if (h->hold)
+    if (h->hold || in->gated)
         return JHO_STOPPED;
     return in->clock_running ? JHO_RUNNING : JHO_ARMED;
 }

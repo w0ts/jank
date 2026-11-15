@@ -10,7 +10,12 @@
  * AUTO BAR: the downbeat estimator (core/beat/jb_down.c, weights from the user's Traktor grids and audio) runs on the
  * same frames and on ModeBpm's grid; when it knows the 1, the bridge's step moves the session's bar onto it in whole
  * beats (jbl_bar_step). Its reset events here: ModeBpm stopped (30 s without a steady beat), a new audio
- * stream (the tracker restarts); a tempo jump only with DOWN_JUMP_RESET. `set autobar off` leaves the bar where it is. */
+ * stream (the tracker restarts); a tempo jump only with DOWN_JUMP_RESET. `set autobar off` leaves the bar where it is.
+ *
+ * LOW CONFIDENCE (core/jank_conf.h, the player's live/confidence.py and engine.py): the tracked beats of the last 8 s
+ * against ModeBpm's grid make the confidence (an F-measure), looked at each step; with STOP / START under the THRESHOLD
+ * the gate closes (it opens again 5 points above), and 0.5 s of silence closes it whatever the setting. The bridge stops
+ * the outputs while it is closed (core/jank_hold.h), and with FOLLOW+LEAD the session (jbl_in.held). */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,6 +28,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "jank_beatlink.h"
+#include "jank_conf.h"
 #include "jank_peer.h"
 #include "jank_sysex.h"
 #include "jb_beat.h"
@@ -66,7 +72,10 @@ static int64_t s_win_start, s_win_busy;
 static int32_t s_win_peak;             /* the input's largest |sample| in this window */
 static float s_win_act;                /* the network's largest activation in this window */
 static int16_t s_peak_db = -99;        /* the last window's: dBFS, and the activation in percent */
-static uint8_t s_conf_pct;
+static uint8_t s_act_pct;
+static struct jcf s_conf;              /* LOW CONFIDENCE: the tracked beats kept and the silence (core/jank_conf.h) */
+static uint8_t s_conf_pct;             /* the confidence at the last step, percent */
+static uint8_t s_gated;                /* its gate (STOP / START under the threshold), at the last step */
 static struct jlv s_live;              /* sound on the source (AUDIO mode) and the input meter: the tracker's own samples */
 static int64_t s_fed_us;               /* when samples last came ... */
 static int64_t s_fed_samples;          /* ... s_samples then */
@@ -172,6 +181,7 @@ static void on_frame(void *ctx, const struct jb_frame *f)
         jb_mode_update(&s_mode, f->time);
         if (s_down_seg)
             down_tracked(f->time, jumps);
+        jcf_beat(&s_conf, f->time);    /* (not while silent: what comes after silence is new music) */
         s_beat_seen = 1;
         s_beat_n++;
         report('b', f->time);
@@ -195,6 +205,8 @@ static void restart_tracker(void)
     jb_beat_reset(&s_b);
     jb_mode_init(&s_mode);
     restart_down();
+    jcf_init(&s_conf);                 /* a resync: no beats, no gate (engine.py resync) */
+    s_gated = 0;
     s_samples = 0;
     s_beat_seen = 0;
 }
@@ -347,10 +359,26 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.level_min_db = s_live.min_db;
     b.level_max_db = s_live.max_db;
     b.peak_db = s_peak_db;
+    b.act_pct = s_act_pct;
     b.conf_pct = s_conf_pct;
+    b.gated = s_gated;
+    b.silent = s_conf.silent;
     portENTER_CRITICAL(&s_mux);
     s_pub = b;
     portEXIT_CRITICAL(&s_mux);
+}
+
+/* LOW CONFIDENCE at a step: the confidence of the tracked beats against ModeBpm's grid now (0 in LINK mode or silence)
+ * and the gate's next state (core/jank_conf.h; engine.py status: conf under the threshold, back at threshold + 5) */
+static void follow_conf(const struct jk_cfg *cfg)
+{
+    double tb = 0.0, period = 0.0, conf = 0.0;
+    if (s_audio_live) {
+        int has = jb_mode_grid(&s_mode, &tb, &period);
+        conf = jcf_confidence(&s_conf, has, tb, period, (double)s_samples / (double)UAC_RATE);
+    }
+    s_conf_pct = jcf_pct(conf);
+    s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
 }
 
 /* the tracker's work on one pass's samples; the time it took is the figure for the CPU */
@@ -359,12 +387,15 @@ static void work(const int16_t *x, size_t n)
     uint32_t h0 = s_hops;
     int64_t t0 = esp_timer_get_time();
     uint32_t c0 = esp_cpu_get_cycle_count();
+    uint64_t sumsq = 0;
     for (size_t i = 0; i < n; i++) {
         int32_t a = x[i] < 0 ? -(int32_t)x[i] : x[i];
         if (a > s_win_peak)
             s_win_peak = a;
+        sumsq += (uint64_t)((int64_t)a * a);
     }
     jlv_push(&s_live, x, n);
+    jcf_samples(&s_conf, sumsq, n);    /* the silence first: a block that begins it keeps none of its beats (engine.py) */
     jb_beat_push_s16(&s_b, x, n, on_frame, NULL);
     uint32_t cycles = esp_cpu_get_cycle_count() - c0;
     int64_t us = esp_timer_get_time() - t0;
@@ -395,7 +426,9 @@ static void follow_sound(int64_t now)
         s_fed_samples = s_samples;
         s_fed_us = now;
     } else if (now - s_fed_us >= SILENT_GAP_US) {
-        jlv_push(&s_live, NULL, (size_t)((now - s_fed_us) * (int64_t)UAC_RATE / 1000000));
+        size_t gap = (size_t)((now - s_fed_us) * (int64_t)UAC_RATE / 1000000);
+        jlv_push(&s_live, NULL, gap);
+        jcf_samples(&s_conf, 0, gap);  /* a stalled stream is silence for LOW CONFIDENCE too */
         s_fed_us = now;
     }
     if (s_audio_live && !(u.open && jlv_live(&s_live)))
@@ -491,7 +524,7 @@ static void beat_task(void *arg)
             s_win_busy = 0;
             /* the second's input peak in dBFS (full scale 32768; silence and anything below -99 dB: -99) and activation */
             s_peak_db = s_win_peak > 0 ? (int16_t)fmax(-99.0, floor(20.0 * log10((double)s_win_peak / 32768.0) + 0.5)) : -99;
-            s_conf_pct = (uint8_t)fmin(100.0, fmax(0.0, floor((double)s_win_act * 100.0 + 0.5)));
+            s_act_pct = (uint8_t)fmin(100.0, fmax(0.0, floor((double)s_win_act * 100.0 + 0.5)));
             s_win_peak = 0;
             s_win_act = 0.0f;
             report('t', (double)s_samples / (double)UAC_RATE);
@@ -502,6 +535,7 @@ static void beat_task(void *arg)
         last_step = now;
         app_cfg_get(&cfg);
         apply_autobar(&cfg);
+        follow_conf(&cfg);
         {
             struct step_ctx c;
             make_input(&cfg, &c.in, &mode, &bpm);
@@ -589,6 +623,15 @@ void beat_state(uint8_t *audio, uint8_t *locked)
     *audio = (uint8_t)(s_pub.on && s_pub.audio_live);
     *locked = (uint8_t)(s_pub.mode != JB_STOPPED && s_pub.bpm_x100 > 0);
     portEXIT_CRITICAL(&s_mux);
+}
+
+uint8_t beat_gated(void)
+{
+    uint8_t g;
+    portENTER_CRITICAL(&s_mux);
+    g = (uint8_t)(s_pub.on && s_pub.audio_live && (s_pub.gated || s_pub.silent));
+    portEXIT_CRITICAL(&s_mux);
+    return g;
 }
 
 uint8_t beat_bar_state(void)

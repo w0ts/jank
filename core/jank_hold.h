@@ -12,7 +12,14 @@
  *
  * Without a hold the outputs do what the transport setting says (jc_should_play: IGNORE = transport AUTO, the clocks run
  * whenever a session is there; FOLLOW / FOLLOW+LEAD = transport LINK, the clocks start and stop with the session).
- * LINK mode (no sound): the hold does not apply; `play` there starts the session as before, and also ends a hold. */
+ * LINK mode (no sound): the hold does not apply; `play` there starts the session as before, and also ends a hold.
+ *
+ * LOW CONFIDENCE (core/jank_conf.h): the gate (the grid-fit confidence under the THRESHOLD with STOP / START, or 0.5 s of
+ * silence) is an automatic Stop that lifts itself. Gated: the outputs stop at once (a MIDI Stop on the next tick), and
+ * with FOLLOW+LEAD the Link session stops (once, as the hold's press); IGNORE, FOLLOW: the session is left to the tracker.
+ * Back above the threshold + JCF_HYST_PCT: the outputs start again on the session's next bar line (the MIDI clock's start
+ * rule), the session too with FOLLOW+LEAD (jank_start.h). The user's hold wins: held, nothing starts whatever the gate
+ * says; Start while gated: armed, the outputs wait for the gate as well as for the lock. LINK mode: no gate either. */
 #ifndef JANK_HOLD_H
 #define JANK_HOLD_H
 #include <stdint.h>
@@ -32,6 +39,7 @@ struct jho_in {
     uint8_t base;                       /* the outputs as the transport setting wants them (jc_should_play) */
     uint8_t locked;                     /* the tracker follows a steady beat (jank_beatlink.h jbl_in.running) */
     uint8_t clock_running;              /* the MIDI clock outputs play (their Start went out) */
+    uint8_t gated;                      /* LOW CONFIDENCE's gate or the silence (jank_conf.h): the outputs stopped by the tracker */
 };
 
 void jho_init(struct jho *h);
@@ -41,10 +49,10 @@ void jho_set(struct jho *h, int hold);
 void jho_link_play(struct jho *h);
 /* whether the MIDI clock outputs should play now (jank_clock.h jc_want); a lock while arming ends the arming */
 int jho_outputs(struct jho *h, const struct jho_in *in);
-/* FOLLOW+LEAD's part: the Link session is held stopped (jank_beatlink.h jbl_in.held) */
+/* FOLLOW+LEAD's part: the Link session is held stopped (jank_beatlink.h jbl_in.held), by the user's hold or the gate */
 int jho_session_held(const struct jho *h, const struct jho_in *in);
-/* the transport icon in AUDIO mode: held -> stopped; the clocks playing -> running; otherwise a start that resolves by
- * itself (the tracker locks, the bar line comes) -> armed */
+/* the transport icon in AUDIO mode: held or gated -> stopped; the clocks playing -> running; otherwise a start that
+ * resolves by itself (the tracker locks, the bar line comes) -> armed */
 uint8_t jho_icon(const struct jho *h, const struct jho_in *in);
 const char *jho_icon_name(uint8_t icon);   /* "stopped" "armed" "running" */
 #endif

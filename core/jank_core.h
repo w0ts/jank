@@ -143,6 +143,9 @@ struct jk_cfg {
     uint8_t source;                   /* enum jur_src: AUDIO > SOURCE AUTO / LINE / USB */
     /* Stored in the same small blob since M2d: */
     uint8_t usbmidi;                  /* 1: the MIDI clock also goes out over USB-MIDI (to the computer, or to hosted gear) */
+    /* ... and since M2e: LOW CONFIDENCE (core/jank_conf.h) */
+    uint8_t lowconf;                  /* enum jcf_lowconf: KEEP RUNNING (0) or STOP / START (1, the default, as the emulator) */
+    uint8_t threshold;                /* percent 0..100: STOP / START gates the outputs under it (0: never) */
     /* Stored in their own blob (store.c, key "lat1") since M2d: beat_latency per audio source (core/jank_lat.h) */
     struct jla lat;
     struct jla_key lat_key;           /* the source beat_latency_ms belongs to now (not stored: usbrole.c follows it) */
@@ -172,7 +175,7 @@ size_t jk_intr_summary(const char *dump, char *out, size_t cap);
 /* drive and MIDI updates: refused while playing ("stop first"): flash erases would stall USB, Wi-Fi and the tracker */
 #define JK_STOP_FIRST "the session or the MIDI clock is playing: stop first"
 
-#define JK_CTL_OUT_MAX 1792u         /* the firmware's answer buffer (ctl.c): the longest status (1510) fits with its ok; under usb.c's 2048 */
+#define JK_CTL_OUT_MAX 1792u         /* the firmware's answer buffer (ctl.c): the longest status (1770 since M2e, tests/test_ctl.c) fits with its ok; under usb.c's 2048 */
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
 struct jk_beat {
@@ -195,8 +198,11 @@ struct jk_beat {
                                          rms_db; the emulator's level_fast_db) */
     int16_t level_min_db, level_max_db;   /* the lowest and highest of those values over the last 3 s */
     int16_t peak_db;                  /* the input's peak over the last second, dBFS, -99 .. 0 (silence: -99) */
-    uint8_t conf_pct;                 /* the tracker's confidence: the network's beat activation peak over the last second,
-                                         percent (the device has no grid confidence like the player's) */
+    uint8_t conf_pct;                 /* the confidence: how well the last 8 s of tracked beats fit the published grid, percent
+                                         (core/jank_conf.h, the player's live/confidence.py); 0 in silence */
+    uint8_t act_pct;                  /* the network's beat activation peak over the last second, percent (M2d's conf=) */
+    uint8_t gated;                    /* LOW CONFIDENCE's gate: the confidence under the threshold (STOP / START) */
+    uint8_t silent;                   /* 0.5 s under -60 dBFS: the outputs stopped too (jank_conf.h SILENCE) */
     uint32_t tempo_sets, phase_forces, starts, stops;   /* what the tracker did to the Link session */
     int32_t err_us;                   /* the session's beat grid against the tracked beat at the last step, before a correction */
     int32_t offset_us;                /* the clock the audio's samples are mapped to local time with: the offset's value */

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "jank_core.h"
+#include "jank_conf.h"
 #include "jank_hold.h"
 #include "jank_usbrole.h"
 
@@ -424,6 +425,12 @@ static void test_save(void)
     b = a;
     b.group = 3;
     CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.lowconf = JCF_RUN;                                /* LOW CONFIDENCE and THRESHOLD: stored apart ("usb1") */
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.threshold = 50;
+    CHECK(jk_cfg_stored_differs(&a, &b));
     /* stopped: at once */
     CHECK(jk_save_on_change(&pending, 1, 0, 0) == JK_SAVE_NOW && !pending);
     CHECK(jk_save_on_change(&pending, 0, 0, 0) == JK_SAVE_NONE && !pending);
@@ -556,7 +563,10 @@ static void test_status_size(void)
     snap.beat.audio = snap.beat.audio_live = snap.hold = 1;           /* the audio lines at their longest */
     snap.outputs = JHO_RUNNING;
     snap.beat.level_db = snap.beat.level_min_db = snap.beat.level_max_db = snap.beat.peak_db = -99;
-    snap.beat.conf_pct = 100;
+    snap.beat.conf_pct = snap.beat.act_pct = 100;
+    snap.beat.gated = snap.beat.silent = 1;
+    cfg.threshold = 100;
+    cfg.lowconf = JCF_STOP;                                           /* "stop" */
     snap.beat.fold_exp = -2;                                          /* "0.25" */
     snap.beat.fold_manual = 1;
     snap.beat.nudge_halves = -5;                                      /* "-2.5" */
@@ -568,9 +578,38 @@ static void test_status_size(void)
     CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
 }
 
+/* LOW CONFIDENCE: STOP / START at 80 % by default; set lowconf run|stop, set threshold 0..100; get and status say them,
+ * status and beat the grid-fit confidence (conf=), the network's activation (act=), the gate and the silence */
+static void test_lowconf(void)
+{
+    struct jk_cfg before;
+    setup();
+    CHECK(cfg.lowconf == JCF_STOP && cfg.threshold == 80);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=stop\nthreshold=80\n"));
+    before = cfg;
+    CHECK(run("set lowconf run") == JK_CTL_CFG_CHANGED && cfg.lowconf == JCF_RUN && jk_cfg_stored_differs(&before, &cfg));
+    CHECK(run("set lowconf stop") == JK_CTL_CFG_CHANGED && cfg.lowconf == JCF_STOP);
+    CHECK(run("set lowconf keep") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.lowconf == JCF_STOP);
+    CHECK(run("set threshold 65") == JK_CTL_CFG_CHANGED && cfg.threshold == 65);
+    CHECK(run("set threshold 0") == JK_CTL_CFG_CHANGED && cfg.threshold == 0);
+    CHECK(run("set threshold 100") == JK_CTL_CFG_CHANGED && cfg.threshold == 100);
+    CHECK(run("set threshold 101") == JK_CTL_NONE && cfg.threshold == 100);
+    CHECK(run("set threshold -5") == JK_CTL_NONE && run("set threshold 7.5") == JK_CTL_NONE && run("set threshold") == JK_CTL_NONE);
+    CHECK(cfg.threshold == 100);
+    run("set threshold 70");
+    run("set lowconf run");
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .conf_pct = 62, .act_pct = 91, .gated = 1};
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nact=91\ngated=1\nsilent=0\nthreshold=70\nlowconf=run\n"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=run\nthreshold=70\n"));
+    snap.beat.silent = 1;
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nconf=62\nact=91\ngated=1\nsilent=1\nthreshold=70\nlowconf=run\nmode="));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|usbmidi|lowconf|threshold|"));
+}
+
 int main(void)
 {
     test_defaults();
+    test_lowconf();
     test_beat();
     test_autobar();
     test_nudge();
