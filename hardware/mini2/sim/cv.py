@@ -3,7 +3,8 @@
 ngspice. Writes sim/cv.txt. The user's ruling: a real 5 V+ output or none; PASS = 5.0 V or more into 10 k from a 3.4 V
 cell, a rise under 10 us, 0 V while the pump is off.
 
-The circuit. The pump: GPIO35 (PUMP_IO) drives a square wave (LEDC, 416,667 Hz = 80 MHz / 2 / 96) through R83 22 ohm into C84
+The circuit. The pump: GPIO35 (PUMP_IO) drives a square wave (LEDC, 416,667 Hz = 80 MHz / 2 / 96) into U13 (a 74LVC1G125 buffer: review
+pass 1), U13 through R83 into C84
 1 uF (the flying cap); D12 (B5819W) from VREG to the flying node, D13 (B5819W) from it to CV_RAIL; C85 10 uF 25 V on
 the rail, R84 100 k bleed. Per output: the GPIO (CLK_IO / RST_IO) on Q3 2N7002's gate (R71 100 k to GND), its drain
 pulls Q4 AO3401A's gate (R73 10 k up to CV_RAIL: off), Q4's source on CV_RAIL, its drain the node N (R74 10 k to GND;
@@ -19,8 +20,9 @@ Models (each one's source; none is the part's maker's own model unless said):
  - D12 / D13 (B5819W): a 1N5819-class Schottky, IS 31.7 uA, N 1.373, RS 51 mohm, CJO 110 pF (the common 1N5819 SPICE
    card), ASSUMED for the SOD-123 part.
  - D10 / D11 (BAV99): a 1N4148-class small-signal diode, ASSUMED close to the BAV99.
- - The GPIOs: high = 3.3 V through 17 ohm, low = 0 V through 12 ohm (midi_faults.py's fit to the datasheet's IOH / IOL,
-   drive strength 3); floating (boot, reset) = the datasheet's IIH 50 nA pushed into the pin's net (Table 5-4); no pull
+ - The pump's driver (review pass 1): U13, a 74LVC1G125 on +3V3, 3.3 V / 0 V through CV_RDRV (10 ohm ASSUMED typical;
+   25 ohm its sheet's worst at 3 V). The GPIOs (CLK_IO, RST_IO): high = 3.3 V through 17 ohm, low = 0 V through 12 ohm
+   (midi_faults.py's fit to the datasheet's IOH / IOL, drive strength 3); floating (boot, reset) = the datasheet's IIH 50 nA pushed into the pin's net (Table 5-4); no pull
    at reset on GPIO35 / 2 / 1 (the datasheet's pin table, p. 16).
  - VREG: an ideal source through 0.1 ohm: 4.6 V (USB: power.txt), 3.4 V (a nearly flat cell). The load: 10 k or
    100 k, with 100 pF (a patch cable and a module's input, ASSUMED).
@@ -38,6 +40,13 @@ RPU = float(os.environ.get("CV_RPU", "10e3"))     # R73 / R79, the P-FET's gate 
 RPD = float(os.environ.get("CV_RPD", "10e3"))      # R74 / R80, the node's pull-down (the board: 10 k; 0: none)
 RS = float(os.environ.get("CV_RS", "22"))          # R83, the pump pin's series resistor (the board: 22 ohm)
 RB = float(os.environ.get("CV_RB", "100e3"))       # R84, the rail's bleed (the board: 100 k)
+CG = float(os.environ.get("CV_CG", "0"))           # (a cap from the P-FET's gate to CV_RAIL: tried, no help: the blip
+#  comes through the P-FET's drain-source capacitance (and the BAV99's), not its gate)
+C85 = float(os.environ.get("CV_C85", "4.2e-6"))    # C85, 10 uF 25 V 0805 at ~7 V: 4.2 uF (DC bias: the sim pass's estimate)
+CN = float(os.environ.get("CV_CN", "4.7e-9"))      # C89 / C90 (review pass 1 / the sim pass): the node N to GND, so a
+#  fast rail rise couples into 4.7 nF, not into R74's 10 k (60c2f3a: none; 10 nF: half the blip, twice the fall)
+RDRV = float(os.environ.get("CV_RDRV", "10"))      # the pump's driver, U13 74LVC1G125 (review pass 1), its output
+#  resistance: 10 ohm ASSUMED typical (TI's sheet: VOH 2.3 V min / VOL 0.55 V max at 24 mA, 3 V: 23 .. 29 ohm worst)
 MODELS = """
 .model QN VDMOS(Rg=3 Vto=1.6 Rd=0 Rs=.75 Rb=.14 Kp=.17 mtriode=1.25 Cgdmax=80p Cgdmin=12p Cgs=50p Cjo=50p Is=.04p)
 .model QP VDMOS(pchan Rg=6 Vto=-0.9 Rd=.02 Rs=.01 Kp=12 Cgdmax=180p Cgdmin=60p Cgs=600p Cjo=150p Is=1e-12)
@@ -54,7 +63,7 @@ M4{k} n{k} pg{k} rail rail QP
 Dlo{k} 0 n{k} DS
 Dhi{k} n{k} rail DS
 R75{k} n{k} o{k}x 1k
-Vm{k} o{k}x o{k} 0""" + (f"\nR74{k} n{k} 0 {RPD:g}" if RPD else "")
+Vm{k} o{k}x o{k} 0""" + (f"\nR74{k} n{k} 0 {RPD:g}" if RPD else "") + (f"\nCg{k} rail pg{k} {CG:g}" if CG else "") + (f"\nCn{k} n{k} 0 {CN:g}" if CN else "")
 
 
 def netlist(vreg, pump, gate_clk, gate_rst, load_clk, load_rst):
@@ -67,7 +76,7 @@ R83 pio p {RS:g}
 C84 p x 1u
 D12 vreg x DSK
 D13 x rail DSK
-C85 rail 0 10u
+C85 rail 0 {C85:g}
 R84 rail 0 {RB:g}
 {gate_clk}
 {gate_rst}
@@ -95,8 +104,8 @@ def vreg(v):
 
 
 HALF = 0.5 / F_PUMP
-PUMP_ON = f"Vp ps 0 PULSE(0 3.3 0 5n 5n {HALF - 5e-9} {1 / F_PUMP})\nRgp ps pio 17"
-PUMP_OFF = "Vp ps 0 0\nRgp ps pio 12"
+PUMP_ON = f"Vp ps 0 PULSE(0 3.3 0 5n 5n {HALF - 5e-9} {1 / F_PUMP})\nRgp ps pio {RDRV:g}"
+PUMP_OFF = f"Vp ps 0 0\nRgp ps pio {RDRV:g}"
 HIGH = {"c": "Vgc gcs 0 3.3\nRgc gcs gc 17", "r": "Vgr grs 0 3.3\nRgr grs gr 17"}
 LOW = {"c": "Vgc gcs 0 0\nRgc gcs gc 12", "r": "Vgr grs 0 0\nRgr grs gr 12"}
 FLOAT = {"c": "Igc 0 gc 50n", "r": "Igr 0 gr 50n"}
@@ -141,20 +150,24 @@ def edges():
     return out, res
 
 
+RISES = (1e-6, 13.8e-6, 26e-6, 100e-6)   # (VREG's rise: the sim pass's 1 us worst, a USB plug-in 13.8 us, the toggle on a
+#  cell 26 us (its power sim), 100 us)
+
+
 def startup():
-    """the toggle switched on (VREG 0 -> v at 1 ms) with the GPIOs floating (boot), the pump started at 20 ms: the
-    outputs (any glitch), the rail, the pump pin's peak current at the pump's start"""
+    """the toggle switched on (VREG 0 -> v at 1 ms, each rise in RISES) with the GPIOs floating (boot), the pump started
+    at 20 ms: the outputs (any glitch), the rail, the pump pin's peak current at the pump's start"""
     out, worst = [], 0.0
-    for v in (4.6, 3.4):
-        vr = f"Vreg vs 0 PWL(0 0 1m 0 1.1m {v})\nRreg vs vreg 0.1"
-        pump = f"Vp ps 0 PULSE(0 3.3 20m 5n 5n {HALF - 5e-9} {1 / F_PUMP})\nRgp ps pio 17"
+    for v, rise in [(v, r) for v in (4.6, 3.4) for r in RISES]:
+        vr = f"Vreg vs 0 PWL(0 0 1m 0 {1e-3 + rise:.7g} {v})\nRreg vs vreg 0.1"
+        pump = f"Vp ps 0 PULSE(0 3.3 20m 5n 5n {HALF - 5e-9} {1 / F_PUMP})\nRgp ps pio {RDRV:g}"
         net = netlist(vr, pump, FLOAT["c"], FLOAT["r"], load("c", "100k"), load("r", "100k"))
-        m = run(net, "tran 100n 28m\nmeas tran omax max v(oc) from=0 to=28m\nmeas tran r19 avg v(rail) from=18m to=19.9m\n"
+        m = run(net, "tran 20n 28m\nmeas tran omax max v(oc) from=0 to=28m\nmeas tran r19 avg v(rail) from=18m to=19.9m\n"
                 "meas tran r28 avg v(rail) from=27m to=28m\nmeas tran ipk max i(Vp) from=20m to=21m\n"
                 "meas tran imin min i(Vp) from=20m to=21m\n" + echo("omax", "r19", "r28", "ipk", "imin"))
         ipk = max(abs(m["ipk"]), abs(m["imin"])) * 1000
         worst = max(worst, m["omax"])
-        out.append(f"VREG 0 -> {v:.1f} V at 1 ms, the GPIOs floating, the pump started at 20 ms: the outputs never above "
+        out.append(f"VREG 0 -> {v:.1f} V at 1 ms in {rise * 1e6:g} us, the GPIOs floating, the pump started at 20 ms: the outputs never above "
                    f"{m['omax'] * 1000:.2f} mV; CV_RAIL {m['r19']:.2f} V with the pump off (VREG through D12 / D13), "
                    f"{m['r28']:.2f} V with it running; the pump pin's peak at its start {ipk:.0f} mA")
     return out, worst

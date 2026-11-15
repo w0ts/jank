@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """jank mini 2.2 (stage 1e, 2026-11-14: the u.FL only; 4 buttons; LEDs or a screen; standard parts; earlier: stage 1c) : the one parts table. No MIDI power input (no reservoir,
 no buck, no detectors): USB or a 1S Li-ion cell (two PH2.0 sockets in parallel, a TP4054 charger, an XB5353A protector,
-a P-FET power path) into VSYS, an HT7833 to 3.3 V; MIDI OUT 2 a passive copy of MIDI OUT 1 (J3 / J6
+a P-FET power path) into VSYS, one LDL1117 (SOT-223) to 3.3 V for both orders (review pass 1); MIDI OUT 2 a passive copy of MIDI OUT 1 (J3 / J6
 on the same nets as J2 / J5); BOOT a plain button again (SW1); one indicator: a red and a green LED behind one window;
 the LINE IN of mini 2 unchanged (README "mini 2.2 simplified"). Below: mini's own words.
 
@@ -23,7 +23,7 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
     "det": "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR",
     "led": "LED-SMD_L1.6-W0.8-R-RD", "sw": "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5",
     "r0603": "R0603", "r0805": "R0805", "r1206": "R1206", "c0603": "C0603",
-    "c0805": "C0805", "r0402": "R0402", "c0402": "C0402", "l0402": "L0402", "trs": "TRS_PADS_SMD",
+    "c0805": "C0805", "c1206": "C1206", "r0402": "R0402", "c0402": "C0402", "l0402": "L0402", "trs": "TRS_PADS_SMD",
     "din": "CONN-TH_DIN-504B-M10",
     "sot235": "SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", "tvs2": "SOT-23_L2.9-W1.3-P1.90-LS2.4-BR",   # (mini 2: LINE IN)
     "sot236br": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR", "sma": "SMA_L4.3-W2.6-LS5.0-BI",   # (stage 1e: SRV05-4, SMAJ5.0CA)
@@ -34,7 +34,8 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
     "pads2": "PADS2_HAND",        # (stage 2: the power switch's two wire pads, make_footprints.py)
     "pads6": "PADS6_SMD", "pads4": "PADS4_SMD",         # (stage 2: the recovery pads, make_footprints.py)
     "twin": "R_TWIN_HAND", "twin_c": "C_TWIN_HAND",        # (stage 2: the twins' hand-solder lands, make_footprints.py)
-    "sod123": "SOD-123_L2.7-W1.6-LS3.7-RD-1",   # (mini 2.2: the green LED, the charger, the cells' sockets, D3)
+    "sod123": "SOD-123_L2.7-W1.6-LS3.7-RD-1",
+    "sc706": "SC-70-6_L2.0-W1.3-P0.65-LS2.1-BL", "tantb": "CASE-B_3528",   # (review pass 1: the LM66100, the tantalums)   # (mini 2.2: the green LED, the charger, the cells' sockets, D3)
 }
 
 # ESP32-S3FN8, QFN56 (ESP32-S3 datasheet, "Pin Overview"; Espressif's checklist "IO Pin Default Configuration"):
@@ -43,14 +44,13 @@ FP = {   # footprint names in lib/chip.pretty (copies of lib/jlc.pretty, plus ou
 #   SPICLK_N, SPICLK_P: left open), 38..42 GPIO33..37, 43 GPIO38, 44 MTCK (39), 45 MTDO (40), 46 VDD3P3_CPU, 47 MTDI (41),
 #   48 MTMS (42), 49 U0TXD (43), 50 U0RXD (44), 51 GPIO45, 52 GPIO46, 53 XTAL_N, 54 XTAL_P, 55/56 VDDA, 57 GND (the pad)
 GPIO = {   # firmware's board.h (README "Pin map"): function -> (GPIO, chip pin)
-    "MIDI_TX": (21, "27"),      # UART TX, MIDI OUT 1: its jack's and its DIN's tips, each through its own 10 ohm; RTC_GPIO21
+    "MIDI_TX": (21, "27"),      # UART TX, MIDI OUT 1: its jack's and its DIN's tips, each through its own 68 ohm; RTC_GPIO21
+                                #  (MIDI_TX2: MIDI OUT 2 the same way, UART2: TIMING.md)
     "MIDI_TX2": (17, "23"),
     "U0TXD": (43, "49"), "U0RXD": (44, "50"),   # stage 2: to J12, the recovery pads (a USB-UART adapter)
     "LIN_DET": (16, "22"),      # stage 2 (the user's "something plugged in"): LINE IN's ring switch (J7 pin 3, closed to
                                 #  the ring with no plug): R38 1 M to +3V3, the ring's R37 100 k to GND: no plug = ~0.3 V
-                                #  (low), a plug lifts the ring spring off it = high. Not a strapping pin     # stage 1f: MIDI OUT 2 (its jack's and its DIN's tips, each through its own 10 ohm): the
-                                #  same UART TX routed to a second pin by the GPIO matrix (TRM: any number of pins may
-                                #  select one peripheral output; not yet tried on hw), so each pin sinks two loops, not four
+                                #  (low), a plug lifts the ring spring off it = high. Not a strapping pin
     "BOOT": (0, "5"),           # BOOT / user button SW1 to GND (strapping: held low at reset = download mode); R16 its
                                 #  pull-up, nothing else on the net (no capacitor: the strap is read at reset)
     "LED_R": (33, "38"),        # the red LED, active high, through 1 k (72 x 72: GPIO33, the left side's upper free pin,
@@ -124,9 +124,12 @@ PARTS = [
     ("R3", "R", "5.1k", "r0603", "C23186", {"1": "CC1", "2": "GND"}),
     ("R4", "R", "5.1k", "r0603", "C23186", {"1": "CC2", "2": "GND"}),
     # ---- power (stage 1d: one board, two orders, VARIANT below): VBUS through D3 into VSYS (both); in "battery" the cell
-    #      into VSYS through Q1 (a P-FET, on while VBUS is absent); VSYS into the 3.3 V LDO, two footprints side by side:
-    #      U2 AMS1117-3.3 (Basic, "usb": 1 A, dropout 1.1 V) or U10 HT7833 ("battery": 500 mA, 4 uA, dropout 360 mV at
-    #      500 mA, runs from the cell; CE tied to VIN). C3 / C5 / C6 serve both
+    #      into VSYS through Q1 (a P-FET, on while VBUS is absent); VSYS into the 3.3 V LDO. Review pass 1 (H1, M1, M2):
+    #      ONE regulator for both orders on U2's SOT-223 footprint (the AMS1117's pinout: 1 GND, 2 OUT, 3 IN, tab OUT):
+    #      ST LDL1117S33R (its datasheet, DocID030319 Rev 3: 1.2 A, dropout 350 mV typ / 600 max at 1.2 A, Iq 250 uA,
+    #      theta-JA 120 C/W, stable with a ceramic 4.7 uF out / 1 uF in, ESR 0.02 .. 10 ohm up to 22 uF). The HT7833
+    #      (SOT-23-5, 500 C/W: ~100 C rise on USB) and the AMS1117 (1.1 V dropout: 2.93 V from a 4.5 V host) are gone.
+    #      C3 (in) and C5 / C6 (out) right at its pins
     ("D3", "D", "B5819W", "sod123", "C8598", {"1": "VSYS", "2": "VBUS"}),
     #      stage 2 (the user's: "off = off, still charges"): the power switch cuts VREG, the regulators' input (and U7's,
     #      LINE IN's LDO) from VSYS, after the charger and the power path: off, the board is dead even on USB while the
@@ -136,25 +139,26 @@ PARTS = [
     #      4 mm apart): pad 1 VSYS, pad 2 VREG. R62, 0 ohm, across them, fitted in the usb order only (always on)
     ("J11", "pads2", "POWER SW", "pads2", "", {"1": "VSYS", "2": "VREG"}),
     ("R62", "R", "0", "r0402", "C17168", {"1": "VSYS", "2": "VREG"}),
-    ("U2", "ldo223", "AMS1117-3.3", "sot223", "C6186", {"3": "VREG", "2": "+3V3", "4": "+3V3", "1": "GND"}),
-    ("U10", "ldo5", "HT7833", "sot235", "C164106", {"1": "VREG", "3": "VREG", "2": "GND", "5": "+3V3"}),
+    ("U2", "ldo223", "LDL1117S33R", "sot223", "C435835", {"3": "VREG", "2": "+3V3", "4": "+3V3", "1": "GND"}),
     ("C3", "C", "10u", "c0603", "C19702", {"1": "VREG", "2": "GND"}),
     ("C5", "C", "22u", "c0603", "C59461", {"1": "+3V3", "2": "GND"}),
     ("C6", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
-    #      the power path ("battery"): Q1 AO3401A, drain on the cell (BAT_P), source on VSYS, gate on VBUS (R50 100 k
-    #      down): no USB = gate low, on (its body diode conducts the same way); USB = gate 5 V, VSYS ~4.7 V over the cell: off
-    ("Q1", "pfet", "AO3401A", "tvs2", "C15127", {"1": "VBUS", "2": "VSYS", "3": "BAT_P"}),
-    ("R50", "R", "10k", "r0402", "C25744", {"1": "VBUS", "2": "GND"}),   # (stage 2: 10 k, was 100 k: sim/power.py)
-    #      stage 2 (sim/power.py): USB pulled with a cell fitted, VBUS stays near VSYS (D3) and Q1 stays off until VBUS
-    #      drains: VSYS hung on Q1's body diode (0.7 V) and +3V3 fell to 2.62 V (a 3.7 V cell, a Wi-Fi burst). D9, a
-    #      second B5819W beside the body diode (0.3 V), and R50 10 k (VBUS drained 10 x faster) give 2.98 V, 21 ms
+    #      the power path ("battery"). Review pass 1 / the sim pass: Q1 (an AO3401A with its gate on VBUS, R50 10 k down)
+    #      left a ~25 ms gap at the USB unplug (it conducts only once VBUS has drained below the cell: +3V3 2.69 V on a
+    #      3.4 V cell) and the S3's D+ pull-up lifted VBUS to ~2.4 V with no host (Q1 half on). Now U15, a TI LM66100
+    #      (SLVSEZ8A: 1.5 A, 91 mohm at 3.6 V, VIN 1.5 .. 5.5 V), CE on VOUT = an ideal diode BAT_P -> VSYS: on when VSYS
+    #      falls 150 mV below the cell (tON 40 us), off when USB lifts VSYS over it; Q1 and R50 gone. D9 stays (the 40 us)
+    ("U15", "idiode", "LM66100", "sc706", "C2869734", {"1": "BAT_P", "2": "GND", "3": "VSYS", "4": "GND", "5": "GND", "6": "VSYS"}),
+    #      D9, a B5819W beside U15 (stage 2: beside Q1's body diode): carries the load for U15's 40 us turn-on
     ("D9", "D", "B5819W", "sod123", "C8598", {"1": "VSYS", "2": "BAT_P"}),
     #      the charger ("battery"): U8 TP4054-42 (4.2 V) from VBUS, R51 5.1 k on PROG = ~196 mA (1000 V / R_PROG), CHRG
     #      left open; 10 uF at VCC and at BAT
     ("U8", "chg", "TP4054-42", "sot25bl", "C32574", {"4": "VBUS", "3": "BAT_P", "2": "GND", "5": "PROG"}),
     ("R51", "R", "5.1k", "r0603", "C23186", {"1": "PROG", "2": "GND"}),
     ("C40", "C", "10u", "c0603", "C19702", {"1": "VBUS", "2": "GND"}),
-    ("C41", "C", "10u", "c0603", "C19702", {"1": "BAT_P", "2": "GND"}),
+    #      review pass 1 (the sim pass, the TP4054's sheet): 1 ohm in series with C41 (a large ceramic on BAT with no cell)
+    ("C41", "C", "10u", "c0603", "C19702", {"1": "BAT_CS", "2": "GND"}),
+    ("R86", "R", "1", "r0402", "C25086", {"1": "BAT_P", "2": "BAT_CS"}),
     #      the cell's protection ("battery"): U9 XB5353A (over-charge, over-discharge, over-current, its own FETs in the
     #      minus lead): its datasheet's application circuit: VDD through R52 100 ohm from the cell's + (XB_VDD), C42 100 nF
     #      from XB_VDD to its GND (the cell's minus, BAT_N) right at the IC; VM (4, 5) on the board's GND; pin 1 VT open
@@ -171,10 +175,12 @@ PARTS = [
     #      the common convention, SparkFun / Adafruit); whoop leads vary between vendors: check every cell with a meter
     ("J8", "ph2", "PH2.0 cell 1", "ph2", "C131337", {"1": "BAT_C", "2": "BAT_N"}),
     ("J9", "ph2", "PH2.0 cell 2", "ph2", "C131337", {"1": "BAT_C", "2": "BAT_N"}),
-    #      the cell's level: 1 M / 1 M + 100 nF on GPIO1 (ADC1_CH0). R10 ("battery" only) from the cell's +; R11 and C8 in
-    #      both orders: in "usb" GPIO1 is held at 0 V (not floating), which also tells the firmware which board it runs on
-    ("R10", "R", "1M", "r0402", "C26083", {"1": "BAT_P", "2": "VBAT_ADC"}),
-    ("R11", "R", "1M", "r0402", "C26083", {"1": "VBAT_ADC", "2": "GND"}),
+    #      the cell's level: 100 k / 100 k + 100 nF on GPIO4 (ADC1_CH3). R10 ("battery" only) from the cell's +; R11 and C8
+    #      in both orders: in "usb" GPIO4 is held at 0 V (not floating), which also tells the firmware which board it runs
+    #      on. Review pass 1 / the sim pass: with 1 M / 1 M (500 k) the ADC's sampling cap, shared with LINE_IN at 41.7 kHz,
+    #      pulled the reading 30 .. 131 mV low (up to 0.64 V); 100 k / 100 k (50 k) cuts it 10 x for 21 uA from the cell
+    ("R10", "R", "100k", "r0402", "C25741", {"1": "BAT_P", "2": "VBAT_ADC"}),
+    ("R11", "R", "100k", "r0402", "C25741", {"1": "VBAT_ADC", "2": "GND"}),
     ("C8", "C", "100n", "c0402", "C1525", {"1": "VBAT_ADC", "2": "GND"}),
     # ---- the chip (ESP32-S3FN8) and its supplies (XIAO ESP32S3 v1.2 values; Espressif's checklist)
     ("U1", "chip", "ESP32-S3FN8", "qfn56", "C2913196", U1),
@@ -216,7 +222,7 @@ PARTS = [
     ("R19", "R", "0", "r0402", "C17168", {"1": "RF", "2": "UFL"}),
     ("J4", "ufl", "U.FL", "ufl", "C88374", {"1": "UFL", "2": "GND", "3": "GND"}),
     # ---- the buttons (stage 1e, the user's "option 1 and 2 on one board"): four under big caps, NO / BACK = BOOT on
-    #      GPIO0 (R16 its pull-up, nothing else), UP / DOWN / YES on GPIO10 / 11 / 12 with the chip's internal pull-ups
+    #      GPIO0 (R16 its pull-up, nothing else), UP / DOWN / YES on GPIO10 / 37 / 36 with the chip's internal pull-ups
     #      (no part). All four the Basic 5.1 mm tactile (C318884). Stage 1f (the user's): no RST button (CHIP_PU keeps its
     #      10 k / 1 uF), the four in a cross: UP top, DOWN bottom, NO / BOOT left, YES right (README "stage 1f")
     ("SW1", "sw", "NO / BOOT", "sw", "C318884", {"1": "GND", "2": "GND", "3": "BOOT", "4": "BOOT"}),
@@ -248,7 +254,7 @@ PARTS = [
     #      (stage 1d: each OUT its own; stage 1f, the user's: each of the four connectors its own source and sink, so a
     #      short or a mono plug on one stops only that one; two loops a pin, ~6.5 mA each at most: README "stage 1f")
     #      MIDI 1.0 at 3.3 V (CA-033): ring = source through 33 ohm (3 x 100 ohm 1206 in parallel: 33.3 ohm, all Basic;
-    #      a mono plug's 0.33 W shared, 0.11 W each), tip = sink through 10 ohm from the UART
+    #      a mono plug's 0.33 W shared, 0.11 W each), tip = sink through 68 ohm from the UART
     ("J2", "jack5", "MIDI OUT", "jack5", "C16684", {"5": "MO_T", "2": "MO_R", "1": "GND"}),
     ("J5", "din", "MIDI OUT DIN", "din", "C2939346", {"4": "MD_R", "2": "MD_T", "3": "GND", "6": "GND", "7": "GND"}),   # (pad 4 = DIN 4, pad 2 = DIN 5)
     ("R14", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MO_R"}),   # (R14 // R26 // R48 = 33.3 ohm)
@@ -258,8 +264,7 @@ PARTS = [
     #      ~41 mA from the GPIO, 0.113 W in a 0.125 W part), the DINs' source two 100 ohm 1206 in parallel (50 ohm: a pin-4
     #      short 0.12 W in each 0.25 W part; three do not fit between the DIN's pads)
     ("R15", "R", "68", "r0805", "C17802", {"1": "MIDI_TX", "2": "MO_T"}),
-    #      the DIN's own (stage 1f): one 33 ohm 0805 (Basic) for the source: a 5-pin cable never shorts DIN 4 (only a
-    #      broken one would: 0.33 W in a 0.125 W part), so the jack's three 1206s are not needed here; 10 ohm sink
+    #      the DIN's own: the source two 100 ohm 1206 in parallel (50 ohm), the sink 68 ohm 0805 (stage 2, above)
     ("R54", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MD_R"}),
     ("R58", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MD_R"}),
     ("R55", "R", "68", "r0805", "C17802", {"1": "MIDI_TX", "2": "MD_T"}),
@@ -273,8 +278,14 @@ PARTS = [
     ("R56", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MD2_R"}),
     ("R59", "R", "100", "r1206", "C17901", {"1": "+3V3", "2": "MD2_R"}),
     ("R57", "R", "68", "r0805", "C17802", {"1": "MIDI_TX2", "2": "MD2_T"}),
+    #      review pass 1 (M7): ESD on the MIDI connectors' lines, one SRV05-4 (the USB's part, C85364: no new type) per
+    #      output, its four I/O on that output's jack tip / ring and DIN 5 / 4, REF on +3V3 (pins 1 I/O1, 2 GND, 3 I/O2,
+    #      4 I/O3, 5 REF, 6 I/O4), between the connectors' pads and their resistors
+    ("U11", "esd4", "SRV05-4-P-T7", "sot236br", "C85364", {"1": "MO_T", "3": "MO_R", "4": "MD_R", "6": "MD_T", "2": "GND", "5": "+3V3"}),
+    ("U12", "esd4", "SRV05-4-P-T7", "sot236br", "C85364", {"1": "MO2_T", "3": "MO2_R", "4": "MD2_R", "6": "MD2_T", "2": "GND", "5": "+3V3"}),
     # ---- mini 2: LINE IN (README "LINE IN"): a 3.5 mm stereo jack, tip (L) and ring (R) summed to mono by an inverting
-    #      summer (each channel 20 k into the op-amp's virtual ground: >= 20 k input impedance, no crosstalk between the
+    #      summer (each channel 20 k into the op-amp's virtual ground, with the 100 k pull-down and the TVS's ~1 nF: ~16.6 k
+    #      at 1 kHz, 7.2 k at 20 kHz (the sim pass), no crosstalk between the
     #      sources), gain 5.6 k / 20 k = 0.28 a channel, -3 dB at ~8.5 kHz (C32 and R35 / C36), AC coupled (7.8 Hz),
     #      biased at 1.47 V (the middle of ATTEN3's 0..2.9 V); powered from VBUS by its own LDO
     ("J7", "jack5", "LINE IN", "jack5", "C16684", {"5": "LIN_T", "2": "LIN_R", "1": "LIN_S", "3": "LIN_DET"}),
@@ -326,8 +337,13 @@ PARTS = [
 #      CV_RAIL (a wrong +12 V lifts the rail to ~10.4 V: under the AO3401A's 12 V VGS, C85's 25 V). The outputs stay
 #      0 V until the firmware drives them; the firmware starts the pump first. Jacks: PJ-320A (no switch: none needed),
 #      bottom side at the top edge, user-soldered as the other jacks.
+#      Review pass 1 (M6): the GPIO no longer drives the pump: U13, a 74LVC1G125 buffer (OE tied low: always on; TI's
+#      DBV pinout 1 OE, 2 A, 3 GND, 4 Y, 5 VCC) on +3V3 with its own 100 nF (C87), takes the 50 .. 80 mA edges (its
+#      +-50 mA continuous output limit: R83 sized in sim/cv.py)
 PUMP = [
-    ("R83", "R", "22", "r0402", "C25092", {"1": "PUMP_IO", "2": "PUMP_D"}),
+    ("U13", "buf", "74LVC1G125", "sot25bl", "C23654", {"1": "GND", "2": "PUMP_IO", "3": "GND", "4": "PUMP_B", "5": "+3V3"}),
+    ("C87", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
+    ("R83", "R", "22", "r0402", "C25092", {"1": "PUMP_B", "2": "PUMP_D"}),
     ("C84", "C", "1u", "c0402", "C52923", {"1": "PUMP_D", "2": "PUMP_X"}),
     ("D12", "D", "B5819W", "sod123", "C8598", {"2": "VREG", "1": "PUMP_X"}),
     ("D13", "D", "B5819W", "sod123", "C8598", {"2": "PUMP_X", "1": "CV_RAIL"}),
@@ -343,6 +359,7 @@ def _cv(n, io, q1, q2, d, r):
         (f"R{r + 3}", "R", "10k", "r0402", "C25744", {"1": "CV_RAIL", "2": f"{n}_PG"}),
         (q2, "pfet", "AO3401A", "tvs2", "C15127", {"1": f"{n}_PG", "2": "CV_RAIL", "3": f"{n}_N"}),
         (f"R{r + 4}", "R", "10k", "r0402", "C25744", {"1": f"{n}_N", "2": "GND"}),
+        (f"C{89 if n == 'CLK' else 90}", "C", "4.7n", "c0402", "C1538", {"1": f"{n}_N", "2": "GND"}),   # (review pass 1: no blip)
         (d, "bav99", "BAV99", "tvs2", "C2500", {"1": "GND", "3": f"{n}_N", "2": "CV_RAIL"}),
         (f"R{r + 5}", "R", "2k", "r1206", "C17944", {"1": f"{n}_N", "2": f"{n}_OUT"}),
         (f"R{r + 6}", "R", "2k", "r1206", "C17944", {"1": f"{n}_N", "2": f"{n}_OUT"}),
@@ -396,8 +413,12 @@ LCSC = {
     "C25079": "120 ohm 1% 0402", "C1531": "2.2 nF 50 V X7R 0402",
     # mini 2.2 simplified
     "C11702": "1 k 1% 0402",
-    "C164106": "Holtek HT7833, 3.3 V LDO, 500 mA, dropout 360 mV at 500 mA, 4 uA, 8 V max, SOT-23-5 (the battery order)",
-    "C6186": "AMS1117-3.3, 3.3 V LDO, 1 A, dropout 1.1 V at 800 mA, 5 mA quiescent, SOT-223 (Basic; the USB order)",
+    "C435835": "ST LDL1117S33R, 3.3 V LDO, 1.2 A, dropout 350 mV typ at 1.2 A, 250 uA, 18 V max, SOT-223 (the AMS1117's "
+               "pinout; both orders since review pass 1)",
+    "C23654": "TI SN74LVC1G125DBVR, single buffer, 3-state (OE low = on), 24 mA at 3 V, SOT-23-5 (the charge pump's driver)",
+    "C2869734": "TI LM66100DCKR, ideal diode, 1.5 A, 79 .. 91 mohm, 1.5 .. 5.5 V, SC-70-6 (the cell -> VSYS path)",
+    "C16133": "Kyocera AVX TAJB107K006RNJ, 100 uF 6.3 V tantalum, case B 3528 (Basic; +3V3 bulk, battery order)",
+    "C1538": "4.7 nF 50 V X7R 0402 (Basic)", "C25086": "1 ohm 1% 0402 (preferred: no fee)",
     "C25076": "100 ohm 1% 0402 (the XB5353A's VDD resistor)",
     "C32574": "TP4054-42-SOT25R, 1-cell Li-ion charger 4.2 V, up to 500 mA, SOT-23-5 (a preferred Extended part)",
     "C15127": "AOS AO3401A, P-MOSFET 30 V 4 A, SOT-23 (the power path)",
@@ -405,19 +426,22 @@ LCSC = {
     "C131337": "JST B2B-PH-K-S, PH2.0 2-pin socket, through hole (DNP: the user fits it from the bottom)",
     "C8598": "CJ B5819W SL, Schottky 40 V 1 A, SOD-123", "C26083": "1 M 1% 0402", "C25741": "100 k 1% 0402",
     "C2297": "KT-0805G, emerald green LED 0805, Vf 2.6..3.1 V at 5 mA (Basic)",
-    "C17901": "100 ohm 1% 1206, 0.25 W (Basic)", "C17634": "33 ohm 1% 0805, 0.125 W (Basic; stage 1f: the DINs' source)",
+    "C17901": "100 ohm 1% 1206, 0.25 W (Basic)",
 }
 
 
 # ---- stage 2 (the user's "pads that could save the batch"): spare lands, DNP (no part, no paste, no cost)
 SPARES = [
     ("J12", "pads6", "RECOVERY", "pads6", "", {"1": "U0TXD", "2": "U0RXD", "3": "+3V3", "4": "GND", "5": "CHIP_PU", "6": "BOOT"}),
-    ("C72", "C", "VSYS bulk", "twin", "", {"1": "VSYS", "2": "GND"}),
+    # (review pass 1 / the sim pass: C72 and C86 are +3V3's bulk in the battery order, two 100 uF 6.3 V tantalums
+    #  (Basic; their ESR keeps the LDL1117 in its stability window): they carry +3V3 through U15's 40 us turn-on at the
+    #  USB unplug; pad 1 = + (the band). A bulk cap on VSYS (100 uF X5R) was tried: no gain, more USB inrush)
+    ("C72", "C", "100u tant", "tantb", "C16133", {"1": "+3V3", "2": "GND"}),
     # (72 x 72, the user's "one board, different screens": J10B, the 2.42" module's lead (its header is down its left
     #  side, over J5's DIN: no header there), on the screen's four nets; C86 a 1206 land for a bulk cap by it, the
     #  2.42" module's boost converter's inrush)
-    ("J10B", "hdr4", "OLED 2.42 LEAD", "pads4", "", {"1": "OLED_P1", "2": "OLED_P2", "3": "SCL", "4": "SDA"}),
-    ("C86", "C", "OLED bulk", "twin", "", {"1": "+3V3", "2": "GND"}),       # (a 1206 / tantalum land on VSYS by the power path)
+    ("J10B", "hdr4", "OLED 2.42 LEAD", "hdr4", "", {"1": "OLED_P1", "2": "OLED_P2", "3": "SCL", "4": "SDA"}),   # (review pass 1: through hole)
+    ("C86", "C", "100u tant", "tantb", "C16133", {"1": "+3V3", "2": "GND"}),   # (+3V3: by J10B, also the 2.42" module's inrush)
     ("C26", "C", "DNP", "c0402", "", {"1": "UFL", "2": "GND"}),             # (the u.FL side's shunt: with C24 and R19 a pi)
     ("C80", "C", "DNP", "c0603", "", {"1": "BTN_UP", "2": "GND"}),          # (debounce caps by the buttons)
     ("C81", "C", "DNP", "c0603", "", {"1": "BTN_DOWN", "2": "GND"}),
@@ -425,7 +449,7 @@ SPARES = [
     ("C83", "C", "DNP", "c0603", "", {"1": "BTN_YES", "2": "GND"}),
 ]
 PARTS += SPARES
-DNP |= {p[0] for p in SPARES} | {"C27", "C67"}
+DNP |= {p[0] for p in SPARES if p[0] not in ("C72", "C86")} | {"C27", "C67"}
 
 # ---- the twins (stage 2, the user's standing rule, as hardware/sd-board's in the optimist repo): every resistor whose
 #      value may need changing after the boards arrive gets a bare hand-solder pad pair in parallel (1.4 x 2.0 mm pads
@@ -449,7 +473,8 @@ TWINS = {   # twin: (its resistor, the reason)
     # (the outputs' 2 k series pairs R75 // R76, R81 // R82: two pads already, swap one: not twinned)
     # (stage 2, spare lands as twins of capacitors: the crystal's load, the LINE IN filter, CHIP_PU's delay, the
     #  regulators' input / output (a 1206 or a 3216 tantalum: the AMS1117's sheet asks 22 uF tantalum), +3V3 by the chip)
-    "CT3": ("C3", "regulator input"),
+    # (review pass 1: CT3, C3's twin, gone: C3 sits at the LDO's pin with no room beside it, and C72, VSYS's 100 uF, is
+    #  fitted now)
     # (72 x 72: these three on the BOTTOM under their parts, make_board.BOTTOM_TWINS: on top CT9 / CT10 closed the way
     #  round the crystal, CT8 had no room in the fan-out lanes)
     "CT9": ("C9", "crystal load XTAL_P"), "CT10": ("C10", "crystal load XTAL_N"),
@@ -468,9 +493,9 @@ DNP |= set(TWINS)
 # fitted. A part named here is fitted in that order only; every other part (not DNP) in both. make_assembly.py writes one
 # BOM / CPL pair per order (fab/usb/, fab/battery/), cost.py prices both.
 VARIANTS = ("usb", "battery")
-ONLY = {"U2": "usb", "R62": "usb",                                                         # (the AMS1117: Basic, USB only)
-        **{r: "battery" for r in ("U10", "Q1", "R50", "D9", "U8", "R51", "C40", "C41", "U9", "R52", "C42", "Q2", "R53",
-                                  "R10")}}
+ONLY = {"R62": "usb",                                       # (review pass 1: U2, the LDL1117, in both orders)
+        **{r: "battery" for r in ("U15", "D9", "U8", "R51", "C40", "C41", "R86", "U9", "R52", "C42", "Q2", "R53",
+                                  "R10", "C72", "C86")}}   # (C72 / C86: no inrush on USB-only boards)
 
 
 def fitted(ref, variant=None):

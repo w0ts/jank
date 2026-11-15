@@ -1,18 +1,24 @@
 jank mini 2.2, the CLOCK / RESET outputs and their charge pump: ngspice results (cv.py; the models in its docstring); the pump at 416.667 kHz
 
 steady (the pump running):
-  VREG 4.6 V, both outputs high into 10k: CV_RAIL 6.79 V (ripple 21 mV pp), the outputs 6.17 V; the pump pin's peak 52 mA (steady)
-  VREG 4.6 V, both outputs high into 100k: CV_RAIL 6.96 V (ripple 24 mV pp), the outputs 6.89 V; the pump pin's peak 53 mA (steady)
-  VREG 3.4 V, both outputs high into 10k: CV_RAIL 5.70 V (ripple 22 mV pp), the outputs 5.18 V; the pump pin's peak 52 mA (steady)
-  VREG 3.4 V, both outputs high into 100k: CV_RAIL 5.84 V (ripple 25 mV pp), the outputs 5.78 V; the pump pin's peak 53 mA (steady)
+  VREG 4.6 V, both outputs high into 10k: CV_RAIL 6.96 V (ripple 1 mV pp), the outputs 6.33 V; the pump pin's peak 59 mA (steady)
+  VREG 4.6 V, both outputs high into 100k: CV_RAIL 7.12 V (ripple 1 mV pp), the outputs 7.05 V; the pump pin's peak 59 mA (steady)
+  VREG 3.4 V, both outputs high into 10k: CV_RAIL 5.86 V (ripple 1 mV pp), the outputs 5.33 V; the pump pin's peak 59 mA (steady)
+  VREG 3.4 V, both outputs high into 100k: CV_RAIL 6.00 V (ripple 1 mV pp), the outputs 5.94 V; the pump pin's peak 60 mA (steady)
 
 edges:
-  VREG 4.6 V, a 100 us pulse into 10 k // 100 pF: high 6.71 V, rise (10-90 %) 199 ns, fall 9.01 us, 72 ns after the GPIO
-  VREG 3.4 V, a 100 us pulse into 10 k // 100 pF: high 5.63 V, rise (10-90 %) 199 ns, fall 8.33 us, 72 ns after the GPIO
+  VREG 4.6 V, a 100 us pulse into 10 k // 100 pF: high 6.94 V, rise (10-90 %) 196 ns, fall 56.77 us, 74 ns after the GPIO
+  VREG 3.4 V, a 100 us pulse into 10 k // 100 pF: high 5.86 V, rise (10-90 %) 196 ns, fall 56.84 us, 74 ns after the GPIO
 
 switch-on and boot:
-  VREG 0 -> 4.6 V at 1 ms, the GPIOs floating, the pump started at 20 ms: the outputs never above 92.09 mV; CV_RAIL 4.53 V with the pump off (VREG through D12 / D13), 7.56 V with it running; the pump pin's peak at its start 78 mA
-  VREG 0 -> 3.4 V at 1 ms, the GPIOs floating, the pump started at 20 ms: the outputs never above 69.98 mV; CV_RAIL 3.33 V with the pump off (VREG through D12 / D13), 6.37 V with it running; the pump pin's peak at its start 78 mA
+  VREG 0 -> 4.6 V at 1 ms in 1 us, the GPIOs floating, the pump started at 20 ms: the outputs never above 144.04 mV; CV_RAIL 4.54 V with the pump off (VREG through D12 / D13), 7.72 V with it running; the pump pin's peak at its start 95 mA
+  VREG 0 -> 4.6 V at 1 ms in 13.8 us, the GPIOs floating, the pump started at 20 ms: the outputs never above 115.09 mV; CV_RAIL 4.54 V with the pump off (VREG through D12 / D13), 7.72 V with it running; the pump pin's peak at its start 95 mA
+  VREG 0 -> 4.6 V at 1 ms in 26 us, the GPIOs floating, the pump started at 20 ms: the outputs never above 104.18 mV; CV_RAIL 4.54 V with the pump off (VREG through D12 / D13), 7.72 V with it running; the pump pin's peak at its start 95 mA
+  VREG 0 -> 4.6 V at 1 ms in 100 us, the GPIOs floating, the pump started at 20 ms: the outputs never above 56.90 mV; CV_RAIL 4.54 V with the pump off (VREG through D12 / D13), 7.72 V with it running; the pump pin's peak at its start 95 mA
+  VREG 0 -> 3.4 V at 1 ms in 1 us, the GPIOs floating, the pump started at 20 ms: the outputs never above 93.79 mV; CV_RAIL 3.35 V with the pump off (VREG through D12 / D13), 6.53 V with it running; the pump pin's peak at its start 95 mA
+  VREG 0 -> 3.4 V at 1 ms in 13.8 us, the GPIOs floating, the pump started at 20 ms: the outputs never above 87.13 mV; CV_RAIL 3.35 V with the pump off (VREG through D12 / D13), 6.53 V with it running; the pump pin's peak at its start 95 mA
+  VREG 0 -> 3.4 V at 1 ms in 26 us, the GPIOs floating, the pump started at 20 ms: the outputs never above 79.97 mV; CV_RAIL 3.35 V with the pump off (VREG through D12 / D13), 6.53 V with it running; the pump pin's peak at its start 95 mA
+  VREG 0 -> 3.4 V at 1 ms in 100 us, the GPIOs floating, the pump started at 20 ms: the outputs never above 45.47 mV; CV_RAIL 3.35 V with the pump off (VREG through D12 / D13), 6.53 V with it running; the pump pin's peak at its start 95 mA
 
 the pump off:
   the pump off, VREG 4.6 V, the GPIOs floating: the outputs 31.0 uV (100 k), CV_RAIL 4.54 V
@@ -22,14 +28,14 @@ the pump off:
   the pump off but CLK driven high (a firmware error): CLK 3.94 V into 10 k (CV_RAIL = VREG through the diodes): the firmware keeps the outputs low until the pump runs
 
 a wrong voltage into the output (sustained):
-  +12 V into CLK, VREG 4.6 V, CLK low: 1.19 mA, 1 mW in each 2 k (of 250); CV_RAIL 10.36 V; Q4's VGS 0.00 V (AO3401A: +-12 V)
-  +12 V into CLK, VREG 4.6 V, CLK high: 2.07 mA, 2 mW in each 2 k (of 250); CV_RAIL 9.93 V; Q4's VGS -9.93 V (AO3401A: +-12 V)
-  -12 V into CLK, VREG 4.6 V, CLK low: 11.30 mA, 64 mW in each 2 k (of 250); CV_RAIL 7.20 V; Q4's VGS -0.00 V (AO3401A: +-12 V)
-  -12 V into CLK, VREG 4.6 V, CLK high: 16.61 mA, 138 mW in each 2 k (of 250); CV_RAIL 4.61 V; Q4's VGS -4.61 V (AO3401A: +-12 V)
+  +12 V into CLK, VREG 4.6 V, CLK low: 1.18 mA, 1 mW in each 2 k (of 250); CV_RAIL 10.37 V; Q4's VGS 0.00 V (AO3401A: +-12 V)
+  +12 V into CLK, VREG 4.6 V, CLK high: 2.05 mA, 2 mW in each 2 k (of 250); CV_RAIL 9.95 V; Q4's VGS -9.94 V (AO3401A: +-12 V)
+  -12 V into CLK, VREG 4.6 V, CLK low: 11.30 mA, 64 mW in each 2 k (of 250); CV_RAIL 7.64 V; Q4's VGS -0.00 V (AO3401A: +-12 V)
+  -12 V into CLK, VREG 4.6 V, CLK high: 17.06 mA, 145 mW in each 2 k (of 250); CV_RAIL 5.06 V; Q4's VGS -5.06 V (AO3401A: +-12 V)
   +12 V into CLK, VREG 3.4 V, CLK low: 1.21 mA, 1 mW in each 2 k (of 250); CV_RAIL 10.32 V; Q4's VGS 0.00 V (AO3401A: +-12 V)
-  +12 V into CLK, VREG 3.4 V, CLK high: 2.10 mA, 2 mW in each 2 k (of 250); CV_RAIL 9.90 V; Q4's VGS -9.89 V (AO3401A: +-12 V)
-  -12 V into CLK, VREG 3.4 V, CLK low: 11.30 mA, 64 mW in each 2 k (of 250); CV_RAIL 6.01 V; Q4's VGS -0.00 V (AO3401A: +-12 V)
-  -12 V into CLK, VREG 3.4 V, CLK high: 15.59 mA, 121 mW in each 2 k (of 250); CV_RAIL 3.59 V; Q4's VGS -3.59 V (AO3401A: +-12 V)
+  +12 V into CLK, VREG 3.4 V, CLK high: 2.10 mA, 2 mW in each 2 k (of 250); CV_RAIL 9.90 V; Q4's VGS -9.90 V (AO3401A: +-12 V)
+  -12 V into CLK, VREG 3.4 V, CLK low: 11.30 mA, 64 mW in each 2 k (of 250); CV_RAIL 6.44 V; Q4's VGS -0.00 V (AO3401A: +-12 V)
+  -12 V into CLK, VREG 3.4 V, CLK high: 16.02 mA, 128 mW in each 2 k (of 250); CV_RAIL 4.02 V; Q4's VGS -4.02 V (AO3401A: +-12 V)
   +12 V into BOTH outputs, both high, VREG 4.6 V: CV_RAIL 9.97 V, Q4's VGS -9.97 V (C85 25 V; AO3401A 30 V / 12 V; D13 40 V)
 
-PASS (>= 5.0 V into 10 k from a 3.4 V cell: 5.18 V; rise < 10 us: 0.20 us; 0 V while the pump is off: 0.03 mV at most): YES; the switch-on blip (the GPIOs floating): 92 mV at most
+PASS (>= 5.0 V into 10 k from a 3.4 V cell: 5.33 V; rise < 10 us: 0.20 us; 0 V while the pump is off: 0.03 mV at most): YES; the switch-on blip (the GPIOs floating): 144 mV at most

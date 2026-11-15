@@ -86,7 +86,7 @@ SYMBOLS["tvs2"] = ([("1", "IO1", PAS), ("2", "IO2", PAS)], [("3", "COM", PAS)], 
 SYMBOLS["ldo5"] = ([("1", "VIN", "power_in"), ("3", "CE", "input")], [("5", "VOUT", PAS), ("2", "GND", "power_in"),
                                                                      ("4", "NC", "no_connect")], "U", 7.62)
 # (HT7833's VOUT passive: it and the AMS1117 are alternatives on one +3V3, one per order; the AMS1117's VOUT drives the
-#  net for the ERC.) The AMS1117-3.3 (EasyEDA's symbol for C6186: 1 GND, 2 VOUT, 3 VIN, 4 the tab = VOUT)
+#  net for the ERC.) The SOT-223 LDO (the AMS1117's pinout, review pass 1 the LDL1117: 1 GND, 2 VOUT, 3 VIN, 4 the tab = VOUT)
 SYMBOLS["ldo223"] = ([("3", "VIN", "power_in")], [("2", "VOUT", "power_out"), ("4", "TAB", PAS), ("1", "GND", "power_in")],
                      "U", 7.62)
 SYMBOLS["nfet"] = ([("1", "G", "input")], [("3", "D", PAS), ("2", "S", PAS)], "Q", 5.08)   # (stage 2: CLOCK / RESET)
@@ -101,6 +101,14 @@ SYMBOLS["ph2"] = ([("1", "1", PAS)], [("2", "2", PAS)], "J", 5.08)
 SYMBOLS["tvsbi"] = ([("1", "~", PAS)], [("2", "~", PAS)], "D", 2.54)
 SYMBOLS["hdr4"] = ([("1", "P1", PAS), ("2", "P2", PAS)], [("3", "SCL", PAS), ("4", "SDA", PAS)], "J", 5.08)
 SYMBOLS["sj3"] = ([("1", "A", PAS), ("3", "B", PAS)], [("2", "C", PAS)], "JP", 5.08)
+# review pass 1: the MIDI lines' ESD (the SRV05-4's own pin names: four separate lines), the charge pump's buffer
+SYMBOLS["esd4"] = ([("1", "IO1", PAS), ("3", "IO2", PAS), ("4", "IO3", PAS), ("6", "IO4", PAS)],
+                   [("5", "REF", PAS), ("2", "GND", PAS)], "U", 7.62)
+SYMBOLS["idiode"] = ([("1", "VIN", PAS), ("3", "~{CE}", "input")], [("6", "VOUT", PAS), ("5", "~{ST}", PAS),
+                                                                   ("2", "GND", "power_in"), ("4", "NC", PAS)], "U", 7.62)
+# (the LM66100's VIN / VOUT passive: the cell's and VSYS's power flags drive them; ST tied to GND)
+SYMBOLS["buf"] = ([("2", "A", "input"), ("1", "~{OE}", "input")], [("4", "Y", "output"), ("5", "VCC", "power_in"),
+                                                                   ("3", "GND", "power_in")], "U", 7.62)
 
 
 def symbol(kind):

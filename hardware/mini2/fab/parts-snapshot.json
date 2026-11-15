@@ -9,7 +9,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 31459132,
+   "stock": 31457620,
    "loss": 10,
    "prices": [
     [
@@ -45,7 +45,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 3346527,
+   "stock": 3346087,
    "loss": 14,
    "prices": [
     [
@@ -81,7 +81,7 @@
    "package": "Plugin,P=2mm",
    "type": "Extended",
    "preferred": false,
-   "stock": 289689,
+   "stock": 289632,
    "loss": 1,
    "prices": [
     [
@@ -117,7 +117,7 @@
    "package": "SOT-23",
    "type": "Basic",
    "preferred": false,
-   "stock": 1526811,
+   "stock": 1529592,
    "loss": 4,
    "prices": [
     [
@@ -153,7 +153,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 6083209,
+   "stock": 6082752,
    "loss": 15,
    "prices": [
     [
@@ -189,7 +189,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 38191428,
+   "stock": 38178698,
    "loss": 15,
    "prices": [
     [
@@ -225,7 +225,7 @@
    "package": "0402",
    "type": "Extended",
    "preferred": true,
-   "stock": 548719,
+   "stock": 548739,
    "loss": 10,
    "prices": [
     [
@@ -254,6 +254,42 @@
     ]
    ]
   },
+  "C1538": {
+   "code": "C1538",
+   "mpn": "0402B472K500NT",
+   "brand": "FH (Guangdong Fenghua Advanced Tech)",
+   "package": "0402",
+   "type": "Basic",
+   "preferred": false,
+   "stock": 920274,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0038
+    ],
+    [
+     1000,
+     0.0029
+    ],
+    [
+     3000,
+     0.0024
+    ],
+    [
+     10000,
+     0.0019
+    ],
+    [
+     50000,
+     0.0016
+    ],
+    [
+     50200,
+     0.0016
+    ]
+   ]
+  },
   "C1550": {
    "code": "C1550",
    "mpn": "0402CG1R0C500NT",
@@ -261,7 +297,7 @@
    "package": "0402",
    "type": "Extended",
    "preferred": true,
-   "stock": 690960,
+   "stock": 689480,
    "loss": 10,
    "prices": [
     [
@@ -297,7 +333,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 8885744,
+   "stock": 8880401,
    "loss": 10,
    "prices": [
     [
@@ -326,39 +362,39 @@
     ]
    ]
   },
-  "C164106": {
-   "code": "C164106",
-   "mpn": "HT7833",
-   "brand": "Holtek Semicon",
-   "package": "SOT-23-5",
-   "type": "Extended",
+  "C16133": {
+   "code": "C16133",
+   "mpn": "TAJB107K006RNJ",
+   "brand": "--",
+   "package": "CASE-B-3528-21(mm)",
+   "type": "Basic",
    "preferred": false,
-   "stock": 4337,
-   "loss": 0,
+   "stock": 572934,
+   "loss": 2,
    "prices": [
     [
      1,
-     0.3383
+     0.2515
     ],
     [
-     50,
-     0.2743
+     20,
+     0.1938
     ],
     [
-     150,
-     0.2469
+     60,
+     0.1656
     ],
     [
-     500,
-     0.2126
+     200,
+     0.1404
     ],
     [
-     3000,
-     0.1743
+     1000,
+     0.1334
     ],
     [
-     6000,
-     0.1651
+     2000,
+     0.1293
     ]
    ]
   },
@@ -369,7 +405,7 @@
    "package": "Plugin",
    "type": "Extended",
    "preferred": false,
-   "stock": 12290,
+   "stock": 12264,
    "loss": 0,
    "prices": [
     [
@@ -405,7 +441,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 674841,
+   "stock": 659734,
    "loss": 18,
    "prices": [
     [
@@ -477,7 +513,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 15625517,
+   "stock": 15637465,
    "loss": 10,
    "prices": [
     [
@@ -513,7 +549,7 @@
    "package": "0805",
    "type": "Extended",
    "preferred": true,
-   "stock": 253926,
+   "stock": 253986,
    "loss": 10,
    "prices": [
     [
@@ -549,7 +585,7 @@
    "package": "1206",
    "type": "Basic",
    "preferred": false,
-   "stock": 2017238,
+   "stock": 2017049,
    "loss": 10,
    "prices": [
     [
@@ -585,7 +621,7 @@
    "package": "1206",
    "type": "Basic",
    "preferred": false,
-   "stock": 1648882,
+   "stock": 1648814,
    "loss": 10,
    "prices": [
     [
@@ -657,7 +693,7 @@
    "package": "DO-214AC(SMA)",
    "type": "Extended",
    "preferred": true,
-   "stock": 612631,
+   "stock": 612633,
    "loss": 2,
    "prices": [
     [
@@ -693,7 +729,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 11617695,
+   "stock": 11634012,
    "loss": 10,
    "prices": [
     [
@@ -729,7 +765,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 17202663,
+   "stock": 17202006,
    "loss": 10,
    "prices": [
     [
@@ -765,7 +801,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 5810346,
+   "stock": 5812097,
    "loss": 10,
    "prices": [
     [
@@ -801,7 +837,7 @@
    "package": "0805",
    "type": "Basic",
    "preferred": false,
-   "stock": 1721504,
+   "stock": 1720442,
    "loss": 10,
    "prices": [
     [
@@ -837,7 +873,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 19235959,
+   "stock": 19234598,
    "loss": 10,
    "prices": [
     [
@@ -866,6 +902,42 @@
     ]
    ]
   },
+  "C23654": {
+   "code": "C23654",
+   "mpn": "SN74LVC1G125DBVR",
+   "brand": "Texas Instruments",
+   "package": "SOT-23-5",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 219106,
+   "loss": 4,
+   "prices": [
+    [
+     1,
+     0.0676
+    ],
+    [
+     100,
+     0.0539
+    ],
+    [
+     300,
+     0.0468
+    ],
+    [
+     3000,
+     0.0411
+    ],
+    [
+     6000,
+     0.0392
+    ],
+    [
+     9000,
+     0.0377
+    ]
+   ]
+  },
   "C2500": {
    "code": "C2500",
    "mpn": "BAV99,215",
@@ -873,7 +945,7 @@
    "package": "SOT-23",
    "type": "Basic",
    "preferred": false,
-   "stock": 1385119,
+   "stock": 1384982,
    "loss": 5,
    "prices": [
     [
@@ -909,7 +981,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 10855068,
+   "stock": 10854884,
    "loss": 15,
    "prices": [
     [
@@ -945,7 +1017,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 3400738,
+   "stock": 3401255,
    "loss": 15,
    "prices": [
     [
@@ -974,6 +1046,42 @@
     ]
    ]
   },
+  "C25086": {
+   "code": "C25086",
+   "mpn": "0402WGF100KTCE",
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "package": "0402",
+   "type": "Extended",
+   "preferred": true,
+   "stock": 337282,
+   "loss": 10,
+   "prices": [
+    [
+     1,
+     0.0017
+    ],
+    [
+     1000,
+     0.0013
+    ],
+    [
+     3000,
+     0.0011
+    ],
+    [
+     10000,
+     0.001
+    ],
+    [
+     50000,
+     0.0009
+    ],
+    [
+     50200,
+     0.0009
+    ]
+   ]
+  },
   "C25092": {
    "code": "C25092",
    "mpn": "0402WGF220JTCE",
@@ -981,7 +1089,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 4784893,
+   "stock": 4783901,
    "loss": 15,
    "prices": [
     [
@@ -1053,7 +1161,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 10405765,
+   "stock": 10419380,
    "loss": 12,
    "prices": [
     [
@@ -1089,7 +1197,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 21089761,
+   "stock": 21104158,
    "loss": 15,
    "prices": [
     [
@@ -1110,11 +1218,11 @@
     ],
     [
      50000,
-     0.0005
+     0.0006
     ],
     [
      50200,
-     0.0005
+     0.0006
     ]
    ]
   },
@@ -1125,7 +1233,7 @@
    "package": "0402",
    "type": "Extended",
    "preferred": true,
-   "stock": 363906,
+   "stock": 363846,
    "loss": 10,
    "prices": [
     [
@@ -1161,7 +1269,7 @@
    "package": "0402",
    "type": "Extended",
    "preferred": true,
-   "stock": 1034465,
+   "stock": 1034415,
    "loss": 10,
    "prices": [
     [
@@ -1197,7 +1305,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 2877543,
+   "stock": 2880773,
    "loss": 10,
    "prices": [
     [
@@ -1233,7 +1341,7 @@
    "package": "0402",
    "type": "Extended",
    "preferred": true,
-   "stock": 265653,
+   "stock": 265668,
    "loss": 10,
    "prices": [
     [
@@ -1269,7 +1377,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 2332194,
+   "stock": 2344838,
    "loss": 15,
    "prices": [
     [
@@ -1305,7 +1413,7 @@
    "package": "Plugin,P=2.54mm",
    "type": "Extended",
    "preferred": false,
-   "stock": 904589,
+   "stock": 904270,
    "loss": 1,
    "prices": [
     [
@@ -1341,7 +1449,7 @@
    "package": "SMD",
    "type": "Extended",
    "preferred": false,
-   "stock": 1047323,
+   "stock": 1050090,
    "loss": 3,
    "prices": [
     [
@@ -1367,6 +1475,42 @@
     [
      20000,
      0.039
+    ]
+   ]
+  },
+  "C2869734": {
+   "code": "C2869734",
+   "mpn": "LM66100DCKR",
+   "brand": "Texas Instruments",
+   "package": "SC-70-6",
+   "type": "Extended",
+   "preferred": false,
+   "stock": 39632,
+   "loss": 0,
+   "prices": [
+    [
+     1,
+     0.1949
+    ],
+    [
+     50,
+     0.1496
+    ],
+    [
+     150,
+     0.1275
+    ],
+    [
+     500,
+     0.1079
+    ],
+    [
+     3000,
+     0.1023
+    ],
+    [
+     6000,
+     0.0992
     ]
    ]
   },
@@ -1449,7 +1593,7 @@
    "package": "SMD-4P,5.1x5.1mm",
    "type": "Basic",
    "preferred": false,
-   "stock": 861278,
+   "stock": 860695,
    "loss": 8,
    "prices": [
     [
@@ -1485,7 +1629,7 @@
    "package": "SOT-23-5",
    "type": "Extended",
    "preferred": true,
-   "stock": 69890,
+   "stock": 69883,
    "loss": 2,
    "prices": [
     [
@@ -1521,7 +1665,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 2048078,
+   "stock": 2047844,
    "loss": 10,
    "prices": [
     [
@@ -1550,39 +1694,39 @@
     ]
    ]
   },
-  "C5248080": {
-   "code": "C5248080",
-   "mpn": "HS96L03W2C03",
-   "brand": "HS",
-   "package": "-",
+  "C435835": {
+   "code": "C435835",
+   "mpn": "LDL1117S33R",
+   "brand": "STMicroelectronics",
+   "package": "SOT-223-4",
    "type": "Extended",
    "preferred": false,
-   "stock": 4928,
+   "stock": 51443,
    "loss": 0,
    "prices": [
     [
      1,
-     2.3446
+     0.4876
     ],
     [
      10,
-     1.9487
+     0.378
     ],
     [
      30,
-     1.7376
+     0.324
     ],
     [
-     70,
-     1.5462
+     100,
+     0.2766
     ],
     [
-     490,
-     1.4562
+     500,
+     0.2635
     ],
     [
-     980,
-     1.4202
+     1000,
+     0.2553
     ]
    ]
   },
@@ -1593,7 +1737,7 @@
    "package": "0402",
    "type": "Basic",
    "preferred": false,
-   "stock": 10248782,
+   "stock": 10289857,
    "loss": 12,
    "prices": [
     [
@@ -1629,7 +1773,7 @@
    "package": "SOT-23-3L",
    "type": "Basic",
    "preferred": false,
-   "stock": 497585,
+   "stock": 496581,
    "loss": 2,
    "prices": [
     [
@@ -1701,7 +1845,7 @@
    "package": "0603",
    "type": "Basic",
    "preferred": false,
-   "stock": 6260768,
+   "stock": 6258833,
    "loss": 10,
    "prices": [
     [
@@ -1727,42 +1871,6 @@
     [
      20000,
      0.0077
-    ]
-   ]
-  },
-  "C6186": {
-   "code": "C6186",
-   "mpn": "AMS1117-3.3",
-   "brand": "Advanced Monolithic Systems",
-   "package": "SOT-223",
-   "type": "Basic",
-   "preferred": false,
-   "stock": 1442547,
-   "loss": 0,
-   "prices": [
-    [
-     1,
-     0.2013
-    ],
-    [
-     50,
-     0.1558
-    ],
-    [
-     150,
-     0.1337
-    ],
-    [
-     500,
-     0.1139
-    ],
-    [
-     2500,
-     0.1084
-    ],
-    [
-     5000,
-     0.1051
     ]
    ]
   },
@@ -1881,7 +1989,7 @@
    "package": "0402",
    "type": "Extended",
    "preferred": false,
-   "stock": 340889,
+   "stock": 340909,
    "loss": 10,
    "prices": [
     [
@@ -1917,7 +2025,7 @@
    "package": "SOT-23-5",
    "type": "Extended",
    "preferred": true,
-   "stock": 66467,
+   "stock": 66477,
    "loss": 4,
    "prices": [
     [
@@ -1989,7 +2097,7 @@
    "package": "SOT-23-6",
    "type": "Extended",
    "preferred": true,
-   "stock": 20281,
+   "stock": 20261,
    "loss": 0,
    "prices": [
     [
@@ -2025,7 +2133,7 @@
    "package": "SOT-23",
    "type": "Basic",
    "preferred": false,
-   "stock": 6262324,
+   "stock": 6261920,
    "loss": 8,
    "prices": [
     [
@@ -2061,7 +2169,7 @@
    "package": "SOD-123",
    "type": "Basic",
    "preferred": false,
-   "stock": 349998,
+   "stock": 349661,
    "loss": 8,
    "prices": [
     [
@@ -2133,7 +2241,7 @@
    "package": "SMD",
    "type": "Extended",
    "preferred": false,
-   "stock": 293708,
+   "stock": 293613,
    "loss": 4,
    "prices": [
     [

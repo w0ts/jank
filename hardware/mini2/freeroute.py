@@ -26,8 +26,8 @@ KICAD_CLI = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
 MM = pcbnew.FromMM
 OX = OY = 100.0
 ROUNDS = 3
-EXTRA = 4
-MOAT_ROUNDS = 6
+EXTRA = 2                                        # (review pass 1: rounds 4 .. 7 left the same 18 open)
+MOAT_ROUNDS = 3                                  # (review pass 1: rounds past the first moat found none)
 PASSES = "100"
 # net classes (widths in um; clearance 0.2 as the rules: the chip's 0.4 mm pitch leaves exactly 0.2 between 0.2 tracks)
 # (mini 2.2: +3V3 0.25 into the chip's 0.4 mm-pitch pins; VSYS and VBUS 0.3 (the LDO's input, up to ~0.5 A); the cell's
@@ -35,7 +35,7 @@ PASSES = "100"
 PWR = {"VDD3P3": 250, "+3V3": 250, "VSYS": 500, "VREG": 500, "CV_RAIL": 300, "VBUS": 300, "VUSB": 300, "BAT_P": 400, "BAT_N": 400, "BAT_C": 400}
 DIN_NETS = ["MO_R", "MO_T", "MO2_R", "MO2_T", "MD_R", "MD_T", "MD2_R", "MD2_T"]   # (0.5 from everything: the iron's room, README "DIN"; mini 2.2: both MIDI OUTs; stage 1f: the jacks' and the DINs' own)
 IRON = 0.8                                       # (no via within a DIN pad's copper + 0.8 mm)
-IRON_PARTS = ("J5", "J6", "J2", "J3", "J7", "J8", "J9", "J10", "J11", "J13", "J14")   # (stage 2: every part the user solders from the top)
+IRON_PARTS = ("J5", "J6", "J2", "J3", "J7", "J8", "J9", "J10", "J10B", "J11", "J13", "J14")   # (stage 2: every part the user solders from the top)
 EDGE = 0.3                                       # (+ the 0.2 clearance: the rules' 0.5 from the board's edge)
 # the bottom stays one ground under the chip with its left and lower parts, and under the RF path
 CHIP_BLOCK = ["U1", "Y1", "R17", "C9", "C10"]   # (mini 2.2 stage 2: the chip and the crystal only: the long vertical routes (VBUS, I2C) need the bottom beside the chip)

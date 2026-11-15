@@ -36,7 +36,7 @@ TAGS = {   # short purposes, top (README "Twins", "Spare pads"): placed like a r
     "RT30": "IN T", "RT31": "IN R", "RT32": "GAIN", "RT33": "BIAS", "RT34": "BIAS", "RT36": "PD", "RT37": "PD",
     "RT38": "DET", "RT51": "ICHG", "RT10": "VBAT", "RT11": "VBAT", "RT60": "SCL", "RT61": "SDA", "RT39": "GND LIFT",
     "RT73": "CLK PU", "RT75": "CLK R", "RT79": "RST PU", "RT81": "RST R", "CT9": "XTAL", "CT10": "XTAL", "CT8": "VBAT C", "CT3": "VIN",
-    "C72": "VSYS", "C86": "OLED BULK", "C26": "PI", "C80": "DB", "C81": "DB", "C82": "DB", "C83": "DB", "C27": "VBUS", "C67": "GS",
+    "C72": "3V3 BULK", "C86": "3V3 BULK", "U11": "ESD", "U12": "ESD", "U15": "IDEAL D", "U13": "PUMP BUF", "C26": "PI", "C80": "DB", "C81": "DB", "C82": "DB", "C83": "DB", "C27": "VBUS", "C67": "GS",
 }
 NOTES = [("R62", "USB ONLY: BRIDGE"), ("R39", "GND LIFT"), ("R63", "FB"), ("J11", "<- ON/OFF"),
          ("J10", "OLED 1.3 1.54"), ("J10B", "OLED 2.42 LEAD")]
@@ -255,11 +255,22 @@ def refs(board, s):
             s.text(tag, around(box, reach=3.2), layer)
 
 
+POLAR = ("C72", "C86")
+
+
 def notes(board, s):
     fps = {f.GetReference(): f for f in board.GetFootprints()}
     for r, text in NOTES:
         box = local(mm_box(fps[r].GetCourtyard(pcbnew.F_CrtYd).BBox()))
         s.text(text, around(box, reach=8.0))
+    for r in POLAR:                               # (review pass 1: the tantalums' + by pad 1, outward along the part)
+        f = fps[r]
+        p1, p2 = [next(q for q in f.Pads() if q.GetNumber() == n) for n in ("1", "2")]
+        x1, y1 = TO(p1.GetPosition().x) - OX, TO(p1.GetPosition().y) - OY
+        x2, y2 = TO(p2.GetPosition().x) - OX, TO(p2.GetPosition().y) - OY
+        L = math.hypot(x1 - x2, y1 - y2) or 1.0
+        ux, uy = (x1 - x2) / L, (y1 - y2) / L
+        s.text("+", [(x1 + ux * d - uy * k, y1 + uy * d + ux * k, 0) for d in (1.4, 1.7, 2.0) for k in (0, 1.0, -1.0)], h=1.0)
     j12 = fps["J12"]
     for p in j12.Pads():
         x, y = TO(p.GetPosition().x) - OX, TO(p.GetPosition().y) - OY

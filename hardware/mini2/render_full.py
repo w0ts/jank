@@ -81,7 +81,7 @@ def main():
     try:
         for args, out in ((["--perspective", "--rotate", "-40,0,-25", "--zoom", "0.8"], "render-3d-full.png"),
                           (["--side", "bottom", "--perspective", "--rotate", "40,0,25", "--zoom", "0.8"], "render-bottom-full.png")):
-            subprocess.run(["nice", "-n", "19", KC, "pcb", "render", "--width", "1600", "--height", "1200", "--quality", "high",
+            subprocess.run(["nice", "-n", "19", KC, "pcb", "render", "--width", "1600", "--height", "1200", "--quality", os.environ.get("RQ", "basic"),
                             *args, "-o", os.path.join(HERE, out), tmp], check=True, capture_output=True)
             print("wrote", out)
     finally:

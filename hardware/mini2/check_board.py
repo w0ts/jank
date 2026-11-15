@@ -121,7 +121,7 @@ def pivot(board, fps, boxes, problems):
 def vias(board, fps, problems):
     smd = [(r, p) for r, f in fps.items() for p in f.Pads() if p.GetAttribute() == pcbnew.PAD_ATTRIB_SMD]
     tht = [(r, p) for r, f in fps.items() for p in f.Pads() if p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH
-           and r in ("J2", "J3", "J5", "J6", "J7", "J11", "J13", "J14")]
+           and r in ("J2", "J3", "J5", "J6", "J7", "J10B", "J11", "J13", "J14")]
     n = 0
     for v in board.GetTracks():
         if v.GetClass() != "PCB_VIA":
@@ -336,6 +336,18 @@ def separation(board):
             print(f"{name} vs LINE IN's front end (LIN_*, LINE_IN, AVDD): nearest copper {max(best[0], 0):.2f} mm (to {best[1]}, any layer)")
 
 
+def lin_runs(board, problems):
+    """review pass 1, LOW 1: other nets' tracks within lin_keep.KEEP (1 mm, edge to edge, the same layer) of LIN_SUM /
+    LIN_OUT, in all per net: over lin_keep.RUN (2 mm) is a problem; the drawn USB pair (fixed) is reported, not fixed"""
+    import lin_keep
+    runs = lin_keep.close_runs(board)
+    print("within 1 mm of LIN_SUM / LIN_OUT (mm of track, per net): "
+          + (", ".join(f"{n} {r:.1f}" for n, (r, _t) in sorted(runs.items(), key=lambda x: -x[1][0])) or "none"))
+    for n, (r, _t) in runs.items():
+        if r > lin_keep.RUN and n not in lin_keep.FIXED:
+            problems.append(f"{n} runs {r:.1f} mm within 1 mm of LIN_SUM / LIN_OUT (2 mm allowed)")
+
+
 def main():
     board = pcbnew.LoadBoard(sys.argv[1])
     fps = {f.GetReference(): f for f in board.GetFootprints()}
@@ -350,6 +362,7 @@ def main():
     rf(board, fps, problems)
     cv_vs_linein(board, problems)
     separation(board)
+    lin_runs(board, problems)
     for p in problems:
         print(p)
     print(f"check_board: {len(fps)} parts, {nv} vias, {ni} GND pour pieces, {len(P.TWINS)} twins: {len(problems)} problems")

@@ -19,6 +19,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import route
 from parts import TWINS
+import lin_keep
 
 KC = "/opt/homebrew/bin/kicad-cli"
 OX = OY = 100.0
@@ -44,7 +45,11 @@ def open_pairs(path):
     return out
 
 
-def build(board):
+def build(board, inflate=None):
+    """the grid with every pad, track and via; the copper of the nets inflate(net) names kept lin_keep.KEEP from the
+    nets routed on it (LINE IN's summing node and output vs the digital nets: review pass 1)"""
+    inflate = inflate or (lambda n: False)
+    extra = lin_keep.KEEP - route.CLEAR
     bb = board.GetBoardEdgesBoundingBox()
     R = route.Router(TO(bb.GetWidth()), TO(bb.GetHeight()))
     for f in board.GetFootprints():
@@ -54,7 +59,7 @@ def build(board):
             layers = [L for L, cu in ((0, pcbnew.F_Cu), (1, pcbnew.B_Cu)) if p.IsOnLayer(cu)]
             n = p.GetNetname() or None
             if layers:
-                R.rect(layers, n, r)
+                R.rect(layers, n, r, extra if inflate(n) else 0.0)
             if p.GetAttribute() in (pcbnew.PAD_ATTRIB_PTH, pcbnew.PAD_ATTRIB_NPTH):
                 cx, cy = xy(p.GetPosition())
                 rr = max(TO(p.GetSize().x), TO(p.GetSize().y)) / 2 + IRON
@@ -66,6 +71,11 @@ def build(board):
             R.block((0, 1), (r[0] - g, r[1] - g, r[2] + g, r[3] + g), classes=("via",))
             if p.GetNetname() in RF:                 # (the RF parts' bottom stays ground)
                 R.block((1,), (r[0] - 1.0, r[1] - 1.0, r[2] + 1.0, r[3] + 1.0))
+    for f in board.GetFootprints():              # (the bottom under the chip and the crystal stays ground: freeroute.py's
+        if f.GetReference() in ("U1", "Y1"):     #  CHIP_BLOCK; no join track there)
+            b = f.GetBoundingBox(False)
+            R.block((1,), (TO(b.GetLeft()) - OX, TO(b.GetTop()) - OY, TO(b.GetRight()) - OX, TO(b.GetBottom()) - OY),
+                    ("sig", "mid", "pwr"))
     for t in board.GetTracks():
         n = t.GetNetname() or None
         if t.GetClass() == "PCB_VIA":
@@ -74,8 +84,18 @@ def build(board):
             R.drill(x, y, TO(t.GetDrillValue()))
         else:
             (x0, y0), (x1, y1) = xy(t.GetStart()), xy(t.GetEnd())
-            R.seg(0 if t.GetLayer() == pcbnew.F_Cu else 1, n, (x0, y0, x1, y1), TO(t.GetWidth()))
+            R.seg(0 if t.GetLayer() == pcbnew.F_Cu else 1, n, (x0, y0, x1, y1),
+                  TO(t.GetWidth()) + (2 * extra if inflate(n) else 0.0))
     return R
+
+
+KINDS = {"plain": lambda n: False,                                   # (the router each kind of net is joined on)
+         "dig": lambda n: n in lin_keep.KEEP_NETS,                   # (a digital net: LIN_SUM / LIN_OUT kept clear)
+         "lin": lambda n: not lin_keep.quiet(n)}                     # (LIN_SUM / LIN_OUT: every digital net kept clear)
+
+
+def kind(net):
+    return "lin" if net in lin_keep.KEEP_NETS else ("plain" if lin_keep.quiet(net) else "dig")
 
 
 def cells_at(R, board, net, x, y):
@@ -185,34 +205,45 @@ def main():
     path = sys.argv[1]
     board = pcbnew.LoadBoard(path)
     pairs = open_pairs(path)
+    first = os.environ.get("REPAIR_FIRST", "").split(",")      # (nets to join before the others: a crowded corner's)
+    pairs.sort(key=lambda q: q[0] not in first)
     print(f"repair: {len(pairs)} open pairs: {', '.join(n for n, _ in pairs)}")
-    R = build(board)
+    routers = {k: build(board, f) for k, f in KINDS.items()} if pairs else {}
     for net, (a, b) in pairs:
         width, cls = WIDTH.get(net, (0.2, "sig"))
+        R = routers[kind(net)]
         starts, goals = cells_at(R, board, net, *a), cells_at(R, board, net, *b)
         if not starts or not goals:
             print(f"  {net}: its two pieces not found at {a} / {b}")
             continue
         xs = [c[1] for c in starts + goals]
         ys = [c[2] for c in starts + goals]
-        res = None
-        for mg in (4.0, 10.0, 25.0):
-            m = int(mg / route.GRID)
-            win = (max(0, min(xs) - m), max(0, min(ys) - m), min(R.nx - 1, max(xs) + m), min(R.ny - 1, max(ys) + m))
-            res = R.path(net, cls, starts, goals, win)
+        res, note = None, ""
+        for k in (kind(net), "plain"):           # (the keep-out first; without it only if there is no way round)
+            R = routers[k]
+            for mg in (4.0, 10.0, 25.0):
+                m = int(mg / route.GRID)
+                win = (max(0, min(xs) - m), max(0, min(ys) - m), min(R.nx - 1, max(xs) + m), min(R.ny - 1, max(ys) + m))
+                res = R.path(net, cls, starts, goals, win)
+                if res:
+                    break
             if res:
+                note = "" if k == kind(net) else " (no way round LINE IN's keep-out: joined without it)"
                 break
         if not res:
             print(f"  {net}: no path")
             continue
         segs, vias = R.to_items(res)
         add(board, net, segs, vias, width)
-        for L, x0, y0, x1, y1 in segs:
-            R.seg(L, net, (x0, y0, x1, y1), width)
-        for x, y in vias:
-            R.circle((0, 1), net, x, y, route.VIA_D / 2 + route.VIA_EXTRA)
-            R.drill(x, y, route.VIA_DRILL)
-        print(f"  {net}: joined, {sum(math.hypot(s[3] - s[1], s[4] - s[2]) for s in segs):.1f} mm, {len(vias)} vias")
+        ex = lin_keep.KEEP - route.CLEAR
+        for k, Rk in routers.items():
+            w = width + (2 * ex if KINDS[k](net) else 0.0)
+            for L, x0, y0, x1, y1 in segs:
+                Rk.seg(L, net, (x0, y0, x1, y1), w)
+            for x, y in vias:
+                Rk.circle((0, 1), net, x, y, route.VIA_D / 2 + route.VIA_EXTRA + (ex if KINDS[k](net) else 0.0))
+                Rk.drill(x, y, route.VIA_DRILL)
+        print(f"  {net}: joined, {sum(math.hypot(s[3] - s[1], s[4] - s[2]) for s in segs):.1f} mm, {len(vias)} vias{note}")
     print(f"repair: {twin_courtyards(board)} twins' courtyards cut back to their pads")
     n1, n2, kept = tidy(board)
     text = open(os.path.join(HERE, "fab", "repair.rpt")).read()
@@ -225,6 +256,15 @@ def main():
                       and t.HitTest(at) and t.GetLength() < MM(5.0) and free_end(board, t)]:
                 stubs += try_remove(board, t)
     print(f"repair: {stubs} dangling stubs removed")
+    dv = 0
+    for block in text.split("[via_dangling]")[1:]:          # (a via a removed track left hanging)
+        m = re.search(r"@\(([-\d.]+) mm, ([-\d.]+) mm\): Via \[([^\]]+)\]", block)
+        if m:
+            at = pcbnew.VECTOR2I(MM(float(m.group(1))), MM(float(m.group(2))))
+            for v in [t for t in board.GetTracks() if t.GetClass() == "PCB_VIA" and t.GetNetname() == m.group(3)
+                      and (t.GetPosition() - at).EuclideanNorm() < MM(0.01)]:
+                dv += try_remove(board, v)
+    print(f"repair: {dv} dangling vias removed")
     print(f"repair: {n1} GND vias off twins' pads, {n2} GND vias too close to another removed ({kept} kept: needed)")
     print(f"repair: {unconnected(board)} connections open (KiCad's count)")
     board.Save(path)

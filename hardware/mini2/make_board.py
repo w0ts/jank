@@ -79,7 +79,7 @@ BTN_C, BTN_D = (55.5 + (W - 66.0), 48.2 + BAND), 6.5     # stage 1f: the buttons
 PIVOT_R = 1.5                        # stage 2: the D-pad's pivot circle at BTN_C: no part, no via (freeroute.py, check_board.py)
 # stage 2: where no twin goes (place_twins): the chip with its lanes and match, the drawn USB pair, the RF line and the u.FL
 FORBID = [(CX - 4.6, CY - 6.0, CX + 9.0, CY + 4.6), (27.9 + DX2, 12.3, 34.6 + DX2, 14.4), (28.2 + DX2, 13.5, 29.8 + DX2, 36.8 + BAND),
-          (XA - 1.8, Y_L3 - 1.2, XA + 7.0, Y_L3 + 5.6)]
+          (XA - 2.4, Y_L3 - 1.2, XA + 3.0, Y_L3 + 8.6)]
 
 # ref: (x, y, rotation); the footprints' origins (JLC's placement origins); every part on top
 PLACE = {
@@ -127,9 +127,13 @@ PLACE = {
     # (72 x 72: the pump in a row and R73 / RT73 up in the band, off the chip's decoupling (C7, R8, L2, C16, C17), which
     #  boxed VDD3P3 and CHIP_PU in: the 72 x 72 routing's first try; these are raw: + DX2 and + BAND - 6 in place())
     "RT73": (57.0, 34.6, 0), "R73": (57.0, 36.7, 0), "RT79": (62.9, 48.5, 0), "R79": (62.9, 50.6, 0),
+    # (review pass 1: the nodes' 4.7 nF, C89 over D10, C90 under R80 (RST_N's pull-down): no switch-on blip)
+    "C89": (58.1, 36.9, 0), "C90": (46.0, 36.8, 0),
     # (the pump at the board's lower left, by GPIO35's pin and VREG, far from LINE IN; raw: + DX2, + BAND - 6)
-    "R83": (14.0, 52.3, 0), "C84": (16.2, 52.3, 0), "R84": (18.4, 52.3, 0), "D12": (15.4, 54.2, 0), "D13": (15.4, 56.6, 0),
-    "C85": (15.4, 59.0, 0),
+    # (review pass 1: U13, the pump's buffer, and its 100 nF where U10 was; R83 / C84 between it and the diodes, which
+    #  moved 0.6 mm right for C3 at the LDO)
+    "R83": (19.1, 54.3, 90), "C84": (20.4, 54.3, 90), "R84": (18.4, 52.3, 0), "D12": (16.0, 54.2, 0), "D13": (16.0, 56.6, 0),
+    "C85": (16.0, 59.0, 0), "U13": (20.4, 57.4, 0), "C87": (23.2, 57.4, 90),
     "C80": (36.5, 39.6, 0),                                   # (UP's debounce pad, on BTN_UP's way to UP)
     "J10": (HDR[0], HDR[1], 0, "T"), "JP1": (32.0, 19.8, 0), "JP2": (36.2, 19.8, 0),
     "C60": (42.4, 15.1, 90), "C61": (44.0, 15.1, 90),
@@ -152,12 +156,15 @@ PLACE = {
     # (stage 2: J3's source trio and sink in the top right, by J3's legs)
     # (the power switch is in the lid's right wall, its wires to J11 under it; R62 between them and J6's pads)
     # (72 x 72: the toggle on the left wall under the screen band, J11 by it: VSYS / VREG short to the power block)
-    "J11": (5.0, 49.5, 0), "R62": (5.0, 52.6, 0), "J10B": (5.5, 44.6, 0), "C86": (13.3, 44.6, 0),
+    "J11": (5.0, 49.5, 0), "R62": (5.0, 52.6, 0), "J10B": (5.5, 44.6, 0), "C86": (14.0, 44.6, 0),
     # (stage 2: the spare lands and the recovery pads (parts.SPARES); R63 / C27, VBUS's ferrite place, by D3 and the
     #  charger; R39 / R65 / R66 / C67, the LINE IN's ground sensing: R39 by J7's sleeve leg, the divider by C33)
     # (stage 2: J12 left of the chip in the band, not on the bottom edge: U0TXD / U0RXD no longer cross the crystal's
     #  corner, which RESET, YES and DOWN now pass round)
-    "J12": (18.0, 49.0, 0), "C72": (2.6, 48.0, 90), "C26": (39.1, 50.6, 0),
+    "J12": (18.0, 49.0, 0), "C72": (2.6, 48.0, 90),
+    # (review pass 1, M7: each MIDI output's SRV05-4 between its jack's resistors and its DIN's, over the DIN's body,
+    #  clear of the DIN pads' iron rooms)
+    "U11": (8.0, 22.0, 0), "U12": (W - 8.0, 22.0, 0),
     "C81": (60.4, 56.4, 90), "C82": (49.0, 51.9, 0), "C83": (46.0, 55.5, 0),
     "R63": (19.0, 38.8, 90), "C27": (21.4, 38.8, 90),   # (+ BAND: between J12 and the power block)
     "R39": (24.0, 5.0, 0), "RT39": (24.0, 6.65, 0),   # (72 x 72: right of J7, its twin under it)
@@ -166,13 +173,14 @@ PLACE = {
     # (stage 2: the XB5353A by the sockets, in the cell's minus lead: BAT_N stays 5 mm long)
     "U9": (39.9, 36.45, 0), "C42": (40.0, 38.9, 0),
     "U8": (14.0, 48.0, 0), "R51": (7.5, 46.5, 0), "RT51": (7.5, 48.45, 0), "C41": (14.0, 44.5, 0), "C40": (10.0, 44.5, 0),
-    "D3": (6.0, 42.0, 0), "Q1": (19.5, 44.0, 0), "R50": (19.5, 41.0, 0),
+    "D3": (6.0, 42.0, 0), "U15": (19.5, 44.0, 0),   # (review pass 1: the LM66100 in Q1's place; R50 gone)
+    "R86": (16.2, 44.5, 90),                        # (review pass 1: C41's 1 ohm, beside it)
     "D9": (13.0, 41.6, 0),                 # (stage 2: the Schottky beside Q1's body diode, BAT_P -> VSYS)
-    # the 3.3 V LDO, two footprints (stage 1d): U10 HT7833 ("battery") and U2 AMS1117-3.3 ("usb", SOT-223) left of it,
-    # where the sockets were; C3 / C5 / C6 between them serve both
-    "U10": (20.0, 51.0, 0), "U2": (10.0, 54.0, 0),
-    "C3": (20.0, 54.3, 0), "C5": (23.2, 51.0, 90), "C6": (23.2, 54.0, 90),
-    "C8": (CX + 5.1, CY - 6.3, 90),     # (at the cell level's lane; stage 2: the divider and its twins in the LINE IN block's column)
+    # the 3.3 V LDO (review pass 1: one LDL1117 on the SOT-223 for both orders, U10 gone): its input cap C3 right of
+    # pin 3 (IN), its output caps C5 / C6 left of the tab (OUT), each ~0.6 mm pad to pad
+    "U2": (10.0, 54.0, 0),
+    "C3": (15.4, 51.9, 90), "C5": (4.4, 54.0, 90), "C6": (4.4, 56.6, 90),
+    "C8": (CX + 5.4, CY - 6.3, 90),     # (at the cell level's lane; stage 2: the divider and its twins in the LINE IN block's column)
     # (stage 2: the cell's divider and its twins in the middle, between the header and the sockets)
     "R10": (41.7, 18.8, 0), "RT10": (41.7, 20.45, 0), "R11": (41.7, 22.8, 0), "RT11": (41.7, 24.45, 0),
     "R16": (44.0, 52.5, 90),                 # (stage 2: by SW1 / NO, off the LINE IN block and the moved u.FL)
@@ -194,15 +202,18 @@ PLACE = {
     "L2": (CX + 9.1, CY - 0.2, 270), "C18": (CX + 9.8, CY + 1.5, 0),                   # VDD3P3: the 2 nH, 100 nF after it
     "C16": (29.0 + S, 30.0, 90), "C14": (30.0 + S, 32.2, 90), "C15": (31.0 + S, 32.2, 90),
     "C17": (32.4 + S, 32.4, 90),                                                         # (10 uF: the checklist)
-    "Y1": (19.5 + S, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.75 + S, 37.7, 270), "C9": (20.6 + S, CY + 10.3, 0),
+    "Y1": (19.5 + S, CY + 7.9, 180), "R17": (CX + 2.0, CY + 4.85, 90), "C10": (16.45 + S, 37.7, 270), "C9": (22.55 + S, CY + 8.5, 90),
+    # (review pass 1, LOW 2: C9 the mirror of C10 through Y1's centre: each load cap the same distance from its pad)
     # RF (README "RF"): the chip's pi (C23 shunt on the line at the pin, its ground end to a via; L3 series; C24 shunt),
     # the line down to the antenna's pi (C25 shunt, R18 the series 0 ohm: DNP, C26 shunt) at the ground edge; R19 (fitted) / J4
     # (fitted) the u.FL path, the default (the user's ruling 2026-11-11); the unfitted pads right against the line (their
     # stubs as short as the pads allow)
-    "C23": (CX + 4.8, Y_LINE + 0.85, 270), "L3": (CX + 6.5, Y_L3, 0), "C24": (XA + 1.0, Y_L3 + 1.0, 0),
+    "C23": (CX + 4.8, Y_LINE + 0.85, 270), "L3": (CX + 6.5, Y_L3, 0), "C24": (XA + 0.92, Y_L3 + 1.2, 0),
     # R19 at the line's end (stage 1e: the line ends there; the chip antenna, its pi and R18 are gone), J4 right beside it
     # (stage 2, the user's: the u.FL right after the match, not at the old antenna strip's edge: a ~4 mm line)
-    "R19": (XA + 1.3, Y_L3 + 3.2, 0), "J4": (XA + 4.4, Y_L3 + 2.7, 270),
+    # (review pass 1, M3: one straight 50 ohm line down x = XA from L3's corner: C24 and C26 across its right gap (their
+    #  signal pad on the line's edge, the ground pad on the pour), R19 in it, J4's signal pad at its end)
+    "R19": (XA, Y_L3 + 2.7, 270), "C26": (XA + 0.92, Y_L3 + 4.1, 0), "J4": (XA, Y_L3 + 6.66, 180),
     # mini 2, LINE IN (README "LINE IN"): J7 on the top edge (its bushing up) between J2 and the USB-C, tip / ring pads on its
     # right; D7 by them; the summer's inputs (R30 / C30 tip, R31 / C31 ring) to U6 (turned: IN- and IN+ on top, OUT and V+
     # below), R32 // C32 on its left from IN- to OUT, the bias (R33 / R34 / C33) on its right; the LDO (U7, C34 in, C35 out)
@@ -220,10 +231,13 @@ PLACE = {
     "R38": (19.95, 35.5, 0), "RT38": (19.95, 37.15, 0),
     "C30": (24.4, 19.5, 0), "C31": (24.4, 23.5, 0), "C34": (24.4, 27.6, 0), "U7": (25.0, 31.0, 0), "C35": (25.0, 34.0, 0),
     "C37": (26.3, 17.4, 0),
-    "U6": (31.4, 24.8, 90), "C32": (31.4, 28.3, 0), "C33": (31.4, 29.7, 0),
+    # (review pass 1, LOW 1: U6 / C32 / C33 0.6 mm right: LIN_SUM's pads 1.2 mm from the drawn USB pair, was 0.65)
+    "U6": (32.0, 24.8, 90), "C32": (32.0, 28.3, 0), "C33": (32.0, 29.7, 0),
     "R32": (36.6, 22.6, 0), "RT32": (36.6, 24.25, 0), "R33": (36.6, 26.6, 0), "RT33": (36.6, 28.25, 0),
     "R34": (41.7, 26.9, 0), "RT34": (41.7, 28.55, 0),
-    "C36": (CX + 3.41, CY - 5.5, 90), "R35": (CX + 3.41, CY - 7.3, 90),   # (stage 2: R35 over C36 in LINE_IN's column)
+    # (review pass 1: LINE_IN's column straight: C36 turned, its GND pad to the right, R35 turned, its LINE_IN pad down
+    #  next to C36's: LINE_IN no longer detours over pins 15 .. 17, whose channel north UP / SCL / SDA need)
+    "C36": (CX + 3.83, CY - 5.5, 0), "R35": (CX + 3.41, CY - 6.9, 270),
 }
 WIDTH = {"VDD3P3": 0.5, "VSYS": 0.5, "+3V3": 0.4, "VBUS": 0.4, "VUSB_D": 0.4, "SW": 0.4}
 ORDER = ["UDP", "UDN", "USB_DP", "USB_DN", "XTAL_P", "XTAL_N", "XTAL_X1", "VDD_SPI", "CHIP_PU", "PWR_HOLD", "VBUS_SENSE", "VBANK_ADC", "BOOT",
@@ -278,19 +292,19 @@ SPREAD_X = {}
 
 
 # stage 2: the lower block's parts placed at fixed spots (not from CY or BTN_C): they move down the band with the chip
-LOWER = {"C26", "C27", "C3", "C40", "C41", "C5", "C6", "C72", "C81", "C82", "C83", "D3", "D9", "Q1",
-         "R16", "R50", "R51", "R63", "RT51", "U10", "U2", "U8"}
+LOWER = {"C27", "C3", "C40", "C41", "C5", "C6", "C72", "C81", "C82", "C83", "D3", "D9", "U15", "R86",
+         "R16", "R51", "R63", "RT51", "U2", "U8"}
 # (the cell's protection, U9 / C42 / R52 / Q2 / R53, stays by the sockets above the band; C80 moves by hand)
 
 
-XS_SKIP = {"J11", "R62", "J10B", "C86", "C10", "C11", "C12", "C13", "C14", "C15", "C16", "C17", "C18", "C19", "C20", "C21", "C22", "C23", "C24",
+XS_SKIP = {"U12", "C26", "J11", "R62", "J10B", "C86", "C10", "C11", "C12", "C13", "C14", "C15", "C16", "C17", "C18", "C19", "C20", "C21", "C22", "C23", "C24",
            "C28", "C36", "C7", "C8", "C9", "J1", "J4", "L2", "L3", "R17", "R19", "R24", "R25", "R3", "R35", "R4", "R8",
            "U1", "U5", "Y1", "J3", "J6", "R56", "R57", "R59", "RT57", "J10", "SW1", "SW3", "SW4", "SW5"}
 # the parts placed by hand round the chip for the 6 mm band (the pump, CLOCK / RESET, J12): with the chip down BAND - 6
 # more, and right by their x shift (the pump with the chip's DX2, the drivers with the right side's 2 x DX2)
-MID = {**{r: DX2 for r in ("R83", "C84", "D12", "D13", "C85", "R84", "R73", "RT73")},
+MID = {**{r: DX2 for r in ("R83", "C84", "D12", "D13", "C85", "R84", "R73", "RT73", "U13", "C87")},
        **{r: 2 * DX2 for r in ("Q3", "Q4", "D10", "Q5", "Q6", "D11", "R75", "R76", "R81", "R82", "R74", "R80", "R71", "R77",
-                                "RT79", "R79")}}
+                                "RT79", "R79", "C89", "C90")}}
 
 
 def place():
@@ -342,7 +356,7 @@ def place():
     for p in fps["U1"].Pads():                   # (the exposed pad: solid to the pour, its vias inside)
         if p.GetNumber() == "57":
             p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
-            windowpane(fps["U1"], p)
+            print(f"U1 exposed pad: paste {windowpane(fps['U1'], p) * 100:.0f} % of the pad")
     auto_place(fps)
     place_twins(fps)
     return fps
@@ -464,7 +478,7 @@ TWINS_DONE = set()
 # along the part's axis past the twin's pad (no via on a twin's pad) and a top track from the via to the part's pad
 BOTTOM_TWINS = {"CT8", "CT9", "CT10"}
 TWIN_VIA = 2.0
-BOTTOM_SHIFT = {"CT9": (0.0, 1.8)}
+BOTTOM_SHIFT = {}                  # (review pass 1: CT9 right under C9 again, C9 now C10's mirror)
 # the via beside the pad instead of out along the axis (mm from the part's pad): C8's would sit on the fan-out lanes'
 # vias, C10's on C19's ground pad
 BOTTOM_VIA = {"CT8": (1.3, 0.0), "CT10": (-1.3, 0.0)}   # (mm: C9's own ground via, 0.7 mm right of its pad, would sit on CT9's pad)
@@ -590,14 +604,15 @@ def place_twins(fps, only=None):
 
 
 EP_VIAS = [(dx, dy) for dx in (-1.3, 0.0, 1.3) for dy in (-1.3, 0.0, 1.3)]   # the exposed pad's 9 vias (Espressif: 9 or more)
-# the paste (2026-11-12 review: 16 % was low): via-free strips between the via columns (x +-0.35..0.95, +-1.65..1.95),
-# each cut in EP_SEGMENTS windows EP_GAP apart, 0.05 off the via rings and the pad's edge
-EP_EDGE, EP_GAP, EP_SEGMENTS = 0.05, 0.25, 4
+# the paste (2026-11-12 review: 16 % was low; review pass 1: 35 % with the strips only, ~50 % usual): a lattice, the
+# via-free rows and columns between the via rings (each ring + EP_EDGE), every strip EP_TRIM narrower on its inner sides
+EP_EDGE, EP_TRIM = 0.05, 0.1
 
 
 def windowpane(f, ep):
-    """the exposed pad's paste as four windows between its vias (a whole-pad paste would float the QFN and fill the
-    vias): the pad itself loses its paste layer; four paste-only apertures are added to the footprint"""
+    """the exposed pad's paste as a lattice round its vias (a whole-pad paste would float the QFN and fill the vias):
+    the pad itself loses its paste layer; paste-only strips, across and down, are added to the footprint (where they
+    cross the stencil opens once). Returns the paste's share of the pad"""
     ls = ep.GetLayerSet()
     ls.RemoveLayer(pcbnew.F_Paste)
     ep.SetLayerSet(ls)
@@ -606,22 +621,22 @@ def windowpane(f, ep):
     keep = route.VIA_D / 2 + EP_EDGE              # (the via rings + 0.05)
     cols = sorted({dx for dx, _ in EP_VIAS})
     edges = [-h] + [e for x in cols for e in (x - keep, x + keep)] + [h]
-    lanes = [(edges[i], edges[i + 1]) for i in range(0, len(edges), 2) if edges[i + 1] - edges[i] >= 0.25]
-    n = EP_SEGMENTS
-    seg = (2 * h - (n - 1) * EP_GAP) / n
-    for x0, x1 in lanes:                          # (via-free strips between the via columns, each cut in n windows)
-        for k in range(n):
-            y0 = -h + k * (seg + EP_GAP)
+    free = [(edges[i] + (EP_TRIM if i else 0), edges[i + 1] - (EP_TRIM if i + 2 < len(edges) else 0))
+            for i in range(0, len(edges), 2)]     # (the via-free bands, trimmed on their inner sides)
+    for b0, b1 in free:
+        for w, hh, x, y in ((2 * h, b1 - b0, 0.0, (b0 + b1) / 2), (b1 - b0, 2 * h, (b0 + b1) / 2, 0.0)):
             a = pcbnew.PAD(f)
             a.SetAttribute(pcbnew.PAD_ATTRIB_SMD)
             a.SetShape(pcbnew.PAD_SHAPE_RECT)
-            a.SetSize(pcbnew.VECTOR2I(MM(x1 - x0), MM(seg)))
+            a.SetSize(pcbnew.VECTOR2I(MM(w), MM(hh)))
             pl = pcbnew.LSET()
             pl.AddLayer(pcbnew.F_Paste)
             a.SetLayerSet(pl)
             a.SetNumber("")
-            a.SetPosition(pcbnew.VECTOR2I(c.x + MM((x0 + x1) / 2), c.y + MM(y0 + seg / 2)))
+            a.SetPosition(pcbnew.VECTOR2I(c.x + MM(x), c.y + MM(y)))
             f.Add(a)
+    hs = sum(b1 - b0 for b0, b1 in free)
+    return (2 * (2 * h) * hs - hs * hs) / pcbnew.ToMM(ep.GetSize().x) / pcbnew.ToMM(ep.GetSize().y)
 
 
 def bb(item):
@@ -686,7 +701,7 @@ COPPER = []       # (rect) unconnected copper: the antenna's end pad extension
 
 
 def rf_path(fps):
-    """the line from L3 to R18 (net RF), its stubs to C24 / C25 / R19, LNA_IN's stub to C23, the antenna feed"""
+    """LNA_IN from the pin through C23's pad to L3; the 50 ohm line (RF, then UFL past R19) straight down to J4"""
     del RF_SEGS[:], RF_VIAS[:], COPPER[:], FAN_VIAS[:], FIXED_VIAS[:]
     lx, ly = pad_center(pad_of(fps, "U1", "1"))
     c23 = pad_center(pad_of(fps, "C23", "1"))
@@ -703,18 +718,23 @@ def rf_path(fps):
     y_turn = Y_L3
     RF_SEGS.append(("RF", 0, l3b[0], y_turn, l3b[0] + RF_W / 2, y_turn, 0.5))   # (out of L3's pad, narrow)
     RF_SEGS.append(("RF", 0, l3b[0] + RF_W / 2, y_turn, XA, y_turn, RF_W))
-    RF_SEGS.append(("RF", 0, XA, y_turn, XA, r19[1], RF_W))                       # (down to R19's row, its round end there)
-    for ref in ("C24", "R19"):
-        c = pad_center(pad_of(fps, ref, "1"))
-        RF_SEGS.append(("RF", 0, XA, c[1], c[0], c[1], 0.5))
+    NECK = 0.85                                  # (the last 0.85 mm into R19's pads 0.5 wide: a 1.2 mm end cap would reach
+    RF_SEGS.append(("RF", 0, XA, y_turn, XA, r19[1] - NECK, RF_W))                #  the other pad, 0.86 mm on)
+    RF_SEGS.append(("RF", 0, XA, r19[1] - NECK, XA, r19[1], 0.5))
+    # (review pass 1: C24's signal pad sits on the line's edge, no stub; R19 in the line; the UFL line on at RF_W to
+    #  J4's signal pad with C26's pad on its edge)
     r19b = pad_center(pad_of(fps, "R19", "2"))
     j4 = pad_center(pad_of(fps, "J4", "1"))
-    RF_SEGS.append(("UFL", 0, r19b[0], r19b[1], j4[0], j4[1], 0.5))         # (R19 straight to J4's signal pad)
+    RF_SEGS.append(("UFL", 0, XA, r19b[1], XA, r19b[1] + NECK, 0.5))
+    RF_SEGS.append(("UFL", 0, XA, r19b[1] + NECK, XA, j4[1], RF_W))
+    for ref in ("C24", "C26"):                   # (each shunt's signal pad joined to the line's edge)
+        c = pad_center(pad_of(fps, ref, "1"))
+        RF_SEGS.append(("RF" if ref == "C24" else "UFL", 0, XA, c[1], c[0], c[1], 0.5))
     # the fences: GND vias both sides of the line, their rings 0.35 mm from its edge (0.15 inside the pour), down to
-    # 1 mm past the line's end (the board's edge is the ground's edge now)
+    # J4's signal pad (its ground pads take over there)
     off = RF_W / 2 + RF_GAP + route.VIA_D / 2 + 0.15
-    fence_end = min(GE - 0.6, r19[1] + 1.0)
-    rf_pads = [p for ref in ("C24", "R19", "J4") for p in fps[ref].Pads()]
+    fence_end = min(GE - 0.6, j4[1] - 0.3)
+    rf_pads = [p for ref in ("C24", "R19", "C26", "J4") for p in fps[ref].Pads()]
 
     def clear_of_pads(x, y):                     # (a fence via 0.2 mm or more from the RF parts' pads)
         c = pcbnew.SHAPE_CIRCLE(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)), MM(route.VIA_D / 2))
@@ -759,10 +779,11 @@ def rf_path(fps):
     c28g = pad_center(pad_of(fps, "C28", "2"))
     RF_SEGS.append(("GND", 0, c28g[0], c28g[1], CX + 6.75, CY + 1.95, 0.25))
     FIXED_VIAS.append(("GND", CX + 6.75, CY + 1.95))
-    # the crystal's load cap C9: its ground pad gets its own via 0.7 mm right of it (the routes boxed it in)
-    c9g = pad_center(pad_of(fps, "C9", "2"))
-    RF_SEGS.append(("GND", 0, c9g[0], c9g[1], c9g[0] + 0.7, c9g[1], 0.25))
-    FIXED_VIAS.append(("GND", c9g[0] + 0.7, c9g[1]))
+    # the crystal's load cap C9: its ground pad gets its own via 0.7 mm past it (the routes boxed it in)
+    c9g, c9s = pad_center(pad_of(fps, "C9", "2")), pad_center(pad_of(fps, "C9", "1"))
+    gx, gy = c9g[0] + 1.1, c9g[1]                 # (beside it, off CT9's bigger pad under it)
+    RF_SEGS.append(("GND", 0, c9g[0], c9g[1], gx, gy, 0.25))
+    FIXED_VIAS.append(("GND", gx, gy))
     # VDD3P3 on from its via at the pins: under the fan-out lanes on the bottom (y CY+1.3, clear of C28's ground via) to a
     # via beside C18, then C18 and L2's pad on top (review 2026-11-13: the router took 22.8 mm for this 6 mm hop)
     l2b, c18 = pad_center(pad_of(fps, "L2", "2")), pad_center(pad_of(fps, "C18", "1"))
@@ -890,7 +911,7 @@ def router(fps):
                 by_net.setdefault(n, []).append((entry(p, r), pad_layers(p), p))
     for n, layer, x0, y0, x1, y1, w in RF_SEGS:
         R.seg(layer, n, (x0, y0, x1, y1), w)
-        if n == "RF":                              # (the line's gap to anything else: RF_GAP, wider than the rules)
+        if n in ("RF", "UFL"):                     # (the line's gap to anything else: RF_GAP, wider than the rules)
             R.seg(layer, None, (x0, y0, x1, y1), w + 2 * max(0.0, RF_GAP + 0.05 - route.CLEAR))
     for r in COPPER:
         R.rect((0,), None, r)

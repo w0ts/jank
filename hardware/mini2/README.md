@@ -1,9 +1,88 @@
 # jank mini 2.2: one board, two orders (USB only, or with a 1S cell), two MIDI OUTs, LINE IN with plug detect, CLOCK / RESET outs, a D-pad over 4 buttons, LEDs or a screen, u.FL (branch hw/mini2.2)
 
-**Stage 2 (2026-11-14, 72 x 72 mm): placed, routed, simulated, the fab files written; NOT ordered, NOT built, NOT measured.**
+**Stage 2 + review pass 1 (2026-11-15, 72 x 72 mm): placed, routed, simulated, the fab files written; NOT ordered, NOT built, NOT measured.**
 `mini2.kicad_pcb` is the routed board; `fab/` holds the Gerbers and both orders' BOM / CPL; `sim/` the simulations;
 `case/` the case. Each stage's section supersedes the older ones where they differ (2, 1f, 1e, 1d, then 1c); "mini 2.2
 (stage 1)" and "1b" are superseded (the encoder and the RGB LEDs are gone); everything after them is mini 2's text.
+
+## BLOCKING BEFORE ORDER: confirm the DIN-504B-M10 pin numbering and the PJ-320A tip contact
+
+Neither is confirmed by a datasheet (review pass 1, M5); a wrong guess is a dead output, not a fix with an iron.
+- **DIN-504B-M10 (J5 / J6, C2939346):** with one socket and a meter, find which solder pin is DIN contact 4 and which
+  is DIN contact 5 (the numbers moulded on the socket's face, the arc 1-4-2-5-3), and compare with the footprint:
+  **pad 2 must be DIN 5 (the sink, MD_T / MD2_T), pad 4 DIN 4 (the source, MD_R / MD2_R)** (parts.py's note: pad 1 =
+  DIN 3, pad 3 = DIN 2, pad 5 = DIN 1, pads 6 / 7 the shell). Mirrored, both DIN outputs are dead.
+- **PJ-320A (J13 CLOCK, J14 RESET, C18185602):** with a plug in, which solder pin touches the plug's tip: it must be
+  **pad D** (CLK_OUT / RST_OUT); pad A the sleeve (GND). Otherwise the output lands on the ring or the switch pin.
+- No jumper pads were added for either (the user's decision): a wrong answer means changing the footprint first.
+
+## Before ordering (checklist)
+
+- The two BLOCKING checks above.
+- **JLC's placement preview** (review pass 1, LOW 9): the orientation of every IC (U1, U2, U5, U6, U7, U8, U9, U11, U12,
+  U13), FET (Q1 .. Q6), diode (D3, D7 .. D13), LED (LED1, LED2), Y1 and J1, before paying.
+- `sh case/make_stl.sh` re-run on the final board before printing (review pass 1, LOW 5: **not re-run** this round (the coordinator: the STLs come later); J4 moved under the RF line, the case reads it (`place_args.py`)).
+- **Check every cell's polarity** with a meter (pin 1, the square pad, = +) before plugging it: see "a reversed cell"
+  below.
+- The tantalums C72 / C86 (battery order): JLC's preview must show their band (+) on pad 1, the +3V3 pad.
+- The firmware (review pass 1): MIDI pins at drive strength 3; the brown-out detector on; the cell "empty" at ~3.5 V
+  under load; the charge pump started softly (its first edges 95 mA from U13); CLK / RST driven only once the pump
+  runs.
+
+## Review pass 1 (2026-11-14): the fixes on 60c2f3a (`~/GitHub/jank/worktrees/review-pass1/FINDINGS.md`)
+
+Each fix below supersedes what the stage 2 text further down says about the same thing.
+
+| Finding | Fix (what the board has now) |
+|---|---|
+| **H1** the HT7833 (SOT-23-5, 500 C/W) ~100 C over ambient on USB; **M1** the AMS1117's 1.1 V dropout (2.93 V from a 4.5 V host); **M2** no cap within 10 mm of the AMS1117 | **One regulator for both orders, U2 = ST LDL1117S33R (C435835)** on the SOT-223 footprint (the AMS1117's pinout: 1 GND, 2 OUT, 3 IN, tab OUT); U10 removed. Its datasheet (DocID030319 Rev 3): 1.2 A, **dropout 350 mV typ / 600 mV max at 1.2 A** (by the R_on reading ~90 mV typ / 150 mV max at 300 mA), **Iq 250 uA** typ, **theta-JA 120 C/W**, stable with ceramics (1 uF in, 4.7 uF out; its plan: 1 .. 22 uF, ESR 0.02 .. 10 ohm). Extended, $0.49 (1 pc), 51k in stock; no Basic or preferred low-dropout SOT-223 at JLC (searched: AP2114H 450 mV typ at 1 A, $0.24; TLV1117LV 455 mV; the AMS1117 / 1117 clones ~1.1 V). **Thermal on USB: 1.35 V x 200 mA = 0.27 W x 120 C/W = 32 C rise** (the HT7833: ~135 C at 0.27 W). C3 (in) 0.6 mm from pin 3; C5 22 uF / C6 100 nF (out) 0.6 mm from the tab; CT3 (C3's twin) dropped, no room. |
+| **M3** the RF feed not 50 ohm (0.2 .. 0.5 mm, doglegs to C26) | **One straight grounded-coplanar line** down x = 40.8 from L3's corner to J4 (moved under the line, turned 180), **1.2 mm wide, 0.2 mm gaps** (the pours' clearance, uniform), the bottom pour under it, GND vias both sides every 0.9 mm; R19 in the line; **C24 and C26 across the right gap** (signal pad on the line's edge, ground pad on the pour): no stubs, no doglegs. Impedance per segment (`rf_line.py`, Wadell, 1.6 mm FR-4, er 4.5 ASSUMED, 1 oz): the pin's neck 0.2 mm 88 ohm (~1.1 mm), C23 -> L3 0.3 mm 78 ohm (~1.4 mm), out of L3's pad 0.5 mm 67 ohm (0.6 mm), **RF and UFL 1.2 mm 50.5 ohm** (RF 2.2 mm and UFL 1.9 mm at 1.2 mm; the necks into R19 0.5 mm, 0.85 mm each side (67 ohm), C24 / C26 joins 0.5 mm), the shunts' joins 0.5 mm (0.4 mm). The chip side (pin -> C23 -> L3, ~3 mm, 1/25 wavelength) is set by the 0402 match and the 0.4 mm pitch: lumped with the match. A tune on the real board is still planned (the match's values are the XIAO's). |
+| **M4** USB pulled during a Wi-Fi burst: +3V3 2.58 V on a 3.4 V cell (the sim pass: 2.69 V for 34 ms; 2.99 V on 3.7 V) | **Q1 / R50 replaced by U15, a TI LM66100 ideal diode (C2869734, Extended, $0.19)** from BAT_P to VSYS, CE on VSYS (its "always-on reverse current blocking"): it conducts once VSYS falls 150 mV under the cell (tON 40 us) instead of waiting ~25 ms for VBUS to drain below the cell (Q1's gate); D9 kept for those 40 us; **+3V3 bulk: C72 and C86 fitted, two 100 uF 6.3 V tantalums (TAJB107K006RNJ, C16133, Basic), battery order only** (their ESR, ~0.9 ohm each ASSUMED, sits in the LDL1117's 0.02 .. 10 ohm window; their 200 uF lies past its plotted 22 uF: UNVERIFIED). `sim/power.py`, the sim pass's load (the S3 80 mA, bursts to 340 mA, MIDI 22 mA, derated caps, 1 uH cable), typical / worst (the LDO's 600 mV dropout, the LM66100's VON -250 mV and 125 mohm): **cell 3.7 V 3.16 / 3.12 V, 3.5 V 3.07 / 3.02 V, 3.4 V 3.02 / 2.96 V**. Tried and dropped: a 100 uF X5R on VSYS (no gain: VSYS sits on D9 either way; more USB inrush), R50 1 k / C40 1 uF (Q1 sooner, the dip unchanged), one tantalum (2.94 V). The cell alone at 340 mA: 3.07 V typ / 3.00 V worst at 3.4 V. **Firmware: treat ~3.5 V under load as empty** (the margin under that is the LDO's tolerance). |
+| **M6** the pump's 52 .. 78 mA edges from a GPIO | **U13, a TI SN74LVC1G125 buffer (C23654, Extended, $0.07)** on +3V3 with C87 100 nF, OE tied low, between GPIO35 and R83 (R83 stays 22 ohm). `sim/cv.py`: **5.29 V into 10 k from a 3.4 V cell** (5.05 V with the buffer's worst-case output, 25 ohm; PASS either way), rise 0.20 us; the edges 59 mA (ns) in steady state, 95 mA at the pump's start (start it softly); the 74LVC1G125's limit is +-50 mA continuous, the average is a few mA. R83 33 ohm would cut the edges to 49 mA but leaves 4.87 V with the worst driver: kept 22 ohm. |
+| **M7** no ESD on the MIDI connectors | **U11 / U12: SRV05-4 (C85364, the USB's part: no new type)**, one per output, its I/O on the jack's tip / ring and the DIN's 5 / 4, REF on +3V3, GND; between the connectors and their resistors (U11 at (8.0, 22.0), U12 at (64.0, 22.0)). Two, not one: each output has four lines. |
+| **H2** a reversed cell beside a correct one: an unprotected short | **Not protected: the user accepts the risk.** J8 / J9 sit in parallel (pins 1 both BAT_C, pins 2 both BAT_N); Q2 and the XB5353A are after them, outside the J8-J9 loop: a cell plugged the wrong way round next to a correct one is shorted by it through the sockets (only the cells' own protection, if any, limits it). **Check the cells' polarity** with a meter (pin 1 = +, the square pad) before plugging, every cell. The user will confirm the tinywhoop cells' polarity later. |
+| **M5** the DIN-504B-M10's pin numbers, the PJ-320A's tip contact | **BLOCKING BEFORE ORDER** at the top of this README (what to check). No jumper pads. |
+| **LOW 1** digital tracks beside the summing node (UDN 0.35 mm x 4.9 mm, SDA, MIDI_TX2) | `lin_keep.py` (new): no other net's track within 1.0 mm (same layer, edge to edge) of LIN_SUM / LIN_OUT for more than 2 mm in all; after Freerouting it removes such tracks and `repair.py` joins those nets again round a 1 mm keep-out (the drawn USB pair stays: LIN's own tracks near it are rerouted instead). U6 / C32 / C33 0.6 mm right (LIN_SUM's pads 1.2 mm from the USB pair). `check_board.py` reports it: after the repair, CHIP_PU 5.5 mm (joined round the chip without the keep-out: no other way; a DC net held by 10 k / 1 uF), VUSB 1.8, UDN 1.7 (the drawn pair, fixed), +3V3 1.6, SCL 0.9 mm (under 2 mm). LINE_IN's column straightened too (C36 turned, its GND pad right; R35 turned): its old dogleg over pins 15 .. 17 blocked UP / SCL. | |
+| **LOW 2** the crystal's load asymmetric | **C9 now C10's mirror through Y1's centre** (each 2.95 mm from it, the same turn), CT9 right under C9 again; C9's ground via 1.1 mm beside its pad (off CT9's bigger pad). Routed: XTAL_X1 8.0 mm + R17 / XTAL_P 1.2 mm, XTAL_N 14.5 mm, one via each: the load caps are symmetric, the chip-to-crystal tracks are not (the router's). | |
+| **LOW 3** the exposed pad's paste 35 % | **50 %**: a lattice of paste strips across and down between the nine via rings (each ring + 0.05 mm), 0.1 mm trimmed off each strip's inner sides (`make_board.windowpane`). |
+| **LOW 4** stale parts.py comments | VBAT on GPIO4 / ADC1_CH3, the MIDI sinks 68 ohm, the DINs' source 2 x 100 ohm, R50 10 k, UP / DOWN / YES on GPIO10 / 37 / 36, the LIN_DET / MIDI_TX2 comment unspliced, C17634 removed, the HT7833 / AMS1117 lines replaced. |
+| **LOW 5** the case not re-checked | **not re-run** this round (the coordinator: the STLs come later); J4 moved under the RF line, the case reads it (`place_args.py`) |
+| **LOW 9** JLC's orientations | in "Before ordering" above. |
+| **LOW 10** J10B on SMD pads | **through hole** now (the 1 x 4 2.54 mm header's footprint, J10's), in the iron-room lists; C86 (now a fitted tantalum, above) 0.7 mm right of it. |
+| **sim pass 2** phantom VBUS: the S3's D+ pull-up through the SRV05-4's steering diode into R50 (2.4 V), Q1 half on: +3V3 2.75 V | **Gone with Q1 / R50** (U15 has no gate on VBUS). `sim/power.py` with the pull-up modelled (1.5 k into VUSB): +3V3 3.02 V on a 3.4 V cell, the same as without it (60c2f3a's circuit with the LDL1117: 2.71 V). VBUS itself still floats up to ~2.7 V with no host (TP4054 under its UVLO, D3 reverse-biased): harmless. |
+| **sim pass 3** the cell's ADC reading 30 .. 131 mV low (up to 0.64 V): 500 k into the sampling cap shared with LINE_IN at 41.7 kHz | **R10 / R11 100 k / 100 k (Basic, C25741; 50 k Thevenin)**: the shift scales with the source resistance: **3 .. 13 mV low** (the cap keeping the other channel; 15 .. 64 mV if it resets each sample: Cs 2 .. 10 pF, unknown). Cost: **21 uA from the cell at 4.2 V while switched off** (was 2.1 uA: a 550 mAh cell still lasts >2 years on it). Cheaper than a buffer (a part) and robust without a firmware rule; the firmware averages it and may take a 0.5 % correction after a meter check. |
+| **sim pass 4** MIDI loop current under 5 mA (1.5 V opto, the GPIO's resistance counted) | **Not both possible, so not changed: a decision for the user** (`sim/midi.py`, now with the pins' resistance: drive 3 17.7 / 16.5 ohm from Table 5-4, drive 2 35 / 33 ohm ESTIMATED). At 3.3 V with a 1.5 V opto (jack / DIN), and the faults: see "MIDI trade-off" below. The board keeps 68 ohm; **the firmware sets drive 3** (5.03 / 4.79 mA; tip short 39 mA, 104 mW in the 125 mW sink). 5 mA on both needs 47 ohm and drive 3: a tip short then pulls 52 mA from the pin (its 40 mA typ) and 127 mW in a 125 mW 0805. |
+| **sim pass 5** CLK / RST blip at power-on (0.61 V for ~19 us on the toggle, ~0.9 V on USB plug-in, 2.0 V at a 1 us rail rise): the P-FET's drain-source capacitance into R74 / R80 10 k | **C89 / C90, 4.7 nF (C1538, Basic) from each node N to GND** (C89 over D10, C90 by R80). `sim/cv.py`, the rail rising in 1 / 13.8 / 26 / 100 us: **144 / 115 / 104 / 57 mV at most** (the same model without them: 1.01 V / 0.49 / 0.29 / 0.09 V; the sim pass's vendor model gave ~2x mine). A gate-to-rail cap was tried first: no help (the blip does not come through the gate). Cost: the output's fall 9 -> **57 us** (the node's 4.7 nF through R74 // the load); the rise stays 0.2 us. |
+| **sim pass 6** USB inrush 143 .. 185 uC (USB 2.0: 50 uC) | **Noted, not reduced** (a soft-start would cost a P-FET and an RC): the usb order is unchanged; the tantalums are battery-order only, and in that order +3V3 is already charged from the cell at the plug-in (with no cell fitted, they charge through the LDO's current limit, ~0.5 ms). C72's old VSYS bulk (100 uF X5R) would have added ~190 uC: not fitted. |
+| **sim pass 7** LINE IN headroom ends near +7 dBu (+10 dBu clips, THD 7.9 %); ground-loop rejection 25 dB at 1 kHz, 5 .. 6 dB at 10 kHz | **Noted.** A hot source: a part on RT32 (R32's twin) lowers the gain (5.6 k // 5.6 k: -6 dB, clipping near +13 dBu). The ground sensing helps at low frequencies only (C67, a DNP 2.2 nF land across R66, matches C32: 46 dB at 1 kHz in sim/linein.py). |
+| **sim pass 8** the TP4054's sheet: 1 ohm in series with a large ceramic on BAT with no cell | **R86, 1 ohm 0402 (C25086, preferred: no fee), in series with C41** (battery order). |
+| **sim pass 9** -12 V into a high CLK / RST: 29 mA on GPIO35; CHIP_PU after a 5 ms cut stays above 1.2 V | **Now on U13, not the GPIO:** 34 .. 36 mA average, 51 mA peak (`cv.py`, VREG 3.4 / 4.6 V), under the 74LVC1G125's +-50 mA continuous. **CHIP_PU:** C7 (1 uF) holds it after a short cut (no clamp to VDD documented): **the firmware must enable the brown-out detector** so short cuts reset the chip. |
+| **sim pass 10** my sims and stale texts | midi.py counts the pins' resistance (above); cv.py takes the rail's rise from 1 us (the sim pass's worst), C85 derated to 4.2 uF at 7 V, the driver's resistance; the AO3401A's fall (the sim pass's vendor model: 31 .. 39 us without C89 / C90) is not modelled here (a generic VDMOS): the fall with C89 / C90 is ~60 .. 90 us. Stale: parts.py's MIDI lines, LINE IN's impedance (~16.6 k at 1 kHz, 7.2 k at 20 kHz), C86 ("on VSYS": it is +3V3), the old LINE IN section (U7 / PESD5V0S2BT / J7) marked superseded. |
+
+**MIDI trade-off** (`sim/midi.py`; a 1.5 V opto behind 220 ohm; jack / DIN; the sources stay 33.3 / 50 ohm; the GPIO's typical figures: 40 mA IOH, 28 mA IOL; the 0805 sink 125 mW):
+
+| sink | drive | 3.3 V | + series diode | 3.0 V | tip short, pin high | tip to ring, pin low | both tips of one output |
+|---|---|---|---|---|---|---|---|
+| 68 ohm | 2 | 4.61 / 4.39 mA | 3.04 / 2.90 | 3.87 / 3.68 | 33 mA, 72 mW | 24 mA | 49 mA |
+| 68 ohm | 3 | 5.03 / 4.79 mA | 3.30 / 3.16 | 4.22 / 4.02 | 39 mA, 104 mW | 28 mA | 65 mA |
+| 56 ohm | 2 | 4.75 / 4.52 mA | 3.13 / 2.98 | 3.98 / 3.79 | 37 mA, 76 mW | 27 mA | 54 mA |
+| 56 ohm | 3 | 5.20 / 4.94 mA | 3.41 / 3.25 | 4.36 / 4.15 | 45 mA, 116 mW | 31 mA | 74 mA |
+| 47 ohm | 2 | 4.86 / 4.62 mA | 3.20 / 3.05 | 4.08 / 3.87 | 41 mA, 78 mW | 29 mA | 58 mA |
+| 47 ohm | 3 | 5.34 / 5.07 mA | 3.49 / 3.33 | 4.47 / 4.25 | 52 mA, 127 mW | 34 mA | 82 mA |
+| 39 ohm | 2 | 4.97 / 4.71 mA | 3.26 / 3.11 | 4.17 / 3.95 | 45 mA, 80 mW | 31 mA | 63 mA |
+| 39 ohm | 3 | 5.46 / 5.18 mA | 3.57 / 3.40 | 4.58 / 4.34 | 59 mA, 138 mW | 37 mA | 92 mA |
+
+The board keeps 68 ohm with drive 3 (the bold row's choice is the user's: 5 mA on both connectors costs the shorts' margins).
+
+**Not changed** (LOW 6, 7, 8): the toggle's off state back-feeding +3V3 through R10 (~1 .. 1.5 V at uA), a weak USB host
+with a cell (the cell feeds the load, the charger never terminates), the SMAJ5.0CA's capacitance on LINE IN (only with
+~10 k sources): as the review describes them, unverified on hardware.
+
+**Routing** (make_fab.sh ROUTE=1: the placement, Freerouting, `lin_keep.py`, `repair.py`, `fatten.py`): the placement as above, Freerouting (3 + 2 rounds and 3 moat rounds, ~1.7 h with the load pauses: 2 connections open), `lin_keep.py` (ripped CHIP_PU 2.9 mm, MIDI_TX2 3.0 mm, SDA 31.3 mm near LIN_SUM / LIN_OUT), `repair.py` (SCL, BTN_UP, SDA first: 8 pairs joined, CHIP_PU without the keep-out; 0 open), `fatten.py` (VBUS 16.1 mm at 0.5 + 14.0 at 0.4, VUSB 33.6 at 0.5 + 29.2 at 0.4, +3V3 162 at 0.5 + 41 at 0.4 + 127 at 0.3: narrowest VBUS / VUSB 0.4 mm, +3V3 0.3 mm). `repair.py` now keeps the bottom under U1 and Y1 free and drops vias left dangling.
+
+**Checks:** ERC 0; **DRC 0 errors, 0 unconnected** (34 lib_footprint_mismatch, 7 track_dangling: warnings); `check_nets.py` 511 pins, 469 intended, 0 problems; `check_board.py` 181 parts, 262 vias, 2 problems: **a GND via on CT10's pad 2** (the DNP twin under C10: a hand-soldered cap there would wick; kept, it grounds C10) and **CHIP_PU 5.5 mm within 1 mm of LIN_SUM / LIN_OUT** (above). Separations: CLK / RST to LINE IN's ADC path 1.29 mm (same layer, no run within 1 mm); **CLK_OUT passes on the bottom under RT34's LIN_GS pad and a LIN_GS track** (a crossing on the other layer, not a parallel run); the pump 5.68 mm; RF / u.FL 5.00 mm. Both orders' BOM / CPL: every part within 0.01 mm of JLC's footprint.
+
+**Costs** (`fab/cost.md`): `cost.py` ESTIMATES (the parts snapshot of 2026-11-14 and JLC's published fees; real orders have come in ~50 % higher): **usb 5 boards $77.44 ($15.49 each), 10 boards $108.61 ($10.86); battery 5 boards $90.32 ($18.06), 10 boards $125.95 ($12.59)**; Extended types 8 (usb) / 10 (battery). A JLC quote from `fab/` replaces these.
 
 ## mini 2.2, stage 2 (2026-11-14): placed, routed, simulated, fab files; NOT ordered, NOT built, NOT measured
 
@@ -258,7 +337,7 @@ As stage 1f, and: J12 (TX RX 3V3 GND EN BOOT) for a USB-UART adapter at 3.3 V if
 | **4 (9)** | VBAT_ADC (was GPIO1) | ADC1_CH3: the cell / 2 (R10 / R11), C8 100 nF at the pin |
 | 10 (15) | BTN_UP | internal pull-up |
 | **33 (38), 34 (39)** | LED_R, LED_G (were GPIO38 / 39) | the LEDs, active high, through 1 k |
-| **35 (40)** | **PUMP_IO** (stage 2) | the charge pump: LEDC 416,667 Hz (10 x the ADC's rate per channel: below), 50 % |
+| **35 (40)** | **PUMP_IO** (stage 2) | the charge pump through U13 (74LVC1G125, review pass 1): LEDC 416,667 Hz (10 x the ADC's rate per channel: below), 50 % |
 | **36 (41), 37 (42)** | BTN_YES, BTN_DOWN (were GPIO2 / 4) | internal pull-ups |
 | 9 (14) | LINE_IN | ADC1_CH8 |
 | 11 (16), 12 (17) | SCL, SDA | R60 / R61 10 k |
@@ -282,17 +361,17 @@ exactly 96**: check `ledc_get_freq` == 416,666; a rounded 96 - 1/256 folds to ~1
 41,667 Hz would fold to 16.7 kHz; against 44.1 kHz to 3.1 kHz.) Keep APB fixed (no DFS, no light sleep while
 sampling). The 41.7 kHz stream is resampled to 44.1 kHz for the tracker in firmware.
 
-**Firmware notes:** the MIDI pins at drive strength 2 (20 mA nominal; GPIO17's default is 10 mA). **The pump: GPIO35,
-LEDC at 416,667 Hz (divider 96: above), 50 %, drive strength 3, started softly; the
-outputs stay 0 V until the pump runs** (start the pump,
-wait ~10 ms, then drive CLK / RST). CLK / RST: high = the output high (non-inverting; the pull-downs hold them low at
-boot). LIN_DET low = no plug; audio vs silence by RMS. MIDI OUT 1 / 2 on two UARTs (UART1 GPIO21, UART2 GPIO17), each
-with its own offset (TIMING.md). The cell's level (GPIO4, ADC1_CH3) shares the ADC pattern with LINE IN: its divider is
-R10 / R11 1 M / 1 M (500 k Thevenin) with **C8 100 nF at the pin** (no twin: no room in the chip's fan-out lanes): the SAR's sampling cap (~10 pF,
-assumed) takes ~0.2 mV from C8 per conversion after a LINE IN sample, not the ~0.1 V an unbuffered 500 k would lose; C8
-recharges through 500 k in 50 ms (the cell's level is averaged). LINE IN's pin is driven by U6's output (a rail-to-rail
-op-amp, low impedance) through R35 120 ohm with C36 100 nF at the pin: it settles within a sample after the channel
-switch.
+**Firmware notes** (review pass 1's values): the MIDI pins at **drive strength 3** (GPIO17's default is 10 mA; the
+loop currents and the shorts: "MIDI trade-off" above). **The pump: GPIO35, LEDC at 416,667 Hz (divider 96: above), 50
+%, into U13 (the 74LVC1G125 buffer), started softly; the outputs stay 0 V until the pump runs** (start the pump, wait
+~10 ms, then drive CLK / RST). CLK / RST: high = the output high (non-inverting; the pull-downs hold them low at
+boot); their falling edge takes ~60 us (C89 / C90). LIN_DET low = no plug; audio vs silence by RMS. MIDI OUT 1 / 2 on
+two UARTs (UART1 GPIO21, UART2 GPIO17), each with its own offset (TIMING.md). The cell's level (GPIO4, ADC1_CH3) shares
+the ADC pattern with LINE IN: its divider is **R10 / R11 100 k / 100 k (50 k Thevenin)** with C8 100 nF at the pin;
+the sampling cap shared with LINE_IN pulls it 3 .. 13 mV low (15 .. 64 mV if the cap resets each sample: the sim pass's
+formula at 50 k), so average it and treat ~3.5 V under load as empty. The brown-out detector on (CHIP_PU's 1 uF rides
+through short cuts). LINE IN's pin is driven by U6's output (a rail-to-rail op-amp, low impedance) through R35 120 ohm
+with C36 100 nF at the pin: it settles within a sample after the channel switch.
 
 ### Costs (`fab/cost.md`)
 
@@ -1140,6 +1219,9 @@ or the CPL; JLC drills their holes only.
 - **C20 turned 180 degrees** (its +3V3 pad now east, `make_board.py` PLACED, y 0.15 mm up): the one placement change stage 2 needed (below).
 
 ## LINE IN (mini 2)
+
+(mini 2's text, superseded where mini 2.2 differs: J7 is now a PJ-307C (C16684), the ESD two SMAJ5.0CA (D7 / D8), U7
+runs from VREG (the cell or USB, after the toggle), and the input impedance is ~16.6 k at 1 kHz (the sim pass).)
 
 A 3.5 mm stereo jack (J7, C18185602, the jack mini 1 uses) into the chip's ADC: `J7 -> D7 (PESD5V0S2BT, ESD) -> 20 k per channel -> U6 (LMV321, inverting summer, L + R to mono, gain 5.6 k / 20 k = 0.28 a channel, 2.2 nF across the feedback, ~8.5 kHz low-pass) -> R35 120 ohm + C36 100 nF at the pin -> GPIO9 (ADC1_CH8, net LINE_IN)`. 1 uF coupling in (7.8 Hz high-pass), bias 1.47 V from 150 k / 120 k off AVDD. U6 and the bias run from **AVDD**, a 3.3 V XC6206 LDO (U7) fed from VBUS: **LINE IN works only with USB plugged**, and a plug-in with a hot source cannot push the pin above +3V3 (sim). ngspice (`sim/linein.py`, `sim/results.txt`, generic op-amp, 10 pF ADC cap ASSUMED): +4 dBu stereo gives 0.53 .. 2.41 V at the pin; band 7.8 Hz .. 8.48 kHz; -11.7 dB at 22 kHz; mono plug (ring grounded) half the swing; +20 dBu clips to 0.05 .. 3.29 V without harm.
 
