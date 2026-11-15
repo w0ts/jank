@@ -163,6 +163,10 @@ void jbl_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, 
 {
     if (!settled)
         return;
+    if (memcmp(c->sess, k->sess, sizeof c->sess)) {
+        memcpy(c->sess, k->sess, sizeof c->sess);
+        c->playing = 0;                 /* a new session: its start / stop is its own (Link's join resets it) */
+    }
     if (in->passive) {                  /* (c->held kept: a hold that lasts through LINK mode does not stop the session again) */
         let_go(c, start);
         return;

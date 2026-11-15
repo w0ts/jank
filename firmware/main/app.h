@@ -101,8 +101,8 @@ int bridge_play(int play);
 void bridge_set_lead(int lead);
 /* AUDIO mode's Stop holds the Link session (FOLLOW+LEAD): for the beat tracker's step, the bridge's lock held */
 int bridge_session_held(void);
-/* the joined session plays, or (transport LINK) the MIDI clock has a start out: no flash writes now (updates refused,
- * settings saved later; the timing audit). Lock-free (bridge.c) */
+/* the session plays (joined, or AUDIO mode's own), or (transport LINK) the MIDI clock has a start out: no flash writes
+ * now (updates excepted; settings saved later; the timing audit). Lock-free (bridge.c) */
 int bridge_is_playing(void);
 void bridge_diag(char *out, size_t cap);             /* the Link clock filter, for `diag` */
 void app_diag(char *out, size_t cap);                /* restarts and the last reset's reason, for `diag` */

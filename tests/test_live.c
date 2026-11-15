@@ -228,6 +228,27 @@ static void test_link_play_ends_hold(void)
     CHECK(!strcmp(jho_icon_name(JHO_ARMED), "armed") && !strcmp(jho_icon_name(9), "stopped"));
 }
 
+/* LINK mode's own `stop`: the clocks stay stopped whatever the transport wants (another peer starts the session, AUTO
+ * sees a peer), until `play` or a change of mode; AUDIO mode is not touched by it */
+static void test_link_stop_holds(void)
+{
+    struct jho h;
+    struct jho_in in = hin(JHO_IGNORE, 1, 0);
+    jho_init(&h);
+    in.audio = 0;
+    CHECK(jho_outputs(&h, &in) == 1);
+    jho_link_stop(&h);
+    CHECK(jho_outputs(&h, &in) == 0 && jho_outputs(&h, &in) == 0);
+    jho_link_play(&h);
+    CHECK(jho_outputs(&h, &in) == 1);
+    jho_link_stop(&h);
+    in.audio = 1;                                               /* sound: AUDIO mode, its own rules */
+    in.locked = 1;
+    CHECK(jho_outputs(&h, &in) == 1);
+    in.audio = 0;                                               /* back to LINK mode: its clocks on again */
+    CHECK(jho_outputs(&h, &in) == 1);
+}
+
 /* LOW CONFIDENCE's gate: the outputs stop in every option, the session only with FOLLOW+LEAD; lifted, the transport's
  * rule again (the clock starts on its bar line: armed until then); LINK mode: no gate */
 static void test_gate_stops_outputs(void)
@@ -286,6 +307,7 @@ int main(void)
     test_release_arms_until_locked();
     test_session_by_option();
     test_link_play_ends_hold();
+    test_link_stop_holds();
     test_gate_stops_outputs();
     test_hold_wins_over_gate();
     printf("live: %d checks, %d failed\n", checks, fails);

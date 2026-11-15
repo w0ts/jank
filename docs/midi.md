@@ -8,7 +8,10 @@ baud, with multiply and shift only. Small session moves slew by up to half a tic
 (`JC_RESYNC_TICKS`). A board may list more pads for the same TX signal (`BOARD_MIDI_TX_MORE_GPIOS`, routed through the
 GPIO matrix); no board uses it yet.
 
-`transport link` follows Link's Start Stop Sync; `transport auto` runs whenever a session is joined. `offset` moves the
+`transport link` follows Link's Start Stop Sync; `transport auto` runs whenever a session is joined. In AUDIO mode the
+outputs follow the session's start / stop with either setting (the tracker starts it on a bar line once it locks, alone
+or with peers). In LINK mode `stop` stops the stick's own clocks until its `play`, whoever starts the session again or
+whatever peer comes (with `transport auto` the session itself is left alone). `offset` moves the
 clock against the session by -100..100 ms, for gear that lags. `quantum` (1..16, default 4) is the bar for start.
 
 ## Resync (a click)

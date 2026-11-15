@@ -115,7 +115,7 @@ static void session_at(struct jank_peer *p, int64_t now, void *arg)
 {
     struct session_q *q = arg;
     (void)now;
-    q->ok = (uint8_t)(jp_joined(p) && jp_playing(p));
+    q->ok = (uint8_t)(jp_in_session(p) && jp_playing(p));
     if (q->ok)
         q->us = jbl_session_offset_us(jp_beat_at(p, q->at), jp_mpb(p));
 }
@@ -244,7 +244,7 @@ static void make_bar(const struct jk_cfg *cfg, struct jbl_bar *bar)
  * held, in the beat task */
 static void fold_step(struct jank_peer *p, int64_t now, int settled, struct step_ctx *c)
 {
-    int on = settled && jp_joined(p);
+    int on = settled;                  /* (settled: in a session, joined or AUDIO mode's own) */
     double session_bpm = on && jp_playing(p) && jp_mpb(p) > 0 ? 60000000.0 / (double)jp_mpb(p) : 0.0;
     if (c->in.running && !s_fold.had_tempo)
         s_bar_now = 1;                 /* a new lock (a new track): a new start for the bar */

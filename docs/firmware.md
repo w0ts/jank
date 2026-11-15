@@ -72,7 +72,9 @@ pair window (`err ble is off` with the setting off), `ble close` ends the window
 `ble_state=off|window|connected` and `ble_left=<s>`. Over Bluetooth, `ota`, `bootloader` and `set pass` are refused
 (`err ... over USB only`). `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
 nothing. `net jank` is the protocol's name for jank mode. `tempo`, `play` and `stop` change the whole Link session, as
-any Link app may; with no settled session they answer `err no session`: alone, the stick has no session of its own.
+any Link app may; with no settled session they answer `err no session`: alone in LINK mode, the stick has no session of
+its own. Alone in AUDIO mode it has one (the tracker's, `core/jank_peer.h` jp_solo): the MIDI clock starts on its bar
+line once the tracker locks, as with peers.
 
 - **`play` starts on the next bar line** (`quantum` beats). The start goes out 150 ms before that bar, as "playing from
   bar B" (Link's isPlaying, beats B, time stamp now), so every peer starts on B: Live and LinkHut read B, the FM-1 and the
@@ -93,8 +95,10 @@ any Link app may; with no settled session they answer `err no session`: alone, t
   default) also stops the Link session, which the tracker then does not start while held; with IGNORE (transport `auto`)
   or FOLLOW the session is left alone. The tracker keeps listening and the hold stays through its stops and through LINK
   mode. `play` ends the hold: the outputs wait for the tracker to lock, then start on the next bar line (FOLLOW+LEAD:
-  the tracker starts the session on its next bar line and the clocks follow it). In LINK mode `play` and `stop` are the
-  session's as before, and `play` also ends a hold. `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
+  the tracker starts the session on its next bar line and the clocks follow it). In LINK mode `stop` stops the stick's own
+  clocks until its `play` (or a change of mode), whoever starts the session again; with transport `link` it stops the
+  session too, with `auto` the session is left alone. `play` starts them on the next bar line (transport `link`: the
+  session too), and also ends a hold. `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
   transport icon), with `audio=` (the source open), `audio_live=` (sound: AUDIO mode), the input meter `rms_db=` (RMS over
   0.3 s, a value every 250 ms), `rms_min_db=` / `rms_max_db=` (its extremes over 3 s), `peak_db=` (the last second's
   peak), `conf=` (the grid-fit confidence below, percent) and `act=` (the tracker's network activation peak over the
