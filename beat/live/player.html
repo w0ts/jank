@@ -382,8 +382,8 @@ const QR = (() => {
 
    ctx, read by the UI (the host fills it from /api/status and its own emulated state): link (mode is LINK; the host derives it from the line-in plug detect: plugged = AUDIO, unplugged = LINK), bpm
    (audio mode, after the half/double fold), linkBpm, mode, conf 0..1, th percent, levelDb (dBFS), silent, gated, hold,
-   playing (Link transport), running / armed (the transport icon), trackerLeads (--xiao in AUDIO: UP/DOWN say TRACKER LEADS; YES still starts / stops the outputs), xiao (--xiao: YES sends play / stop in both modes), ble { mode 0 PAIR NOW | 1 ON START | 2 OFF, left (seconds of the pair window left, null = closed), phone (connected) }, peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
-   autoBar (the AUTO BAR setting), bar (the downbeat estimator: { state, conf } or null),
+   playing (Link transport), running / armed (the transport icon), fold (AUDIO: 1 2 4 0.5 0.25, the label X2 /2 ... top left; --xiao from the status's fold= / the home line's mode), foldAuto (AUTO RANGE set it), xiao (--xiao: YES sends play / stop in both modes), ble { mode 0 PAIR NOW | 1 ON START | 2 OFF, left (seconds of the pair window left, null = closed), phone (connected) }, peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
+   autoBar (the AUTO BAR setting: 0 OFF, 1 AT START, 2 ALWAYS; true / false = 1 / 0), bar (the downbeat estimator: { state, conf } or null),
    offs [MIDI OUT 1, MIDI OUT 2, CLK] in ms, rate (index into the clock divisions), boot, splash.
    net: { mode 0 JANK | 1 LINK CLIENT | 2 LINK AP | 3 SETUP, prev (mode to return to after SETUP), group (the jank GROUP 1..9: the units on the same group form one Link session over open Wi-Fi frames, no router), ssid, pass, appass, apName,
    status, ip, apClients, scan [{name, bars}], setupName }, groupPeers, setup (mode is SETUP), qr { size, mod }, saved.
@@ -399,7 +399,7 @@ const QR = (() => {
                             it. AUDIO: Stop holds Link and the clocks, Start resyncs and runs. LINK: the device's own
                             clocks start / stop (and the session, in FOLLOW+LEAD; see LINK TRANSPORT).        NO (on release) -> MENU
                             With the XIAO (--xiao): `play` (it starts on its next bar line) or `stop`, by the icon, in LINK and
-                            in AUDIO (the hold of the outputs). UP / DOWN in AUDIO say TRACKER LEADS (no x2 / /2 on the XIAO).
+                            in AUDIO (the hold of the outputs). UP / DOWN in AUDIO send `fold x2` / `fold /2`.
                 TRANSPORT ICON  triangle = running, square = stopped, blinking triangle = armed: a start asked for and
                             not reached yet, one that resolves by itself (the next bar line, the tracker locking on
                             music it hears) or by YES; never shown for a session that is merely stopped
@@ -412,7 +412,8 @@ const QR = (() => {
                                1 s overlay "NUDGE MS +3"). A combo cancels the NO / YES release action.
      MENU     AUDIO, LINK TRANSPORT (LINK mode: IGNORE = the clocks run on Link's tempo and beat, own Start / Stop only;
               FOLLOW = they also start / stop with the session; FOLLOW+LEAD = and our Start / Stop starts / stops the session),
-              AUTO BAR (AUDIO mode: ON = the bar's 1 found in the music, Link's bar moved onto it; OFF = left where it is),
+              AUTO BAR (AUDIO mode: OFF = the bar left where it is; AT START = the bar's 1 found in the music and Link's bar moved onto it
+              at a start only, never while playing; ALWAYS = also while playing),
               NETWORK, USB, BLUETOOTH (PAIR NOW / ON START / OFF; YES on PAIR NOW opens the 2 minute pair window, which HOME's
               status line counts down), OFFSET, CLK RATE, DISPLAY, BATTERY (UP/DOWN move; the mode is not a setting: plugging in the line = AUDIO)
                 YES on AUDIO / OFFSET -> SUB                    YES on NETWORK -> NET
@@ -522,7 +523,16 @@ const OLED = (() => {
     ['.........', '..#...#..', '.##...##.', '#########', '.##...##.', '..#...#..', '.........'],
   ];
   const NET_ICON_XR = 86;                                            // the network icon's right edge: a gap before the plug
+  const NET_ICON_XR_BLE = 82;                                        // ... with the Bluetooth rune beside it (4 columns further left)
+  const BLE_ICON_X = 86, PLUG_X = 92, BATT_X = 107;                  // the rune (5 wide) sits between the network icon and the plug
+  // the Bluetooth rune, 5 x 7: hidden while no window is open and no phone is connected, blinking (ARMED_BLINK_MS) while the
+  // pair window is open, solid while a phone is connected
+  const BLE_ICON = ['..#..', '..##.', '#.#.#', '.###.', '#.#.#', '..##.', '..#..'];
   const BLE_SHORT = ['PAIR', 'START', 'OFF'];
+  const AUTOBAR_NAMES = ['OFF', 'AT START', 'ALWAYS'], AUTOBAR_SHORT = ['OFF', 'START', 'ALWAYS'];   // index = dev.autoBar (the old true / false = 1 / 0)
+  const autoBarIndex = v => (v === true ? 1 : v === false || v == null ? 0 : v);
+  // the fold's label on HOME (AUDIO): x2 x4 /2 /4, nothing at 1
+  const foldLabel = k => (k === 2 ? 'X2' : k === 4 ? 'X4' : k === 0.5 ? '/2' : k === 0.25 ? '/4' : '');
   const BLE_WINDOW_S = 120;                                          // the pair window: 2 minutes
   const mmss = s => { const t = Math.max(0, Math.ceil(s)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
   const USB_ICON = ['.....####..', '.....######', '#########..', '.....######', '.....####..'];
@@ -564,8 +574,10 @@ const OLED = (() => {
                help: [['TO A COMPUTER', 'MIDI + AUDIO'], ['TO SELF-POWERED', 'MIDI + AUDIO GEAR']] },
     // the downbeat estimator (AUDIO mode): ON finds the bar's 1 in the music and moves Link's bar onto it. A NUDGE BEAT
     // makes it MANUAL (an M on HOME) until AUTO BAR is picked again (YES on ON, even unchanged) or the tempo starts over
-    autobar: { title: 'AUTO BAR', opts: ['OFF', 'ON'], get: c => (c.autoBar ? 1 : 0), live: false, repick: true,
-               help: [['THE BAR 1 STAYS', 'WHERE IT IS'], ['FINDS BEAT 1 IN THE', 'MUSIC. NUDGE: MANUAL']] },
+    // OFF: no placement. AT START (default): the 1 is placed while the session is stopped or its start is not reached, or
+    // once at a new start for the bar; never mid-play. ALWAYS: also while playing (moves can come at any time)
+    autobar: { title: 'AUTO BAR', opts: AUTOBAR_NAMES, get: c => autoBarIndex(c.autoBar), live: false, repick: true,
+               help: [['THE BAR 1 STAYS', 'WHERE IT IS'], ['1 PLACED AT A START', 'NEVER WHILE PLAYING'], ['MOVES THE 1 ALSO', 'WHILE PLAYING']] },
   };
   const helpOf = (sp, v) => (sp.opts ? sp.help[v] : sp.help) || ['', ''];
   const MENU = [                                                    // the top-level menu, in order
@@ -648,10 +660,8 @@ const OLED = (() => {
       return;
     }
     if (ui.screen === 'home') {
-      if (c.trackerLeads && d) {                                    // --xiao, AUDIO: the XIAO's tracker owns the tempo (no x2 / /2)
-        ui.overlay = { until: now + OVERLAY_MS, title: 'TRACKER LEADS', value: '' };
-      } else if (d) {
-        const v = c.tempoStep(d);                                  // link: +/-1 BPM; audio: x2 or /2
+      if (d) {
+        const v = c.tempoStep(d);                                  // link: +/-1 BPM; audio: x2 or /2 (--xiao: `fold x2` / `fold /2`)
         ui.overlay = { until: now + OVERLAY_MS, title: c.link ? 'LINK TEMPO' : (d > 0 ? 'DOUBLE' : 'HALF'), value: v == null ? '---' : v.toFixed(1) };
       } else if (btn === 'yes') {                                   // Stop / Start the outputs; the transport icon shows it
         if (c.link || c.xiao) c.linkStartStop(!(c.running || c.armed));     // LINK: the clocks, and the session in FOLLOW+LEAD; --xiao: play / stop
@@ -741,9 +751,26 @@ const OLED = (() => {
     }
     if (c.wifi === 'none') for (let i = 0; i < 9; i++) fb[(8 - i) * W + left + i + (m === 0 ? 1 : 0)] ^= 1;
   }
-  function drawPower(fb, c) {
-    drawNetIcon(fb, c, NET_ICON_XR);
-    if (c.usb) icon(fb, USB_ICON, 92, 1);                            // a plug on its cable
+  // the HOME top bar's boxes (x ranges, inclusive; null = not drawn), so that nothing can overlap: the transport icon, in LINK
+  // mode the transport option's icon, in AUDIO mode the fold label (X2 /2 ...), the network's name (right-aligned, truncated
+  // to what is left), the network icon, the Bluetooth rune, the USB plug, the battery
+  function topBar(c) {
+    const m = c.net.mode, bleOn = !!(c.ble && (c.ble.phone || c.ble.left != null));
+    const xr = bleOn ? NET_ICON_XR_BLE : NET_ICON_XR, netL = xr - [10, 7, 20][m];
+    const lt = c.link ? LT_ICONS[c.ltMode] : null, fl = !c.link ? foldLabel(c.fold) : '';
+    const left = lt ? { l: 12, r: 12 + lt[0].length - 1 } : fl ? { l: 12, r: 12 + textW(fl, 1) - 1 } : null;
+    const nameLeft = left ? left.r + 5 : 10;
+    const full = [c.net.group != null ? 'JANK GRP ' + c.net.group : '', c.net.ssid, c.net.apName][m] || '';
+    const name = full ? fit(full, netL - 2 - nameLeft) : '';
+    return { tri: { l: 2, r: 8 }, left, label: fl, lt, name, nameBox: name ? { l: netL - 2 - textW(name, 1), r: netL - 3 } : null, nameR: netL - 2,
+             net: { l: netL, r: xr }, xr, ble: bleOn ? { l: BLE_ICON_X, r: BLE_ICON_X + 4, solid: !!c.ble.phone } : null,
+             usb: c.usb ? { l: PLUG_X, r: PLUG_X + USB_ICON[0].length - 1 } : null, batt: c.fitted ? { l: BATT_X, r: BATT_X + 16 } : null };
+  }
+  function drawPower(fb, c, now) {
+    const t = topBar(c);
+    drawNetIcon(fb, c, t.xr);
+    if (t.ble && (t.ble.solid || Math.floor(now / ARMED_BLINK_MS) % 2 === 0)) icon(fb, BLE_ICON, t.ble.l, 0);
+    if (c.usb) icon(fb, USB_ICON, PLUG_X, 1);                        // a plug on its cable
     if (c.fitted) {
       frame(fb, 107, 0, 15, 7, 1); rect(fb, 122, 2, 2, 3, 1);
       rect(fb, 109, 2, Math.round(clamp(c.batt, 0, 100) / 100 * 11), 3, 1);
@@ -806,17 +833,18 @@ const OLED = (() => {
   function drawHome(fb, c, now) {
     // the transport only: silence and low confidence are already on the IN and CF bars
     const stopped = !c.running;
-    drawPower(fb, c);
+    drawPower(fb, c, now);
     // the transport: a triangle = playing, a blinking triangle = started and waiting (locking / next bar), a square = stopped
     const tri = !stopped || (c.armed && Math.floor(now / ARMED_BLINK_MS) % 2 === 0);
     if (tri) for (let r = 0; r < 7; r++) rect(fb, 2, r, Math.min(r, 6 - r) + 1, 1, 1);
     else if (!c.armed) rect(fb, 2, 1, 5, 5, 1);
-    // the network's name, right-aligned against the network icon: group (JANK), SSID (CLIENT), AP name (AP); SETUP has its own screen
-    const name = ['JANK GRP ' + c.net.group, c.net.ssid, c.net.apName][c.net.mode], nameRight = [NET_ICON_XR - 10, NET_ICON_XR - 7, NET_ICON_XR - 20][c.net.mode];   // the icon's left edge per mode
-    // LINK mode: the transport option's icon after the transport icon (LT_ICONS); AUDIO mode leads Link anyway: none
-    const lt = c.link ? LT_ICONS[c.ltMode] : null, nameLeft = lt ? 12 + lt[0].length + 4 : 10;
-    if (lt) icon(fb, lt, 12, 0);
-    if (name) textR(fb, fit(name, nameRight - 2 - nameLeft), nameRight - 2, 0, 1, 1);      // right-aligned, next to the network icon
+    // the network's name, right-aligned against the network icon (the Bluetooth rune moves both left): group (JANK), SSID
+    // (CLIENT), AP name (AP); SETUP has its own screen. LINK mode: the transport option's icon after the transport icon
+    // (LT_ICONS); AUDIO mode leads Link anyway: its place shows the fold (X2 /2 ...) when there is one
+    const t = topBar(c);
+    if (t.lt) icon(fb, t.lt, 12, 0);
+    else if (t.label) text(fb, t.label, 12, 0, 1, 1);
+    if (t.name) textR(fb, t.name, t.nameR, 0, 1, 1);
     if (c.link) {                                                    // LINK: big and plain
       text(fb, c.linkBpm == null ? '---' : c.linkBpm.toFixed(1), 2, 9, 4, 1);     // null: no session tempo known yet
       beatBoxes(fb, c, 2, 41, 30, 12, 2);
@@ -833,7 +861,7 @@ const OLED = (() => {
   }
   function drawMenu(fb, ui, c) {
     titleBar(fb, 'MENU', (ui.cursor + 1) + '/' + MENU.length);
-    const vals = { 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': c.autoBar ? 'ON' : 'OFF', NETWORK: NET_SHORT[c.net.mode],
+    const vals = { 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': AUTOBAR_SHORT[autoBarIndex(c.autoBar)], NETWORK: NET_SHORT[c.net.mode],
                    USB: EDITS.usbrole.opts[c.usbRole], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' };
     for (let k = 0; k < VISIBLE; k++) {
       const i = ui.top + k; if (i >= MENU.length) break;
@@ -960,7 +988,7 @@ const OLED = (() => {
     if (c.saved) { boxed(fb, 30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
   }
 
-  return { W, H, create, press, draw, pairOverlay, mmss, BLE_WINDOW_S, DEFAULT_RATE };
+  return { W, H, create, press, draw, pairOverlay, mmss, BLE_WINDOW_S, DEFAULT_RATE, topBar, foldLabel, autoBarIndex, AUTOBAR_NAMES };
 })();
 </script>
 <script>
@@ -1068,7 +1096,7 @@ async function poll() {
 const XIAO = { asked: false, port: null, out: null, portMsg: 'asking for MIDI access', lastBeatAt: 0, lastLineAt: 0,
                latency: null, text: '', lines: [], answerAt: 0, stats: null, statsAt: 0, status: null, statusAt: 0, statusAskedAt: 0,
                cfg: null, cfgAskedAt: 0, rep: null, repAt: 0, sent: null, err: '', errAt: 0,
-               home: null, homeAt: 0, homeAskedAt: 0, pairAt: 0, srcSynced: false };
+               home: null, homeAt: 0, homeAskedAt: 0, pairAt: 0, srcSynced: false, foldSent: null };
 const XIAO_STATUS_FRESH_MS = 5000;       // older `status` numbers than this are not shown (the XIAO unplugged)
 const XIAO_STATUS_MS = 1000;             // `status` (a read) this often: the session's tempo, beat and transport
 const XIAO_PLAY_WAIT_MS = 2500;          // a play / stop the page sent counts until a status answers it, at most this long
@@ -1115,13 +1143,38 @@ function xiaoOutputs(st, statusAt, now, sent) {
   return { running: o === 'running', armed: o === 'armed' };
 }
 /* `home`'s answer line "home=h <bpm x100> <net> <transport> <bar> <quantum> <link peers> <air peers> <batt> <level> <conf>
-   <min> <max>" -> numbers ('-' = none: null), or null when the line is no such answer */
+   <min> <max> [<mode>]" -> numbers ('-' = none: null), or null when the line is no such answer. mode (the firmware's M2c): 0 LINK,
+   1 AUDIO, x2 x4 /2 /4 AUDIO folded -> mode 'link' | 'audio' and fold 1 | 2 | 4 | 0.5 | 0.25 (null: the line has none) */
 function parseHome(line) {
   const f = line.trim().split(/\s+/);
   if (f[0] !== 'home=h' || f.length < 13) return null;
   const n = t => (t === '-' || !Number.isFinite(Number(t)) ? null : Number(t));
   return { bpm: n(f[1]) == null ? null : n(f[1]) / 100, net: f[2], transport: n(f[3]), bar: n(f[4]), quantum: n(f[5]), linkPeers: n(f[6]), airPeers: n(f[7]),
-           batt: n(f[8]), level: n(f[9]), conf: n(f[10]), min: n(f[11]), max: n(f[12]) };
+           batt: n(f[8]), level: n(f[9]), conf: n(f[10]), min: n(f[11]), max: n(f[12]), ...homeMode(f[13]) };
+}
+/* `home`'s mode token -> { mode, fold } */
+function homeMode(t) {
+  const folds = { x2: 2, x4: 4, '/2': 0.5, '/4': 0.25 };
+  if (t === '0') return { mode: 'link', fold: null };
+  if (t === '1') return { mode: 'audio', fold: 1 };
+  return t in folds ? { mode: 'audio', fold: folds[t] } : { mode: null, fold: null };
+}
+/* the fold in force, { k, auto } (AUDIO mode): --xiao: the `home` line's mode token (fresh) or the status's fold= / fold_manual=,
+   a `fold` the page sent and no status has answered yet counting for a moment (sent: { k, at }); local: the page's own k and the
+   player's fold_auto. auto = AUTO RANGE set it (the status's fold_manual=0; the home line does not say: then unknown = false) */
+function foldNow(isXiao, st, statusAt, home, homeAt, sent, now, localK, localAuto) {
+  if (!isXiao) return { k: localK || 1, auto: !!localAuto && localK !== 1 };
+  const stFresh = st && now - statusAt <= XIAO_STATUS_FRESH_MS && Number.isFinite(st.fold);
+  const answered = !sent || sent.at <= statusAt || now - sent.at > XIAO_PLAY_WAIT_MS;
+  if (!answered) return { k: sent.k, auto: false };
+  let k = 1;
+  if (home && now - homeAt <= XIAO_HOME_FRESH_MS && home.fold != null) k = home.fold;
+  else if (stFresh) k = st.fold;
+  return { k, auto: k !== 1 && !!stFresh && st.fold === k && st.fold_manual === 0 };
+}
+/* UP / DOWN in AUDIO: the next fold (x2 / /2 within 0.25..4) */
+function foldNext(k, d) {
+  return Math.min(4, Math.max(0.25, k * (d > 0 ? 2 : 0.5)));
 }
 /* --xiao AUDIO: the meter's numbers from the XIAO: its `home` answer (fresh), else its status's rms_db / rms_min_db / rms_max_db /
    conf; null when neither is fresh. level / min / max dBFS or null (source not open), conf 0..1 */
@@ -1190,7 +1243,7 @@ function beatStats(lines) {
   for (const l of lines) {
     const m = /^([a-z_]+)=(-?[0-9.]+)$/.exec(l.trim());
     if (m) out[m[1]] = Number(m[2]);
-    const w = /^(bar|audio_source|ble_state|outputs|source)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs
+    const w = /^(bar|audio_source|ble_state|outputs|source|autobar)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting
     if (w) out[w[1]] = w[2];
   }
   return out;
@@ -1336,7 +1389,7 @@ const VIEW_KEY = 'beatEmuView';
 const view = { scr: '1.54' };                     // the user's choice (2026-11-14): 1.54 inch
 try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')); } catch (e) { /* storage blocked: the default */ }
 const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: false, no: false, yes: false },
-              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, autoBar: true, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1, bleMode: 1, bleEnd: 0, srcFlash: null,
+              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, autoBar: 1, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1, bleMode: 1, bleEnd: 0, srcFlash: null,
               repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
               net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
 /* remembered in this browser (localStorage; a blocked storage only means nothing is remembered): the test panel
@@ -1393,6 +1446,14 @@ const battLevel = () => Number($('battlvl').value);
 const powered = () => dev.sw && ($('usb').checked || ($('bat').checked && battLevel() > 0));
 const lowPeriodMs = pct => BATT.fastMs + (BATT.slowMs - BATT.fastMs) * clampN((pct - BATT.critPct) / (BATT.lowPct - BATT.critPct), 0, 1);
 
+const AUTOBAR_WORDS = ['off', 'start', 'always'];
+/* AUTO BAR's setting (index 0 OFF, 1 AT START, 2 ALWAYS) from where it is read back: --xiao `get`'s autobar= (cfg), before it
+   answers the status's bar=off; local: the player's status autobar. null: not known */
+function autoBarFrom(isXiao, cfg, st, s) {
+  if (!isXiao) return AUTOBAR_WORDS.includes(s.autobar) ? AUTOBAR_WORDS.indexOf(s.autobar) : null;
+  if (cfg && AUTOBAR_WORDS.includes(cfg.autobar)) return AUTOBAR_WORDS.indexOf(cfg.autobar);
+  return st && st.bar === 'off' ? 0 : null;
+}
 function syncFromStatus(s) {
   const now = performance.now();
   if (now > holdUntil.th) {                  // the player is the truth: 0 = keep running (our threshold is kept for later)
@@ -1411,8 +1472,8 @@ function syncFromStatus(s) {
   if (s.link_playing) dev.startAsked = false;   // the start was reached: a later stop by a peer is a stop, not "armed"
   if (now > holdUntil.tempo) dev.linkBpm = s.xiao ? (xs && xs.bpm > 0 ? xs.bpm : null) : s.link_bpm;   // --xiao: never SimLink's 120
   if (now > holdUntil.autobar) {                            // AUTO BAR: the player's (or the XIAO's) setting is the truth
-    if (s.xiao) { if (xs && xs.bar) dev.autoBar = xs.bar !== 'off'; }
-    else if (s.bar) dev.autoBar = s.bar.state !== 'off';
+    const i = autoBarFrom(!!s.xiao, XIAO.cfg, xs, s);
+    if (i != null) dev.autoBar = i;
   }
 }
 const hold = key => { holdUntil[key] = performance.now() + 1200; };
@@ -1450,9 +1511,10 @@ function setField(field, val) {
   }
   else if (field === 'usbrole') dev.usbRole = val;          // emu: DEVICE (to a computer) / HOST (self-powered gear)
   else if (field === 'autobar') {                           // the player's downbeat estimator, or the XIAO's (--xiao)
-    dev.autoBar = val === 1; hold('autobar');
-    if (S && S.xiao) xiaoSend('set autobar ' + (dev.autoBar ? 'on' : 'off'));
-    else api('autobar', { on: dev.autoBar });
+    dev.autoBar = val; hold('autobar');
+    const word = AUTOBAR_WORDS[val];
+    if (S && S.xiao) { xiaoSend('set autobar ' + word); setTimeout(askGet, 300); }     // read back from `get`
+    else api('autobar', { mode: word });
   }
   saveDevice();
 }
@@ -1538,6 +1600,14 @@ function tempoStep(d) {
     dev.linkBpm = bpm; hold('tempo'); api('tempo', { bpm });
     return bpm;
   }
+  if (S && S.xiao) {                              // --xiao AUDIO: the XIAO folds (`fold x2` / `fold /2`; its reports are folded)
+    const f = foldNow(true, XIAO.status, XIAO.statusAt, XIAO.home, XIAO.homeAt, XIAO.foldSent, performance.now(), 1, false);
+    const k = foldNext(f.k, d), rep = XIAO.rep && performance.now() - XIAO.repAt <= XIAO_REPORT_FRESH_MS ? XIAO.rep : null;
+    xiaoSend(d > 0 ? 'fold x2' : 'fold /2');
+    XIAO.foldSent = { k, at: performance.now() };
+    setTimeout(askStatus, 300); setTimeout(askHome, 300);
+    return rep && rep.bpm > 0 ? rep.bpm * k / f.k : 0;
+  }
   dev.foldK = clampN(dev.foldK * (d > 0 ? 2 : 0.5), 0.25, 4);      // x2 / /2: Link gets it too (the player's fold)
   hold('fold'); api('fold', { factor: dev.foldK });
   return S && S.bpm ? S.bpm * dev.foldK : 0;
@@ -1590,12 +1660,13 @@ function buildCtx(now, beat) {
   const xm = s.xiao && !dev.link ? xiaoMeters(XIAO.home, XIAO.homeAt, XIAO.status, XIAO.statusAt, now) : null;
   const mn = meterNumbers(!!s.xiao, xm, { bar: meter.bar, lo: meter.lo, hi: meter.hi, conf: s.confidence || 0 });
   const ble = bleNow(!!s.xiao, XIAO.status, XIAO.statusAt, XIAO.pairAt, dev.bleEnd, $('blephone').checked, now);
-  const bpm = s.xiao ? (xrep && xrep.bpm > 0 ? xrep.bpm : null) : s.bpm ? s.bpm * dev.foldK : null;
+  const bpm = s.xiao ? (xrep && xrep.bpm > 0 ? xrep.bpm : null) : s.bpm ? s.bpm * dev.foldK : null;     // (--xiao: the report's tempo is the folded one)
+  const fold = dev.link ? { k: 1, auto: false } : foldNow(!!s.xiao, XIAO.status, XIAO.statusAt, XIAO.home, XIAO.homeAt, XIAO.foldSent, now, dev.foldK, s.fold_auto);
   return {
     link: dev.link, bpm, linkBpm: s.xiao && x && now > holdUntil.tempo ? x.bpm : dev.linkBpm, mode: s.xiao ? (xrep ? xrep.mode : 'stopped') : s.mode,
     conf: mn.conf, th: dev.th, gain: dev.gain, confStop: dev.confStop, levelDb: mn.bar, levelMin: mn.lo, levelMax: mn.hi,
     silent: !audioIn || (!s.xiao && !!s.silent), gated: s.xiao ? !!xm && dev.confStop && mn.conf * 100 < dev.th : !!s.gated, hold: dev.hold, playing: s.xiao ? !!(x && x.playing) : !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
-    running, ltMode: dev.ltMode, trackerLeads: !!s.xiao && !dev.link, xiao: !!s.xiao,
+    running, ltMode: dev.ltMode, xiao: !!s.xiao, fold: fold.k, foldAuto: fold.auto,
     armed: s.xiao ? (xo ? xo.armed : !!(x && x.armed)) : armedLocal(s),        // armedLocal / xiaoLink say what armed means
     // the boxes need a bar (Link's count; the estimate has none) and running outputs: stopped, they stand still
     beatN: beat && beat.from === 'link' && running ? beat.n : null,

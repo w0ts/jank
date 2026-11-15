@@ -20,7 +20,8 @@ import numpy as np
 from eval.mode_bpm import ModeBpm
 from live.confidence import grid_confidence
 from live.controller import Snapshot
-from live.downbeat import BandTap, BarView, Downbeat, Driver
+from live.downbeat import LISTENING, LOCKED, BandTap, BarView, Downbeat, Driver, autobar_mode
+from live.fold import Fold
 from live.tracker import SAMPLE_RATE, OnlineTracker
 
 SILENCE_RMS = 1e-3      # -60 dBFS
@@ -30,6 +31,7 @@ LEVEL_WINDOW_S = 5.0    # the steady level averages this long (about 4 beats at 
 LEVEL_FAST_S = 0.3      # the meter's short-term level
 HYSTERESIS = 0.05
 KEEP_BEATS = 256        # the confidence window needs far fewer
+START_WAIT_BEATS = 8    # AUTO BAR AT START: a start waits this many tracked beats for the estimator's lock
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,9 @@ class EngineStatus:
     grid: tuple[float, float] | None    # the estimator's (beat time, period), even while gated
     published: Snapshot     # what the Link controller gets
     bar: BarView            # the downbeat estimator
+    fold: float = 1.0       # the fold in force (x2 / /2, the user's or AUTO RANGE's)
+    fold_auto: bool = False  # AUTO RANGE set it
+    autobar: str = "start"   # off / start / always
 
 
 class Engine:
@@ -58,7 +63,12 @@ class Engine:
         self._silent_s = 0.0
         self._gated = False
         self.hold = False       # while True the published snapshot is "stopped"
-        self.fold = 1.0         # the device's x2 / /2 (HOME UP / DOWN): what Link gets is the tracked tempo times this
+        self._fold = Fold()     # the device's x2 / /2 (HOME UP / DOWN) and AUTO RANGE: Link gets the tracked tempo times it
+        self.session_bpm = lambda: None    # the Link session's tempo while it plays, else None (AUTO RANGE's reference)
+        self.place_fn = lambda t: None     # the Link session's place in beats at stream time t, None when not playing
+        self._last_out: tuple[float, float] | None = None    # the last published output grid (beat, period)
+        self._bar_epoch = 0     # AT START: counts the new starts for the bar that found the estimator locked
+        self._wait = 0          # AT START: tracked beats left that a start waits for the estimator's lock
         self._level_blocks: deque[tuple[int, float]] = deque()   # (samples, sum of squares), the last LEVEL_WINDOW_S
         self._level_n = 0            # running totals over _level_blocks: no re-summing per block
         self._level_energy = 0.0
@@ -85,6 +95,7 @@ class Engine:
             if self.silent and not was_silent:
                 self.estimator = ModeBpm()       # new music after silence: start over
                 self.beats = []
+            self._wait = max(0, self._wait - len(found))
             self.driver.chunk(self.estimator, f0, bands, found, self.tracker.time, self.silent)
             if not self.silent:
                 self.beats.extend(found)
@@ -132,17 +143,50 @@ class Engine:
                 self._gated = conf < threshold
             stop = self.silent or self._gated or self.hold
             bar = self.downbeat.view()
+            self._range(now, bpm, bar)
+            ab = self.driver.autobar
+            wait = ab == "start" and self._wait > 0 and bar.state == LISTENING
             # the bar moves only with Link's beats = the tracked ones (no x2 / /2 fold: the count is the tracked grid's)
-            published = (Snapshot("stopped", None, None) if stop else
-                         Snapshot(mode, *self._folded(bpm, grid), bar if self.fold == 1.0 else None))
-            return EngineStatus(mode, bpm, conf, self.silent, self._gated, self.hold, grid, published, bar)
+            move = ab != "off" and self._fold.exp == 0
+            if stop:
+                published = Snapshot("stopped", None, None)
+            else:
+                fbpm, fgrid = self._folded(bpm, grid)
+                if fgrid is not None:
+                    self._last_out = fgrid
+                published = Snapshot(mode, fbpm, fgrid, bar if move else None, "always" if ab == "always" else "start",
+                                     self._bar_epoch, wait and move)
+            return EngineStatus(mode, bpm, conf, self.silent, self._gated, self.hold, grid, published, bar,
+                                self._fold.factor, self._fold.auto, ab)
+
+    def _range(self, now: float, bpm: float | None, bar: BarView) -> None:
+        """AUTO RANGE's step on the estimator's tempo, and AT START's "new start for the bar" events: a new lock opens
+        the start wait when the estimator still listens; a lock or a fold change with the estimator already locked
+        counts an epoch (one mid-play move)."""
+        was = self._fold.had_tempo
+        new, changed = self._fold.step(bpm, getattr(self.estimator, "jumps", 0), self.session_bpm(), now)
+        if bpm is None:
+            self._wait = 0
+        elif new and not was:
+            if bar.state == LOCKED:
+                self._bar_epoch += 1
+            elif bar.state == LISTENING:
+                self._wait = START_WAIT_BEATS
+        if changed and bar.state == LOCKED:
+            self._bar_epoch += 1
 
     def _folded(self, bpm: float | None,
                 grid: tuple[float, float] | None) -> tuple[float | None, tuple[float, float] | None]:
         """The tempo and grid Link gets: x2 puts a beat between each tracked pair, /2 keeps every other one."""
-        if self.fold == 1.0:
+        f = self._fold
+        if f.exp == 0 or grid is None:
             return bpm, grid
-        return (bpm * self.fold if bpm else bpm), ((grid[0], grid[1] / self.fold) if grid else grid)
+        out = None
+        if self._last_out is not None and not f.anchored and f.exp < 0:
+            t0, period = self._last_out
+            place = self.place_fn(grid[0])
+            out = ((grid[0] - t0) / period if place is None else place, period)
+        return (bpm * f.factor if bpm else bpm), f.grid(grid[0], grid[1], out)
 
     def resync(self) -> None:
         """Forget the tempo and listen afresh (the device's Start); the x2 / /2 fold goes with it, and the bar."""
@@ -150,7 +194,8 @@ class Engine:
             self.estimator = ModeBpm()
             self.beats = []
             self._gated = False
-            self.fold = 1.0
+            self._fold.reset()
+            self._wait = 0
             self.driver.event("reset", self.bands.frames - 1)
 
     def bar_nudge(self) -> BarView:
@@ -158,9 +203,30 @@ class Engine:
         with self._lock:
             return self.downbeat.nudge()
 
-    def set_autobar(self, on: bool) -> None:
+    def set_autobar(self, value) -> str:
+        """AUTO BAR: off / start / always (true = start, false = off). Returns the mode set."""
         with self._lock:
-            self.downbeat.set_auto(on)
+            return self.driver.set_autobar(value)
+
+    @property
+    def autobar(self) -> str:
+        return self.driver.autobar
+
+    @property
+    def fold(self) -> float:
+        return self._fold.factor
+
+    @fold.setter
+    def fold(self, factor: float) -> None:
+        """The user's fold (the device's UP / DOWN): wins until the next new tempo, which AUTO RANGE ranges against the
+        output the user chose."""
+        with self._lock:
+            if self._fold.user(factor) and self.downbeat.view().state == LOCKED:
+                self._bar_epoch += 1
+
+    @property
+    def fold_auto(self) -> bool:
+        return self._fold.auto
 
     def snapshot(self) -> Snapshot:
         return self.status().published

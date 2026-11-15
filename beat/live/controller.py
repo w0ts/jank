@@ -26,6 +26,9 @@ class Snapshot:
     bpm: float | None
     grid: tuple[float, float] | None           # (stream time of a beat in s, period in s)
     bar: BarView | None = None                 # the downbeat estimator (None: the bar is not ours to move)
+    bar_mode: str = "always"                   # AUTO BAR: always, or start (moves only at a start, see _bar_allowed)
+    bar_epoch: int = 0                         # start mode: counts the "new starts for the bar" with the estimator locked
+    start_wait: bool = False                   # start mode: the session's start waits for the estimator's lock
 
 
 class LinkController:
@@ -40,6 +43,9 @@ class LinkController:
         self.beat_offset = 0.0      # the user's NUDGE BEAT, in beats (halves): Link's beats sit this far from the tracked ones
         self.bar_moves = 0          # whole-beat moves made for the downbeat estimator
         self._bar_seq = -1          # its last decision acted on
+        self._start_us: float | None = None     # when the session's scheduled start is reached
+        self._epoch = 0             # the last bar_epoch seen
+        self._once = False          # a "new start for the bar" is open: one move may come mid-play
 
     def tick(self, snap: Snapshot) -> None:
         if not self.clock.ready:
@@ -54,15 +60,27 @@ class LinkController:
             if self.link.playing():
                 self.link.set_playing(False, now)
             self.pending_start = True
+            self._start_us = None
             return
         self._follow_tempo(snap.bpm, now)
         locked = self._follow_phase(snap.grid, now)
         if locked:
-            self._follow_bar(snap.bar)
-        if self.pending_start and locked:
+            self._follow_bar(snap.bar, snap, now)
+        if self.pending_start and locked and not snap.start_wait:
             self._start_on_next_bar(now)
 
-    def _follow_bar(self, bar: BarView | None) -> None:
+    def _bar_allowed(self, snap: Snapshot, now: float) -> tuple[bool, bool]:
+        """(a move may be made now, it uses the mid-play "once"). AT START: only while the session is stopped or its
+        start is not reached yet, or once at a new start for the bar (the engine counts them in bar_epoch)."""
+        if snap.bar_mode == "always":
+            return True, False
+        if snap.bar_epoch != self._epoch:
+            self._epoch, self._once = snap.bar_epoch, True
+        if not self.link.playing() or (self._start_us is not None and now < self._start_us):
+            return True, False
+        return self._once, True
+
+    def _follow_bar(self, bar: BarView | None, snap: Snapshot, now: float) -> None:
         """The downbeat estimator LOCKED on a phase: at each of its decisions (one a counted beat), Link's bar is put on
         its 1 by a whole-beat move, if it is not there (the first move, a later one, or Link's count slipped). Only
         with the phase in tolerance: then Link's beat at the counted beat is unambiguous."""
@@ -70,7 +88,12 @@ class LinkController:
             return
         if bar.t_beat is None or bar.count is None or bar.phi is None:
             return
+        allowed, once = self._bar_allowed(snap, now)
+        if not allowed:
+            return
         self._bar_seq = bar.seq
+        if once:
+            self._once = False
         n = link_shift(bar.count, bar.phi, self.link.beat_at(self.clock.to_link_us(bar.t_beat)))
         if n:
             self.shift_beats(n)
@@ -125,6 +148,7 @@ class LinkController:
             self._start_on_next_bar(now)
         else:
             self.link.set_playing(False, now)
+            self._start_us = None
 
     def _start_on_next_bar(self, now: float) -> None:
         if self.link.playing():
@@ -134,5 +158,6 @@ class LinkController:
         bar = (math.floor(beat / self.quantum) + 1) * self.quantum
         if bar - beat < BAR_MARGIN_BEATS:
             bar += self.quantum
-        self.link.set_playing(True, self.link.time_at_beat(bar), 0.0)
+        self._start_us = self.link.time_at_beat(bar)
+        self.link.set_playing(True, self._start_us, 0.0)
         self.pending_start = False

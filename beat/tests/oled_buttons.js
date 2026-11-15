@@ -18,7 +18,7 @@ const W = OLED.W, lit = (fb, x, y) => fb[y * W + x] === 1;
 const rowLit = (fb, y0, y1) => { let n = 0; for (let y = y0; y <= y1; y++) for (let x = 0; x < W; x++) n += fb[y * W + x]; return n; };
 const calls = [];
 function ctx(extra = {}) {
-  return { link: false, lineIn: false, xiao: false, trackerLeads: false, bpm: 124, linkBpm: 124, conf: 0.9, th: 80, levelDb: -20, levelMin: -25, levelMax: -15,
+  return { link: false, lineIn: false, xiao: false, bpm: 124, linkBpm: 124, conf: 0.9, th: 80, levelDb: -20, levelMin: -25, levelMax: -15,
            running: true, armed: false, beatN: 1, beatMs: 0, peers: 0, wifiQ: null, usb: false, fitted: false, batt: 100,
            ltMode: 2, rate: 2, usbRole: 0, inSrc: 0, net: { mode: 0, group: 1, ssid: '', apName: '' }, autoBar: true, bar: null,
            ble: { mode: 1, left: null, phone: false },
@@ -27,14 +27,14 @@ function ctx(extra = {}) {
 }
 const home = (c, now = 0) => { const fb = new Uint8Array(W * OLED.H); OLED.draw(fb, OLED.create(), c, now); return fb; };
 
-// YES in AUDIO with the XIAO: play / stop by the icon (UP / DOWN still say TRACKER LEADS); without it the hold as before
+// YES in AUDIO with the XIAO: play / stop by the icon (UP / DOWN fold: x2 / /2); without it the hold as before
 let ui = OLED.create();
-OLED.press(ui, 'yes', 0, ctx({ xiao: true, trackerLeads: true, running: true }));
-OLED.press(ui, 'yes', 0, ctx({ xiao: true, trackerLeads: true, running: false, armed: true }));
-OLED.press(ui, 'yes', 0, ctx({ xiao: true, trackerLeads: true, running: false, armed: false }));
+OLED.press(ui, 'yes', 0, ctx({ xiao: true, running: true }));
+OLED.press(ui, 'yes', 0, ctx({ xiao: true, running: false, armed: true }));
+OLED.press(ui, 'yes', 0, ctx({ xiao: true, running: false, armed: false }));
 eq(calls.splice(0), [['startstop', false], ['startstop', false], ['startstop', true]]);
-OLED.press(ui, 'up', 0, ctx({ xiao: true, trackerLeads: true }));
-eq([calls.splice(0), ui.overlay.title], [[], 'TRACKER LEADS']);
+OLED.press(ui, 'up', 0, ctx({ xiao: true }));
+eq([calls.splice(0), ui.overlay.title], [[['tempo', 1]], 'DOUBLE']);                 // --xiao AUDIO: the fold, as without it
 ui = OLED.create();
 OLED.press(ui, 'yes', 0, ctx());
 OLED.press(ui, 'up', 0, ctx());
