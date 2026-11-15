@@ -813,9 +813,15 @@ const OLED = (() => {
   }
   function statusLine(fb, c, now, y) {
     const items = [];                                                // the mode is not listed: the meters (or their absence) say it
-    // Link peers in every network mode (jank is Link too, over its own air); no peers: no peer item
-    if (c.peers > 0) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false });
-    items.push(...wifiItems(c.wifiQ));
+    // Link peers in every network mode (jank is Link too, over its own air); no peers: no peer item. The count joins the
+    // Wi-Fi line as "P2" when it fits (the user: "the number of peers could also fit in the same status line with wifi"),
+    // else it keeps an item of its own in the cycle
+    const wifi = wifiItems(c.wifiQ);
+    const peerSeg = c.peers > 0 ? { t: 'P' + c.peers, bad: false } : null;
+    const fits = segs => segs.reduce((a, g) => a + textW(g.t, 1), 0) + (segs.length - 1) * (adv(' ') + 1) <= W - 4;
+    if (peerSeg && wifi.length && fits([peerSeg, ...wifi[0].segs])) wifi[0] = { ...wifi[0], segs: [peerSeg, ...wifi[0].segs], spread: true };
+    else if (peerSeg) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false });
+    items.push(...wifi);
     if (c.ble && c.ble.phone) items.push({ t: 'PHONE', bad: false });
     if (c.ble && c.ble.left != null && !c.ble.phone) { text(fb, 'BT PAIR ' + mmss(c.ble.left), 2, y, 1, 1); return; }   // the open window: shown alone, its count runs
     if (!items.length) return;
