@@ -124,6 +124,9 @@ struct jk_cfg {
      * this line), so they are back at their defaults at every start. */
     uint8_t beat;                     /* 1: the beat tracker steers the Link session */
     int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX) */
+    /* USB host mode (core/jank_usbrole.h): stored apart from the blob above (store.c, key "usb1"), so the blob stays 130 */
+    uint8_t usb;                      /* enum jur_usb: USB DEVICE / HOST */
+    uint8_t source;                   /* enum jur_src: AUDIO > SOURCE AUTO / LINE / USB */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
@@ -147,6 +150,26 @@ struct jk_beat {
     int32_t err_us;                   /* the session's beat grid against the tracked beat at the last step, before a correction */
     int32_t offset_us;                /* the clock the audio's samples are mapped to local time with: the offset's value */
     int32_t latency_us;               /* the setting, in us */
+};
+
+/* the USB port, for `status` (firmware/main/usbrole.c fills it) */
+#define JK_USB_DEVS 4u
+#define JK_USB_NAME_MAX 23u
+struct jk_usb_dev {
+    char name[JK_USB_NAME_MAX + 1];   /* the product string, printable ASCII */
+    uint8_t midi, audio;              /* its MIDI OUT gets the clock; its audio is what the tracker hears */
+};
+struct jk_usb {
+    uint8_t stack;                    /* enum jur_stack: what runs (0 device, 1 host) */
+    uint8_t has_cc;                   /* the CC chip is there and answered */
+    uint8_t cc, cc_dir;               /* enum jur_cc; 1 CC1, 2 CC2, 0 unknown */
+    uint8_t host_en, vbus, line;      /* the 5 V signal on, VBUS from outside, a plug in the line in */
+    uint8_t audio;                    /* enum jur_audio: what the tracker listens to now */
+    uint8_t ndev;
+    struct jk_usb_dev dev[JK_USB_DEVS];
+    uint32_t audio_rate;              /* the hosted stream's format; 0: none */
+    uint8_t audio_channels, audio_bits;
+    uint32_t audio_packets, audio_errors, midi_dropped;
 };
 
 struct jk_snapshot {
@@ -173,6 +196,7 @@ struct jk_snapshot {
     uint32_t midi_ticks;              /* MIDI clocks sent */
     uint32_t midi_resync;             /* the clock had to jump to the session */
     struct jk_beat beat;
+    struct jk_usb usb;
     struct jk_bridge b;
 };
 

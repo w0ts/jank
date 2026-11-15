@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "jank_core.h"
+#include "jank_usbrole.h"
 
 static int fails, checks;
 #define CHECK(c)                                                  \
@@ -315,6 +316,69 @@ static void test_beat(void)
     CHECK(strstr(out, "cpu_pct=25.3\n") && strstr(out, "packets=77\n") && strstr(out, "madmom BENCH ONLY") && ends(out, "ok\n"));
 }
 
+/* USB DEVICE / HOST and AUDIO > SOURCE; the port's lines in status */
+static void test_usb(void)
+{
+    setup();
+    CHECK(cfg.usb == JUR_USB_DEVICE && cfg.source == JUR_SRC_AUTO);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "usb=device\n") && strstr(out, "source=auto\n"));
+    CHECK(run("set usb host") == JK_CTL_CFG_CHANGED && cfg.usb == JUR_USB_HOST && ends(out, "ok\n"));
+    CHECK(run("set usb otg") == JK_CTL_NONE && cfg.usb == JUR_USB_HOST && strstr(out, "err ") == out);
+    CHECK(run("set usb device") == JK_CTL_CFG_CHANGED && cfg.usb == JUR_USB_DEVICE);
+    CHECK(run("set source line") == JK_CTL_CFG_CHANGED && cfg.source == JUR_SRC_LINE);
+    CHECK(run("set source usb") == JK_CTL_CFG_CHANGED && cfg.source == JUR_SRC_USB);
+    CHECK(run("set source mic") == JK_CTL_NONE && cfg.source == JUR_SRC_USB);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "usb=device\n") && strstr(out, "source=usb\n"));
+    /* the XIAO as a device: no CC chip */
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=device\nusb_cc=nochip\n") && !strstr(out, "usb_host_en"));
+    CHECK(strstr(out, "audio_source=none\n") && !strstr(out, "usb_dev=") && !strstr(out, "usb_audio=") && ends(out, "ok\n"));
+    /* the board as a host with a synth on a hub: its MIDI and its audio */
+    snap.usb.stack = JUR_STACK_HOST;
+    snap.usb.has_cc = 1;
+    snap.usb.cc = JUR_CC_DEVICE;
+    snap.usb.cc_dir = 2;
+    snap.usb.host_en = 1;
+    snap.usb.audio = JUR_AUDIO_USB;
+    snap.usb.ndev = 2;
+    strcpy(snap.usb.dev[0].name, "OP-Z");
+    snap.usb.dev[0].midi = 1;
+    snap.usb.dev[0].audio = 1;
+    snap.usb.dev[1].midi = 1;
+    snap.usb.audio_rate = 48000;
+    snap.usb.audio_channels = 2;
+    snap.usb.audio_bits = 24;
+    snap.usb.midi_dropped = 3;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=host\nusb_cc=device\nusb_cc_dir=2\nusb_host_en=1\nusb_vbus=0\n"));
+    CHECK(strstr(out, "audio_source=usb\n") && strstr(out, "usb_dev=OP-Z,midi+audio\n") && strstr(out, "usb_dev=?,midi\n"));
+    CHECK(strstr(out, "usb_audio=48000/2/24\n") && strstr(out, "usb_midi_dropped=3\n") && ends(out, "ok\n"));
+}
+
+/* the longest status (a host with four devices, eight peers) fits the firmware's answer buffer (ctl.c OUT_MAX 1400) */
+static void test_status_size(void)
+{
+    static char big[2048];
+    setup();
+    snap.link_on = 1;
+    snap.armed = 1;
+    snap.usb.stack = JUR_STACK_HOST;
+    snap.usb.has_cc = 1;
+    snap.usb.ndev = JK_USB_DEVS;
+    snap.usb.audio_rate = 48000;
+    for (uint32_t i = 0; i < JK_USB_DEVS; i++) {
+        memset(snap.usb.dev[i].name, 'n', JK_USB_NAME_MAX);
+        snap.usb.dev[i].midi = snap.usb.dev[i].audio = 1;
+    }
+    for (uint32_t i = 0; i < JK_PEERS; i++) {
+        snap.b.peer[i].used = 1;
+        snap.b.peer[i].rssi = -100;
+        snap.b.peer[i].t_heard = 999;
+        snap.b.peer[i].frames = 4000000000u;
+    }
+    CHECK(jk_ctl_line("status", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
+    printf("longest status: %zu bytes\n", strlen(big));
+    CHECK(strlen(big) < 1400u && ends(big, "ok\n"));
+}
+
 int main(void)
 {
     test_defaults();
@@ -333,6 +397,8 @@ int main(void)
     test_cfg_name();
     test_led();
     test_button();
+    test_usb();
+    test_status_size();
     printf("ctl: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }
