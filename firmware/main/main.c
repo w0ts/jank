@@ -92,5 +92,13 @@ void app_main(void)
     ESP_ERROR_CHECK(ctl_start());
     ESP_ERROR_CHECK(bridge_start(&s_cfg, mac, peer_mac));
     ESP_ERROR_CHECK(ui_start());
+#if CONFIG_JANK_BLE_MIDI
+    {
+        /* not fatal: USB and the radio go on without it (and a new image still confirms itself over USB) */
+        esp_err_t e = ble_midi_start(mac);
+        if (e != ESP_OK)
+            ESP_LOGE(TAG, "BLE MIDI: %s", esp_err_to_name(e));
+    }
+#endif
     ota_validate_start();
 }

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# A BLE MIDI peripheral for the control line (main/ble_midi.c): JANK_VARIANT=ble JANK_EXTRA_DEFAULTS=sdkconfig.ble scripts/build.sh
+# Bluetooth LE with the NimBLE host, otherwise ESP-IDF's defaults (sdkconfig.ble-tuned shrinks them).
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_CONTROLLER_ENABLED=y
+CONFIG_JANK_BLE_MIDI=y
+# Wi-Fi and BLE share the radio: software coexistence (api-guides/coexist.rst)
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
+# core 1 is the MIDI clock's alone (midi.c): the controller's task and NimBLE's host task on core 0
+CONFIG_BT_CTRL_PINNED_TO_CORE_0=y
+CONFIG_BT_NIMBLE_PINNED_TO_CORE_0=y
