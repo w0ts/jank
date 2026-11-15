@@ -9,8 +9,8 @@
  *
  * AUTO BAR: the downbeat estimator (core/beat/jb_down.c, weights from the user's Traktor grids and audio) runs on the
  * same frames and on ModeBpm's grid; when it knows the 1, the bridge's step moves the session's bar onto it in whole
- * beats (jbl_bar_step). Its reset events here: ModeBpm stopped (30 s without a steady beat), a tempo jump
- * (DOWN_JUMP_RESET), a new audio stream (the tracker restarts). `set autobar off` leaves the bar where it is. */
+ * beats (jbl_bar_step). Its reset events here: ModeBpm stopped (30 s without a steady beat), a new audio
+ * stream (the tracker restarts); a tempo jump only with DOWN_JUMP_RESET. `set autobar off` leaves the bar where it is. */
 #include <math.h>
 #include <string.h>
 #include "app.h"
@@ -34,7 +34,9 @@
 #define POLL_MS 5
 #define STEP_EVERY_US 250000           /* the Link session is looked after this often, and at each tracked beat */
 #define WINDOW_US 1000000              /* the CPU share is over this long */
-#define DOWN_JUMP_RESET 1              /* a tempo jump (jb_mode's jumps) resets the bar, as designed; 0: the count goes on */
+#define DOWN_JUMP_RESET 0              /* 1: a tempo jump (jb_mode's jumps) resets the bar; off: those are mostly short excursions
+                                        * in breaks, and resetting cost 3 points and 2.4x the moves (beat-listener
+                                        * studies/downbeat/results/v2_stream_check.md) */
 
 static const char *TAG = "beat";
 static struct jb_beat s_b;
