@@ -78,6 +78,8 @@
   .devpanel label { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
   .srcbadge { justify-self:start; align-self:center; font:700 12px/1 ui-monospace, monospace; letter-spacing:1px; padding:4px 8px; border-radius:4px; background:#555; color:#fff; }
   .srcbadge.xiao { background:#2e7d32; }
+  .xaudio { padding:1px 8px; border-radius:9px; font-weight:600; background:#555; color:#fff; }
+  .xaudio.on { background:#2e7d32; }
   .devpanel input[type=range] { flex:1; min-width:90px; width:auto; }
   .meter { position:relative; height:14px; border-radius:7px; background:var(--bg); border:1px solid var(--line); margin-top:8px; overflow:hidden; }
   #confbar { height:100%; width:0; background:var(--ok); transition:width .15s; }
@@ -158,12 +160,15 @@
 
   <div class="card" id="xiaocard" hidden>
     <div class="row">
-      <b>XIAO</b>
-      <span id="xbeat" style="display:inline-block;width:14px;height:14px;border-radius:7px;background:#333"></span>
-      <span><b id="xbpm" class="num">---</b> BPM</span>
-      <span id="xmode">-</span>
-      <span>beat <b id="xn" class="num">-</b></span>
-      <span id="xaudio">-</span>
+      <b>XIAO audio beat tracker</b>
+      <span id="xaudio" class="xaudio">no report yet</span>
+    </div>
+    <div class="num muted" style="font-size:12px;margin:2px 0 6px">The XIAO's own tracker on the music it hears over USB audio: not the Link session (that is on the device screen above) and not the screen itself.</div>
+    <div class="row">
+      <span id="xbeat" title="flashes on each beat the XIAO's tracker hears" style="display:inline-block;width:14px;height:14px;border-radius:7px;background:#333"></span>
+      <span><b id="xbpm" class="num">---</b> BPM heard</span>
+      <span>tracker <b id="xmode">-</b></span>
+      <span>beats heard <b id="xn" class="num">-</b></span>
     </div>
     <div id="xmsg" class="num" style="opacity:.7"></div>
     <table id="acc" class="num" style="margin-top:8px;border-collapse:collapse;font-size:12px">
@@ -367,7 +372,7 @@ const QR = (() => {
 
    ctx, read by the UI (the host fills it from /api/status and its own emulated state): link (mode is LINK; the host derives it from the line-in plug detect: plugged = AUDIO, unplugged = LINK), bpm
    (audio mode, after the half/double fold), linkBpm, mode, conf 0..1, th percent, levelDb (dBFS), silent, gated, hold,
-   playing (Link transport), peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
+   playing (Link transport), running / armed (the transport icon), trackerLeads (--xiao in AUDIO: UP/DOWN/YES do nothing), peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
    offs [MIDI OUT 1, MIDI OUT 2, CLK] in ms, rate (index into the clock divisions), boot, splash.
    net: { mode 0 JANK | 1 LINK CLIENT | 2 LINK AP | 3 SETUP, prev (mode to return to after SETUP), group (the jank GROUP 1..9: the units on the same group form one Link session over open Wi-Fi frames, no router), ssid, pass, appass, apName,
    status, ip, apClients, scan [{name, bars}], setupName }, groupPeers, setup (mode is SETUP), qr { size, mod }, saved.
@@ -382,6 +387,11 @@ const QR = (() => {
                 YES         (on release) Stop / Start of the outputs (MIDI clock, modular clock); the top-left icon shows
                             it. AUDIO: Stop holds Link and the clocks, Start resyncs and runs. LINK: the device's own
                             clocks start / stop (and the session, in FOLLOW+LEAD; see LINK TRANSPORT).        NO (on release) -> MENU
+                            With the XIAO (--xiao): LINK sends `play` (the session starts on its next bar line) or
+                            `stop`; AUDIO does nothing but say TRACKER LEADS: the XIAO's tracker starts and stops it.
+                TRANSPORT ICON  triangle = running, square = stopped, blinking triangle = armed: a start asked for and
+                            not reached yet, one that resolves by itself (the next bar line, the tracker locking on
+                            music it hears) or by YES; never shown for a session that is merely stopped
                 NO + UP/DOWN   AUDIO mode: NUDGE BEAT, half a beat relative to the tracked phase (1 s overlay "NUDGE BEAT +1/2"):
                                one step fixes an off-beat lock, two move the bar's 1 by a beat
                 YES + UP/DOWN  AUDIO mode: nudge the timing 1 ms (the AUDIO IN offset: every output; repeats while held;
@@ -604,9 +614,11 @@ const OLED = (() => {
       return;
     }
     if (ui.screen === 'home') {
-      if (d) {
+      if (c.trackerLeads && (d || btn === 'yes')) {                 // --xiao, AUDIO: the XIAO's tracker owns tempo and transport
+        ui.overlay = { until: now + OVERLAY_MS, title: 'TRACKER LEADS', value: '' };
+      } else if (d) {
         const v = c.tempoStep(d);                                  // link: +/-1 BPM; audio: x2 or /2
-        ui.overlay = { until: now + OVERLAY_MS, title: c.link ? 'LINK TEMPO' : (d > 0 ? 'DOUBLE' : 'HALF'), value: v.toFixed(1) };
+        ui.overlay = { until: now + OVERLAY_MS, title: c.link ? 'LINK TEMPO' : (d > 0 ? 'DOUBLE' : 'HALF'), value: v == null ? '---' : v.toFixed(1) };
       } else if (btn === 'yes') {                                   // Stop / Start the outputs; the transport icon shows it
         if (c.link) c.linkStartStop(!(c.running || c.armed));     // LINK: the clocks, and the session in FOLLOW+LEAD
         else c.setHold(c.running || c.armed);                        // AUDIO: follows the icon: running/armed -> Stop (hold), stopped -> Start
@@ -759,7 +771,7 @@ const OLED = (() => {
     if (lt) icon(fb, lt, 12, 0);
     if (name) textR(fb, fit(name, nameRight - 2 - nameLeft), nameRight - 2, 0, 1, 1);      // right-aligned, next to the network icon
     if (!c.lineIn) {                                                 // LINK without a line in: big and plain
-      text(fb, c.linkBpm.toFixed(1), 2, 9, 4, 1);
+      text(fb, c.linkBpm == null ? '---' : c.linkBpm.toFixed(1), 2, 9, 4, 1);     // null: no session tempo known yet
       beatBoxes(fb, c, 2, 41, 30, 12, 2);
       statusLine(fb, c, now, 57);
       return;
@@ -993,12 +1005,44 @@ async function poll() {
    each beat it tracks (extra: its lag, us: how long before the report it takes the beat to be heard), 't' once a
    second (extra: its beat_latency, ms) (jank docs/beat.md). Each 'b' goes to the player dated as the XIAO takes the beat
    to be heard: the event's own timeStamp (Chrome: when CoreMIDI got the USB packet) on the epoch clock, minus the lag.
-   The control line (F0 7D 'J' 'K' text) reads the XIAO's `beat` numbers every few seconds (a read: it changes nothing);
+   The control line (F0 7D 'J' 'K' text) reads the XIAO's `beat` numbers every few seconds, its `status` every second
+   (the Link session the device screen shows: tempo, beat, transport) and `get` once (the quantum): reads, they change
+   nothing. The device's YES / UP / DOWN in LINK mode send `play` / `stop` / `tempo <bpm>` (linkStartStop, tempoStep);
    only the Calibrate button sends a setting, `set beat_latency`, and only when pressed (not stored: back to 25 at the
    XIAO's next start). Only asked for when the player runs with --xiao. */
 const XIAO = { asked: false, port: null, out: null, portMsg: 'asking for MIDI access', lastBeatAt: 0, lastLineAt: 0,
-               latency: null, text: '', lines: [], stats: null, statsAt: 0, status: null, statusAt: 0 };
-const XIAO_STATUS_FRESH_MS = 15000;      // older `status` numbers than this are not shown (the XIAO unplugged)
+               latency: null, text: '', lines: [], answerAt: 0, stats: null, statsAt: 0, status: null, statusAt: 0, statusAskedAt: 0,
+               cfg: null, cfgAskedAt: 0, rep: null, repAt: 0, sent: null, err: '', errAt: 0 };
+const XIAO_STATUS_FRESH_MS = 5000;       // older `status` numbers than this are not shown (the XIAO unplugged)
+const XIAO_STATUS_MS = 1000;             // `status` (a read) this often: the session's tempo, beat and transport
+const XIAO_PLAY_WAIT_MS = 2500;          // a play / stop the page sent counts until a status answers it, at most this long
+const XIAO_REPORT_FRESH_MS = 3000;       // the tracker's reports: one a second at least while the XIAO runs
+/* --xiao: the XIAO's Link session as the device screen shows it, from its last `status` (st: numbers, taken at statusAt,
+   performance.now() ms) extrapolated to now with its BPM. quantum: beats a bar (`get`). sent: the page's last
+   { cmd: 'play' | 'stop', at } (answered once a status is newer). null: no fresh status (nothing known: no tempo, no
+   transport shown). Otherwise { joined, bpm, beat, box, playing, armed, running }:
+     armed    a start asked for and not reached yet: the XIAO's armed=1 (a play waiting for its bar line, sent for a bar still
+              ahead, or the MIDI start waiting for the next bar) until the extrapolated beat reaches its start=, or a `play`
+              the page sent that no status has answered yet (at most XIAO_PLAY_WAIT_MS). Each one ends by itself.
+     running  the session plays and no start is pending.
+     box      the bar's beat 0..quantum-1 (0 = beat 1 of the bar: Link's phase, beat mod quantum). */
+function xiaoLink(st, statusAt, now, quantum, sent) {
+  if (!st || now - statusAt > XIAO_STATUS_FRESH_MS) return null;
+  if (!(st.bpm > 0) || !Number.isFinite(st.beat)) return { joined: false, bpm: null, beat: null, box: null, playing: false, armed: false, running: false };
+  const q = quantum > 0 ? quantum : 4, beat = st.beat + (now - statusAt) / 60000 * st.bpm;
+  const answered = !sent || sent.at <= statusAt || now - sent.at > XIAO_PLAY_WAIT_MS;
+  let playing = !!st.playing;
+  let armed = st.armed === 1 && !(Number.isFinite(st.start) && beat >= st.start);
+  if (!answered && sent.cmd === 'stop') { playing = false; armed = false; }
+  if (!answered && sent.cmd === 'play' && !playing) armed = true;
+  return { joined: true, bpm: st.bpm, beat, box: ((Math.floor(beat) % q) + q) % q, playing, armed, running: playing && !armed };
+}
+/* what the XIAO's tracker hears, from its last report (r: xiaoReport's, null none): no stream / a stream with no beat / music */
+function xiaoHearing(r) {
+  if (!r) return { on: false, text: 'no report yet' };
+  if (!r.audio) return { on: false, text: 'no audio' };
+  return r.mode === 'stopped' ? { on: false, text: 'audio stream open, no beat heard' } : { on: true, text: 'hearing audio' };
+}
 /* the XIAO's Link and jank peers, from its last `status` answer (null: none, or too old) */
 function xiaoPeers(now) {
   const st = XIAO.status;
@@ -1040,7 +1084,10 @@ function beatStats(lines) {
   }
   return out;
 }
-function onXiaoLineText(t) {
+/* the control line's answers. at: when this frame came; an answer's numbers are dated by its first frame (the XIAO reads
+   its state, then sends: the rest of a long answer only takes longer to arrive) */
+function onXiaoLineText(t, at) {
+  if (!XIAO.text && !XIAO.lines.length) XIAO.answerAt = at;
   XIAO.text += t;
   let i;
   while ((i = XIAO.text.indexOf('\n')) >= 0) {
@@ -1049,15 +1096,32 @@ function onXiaoLineText(t) {
     if (line === 'ok' || line.startsWith('err')) {
       const stats = beatStats(XIAO.lines);
       XIAO.lines = [];
-      if ('phase_forces' in stats) { XIAO.stats = stats; api('xiao_stats', stats); }
-      else if ('link_peers' in stats) { XIAO.status = stats; XIAO.statusAt = performance.now(); }
+      if (line.startsWith('err')) { XIAO.err = line; XIAO.errAt = performance.now(); }
+      else if ('phase_forces' in stats) { XIAO.stats = stats; api('xiao_stats', stats); }
+      else if ('link_peers' in stats) { XIAO.status = stats; XIAO.statusAt = XIAO.answerAt; }
+      else if ('quantum' in stats) XIAO.cfg = stats;
+      XIAO.answerAt = at;
     } else XIAO.lines.push(line);
   }
+}
+const askStatus = () => { XIAO.statusAskedAt = performance.now(); xiaoSend('status'); };
+const askGet = () => { XIAO.cfgAskedAt = performance.now(); xiaoSend('get'); };
+/* --xiao: the device's mode is the XIAO's own. AUDIO while the player's stream to it is open (its reports' audio flag), LINK
+   when closed. The line-in box shows it and is not the user's to change (the player keeps the stream open while it runs) */
+function syncXiaoMode(now) {
+  const box = $('linein');
+  box.disabled = true;
+  box.title = '--xiao: the XIAO is in AUDIO mode while the player\'s USB audio stream to it is open, LINK when it is closed';
+  if (!XIAO.rep || now - XIAO.repAt > XIAO_REPORT_FRESH_MS) return;
+  box.checked = XIAO.rep.audio;
+  if (dev.link === XIAO.rep.audio) setField('mode', XIAO.rep.audio ? 0 : 1);
 }
 function xiaoSend(line) { if (XIAO.out) for (const f of jxFrames(line)) XIAO.out.send(f); }
 function onXiaoReport(r, ev) {
   const now = performance.now();
   XIAO.lastLineAt = now;
+  XIAO.rep = r;
+  XIAO.repAt = now;
   if (r.kind === 't' && r.latencyMs !== undefined) XIAO.latency = r.latencyMs;
   if (r.kind === 'b') {                           // the flash: on the report, not on the next poll
     XIAO.lastBeatAt = now;
@@ -1069,7 +1133,9 @@ function onXiaoReport(r, ev) {
   $('xbpm').textContent = r.bpm > 0 ? r.bpm.toFixed(2) : '---';
   $('xmode').textContent = r.mode;
   $('xn').textContent = String(r.n);
-  $('xaudio').textContent = r.audio ? 'audio in' : 'no audio';
+  const h = xiaoHearing(r);
+  $('xaudio').textContent = h.text;
+  $('xaudio').classList.toggle('on', h.on);
 }
 async function askXiao() {
   XIAO.asked = true;
@@ -1087,9 +1153,10 @@ async function askXiao() {
         const r = xiaoReport(ev.data);
         if (r) { onXiaoReport(r, ev); return; }
         const t = jxText(ev.data);
-        if (t !== null) onXiaoLineText(t);
+        if (t !== null) onXiaoLineText(t, ev.timeStamp || performance.now());
       };
       XIAO.portMsg = port ? 'MIDI port "' + port.name + '"' : 'no MIDI port named jank';
+      if (port && XIAO.out) { askGet(); askStatus(); }             // at once, not after the first period (reads only)
     };
     access.onstatechange = attach;
     attach();
@@ -1134,10 +1201,15 @@ function showXiao(x, bench) {
   if (!x) return;
   if (!XIAO.asked) askXiao();
   const now = performance.now();
-  if (XIAO.out && now - XIAO.statsAt > XIAO_STATS_MS) { XIAO.statsAt = now; xiaoSend('beat'); xiaoSend('status'); }     // reads only
+  if (XIAO.out && now - XIAO.statsAt > XIAO_STATS_MS) { XIAO.statsAt = now; xiaoSend('beat'); }     // reads only
+  if (XIAO.out && now - XIAO.statusAskedAt > XIAO_STATUS_MS) askStatus();
+  if (XIAO.out && !XIAO.cfg && now - XIAO.cfgAskedAt > 3000) askGet();         // (asked again if the answer was lost)
+  syncXiaoMode(now);
   const stale = XIAO.port && XIAO.lastLineAt && now - XIAO.lastLineAt > XIAO_SILENT_MS ? ' | no report for ' + Math.round((now - XIAO.lastLineAt) / 1000) + ' s' : '';
+  if (XIAO.rep && now - XIAO.repAt > XIAO_REPORT_FRESH_MS) { $('xaudio').textContent = 'no report'; $('xaudio').classList.remove('on'); }
   const audio = 'audio out: ' + x.device + ', FIFO ' + f1(x.fifo_ms) + ' ms (target ' + x.fifo_target + '), slips ' + (x.dropped + x.repeated) + ', underruns ' + x.underruns;
-  $('xmsg').textContent = XIAO.portMsg + stale + ' | ' + audio;
+  const err = XIAO.err && now - XIAO.errAt < 5000 ? ' | XIAO: ' + XIAO.err : '';
+  $('xmsg').textContent = XIAO.portMsg + stale + err + ' | ' + audio;
   showAccuracy(bench);
 }
 
@@ -1145,7 +1217,7 @@ function showXiao(x, bench) {
 let S = null, tPoll = 0;
 const holdUntil = { th: 0, off: 0, mode: 0, hold: 0, tempo: 0, fold: 0 };     // keep a local value until the server has caught up
 const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: false, no: false, yes: false },
-              link: false, hold: false, clocks: true, ltMode: 2, linkBpm: 120, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1,
+              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1,
               repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
               net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
 /* remembered in this browser (localStorage; a blocked storage only means nothing is remembered): the test panel
@@ -1213,7 +1285,8 @@ function syncFromStatus(s) {
   if (now > holdUntil.fold && s.fold) dev.foldK = s.fold;
   // --xiao: the session's tempo is the XIAO's (its `status`), not the player's local model (SimLink, 120 by default)
   const xs = s.xiao && XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS ? XIAO.status : null;
-  if (now > holdUntil.tempo) dev.linkBpm = xs && xs.bpm > 0 ? xs.bpm : s.link_bpm;
+  if (s.link_playing) dev.startAsked = false;   // the start was reached: a later stop by a peer is a stop, not "armed"
+  if (now > holdUntil.tempo) dev.linkBpm = s.xiao ? (xs && xs.bpm > 0 ? xs.bpm : null) : s.link_bpm;   // --xiao: never SimLink's 120
 }
 const hold = key => { holdUntil[key] = performance.now() + 1200; };
 
@@ -1230,7 +1303,7 @@ function setField(field, val) {
   else if (field === 'out1') dev.offs[1] = val;             // emu
   else if (field === 'out2') dev.offs[2] = val;             // emu
   else if (field === 'rate') dev.rate = val;                // emu
-  else if (field === 'mode') { dev.link = val === 1; dev.foldK = 1; hold('fold'); api('fold', { factor: 1 }); api('mode', { mode: dev.link ? 'link' : 'audio' }); }     // from the line-in plug detect
+  else if (field === 'mode') { dev.link = val === 1; dev.clocks = true; dev.startAsked = false; dev.foldK = 1; hold('fold'); api('fold', { factor: 1 }); api('mode', { mode: dev.link ? 'link' : 'audio' }); }     // from the line-in plug detect
   else if (field === 'netmode') setNetMode(val);            // network fields are emu only
   else if (field === 'ssid') { dev.net.ssid = val; dev.net.changedAt = performance.now(); }
   else if (field === 'pass') { dev.net.pass = val; dev.net.changedAt = performance.now(); }
@@ -1274,20 +1347,48 @@ function netCtx(now) {
 }
 // LINK mode: the device's own Start / Stop of its clock outputs (emu: the outputs live in the device, the session runs on)
 // LINK mode Stop / Start: IGNORE / FOLLOW = the device's clocks only; FOLLOW+LEAD = also the session (starts on the next bar)
+// (Stop used to leave the clocks on in IGNORE and FOLLOW, so YES could not stop them and FOLLOW blinked "armed" until another
+// peer started the session: forever with none. Now Stop is Stop in every option.)
+// --xiao: the XIAO's session instead: `play` (it starts on its next bar line) or `stop`, the XIAO's own commands
 function linkStartStop(on) {
-  dev.clocks = on || dev.ltMode !== 2;           // leading: stopping the session stops the clocks through FOLLOW, keep them armed
+  if (S && S.xiao) {
+    const cmd = on ? 'play' : 'stop';
+    xiaoSend(cmd);
+    XIAO.sent = { cmd, at: performance.now() };
+    setTimeout(askStatus, 300);                  // its armed / start soon, not at the next period
+    return;
+  }
+  dev.clocks = on;
+  dev.startAsked = on;                           // armed until the session plays (FOLLOW+LEAD: on its next bar)
   if (dev.ltMode === 2) api('transport', { playing: on });
 }
 // the outputs (MIDI clock, modular clock) run: AUDIO = not held and Link playing (the device leads);
 // LINK = started on the device and, when following the session's start/stop, the session playing
 const outputsRun = s => (dev.link ? dev.clocks && (dev.ltMode === 0 || !!s.link_playing) : !dev.hold && !!s.link_playing);
+/* the transport icon's "armed" (blinking): a start asked for and not reached yet, one that resolves by itself or by YES.
+   AUDIO: not held, the tracker hears music with a tempo (not silent, not gated) and Link has not started yet: it locks
+   and starts on the next bar, or the music stops and it is stopped again. LINK: Start was pressed (dev.startAsked) and the
+   session does not play yet (FOLLOW+LEAD: its next bar; FOLLOW: another peer's start; YES stops it). A session that is
+   merely stopped (page start-up, a mode switch) is not armed: the square. IGNORE runs the clocks: never armed */
+function armedLocal(s) {
+  if (!dev.link) return !dev.hold && !s.link_playing && !s.silent && !s.gated && !!s.bpm;
+  return dev.clocks && dev.startAsked && dev.ltMode !== 0 && !s.link_playing;
+}
 async function setHold(on) {                  // Stop = hold; Start = resync, then release the hold
   dev.hold = on; hold('hold');
   if (!on) { dev.foldK = 1; await api('resync', {}); }
   await api('hold', { hold: on });
 }
 function tempoStep(d) {
+  if (dev.link && S && S.xiao) {                 // --xiao: the XIAO's session tempo (`tempo <bpm>`); none known: nothing
+    if (dev.linkBpm == null) return null;
+    const bpm = clampN(Math.round(dev.linkBpm) + d, TEMPO_RANGE[0], TEMPO_RANGE[1]);
+    dev.linkBpm = bpm; hold('tempo'); xiaoSend('tempo ' + bpm);
+    setTimeout(askStatus, 300);
+    return bpm;
+  }
   if (dev.link) {
+    if (dev.linkBpm == null) return null;        // (before the first status)
     const bpm = clampN(Math.round(dev.linkBpm) + d, TEMPO_RANGE[0], TEMPO_RANGE[1]);
     dev.linkBpm = bpm; hold('tempo'); api('tempo', { bpm });
     return bpm;
@@ -1297,7 +1398,14 @@ function tempoStep(d) {
   return S && S.bpm ? S.bpm * dev.foldK : 0;
 }
 
+/* --xiao: the XIAO's session now (xiaoLink), or null */
+const xiaoNow = now => xiaoLink(XIAO.status, XIAO.statusAt, now, XIAO.cfg ? XIAO.cfg.quantum : 4, XIAO.sent);
 function beatInfo(now) {
+  if (S && S.xiao) {                             // --xiao: the XIAO's Link beat; n = the bar's beat (0 = beat 1 of the bar)
+    const x = xiaoNow(now);
+    if (!x || x.beat == null) return null;
+    return { n: x.box, ms: (x.beat - Math.floor(x.beat)) * 60000 / x.bpm, from: 'link' };
+  }
   if (!S || S.beat == null || !S.beat_bpm) return null;
   const beat = S.beat + (now - tPoll) / 60000 * S.beat_bpm;
   const n = Math.floor(beat);
@@ -1313,16 +1421,20 @@ function buildCtx(now, beat) {
   const badge = $('srcbadge');
   badge.textContent = s.xiao ? 'XIAO' : 'LOCAL';
   badge.classList.toggle('xiao', !!s.xiao);
+  // --xiao: tempo, transport and beat are the XIAO's (its `status`), nothing from the local model; before the first
+  // fresh status: no tempo, a stopped transport. AUDIO: the BPM is its tracker's (its reports)
+  const x = s.xiao ? xiaoNow(now) : null;
+  const xrep = s.xiao && XIAO.rep && now - XIAO.repAt <= XIAO_REPORT_FRESH_MS ? XIAO.rep : null;
+  const running = s.xiao ? !!(x && x.running) : outputsRun(s);
+  const bpm = s.xiao ? (xrep && xrep.bpm > 0 ? xrep.bpm : null) : s.bpm ? s.bpm * dev.foldK : null;
   return {
-    link: dev.link, bpm: s.bpm ? s.bpm * dev.foldK : null, linkBpm: dev.linkBpm, mode: s.mode,
+    link: dev.link, bpm, linkBpm: s.xiao && x && now > holdUntil.tempo ? x.bpm : dev.linkBpm, mode: s.xiao ? (xrep ? xrep.mode : 'stopped') : s.mode,
     conf: s.confidence || 0, th: dev.th, gain: dev.gain, confStop: dev.confStop, levelDb: meter.bar, levelMin: meter.lo, levelMax: meter.hi,
-    silent: !lineIn || !!s.silent, gated: !!s.gated, hold: dev.hold, playing: s.xiao && XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS ? !!XIAO.status.playing : !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
-    running: outputsRun(s), ltMode: dev.ltMode,
-    // started but not running yet: AUDIO = not held, Link not started (the tracker locking, or waiting for the next bar);
-    // LINK = our clocks armed and waiting for the session's start (FOLLOW, FOLLOW+LEAD)
-    armed: dev.link ? dev.clocks && dev.ltMode !== 0 && !s.link_playing : !dev.hold && !s.link_playing,
+    silent: !lineIn || !!s.silent, gated: !!s.gated, hold: dev.hold, playing: s.xiao ? !!(x && x.playing) : !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
+    running, ltMode: dev.ltMode, trackerLeads: !!s.xiao && !dev.link,
+    armed: s.xiao ? !!(x && x.armed) : armedLocal(s),        // armedLocal / xiaoLink say what armed means
     // the boxes need a bar (Link's count; the estimate has none) and running outputs: stopped, they stand still
-    beatN: beat && beat.from === 'link' && outputsRun(s) ? beat.n : null,
+    beatN: beat && beat.from === 'link' && running ? beat.n : null,
     beatMs: beat ? beat.ms : 0, usb: $('usb').checked, fitted: $('bat').checked,
     batt: battLevel(), lineIn, bright: dev.bright, sleep: dev.sleep, inOff: dev.inOff, offs: dev.offs, rate: dev.rate, boot: dev.boot, splash: now - dev.powerOnAt < 800,
     net: netCtx(now), wifiQ: wifiQuality(now), groupPeers: $('wifi').value === 'none' ? 0 : xp ? xp.group : 3, setup: dev.net.mode === 3, qr: QR_CODE, saved: now < dev.savedUntil,
@@ -1450,6 +1562,7 @@ function armHint(b) {
 function dropHint() { clearTimeout(dev.hintTimer); ui.hint = null; }
 function comboStep(mod, d) {
   if (dev.link) return;                                          // LINK mode: the session owns the bar and the timing
+  if (S && S.xiao) { showOverlay('TRACKER LEADS', ''); return; } // --xiao: the nudges are the XIAO tracker's (not on it yet)
   if (mod === 'no') { api('shift', { beats: d * NUDGE_BEATS }); showOverlay('NUDGE BEAT', d > 0 ? '+1/2' : '-1/2'); }
   else {
     const ms = clampN(dev.inOff + d * NUDGE_MS, -100, 100);         // the nudge moves the audio input offset: every output

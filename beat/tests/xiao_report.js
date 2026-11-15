@@ -37,4 +37,80 @@ eq(jxText(frame('b 1 2 steady 1')), null);                // a report is not a c
 
 eq(beatStats(['beat=on', 'cpu_pct=39.6', 'hop_max_us=14236', 'err_us=-4300', 'mode=steady', 'phase_forces=30']),
    { cpu_pct: 39.6, hop_max_us: 14236, err_us: -4300, phase_forces: 30 });
+// --xiao: the XIAO's session from its `status` (xiaoLink), and what its tracker hears (xiaoHearing)
+const consts = 'const XIAO_STATUS_FRESH_MS = 5000, XIAO_PLAY_WAIT_MS = 2500;';
+const { xiaoLink, xiaoHearing } = new Function(consts + grab('xiaoLink') + grab('xiaoHearing') + '; return { xiaoLink, xiaoHearing };')();
+const st = (o = {}) => Object.assign({ link_peers: 2, bpm: 120, beat: 10.0, playing: 0, settled: 1, armed: 0 }, o);
+eq(xiaoLink(null, 0, 1000, 4, null), null);                                   // no status yet: nothing known (no 120)
+eq(xiaoLink(st(), 1000, 6001, 4, null), null);                                // older than 5 s: nothing
+eq(xiaoLink(st({ bpm: 0 }), 1000, 1500, 4, null),
+   { joined: false, bpm: null, beat: null, box: null, playing: false, armed: false, running: false });   // not in a session
+let x = xiaoLink(st(), 1000, 1500, 4, null);                                  // stopped, 120 BPM: half a second = a beat
+eq([x.joined, x.bpm, x.beat, x.box, x.playing, x.armed, x.running], [true, 120, 11, 3, false, false, false]);
+eq(xiaoLink(st({ beat: 12.0 }), 1000, 1000, 4, null).box, 0);                  // beat 12 = beat 1 of the bar (box 0)
+eq(xiaoLink(st({ beat: 12.0 }), 1000, 1000, 3, null).box, 0);                  // quantum 3: 12 mod 3
+eq(xiaoLink(st({ beat: 13.5 }), 1000, 1000, 3, null).box, 1);
+eq(xiaoLink(st({ beat: -0.5 }), 1000, 1000, 4, null).box, 3);                  // before the session's beat 0: the bar's last beat
+x = xiaoLink(st({ playing: 1, armed: 1, start: 12 }), 1000, 1500, 4, null);   // sent for bar 12, at beat 11: armed
+eq([x.playing, x.armed, x.running], [true, true, false]);
+x = xiaoLink(st({ playing: 1, armed: 1, start: 12 }), 1000, 1500 + 500, 4, null);   // beat 12 reached between polls: running
+eq([x.armed, x.running], [false, true]);
+x = xiaoLink(st({ playing: 0, armed: 1, start: 12 }), 1000, 1500, 4, null);   // play waiting to be sent: armed, not playing
+eq([x.playing, x.armed, x.running], [false, true, false]);
+x = xiaoLink(st(), 1000, 1500, 4, { cmd: 'play', at: 1200 });                 // the page sent play after this status: armed ..
+eq([x.armed, x.running], [true, false]);
+eq(xiaoLink(st(), 3000, 3500, 4, { cmd: 'play', at: 1200 }).armed, false);    // .. until a status answers it (it said: not playing)
+eq(xiaoLink(st(), 1000, 1200 + 2600, 4, { cmd: 'play', at: 1200 }).armed, false);   // .. or 2.5 s went by: never stuck
+x = xiaoLink(st({ playing: 1 }), 1000, 1500, 4, { cmd: 'stop', at: 1200 });   // stop sent: shown stopped at once
+eq([x.playing, x.armed, x.running], [false, false, false]);
+eq(xiaoLink(st({ playing: 1 }), 1000, 1500, 4, null).running, true);
+eq(xiaoHearing(null), { on: false, text: 'no report yet' });
+eq(xiaoHearing({ audio: false, mode: 'stopped' }).text, 'no audio');
+eq(xiaoHearing({ audio: true, mode: 'stopped' }), { on: false, text: 'audio stream open, no beat heard' });
+eq(xiaoHearing({ audio: true, mode: 'steady' }), { on: true, text: 'hearing audio' });
+
+// the control line's answers: dated by their first frame; `status`, `get` and `beat` told apart; an err kept
+{
+  const XIAO = { text: '', lines: [], answerAt: 0, stats: null, status: null, statusAt: 0, cfg: null, err: '', errAt: 0 };
+  const sent = [];
+  const env = { XIAO, api: (n, b) => sent.push(n), beatStats, performance: { now: () => 99 } };
+  const onXiaoLineText = new Function(...Object.keys(env), grab('onXiaoLineText') + '; return onXiaoLineText;')(...Object.values(env));
+  onXiaoLineText('link=1\nlink_peers=2\nbpm=135.00\nbeat=', 500);
+  onXiaoLineText('12.500\nplaying=1\nsettled=1\narmed=1\nstart=16.000\n', 530);
+  onXiaoLineText('ok\n', 560);
+  eq(XIAO.statusAt, 500);                                                     // the first frame's time, not the last
+  eq([XIAO.status.bpm, XIAO.status.beat, XIAO.status.playing, XIAO.status.armed, XIAO.status.start], [135, 12.5, 1, 1, 16]);
+  onXiaoLineText('group=1\nquantum=3\nbeat=on\nok\n', 700);
+  eq(XIAO.cfg.quantum, 3);
+  onXiaoLineText('cpu_pct=30\nphase_forces=2\nok\n', 800);
+  eq([XIAO.stats.phase_forces, sent], [2, ['xiao_stats']]);
+  onXiaoLineText('err audio mode\n', 900);
+  eq([XIAO.err, XIAO.errAt, XIAO.statusAt], ['err audio mode', 99, 500]);
+}
+
+// the transport icon's armed outside --xiao (armedLocal): only a start that resolves by itself or by YES
+{
+  const dev = { link: false, hold: false, clocks: true, startAsked: false, ltMode: 2 };
+  const armedLocal = new Function('dev', grab('armedLocal') + '; return armedLocal;')(dev);
+  const s = (o = {}) => Object.assign({ link_playing: false, silent: false, gated: false, bpm: 128 }, o);
+  eq(armedLocal(s()), true);                                                  // AUDIO: music with a tempo, Link not started: locking
+  eq(armedLocal(s({ silent: true, bpm: null })), false);                      // AUDIO, silence (start-up, no track): stopped, not armed
+  eq(armedLocal(s({ gated: true })), false);
+  eq(armedLocal(s({ bpm: null })), false);
+  eq(armedLocal(s({ link_playing: true })), false);
+  dev.hold = true;
+  eq(armedLocal(s()), false);                                                 // held: stopped
+  dev.link = true;                                                            // LINK, page start-up / mode switch: no Start asked
+  eq(armedLocal(s()), false);
+  dev.startAsked = true;                                                      // Start pressed, the session not playing yet
+  eq(armedLocal(s()), true);
+  eq(armedLocal(s({ link_playing: true })), false);
+  dev.ltMode = 1;                                                             // FOLLOW: waiting for the session, YES stops it
+  eq(armedLocal(s()), true);
+  dev.clocks = false;                                                         // stopped by YES
+  eq(armedLocal(s()), false);
+  dev.clocks = true;
+  dev.ltMode = 0;                                                             // IGNORE: the clocks run, never armed
+  eq(armedLocal(s()), false);
+}
 console.log('xiao page helpers: ' + checks + ' checks passed');
