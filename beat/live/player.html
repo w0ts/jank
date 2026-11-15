@@ -33,6 +33,15 @@
   #devwrap { display:flex; flex-wrap:wrap; gap:12px; align-items:stretch; }
   #leftcol { flex:0 1 auto; max-width:100%; display:flex; flex-direction:column; gap:12px; min-width:0; }
   #leftcol > .device { flex:0 0 auto; }
+  /* the XIAO card never moves the layout: it takes the device's width without widening the column (width 0 + min-width
+     100 %), every changing line keeps its height, stays on one line and is cut with "..." */
+  #leftcol > #xiaocard { width:0; min-width:100%; box-sizing:border-box; }
+  #xiaocard .row, #xiaocard #xmsg, #xiaocard #accmodel, #xiaocard #accxstats { min-height:1.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-wrap:nowrap; }
+  #xiaocard #xmsg, #xiaocard #accmodel, #xiaocard #accxstats, #xiaocard #calibmsg, #xiaocard #autolatmsg { display:block; }
+  #xiaocard #calibmsg, #xiaocard #autolatmsg { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #xiaocard #xaudio { display:inline-block; min-width:9.5em; text-align:center; }
+  #xiaocard #xbpm { display:inline-block; min-width:4.2em; text-align:right; font-variant-numeric:tabular-nums; }
+  #xiaocard #xn { display:inline-block; min-width:3.6em; font-variant-numeric:tabular-nums; }
   #rightcol { flex:1 1 420px; min-width:0; display:flex; flex-direction:column; gap:12px; }
   .tabs { display:flex; gap:3px; margin-bottom:-13px; position:relative; z-index:1; padding-left:10px; }
   .tabs button { border-radius:8px 8px 0 0; border-bottom-color:var(--line); background:var(--bg); color:var(--muted); padding:7px 16px; }
