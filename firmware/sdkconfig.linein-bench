@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# The XIAO's bench LINE IN on pad D3 (GPIO4): the LINE IN path without the board (docs/linein.md). After sdkconfig.xiao:
+# JANK_VARIANT=linein-bench JANK_EXTRA_DEFAULTS="sdkconfig.ble;sdkconfig.ble-tuned;sdkconfig.linein-bench" scripts/build.sh xiao
+CONFIG_JANK_LINEIN_BENCH=y

@@ -391,7 +391,7 @@ void bridge_snapshot(struct jk_snapshot *s)
     midi_stats(&s->midi_ticks, &s->midi_resync);
     beat_stats(&s->beat);
     s->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
-    s->batt_pct = -1;                  /* no board has a battery gauge yet */
+    s->batt_pct = (int8_t)linein_batt_pct();   /* the cell from the LINE IN's ADC pattern (linein.c); -1: none */
 #if CONFIG_JANK_BLE_MIDI
     s->ble_built = 1;
     ble_midi_state(&s->ble_state, &s->ble_left_s);
@@ -511,5 +511,11 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
         return e;
     if (xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) != pdPASS)
         return ESP_ERR_NO_MEM;
-    return beat_start();
+    e = beat_start();
+    if (e != ESP_OK)
+        return e;
+    /* the LINE IN after the tracker (its ring is ready); not fatal: without it the rest runs on USB audio */
+    if (linein_start() != ESP_OK)
+        ESP_LOGE(TAG, "LINE IN task: no memory");
+    return ESP_OK;
 }

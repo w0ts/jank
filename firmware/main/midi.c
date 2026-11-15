@@ -213,6 +213,18 @@ int64_t midi_now_us(void)
     return (int64_t)c;
 }
 
+/* the same clock from an IRAM interrupt that runs with the cache off (the LINE IN's ADC frames, linein.c):
+ * gptimer_get_raw_count is in IRAM with CONFIG_GPTIMER_CTRL_FUNC_IN_IRAM (sdkconfig.defaults; esp_driver_gptimer
+ * linker.lf), the timer object in internal RAM with CONFIG_GPTIMER_OBJ_CACHE_SAFE. Its spinlock is the timer's own, held
+ * for one counter capture, as the USB audio interrupt's midi_now_us already does on core 0. */
+int64_t IRAM_ATTR midi_now_us_isr(void)
+{
+    uint64_t c = 0;
+    if (gptimer_get_raw_count(s_timer, &c) != ESP_OK)
+        return -1;
+    return (int64_t)c;
+}
+
 void midi_set_quantum(uint32_t quantum)
 {
     portENTER_CRITICAL(&s_mux);
