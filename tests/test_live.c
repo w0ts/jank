@@ -228,6 +228,53 @@ static void test_link_play_ends_hold(void)
     CHECK(!strcmp(jho_icon_name(JHO_ARMED), "armed") && !strcmp(jho_icon_name(9), "stopped"));
 }
 
+/* LOW CONFIDENCE's gate: the outputs stop in every option, the session only with FOLLOW+LEAD; lifted, the transport's
+ * rule again (the clock starts on its bar line: armed until then); LINK mode: no gate */
+static void test_gate_stops_outputs(void)
+{
+    for (uint8_t lt = JHO_IGNORE; lt <= JHO_LEAD; lt++) {
+        struct jho h;
+        struct jho_in in = hin(lt, 1, 1);
+        jho_init(&h);
+        in.clock_running = 1;
+        CHECK(jho_outputs(&h, &in) == 1 && jho_icon(&h, &in) == JHO_RUNNING && !jho_session_held(&h, &in));
+        in.gated = 1;
+        CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED);
+        CHECK(jho_session_held(&h, &in) == (lt == JHO_LEAD));
+        CHECK(!h.hold && h.holds == 0);                         /* not the user's hold */
+        in.audio = 0;                                           /* LINK mode: the transport's rule */
+        CHECK(jho_outputs(&h, &in) == 1 && !jho_session_held(&h, &in));
+        in.audio = 1;
+        in.gated = 0;                                           /* back above the threshold */
+        in.clock_running = 0;
+        CHECK(jho_outputs(&h, &in) == 1 && jho_icon(&h, &in) == JHO_ARMED && !jho_session_held(&h, &in));
+        in.clock_running = 1;                                   /* the bar line came */
+        CHECK(jho_icon(&h, &in) == JHO_RUNNING);
+    }
+}
+
+/* the user's hold wins over the gate: held, nothing starts when the gate lifts; Start while gated arms, and the outputs
+ * wait for the gate and the lock both */
+static void test_hold_wins_over_gate(void)
+{
+    struct jho h;
+    struct jho_in in = hin(JHO_LEAD, 1, 1);
+    jho_init(&h);
+    in.gated = 1;
+    jho_set(&h, 1);
+    in.gated = 0;
+    CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in));
+    in.gated = 1;
+    jho_set(&h, 0);                                             /* Start while gated */
+    CHECK(h.arming && jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in));
+    CHECK(h.arming);                                            /* still waiting: the gate is not the lock */
+    in.gated = 0;
+    in.locked = 0;
+    CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_ARMED && !jho_session_held(&h, &in));
+    in.locked = 1;
+    CHECK(jho_outputs(&h, &in) == 1 && !h.arming);
+}
+
 int main(void)
 {
     test_db();
@@ -239,6 +286,8 @@ int main(void)
     test_release_arms_until_locked();
     test_session_by_option();
     test_link_play_ends_hold();
+    test_gate_stops_outputs();
+    test_hold_wins_over_gate();
     printf("live: %d checks, %d failed\n", checks, fails);
     return fails;
 }

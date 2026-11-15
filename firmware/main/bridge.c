@@ -254,7 +254,8 @@ static void follow_mac(void)
 static uint8_t lt_mode(void) { return s_cfg.transport == JK_TRANSPORT_AUTO ? JHO_IGNORE : s_lead ? JHO_LEAD : JHO_FOLLOW; }
 
 /* what the MIDI transport should be: the session's word while joined; held through a change of GROUP; then AUDIO mode's
- * hold (jank_hold.h): Stop silences the outputs at once, Start lets them go once the tracker locks */
+ * hold (jank_hold.h): Stop silences the outputs at once, Start lets them go once the tracker locks; and LOW CONFIDENCE's
+ * gate (jank_conf.h): closed, the outputs stop; open again, they start on the next bar line */
 static void follow_transport(int64_t now)
 {
     int want, base = s_base;
@@ -270,7 +271,7 @@ static void follow_transport(int64_t now)
     s_base = (uint8_t)base;
     beat_state(&audio, &locked);
     s_hin = (struct jho_in){.audio = audio, .lt = lt_mode(), .base = (uint8_t)base, .locked = locked,
-                            .clock_running = (uint8_t)(midi_is_playing() && !midi_start_pending())};
+                            .clock_running = (uint8_t)(midi_is_playing() && !midi_start_pending()), .gated = beat_gated()};
     want = jho_outputs(&s_hold, &s_hin);
     if (want != s_want) {
         s_want = (uint8_t)want;

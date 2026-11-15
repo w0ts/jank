@@ -41,6 +41,9 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .row input { width: 7em; }
 .meter { height: 8px; border-radius: 4px; background: var(--off); overflow: hidden; margin-top: 6px; }
 .meter i { display: block; height: 100%; width: 0; background: var(--accent); }
+.meter { position: relative; }
+.meter b.tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
+.meter.gated i { background: var(--warn); }
 #msg { color: var(--dim); min-height: 1.4em; margin: 0 0 12px; }
 #msg.bad { color: var(--warn); }
 .hide { display: none !important; }
@@ -96,7 +99,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <div class="stat"><b id="h-air">-</b><span>units on the air</span></div>
       <div class="stat"><b id="h-batt">-</b><span>battery</span></div>
       <div class="stat"><b id="h-level">-</b><span id="h-level-range">input level</span><div class="meter"><i id="h-level-bar"></i></div></div>
-      <div class="stat"><b id="h-conf">-</b><span>beat confidence</span><div class="meter"><i id="h-conf-bar"></i></div></div>
+      <div class="stat"><b id="h-conf">-</b><span id="h-conf-note">confidence</span><div class="meter" id="h-conf-meter"><i id="h-conf-bar"></i><b class="tick hide" id="h-conf-tick" title="the threshold"></b></div></div>
       <div class="stat"><b id="h-ble">-</b><span>Bluetooth</span></div>
     </div>
   </section>
@@ -122,6 +125,8 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <label>Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
       <label>Beat latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
       <label>USB MIDI clock <select id="c-usbmidi"><option value="on">On: the clock also over USB</option><option value="off">Off: MIDI out (DIN / TRS) only</option></select></label>
+      <label>Low confidence <select id="c-lowconf"><option value="stop">Stop / start: the outputs stop under the threshold</option><option value="run">Keep running</option></select></label>
+      <label>Confidence threshold, % <input id="c-threshold" type="number" min="0" max="100" step="5" inputmode="numeric"></label>
       <label>Auto bar <select id="c-autobar"><option value="start">At start: the 1 placed when playing starts</option><option value="always">Always: also while playing</option><option value="off">Off</option></select></label>
       <label>Audio source <select id="c-source"><option value="auto">Auto: the line in when plugged, else USB</option><option value="usb">USB audio</option><option value="line">Line in</option><option value="link">None: Link only (a plugged line still wins)</option></select></label>
       <label>Bluetooth <select id="c-ble"><option value="pair">Pair now: three clicks or the button</option><option value="auto">On start: also at every start</option><option value="off">Off</option></select></label>
@@ -540,6 +545,19 @@ function audioView(v) {
            peak_db: v.peak_db ?? "-" };
 }
 
+/* LOW CONFIDENCE on the confidence meter, from `status` (fresh: the age is the caller's) or `get`: the threshold's tick
+   (percent, null: none, KEEP RUNNING or 0) and the note under the number; gated: the outputs are stopped by it (AUDIO mode) */
+function confView(v) {
+  if (!v || v.lowconf === undefined) return { tick: null, note: "confidence", gated: false };
+  const th = Number(v.threshold);
+  const on = v.lowconf === "stop" && th > 0;
+  const gated = on && v.gated === "1" && v.audio_live === "1";
+  const silent = v.silent === "1" && v.audio_live === "1";
+  const note = silent ? "confidence: silence, outputs stopped" : gated ? "confidence: under " + th + " %, outputs stopped"
+             : on ? "confidence (stops under " + th + " %)" : "confidence (keeps running)";
+  return { tick: on ? Math.max(0, Math.min(100, th)) : null, note, gated: gated || silent };
+}
+
 /* a setting's command, or null when the value is not one the jank takes */
 function setCommand(key, raw) {
   const value = String(raw).trim();
@@ -547,14 +565,15 @@ function setCommand(key, raw) {
     if (!/^-?\d{1,3}(\.\d{1,2})?$/.test(value) || Math.abs(Number(value)) > 100) return null;
     return "set offset " + value;
   }
-  const range = { group: [1, 9], quantum: [1, 16], beat_latency: [-300, 300] }[key];
+  const range = { group: [1, 9], quantum: [1, 16], beat_latency: [-300, 300], threshold: [0, 100] }[key];
   if (range) {
     const n = Number(value);
     if (value === "" || !Number.isInteger(n) || n < range[0] || n > range[1]) return null;
     return "set " + key + " " + n;
   }
   const choices = { filter: ["link", "all"], peer: ["on", "off"], transport: ["link", "auto"], beat: ["on", "off"], ble: ["pair", "off", "auto"],
-                    source: ["auto", "line", "usb", "link"], autobar: ["off", "start", "always"], usbmidi: ["on", "off"] }[key];
+                    source: ["auto", "line", "usb", "link"], autobar: ["off", "start", "always"], usbmidi: ["on", "off"],
+                    lowconf: ["run", "stop"] }[key];
   if (choices) return choices.includes(value) ? "set " + key + " " + value : null;
   if (key === "name" && /^[\x20-\x7e]{1,23}$/.test(value)) return "set name " + value;
   return null;
@@ -587,7 +606,8 @@ function nudgeError(message) {
 
 <script id="ui">
 const $ = (id) => document.getElementById(id);
-const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency", "autobar", "usbmidi", "source", "ble"];
+const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency", "autobar", "usbmidi", "lowconf",
+                  "threshold", "source", "ble"];
 const LAT_SRC = { usb: "(the computer's)", line: "(the line in's)" };   /* beat_latency_src; a hosted device: host:VID:PID */
 const BLE_SVC = "03b80e5a-ede8-4b33-a751-6ce34ec4c700", BLE_CHR = "7772e5db-3868-4112-a1a9-f2669d106bf3";
 const BLE_CAP = 20;                   /* write payload: the default ATT MTU's, which every link takes (Web Bluetooth does not say the MTU) */
@@ -631,6 +651,12 @@ function showHome() {
   $("h-batt").textContent = v ? v.battery : "-";
   $("h-level-bar").style.width = (v ? v.levelPct : 0) + "%";
   $("h-conf-bar").style.width = (v ? v.confPct : 0) + "%";
+  const fresh = S.lastStatus && performance.now() - S.statusAt < HOME_STALE_MS;
+  const c = confView(fresh ? S.lastStatus : S.lastGet);     /* (a `get` has the settings, no gate) */
+  $("h-conf-note").textContent = c.note;
+  $("h-conf-tick").classList.toggle("hide", c.tick === null);
+  if (c.tick !== null) $("h-conf-tick").style.left = c.tick + "%";
+  $("h-conf-meter").classList.toggle("gated", c.gated);
   const on = !!(S.line && S.lastHome && S.lastHome.bpm > 0);
   $("t-set").disabled = !on;
   $("t-play").disabled = !(S.line && v && v.canPlay);

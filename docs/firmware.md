@@ -97,8 +97,26 @@ any Link app may; with no settled session they answer `err no session`: alone, t
   session's as before, and `play` also ends a hold. `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
   transport icon), with `audio=` (the source open), `audio_live=` (sound: AUDIO mode), the input meter `rms_db=` (RMS over
   0.3 s, a value every 250 ms), `rms_min_db=` / `rms_max_db=` (its extremes over 3 s), `peak_db=` (the last second's
-  peak) and `conf=` (the tracker's network activation peak over the last second, percent: the device has no grid
-  confidence). The beat reports' audio field is 0 (no source), 1 (open, no sound), 2 (sound).
+  peak), `conf=` (the grid-fit confidence below, percent) and `act=` (the tracker's network activation peak over the
+  last second, percent: M2d's `conf=`). The beat reports' audio field is 0 (no source), 1 (open, no sound), 2 (sound).
+- **LOW CONFIDENCE** `set lowconf run|stop`, `set threshold <0..100>` (percent), stored (blob `usb1`'s 5th and 6th
+  bytes, saved once stopped); STOP / START at 80 % by default, as the emulator (`core/jank_conf.h`, beat-listener's
+  live/confidence.py and engine.py). The confidence: how well the tracked beats of the last 8 s fit ModeBpm's published
+  grid, an F-measure 0..1 (a slot of the grid is hit by a beat within 10 % of a period; a beat near no slot is an extra);
+  0 in silence and in LINK mode; looked at each step (4 times a second and at each tracked beat). With STOP / START the
+  gate closes when it is under the threshold and opens again at the threshold + 5 points (the Python's HYSTERESIS: one
+  beat hit or missed moves the F-measure 2..4 points at 90..180 BPM, so a gate without a band would flap on every beat
+  of a track near the threshold; locked tracks measure 94-97 %, wrong tempos ~40 %). KEEP RUNNING (`run`) or a threshold
+  of 0: never gated. SILENCE, whatever the setting: the input under -60 dBFS RMS for 0.5 s gates too, and the beats kept
+  go (what comes after is new music). Gated (`core/jank_hold.h` jho_in.gated): the MIDI clock outputs stop at once (a
+  MIDI Stop; the bench CLK / RST pins with them); with FOLLOW+LEAD the Link session stops too (once), with IGNORE or
+  FOLLOW it is left to the tracker. Open again: the outputs start on the session's next bar line (FOLLOW+LEAD: the
+  tracker starts the session on its next bar line, AUTO BAR's start wait included). The user's hold wins: held, the gate
+  opening starts nothing; `play` while gated arms, and the outputs wait for the gate and the lock. LINK mode: no gate
+  (as no hold). A first start with STOP / START waits for the window to fill with beats on the grid (about 7 s of music
+  at 80 %), as the player. `status` and `beat`: `conf=`, `act=`, `gated=0|1`, `silent=0|1`, `threshold=`, `lowconf=`;
+  `get`: `lowconf=`, `threshold=`; the transport icon (`outputs=`) is `stopped` while gated, `armed` once the gate opens
+  until the bar line. The HOME line's `conf` is the new confidence.
 - **FOLD and AUTO RANGE** (`core/jank_fold.h`, the Python player's fold): `fold x2|/2|1` in AUDIO mode (`err link mode`
   otherwise) answers `fold=<1|2|4|0.5|0.25>`; `status` says `fold=` and `fold_manual=`; the HOME line's last field is
   `x2 x4 /2 /4` while folded. Link, the MIDI clock and the beat reports get the tracked tempo times the fold. x2 keeps

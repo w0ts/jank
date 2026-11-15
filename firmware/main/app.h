@@ -53,6 +53,9 @@ uint8_t beat_bar_state(void);
 /* AUDIO mode (the tracker on and its source sounding, core/jank_live.h) and the tracker locked on a steady beat; cheap
  * (the bridge's task asks it at every step) */
 void beat_state(uint8_t *audio, uint8_t *locked);
+/* LOW CONFIDENCE (core/jank_conf.h): in AUDIO mode, the gate closed (STOP / START under the threshold) or 0.5 s of silence:
+ * the outputs stop (core/jank_hold.h jho_in.gated); cheap, for the bridge's step */
+uint8_t beat_gated(void);
 /* AUDIO mode's fold (core/jank_fold.h): dir +1 x2, -1 /2, 0 back to 1; taken by the beat task within 5 ms. Returns the
  * new exp (fold 2^exp), -99 in LINK mode */
 int beat_fold(int dir);
