@@ -36,8 +36,10 @@
   /* the XIAO card never moves the layout: it takes the device's width without widening the column (width 0 + min-width
      100 %), every changing line keeps its height, stays on one line and is cut with "..." */
   #leftcol > #xiaocard { width:0; min-width:100%; box-sizing:border-box; }
-  #xiaocard .row, #xiaocard #xmsg, #xiaocard #accmodel, #xiaocard #accxstats { min-height:1.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-wrap:nowrap; }
-  #xiaocard #xmsg, #xiaocard #accmodel, #xiaocard #accxstats, #xiaocard #calibmsg, #xiaocard #autolatmsg { display:block; }
+  #xiaocard .row, #xiaocard #accmodel, #xiaocard #accxstats { min-height:1.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-wrap:nowrap; }
+  /* the status line wraps onto exactly two lines (always two lines tall, so its height never changes) */
+  #xiaocard #xmsg { white-space:normal; overflow:hidden; line-height:1.4em; height:2.8em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  #xiaocard #accmodel, #xiaocard #accxstats, #xiaocard #calibmsg, #xiaocard #autolatmsg { display:block; }
   #xiaocard #calibmsg, #xiaocard #autolatmsg { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #xiaocard #xaudio { display:inline-block; min-width:9.5em; text-align:center; }
   #xiaocard #xbpm { display:inline-block; min-width:4.2em; text-align:right; font-variant-numeric:tabular-nums; }
