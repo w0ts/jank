@@ -105,8 +105,10 @@ eq(xiaoHearing({ audio: true, live: true, mode: 'stopped' }), { on: true, text: 
   eq(armedLocal(s()), false);                                                 // held: stopped
   dev.link = true;                                                            // LINK, page start-up / mode switch: no Start asked
   eq(armedLocal(s()), false);
-  dev.startAsked = true;                                                      // Start pressed, the session not playing yet
-  eq(armedLocal(s()), true);
+  dev.startAsked = true;                                                      // still held (the user's layer, jank M2g): stopped
+  eq(armedLocal(s()), false);
+  dev.hold = false;                                                           // the user's Start (linkStartStop releases the hold),
+  eq(armedLocal(s()), true);                                                  // the session not playing yet
   eq(armedLocal(s({ link_playing: true })), false);
   dev.ltMode = 1;                                                             // FOLLOW: waiting for the session, YES stops it
   eq(armedLocal(s()), true);

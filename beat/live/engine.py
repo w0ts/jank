@@ -4,7 +4,9 @@ Two gates on top of the estimator decide whether Link runs:
 - silence: input under SILENCE_RMS for SILENCE_S stops at once (the estimator's 30 s hold is for breaks in music,
   which are never digital silence) and the estimator starts over: what comes after silence is new music;
 - confidence (live.confidence) under `min_confidence` stops the transport; it runs again once confidence is back at
-  `min_confidence + HYSTERESIS` (and the controller starts it on the next bar).
+  `min_confidence + HYSTERESIS` (and the controller starts it on the next bar). The device's Start (resync) wins over
+  it, as jank's firmware (M2g, core/jank_hold.h gate_off): the gate is disarmed until the confidence has reached
+  `min_confidence + HYSTERESIS` once; a Stop (hold) ends that. Silence is not disarmed.
 
 The downbeat estimator (live.downbeat) runs beside them on the same frames: the tracker's 81 bands (BandTap) and, after
 each tracked beat, ModeBpm's grid. Its reset events: silence, the estimator stopped (30 s without a steady beat), a
@@ -62,7 +64,8 @@ class Engine:
         self.min_confidence = min_confidence
         self._silent_s = 0.0
         self._gated = False
-        self.hold = False       # while True the published snapshot is "stopped"
+        self._disarmed = False  # the device's Start disarmed the confidence gate (M2g)
+        self._hold = False
         self._fold = Fold()     # the device's x2 / /2 (HOME UP / DOWN) and AUTO RANGE: Link gets the tracked tempo times it
         self.session_bpm = lambda: None    # the Link session's tempo while it plays, else None (AUTO RANGE's reference)
         self.place_fn = lambda t: None     # the Link session's place in beats at stream time t, None when not playing
@@ -141,7 +144,10 @@ class Engine:
                 self._gated = conf < min(threshold + HYSTERESIS, 1.0)
             else:
                 self._gated = conf < threshold
-            stop = self.silent or self._gated or self.hold
+            if self._disarmed and (threshold <= 0 or conf >= min(threshold + HYSTERESIS, 1.0)):
+                self._disarmed = False                     # the confidence reached threshold + hysteresis: re-armed
+            gated = self._gated and not self._disarmed
+            stop = self.silent or gated or self.hold
             bar = self.downbeat.view()
             self._range(now, bpm, bar)
             ab = self.driver.autobar
@@ -156,7 +162,7 @@ class Engine:
                     self._last_out = fgrid
                 published = Snapshot(mode, fbpm, fgrid, bar if move else None, "always" if ab == "always" else "start",
                                      self._bar_epoch, wait and move)
-            return EngineStatus(mode, bpm, conf, self.silent, self._gated, self.hold, grid, published, bar,
+            return EngineStatus(mode, bpm, conf, self.silent, gated, self.hold, grid, published, bar,
                                 self._fold.factor, self._fold.auto, ab)
 
     def _range(self, now: float, bpm: float | None, bar: BarView) -> None:
@@ -194,9 +200,22 @@ class Engine:
             self.estimator = ModeBpm()
             self.beats = []
             self._gated = False
+            self._disarmed = True                          # the device's Start wins over the confidence gate (M2g)
             self._fold.reset()
             self._wait = 0
             self.driver.event("reset", self.bands.frames - 1)
+
+    @property
+    def hold(self) -> bool:
+        """The device's Stop: while True the published snapshot is "stopped"."""
+        return self._hold
+
+    @hold.setter
+    def hold(self, on: bool) -> None:
+        with self._lock:
+            self._hold = bool(on)
+            if on:
+                self._disarmed = False                     # a Stop ends a Start's disarm
 
     def bar_nudge(self) -> BarView:
         """The user nudged the beat: the downbeat estimator goes MANUAL. Its view before the nudge (the hand label)."""
