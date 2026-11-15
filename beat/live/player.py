@@ -16,6 +16,9 @@ from dataclasses import asdict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs
+
+import numpy as np
 
 from live.clockmap import ClockMap
 from live.controller import LinkController
@@ -23,6 +26,7 @@ from live.downbeat import BarView
 from live.engine import Engine
 from live.link_port import RealLink, SimLink
 from live.runner import run
+from live.tracker import SAMPLE_RATE
 from live.varispeed import VarispeedSource
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +36,7 @@ TRACKS_DIR = Path.home() / "Music" / "Tracks"
 ACCURACY_DIR = ROOT / "runs" / "accuracy"      # player --xiao: one CSV a day of the accuracy windows
 NUDGE_DIR = ROOT / "runs" / "downbeat"         # one JSON line per NUDGE BEAT: hand labels for the downbeat refit
 DEFAULT_PORT = 8791
+TAB_MAX_S = 2.0            # one tab_audio post carries at most this much audio (the page sends ~0.1 s)
 MAX_OFFSET_MS = 200.0
 FOLDS = (0.25, 0.5, 1.0, 2.0, 4.0)   # x2 / /2 steps, two either way
 MAX_SHIFT_BEATS = 3        # the device nudges half a beat at a time
@@ -88,9 +93,24 @@ class App:
             "offset_ms": self.clock.user_offset_us / 1000.0,
             **self._beat_now(es),
             "bar": bar_status(es.bar, self.controller.bar_moves),
+            "tab": self.source.tab_active(),
             "xiao": self.xiao.status() if self.xiao is not None else None,
             "bench": self.bench.status() if self.bench is not None else None,
         }
+
+    def tab_audio(self, data: bytes, rate: int) -> None:
+        """A block of a browser tab's audio (little-endian float32, mono, 44.1 kHz; the last sample is 'now') goes to the
+        tracker as the source's input. The page's AudioContext runs at 44.1 kHz, so no resampling happens here."""
+        if rate != SAMPLE_RATE:
+            raise ValueError(f"tab audio rate {rate} Hz: {SAMPLE_RATE} Hz only")
+        if not data or len(data) % 4:
+            raise ValueError(f"tab audio: {len(data)} bytes is not whole float32 samples")
+        if len(data) > TAB_MAX_S * SAMPLE_RATE * 4:
+            raise ValueError(f"tab audio: more than {TAB_MAX_S:g} s in one post")
+        samples = np.frombuffer(data, dtype="<f4").astype(np.float32)
+        if not np.isfinite(samples).all():
+            raise ValueError("tab audio: samples are not finite")
+        self.source.feed_tab(np.clip(samples, -1.0, 1.0), self.link.now_us())
 
     def _beat_now(self, es) -> dict:
         """Where the beat is right now, for the device emulator's BEAT LED: Link's own beat while its transport runs,
@@ -222,9 +242,17 @@ def make_handler(app: App):
                 self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         def do_POST(self) -> None:
-            name = self.path.removeprefix("/api/")
+            path, _, query = self.path.partition("?")
+            name = path.removeprefix("/api/")
             try:
                 length = int(self.headers.get("Content-Length") or 0)
+                if name == "tab_audio":
+                    if length > TAB_MAX_S * SAMPLE_RATE * 4:
+                        raise ValueError(f"tab audio: more than {TAB_MAX_S:g} s in one post")
+                    rate = int(parse_qs(query).get("rate", ["0"])[0])
+                    app.tab_audio(self.rfile.read(length), rate)
+                    self._json(HTTPStatus.OK, {"ok": True})
+                    return
                 body = json.loads(self.rfile.read(length) or b"{}")
                 app.command(name, body)
             except KeyError:
