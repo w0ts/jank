@@ -58,14 +58,53 @@ eq(box.pushOf([0xf0, 0x7d, 0x4a, 0x42, 0xf7]), null);
 // --- the HOME line, as tests/test_phone.c makes it ---
 eq(box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87"),                       // older firmware: no min / max
    { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87,
-     levelMin: null, levelMax: null });
+     levelMin: null, levelMax: null, audio: false, fold: "" });
 eq(box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18"),
    { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87,
-     levelMin: -31, levelMax: -18 });
+     levelMin: -31, levelMax: -18, audio: false, fold: "" });
 eq(box.parseHome("h 0 j3 0 - 4 0 0 - - - - -"),
    { bpm: 0, net: { kind: "jank", group: 3 }, transport: "stopped", bar: null, quantum: 4, link: 0, air: 0, battery: null, level: null, conf: null,
-     levelMin: null, levelMax: null });
+     levelMin: null, levelMax: null, audio: false, fold: "" });
 eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false });
+// M2b/M2c: the mode (0 LINK, 1 AUDIO, x2 x4 /2 /4 AUDIO folded), the hold as the transport in AUDIO mode
+{
+  const link = box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18 0");
+  eq([link.audio, link.fold, link.levelMin, link.levelMax], [false, "", -31, -18]);
+  const lv = box.homeView(link, 0);
+  eq([lv.mode, lv.transport, lv.playText, lv.canPlay, lv.levelRange], ["LINK", "Playing", "Stop", true, "input level, -31 to -18 dB in 3 s"]);
+  const held = box.homeView(box.parseHome("h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1"), 0);
+  eq([held.mode, held.audio, held.transport, held.play, held.playText], ["AUDIO", true, "Held: outputs stopped", "play", "Start outputs"]);
+  const armed = box.homeView(box.parseHome("h 0 j3 2 - 4 0 0 - -30 12 -40 -28 1"), 0);
+  eq([armed.transport, armed.play, armed.playText, armed.canPlay], ["Starts once the beat locks, on a bar", "stop", "Stop outputs", true]);
+  const folded = box.parseHome("h 25600 j3 1 0 4 2 0 - -12 90 -15 -9 x2");
+  eq([folded.audio, folded.fold, box.homeView(folded, 0).mode], [true, "x2", "AUDIO x2"]);
+  eq(box.homeView(box.parseHome("h 6400 j3 1 0 4 2 0 - -12 90 -15 -9 /2"), 0).mode, "AUDIO ÷2");
+  eq(box.parseHome("h 12000 j3 1 0 4 2 0 - -12 90 -15 -9 x3").fold, "");
+  const idle = box.homeView(box.parseHome("h 0 j3 0 - 4 0 0 - - - - - 0"), 0);
+  eq([idle.canPlay, idle.levelRange], [false, "input level"]);
+  // Bluetooth from `status`: the window's countdown, a phone, off; over Bluetooth this phone
+  eq(box.bleView({ ble_state: "window", ble_left: "95" }, 0, false), "pairing 1:35");
+  eq(box.bleView({ ble_state: "window", ble_left: "95" }, 5500, false), "pairing 1:30");
+  eq(box.bleView({ ble_state: "window", ble_left: "3" }, 4000, false), "off");
+  eq(box.bleView({ ble_state: "connected" }, 0, false), "phone connected");
+  eq(box.bleView({ ble_state: "off" }, 0, false), "off");
+  eq(box.bleView(null, 0, true), "this phone");
+  eq(box.bleView({}, 0, false), "-");
+  // the audio lines of status
+  eq(box.audioView({ audio: "1", audio_live: "1", audio_source: "usb", outputs: "armed", peak_db: "-3" }),
+     { audio: "sound (AUDIO), usb", outputs: "armed", peak_db: "-3" });
+  eq(box.audioView({ audio: "1", audio_live: "0", audio_source: "usb" }).audio, "silent (LINK), usb");
+  eq(box.audioView({ audio: "0", audio_live: "0", audio_source: "none" }).audio, "none (LINK)");
+  eq(box.audioView({}), { audio: "-", outputs: "-", peak_db: "-" });
+  // the new settings
+  eq(box.setCommand("source", "link"), "set source link");
+  eq(box.setCommand("source", "mic"), null);
+  eq(box.setCommand("autobar", "start"), "set autobar start");
+  eq(box.setCommand("autobar", "always"), "set autobar always");
+  eq(box.setCommand("autobar", "on"), null);
+  ok(/id="c-bluetooth"/.test(html) && (html.match(/id="c-ble"/g) || []).length === 1, "one element per id: the Bluetooth button apart from its setting");
+  ok(/id="c-source"/.test(html) && /id="c-autobar"/.test(html) && /id="t-up"/.test(html) && /id="t-down"/.test(html), "source, AUTO BAR, x2 / ÷2 on the page");
+}
 eq(box.parseHome("h 12000 w1 2 150 3 2 0 - - -").transport, "armed");
 eq(box.parseHome("h 12000 x3 1 275 4 2 0 - - -"), null);
 eq(box.parseHome("h 12000 j3 1 275"), null);

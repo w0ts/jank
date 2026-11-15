@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "app.h"
+#include "jank_fold.h"
 #include "esp_intr_alloc.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -193,6 +194,13 @@ static void run_line(const char *line)
         ctl_reply("err no bluetooth in this build\n", 31);
 #endif
         return;
+    }
+    if (a == JK_CTL_FOLD) {
+        int dir = 0, exp = jk_ctl_fold(line, &dir) ? -99 : beat_fold(dir);
+        if (exp == -99)
+            strcpy(s_out, "err link mode\n");
+        else
+            snprintf(s_out, sizeof s_out, "fold=%s\nok\n", jfo_name(exp));
     }
     if (a == JK_CTL_TEMPO || a == JK_CTL_PLAY || a == JK_CTL_STOP) {
         int32_t mpb = 0;

@@ -99,6 +99,23 @@ any Link app may; with no settled session they answer `err no session`: alone, t
   0.3 s, a value every 250 ms), `rms_min_db=` / `rms_max_db=` (its extremes over 3 s), `peak_db=` (the last second's
   peak) and `conf=` (the tracker's network activation peak over the last second, percent: the device has no grid
   confidence). The beat reports' audio field is 0 (no source), 1 (open, no sound), 2 (sound).
+- **FOLD and AUTO RANGE** (`core/jank_fold.h`, the Python player's fold): `fold x2|/2|1` in AUDIO mode (`err link mode`
+  otherwise) answers `fold=<1|2|4|0.5|0.25>`; `status` says `fold=` and `fold_manual=`; the HOME line's last field is
+  `x2 x4 /2 /4` while folded. Link, the MIDI clock and the beat reports get the tracked tempo times the fold. x2 keeps
+  every tracked beat a beat; /2 keeps the tracked beats that sit on the session's grid (a user's /2: the session's beats
+  1 and 3, so the 1 stays a 1). AUTO RANGE: a new tempo (a new lock, a track change, a jump of the tracker, an octave flip
+  within a track) is folded to an octave of the reference (the session's tempo while it plays, else the last tempo put out
+  in the last 2 minutes) when it lands within 6 % of it: 70 after 140 -> 140, 90 after 175 -> 180, a tracker flipping 128
+  -> 64 or 256 -> output still 128, same count; 128 -> 132 or 135, or 90 after 132, is followed as is. A user's fold wins
+  until the next new tempo, which is then ranged against the user's output. Not stored: 1 at a start, at Start after
+  Stop, at a new stream and when AUDIO mode ends.
+- **AUTO BAR** `set autobar off|start|always` (`on` = start), stored. AT START (the default): the bar's 1 is placed only
+  while the session is stopped or its start is armed (the start re-targets onto the moved bar line), or once at a new
+  start for the bar (Start after Stop, a fold change, a new lock) if the estimator knows the 1 then; never while it
+  plays. The tracker's start waits up to 8 tracked beats after its lock for the estimator: found, the start lands on the
+  music's 1; not found by then, it starts on the session's next bar line and the 1 is placed at the next start (a bounded
+  wait: beat one honest when the estimator can tell, no long silent wait when it cannot). ALWAYS: also mid-play, as
+  before. No move while folded (the estimator counts tracked beats).
 - **AUDIO > SOURCE** `set source auto|line|usb|link`: AUTO = the line in when a plug is in, else USB audio; LINK = USB
   audio ignored (LINK mode), a plug in the line in still wins. A unit with no screen toggles AUTO <-> LINK with a single
   NO (`jur_src_toggle`, branch fw/ui wires the button).

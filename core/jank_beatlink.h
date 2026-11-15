@@ -44,7 +44,21 @@ struct jbl_in {
     uint8_t passive;                    /* no sound on the source (LINK mode): the session is not the tracker's to start or stop */
     uint8_t held;                       /* AUDIO mode's Stop with LINK TRANSPORT = FOLLOW+LEAD (jank_hold.h): the session is
                                          * stopped once, at the press, then neither started nor stopped by the tracker */
+    uint8_t bar_mode;                   /* AUTO BAR: enum jbl_bar_mode */
+    uint8_t bar_now;                    /* AT START: a new start for the bar now (a resync, a fold change, a new lock): one
+                                         * placement allowed at this step even though the session plays */
+    uint8_t bar_wait;                   /* AT START: the estimator has not found the 1 yet: the tracker's start waits */
 };
+
+/* AUTO BAR (the setting): OFF no placement; AT START the bar's 1 is placed only while the session is stopped or its start
+ * is not reached yet (an armed start re-targets onto the moved grid: it lands on the 1), or at a step with bar_now; never
+ * while it plays. ALWAYS: every new decision, playing or not. START WAIT: with AT START the tracker's start waits for the
+ * estimator (bar_wait, which the caller holds for at most JBL_BAR_WAIT_BEATS tracked beats after the lock): found in time,
+ * the start lands on the music's 1; not, it starts on the session's next bar line and the 1 waits for the next start. A
+ * wait bounded so: "start on beat one" is honest when the estimator can say where it is, and a start is never held up
+ * for long when it cannot (a break, music with no clear bar). */
+enum jbl_bar_mode { JBL_BAR_ALWAYS = 0, JBL_BAR_START = 1, JBL_BAR_OFF = 2 };   /* (0: the behaviour before the setting) */
+#define JBL_BAR_WAIT_BEATS 8u
 
 void jbl_init(struct jbl *c);
 /* settled: the node is in a session with peers and has its state (jp_settled). start: the peer's start, sent by its

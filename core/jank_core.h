@@ -93,6 +93,9 @@ uint32_t jk_peers_heard(const struct jk_bridge *b, uint32_t now_ms);
 int8_t jk_best_rssi(const struct jk_bridge *b, uint32_t now_ms);     /* 0: none heard */
 
 /* settings */
+/* AUTO BAR (core/jank_beatlink.h jbl_bar_mode): OFF; AT START (the default) the 1 is placed only at a (re)start, never
+ * while playing; ALWAYS also mid-play. `set autobar on` is AT START, as before */
+enum jk_autobar { JK_AUTOBAR_OFF = 0, JK_AUTOBAR_START = 1, JK_AUTOBAR_ALWAYS = 2 };
 enum jk_transport {
     JK_TRANSPORT_LINK = 0,            /* MIDI start/stop follows Link's Start Stop Sync */
     JK_TRANSPORT_AUTO = 1             /* start at the next bar once a session is joined, stop when it is gone */
@@ -130,9 +133,10 @@ struct jk_cfg {
      * this line), so they are back at their defaults at every start. */
     uint8_t beat;                     /* 1: the beat tracker steers the Link session */
     int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX) */
-    uint8_t autobar;                  /* 1: the downbeat estimator moves the session's bar onto the music's 1 (AUTO BAR) */
-    uint8_t autobar_picks;            /* counts `set autobar on`: picked again, it leaves MANUAL even when already on */
-    /* USB host mode (core/jank_usbrole.h): stored apart from the blob above (store.c, key "usb1"), so the blob stays 130 */
+    uint8_t autobar_picks;            /* counts `set autobar start|always|on`: picked again, it leaves MANUAL even when on */
+    /* Stored apart from the blob above (store.c, key "usb1"), so the blob stays 130: USB host mode (core/jank_usbrole.h)
+     * and AUTO BAR */
+    uint8_t autobar;                  /* enum jk_autobar: the downbeat estimator puts the session's bar on the music's 1 */
     uint8_t usb;                      /* enum jur_usb: USB DEVICE / HOST */
     uint8_t source;                   /* enum jur_src: AUDIO > SOURCE AUTO / LINE / USB */
 };
@@ -164,6 +168,8 @@ struct jk_beat {
     uint8_t on;                       /* the setting */
     uint8_t audio;                    /* the tracker's source is open (the computer's stream, a hosted device's) */
     uint8_t audio_live;               /* ... and it has sound: AUDIO mode (core/jank_live.h); 0: LINK mode */
+    int8_t fold_exp;                  /* AUDIO mode's fold, 2^fold_exp (core/jank_fold.h) */
+    uint8_t fold_manual;              /* the user chose it, not AUTO RANGE */
     uint8_t mode;                     /* 0 stopped, 1 steady, 2 speeding up, 3 slowing down */
     int32_t bpm_x100;                 /* the tracker's published tempo, 0: none */
     uint32_t hops;                    /* 10 ms frames computed */
@@ -254,13 +260,16 @@ enum jk_ctl_action {
     JK_CTL_PLAY,                      /* out is empty: the caller starts the session, answers ok or err */
     JK_CTL_STOP,                      /* out is empty: the caller stops the session, answers ok or err */
     JK_CTL_BLE_PAIR,                  /* out is empty: the caller opens a pair window (jph_pair), answers ok or err */
-    JK_CTL_BLE_CLOSE                  /* out is empty: the caller ends the window and the phone's link, answers ok */
+    JK_CTL_BLE_CLOSE,                 /* out is empty: the caller ends the window and the phone's link, answers ok */
+    JK_CTL_FOLD                       /* out is empty: the caller folds (jk_ctl_fold), answers fold=<f> ok or err link mode */
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
 #define JK_BPM_MIN_X100 2000u          /* the BPM the tempo command takes, hundredths: Link's own clamp, 20..999 */
 #define JK_BPM_MAX_X100 99900u
 /* "tempo <bpm>", BPM 20..999 with up to two decimals -> 0 and us a beat; -1 not one */
 int jk_ctl_tempo(const char *line, int32_t *mpb);
+/* "fold x2" / "fold /2" / "fold 1" (AUDIO mode's x2 / /2, core/jank_fold.h) -> 0 and dir +1 / -1 / 0; -1 not one */
+int jk_ctl_fold(const char *line, int *dir);
 
 /* on the session's beat: MODE JANK rests off and flashes on, the Wi-Fi network the other way round. No session: the rest.
  * beat_ub in micro-beats, mpb us a beat. -> 1: lit */

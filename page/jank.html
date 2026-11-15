@@ -59,7 +59,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
     <h2>Connect</h2>
     <div class="buttons">
       <button id="c-midi">MIDI port (USB, iPhone app)</button>
-      <button id="c-ble">Bluetooth</button>
+      <button id="c-bluetooth">Bluetooth</button>
       <button id="c-off" class="quiet hide">Disconnect</button>
     </div>
     <label id="c-ports-box" class="hide" style="margin-top:10px">MIDI port <select id="c-ports"></select></label>
@@ -73,19 +73,23 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
     <div class="home-top">
       <div><div class="big" id="h-bpm">-</div><span class="note">BPM</span></div>
       <div><div class="boxes" id="h-boxes"></div><span class="note" id="h-transport">-</span></div>
+      <div><div class="big" id="h-mode">-</div><span class="note" id="h-mode-note">mode</span></div>
     </div>
     <div class="row" style="flex-wrap:wrap;margin-bottom:12px">
       <label>New tempo <input id="t-tempo" inputmode="decimal" placeholder="120"></label>
       <button id="t-set" disabled>Set</button>
       <button id="t-play" disabled>Play</button>
+      <button id="t-up" class="quiet hide" disabled>x2</button>
+      <button id="t-down" class="quiet hide" disabled>÷2</button>
     </div>
     <div class="grid">
       <div class="stat"><b id="h-net">-</b><span>network</span></div>
       <div class="stat"><b id="h-link">-</b><span>Link peers</span></div>
       <div class="stat"><b id="h-air">-</b><span>units on the air</span></div>
       <div class="stat"><b id="h-batt">-</b><span>battery</span></div>
-      <div class="stat"><b id="h-level">-</b><span>input level</span><div class="meter"><i id="h-level-bar"></i></div></div>
+      <div class="stat"><b id="h-level">-</b><span id="h-level-range">input level</span><div class="meter"><i id="h-level-bar"></i></div></div>
       <div class="stat"><b id="h-conf">-</b><span>beat confidence</span><div class="meter"><i id="h-conf-bar"></i></div></div>
+      <div class="stat"><b id="h-ble">-</b><span>Bluetooth</span></div>
     </div>
   </section>
 
@@ -109,10 +113,12 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
       <label>Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
       <label>Beat latency, ms <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
-      <label>Bluetooth <select id="c-ble"><option value="pair">Three clicks open it</option><option value="auto">Also at every start</option><option value="off">Off</option></select></label>
+      <label>Auto bar <select id="c-autobar"><option value="start">At start: the 1 placed when playing starts</option><option value="always">Always: also while playing</option><option value="off">Off</option></select></label>
+      <label>Audio source <select id="c-source"><option value="auto">Auto: the line in when plugged, else USB</option><option value="usb">USB audio</option><option value="line">Line in</option><option value="link">None: Link only (a plugged line still wins)</option></select></label>
+      <label>Bluetooth <select id="c-ble"><option value="pair">Pair now: three clicks or the button</option><option value="auto">On start: also at every start</option><option value="off">Off</option></select></label>
     </div>
     <div class="buttons" style="margin-top:10px">
-      <button id="ble-pair" class="quiet" disabled>Open a Bluetooth window</button>
+      <button id="ble-pair" class="quiet" disabled>Pair now (two minutes)</button>
       <button id="ble-close" class="quiet hide" disabled>Done: Bluetooth off</button>
     </div>
     <p class="note">Bluetooth shares the radio with Wi-Fi and MODE JANK, so it is on only for two minutes after three clicks (or
@@ -140,6 +146,9 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <div class="stat"><b id="s-midi_ticks">-</b><span>MIDI clocks sent</span></div>
         <div class="stat"><b id="s-midi_resync">-</b><span>clock jumps</span></div>
         <div class="stat"><b id="s-ble_state">-</b><span>Bluetooth</span></div>
+        <div class="stat"><b id="s-audio">-</b><span>audio heard</span></div>
+        <div class="stat"><b id="s-outputs">-</b><span>clock outputs</span></div>
+        <div class="stat"><b id="s-peak_db">-</b><span>peak, dB</span></div>
         <div class="stat"><b id="s-air_in">-</b><span>frames from the air</span></div>
         <div class="stat"><b id="s-air_out">-</b><span>frames to the air</span></div>
         <div class="stat"><b id="s-drops">-</b><span>dropped by faults</span></div>
@@ -227,8 +236,9 @@ function pushOf(data) {
   return { type: data[JX_PUSH.length], text };
 }
 
-/* the HOME line (core/jank_phone.h): "h bpm_x100 net transport bar quantum link_peers air_peers battery level conf min max"
-   (level: the input meter's RMS over 0.3 s; min / max: its extremes over 3 s, absent from older firmware) */
+/* the HOME line (core/jank_phone.h): "h bpm_x100 net transport bar quantum link_peers air_peers battery level conf min max mode"
+   (level: the input meter's RMS over 0.3 s; min / max: its extremes over 3 s; mode 0 LINK, 1 AUDIO, x2 x4 /2 /4 AUDIO
+   folded; the last three absent from older firmware) */
 function parseHome(text) {
   const f = String(text).trim().split(/\s+/);
   if (f.length < 11 || f[0] !== "h") return null;
@@ -238,7 +248,8 @@ function parseHome(text) {
   const quantum = num(f[5]);
   if (!net || !transport || !quantum) return null;
   return { bpm: (num(f[1]) || 0) / 100, net, transport, bar: num(f[4]), quantum, link: num(f[6]) || 0, air: num(f[7]) || 0,
-           battery: num(f[8]), level: num(f[9]), conf: num(f[10]), levelMin: f.length > 11 ? num(f[11]) : null, levelMax: f.length > 12 ? num(f[12]) : null };
+           battery: num(f[8]), level: num(f[9]), conf: num(f[10]), levelMin: f.length > 11 ? num(f[11]) : null, levelMax: f.length > 12 ? num(f[12]) : null,
+           audio: f.length > 13 && f[13] !== "0", fold: f.length > 13 && /^[x/][24]$/.test(f[13]) ? f[13] : "" };
 }
 
 /* what HOME shows, ageMs after the line came: the beat goes on at the line's tempo between lines */
@@ -249,12 +260,21 @@ function homeView(h, ageMs) {
     const pos = h.bar / 100 + (h.transport === "stopped" ? 0 : Math.max(0, ageMs) / 60000 * h.bpm);
     v.beat = Math.floor(((pos % h.quantum) + h.quantum) % h.quantum);
   }
-  v.transport = h.bpm > 0 ? { stopped: "Stopped", playing: "Playing", armed: "Starts on the next bar" }[h.transport] : "No Link session yet";
+  /* AUDIO mode: the transport is the clock outputs' (core/jank_hold.h): stopped only while held by Stop */
+  v.audio = h.audio;
+  v.mode = h.audio ? "AUDIO" + (h.fold ? " " + h.fold.replace("/", "÷") : "") : "LINK";
+  v.modeNote = h.audio ? "the beat tracker leads" : "Link's session";
+  if (h.audio) v.transport = { stopped: "Held: outputs stopped", playing: "Playing", armed: "Starts once the beat locks, on a bar" }[h.transport];
+  else v.transport = h.bpm > 0 ? { stopped: "Stopped", playing: "Playing", armed: "Starts on the next bar" }[h.transport] : "No Link session yet";
+  v.play = h.transport === "stopped" ? "play" : "stop";
+  v.playText = h.audio ? (v.play === "play" ? "Start outputs" : "Stop outputs") : v.play === "play" ? "Play" : "Stop";
+  v.canPlay = h.audio || h.bpm > 0;
   v.net = h.net.kind === "jank" ? "MODE JANK " + h.net.group : h.net.up ? "Wi-Fi" : "Wi-Fi (looking)";
   v.link = String(h.link);
   v.air = h.net.kind === "jank" ? String(h.air) : "-";
   v.battery = h.battery === null ? "-" : h.battery + " %";
   v.level = h.level === null ? "-" : h.level + " dB";
+  v.levelRange = h.levelMin === null || h.levelMax === null ? "input level" : "input level, " + h.levelMin + " to " + h.levelMax + " dB in 3 s";
   v.levelPct = h.level === null ? 0 : Math.max(0, Math.min(100, (h.level + 60) / 60 * 100));
   v.conf = h.conf === null ? "-" : h.conf + " %";
   v.confPct = h.conf === null ? 0 : Math.max(0, Math.min(100, h.conf));
@@ -494,6 +514,23 @@ function faultDrops(v) {
   return ["drop_big", "drop_bad", "tx_fail", "queue_full", "drop_foreign"].reduce((sum, k) => sum + Number(v[k] || 0), 0);
 }
 
+/* Bluetooth from `status` (ble_state, ble_left) ageMs after it came; over Bluetooth this phone is the one connected */
+function bleView(v, ageMs, overBle) {
+  if (overBle) return "this phone";
+  if (!v || !v.ble_state) return "-";
+  if (v.ble_state === "connected") return "phone connected";
+  if (v.ble_state !== "window") return "off";
+  const left = Math.max(0, Number(v.ble_left || 0) - Math.floor(Math.max(0, ageMs) / 1000));
+  return left > 0 ? "pairing " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") : "off";
+}
+
+/* the audio lines of `status` for the details */
+function audioView(v) {
+  const heard = v.audio === undefined ? "-" : v.audio_live === "1" ? "sound (AUDIO)" : v.audio === "1" ? "silent (LINK)" : "none (LINK)";
+  return { audio: v.audio_source && v.audio_source !== "none" ? heard + ", " + v.audio_source : heard, outputs: v.outputs || "-",
+           peak_db: v.peak_db ?? "-" };
+}
+
 /* a setting's command, or null when the value is not one the jank takes */
 function setCommand(key, raw) {
   const value = String(raw).trim();
@@ -507,7 +544,8 @@ function setCommand(key, raw) {
     if (value === "" || !Number.isInteger(n) || n < range[0] || n > range[1]) return null;
     return "set " + key + " " + n;
   }
-  const choices = { filter: ["link", "all"], peer: ["on", "off"], transport: ["link", "auto"], beat: ["on", "off"], ble: ["pair", "off", "auto"] }[key];
+  const choices = { filter: ["link", "all"], peer: ["on", "off"], transport: ["link", "auto"], beat: ["on", "off"], ble: ["pair", "off", "auto"],
+                    source: ["auto", "line", "usb", "link"], autobar: ["off", "start", "always"] }[key];
   if (choices) return choices.includes(value) ? "set " + key + " " + value : null;
   if (key === "name" && /^[\x20-\x7e]{1,23}$/.test(value)) return "set name " + value;
   return null;
@@ -516,11 +554,13 @@ function setCommand(key, raw) {
 
 <script id="ui">
 const $ = (id) => document.getElementById(id);
-const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency", "ble"];
+const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency", "autobar", "source", "ble"];
 const BLE_SVC = "03b80e5a-ede8-4b33-a751-6ce34ec4c700", BLE_CHR = "7772e5db-3868-4112-a1a9-f2669d106bf3";
 const BLE_CAP = 20;                   /* write payload: the default ATT MTU's, which every link takes (Web Bluetooth does not say the MTU) */
 const HOME_EVERY_USB_MS = 300, STATUS_EVERY_MS = 1500, HOME_STALE_MS = 3000, BLE_WAIT_MS = 5000;
-const S = { line: null, kind: null, ble: false, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastScans: [], timers: [] };
+const PAIR_WATCH_MS = 125000;         /* after Pair now, `status` is polled for the window's countdown this long */
+const S = { line: null, kind: null, ble: false, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastScans: [], timers: [],
+            lastStatus: null, statusAt: 0, pairAt: -Infinity };
 
 function say(text, bad) {
   $("msg").textContent = text;
@@ -549,14 +589,22 @@ function showHome() {
   for (let i = 0; i < q; i++) boxes.children[i].classList.toggle("on", v.beat === i);
   $("h-bpm").textContent = v ? v.bpm : "-";
   $("h-transport").textContent = v ? v.transport : "-";
+  $("h-mode").textContent = v ? v.mode : "-";
+  $("h-mode-note").textContent = v ? v.modeNote : "mode";
+  $("h-level-range").textContent = v ? v.levelRange : "input level";
+  $("h-ble").textContent = bleView(S.lastStatus, performance.now() - S.statusAt, S.ble);
   for (const k of ["net", "link", "air", "level", "conf"]) $("h-" + k).textContent = v ? v[k] : "-";
   $("h-batt").textContent = v ? v.battery : "-";
   $("h-level-bar").style.width = (v ? v.levelPct : 0) + "%";
   $("h-conf-bar").style.width = (v ? v.confPct : 0) + "%";
   const on = !!(S.line && S.lastHome && S.lastHome.bpm > 0);
   $("t-set").disabled = !on;
-  $("t-play").disabled = !on;
-  $("t-play").textContent = S.lastHome && S.lastHome.transport !== "stopped" ? "Stop" : "Play";
+  $("t-play").disabled = !(S.line && v && v.canPlay);
+  $("t-play").textContent = v ? v.playText : "Play";
+  for (const id of ["t-up", "t-down"]) {         /* AUDIO mode: the fold, x2 / ÷2 of the tracked tempo (`fold`) */
+    $(id).classList.toggle("hide", !(v && v.audio));
+    $(id).disabled = !(S.line && v && v.audio);
+  }
 }
 
 function takeHome(text) {
@@ -579,6 +627,10 @@ function showSettings({ values: v }) {
 }
 
 function showStatus({ values: v, units }) {
+  S.lastStatus = v;
+  S.statusAt = performance.now();
+  const a = audioView(v);
+  for (const key of ["audio", "outputs", "peak_db"]) $("s-" + key).textContent = a[key];
   for (const key of ["rssi", "channel", "link_ip", "midi_ticks", "midi_resync", "air_in", "air_out"]) $("s-" + key).textContent = v[key] ?? "-";
   $("s-ble_state").textContent = v.ble_state ? v.ble_state + (v.ble_state === "window" ? ", " + v.ble_left + " s" : "") : "not in this build";
   $("s-drops").textContent = faultDrops(v);
@@ -642,7 +694,7 @@ async function session(command, done) {
     say(done);
     if (!S.ble) takeHome((await send("home")).values.home);
   } catch (e) {
-    say(e.message === "err no session" ? "No Link session to change yet." : e.message, true);
+    say(e.message === "err no session" ? "No Link session to change yet." : e.message === "err link mode" ? "x2 and ÷2 are for AUDIO mode (music heard)." : e.message, true);
   }
 }
 
@@ -657,7 +709,7 @@ async function pollHome() {
   }
 }
 async function pollStatus() {
-  if (!S.line || S.ble || !$("more").open) return;
+  if (!S.line || S.ble || (!$("more").open && performance.now() - S.pairAt > PAIR_WATCH_MS)) return;
   try {
     showStatus(await send("status"));
   } catch (e) {
@@ -811,7 +863,7 @@ async function connectBle() {
 for (let g = 1; g <= 9; g++) $("c-group").add(new Option("Group " + g + " (channel " + [1, 6, 11][(g - 1) % 3] + ")", String(g)));
 for (const key of SETTINGS) $("c-" + key).addEventListener("change", () => change(key));
 $("c-midi").addEventListener("click", connectMidi);
-$("c-ble").addEventListener("click", connectBle);
+$("c-bluetooth").addEventListener("click", connectBle);
 $("c-off").addEventListener("click", () => disconnected("Disconnected."));
 $("scan").addEventListener("click", scan);
 $("t-set").addEventListener("click", () => {
@@ -819,12 +871,17 @@ $("t-set").addEventListener("click", () => {
   if (!command) { say("A tempo is 20 to 999 BPM.", true); return; }
   session(command, "Tempo sent to the session.").then(() => { $("t-tempo").value = ""; });
 });
+$("t-up").addEventListener("click", () => session("fold x2", "Tempo doubled (x2)."));
+$("t-down").addEventListener("click", () => session("fold /2", "Tempo halved (÷2)."));
 $("t-play").addEventListener("click", () => {
-  const play = !S.lastHome || S.lastHome.transport === "stopped";
-  session(play ? "play" : "stop", play ? "The session starts on the next bar." : "Session stopped.");
+  const v = homeView(S.lastHome, 0);
+  const play = !v || v.play === "play";
+  const done = v && v.audio ? (play ? "Outputs start once the beat locks, on the next bar." : "Outputs stopped.")
+    : play ? "The session starts on the next bar." : "Session stopped.";
+  session(play ? "play" : "stop", done);
 });
 $("ble-pair").addEventListener("click", async () => {
-  try { await send("ble pair"); say("Bluetooth is open for two minutes: connect the phone now."); } catch (e) { say(e.message === "err ble is off" ? "Bluetooth is set to off: change the setting first." : e.message, true); }
+  try { await send("ble pair"); S.pairAt = performance.now(); say("Bluetooth is open for two minutes: connect the phone now."); pollStatus(); } catch (e) { say(e.message === "err ble is off" ? "Bluetooth is set to off: change the setting first." : e.message, true); }
 });
 $("ble-close").addEventListener("click", async () => {
   try { await send("ble close"); } catch (e) { /* the link may end before the answer: that is the point */ }
@@ -848,7 +905,7 @@ $("bootloader").addEventListener("click", async () => {
   try { await send("bootloader"); } catch (e) { say(e.message, true); }
   disconnected("The jank restarted for flashing. Unplug it and plug it back in to run again.");
 });
-$("c-ble").classList.toggle("hide", !navigator.bluetooth);
+$("c-bluetooth").classList.toggle("hide", !navigator.bluetooth);
 setConnected(null, false);
 showHome();
 </script>

@@ -27,6 +27,7 @@
 #include "jb_beat.h"
 #include "jb_down.h"
 #include "jb_mode.h"
+#include "jank_fold.h"
 #include "jank_live.h"
 #include "usb_audio.h"
 
@@ -49,7 +50,10 @@ static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static struct jk_beat s_pub;           /* published to beat_stats, under s_mux */
 static struct jb_down s_down;          /* the downbeat estimator, the beat task's own */
 static jd_seg_row *s_down_seg;         /* its segment ring (2.9 KB), in PSRAM when there is some */
-static uint8_t s_autobar = 1, s_autobar_picks;     /* the setting as last applied */
+static uint8_t s_autobar = JK_AUTOBAR_START, s_autobar_picks;     /* the setting as last applied (enum jk_autobar) */
+static uint8_t s_bar_now;              /* AT START: a new start for the bar (a resync, a fold change, a new lock) */
+static uint8_t s_was_running;          /* the tracker gave a tempo at the last step ... */
+static uint32_t s_run_from;            /* ... from this tracked beat on (START WAIT counts from it) */
 
 /* the task's own */
 static int64_t s_samples;              /* samples given to the tracker since its start */
@@ -71,7 +75,13 @@ struct step_ctx {
     struct jbl_in in;
     struct jbl_bar bar;
     uint32_t quantum;
+    double bpm;                        /* the tracker's own (unfolded) tempo, 0: none */
 };
+
+/* AUDIO mode's fold and AUTO RANGE (jank_fold.h): the beat task's; the control line asks through s_fold_req */
+enum { FOLD_REQ_NONE = 0, FOLD_REQ_UP, FOLD_REQ_DOWN, FOLD_REQ_ONE, FOLD_REQ_RESET };
+static struct jfo s_fold;
+static volatile uint8_t s_fold_req;
 
 struct session_q {
     int64_t at;                        /* host us */
@@ -101,6 +111,7 @@ static void report(char kind, double at_s)
     enum jb_mode_kind mode = jb_mode_at(&s_mode, at_s);
     if (!jb_mode_bpm_at(&s_mode, at_s, &bpm))
         bpm = 0.0;
+    bpm *= jfo_factor(&s_fold);        /* the tempo jank puts out */
     uac_stats(&u);
     app_cfg_get(&cfg);
     if (kind == 't')
@@ -160,12 +171,14 @@ static void restart_down(void)
     if (!s_down_seg)
         return;
     jd_init(&s_down, s_down_seg);       /* the frame count starts over with the tracker */
-    jd_set_auto(&s_down, s_autobar);
+    jd_set_auto(&s_down, s_autobar != JK_AUTOBAR_OFF);
 }
 
 static void restart_tracker(void)
 {
     uac_restart();
+    jfo_reset(&s_fold);                /* a resync: fold 1 (Python: resync clears the fold) */
+    s_bar_now = 1;
     jb_beat_reset(&s_b);
     jb_mode_init(&s_mode);
     restart_down();
@@ -180,7 +193,7 @@ static void apply_autobar(const struct jk_cfg *cfg)
         return;
     s_autobar = cfg->autobar;
     s_autobar_picks = cfg->autobar_picks;
-    jd_set_auto(&s_down, s_autobar);
+    jd_set_auto(&s_down, s_autobar != JK_AUTOBAR_OFF);
 }
 
 /* the downbeat estimator as the bridge's bar step wants it: a LOCKED decision and its beat in Link host time */
@@ -201,14 +214,55 @@ static void make_bar(const struct jk_cfg *cfg, struct jbl_bar *bar)
     bar->beat_us = us + (int64_t)cfg->beat_latency_ms * 1000;
 }
 
+/* the fold onto what Link gets: AUTO RANGE on a new tempo (against the session's tempo while it plays), then the folded
+ * grid (for /2, /4 anchored on the session's grid); AUTO BAR makes no move while folded (jank_fold.h). The bridge's lock
+ * held, in the beat task */
+static void fold_step(struct jank_peer *p, int64_t now, int settled, struct step_ctx *c)
+{
+    int on = settled && jp_joined(p);
+    double session_bpm = on && jp_playing(p) && jp_mpb(p) > 0 ? 60000000.0 / (double)jp_mpb(p) : 0.0;
+    if (c->in.running && !s_fold.had_tempo)
+        s_bar_now = 1;                 /* a new lock (a new track): a new start for the bar */
+    if (jfo_step(&s_fold, c->in.running, c->bpm, s_mode.jumps, session_bpm, (uint32_t)(now / 1000)))
+        s_bar_now = 1;
+    if (c->in.running) {
+        int64_t beat;
+        double period;
+        double pos = on ? (double)lk_beat_at(&p->k, c->in.beat_us) / (double)LK_UBEAT : 0.0;
+        jfo_grid(&s_fold, c->in.beat_us, c->in.period_us, on, pos, on ? (double)jp_mpb(p) : 0.0, &beat, &period);
+        c->in.beat_us = beat;
+        c->in.period_us = period;
+    }
+    if (s_fold.exp)
+        c->bar.locked = 0;
+    c->in.bar_now = s_bar_now;
+}
+
+/* AUTO BAR's setting for the bar step, and START WAIT: with AT START the tracker's start waits up to JBL_BAR_WAIT_BEATS
+ * tracked beats after its lock for the estimator to find the 1 (jank_beatlink.h) */
+static void bar_rules(struct step_ctx *c)
+{
+    struct jd_view v;
+    if (c->in.running && !s_was_running)
+        s_run_from = s_beat_n;
+    s_was_running = c->in.running;
+    c->in.bar_mode = s_autobar == JK_AUTOBAR_OFF ? JBL_BAR_OFF : s_autobar == JK_AUTOBAR_ALWAYS ? JBL_BAR_ALWAYS : JBL_BAR_START;
+    if (c->in.bar_mode != JBL_BAR_START || !s_down_seg || !c->in.running)
+        return;
+    jd_view(&s_down, &v);
+    c->in.bar_wait = (uint8_t)(v.state != JD_LOCKED && s_beat_n - s_run_from < JBL_BAR_WAIT_BEATS);
+}
+
 /* the bridge's task, holding its lock */
 static void step_link(struct jank_peer *p, int64_t now, void *arg)
 {
     struct step_ctx *c = arg;
     int settled = jp_settled(p, now);
     c->in.held = (uint8_t)bridge_session_held();   /* AUDIO mode's Stop with FOLLOW+LEAD (jank_hold.h) */
+    fold_step(p, now, settled, c);
     jbl_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, c->quantum);
     jbl_bar_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, &c->bar);
+    s_bar_now = 0;                     /* (one step: a decision not there yet waits for the next start) */
 }
 
 /* what the tracker says, as the session's master wants it: a tracked beat in Link host time and the grid's period */
@@ -240,6 +294,8 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.on = cfg->beat;
     b.audio = u.open;
     b.audio_live = s_audio_live;
+    b.fold_exp = s_fold.exp;
+    b.fold_manual = s_fold.manual;
     b.mode = (uint8_t)mode;
     b.bpm_x100 = (int32_t)llround(bpm * 100.0);
     b.hops = s_hops;
@@ -323,7 +379,21 @@ static void follow_sound(int64_t now)
         jlv_push(&s_live, NULL, (size_t)((now - s_fed_us) * (int64_t)UAC_RATE / 1000000));
         s_fed_us = now;
     }
+    if (s_audio_live && !(u.open && jlv_live(&s_live)))
+        jfo_reset(&s_fold);            /* AUDIO mode ended: fold 1 */
     s_audio_live = (uint8_t)(u.open && jlv_live(&s_live));
+}
+
+/* the control line's fold, taken in the beat task */
+static void take_fold_req(void)
+{
+    uint8_t r = __atomic_exchange_n(&s_fold_req, (uint8_t)FOLD_REQ_NONE, __ATOMIC_ACQ_REL);
+    if (r == FOLD_REQ_UP || r == FOLD_REQ_DOWN || r == FOLD_REQ_ONE)
+        jfo_user(&s_fold, r == FOLD_REQ_UP ? 1 : r == FOLD_REQ_DOWN ? -1 : 0);
+    else if (r == FOLD_REQ_RESET)
+        jfo_reset(&s_fold);
+    if (r != FOLD_REQ_NONE)
+        s_bar_now = 1;                 /* a fold change or a Start: a new start for the bar */
 }
 
 static void beat_task(void *arg)
@@ -350,6 +420,7 @@ static void beat_task(void *arg)
         while ((n = uac_pull(x, JB_HOP)) != 0u)
             work(x, n);
         follow_sound(esp_timer_get_time());
+        take_fold_req();
         if (s_down_seg && jd_counting(&s_down) && jb_mode_at(&s_mode, (double)s_samples / (double)UAC_RATE) == JB_STOPPED)
             jd_stop(&s_down);           /* 30 s without a steady beat: the bar starts over */
         now = esp_timer_get_time();
@@ -373,12 +444,14 @@ static void beat_task(void *arg)
         {
             struct step_ctx c;
             make_input(&cfg, &c.in, &mode, &bpm);
+            c.bpm = c.in.running ? bpm : 0.0;
             make_bar(&cfg, &c.bar);
+            bar_rules(&c);
             c.quantum = cfg.quantum;
             if (cfg.beat)
                 bridge_with_peer(step_link, &c);
         }
-        publish(mode, bpm, &cfg, cpu_x10);
+        publish(mode, bpm * jfo_factor(&s_fold), &cfg, cpu_x10);
     }
 }
 
@@ -393,6 +466,21 @@ void beat_stats(struct jk_beat *out)
     out->psram_free = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     out->psram_min = (uint32_t)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM);
 }
+
+int beat_fold(int dir)
+{
+    uint8_t audio, locked;
+    int exp = s_fold.exp;
+    beat_state(&audio, &locked);
+    if (!audio)
+        return -99;                    /* LINK mode: no fold (UP / DOWN are the session's tempo there) */
+    exp = dir > 0 ? exp + 1 : dir < 0 ? exp - 1 : 0;
+    exp = exp < JFO_EXP_MIN ? JFO_EXP_MIN : exp > JFO_EXP_MAX ? JFO_EXP_MAX : exp;
+    __atomic_store_n(&s_fold_req, (uint8_t)(dir > 0 ? FOLD_REQ_UP : dir < 0 ? FOLD_REQ_DOWN : FOLD_REQ_ONE), __ATOMIC_RELEASE);
+    return exp;
+}
+
+void beat_fold_resync(void) { __atomic_store_n(&s_fold_req, (uint8_t)FOLD_REQ_RESET, __ATOMIC_RELEASE); }
 
 void beat_state(uint8_t *audio, uint8_t *locked)
 {

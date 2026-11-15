@@ -9,7 +9,7 @@
 
 #define NS "jank"
 #define KEY "cfg1"
-#define KEY_USB "usb1"                 /* USB DEVICE / HOST and AUDIO > SOURCE, two bytes, apart from the release's blob */
+#define KEY_USB "usb1"                 /* USB DEVICE / HOST, AUDIO > SOURCE and AUTO BAR, three bytes, apart from the release's blob */
 /* what is stored is the struct up to the beat-follow bench settings: a stick flashed with this build keeps its group, name
  * and Wi-Fi, and one flashed back to the release reads the same blob (no setting of the bench build is saved) */
 #define STORED_SIZE JK_CFG_STORED
@@ -24,12 +24,14 @@ static int valid(const struct jk_cfg *c)
 
 static void load_usb(nvs_handle_t h, struct jk_cfg *c)
 {
-    uint8_t u[2];
+    uint8_t u[3];                      /* usb, source, autobar (the last one since M2c: a 2-byte blob keeps AUTO BAR's default) */
     size_t n = sizeof u;
     esp_err_t e = nvs_get_blob(h, KEY_USB, u, &n);
-    if (e == ESP_OK && n == sizeof u && u[0] <= JUR_USB_HOST && u[1] <= JUR_SRC_LINK) {
+    if (e == ESP_OK && (n == 2u || n == 3u) && u[0] <= JUR_USB_HOST && u[1] <= JUR_SRC_LINK && (n == 2u || u[2] <= JK_AUTOBAR_ALWAYS)) {
         c->usb = u[0];
         c->source = u[1];
+        if (n == 3u)
+            c->autobar = u[2];
     } else if (e != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGW(TAG, "stored USB settings ignored: %s, %u bytes", esp_err_to_name(e), (unsigned)n);
     }
@@ -66,7 +68,7 @@ esp_err_t store_save(const struct jk_cfg *c)
         return e;
     e = nvs_set_blob(h, KEY, c, STORED_SIZE);
     if (e == ESP_OK) {
-        const uint8_t u[2] = {c->usb, c->source};
+        const uint8_t u[3] = {c->usb, c->source, c->autobar};
         e = nvs_set_blob(h, KEY_USB, u, sizeof u);
     }
     if (e == ESP_OK)
