@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# The jank mini 2.2 board (battery order): its pins (main/board.h) for USB host mode. After sdkconfig.fh4r2, as a build
+# check until the board exists: JANK_VARIANT=mini22 JANK_EXTRA_DEFAULTS="sdkconfig.fh4r2;sdkconfig.mini22" scripts/build.sh xiao
+CONFIG_JANK_BOARD_MINI22=y

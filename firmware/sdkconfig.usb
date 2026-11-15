@@ -2,6 +2,9 @@
 CONFIG_TINYUSB_MSC_ENABLED=y
 # host mode: USB-MIDI devices, through a hub too
 CONFIG_USB_HOST_HUBS_SUPPORTED=y
+# host mode's audio in: the IN FIFO biased up, its largest packet 600 bytes instead of 408 (components/usb/Kconfig,
+# USB_HOST_HW_BUFFER_BIAS); bulk OUT (MIDI) keeps one 64-byte packet, which is all a full-speed MIDI endpoint takes
+CONFIG_USB_HOST_HW_BUFFER_BIAS_IN=y
 # updates over USB MIDI: two app slots, and a new image that does not confirm itself (main/ota.c) is replaced by the old one at the next reset
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
