@@ -17,7 +17,7 @@
 #define CTL_CHUNK_MAX 64u                /* text a chunk carries (usb.c reads 64 bytes of MIDI at a time) */
 #define CTL_IN_SIZE 1280u                /* room for a few update lines with each chunk's 5 bytes of header */
 #define CTL_TICK_MS 1000
-#define OUT_MAX 1400u
+#define OUT_MAX JK_CTL_OUT_MAX
 
 void app_bootloader(void);
 void app_reboot(void);

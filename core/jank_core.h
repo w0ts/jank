@@ -157,6 +157,7 @@ size_t jk_intr_summary(const char *dump, char *out, size_t cap);
 /* drive and MIDI updates: refused while playing ("stop first"): flash erases would stall USB, Wi-Fi and the tracker */
 #define JK_STOP_FIRST "the session or the MIDI clock is playing: stop first"
 
+#define JK_CTL_OUT_MAX 1792u         /* the firmware's answer buffer (ctl.c): the longest status (1510) fits with its ok; under usb.c's 2048 */
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
 struct jk_beat {

@@ -51,6 +51,7 @@ static TaskHandle_t s_task;
 static volatile uint32_t s_last_write_ms;
 static volatile uint8_t s_eject;          /* the computer ejected the drive */
 static volatile uint8_t s_ready;
+static volatile uint8_t s_wait_stop;      /* a whole image waits for the session to stop before it is installed */
 static const char *volatile s_refused;    /* why an image was not taken (set in TinyUSB's task) */
 static esp_err_t s_flash_err;
 static uint8_t *s_page;                   /* 4 KB, only for a sector of the image written twice */
@@ -378,7 +379,12 @@ static void drive_task(void *arg)
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         if (s_d.phase == JV_DONE) {
-            esp_err_t e = esp_ota_set_boot_partition(s_slot);   /* esp_image_verify first: segments, checksum, SHA-256 */
+            esp_err_t e;
+            /* whole, but playing started after its last sector: the boot choice (a flash write) and the restart wait */
+            for (s_wait_stop = 1; bridge_is_playing(); )
+                vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+            s_wait_stop = 0;
+            e = esp_ota_set_boot_partition(s_slot);   /* esp_image_verify first: segments, checksum, SHA-256 */
             if (e == ESP_OK)
                 finish("jank.bin installed from the drive, restarted", s_slot->label, true);
             snprintf(text, sizeof text, "jank.bin not installed: image check failed (%s)", esp_err_to_name(e));
@@ -398,7 +404,7 @@ void drive_state(char *out, size_t cap)
 {
     static const char *const phase[] = {"idle", "stream", "done", "failed"};
     snprintf(out, cap, "drive=%s\ndrive_image=%s %lu/%lu bytes, %lu sectors in\ndrive_cache=%lu dropped=%lu%s%s\n", s_ready ? "ok" : "not started",
-             phase[s_d.phase & 3u], (unsigned long)(s_d.frontier * JV_SECTOR), (unsigned long)jv_image_len(&s_d), (unsigned long)s_d.sectors_in,
+             s_wait_stop ? "done, installed once stopped" : phase[s_d.phase & 3u], (unsigned long)(s_d.frontier * JV_SECTOR), (unsigned long)jv_image_len(&s_d), (unsigned long)s_d.sectors_in,
              (unsigned long)s_d.ncache, (unsigned long)s_d.cache_dropped, s_refused ? " refused: " : "", s_refused ? s_refused : "");
 }
 

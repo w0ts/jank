@@ -110,6 +110,11 @@ static void do_end(void)
         say(e, s_jo.offset);
         return;
     }
+    if (e == JO_OK && bridge_is_playing()) {   /* the boot choice writes flash, and the restart would stop the clock */
+        drop_flash();
+        say(JO_E_PLAYING, 0);
+        return;
+    }
     if (e == JO_OK) {
         r = esp_ota_end(s_handle);
         s_handle = 0;
@@ -187,10 +192,17 @@ void ota_mark_valid(void)
 static void valid_task(void *arg)
 {
     uint32_t beats = 0;
-    int seen = 0;
+    int seen = 0, ready = 0;
     (void)arg;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(VALID_POLL_MS));
+        if (ready) {                   /* the confirm erases flash (otadata, the note): once stopped, no deadline now */
+            if (!bridge_is_playing()) {
+                ota_mark_valid();
+                vTaskDelete(NULL);
+            }
+            continue;
+        }
         if (esp_timer_get_time() >= VALID_DEADLINE_US) {
             ESP_LOGE(TAG, "no computer spoke on the MIDI control line within %d s: restarting into the old image", (int)(VALID_DEADLINE_US / 1000000));
             vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));
@@ -202,8 +214,7 @@ static void valid_task(void *arg)
             seen = 1;
             beats = ctl_beats();
         } else if (ctl_beats() != beats && esp_timer_get_time() >= VALID_MIN_UP_US) {
-            ota_mark_valid();
-            vTaskDelete(NULL);
+            ready = 1;
         }
     }
 }
@@ -215,6 +226,6 @@ void ota_validate_start(void)
     if (!run || esp_ota_get_state_partition(run, &st) != ESP_OK || st != ESP_OTA_IMG_PENDING_VERIFY)
         return;
     ESP_LOGW(TAG, "new image, not confirmed yet");
-    if (xTaskCreatePinnedToCore(valid_task, "ota_valid", 2048, NULL, 1, NULL, 0) != pdPASS)
+    if (xTaskCreatePinnedToCore(valid_task, "ota_valid", 4096, NULL, 1, NULL, 0) != pdPASS)
         ESP_LOGE(TAG, "no task to confirm the image: the next reset rolls it back");
 }

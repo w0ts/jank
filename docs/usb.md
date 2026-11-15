@@ -57,7 +57,8 @@ Connect), the control task has gone round once after that, and the image has run
 restarts into the old image. So after a drive update, open the page and press Connect within two minutes (any line from
 the computer on the control line does it; a line from a phone over Bluetooth does not). A crash or a power cut before that
 puts the old image back. A start as USB host does not confirm it either: `ota.c` restarts into the old image after 120 s,
-so confirm a new image from a computer before setting `usb host`.
+so confirm a new image from a computer before setting `usb host`. The confirm itself writes flash: while the session plays it waits until it
+stops, and once its conditions are met the 120 s deadline no longer applies.
 
 ## Updating over USB MIDI (optional)
 

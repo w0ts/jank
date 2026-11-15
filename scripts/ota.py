@@ -123,6 +123,8 @@ class Uploader:
                 else:
                     raise OtaError("the stick stopped the transfer: %s" % answer)
             answer = self.ask("ota end")
+            if answer.startswith("err playing"):
+                raise OtaError(STOP_FIRST)
             if not answer.startswith("ok"):
                 raise OtaError("the image was not accepted: %s" % answer)
         except (OtaError, KeyboardInterrupt):
