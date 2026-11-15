@@ -66,6 +66,9 @@ fi
 # The beat tracker as the Link session's master.
 "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_beatlink.c" "$HERE/core/jank_beatlink.c" "$HERE/core/jank_clock.c" $LINK -lm -o "$OUT/test_beatlink"
 "$OUT/test_beatlink"
+# AUDIO mode alone: a session of its own led by the tracker, the MIDI clock on its bar line; peers coming and going.
+"$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_solo.c" "$HERE/core/jank_peer.c" "$HERE/core/jank_beatlink.c" "$HERE/core/jank_hold.c" "$HERE/core/jank_clock.c" $LINK -lm -o "$OUT/test_solo"
+"$OUT/test_solo"
 
 # The beat tracker. BEAT_WAV_DIR (mono 44.1 kHz WAVs, see test_beat.c) adds the run on audio against madmom's results.
 "$CC" $FLAGS -std=c11 -I"$HERE/core/beat" "$HERE/tests/test_beat.c" "$HERE"/core/beat/*.c -lm -o "$OUT/test_beat"

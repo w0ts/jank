@@ -127,8 +127,8 @@ static int link_send(void *ctx, uint32_t ip, uint16_t port, const uint8_t *data,
     struct jank_peer *p = ctx;
     const struct jp_host *h;
     size_t len;
-    if (n > LK_MSG_MAX)
-        return -1;
+    if (n > LK_MSG_MAX || !p->allowed || !p->ip)
+        return -1;                                  /* the setting off, or no address yet: a session of its own, silent */
     if (ip == LK_MCAST_IP) {
         len = build_udp(p, ip, port, data, n);
         emit(p, JP_TO_AIR, group, len);
@@ -166,10 +166,13 @@ static void stop(struct jank_peer *p, int64_t now)
     jst_cancel(&p->start);
 }
 
+/* (called at every settings change: only the change from on to off leaves; AUDIO mode's session of its own then starts
+ * again at the next poll, silent) */
 void jp_allow(struct jank_peer *p, int allowed, int64_t now_us)
 {
+    uint8_t was = p->allowed;
     p->allowed = allowed != 0;
-    if (!allowed)
+    if (was && !p->allowed)
         stop(p, now_us);
 }
 
@@ -190,7 +193,8 @@ void jp_set_network(struct jank_peer *p, uint32_t ip, uint32_t mask, int64_t now
 
 void jp_leave(struct jank_peer *p, int64_t now_us)
 {
-    stop(p, now_us);
+    if (!(p->on && p->solo && !lk_peers(&p->k)))   /* alone in a session of its own: it goes on in the new GROUP */
+        stop(p, now_us);
     memset(p->host, 0, sizeof p->host);
 }
 
@@ -300,15 +304,33 @@ static int others_pending(const struct jank_peer *p)
 
 int jp_joined(const struct jank_peer *p) { return p->on && lk_peers(&p->k) > 0u; }
 
-int jp_settled(const struct jank_peer *p, int64_t now_us)
+int jp_solo(struct jank_peer *p, int solo, int64_t now_us)
 {
-    return jp_joined(p) && now_us - p->t_settle >= (int64_t)JP_SETTLE_US && (p->was_settled || !others_pending(p));
+    int ended = 0;
+    if (p->solo && !solo && p->on && !lk_peers(&p->k)) {
+        stop(p, now_us);                            /* LINK mode alone: nothing to follow (a bye-bye) */
+        ended = 1;
+    }
+    p->solo = (uint8_t)(solo != 0);
+    return ended;
 }
 
-/* the settle hold starts again when the peer is alone or its session changes (a join, a session of its own) */
+int jp_in_session(const struct jank_peer *p) { return p->on && (lk_peers(&p->k) > 0u || p->solo); }
+
+int jp_settled(const struct jank_peer *p, int64_t now_us)
+{
+    if (!p->on)
+        return 0;
+    if (!lk_peers(&p->k))
+        return p->solo;                             /* a session of its own: its state is the stick's */
+    return now_us - p->t_settle >= (int64_t)JP_SETTLE_US && (p->was_settled || !others_pending(p));
+}
+
+/* the settle hold starts again when the peer is out of a session (alone, not AUDIO mode) or its session changes (a join,
+ * a session of its own). A peer joining the stick's own session changes nothing: the stick has the state already */
 static void track_settle(struct jank_peer *p, int64_t now)
 {
-    if (!jp_joined(p) || memcmp(p->sess_seen, p->k.sess, sizeof p->sess_seen)) {
+    if (!jp_in_session(p) || memcmp(p->sess_seen, p->k.sess, sizeof p->sess_seen)) {
         memcpy(p->sess_seen, p->k.sess, sizeof p->sess_seen);
         p->t_settle = now;
         p->was_settled = 0;
@@ -319,10 +341,12 @@ static void track_settle(struct jank_peer *p, int64_t now)
 
 void jp_poll(struct jank_peer *p, int64_t now_us)
 {
+    if (!p->on && p->solo)
+        start(p, now_us);                           /* AUDIO mode: a session of its own (silent without the setting) */
     if (!p->on)
         return;
     lk_poll(&p->k, now_us);
-    if (lk_peers(&p->k))
+    if (lk_peers(&p->k) || p->solo)
         p->t_company = now_us;
     else if (now_us - p->t_company > (int64_t)JP_ALONE_MS * 1000)
         stop(p, now_us);

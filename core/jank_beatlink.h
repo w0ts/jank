@@ -20,6 +20,8 @@
 
 struct jbl {
     uint8_t playing;                    /* we asked the session to play and have not asked it to stop */
+    uint8_t sess[8];                    /* the session `playing` is about: another one (a join) takes the tracker's start
+                                         * again (a session of its own joining an older, stopped one would wait forever) */
     uint32_t tempo_sets, phase_forces, starts, stops, releases;
     int32_t err_us;                     /* the last grid error seen against the tracked beat, before any correction */
     uint32_t bar_seq;                   /* the downbeat estimator's last decision acted on */
@@ -64,8 +66,8 @@ enum jbl_bar_mode { JBL_BAR_ALWAYS = 0, JBL_BAR_START = 1, JBL_BAR_OFF = 2 };   
 #define JBL_BAR_WAIT_BEATS 8u
 
 void jbl_init(struct jbl *c);
-/* settled: the node is in a session with peers and has its state (jp_settled). start: the peer's start, sent by its
- * owner's poll (jst_poll). now: host time. quantum: beats a bar. */
+/* settled: the node is in a session (with peers, or AUDIO mode's own alone) and has its state (jp_settled). start: the
+ * peer's start, sent by its owner's poll (jst_poll). now: host time. quantum: beats a bar. */
 void jbl_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, int64_t now, const struct jbl_in *in, uint32_t quantum);
 /* Where the session's nearest beat is from an instant, in us (+: the session's beat comes later), given the session's
  * beat position at that instant (micro-beats, lk_beat_at) and its microseconds a beat. For the beat reports: what Live

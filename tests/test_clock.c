@@ -428,6 +428,30 @@ static void test_transport(void)
     CHECK(jc_should_play(1, 1, 0) == 0);
 }
 
+/* the outputs' wish at a bridge step (bridge.c follow_transport) */
+static void test_base(void)
+{
+    struct jc_tr t = {.audio = 1, .session = 1, .settled = 1, .playing = 0, .peers = 0};
+    CHECK(jc_base(1, &t) == 0);                 /* AUDIO, alone in its own session: the session's start / stop */
+    t.playing = 1;
+    CHECK(jc_base(0, &t) == 1);
+    t.automatic = 1;
+    t.playing = 0;
+    t.peers = 2;
+    CHECK(jc_base(1, &t) == 0);                 /* AUDIO with AUTO: still the session's (no clock on a peer alone) */
+    t.audio = 0;
+    CHECK(jc_base(0, &t) == 1);                 /* LINK mode, AUTO: a peer is there */
+    t.automatic = 0;
+    CHECK(jc_base(1, &t) == 0);                 /* LINK mode, LINK: the session's */
+    t.settled = 0;
+    t.playing = 1;
+    CHECK(jc_base(0, &t) == 0 && jc_base(1, &t) == 1);   /* not settled: the wish before, held */
+    t = (struct jc_tr){.session = 0};
+    CHECK(jc_base(1, &t) == 1);                 /* no session, transport LINK: held */
+    t.gone = 1;
+    CHECK(jc_base(1, &t) == 0);
+}
+
 int main(void)
 {
     test_map_exact();
@@ -445,6 +469,7 @@ int main(void)
     test_negative_beats_bar();
     test_begin_needs_map();
     test_transport();
+    test_base();
     printf("clock: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

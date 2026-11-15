@@ -10,9 +10,10 @@
  *          line (the MIDI clock's own start rule, jank_clock.h). FOLLOW+LEAD: the tracker starts the session on its next
  *          bar line (jank_start.h), and the outputs follow the session as always.
  *
- * Without a hold the outputs do what the transport setting says (jc_should_play: IGNORE = transport AUTO, the clocks run
- * whenever a session is there; FOLLOW / FOLLOW+LEAD = transport LINK, the clocks start and stop with the session).
- * LINK mode (no sound): the hold does not apply; `play` there starts the session as before, and also ends a hold.
+ * Without a hold the outputs do what the transport setting says (jank_clock.h jc_base: in AUDIO mode the session's start /
+ * stop, which the tracker leads; in LINK mode jc_should_play: IGNORE = transport AUTO, the clocks run whenever a session
+ * is there; FOLLOW / FOLLOW+LEAD = transport LINK, the clocks start and stop with the session).
+ * LINK mode (no sound): the hold does not apply; LINK mode's own `stop` / `play` do (jho_link_stop, jho_link_play).
  *
  * LOW CONFIDENCE (core/jank_conf.h): the gate (the grid-fit confidence under the THRESHOLD with STOP / START, or 0.5 s of
  * silence) is an automatic Stop that lifts itself. Gated: the outputs stop at once (a MIDI Stop on the next tick), and
@@ -30,13 +31,15 @@ enum jho_outputs { JHO_STOPPED = 0, JHO_ARMED = 1, JHO_RUNNING = 2 };  /* the tr
 struct jho {
     uint8_t hold;                       /* Stop was pressed in AUDIO mode, and no Start since */
     uint8_t arming;                     /* Start was pressed: the outputs wait for the tracker to lock */
+    uint8_t link_stop;                  /* LINK mode's Stop: its clocks stay stopped until its Start or a change of mode */
+    uint8_t was_audio;                  /* the mode at the last jho_outputs */
     uint32_t holds, releases;
 };
 
 struct jho_in {
     uint8_t audio;                      /* AUDIO mode: the chosen source has sound (jank_live.h) */
     uint8_t lt;                         /* enum jho_lt */
-    uint8_t base;                       /* the outputs as the transport setting wants them (jc_should_play) */
+    uint8_t base;                       /* the outputs as the transport setting wants them (jank_clock.h jc_base) */
     uint8_t locked;                     /* the tracker follows a steady beat (jank_beatlink.h jbl_in.running) */
     uint8_t clock_running;              /* the MIDI clock outputs play (their Start went out) */
     uint8_t gated;                      /* LOW CONFIDENCE's gate or the silence (jank_conf.h): the outputs stopped by the tracker */
@@ -45,8 +48,14 @@ struct jho_in {
 void jho_init(struct jho *h);
 /* Stop (1) or Start (0) in AUDIO mode */
 void jho_set(struct jho *h, int hold);
-/* `play` in LINK mode: the session starts, and a hold from AUDIO mode ends with it (no surprise stop when sound returns) */
+/* `play` in LINK mode: the stick's own clocks on again (with transport LINK the session starts too, bridge.c), and a hold
+ * from AUDIO mode ends with it (no surprise stop when sound returns) */
 void jho_link_play(struct jho *h);
+/* `stop` in LINK mode, the emulator's (player.html linkStartStop: "Stop is Stop in every option"): the stick's own clocks
+ * stop, and stay stopped whoever starts the session again (another stick's tracker, Live) and whatever peer comes
+ * (transport AUTO), until its `play` or a change of mode. With transport LINK (FOLLOW+LEAD) the session stops too
+ * (bridge.c); with AUTO (IGNORE) the session is not the stick's to stop and is left alone */
+void jho_link_stop(struct jho *h);
 /* whether the MIDI clock outputs should play now (jank_clock.h jc_want); a lock while arming ends the arming */
 int jho_outputs(struct jho *h, const struct jho_in *in);
 /* FOLLOW+LEAD's part: the Link session is held stopped (jank_beatlink.h jbl_in.held), by the user's hold or the gate */
