@@ -261,9 +261,10 @@ static void follow_transport(int64_t now)
 {
     int want, automatic = s_cfg.transport == JK_TRANSPORT_AUTO;
     int session = jp_in_session(&s_peer);
-    uint8_t audio, locked;
+    uint8_t audio, locked, gated, silent, conf_open;
     struct jc_tr t;
     beat_state(&audio, &locked);
+    beat_gate(&gated, &silent, &conf_open);
     t = (struct jc_tr){.audio = audio, .automatic = (uint8_t)automatic, .session = (uint8_t)session,
                        .settled = (uint8_t)jp_settled(&s_peer, now), .playing = (uint8_t)jp_playing(&s_peer),
                        .gone = (uint8_t)(automatic && !s_peer.on && now >= s_hop_until), .peers = jp_peers(&s_peer)};
@@ -271,7 +272,8 @@ static void follow_transport(int64_t now)
         s_hop_until = 0;
     s_base = (uint8_t)jc_base(s_base, &t);  /* (in a session not settled yet: the last wish held, nothing started on a guess) */
     s_hin = (struct jho_in){.audio = audio, .lt = lt_mode(), .base = s_base, .locked = locked,
-                            .clock_running = (uint8_t)(midi_is_playing() && !midi_start_pending()), .gated = beat_gated()};
+                            .clock_running = (uint8_t)(midi_is_playing() && !midi_start_pending()), .gated = gated,
+                            .silent = silent, .conf_open = conf_open};
     want = jho_outputs(&s_hold, &s_hin);
     if (want != s_want) {
         s_want = (uint8_t)want;
@@ -376,7 +378,7 @@ static int pending_start(int64_t beat_ub, int64_t *bar_ub)
 void bridge_snapshot(struct jk_snapshot *s)
 {
     int8_t rssi;
-    uint8_t channel;
+    uint8_t channel, gate_off;
     memset(s, 0, sizeof *s);
     /* the Wi-Fi driver's own call outside the bridge's lock: the HOME push and the control line take this snapshot, and
      * the bridge's task (frames, Link) must never wait behind a Wi-Fi API call (the timing audit's fix 3) */
@@ -407,14 +409,17 @@ void bridge_snapshot(struct jk_snapshot *s)
         s->armed = (uint8_t)pending_start(s->beat_ub, &s->start_ub);
     }
     s->hold = s_hold.hold;
+    gate_off = s_hold.gate_off;
     if (s_hin.audio)
         s->outputs = jho_icon(&s_hold, &s_hin);
     else                               /* LINK mode: the clocks as they are, a start waiting for its bar line armed (not
                                         * after the stick's own Stop: its clocks wait for its Start, not for a bar line) */
-        s->outputs = s_hin.clock_running ? JHO_RUNNING : !s_hold.link_stop && (s->armed || midi_start_pending()) ? JHO_ARMED : JHO_STOPPED;
+        s->outputs = s_hin.clock_running ? JHO_RUNNING : !s_hold.hold && (s->armed || midi_start_pending()) ? JHO_ARMED : JHO_STOPPED;
     xSemaphoreGive(s_lock);
     midi_stats(&s->midi_ticks, &s->midi_resync);
     beat_stats(&s->beat);
+    if (gate_off)
+        s->beat.gated = 0;             /* gated= as it acts: a Start disarmed it (core/jank_hold.h gate_off, M2g) */
     s->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
     s->batt_pct = -1;                  /* no board has a battery gauge yet */
 #if CONFIG_JANK_BLE_MIDI

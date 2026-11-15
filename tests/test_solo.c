@@ -45,6 +45,7 @@ struct stick {
     uint8_t base, want, ticking, was_settled;
     int64_t next_pub, next_beat;
     uint8_t audio, locked, automatic;  /* AUDIO mode, the tracker locked, transport AUTO (LINK TRANSPORT IGNORE) */
+    uint8_t gated, silent, conf_open;  /* LOW CONFIDENCE's gate, the silence, the confidence at the threshold + 5 */
     int64_t beat0;                     /* a beat of the music, host us */
     double period_us;
     uint32_t starts, stops, clocks;    /* MIDI out */
@@ -281,7 +282,8 @@ static void bridge_step(struct stick *s, int64_t now)
     s->was_settled = (uint8_t)(t.session && settled);
     s->base = (uint8_t)jc_base(s->base, &t);
     s->hin = (struct jho_in){.audio = s->audio, .lt = s->automatic ? JHO_IGNORE : JHO_LEAD, .base = s->base, .locked = s->locked,
-                             .clock_running = (uint8_t)(s->tick.playing && !s->tick.want_start && !s->tick.resync)};
+                             .clock_running = (uint8_t)(s->tick.playing && !s->tick.want_start && !s->tick.resync),
+                             .gated = s->gated, .silent = s->silent, .conf_open = s->conf_open};
     want = jho_outputs(&s->hold, &s->hin);
     if (want != s->want) {
         s->want = (uint8_t)want;
@@ -578,6 +580,105 @@ static void test_two_solo_sticks_meet(void)
     printf("solo: two sticks met: the younger's clock jumped %u time(s), no Stop / Start\n", (unsigned)b->tick.resyncs);
 }
 
+/* M2g, the user's case (2026-11-15): alone, locked, conf 49 under the threshold 80: gated, stopped. The user's Start
+ * wins: the outputs start on the session's next bar line (armed until then); a drop before the confidence reached the
+ * threshold + 5 stops nothing; after it a drop stops, as before; silence stops at once, Start or not */
+static void test_start_wins_alone(void)
+{
+    struct stick *a;
+    int64_t t_play, delay;
+    world();
+    a = stick_on(0, 1, 0);
+    music(a, 122.9, 1);
+    a->gated = 1;
+    run_for(6000000);
+    CHECK(a->starts == 0 && !jp_playing(&a->jp) && jho_icon(&a->hold, &a->hin) == JHO_STOPPED);
+    play(a, 1);
+    t_play = sim_now;
+    run_for(STEP_US);
+    CHECK(jho_icon(&a->hold, &a->hin) == JHO_ARMED);
+    run_for(4000000);
+    CHECK(a->starts == 1 && a->stops == 0 && on_the_bar(a) && jc_tick_ub(a->start_tick) == lk_play_beat(&a->jp.k));
+    delay = a->start_at - t_play;
+    CHECK(delay <= llround(a->period_us * QUANTUM) + BEAT_STEP_US + JST_LEAD_US);
+    CHECK(jho_icon(&a->hold, &a->hin) == JHO_RUNNING);
+    a->gated = 0;                                              /* the threshold, not + 5 */
+    run_for(1000000);
+    a->gated = 1;                                              /* a drop before the re-arm */
+    run_for(3000000);
+    CHECK(a->starts == 1 && a->stops == 0 && jp_playing(&a->jp));
+    a->gated = 0;
+    a->conf_open = 1;                                          /* threshold + 5: re-armed */
+    run_for(1000000);
+    a->conf_open = 0;
+    a->gated = 1;                                              /* a drop now: stops (FOLLOW+LEAD: the session too) */
+    run_for(1000000);
+    CHECK(a->starts == 1 && a->stops == 1 && !jp_playing(&a->jp));
+    play(a, 1);                                                /* Start again, then silence: stops at once */
+    run_for(4000000);
+    CHECK(a->starts == 2 && on_the_bar(a));
+    a->silent = 1;
+    run_for(100000);
+    CHECK(a->stops == 2 && jho_icon(&a->hold, &a->hin) == JHO_STOPPED);
+    printf("solo: Start at low confidence: MIDI start %lld ms after it\n", (long long)(delay / 1000));
+}
+
+/* the two layers, alone (the user, 2026-11-15: "if I manually stopped, don't start again automatically"): after the
+ * user's Stop nothing automatic starts the MIDI clock: the gate closing and opening, silence then sound, a re-lock, the
+ * sound gone (LINK mode, the session of its own ended) and back (a new one), a computer joining and starting the session.
+ * The user's Start does, on the bar; then an automatic stop (the gate, once re-armed) restarts automatically */
+static void test_user_stop_holds_alone(void)
+{
+    struct stick *a;
+    world();
+    a = stick_on(0, 1, 0);
+    music(a, 122.9, 1);
+    run_for(6000000);
+    CHECK(a->starts == 1);
+    play(a, 0);
+    run_for(1000000);
+    CHECK(a->stops == 1 && !jp_playing(&a->jp));
+    a->gated = 1;
+    run_for(1000000);
+    a->gated = 0;
+    a->conf_open = 1;
+    run_for(2000000);
+    a->conf_open = 0;
+    a->silent = 1;
+    run_for(1000000);
+    a->silent = 0;
+    run_for(2000000);
+    a->locked = 0;
+    run_for(1000000);
+    a->locked = 1;
+    run_for(3000000);
+    a->audio = 0;
+    run_for(1000000);
+    CHECK(!a->jp.on);
+    a->audio = 1;
+    run_for(3000000);
+    CHECK(a->jp.on && !jp_playing(&a->jp));
+    pc_open(0, 500000);
+    run_for(4000000);
+    lk_set_playing(&pc, 1, lk_beat_at(&pc, sim_now), sim_now);
+    run_for(4000000);
+    CHECK(jp_peers(&a->jp) == 1 && jp_playing(&a->jp));         /* the computer started the session ... */
+    CHECK(a->starts == 1 && a->stops == 1 && jho_icon(&a->hold, &a->hin) == JHO_STOPPED);   /* ... the clock stays off */
+    play(a, 1);
+    run_for(5000000);
+    CHECK(a->starts == 2 && on_the_bar(a) && jc_tick_ub(a->start_tick) % ((int64_t)QUANTUM * LK_UBEAT) == 0);
+    a->conf_open = 1;                                          /* the gate re-armed */
+    run_for(500000);
+    a->conf_open = 0;
+    a->gated = 1;                                              /* an automatic stop ... */
+    run_for(2000000);
+    CHECK(a->stops == 2);
+    a->gated = 0;                                              /* ... and an automatic start, on the bar */
+    a->conf_open = 1;
+    run_for(5000000);
+    CHECK(a->starts == 3 && on_the_bar(a));
+}
+
 int main(void)
 {
     test_alone_starts_on_the_bar();
@@ -591,6 +692,8 @@ int main(void)
     test_two_sticks(0);
     test_two_sticks(1);
     test_two_solo_sticks_meet();
+    test_start_wins_alone();
+    test_user_stop_holds_alone();
     printf("solo: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

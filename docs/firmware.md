@@ -95,10 +95,14 @@ line once the tracker locks, as with peers.
   default) also stops the Link session, which the tracker then does not start while held; with IGNORE (transport `auto`)
   or FOLLOW the session is left alone. The tracker keeps listening and the hold stays through its stops and through LINK
   mode. `play` ends the hold: the outputs wait for the tracker to lock, then start on the next bar line (FOLLOW+LEAD:
-  the tracker starts the session on its next bar line and the clocks follow it). In LINK mode `stop` stops the stick's own
-  clocks until its `play` (or a change of mode), whoever starts the session again; with transport `link` it stops the
+  the tracker starts the session on its next bar line and the clocks follow it). In LINK mode `stop` is the same hold:
+  the stick's own clocks stop until its `play`, whoever starts the session again; with transport `link` it stops the
   session too, with `auto` the session is left alone. `play` starts them on the next bar line (transport `link`: the
-  session too), and also ends a hold. `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
+  session too). **Two layers** (2026-11-15, the user: "if I manually stopped, don't start again automatically"): the
+  user's `stop` holds in both modes until the user's `play`, through everything automatic (the gate, silence then
+  sound, a re-lock, AUTO BAR, a fold, AUDIO <-> LINK mode with the sound, the session of its own ending and restarting, a
+  peer joining or starting the session, an audio stream restart); the gate and the silence stop and start the outputs
+  only while the user's layer is started. The hold is in RAM: a restart starts unheld. `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
   transport icon), with `audio=` (the source open), `audio_live=` (sound: AUDIO mode), the input meter `rms_db=` (RMS over
   0.3 s, a value every 250 ms), `rms_min_db=` / `rms_max_db=` (its extremes over 3 s), `peak_db=` (the last second's
   peak), `conf=` (the grid-fit confidence below, percent) and `act=` (the tracker's network activation peak over the
@@ -116,7 +120,10 @@ line once the tracker locks, as with peers.
   MIDI Stop; the bench CLK / RST pins with them); with FOLLOW+LEAD the Link session stops too (once), with IGNORE or
   FOLLOW it is left to the tracker. Open again: the outputs start on the session's next bar line (FOLLOW+LEAD: the
   tracker starts the session on its next bar line, AUTO BAR's start wait included). The user's hold wins: held, the gate
-  opening starts nothing; `play` while gated arms, and the outputs wait for the gate and the lock. LINK mode: no gate
+  opening starts nothing. **The user's `play` wins over the gate** (M2g): it disarms it, the outputs start on the next
+  bar line once the tracker is locked whatever the confidence (armed until then); the gate re-arms once the confidence
+  has reached the threshold + 5, then stops and starts as before; `gated=` says 0 while disarmed. Silence still stops at
+  once. LINK mode: no gate
   (as no hold). A first start with STOP / START waits for the window to fill with beats on the grid (about 7 s of music
   at 80 %), as the player. `status` and `beat`: `conf=`, `act=`, `gated=0|1`, `silent=0|1`, `threshold=`, `lowconf=`;
   `get`: `lowconf=`, `threshold=`; the transport icon (`outputs=`) is `stopped` while gated, `armed` once the gate opens
