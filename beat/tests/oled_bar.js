@@ -14,7 +14,7 @@ const fields = [];
 function ctx(bar, extra = {}) {
   return { link: false, lineIn: true, bpm: 124, linkBpm: 124, conf: 0.9, th: 80, levelDb: -20, levelMin: -25, levelMax: -15,
            running: true, armed: false, beatN: 1, beatMs: 0, peers: 0, wifiQ: null, usb: false, fitted: false, batt: 100,
-           ltMode: 2, rate: 2, usbRole: 0, net: { mode: 0, group: 1, ssid: '', apName: '' }, autoBar: true, bar,
+           ltMode: 2, rate: 2, usbRole: 0, net: { mode: 0, group: 1, ssid: '', apName: '' }, autoBar: true, bar, ble: { mode: 1, left: null, phone: false },
            setField: (f, v) => fields.push([f, v]), tempoStep: () => 0, setHold: () => {}, linkStartStop: () => {}, ...extra };
 }
 function home(bar) {

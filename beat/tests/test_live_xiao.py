@@ -211,6 +211,23 @@ def test_the_page_reads_the_xiao_reports():
     assert "checks passed" in r.stdout
 
 
+@pytest.mark.parametrize("script", ["xiao_m2b.js", "oled_buttons.js"])
+def test_the_page_follows_the_xiao_m2b_and_the_one_button(script):
+    """player.html with the XIAO firmware M2b (the sound flag, outputs, home's meter, Bluetooth) and NO's clicks / the
+    screenless unit, run by node."""
+    import shutil
+    import subprocess
+    from pathlib import Path
+    node = shutil.which("node")
+    if node is None:
+        pytest.fail("node not found: the page's helpers cannot be checked")
+    here = Path(__file__).resolve().parent
+    r = subprocess.run([node, str(here / script), str(here.parent / "live" / "player.html")],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert "checks passed" in r.stdout
+
+
 class FakeSpeakers:
     latency = 0.01
 
