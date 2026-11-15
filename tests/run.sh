@@ -8,7 +8,7 @@ mkdir -p "$OUT"
 CC="${CC:-cc}"
 FLAGS="-std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -I$HERE/core"
 
-CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_phone.c"
+CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_phone.c $HERE/core/jank_usbrole.c"
 LINK="$HERE/third_party/link/link.c $HERE/core/jank_start.c"
 for t in core ctl ui; do
     "$CC" $FLAGS "$HERE/tests/test_$t.c" $CORE -o "$OUT/test_$t"
@@ -37,6 +37,16 @@ if [ -f "$HERE/core/jank_peer.c" ]; then
     "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_peer.c" "$HERE/core/jank_peer.c" "$HERE/core/jank_clock.c" $CORE $LINK -o "$OUT/test_peer"
     "$OUT/test_peer"
 fi
+
+# USB host mode: the port's role, the TUSB320 CC chip, a hosted device's audio descriptors and its PCM.
+"$CC" $FLAGS "$HERE/tests/test_usbrole.c" "$HERE/core/jank_usbrole.c" -o "$OUT/test_usbrole"
+"$OUT/test_usbrole"
+"$CC" $FLAGS "$HERE/tests/test_tusb320.c" "$HERE/core/jank_tusb320.c" -o "$OUT/test_tusb320"
+"$OUT/test_tusb320"
+"$CC" $FLAGS -I"$HERE/firmware/main" "$HERE/tests/test_uacdesc.c" "$HERE/core/jank_uacdesc.c" -o "$OUT/test_uacdesc"
+"$OUT/test_uacdesc"
+"$CC" $FLAGS "$HERE/tests/test_pcm.c" "$HERE/core/jank_pcm.c" -lm -o "$OUT/test_pcm"
+"$OUT/test_pcm"
 
 # The USB speaker's descriptor (firmware/main/usb_audio.h: macros only).
 "$CC" $FLAGS -I"$HERE/firmware/main" "$HERE/tests/test_uac_desc.c" -o "$OUT/test_uac_desc"

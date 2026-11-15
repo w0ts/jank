@@ -132,6 +132,9 @@ struct jk_cfg {
     int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX) */
     uint8_t autobar;                  /* 1: the downbeat estimator moves the session's bar onto the music's 1 (AUTO BAR) */
     uint8_t autobar_picks;            /* counts `set autobar on`: picked again, it leaves MANUAL even when already on */
+    /* USB host mode (core/jank_usbrole.h): stored apart from the blob above (store.c, key "usb1"), so the blob stays 130 */
+    uint8_t usb;                      /* enum jur_usb: USB DEVICE / HOST */
+    uint8_t source;                   /* enum jur_src: AUDIO > SOURCE AUTO / LINE / USB */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
@@ -163,6 +166,26 @@ struct jk_beat {
     uint32_t bar_moves;               /* whole-beat moves of the session's bar */
 };
 
+/* the USB port, for `status` (firmware/main/usbrole.c fills it) */
+#define JK_USB_DEVS 4u
+#define JK_USB_NAME_MAX 23u
+struct jk_usb_dev {
+    char name[JK_USB_NAME_MAX + 1];   /* the product string, printable ASCII */
+    uint8_t midi, audio;              /* its MIDI OUT gets the clock; its audio is what the tracker hears */
+};
+struct jk_usb {
+    uint8_t stack;                    /* enum jur_stack: what runs (0 device, 1 host) */
+    uint8_t has_port;                   /* a port chip is there and answered */
+    uint8_t cc, cc_dir;               /* enum jur_cc; 1 CC1, 2 CC2, 0 unknown */
+    uint8_t vbus_on, vbus, line;      /* jank's 5 V on VBUS, VBUS from outside, a plug in the line in */
+    uint8_t audio;                    /* enum jur_audio: what the tracker listens to now */
+    uint8_t ndev;
+    struct jk_usb_dev dev[JK_USB_DEVS];
+    uint32_t audio_rate;              /* the hosted stream's format; 0: none */
+    uint8_t audio_channels, audio_bits;
+    uint32_t audio_packets, audio_errors, midi_dropped;
+};
+
 struct jk_snapshot {
     uint8_t usb_up;
     uint32_t uptime_s;
@@ -191,6 +214,7 @@ struct jk_snapshot {
     uint8_t ble_built;                /* the build has Bluetooth for a phone */
     uint8_t ble_state;                /* enum jph_state (jank_phone.h): off, window, connected */
     uint32_t ble_left_s;              /* the pair window's seconds left */
+    struct jk_usb usb;
     struct jk_bridge b;
 };
 

@@ -5,9 +5,11 @@
  * No CDC-ACM serial: the S3 has 5 IN endpoints, EP0 included (tinyusb dwc2_esp32.h ep_in_count). NCM takes 2, MIDI 1 and
  * the drive 1, which is all of them; more fails when the host configures the device. The speaker (usb_audio.h) is an OUT
  * endpoint (EP5 of 7), adaptive, with no feedback endpoint for that reason.
- * Device or host is decided at each start and kept: as a device first, and when no computer has spoken within HOST_WAIT_MS
- * it restarts once as host (usb_midi_host.c). A computer on this port is what powers the stick, so it is there from the
- * start; a mode switched later, with no restart, would have to break the clock whenever the port is idle.
+ * Device or host is decided at each start and kept (usbrole.c, core/jank_usbrole.h): the setting USB DEVICE / HOST, and on
+ * a board with the CC chip what is on the cable. Host mode is usb_hostlib.c with two clients, usb_midi_host.c (the clock
+ * out) and usb_uac_host.c (a device's audio into the tracker). Another role later is a restart into it (usbrole.c): the
+ * device and host stacks are never both installed. On the XIAO, HOST means what this file did alone before: a device
+ * first, and when no computer configured it within 3 s, a restart as host.
  * The address in the NCM descriptor is the computer's adapter's own address, which is why the stick offers the one
  * its radio has: the bridge then never rewrites an address. */
 #include <string.h>
@@ -15,7 +17,6 @@
 #include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_log.h"
-#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/message_buffer.h"
 #include "freertos/semphr.h"
@@ -27,6 +28,9 @@
 #include "tinyusb_net.h"
 #include "tusb.h"
 #include "usb_audio.h"
+#include "board.h"
+#include "jank_usbrole.h"
+#include "usb_host_mode.h"
 
 #define RING_SIZE 64u                  /* a power of two; a clock tick is one byte */
 #define TEXT_OUT_SIZE 2048u
@@ -34,8 +38,6 @@
 #define WRITE_TRIES 50                 /* milliseconds a full MIDI buffer may hold us up */
 #define MIDI_TASK_CORE 0              /* core 1 is the MIDI clock's alone (midi.c) */
 #define MIDI_TASK_PRIO 24             /* above Wi-Fi (23) on core 0: it runs a few us a tick, straight into the endpoint (measured 2026-11-09: at 6, USB clock sd 220 us) */
-#define HOST_WAIT_MS 3000
-#define HOST_NEXT 0x4A4B484Fu          /* in RTC memory, for one restart: garbage after power-on is not this */
 
 /* tusb_get_mac_string_id() with CDC off and MSC on: esp_tinyusb writes the MAC there, so STR_MAC has to be that index */
 /* esp_tinyusb takes at most 8 strings (USB_STRING_DESCRIPTOR_ARRAY_SIZE, include_private/descriptors_control.h): more and
@@ -73,7 +75,6 @@ static volatile uint8_t s_host_spoke;      /* a control line came from the compu
 /* the timer's interrupt fills it, the MIDI task empties it */
 static DRAM_ATTR uint8_t s_ring[RING_SIZE];
 static DRAM_ATTR uint32_t s_head, s_tail, s_dropped;
-static RTC_NOINIT_ATTR uint32_t s_start_as;
 static uint8_t s_host;
 
 static esp_err_t on_frame(void *buf, uint16_t len, void *ctx)
@@ -206,38 +207,23 @@ static void midi_task(void *arg)
     }
 }
 
-static void wait_for_a_computer(void *arg)
-{
-    (void)arg;
-    vTaskDelay(pdMS_TO_TICKS(HOST_WAIT_MS));
-    if (!tud_connected()) {              /* its first SETUP sets this */
-        /* No ota_mark_valid() here: a new image is confirmed only after a computer spoke to it (ota.c). One that no
-         * computer configured within 3 s may be one whose USB is broken, so this restart puts the old image back; the old
-         * image then starts as host, as asked. */
-        s_start_as = HOST_NEXT;
-        esp_restart();
-    }
-    vTaskDelete(NULL);
-}
-
-static int start_as_host(void)
-{
-    int host = s_start_as == HOST_NEXT;
-    s_start_as = 0;
-    return host;
-}
-
 esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, usb_line_fn line_rx)
 {
     tinyusb_config_t cfg = TINYUSB_DEFAULT_CONFIG();
     cfg.task.xCoreID = 0;             /* TinyUSB's task and the USB interrupt it installs: off the clock's core 1 */
     tinyusb_net_config_t net = {.on_recv_callback = on_frame, .free_tx_buffer = on_tx_done};
     esp_err_t e;
-    s_host = (uint8_t)start_as_host();
+    s_host = (uint8_t)(usbrole_boot() == JUR_STACK_HOST);
     if (s_host) {
         e = usb_midi_host_start();
         if (e == ESP_OK && xTaskCreatePinnedToCore(midi_task, "usb_midi", 4096, NULL, MIDI_TASK_PRIO, &s_task, MIDI_TASK_CORE) != pdPASS)
             e = ESP_ERR_NO_MEM;
+        if (e == ESP_OK) {
+            esp_err_t a = usb_uac_host_start();
+            if (a != ESP_OK)            /* the clock goes on without the audio */
+                ESP_LOGE(TAG, "host audio: %s", esp_err_to_name(a));
+            e = usbrole_start();
+        }
         return e;
     }
     s_rx = rx;
@@ -251,6 +237,12 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
     cfg.descriptor.full_speed_config = CONFIG_DESC;
     cfg.descriptor.string = STRINGS;
     cfg.descriptor.string_count = STR_COUNT;
+#if BOARD_VBUS_SENSE_GPIO >= 0
+    /* a board with its own power: the D+ pull-up only while VBUS is there (esp_tinyusb's VBUS monitor on VBUS_SENSE; the
+     * GPIO interrupt service is usbrole_boot's) */
+    cfg.phy.self_powered = true;
+    cfg.phy.vbus_monitor_io = BOARD_VBUS_SENSE_GPIO;
+#endif
     memcpy(net.mac_addr, mac, 6);
     e = drive_start();
     if (e != ESP_OK)                     /* the page on a web site still works: the network and MIDI go on without it */
@@ -263,8 +255,8 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
         e = tinyusb_net_init(&net);
     if (e == ESP_OK && xTaskCreatePinnedToCore(midi_task, "usb_midi", 4096, NULL, MIDI_TASK_PRIO, &s_task, MIDI_TASK_CORE) != pdPASS)
         e = ESP_ERR_NO_MEM;
-    if (e == ESP_OK && xTaskCreatePinnedToCore(wait_for_a_computer, "usb_wait", 2048, NULL, 2, NULL, 0) != pdPASS)
-        e = ESP_ERR_NO_MEM;
+    if (e == ESP_OK)
+        e = usbrole_start();             /* the XIAO's HOST: no computer within 3 s -> a restart as host */
     if (e != ESP_OK)
         ESP_LOGE(TAG, "start: %s", esp_err_to_name(e));
     return e;

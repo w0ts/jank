@@ -5,6 +5,9 @@ menu "jank"
         config JANK_BOARD_XIAO
             bool "Seeed XIAO ESP32S3"
             depends on IDF_TARGET_ESP32S3
+        config JANK_BOARD_MINI22
+            bool "jank mini 2.2 (ESP32-S3FH4R2): USB host mode's parts; a build check until the board exists"
+            depends on IDF_TARGET_ESP32S3
     endchoice
 
     config JANK_BLE_MIDI

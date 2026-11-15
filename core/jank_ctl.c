@@ -2,6 +2,7 @@
 /* The control line protocol (jank_core.h): get, set, status. */
 #include "jank_core.h"
 #include "jank_phone.h"
+#include "jank_usbrole.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +20,8 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->beat_latency_ms = JK_BEAT_LATENCY_DEFAULT_MS;
     c->autobar = 1;
     c->ble = JK_BLE_PAIR;
+    c->usb = JUR_USB_DEVICE;
+    c->source = JUR_SRC_AUTO;
     strcpy(c->name, "jank");
 }
 
@@ -74,6 +77,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%s%d.%02d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_10us < 0 ? "-" : "", abs(c->offset_10us) / 100, abs(c->offset_10us) % 100);
     put(w, "beat=%s\nbeat_latency=%d\nautobar=%s\n", on_off(c->beat), c->beat_latency_ms, on_off(c->autobar));
     put(w, "ble=%s\n", ble_name(c->ble));
+    put(w, "usb=%s\nsource=%s\n", jur_usb_name(c->usb), jur_src_name(c->source));
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "version=%s\nok\n", JK_VERSION);
@@ -116,6 +120,21 @@ static void put_bar(const struct jk_beat *t, struct writer *w)
     put(w, "bar=%s\nbar_phi=%d\nbar_lead=%s%lu.%02lu\n", BAR_NAME[t->bar & 3u], t->bar_phi, lead < 0 ? "-" : "", (unsigned long)(mag / 100u), (unsigned long)(mag % 100u));
 }
 
+/* the USB port: what runs, what the CC chip sees, the devices hosted and the audio the tracker hears */
+static void put_usb(const struct jk_usb *u, struct writer *w)
+{
+    put(w, "usb_role=%s\nusb_cc=%s\n", jur_usb_name(u->stack), u->has_port ? jur_cc_name(u->cc) : "nochip");
+    if (u->has_port)
+        put(w, "usb_cc_dir=%u\nusb_vbus_out=%u\nusb_vbus=%u\n", u->cc_dir, u->vbus_on, u->vbus);
+    put(w, "line_plugged=%u\naudio_source=%s\n", u->line, jur_audio_name(u->audio));
+    for (uint32_t i = 0; i < u->ndev && i < JK_USB_DEVS; i++)
+        put(w, "usb_dev=%s,%s%s\n", u->dev[i].name[0] ? u->dev[i].name : "?", u->dev[i].midi ? "midi" : "", u->dev[i].audio ? (u->dev[i].midi ? "+audio" : "audio") : "");
+    if (u->audio_rate)
+        put(w, "usb_audio=%lu/%u/%u\nusb_audio_packets=%lu\nusb_audio_errors=%lu\n", (unsigned long)u->audio_rate, u->audio_channels, u->audio_bits, (unsigned long)u->audio_packets, (unsigned long)u->audio_errors);
+    if (u->stack == JUR_STACK_HOST)
+        put(w, "usb_midi_dropped=%lu\n", (unsigned long)u->midi_dropped);
+}
+
 static void cmd_status(const struct jk_snapshot *s, uint32_t now_ms, struct writer *w)
 {
     const struct jk_bridge *b = &s->b;
@@ -133,6 +152,7 @@ static void cmd_status(const struct jk_snapshot *s, uint32_t now_ms, struct writ
         static const char *const st[] = {"off", "window", "connected"};
         put(w, "ble_state=%s\nble_left=%lu\n", s->ble_state <= 2u ? st[s->ble_state] : "off", (unsigned long)s->ble_left_s);
     }
+    put_usb(&s->usb, w);
     for (uint32_t i = 0; i < JK_PEERS; i++) {
         const struct jk_peer *p = &b->peer[i];
         if (!p->used || now_ms - p->t_heard >= JK_HEARD_MS)
@@ -265,6 +285,10 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
             }
         return -1;
     }
+    if (!strcmp(key, "usb"))
+        return jur_usb_parse(val, &c->usb);
+    if (!strcmp(key, "source"))
+        return jur_src_parse(val, &c->source);
     return set_number(c, key, val);
 }
 
@@ -387,7 +411,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     } else if (!strcmp(s, "ble pair") || !strcmp(s, "ble close"))
         return s[4] == 'p' ? JK_CTL_BLE_PAIR : JK_CTL_BLE_CLOSE;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|autobar|ble|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nble pair|close\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|autobar|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nble pair|close\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;
