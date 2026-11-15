@@ -75,7 +75,8 @@ eq(xiaoHearing({ audio: true, live: true, mode: 'stopped' }), { on: true, text: 
 {
   const XIAO = { text: '', lines: [], answerAt: 0, stats: null, status: null, statusAt: 0, cfg: null, err: '', errAt: 0 };
   const sent = [];
-  const env = { XIAO, api: (n, b) => sent.push(n), beatStats, performance: { now: () => 99 } };
+  const env = { XIAO, api: (n, b) => sent.push(n), beatStats, performance: { now: () => 99 },
+                xiaoNudged: () => sent.push('nudged'), xiaoNudgeErr: () => {} };            // (M2d's nudge answers: xiao_m2d.js)
   const onXiaoLineText = new Function(...Object.keys(env), grab('onXiaoLineText') + '; return onXiaoLineText;')(...Object.values(env));
   onXiaoLineText('link=1\nlink_peers=2\nbpm=135.00\nbeat=', 500);
   onXiaoLineText('12.500\nplaying=1\nsettled=1\narmed=1\nstart=16.000\n', 530);
