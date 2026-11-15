@@ -431,7 +431,8 @@ const QR = (() => {
                 DISPLAY: BRIGHTNESS (10..100 %), SCREEN OFF (NEVER / 30 S / 1 MIN / 5 MIN without a button; the first
                          press on a dark screen only wakes it; SETUP keeps the screen on)
                 AUDIO:  LEVEL (-12..+12 dB, attenuator / boost before the tracker), LOW CONFIDENCE (KEEP RUNNING or
-                        STOP / START: under the threshold the transport stops), THRESHOLD (%)
+                        STOP / START: under the threshold the transport stops), THRESHOLD (%); --xiao: the XIAO's own
+                        (`set lowconf stop|run`, `set threshold N`, read back from its status / get)
                 OFFSET: AUDIO IN (-100..+100 ms: the input latency, moves every output; the YES + UP/DOWN nudge
                         changes it), MIDI OUT 1, MIDI OUT 2, CLK OUT in ms (-50..+50, per output)
      NET      TYPE (JANK / LINK CLIENT / LINK AP / SETUP, applied on YES) and per mode: JANK: PEERS; CLIENT: NETWORK (-> SCAN),
@@ -1196,8 +1197,22 @@ function foldNow(isXiao, st, statusAt, home, homeAt, sent, now, localK, localAut
 function foldNext(k, d) {
   return Math.min(4, Math.max(0.25, k * (d > 0 ? 2 : 0.5)));
 }
+/* --xiao LOW CONFIDENCE as the XIAO has it (M2e, jank core/jank_conf.h): { confStop, th } from a fresh `status` (lowconf=,
+   threshold=), else its `get`; null when neither says (an older firmware: the page's own setting stays) */
+function xiaoLowConf(cfg, st, statusAt, now) {
+  const has = v => !!v && Number.isFinite(v.threshold) && (v.lowconf === 'run' || v.lowconf === 'stop');
+  const src = has(st) && now - statusAt <= XIAO_STATUS_FRESH_MS ? st : has(cfg) ? cfg : null;
+  return src ? { confStop: src.lowconf === 'stop', th: src.threshold } : null;
+}
+/* --xiao: the XIAO's gate from a fresh `status` (M2e: gated= the confidence under the threshold with STOP / START, silent=
+   0.5 s of silence; either stops its outputs). null: no fresh status, or an older firmware without them */
+function xiaoGate(st, statusAt, now) {
+  if (!st || now - statusAt > XIAO_STATUS_FRESH_MS || !('gated' in st)) return null;
+  return { gated: st.gated === 1, silent: st.silent === 1 };
+}
 /* --xiao AUDIO: the meter's numbers from the XIAO: its `home` answer (fresh), else its status's rms_db / rms_min_db / rms_max_db /
-   conf; null when neither is fresh. level / min / max dBFS or null (source not open), conf 0..1 */
+   conf; null when neither is fresh. level / min / max dBFS or null (source not open), conf 0..1 (M2e: the grid-fit
+   confidence, LOW CONFIDENCE's; M2d's was the network's activation, now act=) */
 function xiaoMeters(home, homeAt, st, statusAt, now) {
   if (home && now - homeAt <= XIAO_HOME_FRESH_MS) return { level: home.level, min: home.min, max: home.max, conf: home.conf == null ? 0 : home.conf / 100 };
   if (st && now - statusAt <= XIAO_STATUS_FRESH_MS && 'rms_db' in st)
@@ -1263,7 +1278,7 @@ function beatStats(lines) {
   for (const l of lines) {
     const m = /^([a-z_]+)=(-?[0-9.]+)$/.exec(l.trim());
     if (m) out[m[1]] = Number(m[2]);
-    const w = /^(bar|audio_source|ble_state|outputs|source|autobar|usbmidi)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting, USB MIDI CLOCK
+    const w = /^(bar|audio_source|ble_state|outputs|source|autobar|usbmidi|lowconf)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting, USB MIDI CLOCK, LOW CONFIDENCE
     if (w) out[w[1]] = w[2];
   }
   return out;
@@ -1277,12 +1292,14 @@ function onXiaoLineText(t, at) {
   while ((i = XIAO.text.indexOf('\n')) >= 0) {
     const line = XIAO.text.slice(0, i).trim();
     XIAO.text = XIAO.text.slice(i + 1);
-    if (line === 'ok' || line.startsWith('err')) {
+    // the end of a reply: "ok" or "err <why>" (with the space: the `beat` reply's "err_us=..." is a number, not an error)
+    const isErr = line === 'err' || line.startsWith('err ');
+    if (line === 'ok' || isErr) {
       const stats = beatStats(XIAO.lines);
       const homeLine = XIAO.lines.find(l => l.startsWith('home=h'));
       XIAO.lines = [];
       if (homeLine && line === 'ok') { XIAO.home = parseHome(homeLine); XIAO.homeAt = XIAO.answerAt; }       // `home`: the meter's numbers
-      else if (line.startsWith('err')) { XIAO.err = line; XIAO.errAt = performance.now(); xiaoNudgeErr(line); }
+      else if (isErr) { XIAO.err = line; XIAO.errAt = performance.now(); xiaoNudgeErr(line); }
       else if ('phase_forces' in stats) { XIAO.stats = stats; api('xiao_stats', stats); }
       else if ('link_peers' in stats) { XIAO.status = stats; XIAO.statusAt = XIAO.answerAt; }
       else if ('quantum' in stats) XIAO.cfg = stats;
@@ -1440,7 +1457,10 @@ function showXiao(x, bench) {
   syncXiaoMode(now);
   const stale = XIAO.port && XIAO.lastLineAt && now - XIAO.lastLineAt > XIAO_SILENT_MS ? ' | no report for ' + Math.round((now - XIAO.lastLineAt) / 1000) + ' s' : '';
   if (XIAO.rep && now - XIAO.repAt > XIAO_REPORT_FRESH_MS) { $('xaudio').textContent = 'no report'; $('xaudio').classList.remove('on'); }
-  const audio = 'audio out: ' + x.device + ', FIFO ' + f1(x.fifo_ms) + ' ms (target ' + x.fifo_target + '), slips ' + (x.dropped + x.repeated) + ', underruns ' + x.underruns;
+  // the Mac's side, not the XIAO's (the user: "it sits in the XIAO audio beat tracker section"): the player's buffer that
+  // feeds the "jank" USB output; its underruns are the Mac running late (silence sent), the XIAO's own counters are `gaps`
+  const ms = n => f1(n / 44.1, 0);
+  const audio = 'Mac → ' + x.device + ' USB audio: buffer ' + f1(x.fifo_ms) + ' ms (aim ' + ms(x.fifo_target) + ' ms), slips ' + (x.dropped + x.repeated) + ', Mac underruns ' + x.underruns;
   const err = XIAO.err && now - XIAO.errAt < 5000 ? ' | XIAO: ' + XIAO.err : '';
   $('xmsg').textContent = XIAO.portMsg + stale + err + ' | ' + audio;
   showAccuracy(bench);
@@ -1521,7 +1541,10 @@ function autoBarFrom(isXiao, cfg, st, s) {
 }
 function syncFromStatus(s) {
   const now = performance.now();
-  if (now > holdUntil.th) {                  // the player is the truth: 0 = keep running (our threshold is kept for later)
+  if (now > holdUntil.th && s.xiao) {        // --xiao: the XIAO is the truth (its lowconf= and threshold=, both stored there)
+    const lc = xiaoLowConf(XIAO.cfg, XIAO.status, XIAO.statusAt, now);
+    if (lc) { dev.confStop = lc.confStop; dev.th = lc.th; }
+  } else if (now > holdUntil.th) {           // the player is the truth: 0 = keep running (our threshold is kept for later)
     dev.confStop = s.min_confidence > 0;
     if (dev.confStop) dev.th = Math.round(s.min_confidence * 100);
   }
@@ -1547,8 +1570,8 @@ const hold = key => { holdUntil[key] = performance.now() + 1200; };
 /* USB MIDI CLOCK's index (0 ON, 1 OFF): --xiao the XIAO's `get` usbmidi= once known, else the page's own */
 function usbMidiNow() { return S && S.xiao && XIAO.cfg && (XIAO.cfg.usbmidi === 'on' || XIAO.cfg.usbmidi === 'off') ? (XIAO.cfg.usbmidi === 'on' ? 0 : 1) : dev.usbMidi; }
 function setField(field, val) {
-  if (field === 'threshold') { dev.th = val; sendThreshold(); }
-  else if (field === 'lowconf') { dev.confStop = val === 1; sendThreshold(); }
+  if (field === 'threshold') { dev.th = val; sendThreshold('threshold'); }
+  else if (field === 'lowconf') { dev.confStop = val === 1; sendThreshold('lowconf'); }
   else if (field === 'ltmode') dev.ltMode = val;            // emu: the outputs live in the device
   else if (field === 'gain') dev.gain = val;
   else if (field === 'bright') dev.bright = val;            // emu: the panel's contrast
@@ -1589,9 +1612,15 @@ function setField(field, val) {
   }
   saveDevice();
 }
-// low confidence: STOP / START sends the threshold; KEEP RUNNING sends 0 (never gate), the threshold stays for later
+// low confidence: STOP / START sends the threshold; KEEP RUNNING sends 0 (never gate), the threshold stays for later.
+// --xiao: the XIAO's own settings, the item changed (`set lowconf stop|run`, `set threshold N`), read back from `get`
 const SRC_NAMES = ['auto', 'line', 'usb', 'link'], BLE_NAMES = ['pair', 'auto', 'off'];     // the choices' `set source` / `set ble` words
-function sendThreshold() { hold('th'); api('threshold', { min_confidence: dev.confStop ? dev.th / 100 : 0 }); }
+function lowConfCommand(item, confStop, th) { return item === 'lowconf' ? 'set lowconf ' + (confStop ? 'stop' : 'run') : 'set threshold ' + th; }
+function sendThreshold(item) {
+  hold('th');
+  if (S && S.xiao) { xiaoSend(lowConfCommand(item, dev.confStop, dev.th)); setTimeout(askGet, 300); return; }
+  api('threshold', { min_confidence: dev.confStop ? dev.th / 100 : 0 });
+}
 function setNetMode(v) {
   const n = dev.net;
   if (v === 3) { if (n.mode !== 3) n.prev = n.mode; n.mode = 3; setHold(true); return; }     // SETUP: stop operating, open hotspot
@@ -1729,6 +1758,7 @@ function buildCtx(now, beat) {
   const audioIn = lineIn || $('usbaudio').checked;                  // sound comes from a source (the line, USB audio, the XIAO's)
   // --xiao in AUDIO: the IN and CF bars are the XIAO's numbers (its `home`), else the page's own meter
   const xm = s.xiao && !dev.link ? xiaoMeters(XIAO.home, XIAO.homeAt, XIAO.status, XIAO.statusAt, now) : null;
+  const xg = s.xiao && !dev.link ? xiaoGate(XIAO.status, XIAO.statusAt, now) : null;
   const mn = meterNumbers(!!s.xiao, xm, { bar: meter.bar, lo: meter.lo, hi: meter.hi, conf: s.confidence || 0 });
   const ble = bleNow(!!s.xiao, XIAO.status, XIAO.statusAt, XIAO.pairAt, dev.bleEnd, $('blephone').checked, now);
   const bpm = s.xiao ? (xrep && xrep.bpm > 0 ? xrep.bpm : null) : s.bpm ? s.bpm * dev.foldK : null;     // (--xiao: the report's tempo is the folded one)
@@ -1736,7 +1766,9 @@ function buildCtx(now, beat) {
   return {
     link: dev.link, bpm, linkBpm: s.xiao && x && now > holdUntil.tempo ? x.bpm : dev.linkBpm, mode: s.xiao ? (xrep ? xrep.mode : 'stopped') : s.mode,
     conf: mn.conf, th: dev.th, gain: dev.gain, confStop: dev.confStop, levelDb: mn.bar, levelMin: mn.lo, levelMax: mn.hi,
-    silent: !audioIn || (!s.xiao && !!s.silent), gated: s.xiao ? !!xm && dev.confStop && mn.conf * 100 < dev.th : !!s.gated, hold: dev.hold, playing: s.xiao ? !!(x && x.playing) : !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
+    // --xiao: the XIAO's own gate (status gated= / silent=, M2e); an older firmware's: the CF bar against the threshold
+    silent: !audioIn || (!s.xiao && !!s.silent) || !!(xg && xg.silent),
+    gated: s.xiao ? (xg ? xg.gated : !!xm && dev.confStop && mn.conf * 100 < dev.th) : !!s.gated, hold: dev.hold, playing: s.xiao ? !!(x && x.playing) : !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
     running, ltMode: dev.ltMode, xiao: !!s.xiao, fold: fold.k, foldAuto: fold.auto,
     armed: s.xiao ? (xo ? xo.armed : !!(x && x.armed)) : armedLocal(s),        // armedLocal / xiaoLink say what armed means
     // the boxes need a bar (Link's count; the estimate has none) and running outputs: stopped, they stand still
