@@ -2,10 +2,10 @@
 
 Listen to a line input, follow its beat, drive Ableton Link and MIDI clock.
 
-Moved into jank as `beat/` on 2026-11-15 (it was ~/GitHub/beat-listener, never committed there). The commands below
-run from this folder. Not in git:
-- `.venv/`: make one here, or use ~/GitHub/beat-listener/.venv;
-- `data/`: GTZAN, Traktor grids and the user's mixes; a link to ~/GitHub/beat-listener/data on the Mac;
+Moved into jank as `beat/` on 2026-11-15 (it was ~/GitHub/beat-listener, never committed there; that folder is
+gone). The commands below run from this folder. Kept here but not in git:
+- `.venv/`;
+- `data/`: GTZAN, Traktor grids, the user's mixes;
 - `runs/`.
 
 Studies: `studies/downbeat/REPORT.md` ("which beat is the 1"; not used by the player or the firmware yet).
