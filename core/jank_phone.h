@@ -46,17 +46,18 @@ uint32_t jph_left_s(const struct jph *p, uint32_t now_ms);             /* the wi
 const char *jph_state_name(const struct jph *p);                       /* "off", "window", "connected" */
 
 /* The HOME line, F0 7D 'J' 'B' JX_PUSH_HOME <text> F7 (jank_sysex.h), space separated:
- *   h <bpm x100> <net> <transport> <bar> <quantum> <link peers> <air peers> <battery> <level> <conf>
+ *   h <bpm x100> <net> <transport> <bar> <quantum> <link peers> <air peers> <battery> <level> <conf> <min> <max>
  *   bpm x100   the session's tempo, 0 with no session
  *   net        j<group> in MODE JANK; w1 on the Wi-Fi network, w0 still looking for it
- *   transport  0 stopped, 1 playing, 2 a start armed for a bar line ahead
+ *   transport  0 stopped, 1 playing, 2 a start armed for a bar line ahead (AUDIO mode: the clock outputs, jank_hold.h)
  *   bar        where the session is in the bar, hundredths of a beat (0 .. quantum x 100 - 1); "-" with no session
  *   quantum    beats a bar
  *   link peers Link peers in the session, the stick not counted
  *   air peers  units heard on the group's channel (MODE JANK; 0 on Wi-Fi)
  *   battery    percent, "-" with no gauge (no board measures one yet)
- *   level      the beat tracker's input peak over the last second, dBFS (-99 .. 0); "-" with no audio stream
+ *   level      the input meter: RMS over 0.3 s, a value every 250 ms, dBFS (-99 .. 0); "-" with no audio stream
  *   conf       the tracker's beat activation peak over the last second, percent; "-" with no audio stream
+ *   min max    the lowest and highest meter values over the last 3 s (the meter's lines); "-" with no audio stream
  * -> its length, 0 when it does not fit */
 size_t jph_home_line(const struct jk_cfg *c, const struct jk_snapshot *s, uint32_t now_ms, char *out, size_t cap);
 

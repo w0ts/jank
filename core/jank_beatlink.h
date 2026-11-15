@@ -5,7 +5,8 @@
  *   tempo       set when it differs from the session's by more than 0.02 BPM
  *   phase       the session's beat grid is moved only when it is more than 5 ms from the tracked beat
  *   transport   stopped -> Link stop at once; running again -> Link start on the next bar (quantum beats), sent
- *               JST_LEAD_US before it (jank_start.h); the audio stream closed (LINK mode) -> the session left as it is
+ *               JST_LEAD_US before it (jank_start.h); no sound on the source (LINK mode) -> the session left as it is;
+ *               the user's Stop with FOLLOW+LEAD (held) -> Link stop at the press, and no start until the Start
  *
  * Called with the Link node's owner holding its lock, every few hundred ms and on each tracked beat. */
 #ifndef JANK_BEATLINK_H
@@ -24,6 +25,7 @@ struct jbl {
     uint32_t bar_seq;                   /* the downbeat estimator's last decision acted on */
     uint8_t bar_seen;                   /* bar_seq holds one */
     uint32_t bar_moves;                 /* whole-beat moves of the session's bar */
+    uint8_t held;                       /* the last step was held (jbl_in.held): the press is acted on once */
 };
 
 /* the downbeat estimator (core/beat/jb_down.h) as the bar step wants it */
@@ -39,7 +41,9 @@ struct jbl_in {
     uint8_t running;                    /* the tracker follows a steady or moving beat (not stopped, audio flowing) */
     int64_t beat_us;                    /* a tracked beat, Link host time: any beat of the grid */
     double period_us;                   /* the beat grid's period */
-    uint8_t passive;                    /* no audio stream (LINK mode): the session is not the tracker's to start or stop */
+    uint8_t passive;                    /* no sound on the source (LINK mode): the session is not the tracker's to start or stop */
+    uint8_t held;                       /* AUDIO mode's Stop with LINK TRANSPORT = FOLLOW+LEAD (jank_hold.h): the session is
+                                         * stopped once, at the press, then neither started nor stopped by the tracker */
 };
 
 void jbl_init(struct jbl *c);

@@ -5,6 +5,7 @@
 #include <string.h>
 #include "jank_core.h"
 #include "jank_phone.h"
+#include "jank_hold.h"
 #include "jank_sysex.h"
 
 static int fails, checks;
@@ -115,7 +116,7 @@ static void test_home_line(void)
     snapshot(&s, &c);
     /* no session, no audio, no battery */
     CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0);
-    CHECK(!strcmp(out, "h 0 j3 0 - 4 0 0 - - -"));
+    CHECK(!strcmp(out, "h 0 j3 0 - 4 0 0 - - - - -"));
     /* 120 BPM, beat 6.75 of a 4/4 bar: 2.75 into the bar; playing; two Link peers; the tracker hearing */
     s.mpb = 500000;
     s.beat_ub = 6750000;
@@ -123,16 +124,27 @@ static void test_home_line(void)
     s.link_peers = 2;
     s.beat.audio = 1;
     s.beat.level_db = -24;
+    s.beat.level_min_db = -31;
+    s.beat.level_max_db = -18;
     s.beat.conf_pct = 87;
     s.batt_pct = 64;
     CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0);
-    CHECK(!strcmp(out, "h 12000 j3 1 275 4 2 0 64 -24 87"));
+    CHECK(!strcmp(out, "h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18"));
     /* negative beats (before the session's zero) go into the bar as Link's phase does; armed beats playing */
     s.beat_ub = -1500000;
     s.armed = 1;
     c.quantum = 3;
     CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0);
-    CHECK(!strcmp(out, "h 12000 j3 2 150 3 2 0 64 -24 87"));
+    CHECK(!strcmp(out, "h 12000 j3 2 150 3 2 0 64 -24 87 -31 -18"));
+    /* AUDIO mode (sound): the transport is the clock outputs' (jank_hold.h), whatever the session does */
+    s.beat.audio_live = 1;
+    s.outputs = JHO_STOPPED;                                    /* held: stopped, the session armed / playing */
+    CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && !strncmp(out, "h 12000 j3 0 ", 13));
+    s.outputs = JHO_RUNNING;
+    CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && !strncmp(out, "h 12000 j3 1 ", 13));
+    s.outputs = JHO_ARMED;
+    CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && !strncmp(out, "h 12000 j3 2 ", 13));
+    s.beat.audio_live = 0;
     s.beat_ub = -1;                                             /* just below zero: the bar's last hundredth */
     CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && !strncmp(out + 13, "299 ", 4));
     /* on the Wi-Fi network: w1 / w0 and no air peers */
@@ -147,7 +159,7 @@ static void test_home_line(void)
     s.beat_ub = 15999999;
     s.link_peers = 99;
     s.batt_pct = 100;
-    s.beat.level_db = -99;
+    s.beat.level_db = s.beat.level_min_db = s.beat.level_max_db = -99;
     s.beat.conf_pct = 100;
     CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && strlen(out) <= JX_PUSH_TEXT_MAX);
     CHECK(jph_home_line(&c, &s, 0, out, 10) == 0);              /* too small: nothing */
@@ -190,7 +202,7 @@ static void test_commands(void)
     CHECK(jk_ctl_line("ble pair", &c, &s, 0, out, sizeof out) == JK_CTL_BLE_PAIR && !out[0]);
     CHECK(jk_ctl_line(" ble close ", &c, &s, 0, out, sizeof out) == JK_CTL_BLE_CLOSE && !out[0]);
     CHECK(jk_ctl_line("ble", &c, &s, 0, out, sizeof out) == JK_CTL_NONE && !strcmp(out, "err unknown command\n"));
-    CHECK(jk_ctl_line("home", &c, &s, 0, out, sizeof out) == JK_CTL_NONE && !strcmp(out, "home=h 0 j3 0 - 4 0 0 - - -\nok\n"));
+    CHECK(jk_ctl_line("home", &c, &s, 0, out, sizeof out) == JK_CTL_NONE && !strcmp(out, "home=h 0 j3 0 - 4 0 0 - - - - -\nok\n"));
     /* status names the link only in a build with Bluetooth */
     CHECK(jk_ctl_line("status", &c, &s, 0, out, sizeof out) == JK_CTL_NONE && !strstr(out, "ble_state="));
     s.ble_built = 1;

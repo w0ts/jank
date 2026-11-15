@@ -88,6 +88,10 @@ static void test_beat_report(void)
     assert(SAME("b 17 12403 steady 1 -4000 -"));
     n = jx_beat_line(text, sizeof text, 't', 0, -5, 0, 0, 25, JX_NO_EXTRA);  /* the latency, ms */
     assert(SAME("t 0 0 stopped 0 25 -"));
+    n = jx_beat_line(text, sizeof text, 't', 3, 12000, 1, 2, 25, JX_NO_EXTRA);  /* sound on the source: AUDIO mode */
+    assert(SAME("t 3 12000 steady 2 25 -"));
+    n = jx_beat_line(text, sizeof text, 't', 3, 12000, 1, 7, JX_NO_EXTRA, JX_NO_EXTRA);
+    assert(SAME("t 3 12000 steady 2"));
     n = jx_beat_line(text, sizeof text, 'b', 1, 100, 1, 1, 123456789, -123456789);   /* clamped */
     assert(SAME("b 1 100 steady 1 9999999 -9999999"));
     n = jx_beat_line(text, sizeof text, 'b', 4294967295u, 99999, 3, 1, INT32_MIN + 1, INT32_MIN + 1);   /* the longest fits */

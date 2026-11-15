@@ -229,6 +229,15 @@ int jl_pattern(enum jl_event e, uint32_t group, uint32_t t_ms, uint8_t rgb[3])
         if (t_ms % JL_PULSE_MS < JL_PULSE_MS * 2u / 3u)
             set_rgb(rgb, 40, 0, 0);
         return 1;
+    case JL_SRC_AUDIO:
+    case JL_SRC_LINK:
+        if (t_ms >= JL_SRC_MS)
+            return 0;
+        if (e == JL_SRC_AUDIO)
+            set_rgb(rgb, 0, 30, 30);
+        else
+            set_rgb(rgb, 20, 0, 40);
+        return 1;
     default:
         return 0;
     }

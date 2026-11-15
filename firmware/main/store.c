@@ -27,7 +27,7 @@ static void load_usb(nvs_handle_t h, struct jk_cfg *c)
     uint8_t u[2];
     size_t n = sizeof u;
     esp_err_t e = nvs_get_blob(h, KEY_USB, u, &n);
-    if (e == ESP_OK && n == sizeof u && u[0] <= JUR_USB_HOST && u[1] <= JUR_SRC_USB) {
+    if (e == ESP_OK && n == sizeof u && u[0] <= JUR_USB_HOST && u[1] <= JUR_SRC_LINK) {
         c->usb = u[0];
         c->source = u[1];
     } else if (e != ESP_ERR_NVS_NOT_FOUND) {

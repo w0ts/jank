@@ -78,8 +78,30 @@ any Link app may; with no settled session they answer `err no session`: alone, t
   bar B" (Link's isPlaying, beats B, time stamp now), so every peer starts on B: Live and LinkHut read B, the FM-1 and the
   stick's own MIDI clock start on the next bar line they have not sent yet (`core/jank_start.h`). The session playing
   already: nothing changes. `stop` stops at once.
-- **AUDIO mode** (the speaker's stream open, `beat on`): the tracker starts the session when it has the beat and stops it
-  on silence; `play` and `stop` answer `err audio mode`. Closing the stream (LINK mode) leaves the session as it is.
+- **AUDIO mode** = the tracker's source has SOUND (`beat on`; `core/jank_live.h`): its RMS over 0.75 s above -50 dBFS
+  for 1 s. An open stream of zeros (a computer keeps jank's stream open while it is the output, even silent) is LINK
+  mode. Back to LINK mode once the RMS stayed under -55 dBFS for 4 s (about 4.75 s after the last sound: longer than any
+  quiet break measured in music, see below). In AUDIO mode the tracker starts the session when it has the beat and
+  stops it as its rules say (30 s without a steady beat); switching to LINK mode leaves the session as Link has it
+  (playing or not: the user starts and stops it then).
+  Measured with the detector itself over GTZAN's 1000 clips of 30 s and a 73-minute DJ set: 986 clips went AUDIO at
+  1.0 s (the slowest, a quiet hip-hop intro, at 3.4 s; one corrupt clip unread); the DJ set at 1.1 s and never left;
+  outside classical music no quiet stretch (RMS under -55 dBFS) lasted over 0.3 s; one classical clip with 12 s of
+  near silence went back to LINK mode once, the longest classical pause that did not was 2.25 s.
+- **`play` / `stop` in AUDIO mode are Start / Stop of the OUTPUTS** (`core/jank_hold.h`, the emulator's hold): `stop`
+  silences the MIDI clock outputs at once (a MIDI Stop) and with LINK TRANSPORT = FOLLOW+LEAD (transport `link`, the
+  default) also stops the Link session, which the tracker then does not start while held; with IGNORE (transport `auto`)
+  or FOLLOW the session is left alone. The tracker keeps listening and the hold stays through its stops and through LINK
+  mode. `play` ends the hold: the outputs wait for the tracker to lock, then start on the next bar line (FOLLOW+LEAD:
+  the tracker starts the session on its next bar line and the clocks follow it). In LINK mode `play` and `stop` are the
+  session's as before, and `play` also ends a hold. `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
+  transport icon), with `audio=` (the source open), `audio_live=` (sound: AUDIO mode), the input meter `rms_db=` (RMS over
+  0.3 s, a value every 250 ms), `rms_min_db=` / `rms_max_db=` (its extremes over 3 s), `peak_db=` (the last second's
+  peak) and `conf=` (the tracker's network activation peak over the last second, percent: the device has no grid
+  confidence). The beat reports' audio field is 0 (no source), 1 (open, no sound), 2 (sound).
+- **AUDIO > SOURCE** `set source auto|line|usb|link`: AUTO = the line in when a plug is in, else USB audio; LINK = USB
+  audio ignored (LINK mode), a plug in the line in still wins. A unit with no screen toggles AUTO <-> LINK with a single
+  NO (`jur_src_toggle`, branch fw/ui wires the button).
 - **Settled first.** After joining a session (start-up, a replug, another group) the stick waits until it has been in the
   same session for 1 s with no other session left to measure (`jp_settled`): until then it sends no MIDI clock and no
   start, sets no tempo, and the tracker steers nothing. With no Link peer at all it has no session: no clock, nothing to

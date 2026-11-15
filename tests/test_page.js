@@ -56,10 +56,15 @@ eq(box.pushOf([0xf0, 0x7d, 0x4a, 0x4b, 0x6f, 0xf7]), null);
 eq(box.pushOf([0xf0, 0x7d, 0x4a, 0x42, 0xf7]), null);
 
 // --- the HOME line, as tests/test_phone.c makes it ---
-eq(box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87"),
-   { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87 });
-eq(box.parseHome("h 0 j3 0 - 4 0 0 - - -"),
-   { bpm: 0, net: { kind: "jank", group: 3 }, transport: "stopped", bar: null, quantum: 4, link: 0, air: 0, battery: null, level: null, conf: null });
+eq(box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87"),                       // older firmware: no min / max
+   { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87,
+     levelMin: null, levelMax: null });
+eq(box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18"),
+   { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87,
+     levelMin: -31, levelMax: -18 });
+eq(box.parseHome("h 0 j3 0 - 4 0 0 - - - - -"),
+   { bpm: 0, net: { kind: "jank", group: 3 }, transport: "stopped", bar: null, quantum: 4, link: 0, air: 0, battery: null, level: null, conf: null,
+     levelMin: null, levelMax: null });
 eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false });
 eq(box.parseHome("h 12000 w1 2 150 3 2 0 - - -").transport, "armed");
 eq(box.parseHome("h 12000 x3 1 275 4 2 0 - - -"), null);

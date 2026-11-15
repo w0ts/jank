@@ -162,7 +162,8 @@ size_t jk_intr_summary(const char *dump, char *out, size_t cap);
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
 struct jk_beat {
     uint8_t on;                       /* the setting */
-    uint8_t audio;                    /* the computer's audio stream is open */
+    uint8_t audio;                    /* the tracker's source is open (the computer's stream, a hosted device's) */
+    uint8_t audio_live;               /* ... and it has sound: AUDIO mode (core/jank_live.h); 0: LINK mode */
     uint8_t mode;                     /* 0 stopped, 1 steady, 2 speeding up, 3 slowing down */
     int32_t bpm_x100;                 /* the tracker's published tempo, 0: none */
     uint32_t hops;                    /* 10 ms frames computed */
@@ -173,8 +174,12 @@ struct jk_beat {
     uint32_t heap_free, heap_min, heap_largest;  /* internal heap: now, lowest ever, largest free block */
     uint32_t psram_free, psram_min;   /* the PSRAM heap (XIAO): now, lowest ever; 0 0 when there is none */
     uint32_t stack_free;              /* bytes never used of the tracker task's stack */
-    int16_t level_db;                 /* the input's peak over the last second, dBFS, -99 .. 0 (silence: -99) */
-    uint8_t conf_pct;                 /* the network's beat activation peak over the last second, percent */
+    int16_t level_db;                 /* the input meter: RMS over 0.3 s, a value every 250 ms, dBFS -99 .. 0 (the line in's
+                                         rms_db; the emulator's level_fast_db) */
+    int16_t level_min_db, level_max_db;   /* the lowest and highest of those values over the last 3 s */
+    int16_t peak_db;                  /* the input's peak over the last second, dBFS, -99 .. 0 (silence: -99) */
+    uint8_t conf_pct;                 /* the tracker's confidence: the network's beat activation peak over the last second,
+                                         percent (the device has no grid confidence like the player's) */
     uint32_t tempo_sets, phase_forces, starts, stops;   /* what the tracker did to the Link session */
     int32_t err_us;                   /* the session's beat grid against the tracked beat at the last step, before a correction */
     int32_t offset_us;                /* the clock the audio's samples are mapped to local time with: the offset's value */
@@ -218,6 +223,8 @@ struct jk_snapshot {
     uint8_t settled;                  /* joined long enough to have the session's state (jank_peer.h jp_settled) */
     uint8_t armed;                    /* a start not reached yet: its bar line is start_ub */
     int64_t start_ub;
+    uint8_t hold;                     /* AUDIO mode's Stop (core/jank_hold.h) */
+    uint8_t outputs;                  /* enum jho_outputs: the clock outputs as the transport icon shows them */
     uint32_t link_ip;                 /* the peer's own address, host order; 0: none yet */
     uint32_t link_peers;              /* Link peers in the session, the stick not counted */
     int32_t mpb;                      /* us a beat; 0: no session */

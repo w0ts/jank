@@ -29,6 +29,17 @@ static void let_go(struct jbl *c, struct jst *start)
     c->releases++;
 }
 
+/* the user's Stop with FOLLOW+LEAD: the session stops now, whoever started it; a start not sent yet is dropped */
+static void hold_session(struct jbl *c, struct lk_node *k, struct jst *start, int64_t now)
+{
+    jst_cancel(start);
+    if (lk_playing(k)) {
+        lk_set_playing(k, 0, lk_beat_at(k, now), now);
+        c->stops++;
+    }
+    c->playing = 0;
+}
+
 /* the tempo, when it moved more than the deadband */
 static void follow_tempo(struct jbl *c, struct lk_node *k, int64_t now, double period_us)
 {
@@ -89,7 +100,7 @@ int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settle
                  const struct jbl_bar *bar)
 {
     int n;
-    if (!settled || in->passive || !in->running || !bar->locked || (c->bar_seen && bar->seq == c->bar_seq))
+    if (!settled || in->passive || in->held || !in->running || !bar->locked || (c->bar_seen && bar->seq == c->bar_seq))
         return 0;
     if (c->err_us > JBL_PHASE_US || c->err_us < -JBL_PHASE_US)
         return 0;
@@ -114,10 +125,17 @@ void jbl_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, 
 {
     if (!settled)
         return;
-    if (in->passive) {
+    if (in->passive) {                  /* (c->held kept: a hold that lasts through LINK mode does not stop the session again) */
         let_go(c, start);
         return;
     }
+    if (in->held) {
+        if (!c->held)
+            hold_session(c, k, start, now);
+        c->held = 1;
+        return;
+    }
+    c->held = 0;
     if (!in->running || in->period_us <= 0.0) {
         stop_session(c, k, start, now);
         return;

@@ -48,7 +48,10 @@ void usb_serial_write(const char *text, size_t n);                 /* the contro
 struct jank_peer;
 esp_err_t beat_start(void);
 void beat_stats(struct jk_beat *out);
-uint8_t beat_bar_state(void);                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
+uint8_t beat_bar_state(void);
+/* AUDIO mode (the tracker on and its source sounding, core/jank_live.h) and the tracker locked on a steady beat; cheap
+ * (the bridge's task asks it at every step) */
+void beat_state(uint8_t *audio, uint8_t *locked);                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
 
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);
@@ -72,7 +75,14 @@ void bridge_table_stop(struct js_table *out);                /* .. to here */
 uint32_t bridge_peers_heard(void);
 int bridge_beat(int64_t *beat_ub, int32_t *mpb);    /* 1 in a session, with its beat now */
 int bridge_tempo(int32_t mpb);                       /* 0 set; -1 no session to set it in */
-int bridge_play(int play);                           /* 0 a start armed for the next bar / stopped; -1 no settled session; -2 AUDIO mode */
+/* YES / `play` / `stop`. AUDIO mode: Start / Stop of the outputs (the hold, core/jank_hold.h), always 0. LINK mode: the
+ * session: 0 a start armed for the next bar / stopped; -1 no settled session; `play` also ends a hold */
+int bridge_play(int play);
+/* LINK TRANSPORT FOLLOW (0) or FOLLOW+LEAD (1, the default) while the transport setting is LINK (AUTO = IGNORE): the
+ * device UI's choice (branch fw/ui keeps it in its prefs: it calls this when it loads or changes it) */
+void bridge_set_lead(int lead);
+/* AUDIO mode's Stop holds the Link session (FOLLOW+LEAD): for the beat tracker's step, the bridge's lock held */
+int bridge_session_held(void);
 /* the joined session plays, or (transport LINK) the MIDI clock has a start out: no flash writes now (updates refused,
  * settings saved later; the timing audit). Lock-free (bridge.c) */
 int bridge_is_playing(void);
