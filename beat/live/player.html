@@ -1177,7 +1177,9 @@ function syncFromStatus(s) {
   if (now > holdUntil.off) dev.inOff = Math.round(s.offset_ms);       // the audio input offset is the player's Link offset
   if (now > holdUntil.hold) dev.hold = !!s.hold;
   if (now > holdUntil.fold && s.fold) dev.foldK = s.fold;
-  if (now > holdUntil.tempo) dev.linkBpm = s.link_bpm;
+  // --xiao: the session's tempo is the XIAO's (its `status`), not the player's local model (SimLink, 120 by default)
+  const xs = s.xiao && XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS ? XIAO.status : null;
+  if (now > holdUntil.tempo) dev.linkBpm = xs && xs.bpm > 0 ? xs.bpm : s.link_bpm;
 }
 const hold = key => { holdUntil[key] = performance.now() + 1200; };
 
@@ -1279,7 +1281,7 @@ function buildCtx(now, beat) {
   return {
     link: dev.link, bpm: s.bpm ? s.bpm * dev.foldK : null, linkBpm: dev.linkBpm, mode: s.mode,
     conf: s.confidence || 0, th: dev.th, gain: dev.gain, confStop: dev.confStop, levelDb: meter.bar, levelMin: meter.lo, levelMax: meter.hi,
-    silent: !lineIn || !!s.silent, gated: !!s.gated, hold: dev.hold, playing: !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
+    silent: !lineIn || !!s.silent, gated: !!s.gated, hold: dev.hold, playing: s.xiao && XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS ? !!XIAO.status.playing : !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
     running: outputsRun(s), ltMode: dev.ltMode,
     // started but not running yet: AUDIO = not held, Link not started (the tracker locking, or waiting for the next bar);
     // LINK = our clocks armed and waiting for the session's start (FOLLOW, FOLLOW+LEAD)
