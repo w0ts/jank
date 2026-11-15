@@ -1,7 +1,8 @@
 # USB
 
-An S3 build is one USB device with three functions: a network adapter (CDC-NCM), a MIDI port called jank, and a small
-drive (label JANK, FAT12, 512-byte sectors) holding `jank.html`, the control page, and taking firmware updates.
+An S3 build is one USB device with three functions: a network adapter (CDC-NCM), a MIDI port called jank, and a drive
+(label JANK) holding `jank.html`, the control page, and taking firmware updates. The drive is made up by the firmware: a
+FAT16 volume of 4 MB that is stored nowhere (`core/jank_vdrive.h`, `main/drive.c`).
 
 - **No serial port.** The S3 has 5 IN endpoints including EP0; NCM takes 2, MIDI 1 and the drive 1. The control line
   goes as SysEx on the MIDI port instead (`core/jank_sysex.h`: `F0 7D 'J' 'K'`, 7-bit text, `F7`, 30 characters a
@@ -10,42 +11,49 @@ drive (label JANK, FAT12, 512-byte sectors) holding `jank.html`, the control pag
   to TinyUSB, which cannot be called from an interrupt.
 - **USB ID.** Espressif's VID with a made-up PID, `0x4A4B`: fine on one's own desk, not for distribution.
 
-## Updating: copy jank.bin onto the drive, eject
+## Updating: copy jank.bin onto the drive
 
-No button, no download mode, no tool. The first install of this build still needs download mode once (it changes the
-partition table and the bootloader; see [boards.md](boards.md), "Flashing"); after that:
+No button, no download mode, no tool, and no eject needed. The first install of an OTA build still needs download mode
+once (it changes the partition table and the bootloader; see [boards.md](boards.md), "Flashing"); after that:
 
 1. Copy the app image (`jank.bin`, from `scripts/build.sh xiao`: `$JANK_SCRATCH/build-xiao/jank.bin`) onto the JANK drive.
-   Any `*.bin` in the root will do; with several, the largest.
-2. **Eject the drive** (Finder: eject; Windows: Eject; Linux: `udisksctl power-off`/`eject`). The ejecting is the signal
-   (SCSI START STOP UNIT with LoEj): esp_tinyusb then takes the volume from the computer and mounts it for the app.
-3. The stick reads the file, checks it (the image header, the ESP32-S3 chip id, a size that fits the slot, then
-   `esp_ota_end`'s check of the segments and SHA-256), writes it to the *other* app slot, picks it for the next start and
-   restarts. The drive comes back in a few seconds with `jank.html` and nothing else. If the file was refused, the reason is
-   in `UPDATE.TXT` on the drive and the old firmware keeps running. Copying and ejecting is a few seconds' work on the
-   stick's side: the image is 0.9 MB.
+2. The stick takes it **as it lands**: the file's first sector is an ESP32-S3 app image header, so from there each sector
+   the computer writes goes straight into the spare app slot (each 4 KB flash page erased before its first write). Once
+   every byte of the image is in (the length comes from the image's own segment headers), `esp_ota_set_boot_partition`
+   checks it (`esp_image_verify`: segments, checksum, SHA-256) and picks it for the next start.
+3. The stick restarts when the computer has been quiet for 1.5 s (it writes the file's directory entry and FAT just after
+   the data), at the latest 10 s after the image was whole, or at once on an eject. The drive comes back with `jank.html`
+   and `UPDATE.TXT`, which says what happened. macOS may complain that the drive was not ejected: it was pulled while
+   mounted, as with any UF2 board.
 
-Why eject and not "watch the drive": the computer keeps the FAT and the directory in a cache and writes its copy back
-whenever it likes. A volume changed behind its back loses the change or is corrupted, and a file seen half-copied is
-not a file. So the stick never touches the volume while the computer has it: it wipes the drive and writes `jank.html`
-at every start (before USB is up), and reads the update only after the eject, when the computer has flushed and let go.
-Restoring the page continuously would need the stick to tell the computer the medium changed (a SCSI unit attention, which
-macOS answers by dropping the volume and mounting it again): that works, but every restore then pulls the drive away from
-under whatever the computer is doing with it, so it is not done. A `jank.html` the user deletes is back after the next
-start. Unplugging the stick without ejecting also triggers a look for a `.bin` (esp_tinyusb mounts the volume for the app
-on a USB disconnect), which is harmless: a file that is not whole fails the SHA-256 check.
+Refused, with the reason in `UPDATE.TXT` and the old firmware still running (a restart all the same): an image bigger than
+the slot or with a header the loader refuses, a failed check, an update over MIDI going on, a running image not confirmed
+yet (see Rollback: after an update, wait until it has talked to a computer for 20 s), a copy cut short and then ejected.
+A file that is not an image (notes, the macOS `._` files, `.fseventsd`) is kept in RAM while the drive is mounted, so the
+computer reads back what it wrote; nothing of it survives a restart.
 
-The storage partition is 2 MB (an image up to about 1.9 MB fits; the app slots are 2 MB each), the FAT's label survives the
-wipe. A volume that will not mount or wipe is erased once and formatted afresh at the next start (the label is then the
-default).
+**Why made up, not a FAT on flash.** The board's ESP32-S3FH4R2 has 4 MB of flash: two 1.6 MB app slots leave no room for a
+drive that could hold a 1.2 MB file before it is installed (`firmware/partitions_fh4r2.csv`). Streaming into the slot needs
+no room at all, and a drive that is not stored cannot be corrupted. The XIAO runs the same code; its table's 2 MB
+`storage` partition is no longer used.
+
+**How the file is found.** The volume's free space is one run of clusters, and hosts give a new file free clusters in order,
+so the image's byte k is in sector (start + k / 512), start being the sector its header came in. Sectors may come in any
+order after the header; up to 64 that come before it are kept and moved into the slot when it comes. A host that splits
+the file into pieces far apart would fail the SHA-256 check (refused, nothing broken). TinyUSB's mass storage callbacks
+are the drive's own (`main/drive.c`); esp_tinyusb's are made weak by `third_party/esp_tinyusb-msc-weak.patch`. Flash
+writes run in TinyUSB's task: USB waits out each page erase (tens of ms; how long a whole copy takes is not measured).
+Host tests: `tests/test_vdrive.c` reads the volume as a FAT16 reader and copies images onto it in the orders hosts write.
 
 ### Rollback
 
 A new image starts "pending verify". The old one comes back at the next reset, of any kind, unless the new one confirms
-itself with `esp_ota_mark_app_valid_cancel_rollback()`. It does that (`main/ota.c`, `ota_validate_start`) when the computer
-has configured the USB device (`tud_mounted`) and the control task has then gone round once (about a second): that is
-the path the next update needs. A start as USB host (nothing plugged in, see below) confirms before its restart.
-A crash, a hang that resets the watchdog or a power cut before that puts the old image back.
+itself with `esp_ota_mark_app_valid_cancel_rollback()`. It does that (`main/ota.c`, `valid_task`) once the computer has
+configured the USB device, has spoken on the MIDI control line (`scripts/ota.py`'s `get` after an update, or the page's
+Connect), the control task has gone round once after that, and the image has run 20 s. Not confirmed within 120 s: it
+restarts into the old image. So after a drive update, open the page and press Connect within two minutes (any line from
+the computer on the control line does it; a line from a phone over Bluetooth does not). A crash or a power cut before that
+puts the old image back.
 
 ## Updating over USB MIDI (optional)
 
