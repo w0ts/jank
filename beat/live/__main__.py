@@ -23,6 +23,8 @@ def parse(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--realtime", action="store_true", help="with --file: pace like real time (needed for Link)")
     p.add_argument("--dry-run", action="store_true", help="everything except joining Link (a local model instead)")
     p.add_argument("--list-devices", action="store_true", help="list the audio inputs and exit")
+    p.add_argument("--advanced-follow", action="store_true",
+                   help="the advanced-follow quick win: the tempo glides with pitch moves (studies/advanced-follow)")
     args = p.parse_args(argv)
     if args.range[0] >= args.range[1]:
         p.error("--range MIN must be below MAX")
@@ -62,7 +64,11 @@ def main(argv: list[str] | None = None) -> int:
     mode = "dry run (no Link)" if args.dry_run else ("Link master" if link else "analysis only")
     print(f"{mode}; BPM range {args.range[0]:g}-{args.range[1]:g}; device latency {latency:.1f} ms "
           f"+ offset {args.offset_ms:g} ms", flush=True)
-    engine = Engine(*args.range)
+    if args.advanced_follow:
+        from live.follow import follow_engine
+        engine = follow_engine(*args.range)
+    else:
+        engine = Engine(*args.range)
     try:
         run(source, engine, clock, link, controller)
     except KeyboardInterrupt:
