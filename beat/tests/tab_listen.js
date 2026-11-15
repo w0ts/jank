@@ -82,5 +82,16 @@ eq(P.paneSwitchPlan('player', 'player', 'idle').pausePlayer, false);
 for (const needle of ['data-pane="player"', 'data-pane="tab"', 'id="panebtn-tab"', "localStorage.setItem(PANE_KEY"]) { assert.ok(html.includes(needle), needle); checks++; }
 // the removed cards (confidence + threshold, the BPM / mode row, the Link line) and their ids are gone; the layout wraps the XIAO card beside the device
 for (const id of ['confval', 'confbar', 'confmark', 'linkstate', 'thval', 'exp', 'diff']) { assert.ok(!html.includes('id="' + id + '"') && !html.includes("$('" + id + "')"), id); checks++; }
-assert.ok(html.includes('id="devwrap"') && html.includes('#devwrap > #xiaocard')); checks++;
+assert.ok(html.includes('id="devwrap"') && html.includes('id="leftcol"') && html.includes('#list { flex:1 1 0; min-height:260px; overflow:auto;')); checks++;
+// real tabs to the right of the device, one box for the track + pitch + volume, no accuracy table, no XIAO description
+for (const id of ['accrows', 'acc', 'panebar']) { assert.ok(!html.includes('id="' + id + '"') && !html.includes("$('" + id + "')"), id); checks++; }
+for (const needle of ['class="tabs" role="tablist"', 'id="rightcol"', 'class="card tabpanel"', 'id="calib"', 'id="calibmsg"', 'id="autolat"']) { assert.ok(html.includes(needle), needle); checks++; }
+assert.ok(!html.includes("The XIAO's own tracker on the music")); checks++;
+assert.ok(!html.includes('<h1>Beat Player</h1>')); checks++;
+const devAt = html.indexOf('<div class="card device">'), right = html.indexOf('id="rightcol"'), xiao = html.indexOf('id="xiaocard"'), wrapEnd = html.indexOf('</main>');
+assert.ok(devAt < xiao && xiao < right && right < wrapEnd); checks++;                       // the XIAO card under the device (left column), then the tabs column
+const box = html.slice(html.indexOf('<div class="ctl">'), html.indexOf('</main>'));
+for (const id of ['play', 'auto', 'time', 'seek', 'pitchval', 'pitch', 'vol']) { assert.ok(box.includes('id="' + id + '"'), id); checks++; }   // one box
+assert.strictEqual((html.match(/class="now"/g) || []).length, 1); checks++;
+assert.ok(!html.includes('what you hear')); checks++;
 console.log(checks + ' checks passed');
