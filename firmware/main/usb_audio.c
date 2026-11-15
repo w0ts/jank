@@ -14,7 +14,7 @@
 #define RING 4096u                      /* mono samples, a power of two: 93 ms; the tracker wakes every 5 ms */
 #define SMOOTH_SHIFT 6                  /* the offset moves 1/64 of the way to each packet's value ... */
 #define FAST_PACKETS 64u                /* ... and 1/8 for the first packets */
-#define GAP_US 1500
+#define GAP_SLACK_US 500           /* 44 samples (998 us) + this = the 1.5 ms a missing 1 ms packet shows as */
 
 static int16_t s_ring[RING];              /* (bss: DRAM_ATTR on an unset array would put 16 KB of zeros in the image) */
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -26,17 +26,32 @@ static uint8_t s_have_off;
 static uint32_t s_seen;                     /* packets since the offset started */
 static struct uac_stats s_st;
 static volatile uint32_t s_epoch;
+static uint8_t s_stream;                    /* a stream is open: the computer's (alt 1) or the hosted device's */
+static uint8_t s_route = 1;                 /* the audio source is USB (usbrole.c): else the samples are dropped */
 
 static int64_t sample_us(uint32_t samples) { return (int64_t)samples * 10000 / 441; }
+
+/* the stream as the tracker sees it: open and routed to it; any change restarts the tracker */
+static void set_stream(int stream, int route)
+{
+    portENTER_CRITICAL_SAFE(&s_mux);
+    if (stream >= 0)
+        s_stream = (uint8_t)stream;
+    if (route >= 0)
+        s_route = (uint8_t)route;
+    if (s_st.open != (s_stream && s_route) || stream > 0) {
+        s_st.open = (uint8_t)(s_stream && s_route);
+        s_epoch++;
+    }
+    portEXIT_CRITICAL_SAFE(&s_mux);
+}
 
 /* the host's side of the descriptor: which alternate setting is on */
 bool tud_audio_set_itf_cb(uint8_t rhport, tusb_control_request_t const *p_request)
 {
     (void)rhport;
-    if ((p_request->wValue & 0xFFu) != 0u) {
-        s_st.open = 1;
-        s_epoch++;
-    }
+    if ((p_request->wValue & 0xFFu) != 0u)
+        set_stream(1, -1);
     return true;
 }
 
@@ -44,10 +59,15 @@ bool tud_audio_set_itf_close_ep_cb(uint8_t rhport, tusb_control_request_t const 
 {
     (void)rhport;
     (void)p_request;
-    s_st.open = 0;
-    s_epoch++;
+    set_stream(0, -1);
     return true;
 }
+
+void uac_host_stream(int open) { set_stream(open ? 1 : 0, -1); }
+
+void uac_route(int usb) { set_stream(-1, usb ? 1 : 0); }
+
+int uac_stream_open(void) { return s_stream; }
 
 /* GET CUR / RANGE of the clock source: 44.1 kHz and nothing else; the clock is valid */
 bool tud_audio_get_req_entity_cb(uint8_t rhport, tusb_control_request_t const *rq)
@@ -82,18 +102,16 @@ bool tud_audio_set_req_entity_cb(uint8_t rhport, tusb_control_request_t const *r
     return TU_U16_HIGH(rq->wIndex) == UAC_CLOCK_ID;
 }
 
-/* each packet: into the ring (mono already), and the offset updated. In the USB interrupt. */
-bool tud_audio_rx_done_isr(uint8_t rhport, uint16_t n_bytes_received, uint8_t func_id, uint8_t ep_out, uint8_t cur_alt_setting)
+/* mono samples that arrived at `now` (local us): into the ring, and the offset updated. The USB interrupt (device) or the
+ * USB host client's task (host, usb_uac_host.c). */
+void uac_feed(const int16_t *pk, uint32_t frames, int64_t now)
 {
-    int16_t pk[UAC_EP_SIZE / 2u + 2u];
-    uint16_t got = tud_audio_read(pk, sizeof pk);
-    uint32_t frames = got / 2u;
-    int64_t now = midi_now_us();
-    (void)rhport, (void)n_bytes_received, (void)func_id, (void)ep_out, (void)cur_alt_setting;
     if (!frames)
-        return true;
-    portENTER_CRITICAL_ISR(&s_mux);
-    if (RING - (s_head - s_tail) < frames) {
+        return;
+    portENTER_CRITICAL_SAFE(&s_mux);
+    if (!s_route) {
+        /* the tracker hears the line in: nothing of this goes to it */
+    } else if (RING - (s_head - s_tail) < frames) {
         s_st.overflows++;
         s_epoch++;                      /* the tracker starts again from here */
     } else {
@@ -108,14 +126,25 @@ bool tud_audio_rx_done_isr(uint8_t rhport, uint16_t n_bytes_received, uint8_t fu
             } else {
                 s_off_us += (x - s_off_us) >> (s_seen < FAST_PACKETS ? 3 : SMOOTH_SHIFT);
             }
-            if (s_last_us && now - s_last_us > GAP_US)
-                s_st.gaps += (uint32_t)((now - s_last_us + 500) / 1000) - 1u;
+            /* a gap: longer since the last feed than this feed's own audio and half a millisecond (device: 1 ms packets, so
+             * over 1.5 ms; host: a transfer of a few packets at a time) */
+            if (s_last_us && now - s_last_us > sample_us(frames) + GAP_SLACK_US)
+                s_st.gaps += (uint32_t)((now - s_last_us - sample_us(frames) + GAP_SLACK_US) / 1000);
             s_last_us = now;
             s_seen++;
         }
         s_st.packets++;
     }
-    portEXIT_CRITICAL_ISR(&s_mux);
+    portEXIT_CRITICAL_SAFE(&s_mux);
+}
+
+/* each packet of the computer's stream: mono already. In the USB interrupt. */
+bool tud_audio_rx_done_isr(uint8_t rhport, uint16_t n_bytes_received, uint8_t func_id, uint8_t ep_out, uint8_t cur_alt_setting)
+{
+    int16_t pk[UAC_EP_SIZE / 2u + 2u];
+    uint16_t got = tud_audio_read(pk, sizeof pk);
+    (void)rhport, (void)n_bytes_received, (void)func_id, (void)ep_out, (void)cur_alt_setting;
+    uac_feed(pk, got / 2u, midi_now_us());
     return true;
 }
 

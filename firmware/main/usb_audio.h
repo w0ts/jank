@@ -73,4 +73,12 @@ size_t uac_pull(int16_t *dst, size_t max);
 int uac_sample_time(int64_t s, int64_t *us);
 void uac_stats(struct uac_stats *out);
 int32_t uac_offset_us(void);
+
+/* ---- feeding the ring from elsewhere (USB host mode) and the audio source ---- */
+
+/* mono 44.1 kHz samples that arrived at local time `now` (us), the newest last: a task or an interrupt */
+void uac_feed(const int16_t *mono, uint32_t frames, int64_t now);
+void uac_host_stream(int open);         /* the hosted device's stream started (1) or stopped (0): as alt 1 / 0 in device mode */
+void uac_route(int usb);                /* 1: the tracker hears USB audio (AUDIO > SOURCE); 0: it is dropped */
+int uac_stream_open(void);              /* a USB stream is open, routed or not (AUTO's "USB audio when it plays") */
 #endif
