@@ -54,7 +54,6 @@ FEATURES = ("e150", "e100", "e150_mean", "flux150", "flux_all", "nov_all", "nov_
 NF = len(FEATURES)
 WEIGHTS = Path(__file__).resolve().parent.parent / "studies" / "downbeat" / "results" / "v2_weights.json"
 OFF, LISTENING, LOCKED, MANUAL = "off", "listening", "locked", "manual"
-CONF_FULL = 3.0                           # the screen's confidence tick is full at this lead (score units)
 
 
 @dataclass(frozen=True)
@@ -86,7 +85,7 @@ class BarView:
     state: str                            # off / listening / locked / manual
     phi: int | None                       # LOCKED: the count position (count mod 4) of the 1
     lead: float                           # LOCKED: the 1's score over the best other; else the best over the second
-    conf: float                           # 0..1, the lead against CONF_FULL (0 before the scores are ready)
+    conf: float                           # 0..1, the lead against the commit level (0 before the scores are ready)
     seq: int                              # decisions taken since the start (one per counted beat)
     count: int | None                     # the count of the beat the last decision was taken at
     t_beat: float | None                  # its stream time, s
@@ -185,7 +184,7 @@ class Downbeat:
 
     def view(self) -> BarView:
         sc = None if self._scores is None else tuple(float(x) for x in self._scores)
-        conf = 0.0 if sc is None else min(max(self._lead / CONF_FULL, 0.0), 1.0)
+        conf = 0.0 if sc is None else min(max(self._lead / self.model.commit, 0.0), 1.0)
         return BarView(self._state, self._phi, float(self._lead), conf, self._seq, self._dec_count, self._dec_time, sc,
                        self._moves)
 
