@@ -201,7 +201,7 @@ static void restart_tracker(void)
 {
     uac_restart();
     jfo_reset(&s_fold);                /* a resync: fold 1 (Python: resync clears the fold) */
-    jbl_nudge_clear(&s_jbl);           /* a new stream: AUTO BAR's reset event, the user's nudges with it */
+    /* (the user's PHASE stays: the automatic layer never changes it, M2h) */
     s_bar_now = 1;
     jb_beat_reset(&s_b);
     jb_mode_init(&s_mode);
@@ -464,8 +464,9 @@ static int8_t take_nudge(void)
 
 static const char *const BAR_NAME[] = {"off", "listening", "locked", "manual"};
 
-/* the nudge's answer; taken: AUTO BAR goes MANUAL, and the estimator's view before it is logged and answered (the Python
- * player logs each nudge with it, a hand label for a refit: here the serial log and the answer carry it) */
+/* the nudge's answer; the estimator's view before it is logged and answered (the Python player logs each nudge with it, a
+ * hand label for a refit: here the serial log and the answer carry it). AUTO BAR stays in charge: the PHASE rides on its
+ * bar (M2h, jank_beatlink.h jbl_bar_step) */
 static void finish_nudge(int8_t halves, int8_t rc)
 {
     char view[sizeof s_nudge.view] = "";
@@ -474,8 +475,6 @@ static void finish_nudge(int8_t halves, int8_t rc)
         jd_view(&s_down, &v);
         snprintf(view, sizeof view, "bar=%s\nbar_phi=%d\nbar_count=%ld\nbar_scores=%.2f,%.2f,%.2f,%.2f\n", BAR_NAME[v.state & 3u],
                  v.phi, (long)v.count, (double)v.scores[0], (double)v.scores[1], (double)v.scores[2], (double)v.scores[3]);
-        if (rc == BEAT_NUDGE_OK)
-            jd_nudge(&s_down);
     }
     if (rc == BEAT_NUDGE_OK)
         ESP_LOGI(TAG, "nudge %+d/2 beat: total %+d/2, %u nudges; before it %s", halves, s_jbl.nudge, (unsigned)s_jbl.nudges, view);
@@ -516,7 +515,6 @@ static void beat_task(void *arg)
         take_fold_req();
         nudge = take_nudge();
         if (jb_mode_at(&s_mode, (double)s_samples / (double)UAC_RATE) == JB_STOPPED) {
-            jbl_nudge_clear(&s_jbl);    /* no beat (30 s without a steady one, or none yet): the user's nudges go */
             if (s_down_seg && jd_counting(&s_down))
                 jd_stop(&s_down);       /* 30 s without a steady beat: the bar starts over */
         }
@@ -649,6 +647,8 @@ uint8_t beat_bar_state(void)
 esp_err_t beat_start(void)
 {
     jbl_init(&s_jbl);
+    s_jbl.held = 1;                    /* power-on is the user's Stop (core/jank_hold.h jho_init): a session already playing
+                                        * (Live, another stick) is not stopped for it, nor started by the tracker */
     if (jb_beat_init_q16(&s_b) != 0) {         /* the network's weights in RAM as int16: from flash they cost > a core */
         ESP_LOGE(TAG, "tracker setup failed");
         return ESP_FAIL;

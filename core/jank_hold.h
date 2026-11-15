@@ -20,8 +20,17 @@
  * (the mode itself is automatic: the sound coming and going), through everything automatic: the gate, silence and sound,
  * a re-lock, AUTO BAR, a fold, the session of its own ending and starting again, a peer joining or starting the session,
  * a USB audio stream restart. Nothing but jho_set / jho_link_play / jho_link_stop (the user's commands, bridge_play)
- * writes it. It lives in RAM: a restart starts unheld. The AUTOMATIC layer (LOW CONFIDENCE's gate, the silence) stops
- * and starts the outputs only while the user layer says started.
+ * writes it. Power-on is stopped (M2h, the user: "come up with manual state: stopped"; jho_init, a constant: nothing
+ * stored, no flash write). The AUTOMATIC layer (LOW CONFIDENCE's gate, the silence) stops and starts the outputs only
+ * while the user layer says started, and never changes the user layer. The outputs run only when user = started AND
+ * automatic = open:
+ *
+ *   user      automatic                      outputs
+ *   stopped   anything                       stopped (power-on, the user's Stop; only the user's Start ends it)
+ *   started   open                           run (started on the session's bar line once the tracker is locked)
+ *   started   gate closed (conf < threshold) stopped; open again at threshold + 5: run again, no new Start needed
+ *   started   silence (0.5 s, -60 dBFS)      stopped at once; ends a Start's override (the next music waits for the gate)
+ *   Start     gate closed                    the Start forces the gate open (override) until conf >= threshold + 5 once
  *
  * LOW CONFIDENCE (core/jank_conf.h): the gate (the grid-fit confidence under the THRESHOLD with STOP / START, or 0.5 s of
  * silence) is an automatic Stop that lifts itself. Gated: the outputs stop at once (a MIDI Stop on the next tick), and
@@ -34,7 +43,8 @@
  * confidence gate. The outputs then start on the session's next bar line once the tracker is locked, whatever the
  * confidence (the icon armed until they run). The gate re-arms once the confidence has reached the threshold +
  * JCF_HYST_PCT (jho_in.conf_open), and from then on stops and starts as before. The silence stops the outputs at once,
- * Start or not. A Stop ends the disarm. KEEP RUNNING: no gate, nothing changes. */
+ * Start or not, and ends the disarm (M2h: the automatic layer starts over; the user layer stays started). A Stop ends
+ * the disarm. KEEP RUNNING: no gate, nothing changes. */
 #ifndef JANK_HOLD_H
 #define JANK_HOLD_H
 #include <stdint.h>
@@ -61,6 +71,7 @@ struct jho_in {
     uint8_t conf_open;                  /* the confidence at the threshold + JCF_HYST_PCT: a Start's disarm ends */
 };
 
+/* power-on: the user's layer stopped (M2h, the user: "come up with manual state: stopped"; a constant, nothing stored) */
 void jho_init(struct jho *h);
 /* Stop (1) or Start (0) in AUDIO mode. Start ends a hold (the outputs then wait for the lock) and disarms LOW
  * CONFIDENCE's gate (gate_off) whether held or not; Stop ends that disarm */

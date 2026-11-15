@@ -109,10 +109,18 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   eq(box.setCommand("usbmidi", "no"), null);
   eq([box.nudgeCommand("beat", 1), box.nudgeCommand("beat", -1), box.nudgeCommand("ms", 1), box.nudgeCommand("ms", -1)],
      ["nudge beat +0.5", "nudge beat -0.5", "nudge ms +1", "nudge ms -1"]);
-  ok(/earlier \(\+1\.5 beats in all\)/.test(box.nudgeSaid("beat", 1, { nudge_beats: "1.5" })), "the total after a nudge");
-  ok(/later \(-0\.5 beats/.test(box.nudgeSaid("beat", -1, { nudge_beats: "-0.5" })), "a nudge later");
-  eq(box.nudgeSaid("ms", 1, { beat_latency: "26" }), "Audio in offset +26 ms.");
-  eq(box.nudgeSaid("ms", -1, { beat_latency: "-3" }), "Audio in offset -3 ms.");
+  // M2h: two layers each: PHASE on top of AUTO BAR's bar, AUDIO SHIFT on top of the auto latency; 0 is AUTO
+  eq(box.nudgeSaid("beat", 1, { nudge_beats: "1.5" }), "Phase +1.5 beats, on top of AUTO BAR's bar.");
+  eq(box.nudgeSaid("beat", -1, { nudge_beats: "-0.5" }), "Phase -0.5 beats, on top of AUTO BAR's bar.");
+  eq(box.nudgeSaid("beat", -1, { nudge_beats: "0" }), "Phase: AUTO (AUTO BAR's bar alone).");
+  eq(box.nudgeSaid("ms", 1, { beat_latency: "-62", lat_auto: "-65", lat_trim: "3" }), "Audio shift +3 ms, on top of the auto -65 ms.");
+  eq(box.nudgeSaid("ms", -1, { beat_latency: "-65", lat_auto: "-65", lat_trim: "0" }), "Audio shift: AUTO (-65 ms).");
+  eq(box.nudgeSaid("ms", 1, { beat_latency: "26" }), "Audio in offset +26 ms.");           // a firmware before M2h
+  eq(box.latField({ beat_latency: "-62", lat_auto: "-65" }), "-65");                       // the field is the auto base
+  eq(box.latField({ beat_latency: "26" }), "26");
+  eq(box.latNote("usb", { lat_trim: "3" }), "(the computer's) + audio shift +3 ms");
+  eq(box.latNote("usb", { lat_trim: "0" }), "(the computer's)");
+  eq(box.latNote("host:1935:000c", {}), "(host:1935:000c)");
   ok(/AUDIO mode/.test(box.nudgeError("err link mode")) && /limit/.test(box.nudgeError("err nudge beat at its limit, -3 to 3 beats in all")), "nudge errors in words");
   eq(box.nudgeError("err odd"), "err odd");
   for (const id of ["nudges", "n-beat-down", "n-beat-up", "n-ms-down", "n-ms-up", "c-usbmidi", "c-beat_latency_src"])

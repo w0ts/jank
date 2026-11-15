@@ -101,6 +101,8 @@ int bridge_play(int play);
 void bridge_set_lead(int lead);
 /* AUDIO mode's Stop holds the Link session (FOLLOW+LEAD): for the beat tracker's step, the bridge's lock held */
 int bridge_session_held(void);
+/* the user's layer is stopped (power-on, or the user's Stop: core/jank_hold.h) */
+int bridge_user_stopped(void);
 /* the session plays (joined, or AUDIO mode's own), or (transport LINK) the MIDI clock has a start out: no flash writes
  * now (updates excepted; settings saved later; the timing audit). Lock-free (bridge.c) */
 int bridge_is_playing(void);

@@ -80,10 +80,51 @@ static void test_settings(void)
     CHECK(jk_cfg_stored_differs(&before, &c));                /* saved (once stopped) */
     CHECK(jk_lat_select(&c, &COMPUTER) == 1 && c.beat_latency_ms == 40);   /* back on the computer: its value */
     CHECK(jk_lat_select(&c, &LINE) == 1 && c.beat_latency_ms == JLA_LINE_PATH_MS);
-    CHECK(jk_nudge_ms(&c, -3) == 1 && c.beat_latency_ms == JLA_LINE_PATH_MS - 3 && c.lat.line_trim_ms == -3);
+    CHECK(jk_nudge_ms(&c, -3) == 1 && c.beat_latency_ms == JLA_LINE_PATH_MS - 3 && jla_trim(&c.lat, &LINE) == -3);
+    CHECK(jla_base(&c.lat, &LINE) == JLA_LINE_PATH_MS);       /* (M2h: the nudge is the AUDIO SHIFT, the base untouched) */
     CHECK(jk_lat_select(&c, &elektron) == 1 && c.beat_latency_ms == 2);
-    c.beat_latency_ms = JK_BEAT_LATENCY_MAX_MS;
+    jk_lat_set(&c, JK_BEAT_LATENCY_MAX_MS - 2);
+    CHECK(c.beat_latency_ms == JK_BEAT_LATENCY_MAX_MS);       /* the base 298 + the shift 2 */
     CHECK(jk_nudge_ms(&c, 1) == 0);                           /* at the top: nothing */
+}
+
+/* M2h (the user: "if I set it back to 0 ... it is back to auto"; "ms is more an audio shift"): two layers a source. The
+ * auto base (`set beat_latency`, the player's Auto latency) and the user's AUDIO SHIFT (`nudge ms`, Calibrate's
+ * `set lat_trim`) on top; neither changes the other; a shift of 0 is pure auto. The shifts stored in a blob of their own,
+ * so an older firmware's bases are read as they were (shift 0) */
+static void test_shift(void)
+{
+    struct jla t, u;
+    struct jla_key a = dev(0x1935, 0x000c);
+    uint8_t blob[JLA_TRIM_PACKED], base[JLA_PACKED];
+    jla_init(&t);
+    jla_set_trim(&t, &COMPUTER, 3);
+    CHECK(jla_base(&t, &COMPUTER) == JLA_COMPUTER_DEFAULT_MS && jla_trim(&t, &COMPUTER) == 3);
+    CHECK(jla_get(&t, &COMPUTER) == JLA_COMPUTER_DEFAULT_MS + 3);
+    jla_set(&t, &COMPUTER, -60);                              /* the auto base moves: the shift stays on top */
+    CHECK(jla_get(&t, &COMPUTER) == -57 && jla_trim(&t, &COMPUTER) == 3);
+    jla_set_trim(&t, &COMPUTER, 0);                           /* back to 0: auto alone */
+    CHECK(jla_get(&t, &COMPUTER) == -60);
+    jla_set_trim(&t, &COMPUTER, 3);
+    jla_set_trim(&t, &LINE, -2);
+    CHECK(jla_get(&t, &LINE) == JLA_LINE_PATH_MS - 2 && jla_base(&t, &LINE) == JLA_LINE_PATH_MS);
+    jla_set_trim(&t, &a, 5);                                  /* a device not in the table: added, the default base */
+    CHECK(t.ndev == 1 && jla_base(&t, &a) == JLA_HOSTED_DEFAULT_MS && jla_get(&t, &a) == JLA_HOSTED_DEFAULT_MS + 5);
+    jla_set(&t, &a, 10);                                      /* its base set: the shift kept */
+    CHECK(jla_get(&t, &a) == 15 && jla_trim(&t, &a) == 5);
+    jla_set_trim(&t, &a, 900);                                /* the sum stays within the range */
+    CHECK(jla_get(&t, &a) == JLA_MAX_MS && jla_trim(&t, &a) == JLA_MAX_MS - 10);
+    jla_set_trim(&t, &a, 5);
+    CHECK(jla_pack(&t, base, sizeof base) == JLA_PACKED && JLA_PACKED == 54);    /* the bases' blob as before */
+    CHECK(jla_pack_trim(&t, blob, sizeof blob) == JLA_TRIM_PACKED && jla_pack_trim(&t, blob, 10) == 0);
+    jla_init(&u);
+    CHECK(jla_unpack(&u, base, sizeof base) == 0 && jla_unpack_trim(&u, blob, sizeof blob) == 0 && jla_same(&t, &u));
+    jla_init(&u);
+    CHECK(jla_unpack(&u, base, sizeof base) == 0 && jla_trim(&u, &COMPUTER) == 0 && jla_get(&u, &COMPUTER) == -60);
+    CHECK(!jla_same(&t, &u));                                 /* no shifts stored (an older firmware): pure auto */
+    CHECK(jla_unpack_trim(&u, blob, sizeof blob - 1) == -1 && jla_trim(&u, &COMPUTER) == 0);
+    blob[0] = 99;
+    CHECK(jla_unpack_trim(&u, blob, sizeof blob) == -1);
 }
 
 /* the control line: set beat_latency (Calibrate) is the current source's; beat_latency_usb the computer's always;
@@ -103,7 +144,7 @@ static void test_ctl(void)
     CHECK(jk_ctl_line("set beat_latency_usb 28", &c, &s, 0, out, sizeof out) == JK_CTL_CFG_CHANGED);
     CHECK(c.beat_latency_ms == 6 && jla_get(&c.lat, &COMPUTER) == 28);    /* the computer's, the box's live value kept */
     CHECK(jk_ctl_line("set beat_latency_usb 301", &c, &s, 0, out, sizeof out) == JK_CTL_NONE && strstr(out, "err"));
-    CHECK(jk_ctl_line("get", &c, &s, 0, out, sizeof out) == JK_CTL_NONE && strstr(out, "beat_latency=6\nbeat_latency_src=host:1935:000c\n"));
+    CHECK(jk_ctl_line("get", &c, &s, 0, out, sizeof out) == JK_CTL_NONE && strstr(out, "beat_latency=6\nlat_auto=6\nlat_trim=0\nbeat_latency_src=host:1935:000c\n"));
     CHECK(strstr(out, "usbmidi=on\n"));
     CHECK(jk_ctl_line("set usbmidi off", &c, &s, 0, out, sizeof out) == JK_CTL_CFG_CHANGED && c.usbmidi == 0);
     CHECK(jk_ctl_line("set usbmidi maybe", &c, &s, 0, out, sizeof out) == JK_CTL_NONE && strstr(out, "err") && c.usbmidi == 0);
@@ -117,13 +158,18 @@ static void test_ctl(void)
     jk_cfg_defaults(&c);
     jk_lat_select(&c, &elektron);
     CHECK(jk_ctl_line("status", &c, &s, 0, out, sizeof out) == JK_CTL_NONE);
-    CHECK(strstr(out, "beat_latency=0\nbeat_latency_src=host:1935:000c\nusbmidi=on\n"));
+    CHECK(strstr(out, "beat_latency=0\nlat_auto=0\nlat_trim=0\nbeat_latency_src=host:1935:000c\nusbmidi=on\n"));
+    /* M2h: set lat_trim is the current source's AUDIO SHIFT (Calibrate's); set beat_latency its auto base */
+    CHECK(jk_ctl_line("set lat_trim -4", &c, &s, 0, out, sizeof out) == JK_CTL_CFG_CHANGED && c.beat_latency_ms == -4);
+    CHECK(jk_ctl_line("set beat_latency 20", &c, &s, 0, out, sizeof out) == JK_CTL_CFG_CHANGED && c.beat_latency_ms == 16);
+    CHECK(jla_base(&c.lat, &elektron) == 20 && jla_trim(&c.lat, &elektron) == -4 && jla_trim(&c.lat, &COMPUTER) == 0);
 }
 
 int main(void)
 {
     test_table();
     test_settings();
+    test_shift();
     test_ctl();
     printf("lat: %d checks, %d failed\n", checks, fails);
     return fails != 0;

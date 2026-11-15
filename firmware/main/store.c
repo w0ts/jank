@@ -12,7 +12,8 @@
 #define KEY "cfg1"
 #define KEY_USB "usb1"                 /* USB DEVICE / HOST, AUDIO > SOURCE, AUTO BAR, USB MIDI CLOCK, LOW CONFIDENCE, THRESHOLD:
                                         * six bytes, apart from the release's blob (an older, shorter one keeps the rest's defaults) */
-#define KEY_LAT "lat1"                 /* beat_latency per audio source (core/jank_lat.h jla_pack) */
+#define KEY_LAT "lat1"                 /* beat_latency per audio source, the auto bases (core/jank_lat.h jla_pack) */
+#define KEY_TRIM "latt"                /* the AUDIO SHIFTs on top (jla_pack_trim, M2h): none stored (an older firmware's): 0 */
 /* what is stored is the struct up to the beat-follow bench settings: a stick flashed with this build keeps its group, name
  * and Wi-Fi, and one flashed back to the release reads the same blob (no setting of the bench build is saved) */
 #define STORED_SIZE JK_CFG_STORED
@@ -58,6 +59,15 @@ static void load_lat(nvs_handle_t h, struct jk_cfg *c)
         ESP_LOGW(TAG, "stored latencies ignored: %u bytes", (unsigned)n);
     else if (e != ESP_OK && e != ESP_ERR_NVS_NOT_FOUND)
         ESP_LOGW(TAG, "stored latencies ignored: %s", esp_err_to_name(e));
+    {
+        uint8_t t[JLA_TRIM_PACKED];
+        n = sizeof t;
+        e = nvs_get_blob(h, KEY_TRIM, t, &n);
+        if (e == ESP_OK && jla_unpack_trim(&c->lat, t, n) != 0)
+            ESP_LOGW(TAG, "stored audio shifts ignored: %u bytes", (unsigned)n);
+        else if (e != ESP_OK && e != ESP_ERR_NVS_NOT_FOUND)
+            ESP_LOGW(TAG, "stored audio shifts ignored: %s", esp_err_to_name(e));
+    }
     jk_lat_select(c, &c->lat_key);
 }
 
@@ -99,6 +109,10 @@ esp_err_t store_save(const struct jk_cfg *c)
     if (e == ESP_OK) {
         uint8_t b[JLA_PACKED];
         e = nvs_set_blob(h, KEY_LAT, b, jla_pack(&c->lat, b, sizeof b));
+    }
+    if (e == ESP_OK) {
+        uint8_t t[JLA_TRIM_PACKED];
+        e = nvs_set_blob(h, KEY_TRIM, t, jla_pack_trim(&c->lat, t, sizeof t));
     }
     if (e == ESP_OK)
         e = nvs_commit(h);

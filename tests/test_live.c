@@ -146,6 +146,13 @@ static void test_meter(void)
 
 /* ---- AUDIO mode's Stop / Start ---- */
 
+/* a unit the user started earlier (power-on is stopped: test_power_on_stopped) */
+static void started(struct jho *h)
+{
+    jho_init(h);
+    h->hold = 0;
+}
+
 static struct jho_in hin(uint8_t lt, uint8_t base, uint8_t locked)
 {
     struct jho_in in = {.audio = 1, .lt = lt, .base = base, .locked = locked, .clock_running = 0};
@@ -159,7 +166,7 @@ static void test_hold_stops_all_outputs(void)
     for (uint8_t lt = JHO_IGNORE; lt <= JHO_LEAD; lt++) {
         struct jho h;
         struct jho_in in = hin(lt, 1, 1);
-        jho_init(&h);
+        started(&h);
         CHECK(jho_outputs(&h, &in) == 1);
         in.clock_running = 1;
         CHECK(jho_icon(&h, &in) == JHO_RUNNING);
@@ -183,7 +190,7 @@ static void test_release_arms_until_locked(void)
 {
     struct jho h;
     struct jho_in in = hin(JHO_FOLLOW, 1, 0);
-    jho_init(&h);
+    started(&h);
     jho_set(&h, 1);
     jho_set(&h, 0);
     CHECK(h.arming && h.releases == 1);
@@ -204,7 +211,7 @@ static void test_session_by_option(void)
 {
     struct jho h;
     struct jho_in in;
-    jho_init(&h);
+    started(&h);
     jho_set(&h, 1);
     in = hin(JHO_LEAD, 1, 1);
     CHECK(jho_session_held(&h, &in));
@@ -222,7 +229,7 @@ static void test_link_play_ends_hold(void)
 {
     struct jho h;
     struct jho_in in = hin(JHO_LEAD, 1, 1);
-    jho_init(&h);
+    started(&h);
     jho_set(&h, 1);
     jho_link_play(&h);
     CHECK(!h.hold && !h.arming && jho_outputs(&h, &in) == 1);
@@ -235,7 +242,7 @@ static void test_link_stop_holds(void)
 {
     struct jho h;
     struct jho_in in = hin(JHO_IGNORE, 1, 0);
-    jho_init(&h);
+    started(&h);
     in.audio = 0;
     CHECK(jho_outputs(&h, &in) == 1);
     jho_link_stop(&h);
@@ -260,7 +267,7 @@ static void test_user_layer(void)
 {
     struct jho h;
     struct jho_in in = hin(JHO_LEAD, 1, 1);
-    jho_init(&h);
+    started(&h);
     jho_set(&h, 1);
     in.gated = 1;                                               /* the gate closes and opens */
     CHECK(jho_outputs(&h, &in) == 0);
@@ -302,7 +309,7 @@ static void test_gate_stops_outputs(void)
     for (uint8_t lt = JHO_IGNORE; lt <= JHO_LEAD; lt++) {
         struct jho h;
         struct jho_in in = hin(lt, 1, 1);
-        jho_init(&h);
+        started(&h);
         in.clock_running = 1;
         CHECK(jho_outputs(&h, &in) == 1 && jho_icon(&h, &in) == JHO_RUNNING && !jho_session_held(&h, &in));
         in.gated = 1;
@@ -326,7 +333,7 @@ static void test_hold_wins_over_gate(void)
 {
     struct jho h;
     struct jho_in in = hin(JHO_LEAD, 1, 1);
-    jho_init(&h);
+    started(&h);
     in.gated = 1;
     jho_set(&h, 1);
     in.gated = 0;
@@ -347,7 +354,7 @@ static void test_start_wins_over_gate(void)
     for (uint8_t lt = JHO_IGNORE; lt <= JHO_LEAD; lt++) {
         struct jho h;
         struct jho_in in = hin(lt, 1, 1);
-        jho_init(&h);
+        started(&h);
         in.gated = 1;                                           /* conf 49 under 80 */
         CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in) == (lt == JHO_LEAD));
         jho_set(&h, 0);                                         /* Start, not held */
@@ -373,18 +380,44 @@ static void test_silence_after_start(void)
 {
     struct jho h;
     struct jho_in in = hin(JHO_LEAD, 1, 1);
-    jho_init(&h);
+    started(&h);
     in.gated = 1;
     jho_set(&h, 0);
     CHECK(jho_outputs(&h, &in) == 1);
     in.silent = 1;
     CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in));
-    in.silent = 0;
-    CHECK(jho_outputs(&h, &in) == 1 && h.gate_off);
-    jho_set(&h, 1);                                             /* Stop: held, the disarm gone */
+    in.silent = 0;                                              /* M2h: the silence ended the Start's override: the */
+    CHECK(jho_outputs(&h, &in) == 0 && !h.gate_off && !h.hold);  /* next music waits for the gate, no new Start needed */
+    CHECK(jho_icon(&h, &in) == JHO_STOPPED);
+    in.gated = 0;
+    CHECK(jho_outputs(&h, &in) == 1);
+    jho_set(&h, 1);                                             /* Stop: held */
     CHECK(jho_outputs(&h, &in) == 0 && !h.gate_off);
-    jho_set(&h, 0);                                             /* Start again: disarmed again */
+    in.gated = 1;
+    jho_set(&h, 0);                                             /* Start again: the override again */
     CHECK(h.gate_off && jho_outputs(&h, &in) == 1);
+}
+
+/* M2h, the user (2026-11-15): "come up with manual state: stopped". Power-on is the user's Stop (a constant, nothing
+ * stored): stopped in both modes, whatever the transport and the gate say, until the user's Start */
+static void test_power_on_stopped(void)
+{
+    struct jho h;
+    struct jho_in in = hin(JHO_LEAD, 1, 1);
+    jho_init(&h);
+    CHECK(h.hold && jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_STOPPED && jho_session_held(&h, &in));
+    in.audio = 0;                                               /* LINK mode, the session playing */
+    CHECK(jho_outputs(&h, &in) == 0);
+    in.audio = 1;
+    in.locked = 0;
+    jho_set(&h, 0);                                             /* the user's Start: armed, then on the lock */
+    CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_ARMED);
+    in.locked = 1;
+    CHECK(jho_outputs(&h, &in) == 1);
+    jho_init(&h);                                               /* and LINK mode's `play` starts it as well */
+    in.audio = 0;
+    jho_link_play(&h);
+    CHECK(jho_outputs(&h, &in) == 1);
 }
 
 int main(void)
@@ -404,6 +437,7 @@ int main(void)
     test_hold_wins_over_gate();
     test_start_wins_over_gate();
     test_silence_after_start();
+    test_power_on_stopped();
     printf("live: %d checks, %d failed\n", checks, fails);
     return fails;
 }

@@ -156,8 +156,10 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, 
 #define JK_CFG_STORED offsetof(struct jk_cfg, beat)
 /* the audio source the tracker hears now (usbrole.c): beat_latency_ms becomes that source's value (jank_lat.h). 1 changed */
 int jk_lat_select(struct jk_cfg *c, const struct jla_key *k);
-/* beat_latency_ms set, and the current source's value with it (`set beat_latency`, NUDGE MS, Calibrate) */
+/* the current source's auto base (`set beat_latency`, the player's Auto latency), stored; its AUDIO SHIFT kept on top */
 void jk_lat_set(struct jk_cfg *c, int ms);
+/* the current source's AUDIO SHIFT (`set lat_trim`, Calibrate's, NUDGE MS; 0: the auto base alone), stored */
+void jk_lat_trim(struct jk_cfg *c, int ms);
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b);   /* 1: a save would write something */
 
 /* Saving settings writes flash, and a flash write stops everything but the clock's interrupt for the erase (tens of ms,
@@ -175,7 +177,7 @@ size_t jk_intr_summary(const char *dump, char *out, size_t cap);
 /* drive and MIDI updates: refused while playing ("stop first"): flash erases would stall USB, Wi-Fi and the tracker */
 #define JK_STOP_FIRST "the session or the MIDI clock is playing: stop first"
 
-#define JK_CTL_OUT_MAX 1792u         /* the firmware's answer buffer (ctl.c): the longest status (1770 since M2e, tests/test_ctl.c) fits with its ok; under usb.c's 2048 */
+#define JK_CTL_OUT_MAX 1920u         /* the firmware's answer buffer (ctl.c): the longest status (1798 since M2h, tests/test_ctl.c) fits with its ok; under usb.c's 2048 */
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
 struct jk_beat {
@@ -294,10 +296,10 @@ int jk_ctl_fold(const char *line, int *dir);
  * 0.5 to 3 (+0.5, -0.5, 1, -1.5) -> 0 and the half beats (+-1..+-6); -1 not one. The caller nudges (core/jank_beatlink.h
  * jbl_nudge) and answers `nudge_beats=<total>`, the estimator's view before it, ok; or err link mode, no beat, at the limit */
 int jk_ctl_nudge(const char *line, int *halves);
-/* "nudge ms <n>": the AUDIO IN offset, beat_latency += n (1..JK_NUDGE_MS_STEP_MAX either way), kept within its range
- * (JK_BEAT_LATENCY_MIN_MS..MAX), as the current audio source's value (jank_lat.h; stored, saved once stopped, as
- * `set beat_latency`). jk_ctl_line answers beat_latency=<ms> ok (a change:
- * JK_CTL_CFG_CHANGED), or err link mode. jk_nudge_ms is the same for the device's YES + UP/DOWN: 1 when it moved */
+/* "nudge ms <n>": the AUDIO SHIFT (M2h), the current audio source's shift += n (1..JK_NUDGE_MS_STEP_MAX either way) on top
+ * of its auto base, which it never changes; the sum kept within JK_BEAT_LATENCY_MIN_MS..MAX (jank_lat.h; stored, saved once
+ * stopped). jk_ctl_line answers beat_latency=<sum> lat_auto=<base> lat_trim=<shift> ok (a change: JK_CTL_CFG_CHANGED), or
+ * err link mode. jk_nudge_ms is the same for the device's YES + UP/DOWN: 1 when it moved */
 #define JK_NUDGE_MS_STEP_MAX 10
 int jk_nudge_ms(struct jk_cfg *c, int ms);
 /* half beats as beats: 1 -> "0.5", -3 -> "-1.5", 4 -> "2", 0 -> "0" (out holds 8) */

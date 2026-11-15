@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The button, the LED and the group scan.
- * Click: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air. Three
+ * Click: stopped by the user's layer (power-on, a Stop: core/jank_hold.h): the user's Start (bridge_play, as `play`), the
+ * only Start a unit with no screen and no computer has; started: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air. Three
  * clicks: a phone's pair window (BLE builds; the LED blinks blue 4 times a second until a phone connects or it closes).
  * Held 1.5 s and let go: MODE JANK <-> the Wi-Fi network, a restart.
  * Held 10 s: download mode, for flashing. The LED: the session's beat, inverted on the Wi-Fi network; with AUTO BAR
@@ -205,7 +206,10 @@ static void on_button(enum jb_event e)
 {
     switch (e) {
     case JB_CLICK:
-        midi_resync();
+        if (bridge_user_stopped())
+            bridge_play(1);              /* M2h: power-on is stopped; this is the screenless unit's Start */
+        else
+            midi_resync();
         break;
     case JB_DOUBLE:
         scan_groups();

@@ -506,6 +506,15 @@ void bridge_set_lead(int lead)
 
 int bridge_session_held(void) { return jho_session_held(&s_hold, &s_hin); }
 
+int bridge_user_stopped(void)
+{
+    int held;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    held = s_hold.hold;
+    xSemaphoreGive(s_lock);
+    return held;
+}
+
 void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), void *ctx)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -545,6 +554,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     memcpy(s_bssid, s_b.bssid, 6);
     memcpy(s_own, mac, 6);
     js_clear(&s_scan);
+    jho_init(&s_hold);                 /* power-on: the user's layer stopped until the user's Start (M2h) */
     jp_init(&s_peer, peer_mac, mac, esp_random(), peer_out, NULL);
     s_on_network = cfg->net == JK_NET_WIFI;
     jn_init(&s_net, mac, esp_random(), cfg->name, LK_MCAST_IP, net_out, NULL);

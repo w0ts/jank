@@ -102,7 +102,20 @@ line once the tracker locks, as with peers.
   user's `stop` holds in both modes until the user's `play`, through everything automatic (the gate, silence then
   sound, a re-lock, AUTO BAR, a fold, AUDIO <-> LINK mode with the sound, the session of its own ending and restarting, a
   peer joining or starting the session, an audio stream restart); the gate and the silence stop and start the outputs
-  only while the user's layer is started. The hold is in RAM: a restart starts unheld. `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
+  only while the user's layer is started, and never change it. **Power-on is stopped** (M2h, the user: "come up with
+  manual state: stopped"; a constant, nothing stored): the outputs wait for the user's Start (`play`, the page's Start,
+  a click of a screenless unit's button: with the user's layer stopped a click is that Start, otherwise the resync); a
+  session already playing is not stopped for it. The outputs run only when user = started AND automatic = open:
+
+  | user | automatic | outputs |
+  |---|---|---|
+  | stopped (power-on, `stop`) | anything | stopped; only the user's `play` ends it |
+  | started | open | run (from the session's bar line once the tracker is locked) |
+  | started | gate closed (conf < threshold) | stopped; open again at threshold + 5: run again, no new Start |
+  | started | silence (0.5 s under -60 dBFS) | stopped at once; ends a Start's override: the next music waits for the gate |
+  | `play` | gate closed | the Start forces the gate open until the confidence has reached threshold + 5 once |
+
+  `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
   transport icon), with `audio=` (the source open), `audio_live=` (sound: AUDIO mode), the input meter `rms_db=` (RMS over
   0.3 s, a value every 250 ms), `rms_min_db=` / `rms_max_db=` (its extremes over 3 s), `peak_db=` (the last second's
   peak), `conf=` (the grid-fit confidence below, percent) and `act=` (the tracker's network activation peak over the
@@ -123,7 +136,7 @@ line once the tracker locks, as with peers.
   opening starts nothing. **The user's `play` wins over the gate** (M2g): it disarms it, the outputs start on the next
   bar line once the tracker is locked whatever the confidence (armed until then); the gate re-arms once the confidence
   has reached the threshold + 5, then stops and starts as before; `gated=` says 0 while disarmed. Silence still stops at
-  once. LINK mode: no gate
+  once and ends the override (M2h). LINK mode: no gate
   (as no hold). A first start with STOP / START waits for the window to fill with beats on the grid (about 7 s of music
   at 80 %), as the player. `status` and `beat`: `conf=`, `act=`, `gated=0|1`, `silent=0|1`, `threshold=`, `lowconf=`;
   `get`: `lowconf=`, `threshold=`; the transport icon (`outputs=`) is `stopped` while gated, `armed` once the gate opens
@@ -145,27 +158,34 @@ line once the tracker locks, as with peers.
   music's 1; not found by then, it starts on the session's next bar line and the 1 is placed at the next start (a bounded
   wait: beat one honest when the estimator can tell, no long silent wait when it cannot). ALWAYS: also mid-play, as
   before. No move while folded (the estimator counts tracked beats).
-- **NUDGE BEAT** `nudge beat <+-0.5..3, halves>` (AUDIO mode; the device's NO held + UP/DOWN, beat-listener's
+- **PHASE** (NUDGE BEAT) `nudge beat <+-0.5..3, halves>` (AUDIO mode; the device's NO held + UP/DOWN, beat-listener's
   `shift_beats`): Link's beats jump that much at once (+: earlier, UP) and the phase follower keeps them there from then
   on (the half part is its offset, whole beats are in the count; `core/jank_beatlink.h` jbl_nudge). The user's nudges add
-  up, at most +-3 beats in all (`err nudge beat at its limit`). AUTO BAR goes MANUAL until it is picked again or reset. An
-  armed start re-targets the moved grid's next bar line. Folded, a half beat is half a beat of Link's (the folded grid's);
-  the offset is kept in tracked time, so an off-beat fixed at fold 1 stays fixed at x2 and /2. The nudges clear when the
-  tracker starts over (a new stream) or stops (30 s with no steady beat), AUTO BAR's reset events; Start after Stop keeps
-  them (as the Python player does). `err link mode` in LINK mode (the session is not the tracker's), `err no beat yet`
+  up, at most +-3 beats in all (`err nudge beat at its limit`). An armed start re-targets the moved grid's next bar line.
+  Folded, a half beat is half a beat of Link's (the folded grid's); the offset is kept in tracked time, so an off-beat
+  fixed at fold 1 stays fixed at x2 and /2. **Two layers** (M2h, the user: "beat is more phase. So zero is auto"): the
+  total is a manual offset on top of the tracker's grid and AUTO BAR's bar. AUTO BAR stays in charge (no MANUAL any more:
+  it keeps placing the music's 1, the offset riding on it), nothing automatic changes the offset (a new stream, the
+  tracker stopped: kept, in RAM; a restart starts at 0), and back to a total of 0 is AUTO (no offset left). Shown as
+  "PHASE +1/2", "AUTO" at 0. `err link mode` in LINK mode (the session is not the tracker's), `err no beat yet`
   before a lock. The answer: `nudge_beats=<total>` and the downbeat estimator before it (`bar=`, `bar_phi=`,
   `bar_count=`, `bar_scores=`, for a refit's hand labels; the serial log has the same line). The MIDI clock: the session's
   half beat is exactly 12 ticks, so the clock jumps its tick count and keeps its times (one clock per grid time, no double
   or missing one: tests/test_beatlink.c test_nudge_clock); MIDI-clock gear counts the clocks it got since its Start, so
   it follows the nudge at its next Start (Stop / Start, or the button's resync), not at once.
-- **NUDGE MS** `nudge ms <+-1..10>` (AUDIO mode; the device's YES held + UP/DOWN): the AUDIO IN offset, `beat_latency`
-  of the source heard now, +: every output later. Answers `beat_latency=<ms>`.
-- **beat_latency per audio source** (`core/jank_lat.h`), stored (blob `lat1`, saved once stopped): the computer's USB
-  audio (default 25), each hosted USB audio device by VID:PID (the last 8 given a value; default 0: a box's outs and its
-  USB stream leave it together), the line in (a path constant, not measured yet, 0, plus the user's trim). The source
-  heard switches the live value (usbrole.c); `set beat_latency`, NUDGE MS and Calibrate set the current source's;
-  `set beat_latency_usb <ms>` always the computer's. `get` and `status`: `beat_latency=` and `beat_latency_src=`
-  (`usb`, `line`, `host:<vid>:<pid>`).
+- **AUDIO SHIFT** (NUDGE MS) `nudge ms <+-1..10>` (AUDIO mode; the device's YES held + UP/DOWN): the user's shift of
+  the heard audio, on top of the source's auto latency, +: every output later. **Two layers** (M2h, the user: "ms is
+  actually more an audio shift ... zero is auto"): the auto base (`set beat_latency`, the player's Auto latency, or the
+  value remembered) and the AUDIO SHIFT (`nudge ms`, `set lat_trim <ms>`, Calibrate); neither changes the other, the
+  value used (`beat_latency=`) is their sum within -300..300, a shift of 0 is the auto base alone. Answers
+  `beat_latency=<sum>`, `lat_auto=<base>`, `lat_trim=<shift>`. Shown as "AUDIO SHIFT +3 MS", "AUTO" at 0.
+- **beat_latency per audio source** (`core/jank_lat.h`), stored (blobs `lat1`, the bases, and `latt`, the shifts; saved
+  once stopped; an older firmware's `lat1` is read as it was, with no shift): the computer's USB audio (default 25),
+  each hosted USB audio device by VID:PID (the last 8 given a value; default 0: a box's outs and its USB stream leave it
+  together), the line in (a path constant, not measured yet, 0, plus its base). The source heard switches the live value
+  (usbrole.c); `set beat_latency` sets the current source's base, NUDGE MS, `set lat_trim` and Calibrate its shift;
+  `set beat_latency_usb <ms>` always the computer's base. `get` and `status`: `beat_latency=`, `lat_auto=`, `lat_trim=`
+  and `beat_latency_src=` (`usb`, `line`, `host:<vid>:<pid>`).
 - **USB MIDI CLOCK** `set usbmidi on|off`, stored (blob `usb1`'s 4th byte), on by default (the clock always went to
   USB-MIDI before; a computer's DAW ignores a clock it is not set to follow). Off: no clock, start or stop byte reaches
   USB-MIDI, in device mode (the computer) and host mode (hosted gear); turned off while running, one MIDI Stop goes out

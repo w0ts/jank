@@ -29,6 +29,21 @@ into it joins the group too.
 It plays no sound: it follows the group's tempo and phase and sends them on. Link is Ableton's trademark; jank is not an
 Ableton product.
 
+## Start and stop
+
+Two layers that never touch each other: yours (Start / Stop) and the automatic one (low confidence, silence). The
+clock outputs run only when both say go.
+
+| You | Automatic | Outputs |
+|---|---|---|
+| Stopped (also at power-on) | anything | stopped, until your Start |
+| Started | open | run, from a bar line |
+| Started | low confidence | stopped, back on their own when the confidence returns |
+| Started | silence | stopped at once; the next track waits for the confidence |
+| Start pressed | low confidence | your Start wins until the confidence has been good once |
+
+Start: the device's YES, a click of the stick's button, or the control page's play.
+
 ## Two devices
 
 - **The stick:** a bare Seeed XIAO ESP32-S3 (about US$7.50) in a computer or any USB host that speaks MIDI clock or Link (network driver). One button, one LED.

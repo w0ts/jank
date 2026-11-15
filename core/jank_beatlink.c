@@ -110,7 +110,9 @@ int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settle
         return 0;
     c->bar_seq = bar->seq;
     c->bar_seen = 1;
-    n = jbl_bar_shift(lk_beat_at(k, bar->beat_us), bar->count, bar->phi);
+    /* PHASE on top (M2h): the user's nudges moved the session's count by about total/2 beats (a half rounds as
+     * jbl_bar_shift reads a beat: floor(total/2 + 1/4)); the 1 is placed with that offset kept, never undone */
+    n = jbl_bar_shift(lk_beat_at(k, bar->beat_us), bar->count, bar->phi - (int)floor_div(2 * (int64_t)c->nudge + 1, 4));
     jbl_shift_bar(c, k, start, n, now);
     return n;
 }
@@ -132,7 +134,7 @@ int jbl_nudge(struct jbl *c, struct lk_node *k, struct jst *start, int settled, 
         jst_retarget(start, k, now);
     }
     c->nudge = (int8_t)total;
-    c->nudge_8ths = (uint8_t)(((c->nudge_8ths + halves * jbl_half_8ths(fold_exp)) % 32 + 32) % 32);
+    c->nudge_8ths = total ? (uint8_t)(((c->nudge_8ths + halves * jbl_half_8ths(fold_exp)) % 32 + 32) % 32) : 0u;   /* 0: AUTO */
     c->nudges++;
     return 0;
 }

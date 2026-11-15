@@ -34,7 +34,8 @@ the old image back (`main/ota.c`, `main/usb.c`).
 3. Live (or any Link app) with Link on joins over the stick's network adapter as usual. Within some beats the session's
    tempo follows the track, the stick's LED flashes on the beat and Live's Link beat lines up with what is heard. When
    the music stops, Link stops; when it starts again, Link starts on the next bar (quantum 4).
-4. Line up the phase by ear with the page's **Latency, ms** (or `set beat_latency <-300..300>`): the music is heard that
+4. Line up the phase by ear with the page's **Latency, ms** (`set beat_latency <-300..300>`, the auto base; the AUDIO
+   SHIFT on top: `nudge ms`, `set lat_trim`): the music is heard that
    long after its samples reach the stick (speaker output and USB buffering); negative when the stick gets the audio
    after the speakers play it. Default 25 for the computer's audio; since M2d stored per audio source (the computer, each
    hosted USB device, the line in: docs/firmware.md), saved once the session and the clock are stopped. `set beat off` stops the
@@ -91,5 +92,5 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   grid's beats, scores the 4 phases from 22 accent features of the tracker's own 81 bands, and once the best phase leads
   by 2.0 the session's bar moves onto it in whole beats (`jbl_bar_step`, the tempo untouched; an armed start re-targets the
   moved grid's next bar line). A later move needs a lead of 3.0 held 8 beats. Reset (listening again, the bar left where
-  it is): the tracker stopped, a new audio stream (a tempo jump is not one: `DOWN_JUMP_RESET` in beat.c). MANUAL comes with a beat nudge (`nudge beat`, docs/firmware.md);
-  `set autobar on` again ends it. The LED's bar flash turns amber while locked. RAM: 2.2 KB plus a 2.9 KB segment ring in PSRAM.
+  it is): the tracker stopped, a new audio stream (a tempo jump is not one: `DOWN_JUMP_RESET` in beat.c). A beat nudge (`nudge beat`, the PHASE) no longer makes it
+  MANUAL (M2h): AUTO BAR keeps placing the 1 and the PHASE rides on it (docs/firmware.md). The LED's bar flash turns amber while locked. RAM: 2.2 KB plus a 2.9 KB segment ring in PSRAM.
