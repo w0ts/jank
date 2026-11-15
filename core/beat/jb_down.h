@@ -55,6 +55,7 @@ struct jb_down {
     uint8_t has_grid, running, open, has_last;
     double tb, period, next, b_last;
     int64_t k, next_frame;
+    int64_t b_last_frame, index;       /* the frame of the last grid beat; the last frame taken */
     uint32_t sn;                       /* segments opened; segment m at m % JD_SEGS */
     int32_t seg_n[JD_SEGS];
     int64_t seg_start[JD_SEGS];

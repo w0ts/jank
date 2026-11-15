@@ -34,7 +34,7 @@ void jd_init(struct jb_down *d, jd_seg_row *seg)
     memset(d, 0, sizeof *d);
     d->seg = seg;
     memset(seg, 0, sizeof(jd_seg_row) * JD_SEGS);
-    d->first_frame = -1;
+    d->first_frame = d->index = d->b_last_frame = -1;
     for (int i = 0; i < JD_SEGS; i++)
         d->seg_start[i] = -1;
     d->auto_on = 1;
@@ -69,14 +69,20 @@ int jd_counting(const struct jb_down *d) { return d->running || d->n > 0; }
 int jd_playing(const struct jb_down *d) { return d->has_grid; }
 
 static int64_t frame_at(double t) { return (int64_t)floor(t * JD_FPS + 0.5); }
+static void count_beat(struct jb_down *d, int64_t index, double b, int64_t gap);
 
 int jd_grid(struct jb_down *d, double t, double tb, double period, int running)
 {
     double k;
+    int first = running && !d->running && d->n == 0;
     if (!(period > 0.0))
         return -1;
     d->has_grid = 1;
     d->running = (uint8_t)(running != 0);
+    /* counting starts on a beat played on this very frame as a shadow beat (frames come before their tracked beat): it
+     * is the first beat Link plays from the running grid, so it is counted (beat 0) */
+    if (first && d->has_last && d->b_last_frame == d->index)
+        count_beat(d, d->b_last_frame, d->b_last, 0);
     d->tb = tb;
     d->period = period;
     k = ceil((t - tb) / period - 1e-9);
@@ -310,35 +316,12 @@ static void decide(struct jb_down *d, int32_t count, double t)
     }
 }
 
-/* a grid beat at frame index: a segment opens; counted: a decision, then beat i - 4 enters */
-static void beat(struct jb_down *d, int64_t index)
+/* a counted beat whose segment is the newest: a decision, then beat i - 4 enters. gap: its count step (0: the first) */
+static void count_beat(struct jb_down *d, int64_t index, double b, int64_t gap)
 {
-    double b = d->next, p = d->period;
-    int64_t gap = 0;
-    int s;
     uint32_t i;
     int r;
-    if (d->has_last) {
-        gap = (int64_t)floor((b - d->b_last) / p + 0.5);
-        if (gap < 1)
-            gap = 1;
-    }
-    d->b_last = b;
-    d->k++;
-    d->next = d->tb + (double)d->k * p;
-    d->next_frame = frame_at(d->next);
-    s = (int)(d->sn % JD_SEGS);
-    memset(d->seg[s], 0, sizeof(jd_seg_row));
-    d->seg_n[s] = 0;
-    d->seg_start[s] = index;
-    d->sn++;
-    d->open = 1;
-    if (!d->running) {
-        d->has_last = 1;
-        return;                        /* a shadow beat: segments only */
-    }
-    d->c_last = d->n == 0 || !d->has_last ? 0 : d->c_last + (int32_t)gap;
-    d->has_last = 1;
+    d->c_last = d->n == 0 || gap < 1 ? 0 : d->c_last + (int32_t)gap;
     i = d->n++;
     r = (int)(i % JD_BEATS);
     d->rec_count[r] = d->c_last;
@@ -357,10 +340,38 @@ static void beat(struct jb_down *d, int64_t index)
     }
 }
 
+/* a grid beat at frame index: a segment opens; counted when the grid is the running one */
+static void beat(struct jb_down *d, int64_t index)
+{
+    double b = d->next, p = d->period;
+    int64_t gap = 0;
+    int s;
+    if (d->has_last) {
+        gap = (int64_t)floor((b - d->b_last) / p + 0.5);
+        if (gap < 1)
+            gap = 1;
+    }
+    d->b_last = b;
+    d->b_last_frame = index;
+    d->has_last = 1;
+    d->k++;
+    d->next = d->tb + (double)d->k * p;
+    d->next_frame = frame_at(d->next);
+    s = (int)(d->sn % JD_SEGS);
+    memset(d->seg[s], 0, sizeof(jd_seg_row));
+    d->seg_n[s] = 0;
+    d->seg_start[s] = index;
+    d->sn++;
+    d->open = 1;
+    if (d->running)                    /* (a shadow beat: segments only) */
+        count_beat(d, index, b, gap);
+}
+
 int jd_frame(struct jb_down *d, int64_t index, const float *bands)
 {
     int decided = 0;
     uint32_t seq = d->seq;
+    d->index = index;
     if (d->first_frame < 0)
         d->first_frame = index;
     curves(d, bands, d->ring[index % JD_RING]);

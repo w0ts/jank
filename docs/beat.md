@@ -91,5 +91,5 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   grid's beats, scores the 4 phases from 22 accent features of the tracker's own 81 bands, and once the best phase leads
   by 2.0 the session's bar moves onto it in whole beats (`jbl_bar_step`, the tempo untouched; an armed start re-targets the
   moved grid's next bar line). A later move needs a lead of 3.0 held 8 beats. Reset (listening again, the bar left where
-  it is): the tracker stopped, a tempo jump, a new audio stream. MANUAL comes with a beat nudge (none on the XIAO yet);
+  it is): the tracker stopped, a new audio stream (a tempo jump is not one: `DOWN_JUMP_RESET` in beat.c). MANUAL comes with a beat nudge (none on the XIAO yet);
   `set autobar on` again ends it. The LED's bar flash turns amber while locked. RAM: 2.2 KB plus a 2.9 KB segment ring in PSRAM.
