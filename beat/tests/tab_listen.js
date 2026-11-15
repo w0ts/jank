@@ -80,4 +80,7 @@ eq(P.paneSwitchPlan('tab', 'player', 'listening'), { pane: 'player', pausePlayer
 eq(P.paneSwitchPlan('tab', 'player', 'idle'), { pane: 'player', pausePlayer: false, stopTab: false });
 eq(P.paneSwitchPlan('player', 'player', 'idle').pausePlayer, false);
 for (const needle of ['data-pane="player"', 'data-pane="tab"', 'id="panebtn-tab"', "localStorage.setItem(PANE_KEY"]) { assert.ok(html.includes(needle), needle); checks++; }
+// the removed cards (confidence + threshold, the BPM / mode row, the Link line) and their ids are gone; the layout wraps the XIAO card beside the device
+for (const id of ['confval', 'confbar', 'confmark', 'linkstate', 'thval', 'exp', 'diff']) { assert.ok(!html.includes('id="' + id + '"') && !html.includes("$('" + id + "')"), id); checks++; }
+assert.ok(html.includes('id="devwrap"') && html.includes('#devwrap > #xiaocard')); checks++;
 console.log(checks + ' checks passed');

@@ -9,7 +9,7 @@
   @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#ececec; --muted:#9a9a9a; --line:#333; --card:#1e1e1e; --accent:#6aa0ff; --ok:#4cc38a; --bad:#ff8a4c; } }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.4 -apple-system, system-ui, sans-serif; }
-  main { max-width:880px; margin:0 auto; padding:16px; display:grid; gap:12px; }
+  main { max-width:1360px; margin:0 auto; padding:16px; display:grid; gap:12px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
   h1 { font-size:17px; margin:0; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -25,14 +25,14 @@
   .now { font-weight:600; overflow-wrap:anywhere; }
   .muted { color:var(--muted); }
   .num { font-variant-numeric:tabular-nums; }
-  .big { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
-  .big div { text-align:center; }
-  .big .v { font-size:30px; font-weight:650; font-variant-numeric:tabular-nums; }
-  .big .k { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
   .ok { color:var(--ok); } .bad { color:var(--bad); }
   #pitchval { font-size:20px; font-weight:600; min-width:90px; display:inline-block; }
   #err { color:var(--bad); min-height:1.2em; }
   .device { overflow-x:auto; }
+  /* the device keeps its true size (its svg is sized in PX_PER_MM); the XIAO card sits to its right, below it when narrow */
+  #devwrap { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
+  #devwrap > .device { flex:0 0 auto; max-width:100%; }
+  #devwrap > #xiaocard { flex:1 1 380px; min-width:0; }
   .device svg { display:block; flex:none; margin:0 auto; outline:none; touch-action:none; user-select:none; -webkit-user-select:none; }
   .device .lid { fill:#8d9094; stroke:#5d6064; stroke-width:.5; }
   .device .lidshade { fill:none; stroke:#a9acb0; stroke-width:.4; }
@@ -81,9 +81,6 @@
   .xaudio { padding:1px 8px; border-radius:9px; font-weight:600; background:#555; color:#fff; }
   .xaudio.on { background:#2e7d32; }
   .devpanel input[type=range] { flex:1; min-width:90px; width:auto; }
-  .meter { position:relative; height:14px; border-radius:7px; background:var(--bg); border:1px solid var(--line); margin-top:8px; overflow:hidden; }
-  #confbar { height:100%; width:0; background:var(--ok); transition:width .15s; }
-  #confmark { position:absolute; top:0; bottom:0; width:2px; background:var(--fg); left:50%; }
 </style>
 </head>
 <body>
@@ -93,6 +90,7 @@
     <div class="muted">What plays here is what the beat tracker hears. This program is the Link master; Ableton Live follows.</div>
   </div>
 
+  <div id="devwrap">
   <div class="card device">
     <div class="devpanel" id="viewbar">
       <label>Screen <select id="scr"><option value="1.54">1.54 in</option><option value="2.42">2.42 in</option><option value="none">no screen</option></select></label>
@@ -193,6 +191,8 @@
     </div>
   </div>
 
+  </div>
+
   <div class="card" id="panebar">
     <div class="row" role="tablist">
       <button id="panebtn-player" role="tab" type="button">Player</button>
@@ -250,28 +250,6 @@
     <input id="vol" type="range" min="0" max="100" step="1" value="100">
   </div>
 
-  <div class="card">
-    <div class="row">
-      <strong>Confidence</strong>
-      <span id="confval" class="num" style="font-size:20px; font-weight:600; min-width:60px">---</span>
-      <span id="linkstate" class="muted"></span>
-    </div>
-    <div class="meter"><div id="confbar"></div><div id="confmark"></div></div>
-    <div class="row" style="margin-top:10px">
-      <strong>Stop Link below</strong>
-      <span id="thval" class="num">50 %</span>
-      <span class="muted">(0 = never)</span>
-    </div>
-    <input id="th" type="range" min="0" max="100" step="1" value="50">
-  </div>
-
-  <div class="card big">
-    <div><div class="v" id="bpm">---</div><div class="k">tracker BPM</div></div>
-    <div><div class="v" id="mode">---</div><div class="k">mode</div></div>
-    <div><div class="v" id="exp">---</div><div class="k">Traktor × pitch</div></div>
-    <div><div class="v" id="diff">---</div><div class="k">difference</div></div>
-  </div>
-  <div class="card row muted num" id="link">Link: ---</div>
 </main>
 <!-- ===================== SETUP PAGE: the device's web setup form (a draft of the firmware's page) =====================
      Self-contained: markup, styles (.sp-*) and script (spOpen / spSave / spClose) only touch the dev state and setField(). -->
@@ -1023,7 +1001,7 @@ const OLED = (() => {
 </script>
 <script>
 const $ = id => document.getElementById(id);
-let library = [], shown = [], prevStatus = null, seeking = false, pitchDragging = false, volDragging = false, thDragging = false;
+let library = [], shown = [], prevStatus = null, seeking = false, pitchDragging = false, volDragging = false;
 
 async function api(name, body) {
   const r = await fetch('/api/' + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
@@ -1084,26 +1062,7 @@ function show(s) {
   $('time').textContent = fmt(s.position_s) + ' / ' + fmt(s.duration_s);
   if (!seeking && s.duration_s > 0) $('seek').value = Math.round(1000 * s.position_s / s.duration_s);
   setPitchUi(s.rate);
-  $('bpm').textContent = s.bpm ? s.bpm.toFixed(2) : '---';
-  $('mode').textContent = s.mode.replace('_', ' ');
-  $('exp').textContent = s.expected_bpm ? s.expected_bpm.toFixed(2) : '---';
-  if (s.bpm && s.expected_bpm) {
-    const d = s.bpm - s.expected_bpm;
-    $('diff').textContent = (d >= 0 ? '+' : '') + d.toFixed(2);
-    $('diff').className = 'v ' + (Math.abs(d) <= 0.1 ? 'ok' : Math.abs(d) > 0.5 ? 'bad' : '');
-  } else { $('diff').textContent = '---'; $('diff').className = 'v'; }
-  const ph = s.phase_ms == null ? '---' : (s.phase_ms >= 0 ? '+' : '') + s.phase_ms.toFixed(1) + ' ms';
-  $('link').textContent = 'Link peers: ' + s.peers + '   ·   tempo: ' + s.link_bpm.toFixed(2) + '   ·   phase: ' + ph;
   if (!volDragging) { $('vol').value = Math.round(s.volume * 100); $('volval').textContent = Math.round(s.volume * 100) + ' %'; }
-  const c = Math.round(s.confidence * 100), th = Math.round(s.min_confidence * 100);
-  $('confval').textContent = c + ' %';
-  $('confbar').style.width = c + '%';
-  $('confbar').style.background = s.gated || s.silent ? 'var(--bad)' : 'var(--ok)';
-  $('confmark').style.left = th + '%';
-  if (!thDragging) { $('th').value = th; $('thval').textContent = th + ' %'; }
-  $('linkstate').textContent = s.link_playing ? 'Link transport running'
-    : s.silent ? 'Link stopped: silence' : s.gated ? 'Link stopped: confidence under ' + th + ' %'
-    : 'Link stopped: waiting for a lock and the next bar';
 }
 
 async function poll() {
@@ -2035,8 +1994,6 @@ $('pitch').oninput = () => { pitchDragging = true; api('rate', { rate: 1 + $('pi
 $('pitch').onchange = () => { pitchDragging = false; };
 $('vol').oninput = () => { volDragging = true; $('volval').textContent = $('vol').value + ' %'; api('volume', { volume: $('vol').value / 100 }); };
 $('vol').onchange = () => { volDragging = false; };
-$('th').oninput = () => { thDragging = true; $('thval').textContent = $('th').value + ' %'; api('threshold', { min_confidence: $('th').value / 100 }); };
-$('th').onchange = () => { thDragging = false; };
 $('reset').onclick =() => { $('pitch').value = 0; api('rate', { rate: 1 }); };
 $('range').onchange = () => {
   const r = Number($('range').value);
