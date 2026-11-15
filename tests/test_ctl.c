@@ -339,6 +339,41 @@ static void test_autobar(void)
     CHECK(run("beat") == JK_CTL_NONE && strstr(out, "bar=off\n") && strstr(out, "bar_moves=7\n") && ends(out, "ok\n"));
 }
 
+/* settings saves: never a flash write while playing, unless a restart follows; what counts as a stored change */
+static void test_save(void)
+{
+    struct jk_cfg a, b;
+    uint8_t pending = 0;
+    jk_cfg_defaults(&a);
+    b = a;
+    CHECK(!jk_cfg_stored_differs(&a, &b));
+    b.autobar = 0;                                      /* a bench setting: not stored */
+    b.beat_latency_ms = 10;
+    CHECK(!jk_cfg_stored_differs(&a, &b));
+    b.ble = JK_BLE_AUTO;                                /* the release blob's pad byte: stored */
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.source = JUR_SRC_USB;                             /* stored apart ("usb1") */
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.group = 3;
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    /* stopped: at once */
+    CHECK(jk_save_on_change(&pending, 1, 0, 0) == JK_SAVE_NOW && !pending);
+    CHECK(jk_save_on_change(&pending, 0, 0, 0) == JK_SAVE_NONE && !pending);
+    /* playing: later, and not due until stopped */
+    CHECK(jk_save_on_change(&pending, 1, 1, 0) == JK_SAVE_LATER && pending);
+    CHECK(!jk_save_due(&pending, 1) && pending);
+    CHECK(jk_save_on_change(&pending, 0, 1, 0) == JK_SAVE_LATER && pending);    /* an unstored change: still pending */
+    CHECK(jk_save_due(&pending, 0) && !pending);
+    CHECK(!jk_save_due(&pending, 0));                                           /* once */
+    /* playing, but a restart follows (USB DEVICE / HOST): now, before the restart */
+    CHECK(jk_save_on_change(&pending, 1, 1, 1) == JK_SAVE_NOW && !pending);
+    /* a pending save and a change while stopped: one save covers both */
+    CHECK(jk_save_on_change(&pending, 1, 1, 0) == JK_SAVE_LATER);
+    CHECK(jk_save_on_change(&pending, 0, 0, 0) == JK_SAVE_NOW && !pending);
+}
+
 /* USB DEVICE / HOST and AUDIO > SOURCE; the port's lines in status */
 static void test_usb(void)
 {
@@ -433,6 +468,7 @@ int main(void)
     test_button();
     test_usb();
     test_status_size();
+    test_save();
     printf("ctl: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

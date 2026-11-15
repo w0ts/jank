@@ -138,6 +138,20 @@ struct jk_cfg {
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
+/* what store.c keeps: the release's blob (everything up to the bench settings) and, apart, usb and source */
+#define JK_CFG_STORED offsetof(struct jk_cfg, beat)
+int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b);   /* 1: a save would write something */
+
+/* Saving settings writes flash, and a flash write stops everything but the clock's interrupt for the erase (tens of ms,
+ * worst ~400 ms: the timing audit). So a change while the session plays (or the MIDI clock plays) is saved once stopped,
+ * unless a restart follows the change (a restart stops the clock anyway, and the setting must be there after it). */
+enum jk_save { JK_SAVE_NONE, JK_SAVE_NOW, JK_SAVE_LATER };
+/* a change of the settings: *pending is the unsaved flag. JK_SAVE_NOW: save before the change is published */
+enum jk_save jk_save_on_change(uint8_t *pending, int changed, int playing, int restart_follows);
+/* called often (and before a restart with playing 0): 1 when the deferred save is due now (*pending cleared) */
+int jk_save_due(uint8_t *pending, int playing);
+/* drive and MIDI updates: refused while playing ("stop first"): flash erases would stall USB, Wi-Fi and the tracker */
+#define JK_STOP_FIRST "the session or the MIDI clock is playing: stop first"
 
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */

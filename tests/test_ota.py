@@ -129,6 +129,39 @@ def test_idle(binary, scratch):
     dev.close()
 
 
+class Playing:
+    """A stick that plays: it answers begin, or a chunk after the first, with err playing (ota.c, JO_E_PLAYING)."""
+
+    def __init__(self, at_chunk):
+        self.at_chunk, self.chunks, self.pending, self.sent = at_chunk, 0, [], []
+
+    def send(self, text):
+        self.sent.append(text)
+        if text.startswith("ota begin"):
+            self.pending.append("err playing 0" if self.at_chunk == 0 else "ok 0 120")
+        elif text.startswith("ota d "):
+            self.chunks += 1
+            off = int(text.split()[2])
+            self.pending.append("err playing 0" if self.chunks >= self.at_chunk else "ok %d" % (off + 120))
+        elif text == "ota abort":
+            self.pending.append("ok 0")
+
+    def recv(self, timeout):
+        return self.pending.pop(0) if self.pending else None
+
+
+def test_playing():
+    for at in (0, 2):
+        dev = Playing(at)
+        try:
+            ota.Uploader(dev.send, dev.recv).upload(image(500))
+        except ota.OtaError as e:
+            assert "Stop the session" in str(e), str(e)
+            assert at == 0 or dev.sent[-1] == "ota abort"
+            continue
+        raise AssertionError("an update went on while playing")
+
+
 def test_frames():
     f = ota.frame("get\n")
     assert f == [0xF0, 0x7D, 0x4A, 0x4B, 0x67, 0x65, 0x74, 0x0A, 0xF7]
@@ -150,4 +183,5 @@ if __name__ == "__main__":
     test_refusals(binary, scratch)
     test_busy_from_an_earlier_run(binary, scratch)
     test_idle(binary, scratch)
+    test_playing()
     print("ota (python): ok")

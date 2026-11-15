@@ -12,7 +12,7 @@
 #define KEY_USB "usb1"                 /* USB DEVICE / HOST and AUDIO > SOURCE, two bytes, apart from the release's blob */
 /* what is stored is the struct up to the beat-follow bench settings: a stick flashed with this build keeps its group, name
  * and Wi-Fi, and one flashed back to the release reads the same blob (no setting of the bench build is saved) */
-#define STORED_SIZE offsetof(struct jk_cfg, beat)
+#define STORED_SIZE JK_CFG_STORED
 _Static_assert(STORED_SIZE == 130, "the release's blob was 130 bytes");
 static const char *TAG = "store";
 

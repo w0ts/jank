@@ -214,6 +214,15 @@ void midi_resync(void)
     portEXIT_CRITICAL(&s_mux);
 }
 
+int midi_is_playing(void)
+{
+    int r;
+    portENTER_CRITICAL(&s_mux);
+    r = s_tick.playing || s_tick.want_start || s_tick.resync;
+    portEXIT_CRITICAL(&s_mux);
+    return r;
+}
+
 void midi_stats(uint32_t *ticks, uint32_t *resyncs)
 {
     portENTER_CRITICAL(&s_mux);

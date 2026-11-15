@@ -23,6 +23,8 @@ CHIP_ESP32S3 = 9
 REPLY_TIMEOUT = 2.0         # seconds for one answer
 TRIES = 6                   # sends of one chunk before giving up
 BACK_TIMEOUT = 60.0         # seconds for the stick to come back after the restart
+STOP_FIRST = ("the stick is playing (the Link session or its MIDI clock): updates write flash, which stalls USB and "
+              "Wi-Fi, so they wait. Stop the session (Live's transport, or jank's stop), then run this again")
 
 
 class OtaError(Exception):
@@ -98,6 +100,8 @@ class Uploader:
             self.ask("ota abort")
             answer = self.ask(line)
         parts = answer.split()
+        if answer.startswith("err playing"):
+            raise OtaError(STOP_FIRST)
         if parts[0] != "ok" or len(parts) < 3:
             raise OtaError("the stick refused: %s" % answer)
         return min(CHUNK, int(parts[2]))
@@ -112,6 +116,8 @@ class Uploader:
                 if parts[0] == "ok":
                     pos, bad = int(parts[1]), 0
                     self.progress(pos, len(image))
+                elif answer.startswith("err playing"):
+                    raise OtaError(STOP_FIRST)
                 elif parts[1] in ("gap", "crc") and bad < TRIES:
                     pos, bad = int(parts[2]), bad + 1     # go on from where the stick is
                 else:

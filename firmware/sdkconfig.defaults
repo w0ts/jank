@@ -16,6 +16,11 @@ CONFIG_ESP_WIFI_IRAM_OPT=y
 CONFIG_ESP_WIFI_RX_IRAM_OPT=y
 CONFIG_BT_ENABLED=n
 CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=y
+# no flash writes while playing (the timing audit): Wi-Fi keeps nothing in NVS (radio.c sets WIFI_STORAGE_RAM as well)
+CONFIG_ESP_WIFI_NVS_ENABLED=n
+# no power management: no frequency switches or light sleep under the clock's interrupt (off by default; said here so a
+# fragment cannot turn it on unnoticed)
+CONFIG_PM_ENABLE=n
 
 # MIDI clock: the timer interrupt keeps running while flash is written (settings)
 CONFIG_GPTIMER_ISR_HANDLER_IN_IRAM=y

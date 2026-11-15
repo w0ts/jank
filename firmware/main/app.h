@@ -59,6 +59,7 @@ void midi_want(int play);
 int midi_start_pending(void);                        /* a MIDI start waits for its bar line */
 void midi_resync(void);
 void midi_stats(uint32_t *ticks, uint32_t *resyncs);
+int midi_is_playing(void);                           /* a MIDI start went out (or waits for its bar line), no stop since */
 
 /* bridge.c */
 esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uint8_t peer_mac[6]);
@@ -72,6 +73,8 @@ uint32_t bridge_peers_heard(void);
 int bridge_beat(int64_t *beat_ub, int32_t *mpb);    /* 1 in a session, with its beat now */
 int bridge_tempo(int32_t mpb);                       /* 0 set; -1 no session to set it in */
 int bridge_play(int play);                           /* 0 a start armed for the next bar / stopped; -1 no settled session; -2 AUDIO mode */
+/* the session or the MIDI clock plays: no flash writes now (updates refused, settings saved later; the timing audit) */
+int bridge_is_playing(void);
 void bridge_diag(char *out, size_t cap);             /* the Link clock filter, for `diag` */
 void app_diag(char *out, size_t cap);                /* restarts and the last reset's reason, for `diag` */
 /* fn on the Link peer, with the bridge's lock held and the host time now (the beat tracker steers the session through it) */
@@ -131,5 +134,6 @@ void usb_to_rom_download(void);                              /* does not return 
 
 /* main.c: the settings' one owner */
 void app_cfg_get(struct jk_cfg *c);
-void app_cfg_set(const struct jk_cfg *c);
+void app_cfg_set(const struct jk_cfg *c);                     /* saved first (or once stopped, while playing), then published */
+void app_cfg_flush(int force);                               /* a deferred save, once stopped (force: a restart follows) */
 #endif
