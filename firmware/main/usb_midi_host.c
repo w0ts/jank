@@ -14,6 +14,7 @@
 #include "freertos/task.h"
 #include "usb/usb_helpers.h"
 #include "usb/usb_host.h"
+#include "jank_midiq.h"
 #include "usb_host_mode.h"
 
 #define JH_DEVICES 4u
@@ -31,6 +32,7 @@ struct dev {
     uint8_t itf;
     uint16_t mps;
     volatile uint8_t busy;
+    struct jmq q;                      /* packets that came while the transfer was out (s_lock) */
     char name[JK_USB_NAME_MAX + 1];
 };
 
@@ -46,12 +48,31 @@ static SemaphoreHandle_t s_lock;
 static QueueHandle_t s_events;
 static uint32_t s_dropped;
 
+/* the waiting packets, up to mps bytes, go out in one transfer; the rest keeps waiting. s_lock held, d->busy 0 */
+static void submit_pending(struct dev *d)
+{
+    size_t len = jmq_take(&d->q, d->t->data_buffer, d->mps);
+    if (!len)
+        return;
+    d->t->num_bytes = (int)len;
+    d->busy = 1;
+    if (usb_host_transfer_submit(d->t) != ESP_OK) {
+        d->busy = 0;
+        s_dropped += (uint32_t)(len / 4u);
+    }
+}
+
+/* (the client task, from usb_host_client_handle_events) the packets that waited go out at once */
 static void on_sent(usb_transfer_t *t)
 {
     struct dev *d = t->context;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
     if (t->status != USB_TRANSFER_STATUS_COMPLETED)
-        s_dropped++;
+        s_dropped += (uint32_t)(t->num_bytes / 4);
     d->busy = 0;
+    if (d->h)                          /* (a device being removed: nothing more) */
+        submit_pending(d);
+    xSemaphoreGive(s_lock);
 }
 
 static struct dev *free_place(void)
@@ -102,6 +123,7 @@ static esp_err_t claim(struct dev *d, usb_device_handle_t h, uint8_t itf, uint8_
     d->itf = itf;
     d->mps = mps;
     d->busy = 0;
+    memset(&d->q, 0, sizeof d->q);
     usb_host_product_name(h, d->name, sizeof d->name);
     xSemaphoreTake(s_lock, portMAX_DELAY);
     d->h = h;
@@ -214,24 +236,18 @@ void usb_midi_host_list(struct jk_usb *u)
     xSemaphoreGive(s_lock);
 }
 
-/* a device still busy with the last packets misses these: the clock's next tick is worth more than an old one */
+/* each device's packets in order (core/jank_midiq.h): a device still busy with its last transfer gets these in its
+ * next one, sent from on_sent as soon as that completes; no F8 is dropped for a busy transfer */
 void usb_midi_host_send(const uint8_t *packets, size_t n)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     for (uint32_t i = 0; i < JH_DEVICES; i++) {
         struct dev *d = &s_dev[i];
-        size_t len = n > d->mps ? d->mps & ~3u : n;
-        if (!d->h || d->busy) {
-            s_dropped += d->h ? 1u : 0u;
+        if (!d->h)
             continue;
-        }
-        memcpy(d->t->data_buffer, packets, len);
-        d->t->num_bytes = (int)len;
-        d->busy = 1;
-        if (usb_host_transfer_submit(d->t) != ESP_OK) {
-            d->busy = 0;
-            s_dropped++;
-        }
+        s_dropped += jmq_add(&d->q, packets, n);
+        if (!d->busy)
+            submit_pending(d);
     }
     xSemaphoreGive(s_lock);
 }

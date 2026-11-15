@@ -45,6 +45,8 @@ fi
 "$OUT/test_tusb320"
 "$CC" $FLAGS -I"$HERE/firmware/main" "$HERE/tests/test_uacdesc.c" "$HERE/core/jank_uacdesc.c" -o "$OUT/test_uacdesc"
 "$OUT/test_uacdesc"
+"$CC" $FLAGS "$HERE/tests/test_midiq.c" "$HERE/core/jank_midiq.c" -o "$OUT/test_midiq"
+"$OUT/test_midiq"
 "$CC" $FLAGS "$HERE/tests/test_pcm.c" "$HERE/core/jank_pcm.c" -lm -o "$OUT/test_pcm"
 "$OUT/test_pcm"
 
