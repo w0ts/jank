@@ -6,7 +6,7 @@ const html = fs.readFileSync(process.argv[2], 'utf8');
 const grab = name => html.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n'))[0];
 let checks = 0;
 const eq = (a, b) => { assert.deepStrictEqual(a, b); checks++; };
-const fns = ['tabCaptureOptions', 'pickJankDevice', 'tabLabel', 'tabLevelDb', 'latencyAlign', 'tabStep'];
+const fns = ['panePick', 'paneSwitchPlan', 'tabCaptureOptions', 'pickJankDevice', 'tabLabel', 'tabLevelDb', 'latencyAlign', 'tabStep'];
 const P = new Function('const TAB_MAX_DELAY_S = ' + html.match(/TAB_MAX_DELAY_S = ([0-9.]+)/)[1] + ';\n' + fns.map(grab).join('\n') + '; return { ' + fns.join(', ') + ' };')();
 
 // Chrome's options: tabs, the tab itself muted, no window / system audio, not this page
@@ -72,4 +72,12 @@ eq(S('idle', { type: 'bogus' }).state, 'idle');
 for (const needle of ["'/api/tab_audio?rate='", 'setSinkId(jankId)', 'getDisplayMedia(tabCaptureOptions())', "registerProcessor('tab-tap'"]) {
   assert.ok(html.includes(needle.replace(/^'|'$/g, '')), needle); checks++;
 }
+// the tab bar: the remembered pane, and what a switch does
+eq([P.panePick('tab'), P.panePick('player'), P.panePick(null), P.panePick('x')], ['tab', 'player', 'player', 'player']);
+eq(P.paneSwitchPlan('player', 'tab', 'idle'), { pane: 'tab', pausePlayer: true, stopTab: false });
+eq(P.paneSwitchPlan('tab', 'tab', 'listening'), { pane: 'tab', pausePlayer: false, stopTab: false });      // the same tab again: nothing
+eq(P.paneSwitchPlan('tab', 'player', 'listening'), { pane: 'player', pausePlayer: false, stopTab: true });
+eq(P.paneSwitchPlan('tab', 'player', 'idle'), { pane: 'player', pausePlayer: false, stopTab: false });
+eq(P.paneSwitchPlan('player', 'player', 'idle').pausePlayer, false);
+for (const needle of ['data-pane="player"', 'data-pane="tab"', 'id="panebtn-tab"', "localStorage.setItem(PANE_KEY"]) { assert.ok(html.includes(needle), needle); checks++; }
 console.log(checks + ' checks passed');

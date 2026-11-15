@@ -193,7 +193,14 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="panebar">
+    <div class="row" role="tablist">
+      <button id="panebtn-player" role="tab" type="button">Player</button>
+      <button id="panebtn-tab" role="tab" type="button">Tab audio</button>
+    </div>
+  </div>
+
+  <div class="card" data-pane="player">
     <input id="q" type="search" placeholder="Search your Traktor tracks…" autocomplete="off">
     <div id="list"></div>
     <div class="row" style="margin-top:8px">
@@ -203,7 +210,7 @@
     <div id="err"></div>
   </div>
 
-  <div class="card" id="tabcard">
+  <div class="card" id="tabcard" data-pane="tab">
     <div class="row">
       <b>Listen to a tab</b>
       <button id="tabbtn" class="primary">Listen to a tab</button>
@@ -215,7 +222,7 @@
     <div class="muted" style="font-size:12px;margin-top:4px">The accuracy panel needs annotated tracks: a tab has no reference beat grid, so it shows nothing for a tab.</div>
   </div>
 
-  <div class="card">
+  <div class="card" data-pane="player">
     <div class="now" id="now">No track</div>
     <div class="row" style="margin-top:8px">
       <button class="primary" id="play">Play</button>
@@ -2285,6 +2292,31 @@ $('vol').addEventListener('input', () => { if (TAB.gain) TAB.gain.gain.value = $
 $('play').addEventListener('click', () => { if (TAB.state === 'listening') tabStop('Stopped listening: the player plays a track.'); });
 setInterval(tabRender, 250);
 tabRender();
+
+/* the tab bar: Player | Tab audio; one pane is shown at a time (the device, the XIAO card, the meters stay in both).
+   Tab audio pauses the player's track; Player stops the tab listening (the capture and both sinks close). */
+const PANE_KEY = 'jank-player-pane';
+function panePick(saved) {
+  return saved === 'tab' ? 'tab' : 'player';
+}
+function paneSwitchPlan(from, to, tabState) {
+  return { pane: panePick(to), pausePlayer: to === 'tab' && from !== 'tab', stopTab: to !== 'tab' && tabState === 'listening' };
+}
+let pane = 'player';
+function setPane(to) {
+  const plan = paneSwitchPlan(pane, to, TAB.state);
+  pane = plan.pane;
+  if (plan.pausePlayer) api('play', { playing: false });
+  if (plan.stopTab) tabStop('Stopped listening: back on the Player tab.');
+  for (const el of document.querySelectorAll('[data-pane]')) el.hidden = el.dataset.pane !== pane;
+  for (const n of ['player', 'tab']) { const b = $('panebtn-' + n); b.classList.toggle('primary', n === pane); b.setAttribute('aria-selected', String(n === pane)); }
+  try { localStorage.setItem(PANE_KEY, pane); } catch (e) { /* not remembered */ }
+}
+$('panebtn-player').onclick = () => setPane('player');
+$('panebtn-tab').onclick = () => setPane('tab');
+let savedPane = null;
+try { savedPane = localStorage.getItem(PANE_KEY); } catch (e) { /* storage blocked: the Player tab */ }
+setPane(panePick(savedPane));
 </script>
 </body>
 </html>
