@@ -56,8 +56,45 @@ static void test_double(void)
     reset(&b);
     hold(&b, 1, 80);
     hold(&b, 0, 150);
-    CHECK(hold(&b, 1, 80) == JB_DOUBLE);                 /* said on the second press, no waiting */
+    CHECK(hold(&b, 1, 80) == JB_NONE);                   /* not on the second press: a third may follow */
+    CHECK(hold(&b, 0, JB_DOUBLE_MS - 30u) == JB_NONE);
+    CHECK(hold(&b, 0, 100) == JB_DOUBLE);
     CHECK(hold(&b, 0, 1000) == JB_NONE && events == 1);
+    reset(&b);                                           /* a long second press is still a double */
+    hold(&b, 1, 80);
+    hold(&b, 0, 150);
+    CHECK(hold(&b, 1, JB_LONG_MS + 200u) == JB_NONE);
+    CHECK(hold(&b, 0, JB_DOUBLE_MS + 50u) == JB_DOUBLE && events == 1);
+}
+
+static void test_triple(void)
+{
+    struct jb_button b;
+    reset(&b);
+    hold(&b, 1, 80);
+    hold(&b, 0, 150);
+    hold(&b, 1, 80);
+    hold(&b, 0, 150);
+    CHECK(hold(&b, 1, 80) == JB_TRIPLE);                 /* said on the third press */
+    CHECK(hold(&b, 0, 2000) == JB_NONE && events == 1);  /* nothing at its release */
+    reset(&b);                                           /* a third press too late: a double, then a click */
+    hold(&b, 1, 80);
+    hold(&b, 0, 150);
+    hold(&b, 1, 80);
+    CHECK(hold(&b, 0, JB_DOUBLE_MS + 50u) == JB_DOUBLE);
+    hold(&b, 1, 80);
+    CHECK(hold(&b, 0, JB_DOUBLE_MS + 50u) == JB_CLICK && events == 2);
+}
+
+static void test_pair_blink(void)
+{
+    uint8_t c[3];
+    uint32_t lit = 0;
+    for (uint32_t t = 0; t < 1000u; t += 5u)
+        lit += (uint32_t)jl_pair_lit(t, c);
+    CHECK(lit == 100u);                                  /* half of a second's 200 samples */
+    CHECK(jl_pair_lit(0, c) == 1 && c[0] == 0 && c[1] == 0 && c[2] == 40);
+    CHECK(jl_pair_lit(JL_PAIR_MS / 2u, c) == 0 && c[2] == 0);
 }
 
 static void test_two_slow_clicks(void)
@@ -276,6 +313,8 @@ int main(void)
 {
     test_click();
     test_double();
+    test_triple();
+    test_pair_blink();
     test_two_slow_clicks();
     test_bounce();
     test_long();

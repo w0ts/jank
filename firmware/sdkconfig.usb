@@ -1,4 +1,5 @@
-# USB: CDC-NCM + MIDI + a read-only drive with the control page (no CDC-ACM: main/usb.c, the IN endpoints)
+# USB: CDC-NCM + MIDI + the JANK drive (no CDC-ACM: main/usb.c, the IN endpoints). The drive is made up by main/drive.c
+# with TinyUSB's own MSC callbacks; the FATFS and wear-levelling options below only keep esp_tinyusb's unused glue building
 CONFIG_TINYUSB_MSC_ENABLED=y
 # host mode: USB-MIDI devices, through a hub too
 CONFIG_USB_HOST_HUBS_SUPPORTED=y

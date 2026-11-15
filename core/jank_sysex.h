@@ -28,6 +28,8 @@ int jx_feed(struct jx_in *in, uint8_t byte);
  * link: where the Link session's nearest beat is from that instant (+ = later; what Live follows), "-" with no session
  * playing. The numbers are clamped to +-JX_FIELD_MAX. */
 #define JX_PUSH_BEAT 0x10u
+/* the HOME line for a phone over BLE (jank_phone.h, jph_home_line): "h <bpm x100> <net> ...", a few times a second */
+#define JX_PUSH_HOME 0x11u
 #define JX_FIELD_MAX 9999999L
 #define JX_PUSH_TEXT_MAX 48u
 #define JX_PUSH_FRAME_MAX (JX_PUSH_TEXT_MAX + 6u)

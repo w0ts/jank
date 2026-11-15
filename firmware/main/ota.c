@@ -40,6 +40,7 @@ static void drop_flash(void)
     s_handle = 0;
     s_slot = NULL;
     jo_abort(&s_jo);
+    slot_give(SLOT_MIDI);
 }
 
 static void do_begin(const struct jo_cmd *c)
@@ -52,8 +53,14 @@ static void do_begin(const struct jo_cmd *c)
         say(JO_E_STATE, 0);
         return;
     }
+    if (!slot_take(SLOT_MIDI)) {           /* a jank.bin from the drive has the slot (streaming, or installed) */
+        say(JO_E_BUSY, 0);
+        return;
+    }
     e = jo_begin(&s_jo, c->size, c->crc, slot->size, now_ms());
     if (e != JO_OK) {
+        if (!s_jo.active)                  /* (JO_E_BUSY: the transfer running keeps the slot) */
+            slot_give(SLOT_MIDI);
         say(e, s_jo.offset);
         return;
     }
