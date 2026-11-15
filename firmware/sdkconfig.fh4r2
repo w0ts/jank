@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# The jank mini 2.2 board's chip, ESP32-S3FH4R2: 4 MB flash, 2 MB quad PSRAM in the package. After sdkconfig.xiao (whose
+# octal PSRAM it replaces). A size check only, until the board exists: JANK_EXTRA_DEFAULTS="...;sdkconfig.fh4r2".
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_fh4r2.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions_fh4r2.csv"

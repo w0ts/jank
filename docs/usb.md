@@ -44,7 +44,7 @@ default).
 A new image starts "pending verify". The old one comes back at the next reset, of any kind, unless the new one confirms
 itself with `esp_ota_mark_app_valid_cancel_rollback()`. It does that (`main/ota.c`, `ota_validate_start`) when the computer
 has configured the USB device (`tud_mounted`) and the control task has then gone round once (about a second): that is
-the path the next update needs. A start as USB host (nothing plugged in, see below) confirms before its restart.
+the path the next update needs. A start as USB host does not confirm it: `ota.c` restarts into the old image after 120 s.
 A crash, a hang that resets the watchdog or a power cut before that puts the old image back.
 
 ## Updating over USB MIDI (optional)
@@ -75,9 +75,28 @@ Beat-follow bench build only: the device is also a UAC2 speaker, an OUT endpoint
 
 ## Host mode
 
-With no computer on the port, the stick sends its clock to USB-MIDI gear: up to 4 devices, through a hub too. It starts
-as a device; when no computer has spoken within 3 s (`HOST_WAIT_MS`) it restarts once as host, so a clock on a charger
-starts about 3 s late. The choice lasts until the next start. Host mode has no network adapter, drive or control page.
+The setting `usb` (`set usb device|host`, the menu's USB: DEVICE / HOST later; stored, default `device`) chooses.
+**DEVICE**: always a device, as above. **HOST**: jank hosts self-powered USB gear:
+
+- **MIDI**: the clock (the same ticks, starts on the bar line and stops as MIDI OUT) to every USB-MIDI device's first
+  MIDI OUT port, up to 4, through a hub too (`main/usb_midi_host.c`).
+- **Audio**: the first device with a 44.1 or 48 kHz PCM stream (UAC 1.0 or 2.0, 16 or 24 bits, mono to 8 channels) goes
+  to the beat tracker, mixed to mono ((L + R) / 2) and resampled to 44.1 kHz (`main/usb_uac_host.c`, `core/jank_uacdesc.c`,
+  `core/jank_pcm.c`). The tracker sees it as it sees the computer's stream: same ring, same `beat_latency`.
+- `status` says `usb_role`, `usb_cc` (what the cable has: `device`, `host` for a computer or a charger, `none`;
+  `nochip` on the XIAO), `usb_dev=<name>,midi+audio` for each device, `usb_audio=<rate>/<channels>/<bits>`.
+
+Where the role comes from (`core/jank_usbrole.c`, host-tested):
+- **XIAO** (no CC chip): with HOST it starts as a device; when no computer configured it within 3 s it restarts once as
+  host (as before), so a clock on a charger starts about 3 s late. `set usb device` from a computer brings it back.
+- **jank mini 2.2, battery order** (TUSB320LI): a device on the cable -> the host stack and the 5 V signal (pump, then
+  HOST_EN); a computer or a charger -> HOST_EN low at once and the device stack; nothing -> the host stack, waiting. A
+  different stack is a restart (about a second; the clock stops for it); a stack runs at least 3 s before the next one.
+  The setting DEVICE keeps the CC chip a sink: never 5 V, the charger always charges.
+
+`set source auto|line|usb` (AUDIO > SOURCE, stored, default `auto`): AUTO hears the line in when a plug is in, else USB
+audio when a stream is open (the computer's in device mode, the hosted device's in host mode). The line in's own audio
+path is not in this firmware yet: LINE hears nothing for now. Host mode has no network adapter, drive or control page.
 
 jank does not switch power to the device. On a bare XIAO the 5V pin is the USB-C socket's VBUS with nothing between
 them (v1.2 schematic), so 5 V on that pin powers the device, or a powered hub does. The XIAO presents 5.1 k on both CC
