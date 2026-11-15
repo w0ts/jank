@@ -155,6 +155,7 @@
       <label><input type="checkbox" id="bat" checked> battery fitted</label>
       <label>Battery <input type="range" id="battlvl" min="0" max="100" value="80"> <b id="battv" class="num">80 %</b></label>
       <label><input type="checkbox" id="linein" checked> line in plugged</label>
+      <label><input type="checkbox" id="usbaudio"> USB audio playing</label>
     </div>
   </div>
 
@@ -532,14 +533,20 @@ const OLED = (() => {
              help: Array(9).fill(['UNITS ON THE SAME', 'GROUP PLAY TOGETHER']) },     // the jank README: GROUP 1..9, no router
     lowconf: { title: 'LOW CONFIDENCE', opts: ['KEEP RUNNING', 'STOP / START'], get: c => (c.confStop ? 1 : 0),
                help: [['NEVER STOPS', ''], ['STOPS BELOW THE', 'THRESHOLD']] },
+    // what the tracker listens to: AUTO = the line in when plugged, else USB audio when it plays
+    insrc: { title: 'SOURCE', opts: ['AUTO', 'LINE IN', 'USB AUDIO'], get: c => c.inSrc,
+             help: [['LINE IN IF PLUGGED', 'ELSE USB AUDIO'], ['THE LINE IN JACK', 'ONLY'], ['AUDIO OVER USB', 'ONLY']] },
+    // the USB port's role; MIDI and USB audio work in both (host: battery units, the gear has its own power)
+    usbrole: { title: 'USB', opts: ['DEVICE', 'HOST'], get: c => c.usbRole,
+               help: [['TO A COMPUTER', 'MIDI + AUDIO'], ['TO SELF-POWERED', 'MIDI + AUDIO GEAR']] },
   };
   const helpOf = (sp, v) => (sp.opts ? sp.help[v] : sp.help) || ['', ''];
   const MENU = [                                                    // the top-level menu, in order
-    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'NETWORK', net: true }, { name: 'OFFSET', sub: 'offsets' },
+    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'OFFSET', sub: 'offsets' },
     { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
   ];
   // sub-menus: a title and the EDITS they list
-  const SUBS = { audio: { title: 'AUDIO', rows: ['gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
+  const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
                  display: { title: 'DISPLAY', rows: ['bright', 'sleep'] } };
   const VISIBLE = 6;
   const OVERLAY_MS = 1000;
@@ -1109,8 +1116,8 @@ const askGet = () => { XIAO.cfgAskedAt = performance.now(); xiaoSend('get'); };
 /* --xiao: the device's mode is the XIAO's own. AUDIO while the player's stream to it is open (its reports' audio flag), LINK
    when closed. The line-in box shows it and is not the user's to change (the player keeps the stream open while it runs) */
 function syncXiaoMode(now) {
-  const box = $('linein');
-  box.disabled = true;
+  const box = $('usbaudio'), line = $('linein');      // the XIAO hears the player over USB audio; it has no line in
+  box.disabled = true; line.disabled = true; line.checked = false;
   box.title = '--xiao: the XIAO is in AUDIO mode while the player\'s USB audio stream to it is open, LINK when it is closed';
   if (!XIAO.rep || now - XIAO.repAt > XIAO_REPORT_FRESH_MS) return;
   box.checked = XIAO.rep.audio;
@@ -1217,15 +1224,15 @@ function showXiao(x, bench) {
 let S = null, tPoll = 0;
 const holdUntil = { th: 0, off: 0, mode: 0, hold: 0, tempo: 0, fold: 0 };     // keep a local value until the server has caught up
 const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: false, no: false, yes: false },
-              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1,
+              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1,
               repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
               net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
 /* remembered in this browser (localStorage; a blocked storage only means nothing is remembered): the test panel
    (Wi-Fi, USB, battery, battery level, line in) and the device's emulator-only settings. The settings the player owns
    (threshold, low confidence, input offset, fold, hold) come back from the player itself. Passwords are not kept. */
 const PANEL_KEY = 'beatEmuPanel', DEV_KEY = 'beatEmuDevice';
-const PANEL_IDS = ['wifi', 'usb', 'bat', 'battlvl', 'linein'];
-const DEV_FIELDS = ['ltMode', 'gain', 'bright', 'sleep', 'offs', 'rate'];
+const PANEL_IDS = ['wifi', 'usb', 'bat', 'battlvl', 'linein', 'usbaudio'];
+const DEV_FIELDS = ['ltMode', 'gain', 'bright', 'sleep', 'offs', 'rate', 'inSrc', 'usbRole'];
 const NET_FIELDS = ['mode', 'group', 'ssid', 'apName'];
 const loadJson = key => { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; } };
 const saveJson = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { /* not remembered */ } };
@@ -1310,6 +1317,8 @@ function setField(field, val) {
   else if (field === 'appass') dev.net.appass = val;
   else if (field === 'apname') dev.net.apName = val;
   else if (field === 'group') dev.net.group = val + 1;       // emu: the choice index 0..8 = GROUP 1..9
+  else if (field === 'insrc') { dev.inSrc = val; syncModeFromPlug(); }     // emu: the source picks AUDIO / LINK with the plug
+  else if (field === 'usbrole') dev.usbRole = val;          // emu: DEVICE (to a computer) / HOST (self-powered gear)
   saveDevice();
 }
 // low confidence: STOP / START sends the threshold; KEEP RUNNING sends 0 (never gate), the threshold stays for later
@@ -1438,6 +1447,7 @@ function buildCtx(now, beat) {
     beatMs: beat ? beat.ms : 0, usb: $('usb').checked, fitted: $('bat').checked,
     batt: battLevel(), lineIn, bright: dev.bright, sleep: dev.sleep, inOff: dev.inOff, offs: dev.offs, rate: dev.rate, boot: dev.boot, splash: now - dev.powerOnAt < 800,
     net: netCtx(now), wifiQ: wifiQuality(now), groupPeers: $('wifi').value === 'none' ? 0 : xp ? xp.group : 3, setup: dev.net.mode === 3, qr: QR_CODE, saved: now < dev.savedUntil,
+    inSrc: dev.inSrc, usbRole: dev.usbRole,
     tempoStep, setField, setHold, linkStartStop,
   };
 }
@@ -1621,11 +1631,15 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { const b = KEY_BTN[e.key]; if (b && !typing(e.target)) { e.preventDefault(); btnUp(b); } });
 window.addEventListener('blur', () => { for (const b of ['up', 'down', 'no', 'yes']) btnUp(b); });
 
-// the mode follows the line-in plug detect (GPIO16 on the board): plugged = AUDIO, unplugged = LINK; sent at load and on every change
-const syncModeFromPlug = () => setField('mode', $('linein').checked ? 0 : 1);
+// the mode follows the chosen source (AUDIO > SOURCE): AUTO = the line-in plug (GPIO16), else USB audio while it plays;
+// LINE IN / USB AUDIO = that one only. A live source = AUDIO, none = LINK; sent at load and on every change
+const audioLive = () => { const line = $('linein').checked, usbA = $('usbaudio').checked;
+  return dev.inSrc === 1 ? line : dev.inSrc === 2 ? usbA : line || usbA; };
+function syncModeFromPlug(force) { const m = audioLive() ? 0 : 1; if (force === true || dev.link !== (m === 1)) setField('mode', m); }
 $('linein').onchange = syncModeFromPlug;
+$('usbaudio').onchange = syncModeFromPlug;
 restorePanel();                                       // the remembered panel; the mode follows the restored plug
-syncModeFromPlug();
+syncModeFromPlug(true);
 setPower(true);
 requestAnimationFrame(frame);
 
