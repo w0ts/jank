@@ -51,7 +51,6 @@ static TaskHandle_t s_task;
 static volatile uint32_t s_last_write_ms;
 static volatile uint8_t s_eject;          /* the computer ejected the drive */
 static volatile uint8_t s_ready;
-static volatile uint8_t s_wait_stop;      /* a whole image waits for the session to stop before it is installed */
 static const char *volatile s_refused;    /* why an image was not taken (set in TinyUSB's task) */
 static esp_err_t s_flash_err;
 static uint8_t *s_page;                   /* 4 KB, only for a sector of the image written twice */
@@ -158,8 +157,6 @@ static const char *start_refused(void)
         return "no spare app slot";
     if (running_unconfirmed())
         return "the running firmware is not confirmed yet (it confirms itself once a computer has talked to it for 20 s)";
-    if (bridge_is_playing())
-        return JK_STOP_FIRST;
     if (!slot_take(SLOT_DRIVE))
         return "an update over MIDI is running";
     return NULL;
@@ -239,10 +236,7 @@ static void write_sector(uint32_t lba, const uint8_t *data)
     }
     if (k == JV_W_START)
         e = start(lba, data, &op);
-    else if ((k == JV_W_IMAGE || k == JV_W_REWRITE) && bridge_is_playing()) {
-        s_refused = JK_STOP_FIRST;        /* playing started during the copy: no more erases; copy it again once stopped */
-        jv_fail(&s_d);
-    } else if (k == JV_W_IMAGE || k == JV_W_REWRITE) {
+    else if (k == JV_W_IMAGE || k == JV_W_REWRITE) {
         e = k == JV_W_IMAGE ? flash_op(&op, data) : flash_rewrite(&op, data);
         if (e == ESP_OK)
             jv_written(&s_d, &op, read_slot, NULL);
@@ -380,10 +374,7 @@ static void drive_task(void *arg)
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         if (s_d.phase == JV_DONE) {
             esp_err_t e;
-            /* whole, but playing started after its last sector: the boot choice (a flash write) and the restart wait */
-            for (s_wait_stop = 1; bridge_is_playing(); )
-                vTaskDelay(pdMS_TO_TICKS(POLL_MS));
-            s_wait_stop = 0;
+            /* installed at once, playing or not (the user, 2026-11-15: "drop the guard. just let me flash") */
             e = esp_ota_set_boot_partition(s_slot);   /* esp_image_verify first: segments, checksum, SHA-256 */
             if (e == ESP_OK)
                 finish("jank.bin installed from the drive, restarted", s_slot->label, true);
@@ -404,7 +395,7 @@ void drive_state(char *out, size_t cap)
 {
     static const char *const phase[] = {"idle", "stream", "done", "failed"};
     snprintf(out, cap, "drive=%s\ndrive_image=%s %lu/%lu bytes, %lu sectors in\ndrive_cache=%lu dropped=%lu%s%s\n", s_ready ? "ok" : "not started",
-             s_wait_stop ? "done, installed once stopped" : phase[s_d.phase & 3u], (unsigned long)(s_d.frontier * JV_SECTOR), (unsigned long)jv_image_len(&s_d), (unsigned long)s_d.sectors_in,
+             phase[s_d.phase & 3u], (unsigned long)(s_d.frontier * JV_SECTOR), (unsigned long)jv_image_len(&s_d), (unsigned long)s_d.sectors_in,
              (unsigned long)s_d.ncache, (unsigned long)s_d.cache_dropped, s_refused ? " refused: " : "", s_refused ? s_refused : "");
 }
 

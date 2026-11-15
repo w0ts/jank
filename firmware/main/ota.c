@@ -53,10 +53,8 @@ static void do_begin(const struct jo_cmd *c)
         say(JO_E_STATE, 0);
         return;
     }
-    if (bridge_is_playing()) {             /* flash erases would stall USB, Wi-Fi and the tracker: stop first */
-        say(JO_E_PLAYING, 0);
-        return;
-    }
+    /* no "stop first" (the user, 2026-11-15: "drop the guard. just let me flash"): an update while playing is allowed;
+     * its flash erases stall USB, Wi-Fi and the tracker for a moment, so the clock may hiccup during the transfer */
     if (!slot_take(SLOT_MIDI)) {           /* a jank.bin from the drive has the slot (streaming, or installed) */
         say(JO_E_BUSY, 0);
         return;
@@ -84,11 +82,6 @@ static void do_begin(const struct jo_cmd *c)
 static void do_data(const struct jo_cmd *c)
 {
     enum jo_err e = jo_data(&s_jo, c, now_ms());
-    if (e == JO_OK && bridge_is_playing()) {   /* playing started during the transfer: stopped, send it again once stopped */
-        drop_flash();
-        say(JO_E_PLAYING, 0);
-        return;
-    }
     if (e == JO_OK) {
         esp_err_t r = esp_ota_write(s_handle, c->data, c->n);
         if (r != ESP_OK) {
@@ -108,11 +101,6 @@ static void do_end(void)
     esp_err_t r = ESP_OK;
     if (e == JO_E_SHORT) {
         say(e, s_jo.offset);
-        return;
-    }
-    if (e == JO_OK && bridge_is_playing()) {   /* the boot choice writes flash, and the restart would stop the clock */
-        drop_flash();
-        say(JO_E_PLAYING, 0);
         return;
     }
     if (e == JO_OK) {
@@ -196,12 +184,9 @@ static void valid_task(void *arg)
     (void)arg;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(VALID_POLL_MS));
-        if (ready) {                   /* the confirm erases flash (otadata, the note): once stopped, no deadline now */
-            if (!bridge_is_playing()) {
-                ota_mark_valid();
-                vTaskDelete(NULL);
-            }
-            continue;
+        if (ready) {                   /* the confirm (an otadata write) is made at once, playing or not */
+            ota_mark_valid();
+            vTaskDelete(NULL);
         }
         if (esp_timer_get_time() >= VALID_DEADLINE_US) {
             ESP_LOGE(TAG, "no computer spoke on the MIDI control line within %d s: restarting into the old image", (int)(VALID_DEADLINE_US / 1000000));
