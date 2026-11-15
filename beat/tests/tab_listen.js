@@ -1,0 +1,75 @@
+// node tab_listen.js PLAYER_HTML: the "Listen to a tab" helpers: the capture options, the jank device pick by label,
+// the tab label, the level, the latency alignment and the start / stop / error state machine
+const fs = require('fs');
+const assert = require('assert');
+const html = fs.readFileSync(process.argv[2], 'utf8');
+const grab = name => html.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n'))[0];
+let checks = 0;
+const eq = (a, b) => { assert.deepStrictEqual(a, b); checks++; };
+const fns = ['tabCaptureOptions', 'pickJankDevice', 'tabLabel', 'tabLevelDb', 'latencyAlign', 'tabStep'];
+const P = new Function('const TAB_MAX_DELAY_S = ' + html.match(/TAB_MAX_DELAY_S = ([0-9.]+)/)[1] + ';\n' + fns.map(grab).join('\n') + '; return { ' + fns.join(', ') + ' };')();
+
+// Chrome's options: tabs, the tab itself muted, no window / system audio, not this page
+const o = P.tabCaptureOptions();
+eq([o.video, o.preferCurrentTab, o.selfBrowserSurface, o.systemAudio], [true, false, 'exclude', 'exclude']);
+eq(o.audio.suppressLocalAudioPlayback, true);
+eq([o.audio.echoCancellation, o.audio.noiseSuppression, o.audio.autoGainControl], [false, false, false]);
+
+// the jank output by label (case-insensitive), outputs only
+const dev = (kind, label, id) => ({ kind, label, deviceId: id });
+const list = [dev('audioinput', 'jank', 'in1'), dev('audiooutput', 'MacBook Pro Speakers', 'sp'), dev('audiooutput', 'jank (USB Audio)', 'j1'), dev('audiooutput', 'Default', 'default')];
+eq(P.pickJankDevice(list, 'jank'), 'j1');
+eq(P.pickJankDevice([dev('audiooutput', 'JANK', 'J')], 'jank'), 'J');
+eq(P.pickJankDevice(list.slice(0, 2), 'jank'), null);                       // an input named jank does not count
+eq(P.pickJankDevice([dev('audiooutput', '', 'x')], 'jank'), null);          // no permission: empty labels
+eq(P.pickJankDevice([], 'jank'), null);
+eq(P.pickJankDevice(null, 'jank'), null);
+
+eq(P.tabLabel('web-contents-media-stream://12:3'), 'a Chrome tab');
+eq(P.tabLabel(''), 'a Chrome tab');
+eq(P.tabLabel('Daft Punk - YouTube'), 'Daft Punk - YouTube');
+eq(P.tabLevelDb(0), -99);
+eq(Math.round(P.tabLevelDb(0.1)), -20);
+eq(P.tabLevelDb(1e-9), -99);
+
+// the lower-latency sink gets the difference as a delay, capped
+eq(P.latencyAlign(0.020, 0.050), { main: 0.030000000000000002, jank: 0 });
+eq(P.latencyAlign(0.050, 0.020).main, 0);
+eq(P.latencyAlign(0.0, 5), { main: 0.5, jank: 0 });
+eq(P.latencyAlign(undefined, NaN), { main: 0, jank: 0 });
+
+// the state machine
+const S = P.tabStep;
+eq(S('idle', { type: 'start' }).state, 'asking');
+eq(S('asking', { type: 'start' }).state, 'asking');                          // a second click while the dialog is open
+eq(S('listening', { type: 'start' }).state, 'listening');
+let r = S('asking', { type: 'granted', hasAudio: true, label: 'web-contents-media-stream://1:2' });
+eq([r.state, r.msg, r.error], ['listening', 'Listening to a Chrome tab', false]);
+r = S('asking', { type: 'granted', hasAudio: true, label: 'Some Tab' });
+eq(r.msg, 'Listening to Some Tab');
+r = S('asking', { type: 'granted', hasAudio: false });
+eq([r.state, r.error], ['idle', true]);
+assert.ok(/Share tab audio/.test(r.msg)); checks++;
+r = S('asking', { type: 'denied', name: 'NotAllowedError' });
+eq([r.state, r.error], ['idle', false]);
+r = S('asking', { type: 'denied', name: 'NotFoundError' });
+eq([r.state, r.error], ['idle', true]);
+assert.ok(/NotFoundError/.test(r.msg)); checks++;
+r = S('asking', { type: 'nodevice' });
+eq([r.state, r.error], ['idle', true]);
+assert.ok(/jank/.test(r.msg)); checks++;
+r = S('listening', { type: 'ended' });
+eq([r.state, r.error], ['idle', false]);
+assert.ok(/stopped/.test(r.msg)); checks++;
+eq(S('idle', { type: 'ended' }).msg, '');                                    // an 'ended' after our own stop says nothing
+eq(S('listening', { type: 'stop' }).state, 'idle');
+eq(S('listening', { type: 'stop', msg: 'Stopped: x' }).msg, 'Stopped: x');
+r = S('listening', { type: 'fail', msg: 'boom' });
+eq([r.state, r.msg, r.error], ['idle', 'boom', true]);
+eq(S('idle', { type: 'bogus' }).state, 'idle');
+
+// every worklet / capture piece the page uses is wired: the endpoint, the 44.1 kHz rate and the sink call
+for (const needle of ["'/api/tab_audio?rate='", 'setSinkId(jankId)', 'getDisplayMedia(tabCaptureOptions())', "registerProcessor('tab-tap'"]) {
+  assert.ok(html.includes(needle.replace(/^'|'$/g, '')), needle); checks++;
+}
+console.log(checks + ' checks passed');

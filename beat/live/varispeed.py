@@ -7,6 +7,7 @@ the tracker hears that silence too (it goes to "stopped", like a real line input
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -16,6 +17,7 @@ from live.sources import Chunk, NowUs, _StreamSource
 from live.tracker import HOP, SAMPLE_RATE
 
 MIN_RATE, MAX_RATE = 0.5, 1.5
+TAB_HOLD_S = 0.5        # tab audio counts as flowing this long after its last block (the page sends ~10 a second)
 
 
 def render(audio: np.ndarray, pos: float, rate: float, frames: int) -> tuple[np.ndarray, float, bool]:
@@ -57,6 +59,8 @@ class VarispeedSource(_StreamSource):
         self._playing = False
         self._volume = 1.0
         self._frames_out = 0
+        self._ext_lock = threading.Lock()     # the stream clock and the tracker queue, shared with the tab feed
+        self._ext_at = -1e9                   # monotonic time of the last tab block
         self.tap = None      # called with each block as rendered (full level), e.g. live.xiao.XiaoOutput.push
         self.on_block = None  # called with (path, file sample, rate, frames, heard us) of each block played
         self._played = None
@@ -90,6 +94,22 @@ class VarispeedSource(_StreamSource):
         with self._lock:
             self._volume = volume
 
+    def tab_active(self) -> bool:
+        """True while a browser tab's audio feeds the tracker (the player's own stream then stays out of it)."""
+        return time.monotonic() - self._ext_at < TAB_HOLD_S
+
+    def feed_tab(self, samples: np.ndarray, end_link_us: float) -> None:
+        """Mono 44.1 kHz samples from a browser tab, the last one heard at `end_link_us` on the Link clock, go to the
+        tracker in hops in place of the player's own output (which is silent then: the page stops the track)."""
+        n = len(samples)
+        with self._ext_lock:
+            self._ext_at = time.monotonic()
+            for i in range(0, n, HOP):
+                part = samples[i:i + HOP]
+                heard = end_link_us - (n - i) / SAMPLE_RATE * 1e6
+                self._queue.put(Chunk(part, self._frames_out / SAMPLE_RATE, heard))
+                self._frames_out += len(part)
+
     def seek(self, seconds: float) -> None:
         with self._lock:
             if self._audio is not None:
@@ -120,5 +140,8 @@ class VarispeedSource(_StreamSource):
         if self.on_block is not None and self._played is not None:
             path, pos, rate = self._played
             self.on_block(path, pos, rate, frames, heard)      # the file position heard when (live.accuracy)
-        self._queue.put(Chunk(block.mean(axis=1, dtype=np.float32), self._frames_out / SAMPLE_RATE, heard))
-        self._frames_out += frames
+        with self._ext_lock:
+            if self.tab_active():
+                return              # the tab's audio is the tracker's input: no silence chunks in between
+            self._queue.put(Chunk(block.mean(axis=1, dtype=np.float32), self._frames_out / SAMPLE_RATE, heard))
+            self._frames_out += frames

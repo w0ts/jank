@@ -203,6 +203,18 @@
     <div id="err"></div>
   </div>
 
+  <div class="card" id="tabcard">
+    <div class="row">
+      <b>Listen to a tab</b>
+      <button id="tabbtn" class="primary">Listen to a tab</button>
+      <button id="tabstop" hidden>Stop listening</button>
+    </div>
+    <div class="muted" style="font-size:12px;margin:4px 0">Pick a Chrome tab (YouTube, say) and tick "Share tab audio". The tab goes quiet and this page plays it instead: to the speakers (the Volume slider) and, with --xiao, to the "jank" USB audio output at full level; without --xiao, to the speakers and this player's tracker.</div>
+    <div id="tabstat" class="num" style="font-size:13px"></div>
+    <div id="tablat" class="num muted" style="font-size:12px"></div>
+    <div class="muted" style="font-size:12px;margin-top:4px">The accuracy panel needs annotated tracks: a tab has no reference beat grid, so it shows nothing for a tab.</div>
+  </div>
+
   <div class="card">
     <div class="now" id="now">No track</div>
     <div class="row" style="margin-top:8px">
@@ -1030,6 +1042,7 @@ function renderList() {
 }
 
 async function load(path) {
+  if (typeof TAB !== 'undefined' && TAB.state === 'listening') tabStop('Stopped listening: the player plays a track.');
   $('now').textContent = 'Loading…';
   await api('load', { path });
   await api('play', { playing: true });
@@ -2092,6 +2105,186 @@ $('scr').onchange = () => {
   if (view.scr === NO_SCREEN) { ui.screen = 'home'; ui.edit = null; ui.overlay = null; ui.hint = null; }       // no menu without a screen
 };
 applyView();
+</script>
+<script>
+/* "Listen to a tab": Chrome's getDisplayMedia hands over a tab's audio (MDN: MediaDevices.getDisplayMedia; Chrome's
+   suppressLocalAudioPlayback mutes the tab itself, so the speakers get it only from this page). The captured stream is
+   played by this page to the default output (a gain: the Volume slider) and, with --xiao, to the "jank" USB audio device
+   through a second AudioContext whose output is set with AudioContext.setSinkId (MDN: AudioContext/setSinkId, Chrome 110+).
+   Device labels are empty until the page holds a media permission (MDN: MediaDevices.enumerateDevices), so the one-time
+   getUserMedia({audio}) permission is taken and its stream stopped at once (selectAudioOutput is not in Chrome).
+   Without --xiao, an AudioWorklet posts the mono 44.1 kHz samples to /api/tab_audio for the player's tracker. */
+const TAB_RATE = 44100, TAB_BLOCK = 4096, TAB_BACKLOG = 20, TAB_MAX_DELAY_S = 0.5;
+function tabCaptureOptions() {
+  return { video: true, preferCurrentTab: false, selfBrowserSurface: 'exclude', systemAudio: 'exclude',
+           audio: { suppressLocalAudioPlayback: true, echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
+}
+function pickJankDevice(devices, needle) {
+  const n = String(needle || 'jank').toLowerCase();
+  const d = (devices || []).find(x => x.kind === 'audiooutput' && String(x.label || '').toLowerCase().includes(n));
+  return d ? d.deviceId : null;
+}
+function tabLabel(raw) {
+  const s = String(raw || '').trim();
+  return !s || /^[a-z-]+:\/\//i.test(s) ? 'a Chrome tab' : s;
+}
+function tabLevelDb(rms) { return rms > 0 ? Math.max(-99, 20 * Math.log10(rms)) : -99; }
+function latencyAlign(mainS, jankS) {
+  const a = Number.isFinite(mainS) ? mainS : 0, b = Number.isFinite(jankS) ? jankS : 0;
+  const cap = x => Math.min(TAB_MAX_DELAY_S, Math.max(0, x));
+  return { main: cap(b - a), jank: cap(a - b) };
+}
+/* the state machine: idle > asking (Chrome's picker is open) > listening; every end goes back to idle with a message */
+function tabStep(state, ev) {
+  switch (ev.type) {
+    case 'start': return state === 'idle' ? { state: 'asking', msg: 'Pick a tab in Chrome\'s dialog and tick "Share tab audio".', error: false } : { state, msg: '', error: false };
+    case 'granted':
+      return ev.hasAudio ? { state: 'listening', msg: 'Listening to ' + tabLabel(ev.label), error: false }
+        : { state: 'idle', msg: 'No audio in that share: pick the tab again and tick "Share tab audio" (it must be a tab, not a window).', error: true };
+    case 'denied':
+      return ev.name === 'NotAllowedError' ? { state: 'idle', msg: 'The share was cancelled or not allowed.', error: false }
+        : { state: 'idle', msg: 'Chrome could not share a tab: ' + (ev.name || 'error'), error: true };
+    case 'nodevice': return { state: 'idle', msg: 'No audio output named "jank" (is the XIAO plugged in, and the microphone permission allowed so Chrome shows device names?)', error: true };
+    case 'ended': return state === 'listening' ? { state: 'idle', msg: 'The share was stopped (from Chrome\'s bar or the tab was closed).', error: false } : { state, msg: '', error: false };
+    case 'stop': return { state: 'idle', msg: ev.msg || 'Stopped listening.', error: false };
+    case 'fail': return { state: 'idle', msg: ev.msg || 'Listening failed.', error: true };
+    default: return { state, msg: '', error: false };
+  }
+}
+</script>
+<script>
+const TAB = { state: 'idle', msg: '', error: false, stream: null, ctxs: [], gain: null, delays: null, level: -99, queue: [], sending: false,
+              mode: '', label: '', lat: '', postErr: '' };
+const TAB_WORKLET = `class Tap extends AudioWorkletProcessor {
+  constructor(o) { super(); this.post = !!o.processorOptions.post; this.buf = new Float32Array(${TAB_BLOCK}); this.n = 0; this.sumsq = 0; }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0];
+    if (!inp.length) return true;
+    for (let c = 0; c < out.length; c++) out[c].set(inp[Math.min(c, inp.length - 1)]);
+    for (let i = 0; i < inp[0].length; i++) {
+      let m = 0; for (const ch of inp) m += ch[i]; m /= inp.length;
+      this.buf[this.n++] = m; this.sumsq += m * m;
+      if (this.n === this.buf.length) {
+        const rms = Math.sqrt(this.sumsq / this.n);
+        if (this.post) { const copy = this.buf.slice(); this.port.postMessage({ rms, pcm: copy.buffer }, [copy.buffer]); }
+        else this.port.postMessage({ rms });
+        this.n = 0; this.sumsq = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('tab-tap', Tap);`;
+async function jankDeviceId() {
+  const probe = await navigator.mediaDevices.getUserMedia({ audio: true });      // only to unlock the device names
+  for (const t of probe.getTracks()) t.stop();
+  return pickJankDevice(await navigator.mediaDevices.enumerateDevices(), 'jank');
+}
+function tabApply(ev) {
+  const r = tabStep(TAB.state, ev);
+  TAB.state = r.state; if (r.msg) { TAB.msg = r.msg; TAB.error = r.error; }
+}
+async function tabPostLoop() {
+  if (TAB.sending) return;
+  TAB.sending = true;
+  try {
+    while (TAB.queue.length && TAB.state === 'listening') {
+      const body = TAB.queue.shift();
+      const r = await fetch('/api/tab_audio?rate=' + TAB_RATE, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body });
+      TAB.postErr = r.ok ? '' : 'player refused the audio: ' + ((await r.json()).error || r.status);
+    }
+  } catch (e) { TAB.postErr = 'player not reachable: ' + e.message; }
+  TAB.sending = false;
+}
+function tabOnTap(ev, local) {
+  TAB.level = tabLevelDb(ev.data.rms);
+  if (!local || !ev.data.pcm) return;
+  TAB.queue.push(ev.data.pcm);
+  while (TAB.queue.length > TAB_BACKLOG) TAB.queue.shift();       // never a growing lag: drop the oldest
+  tabPostLoop();
+}
+async function tabGraph(stream, jankId) {
+  const local = !jankId;
+  const main = new AudioContext({ sampleRate: TAB_RATE, latencyHint: 'interactive' });
+  TAB.ctxs.push(main);
+  if (main.sampleRate !== TAB_RATE && local) throw new Error('this browser runs audio at ' + main.sampleRate + ' Hz, not ' + TAB_RATE);
+  const url = URL.createObjectURL(new Blob([TAB_WORKLET], { type: 'application/javascript' }));
+  await main.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+  const tap = new AudioWorkletNode(main, 'tab-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], processorOptions: { post: local } });
+  tap.port.onmessage = ev => tabOnTap(ev, local);
+  const gain = main.createGain(); gain.gain.value = $('vol').value / 100;
+  const dMain = main.createDelay(TAB_MAX_DELAY_S);
+  main.createMediaStreamSource(stream).connect(tap); tap.connect(gain); gain.connect(dMain); dMain.connect(main.destination);
+  TAB.gain = gain; TAB.delays = { main: dMain, jank: null };
+  const lat = [['speakers', main]];
+  if (jankId) {                                                   // jank always gets the full level (like the player's own stream)
+    const jank = new AudioContext({ sampleRate: TAB_RATE, latencyHint: 'interactive' });
+    TAB.ctxs.push(jank);
+    await jank.setSinkId(jankId);
+    const dJank = jank.createDelay(TAB_MAX_DELAY_S);
+    jank.createMediaStreamSource(stream).connect(dJank); dJank.connect(jank.destination);
+    TAB.delays.jank = dJank; lat.push(['jank', jank]);
+  }
+  for (const c of TAB.ctxs) if (c.state !== 'running') await c.resume();
+  TAB.mode = local ? 'speakers + the player\'s tracker' : 'speakers + jank';
+  setTimeout(() => tabAlign(lat), 1500);                         // outputLatency is only known once the sinks run
+}
+function tabAlign(lat) {
+  if (TAB.state !== 'listening') return;
+  const secs = lat.map(([, c]) => (c.baseLatency || 0) + (c.outputLatency || 0));
+  TAB.lat = lat.map(([n, c], i) => n + ' ' + Math.round(secs[i] * 1000) + ' ms (base ' + Math.round((c.baseLatency || 0) * 1000) + ' + output ' + Math.round((c.outputLatency || 0) * 1000) + ')').join(', ');
+  if (lat.length === 2) {
+    const d = latencyAlign(secs[0], secs[1]);
+    TAB.delays.main.delayTime.value = d.main; TAB.delays.jank.delayTime.value = d.jank;
+    TAB.lat += ' | delay added: speakers ' + Math.round(d.main * 1000) + ' ms, jank ' + Math.round(d.jank * 1000) + ' ms';
+  }
+}
+function tabTeardown() {
+  if (TAB.stream) for (const t of TAB.stream.getTracks()) t.stop();
+  for (const c of TAB.ctxs) c.close().catch(() => {});
+  Object.assign(TAB, { stream: null, ctxs: [], gain: null, delays: null, queue: [], level: -99, mode: '', lat: '' });
+}
+function tabStop(msg) { tabTeardown(); tabApply({ type: 'stop', msg }); tabRender(); }
+async function tabStart() {
+  if (TAB.state !== 'idle') return;
+  tabApply({ type: 'start' }); tabRender();
+  let stream;
+  try { stream = await navigator.mediaDevices.getDisplayMedia(tabCaptureOptions()); }
+  catch (e) { tabApply({ type: 'denied', name: e.name }); tabRender(); return; }
+  for (const v of stream.getVideoTracks()) { v.stop(); stream.removeTrack(v); }          // only the sound is wanted
+  const audio = stream.getAudioTracks();
+  if (!audio.length) { for (const t of stream.getTracks()) t.stop(); tabApply({ type: 'granted', hasAudio: false }); tabRender(); return; }
+  TAB.stream = stream;
+  let jankId = null;
+  try {
+    if (S && S.xiao) {
+      jankId = await jankDeviceId();
+      if (!jankId) { tabTeardown(); tabApply({ type: 'nodevice' }); tabRender(); return; }
+    }
+    await api('play', { playing: false });                       // the player's own track must not play along (CoreAudio would mix them)
+    audio[0].addEventListener('ended', () => { tabTeardown(); tabApply({ type: 'ended' }); tabRender(); });
+    await tabGraph(stream, jankId);
+  } catch (e) { tabTeardown(); tabApply({ type: 'fail', msg: 'Listening failed: ' + e.message }); tabRender(); return; }
+  tabApply({ type: 'granted', hasAudio: true, label: audio[0].label });
+  TAB.label = tabLabel(audio[0].label);
+  tabRender();
+}
+function tabRender() {
+  const on = TAB.state === 'listening';
+  $('tabbtn').disabled = TAB.state !== 'idle';
+  $('tabstop').hidden = TAB.state === 'idle';
+  const fed = !(S && S.xiao) && on ? (S && S.tab ? ' | tracker is fed' : ' | tracker not fed yet') : '';
+  $('tabstat').textContent = (TAB.msg || 'Not listening.') + (on ? ' | to ' + TAB.mode + ' | level ' + Math.round(TAB.level) + ' dB' + fed : '') + (TAB.postErr ? ' | ' + TAB.postErr : '');
+  $('tabstat').style.color = TAB.error ? '#e0674f' : '';
+  $('tablat').textContent = on && TAB.lat ? 'reported latency: ' + TAB.lat : '';
+}
+$('tabbtn').onclick = tabStart;
+$('tabstop').onclick = () => tabStop();
+$('vol').addEventListener('input', () => { if (TAB.gain) TAB.gain.gain.value = $('vol').value / 100; });     // the speakers only
+$('play').addEventListener('click', () => { if (TAB.state === 'listening') tabStop('Stopped listening: the player plays a track.'); });
+setInterval(tabRender, 250);
+tabRender();
 </script>
 </body>
 </html>
