@@ -83,3 +83,79 @@ def test_a_grid_that_moves_a_little_does_not_double_its_lines():
         log.tick((0.0 + 0.004 * (k % 2), 0.5), now)
     gaps = np.diff(log.times())
     assert gaps.min() > 0.4
+
+
+# ---- jank M2i: the live rate (live/rate.py) and the follow engine's parity with the firmware ----
+
+def _varispeed(change: float, at: float, dur: float) -> np.ndarray:
+    """A chord with a beat envelope, its playback rate stepped by `change` at `at` (scripts/follow_golden.py synth)."""
+    from scripts.follow_golden import synth
+    return synth(dur, at, 1 + change, 0.0, 1000.0)
+
+
+def test_a_frame_not_taken_needs_no_spectrum_and_a_taken_one_does():
+    import pytest
+
+    from live.rate import RateProbe
+    p = RateProbe(step=2, every=2)
+    assert p.taken(10) and not p.taken(11)
+    assert p.frame(10, np.ones(1025)) is None and p.frame(11, None) is None
+    with pytest.raises(ValueError):
+        p.frame(12, None)
+
+
+def test_the_live_rate_finds_a_step_while_active_and_nothing_while_not():
+    from live.rate import RateTap
+    y = _varispeed(0.03, 9.0, 13.0)
+    events = []
+    tap = RateTap()
+    for k in range(0, len(y), 441):
+        events += tap.feed(y[k:k + 441], True)
+    assert len(events) == 1
+    t, r = events[0]
+    assert 9.0 < t < 10.5 and abs(r - 1.03) < 0.002
+    idle = RateTap()
+    assert sum(len(idle.feed(y[k:k + 441], False)) for k in range(0, len(y), 441)) == 0
+    assert idle.probe.estimates == []
+
+
+def test_the_follow_engine_records_no_lines_while_stopped_and_reports_its_follower():
+    from live.follow import follow_engine
+    eng = follow_engine(90, 180, min_confidence=0.8)
+    p = 60 / 128
+    beats = list(np.arange(1.0, 40.0, p))
+    st = eng.follow_status()
+    assert st["follow"] == "stopped" and st["rate_ratio"] == 1.0 and st["rate"] is True
+    i = 0
+    from live.tracker import HOP, SAMPLE_RATE
+    for now in np.arange(1.0, 40.0, 0.25):
+        while i < len(beats) and beats[i] <= now:
+            eng.estimator.update(float(beats[i]))
+            eng.beats.append(float(beats[i]))
+            i += 1
+        eng.tracker.frames = int(round(now * SAMPLE_RATE / HOP)) + 1
+        locked = eng.estimator.bpm_at(float(now)) is not None
+        eng.status()
+        if not locked:
+            assert eng.lines.times() == []          # no tempo, no lines (replay.py, the firmware)
+    st = eng.follow_status()
+    assert st["follow"] == "glide" and abs(st["drift_ppm"]) < 1000 and len(eng.lines.times()) > 10
+
+
+def test_a_rate_event_is_proposed_before_the_first_beat_after_it():
+    from collections import deque
+
+    from live.follow import _make_follow_engine
+    eng = _make_follow_engine()(90, 180)
+    est = eng.estimator
+    q = eng._queue
+    assert isinstance(q, deque) and est.queue is q
+    p = 60 / 135
+    t = 0.0
+    for _ in range(160):
+        t += p
+        est.update(t)
+    q.append((t + 0.1, 1.03))
+    t_next = t + p / 1.03
+    est.update(t_next)                                # the event comes before this beat: proposed, then judged by it
+    assert not q and est.last_ratio == 1.03 and any(e == "ratio" for _, e in est.log)

@@ -95,6 +95,7 @@ class App:
             "offset_ms": self.clock.user_offset_us / 1000.0,
             **self._beat_now(es),
             "bar": bar_status(es.bar, self.controller.bar_moves),
+            "follow": self.engine.follow_status() if hasattr(self.engine, "follow_status") else None,
             "tab": self.source.tab_active(),
             **self._latency_status(),
             "bench": self.bench.status() if self.bench is not None else None,
@@ -302,6 +303,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--xiao", action="store_true",
                    help="also play the track's mid to the jank XIAO (USB audio output \"jank\"): the XIAO tracks the beat "
                         "and leads Link, so this program's own Link is the local model (as --dry-run)")
+    p.add_argument("--advanced-follow", action=argparse.BooleanOptionalAction, default=None,
+                   help="the advanced follow (jank M2i: the Kalman glide, the line confidence, the spectral rate); "
+                        "default: on with --xiao (the firmware runs it), off without")
+    p.add_argument("--no-rate", action="store_true", help="with the advanced follow: no spectral rate (jank's set rate off)")
     args = p.parse_args(argv)
 
     # --xiao: only the XIAO is on Link (it leads, Live follows): this program never joins, its own model runs on a local
@@ -311,7 +316,12 @@ def main(argv: list[str] | None = None) -> int:
     source = VarispeedSource(link.now_us)
     clock = ClockMap(args.offset_ms)
     controller = LinkController(link, clock)
-    engine = Engine(*args.range, min_confidence=args.min_confidence)
+    advanced = args.xiao if args.advanced_follow is None else args.advanced_follow
+    if advanced:
+        from live.follow import follow_engine
+        engine = follow_engine(*args.range, min_confidence=args.min_confidence, rate=not args.no_rate)
+    else:
+        engine = Engine(*args.range, min_confidence=args.min_confidence)
     if not args.xiao:       # power-on: the user's layer stopped until YES (jank M2h); --xiao: the page shows the XIAO's
         engine.hold = True
     if not args.xiao:       # AUTO RANGE's reference and the /2 anchor's place come from this program's own Link session
@@ -333,6 +343,8 @@ def main(argv: list[str] | None = None) -> int:
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     threading.Thread(target=server.serve_forever, daemon=True).start()
     mode = f'XIAO on "{xiao.device_name}", local Link model' if xiao else "dry run" if args.dry_run else "Link master"
+    if advanced:
+        mode += "; advanced follow" + (" without the rate" if args.no_rate else "")
     print(f"player at {url}  ({mode}; {len(app.library)} Traktor tracks; "
           f"output latency {source.latency_ms:.1f} ms; Ctrl-C quits)", flush=True)
     if not args.no_browser:

@@ -195,6 +195,7 @@
       <span>tracker <b id="xmode">-</b></span>
       <span>beats heard <b id="xn" class="num">-</b></span>
     </div>
+    <div class="row num" style="font-size:12px"><span title="the follower (jank M2i): lock = ModeBpm's grid, glide = the Kalman follower; its drift; the last pitch ratio taken from the spectrum">follow <b id="xfollow">-</b></span></div>
     <div id="xmsg" class="num" style="opacity:.7"></div>
     <div id="accmodel" class="num" style="opacity:.8;font-size:12px;margin-top:4px"></div>
     <div id="accxstats" class="num" style="opacity:.8;font-size:12px"></div>
@@ -1222,6 +1223,15 @@ function xiaoLowConf(cfg, st, statusAt, now) {
   const src = has(st) && now - statusAt <= XIAO_STATUS_FRESH_MS ? st : has(cfg) ? cfg : null;
   return src ? { confStop: src.lowconf === 'stop', th: src.threshold } : null;
 }
+/* the follower in a few words (jank M2i status follow= / drift_ppm= / rate_ratio=, or the player's own follow engine):
+   "glide, drift -35 ppm, rate x1.0200"; null when it says nothing (an older firmware, today's engine) */
+function followText(f) {
+  if (!f || typeof f.follow !== 'string') return null;
+  const parts = [f.follow];
+  if (Number.isFinite(f.drift_ppm) && f.follow === 'glide') parts.push('drift ' + f.drift_ppm + ' ppm');
+  if (Number.isFinite(f.rate_ratio) && f.rate_ratio !== 1) parts.push('rate x' + f.rate_ratio.toFixed(4));
+  return parts.join(', ');
+}
 /* --xiao: the XIAO's gate from a fresh `status` (M2e: gated= the confidence under the threshold with STOP / START, silent=
    0.5 s of silence; either stops its outputs). null: no fresh status, or an older firmware without them */
 function xiaoGate(st, statusAt, now) {
@@ -1296,7 +1306,7 @@ function beatStats(lines) {
   for (const l of lines) {
     const m = /^([a-z_]+)=(-?[0-9.]+)$/.exec(l.trim());
     if (m) out[m[1]] = Number(m[2]);
-    const w = /^(bar|audio_source|ble_state|outputs|source|autobar|usbmidi|lowconf)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting, USB MIDI CLOCK, LOW CONFIDENCE
+    const w = /^(bar|audio_source|ble_state|outputs|source|autobar|usbmidi|lowconf|follow)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting, USB MIDI CLOCK, LOW CONFIDENCE, the follower (M2i)
     if (w) out[w[1]] = w[2];
   }
   return out;
@@ -1617,6 +1627,10 @@ function syncFromStatus(s) {
   if (now > holdUntil.autobar) {                            // AUTO BAR: the player's (or the XIAO's) setting is the truth
     const i = autoBarFrom(!!s.xiao, XIAO.cfg, xs, s);
     if (i != null) dev.autoBar = i;
+  }
+  if (s.xiao) {                                             // the XIAO's follower beside the player's own (M2i: the same one)
+    const mine = followText(s.follow), its = followText(xs);
+    $('xfollow').textContent = (its || '-') + (mine ? '  (player: ' + mine + ')' : '');
   }
 }
 const hold = key => { holdUntil[key] = performance.now() + 1200; };
