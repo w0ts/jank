@@ -374,6 +374,33 @@ static void test_save(void)
     CHECK(jk_save_on_change(&pending, 0, 0, 0) == JK_SAVE_NOW && !pending);
 }
 
+/* `diag intr`: esp_intr_dump's text (intr_alloc.c's format) cut to what is in use */
+static void test_intr_summary(void)
+{
+    static const char dump[] = "CPU 0 interrupt status:\n"
+                               " Int  Level  Type   Status\n"
+                               "  0     1    Level  Reserved\n"
+                               "  2     1    Level  Used: USB\n"
+                               "  3     1    Level  Shared: SYSTIMER_TARGET0 TG1_T0_LEVEL \n"
+                               "  4     1    Level  Free\n"
+                               "  6     1    Level  CPU-internal\n"
+                               " 17     1    Level  Reserved (run-time)\n"
+                               "CPU 1 interrupt status:\n"
+                               " Int  Level  Type   Status\n"
+                               "  0     1    Level  Reserved\n"
+                               " 27     3    Level  Used: TG0_T0_LEVEL\n"
+                               " 31     5    Level  Free (not general-use)\n"
+                               "Interrupts available for general use: 15\n"
+                               "Shared interrupts: 1";
+    char out[256];
+    size_t n = jk_intr_summary(dump, out, sizeof out);
+    CHECK(n == strlen(out));
+    CHECK(!strcmp(out, "c0 2 L1 Used: USB\nc0 3 L1 Shared: SYSTIMER_TARGET0 TG1_T0_LEVEL\nc0 17 L1 Reserved (run-time)\n"
+                       "c1 27 L3 Used: TG0_T0_LEVEL\nok\n"));
+    CHECK(jk_intr_summary(dump, out, 40) == 0);                 /* does not fit: no half answer passed as whole */
+    CHECK(jk_intr_summary("", out, sizeof out) == 3 && !strcmp(out, "ok\n"));
+}
+
 /* USB DEVICE / HOST and AUDIO > SOURCE; the port's lines in status */
 static void test_usb(void)
 {
@@ -469,6 +496,7 @@ int main(void)
     test_usb();
     test_status_size();
     test_save();
+    test_intr_summary();
     printf("ctl: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

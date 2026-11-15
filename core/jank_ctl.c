@@ -444,3 +444,47 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         put(&w, "err unknown command\n");
     return JK_CTL_NONE;
 }
+
+/* one line of the dump (" 27     3    Level  Used: TG0_T0_LEVEL"), in use -> "c<cpu> <int> L<level> <status>\n" */
+static int intr_line(const char *l, size_t n, int cpu, struct writer *w)
+{
+    char st[96];
+    const char *s = NULL;
+    int num = -1, level = -1;
+    static const char *const keep[] = {"Used:", "Shared:", "Reserved (run-time)"};
+    for (size_t k = 0; k < sizeof keep / sizeof keep[0] && !s; k++) {
+        const char *p = strstr(l, keep[k]);
+        if (p && p < l + n)
+            s = p;
+    }
+    if (!s || sscanf(l, "%d %d", &num, &level) < 1)
+        return 0;
+    snprintf(st, sizeof st, "%.*s", (int)(l + n - s), s);
+    for (size_t k = strlen(st); k && st[k - 1] == ' '; k--)
+        st[k - 1] = 0;
+    if (level >= 0)
+        put(w, "c%d %d L%d %s\n", cpu, num, level, st);
+    else
+        put(w, "c%d %d %s\n", cpu, num, st);
+    return 1;
+}
+
+size_t jk_intr_summary(const char *dump, char *out, size_t cap)
+{
+    struct writer w = {out, cap, 0};
+    int cpu = -1;
+    if (!cap)
+        return 0;
+    out[0] = 0;
+    while (*dump) {
+        const char *e = strchr(dump, '\n');
+        size_t n = e ? (size_t)(e - dump) : strlen(dump);
+        if (!strncmp(dump, "CPU ", 4))
+            cpu = atoi(dump + 4);
+        else if (cpu >= 0)
+            intr_line(dump, n, cpu, &w);
+        dump += n + (e ? 1u : 0u);
+    }
+    put(&w, "ok\n");
+    return w.n >= 3u && !strcmp(out + w.n - 3u, "ok\n") ? w.n : 0u;
+}
