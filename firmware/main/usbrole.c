@@ -171,6 +171,23 @@ static void publish(const struct jur_in *in, const struct jur_out *o, uint8_t di
     portEXIT_CRITICAL(&s_mux);
 }
 
+/* beat_latency per audio source (core/jank_lat.h): another source heard -> its value becomes the live one */
+static void follow_latency(const struct jk_cfg *seen, uint8_t audio)
+{
+    struct jla_key k;
+    uint16_t vid = 0, pid = 0;
+    int dev = s_stack == JUR_STACK_HOST && usb_uac_host_id(&vid, &pid);
+    struct jk_cfg cfg;
+    if (!jur_lat_key(audio, s_stack, dev, vid, pid, &k) || jla_same_key(&seen->lat_key, &k))
+        return;
+    app_cfg_get(&cfg);                 /* (fresh: the settings may have changed since `seen`) */
+    if (jk_lat_select(&cfg, &k)) {
+        char name[16];
+        ESP_LOGI(TAG, "beat_latency %d ms: %s's", cfg.beat_latency_ms, jla_name(&k, name));
+        app_cfg_set(&cfg);
+    }
+}
+
 static void role_task(void *arg)
 {
     struct usbport_state st = {JUR_CC_NONE, 0};
@@ -212,6 +229,7 @@ static void role_task(void *arg)
             uac_route(audio == JUR_AUDIO_USB);   /* the line in's own path is not on this branch: LINE hears nothing yet */
         }
         publish(&in, &o, st.dir, audio);
+        follow_latency(&cfg, audio);
     }
 }
 

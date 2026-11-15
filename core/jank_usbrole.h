@@ -23,6 +23,7 @@
 #ifndef JANK_USBROLE_H
 #define JANK_USBROLE_H
 #include <stdint.h>
+#include "jank_lat.h"
 
 enum jur_usb { JUR_USB_DEVICE = 0, JUR_USB_HOST = 1 };                 /* the setting */
 enum jur_src { JUR_SRC_AUTO = 0, JUR_SRC_LINE = 1, JUR_SRC_USB = 2, JUR_SRC_LINK = 3 };   /* the setting */
@@ -98,6 +99,9 @@ int jur_line_step(struct jur_line *l, int raw, uint32_t now_ms);    /* -> the de
 
 /* what the tracker listens to (enum jur_audio) */
 uint8_t jur_source(uint8_t setting, int line_plugged, int usb_open);
+/* whose beat_latency is in use (core/jank_lat.h): the line in, the computer (USB audio, jank a device) or the hosted device
+ * streaming (host: has_dev, its VID:PID). 1 and *k set; 0 nothing heard or the device not known yet (the value stays) */
+int jur_lat_key(uint8_t audio, uint8_t stack, int has_dev, uint16_t vid, uint16_t pid, struct jla_key *k);
 /* a screenless unit's single NO: USB AUDIO (AUTO) <-> LINK; from LINE or USB (set on the page): LINK. A plug in the line in:
  * the setting unchanged (the line wins anyway), *changed 0. Returns the new setting */
 uint8_t jur_src_toggle(uint8_t setting, int line_plugged, int *changed);

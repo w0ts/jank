@@ -42,6 +42,7 @@ esp_err_t usb_send(const uint8_t *eth, size_t len, void *token);   /* tx_done(to
 esp_err_t usb_midi_host_start(void);
 void usb_midi_host_send(const uint8_t *packets, size_t n);
 bool usb_midi_isr(const uint8_t *bytes, size_t n);                  /* from the timer interrupt -> a task was woken */
+void usb_midi_clock(int on);                                        /* USB MIDI CLOCK (setting usbmidi): off, none of it to USB */
 void usb_serial_write(const char *text, size_t n);                 /* the control line, as SysEx on the MIDI port */
 
 /* usb_audio.c, beat.c: the beat-follow bench build (README): the computer's audio into the beat tracker, into the Link session */
@@ -55,7 +56,17 @@ void beat_state(uint8_t *audio, uint8_t *locked);
 /* AUDIO mode's fold (core/jank_fold.h): dir +1 x2, -1 /2, 0 back to 1; taken by the beat task within 5 ms. Returns the
  * new exp (fold 2^exp), -99 in LINK mode */
 int beat_fold(int dir);
-void beat_fold_resync(void);                                /* Start after Stop: fold 1, as a resync */                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
+void beat_fold_resync(void);                                /* Start after Stop: fold 1, as a resync */
+/* NUDGE BEAT (core/jank_beatlink.h jbl_nudge; the control line's `nudge beat`, the device's NO + UP/DOWN): half beats,
+ * +: Link's beats come earlier. The beat task applies it at its next pass and this waits for that (up to ~200 ms; call it
+ * from a task that may block, never from the beat or bridge task). *total: the user's nudges after it, half beats; view
+ * (may be NULL, cap bytes): the downbeat estimator before it, "bar=..\nbar_phi=..\nbar_count=..\nbar_scores=a,b,c,d\n". A
+ * nudge sets AUTO BAR to MANUAL until its reset or AUTO BAR picked again; the nudges clear when the tracker starts over or
+ * stops (AUTO BAR's reset events) */
+enum beat_nudge_rc { BEAT_NUDGE_OK = 0, BEAT_NUDGE_LINK = -1, BEAT_NUDGE_NO_BEAT = -2, BEAT_NUDGE_LIMIT = -3, BEAT_NUDGE_BUSY = -4 };
+int beat_nudge(int halves, int8_t *total, char *view, size_t cap);
+/* NUDGE MS for the device's YES + UP/DOWN is core/jank_core.h jk_nudge_ms on the settings (app_cfg_get, jk_nudge_ms,
+ * app_cfg_set), as the control line's `nudge ms` does */                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
 
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);

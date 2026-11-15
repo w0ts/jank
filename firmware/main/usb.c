@@ -90,12 +90,27 @@ static void on_tx_done(void *token, void *ctx)
     s_tx_done(token);
 }
 
+/* USB MIDI CLOCK (the setting usbmidi): off, no clock byte reaches the USB-MIDI port (DIN / TRS MIDI unaffected). Turned
+ * off: one MIDI Stop goes out after the last clock, so gear that was playing stops instead of waiting for clocks */
+static volatile uint8_t s_clock_on = 1, s_stop_due;
+
+void usb_midi_clock(int on)
+{
+    if (on == s_clock_on)
+        return;
+    s_clock_on = (uint8_t)(on != 0);
+    if (!on && s_task) {               /* (at boot, before the port runs: nothing was sent, nothing to stop) */
+        s_stop_due = 1;
+        xTaskNotifyGive(s_task);
+    }
+}
+
 bool IRAM_ATTR usb_midi_isr(const uint8_t *bytes, size_t n)
 {
     BaseType_t woken = pdFALSE;
     uint32_t head = s_head;
     uint32_t tail = __atomic_load_n(&s_tail, __ATOMIC_ACQUIRE);
-    if (!n || !s_task)
+    if (!n || !s_task || !s_clock_on)
         return false;
     if (RING_SIZE - (head - tail) < n) {
         ++s_dropped;
@@ -131,13 +146,17 @@ static void send_clock(void)
 {
     uint32_t head = __atomic_load_n(&s_head, __ATOMIC_ACQUIRE);
     uint32_t tail = s_tail;
-    uint8_t b[RING_SIZE];
+    uint8_t b[RING_SIZE + 1u];         /* (+1: the Stop below) */
     size_t n = 0;
     while (tail != head)
         b[n++] = s_ring[tail++ & (RING_SIZE - 1u)];
     __atomic_store_n(&s_tail, tail, __ATOMIC_RELEASE);
+    if (s_stop_due && !s_clock_on) {   /* USB MIDI CLOCK just turned off: a Stop after what was queued */
+        s_stop_due = 0;
+        b[n++] = 0xFCu;
+    }
     if (n && s_host) {
-        uint8_t packets[RING_SIZE * 4u];
+        uint8_t packets[(RING_SIZE + 1u) * 4u];
         usb_midi_host_send(packets, jx_realtime_packets(b, n, packets, sizeof packets));
     } else if (n && tud_midi_mounted()) {
         write_all(b, n);

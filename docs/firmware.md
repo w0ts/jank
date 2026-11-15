@@ -116,6 +116,39 @@ any Link app may; with no settled session they answer `err no session`: alone, t
   music's 1; not found by then, it starts on the session's next bar line and the 1 is placed at the next start (a bounded
   wait: beat one honest when the estimator can tell, no long silent wait when it cannot). ALWAYS: also mid-play, as
   before. No move while folded (the estimator counts tracked beats).
+- **NUDGE BEAT** `nudge beat <+-0.5..3, halves>` (AUDIO mode; the device's NO held + UP/DOWN, beat-listener's
+  `shift_beats`): Link's beats jump that much at once (+: earlier, UP) and the phase follower keeps them there from then
+  on (the half part is its offset, whole beats are in the count; `core/jank_beatlink.h` jbl_nudge). The user's nudges add
+  up, at most +-3 beats in all (`err nudge beat at its limit`). AUTO BAR goes MANUAL until it is picked again or reset. An
+  armed start re-targets the moved grid's next bar line. Folded, a half beat is half a beat of Link's (the folded grid's);
+  the offset is kept in tracked time, so an off-beat fixed at fold 1 stays fixed at x2 and /2. The nudges clear when the
+  tracker starts over (a new stream) or stops (30 s with no steady beat), AUTO BAR's reset events; Start after Stop keeps
+  them (as the Python player does). `err link mode` in LINK mode (the session is not the tracker's), `err no beat yet`
+  before a lock. The answer: `nudge_beats=<total>` and the downbeat estimator before it (`bar=`, `bar_phi=`,
+  `bar_count=`, `bar_scores=`, for a refit's hand labels; the serial log has the same line). The MIDI clock: the session's
+  half beat is exactly 12 ticks, so the clock jumps its tick count and keeps its times (one clock per grid time, no double
+  or missing one: tests/test_beatlink.c test_nudge_clock); MIDI-clock gear counts the clocks it got since its Start, so
+  it follows the nudge at its next Start (Stop / Start, or the button's resync), not at once.
+- **NUDGE MS** `nudge ms <+-1..10>` (AUDIO mode; the device's YES held + UP/DOWN): the AUDIO IN offset, `beat_latency`
+  of the source heard now, +: every output later. Answers `beat_latency=<ms>`.
+- **beat_latency per audio source** (`core/jank_lat.h`), stored (blob `lat1`, saved once stopped): the computer's USB
+  audio (default 25), each hosted USB audio device by VID:PID (the last 8 given a value; default 0: a box's outs and its
+  USB stream leave it together), the line in (a path constant, not measured yet, 0, plus the user's trim). The source
+  heard switches the live value (usbrole.c); `set beat_latency`, NUDGE MS and Calibrate set the current source's;
+  `set beat_latency_usb <ms>` always the computer's. `get` and `status`: `beat_latency=` and `beat_latency_src=`
+  (`usb`, `line`, `host:<vid>:<pid>`).
+- **USB MIDI CLOCK** `set usbmidi on|off`, stored (blob `usb1`'s 4th byte), on by default (the clock always went to
+  USB-MIDI before; a computer's DAW ignores a clock it is not set to follow). Off: no clock, start or stop byte reaches
+  USB-MIDI, in device mode (the computer) and host mode (hosted gear); turned off while running, one MIDI Stop goes out
+  first. DIN / TRS MIDI out is unaffected; the beat reports and the control line (SysEx) still use the MIDI port. jank
+  never acts on MIDI it receives: the computer's MIDI is read only for the control line's SysEx (realtime bytes are
+  dropped, `jank_sysex.c` jx_feed), hosted gear is opened OUT only (usb_midi_host.c).
+- **fw/ui note** (the device's buttons, for the integrator): NO held + UP/DOWN calls `beat_nudge(+1 / -1, &total, NULL, 0)`
+  (`app.h`; it waits up to 200 ms for the beat task, so call it from the UI task, never from the beat or bridge task;
+  `BEAT_NUDGE_*` says why a nudge was refused, the overlay: "NUDGE BEAT +1/2", "MAX 3 BEATS", "NO BEAT YET"). YES held +
+  UP/DOWN: `app_cfg_get`, `jk_nudge_ms(&cfg, +1 / -1)`, `app_cfg_set` when it returns 1 (overlay "AUDIO IN +3 MS" from
+  `cfg.beat_latency_ms`). Both are AUDIO mode only (`beat_state`'s audio), as the control line refuses them in LINK mode.
+  The menu's USB MIDI CLOCK edits `cfg.usbmidi` (ON / OFF).
 - **AUDIO > SOURCE** `set source auto|line|usb|link`: AUTO = the line in when a plug is in, else USB audio; LINK = USB
   audio ignored (LINK mode), a plug in the line in still wins. A unit with no screen toggles AUTO <-> LINK with a single
   NO (`jur_src_toggle`, branch fw/ui wires the button).

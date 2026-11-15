@@ -26,6 +26,9 @@ struct jbl {
     uint8_t bar_seen;                   /* bar_seq holds one */
     uint32_t bar_moves;                 /* whole-beat moves of the session's bar */
     uint8_t held;                       /* the last step was held (jbl_in.held): the press is acted on once */
+    int8_t nudge;                       /* NUDGE BEAT: the user's nudges since the last clear, in half beats of Link */
+    uint8_t nudge_8ths;                 /* ... and the offset the phase follower keeps, eighths of a TRACKED beat, mod 32 */
+    uint32_t nudges;                    /* nudges taken */
 };
 
 /* the downbeat estimator (core/beat/jb_down.h) as the bar step wants it */
@@ -81,4 +84,27 @@ void jbl_shift_bar(struct jbl *c, struct lk_node *k, struct jst *start, int n, i
  * the counted beat is unambiguous; otherwise the decision waits for the next step). Returns the move made, 0 none. */
 int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, int64_t now, const struct jbl_in *in,
                  const struct jbl_bar *bar);
+
+/* NUDGE BEAT (the device's NO + UP/DOWN, the control line's `nudge beat`; beat-listener's controller.py shift_beats):
+ * Link's beats jump `halves` half beats now (+: the session's beats come earlier, UP), and the phase follower keeps them
+ * that far from the tracked grid from then on: whole beats are in the session's count, the half part is the follower's
+ * offset. The user's nudges add up, clamped to +-JBL_NUDGE_MAX half beats (+-3 beats); one past it is refused whole.
+ *
+ * Folded (jank_fold.h), the half beat is half a beat of Link's (the folded grid's). The offset is kept in TRACKED time
+ * (eighths of a tracked beat), so it means the same music across a later fold change: an off-beat fixed at fold 1 (half a
+ * tracked beat) is a whole beat at x2 (both grids land on the music's beats) and stays on the on-beats at /2.
+ *
+ * The force needs the session's state (settled, as every force); not settled, the offset is kept and the follower puts
+ * the session there once it leads. An armed start re-targets the moved grid's next bar line (jst_retarget). In LINK mode
+ * (passive) the session is not the tracker's: refused. Returns 0, or -1 refused (nothing changed). */
+#define JBL_NUDGE_MAX 6
+int jbl_nudge(struct jbl *c, struct lk_node *k, struct jst *start, int settled, const struct jbl_in *in, int halves,
+              int fold_exp, int64_t now);
+/* half a beat of Link's in eighths of a tracked beat at fold 2^fold_exp (exp -2..2): 16 8 4 2 1 */
+int jbl_half_8ths(int fold_exp);
+/* where the follower puts the session's beats: this long before the (folded) tracked grid, 0 .. one Link beat. The
+ * caller moves the grid's beat (jbl_in.beat_us) back by it. tracked_period_us: the tracker's own (unfolded) period */
+int64_t jbl_nudge_us(const struct jbl *c, double tracked_period_us, int fold_exp);
+/* a reset event (the tracker starts over or stops: AUTO BAR's resets): no nudge any more; the session left where it is */
+void jbl_nudge_clear(struct jbl *c);
 #endif

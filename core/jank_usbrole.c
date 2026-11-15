@@ -134,6 +134,24 @@ uint8_t jur_source(uint8_t setting, int line_plugged, int usb_open)
     return usb_open && setting != JUR_SRC_LINK ? JUR_AUDIO_USB : JUR_AUDIO_NONE;
 }
 
+int jur_lat_key(uint8_t audio, uint8_t stack, int has_dev, uint16_t vid, uint16_t pid, struct jla_key *k)
+{
+    if (audio == JUR_AUDIO_LINE) {
+        *k = (struct jla_key){JLA_LINE, 0, 0};
+        return 1;
+    }
+    if (audio != JUR_AUDIO_USB)
+        return 0;
+    if (stack != JUR_STACK_HOST) {
+        *k = (struct jla_key){JLA_COMPUTER, 0, 0};
+        return 1;
+    }
+    if (!has_dev)
+        return 0;
+    *k = (struct jla_key){JLA_HOSTED, vid, pid};
+    return 1;
+}
+
 uint8_t jur_src_toggle(uint8_t setting, int line_plugged, int *changed)
 {
     uint8_t next = setting == JUR_SRC_LINK ? JUR_SRC_AUTO : JUR_SRC_LINK;

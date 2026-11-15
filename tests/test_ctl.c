@@ -105,7 +105,7 @@ static void test_set_music(void)
     CHECK(run("set offset 0") == JK_CTL_CFG_CHANGED && run("get") == JK_CTL_NONE && strstr(out, "offset=0.00\n"));
     CHECK(run("set offset -101") == JK_CTL_NONE);
     CHECK(run("get") == JK_CTL_NONE);
-    CHECK(strstr(out, "peer=on\n") && !strstr(out, "midi=") && strstr(out, "transport=auto\n"));
+    CHECK(strstr(out, "peer=on\n") && !strstr(out, "\nmidi=") && strstr(out, "transport=auto\n"));   /* (usbmidi= is M2d's) */
     CHECK(strstr(out, "quantum=8\n") && strstr(out, "offset=0.00\n"));
 }
 
@@ -369,6 +369,40 @@ static void test_autobar(void)
     CHECK(run("beat") == JK_CTL_NONE && strstr(out, "bar=off\n") && strstr(out, "bar_moves=7\n") && ends(out, "ok\n"));
 }
 
+/* NUDGE BEAT (the caller applies it) and NUDGE MS (beat_latency, AUDIO mode only); status says both */
+static void test_nudge(void)
+{
+    int h = 0;
+    char b[8];
+    setup();
+    CHECK(run("nudge beat +0.5") == JK_CTL_NUDGE && out[0] == 0);
+    CHECK(!jk_ctl_nudge("nudge beat +0.5", &h) && h == 1 && !jk_ctl_nudge(" nudge beat -0.5 ", &h) && h == -1);
+    CHECK(!jk_ctl_nudge("nudge beat 1", &h) && h == 2 && !jk_ctl_nudge("nudge beat -1.5", &h) && h == -3);
+    CHECK(!jk_ctl_nudge("nudge beat 3", &h) && h == 6 && !jk_ctl_nudge("nudge beat -3.0", &h) && h == -6);
+    CHECK(jk_ctl_nudge("nudge beat 0", &h) == -1 && jk_ctl_nudge("nudge beat 0.25", &h) == -1);
+    CHECK(jk_ctl_nudge("nudge beat 3.5", &h) == -1 && jk_ctl_nudge("nudge beat +-1", &h) == -1 && jk_ctl_nudge("nudge beat", &h) == -1);
+    CHECK(jk_ctl_nudge("nudge beatx 1", &h) == -1 && jk_ctl_nudge("nudge beat up", &h) == -1);
+    CHECK(run("nudge beat 4") == JK_CTL_NONE && strstr(out, "err nudge") == out);
+    CHECK(run("nudge") == JK_CTL_NONE && strstr(out, "err nudge") == out);
+    CHECK(run("nudger") == JK_CTL_NONE && strstr(out, "err unknown") == out);
+    CHECK(!strcmp(jk_half_beats(1, b), "0.5") && !strcmp(jk_half_beats(-3, b), "-1.5") && !strcmp(jk_half_beats(4, b), "2"));
+    CHECK(!strcmp(jk_half_beats(0, b), "0") && !strcmp(jk_half_beats(-1, b), "-0.5") && !strcmp(jk_half_beats(-6, b), "-3"));
+    /* NUDGE MS: LINK mode refused; AUDIO mode moves beat_latency by n, answers it */
+    CHECK(run("nudge ms 1") == JK_CTL_NONE && !strcmp(out, "err link mode\n") && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS);
+    snap.beat.on = snap.beat.audio = snap.beat.audio_live = 1;
+    CHECK(run("nudge ms +1") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS + 1);
+    CHECK(!strcmp(out, "beat_latency=26\nok\n"));
+    CHECK(run("nudge ms -1") == JK_CTL_CFG_CHANGED && !strcmp(out, "beat_latency=25\nok\n"));
+    CHECK(run("nudge ms -10") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 15);
+    CHECK(run("nudge ms 0") == JK_CTL_NONE && strstr(out, "err") && run("nudge ms 11") == JK_CTL_NONE && strstr(out, "err"));
+    CHECK(run("nudge ms x") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == 15);
+    cfg.beat_latency_ms = JK_BEAT_LATENCY_MAX_MS;
+    CHECK(run("nudge ms 1") == JK_CTL_NONE && !strcmp(out, "beat_latency=300\nok\n"));   /* at the top: kept, said */
+    cfg.beat_latency_ms = 15;
+    snap.beat.nudge_halves = -3;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "nudge_beats=-1.5\nbeat_latency=15\nbeat_latency_src=usb\nusbmidi=on\n"));
+}
+
 /* settings saves: never a flash write while playing, unless a restart follows; what counts as a stored change */
 static void test_save(void)
 {
@@ -525,6 +559,9 @@ static void test_status_size(void)
     snap.beat.conf_pct = 100;
     snap.beat.fold_exp = -2;                                          /* "0.25" */
     snap.beat.fold_manual = 1;
+    snap.beat.nudge_halves = -5;                                      /* "-2.5" */
+    cfg.beat_latency_ms = JK_BEAT_LATENCY_MIN_MS;
+    cfg.lat_key = (struct jla_key){JLA_HOSTED, 0xFFFF, 0xFFFF};       /* "host:ffff:ffff" */
     CHECK(jk_ctl_line("status", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest status: %zu bytes\n", strlen(big));
     CHECK(strstr(big, "bar=manual\n") && strstr(big, "ble_state=connected\n") && strstr(big, "usb_role=host\n"));
@@ -536,6 +573,7 @@ int main(void)
     test_defaults();
     test_beat();
     test_autobar();
+    test_nudge();
     test_get();
     test_set();
     test_set_music();

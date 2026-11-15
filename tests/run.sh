@@ -8,9 +8,9 @@ mkdir -p "$OUT"
 CC="${CC:-cc}"
 FLAGS="-std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -I$HERE/core"
 
-CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_phone.c $HERE/core/jank_usbrole.c $HERE/core/jank_hold.c $HERE/core/jank_fold.c"
+CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_phone.c $HERE/core/jank_usbrole.c $HERE/core/jank_hold.c $HERE/core/jank_fold.c $HERE/core/jank_lat.c"
 LINK="$HERE/third_party/link/link.c $HERE/core/jank_start.c"
-for t in core ctl ui; do
+for t in core ctl ui lat; do
     "$CC" $FLAGS "$HERE/tests/test_$t.c" $CORE -o "$OUT/test_$t"
     "$OUT/test_$t"
 done
@@ -61,7 +61,7 @@ fi
 "$OUT/test_live"
 
 # The beat tracker as the Link session's master.
-"$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_beatlink.c" "$HERE/core/jank_beatlink.c" $LINK -lm -o "$OUT/test_beatlink"
+"$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_beatlink.c" "$HERE/core/jank_beatlink.c" "$HERE/core/jank_clock.c" $LINK -lm -o "$OUT/test_beatlink"
 "$OUT/test_beatlink"
 
 # The beat tracker. BEAT_WAV_DIR (mono 44.1 kHz WAVs, see test_beat.c) adds the run on audio against madmom's results.

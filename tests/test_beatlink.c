@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "jank_beatlink.h"
+#include "jank_clock.h"
 
 static int fails, checks;
 #define CHECK(c)                                                  \
@@ -328,8 +329,204 @@ static void test_bar_at_start(void)
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17400000, &in, &bar) == jbl_bar_shift(ub, 7, 1));
 }
 
+/* the follower's input with the user's nudge kept, as beat.c's fold_step makes it (fold 1) */
+static struct jbl_in nudged(struct jbl_in in)
+{
+    in.beat_us -= jbl_nudge_us(&jbl, in.period_us, 0);
+    return in;
+}
+
+/* NUDGE BEAT: Link's beats jump half a beat now, and the follower keeps them there; halves add up to +-3 beats */
+static void test_nudge_half(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    struct jbl_in n;
+    int64_t t = 12000000, b0;
+    uint32_t forces;
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    b0 = lk_beat_at(&node, t);                                    /* a tracked beat, on a session beat */
+    CHECK(abs64(grid_error(t)) <= 2);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 0, 11000000) == 0);    /* UP: half a beat earlier */
+    CHECK(jbl.nudge == 1 && jbl.nudges == 1 && jbl.nudge_8ths == 4);
+    CHECK(llabs(lk_beat_at(&node, t) - b0 - LK_UBEAT / 2) <= 2);  /* the tracked beat is now the session's "and" */
+    CHECK(jbl_nudge_us(&jbl, 500000, 0) == 250000);
+    forces = jbl.phase_forces;
+    n = nudged(in);
+    for (int64_t now = 11100000; now < 20000000; now += 250000)  /* the follower keeps it: no force, in phase */
+        jbl_step(&jbl, &node, &st, 1, now, &n, 4);
+    CHECK(jbl.phase_forces == forces && abs64(jbl.err_us) <= 2);
+    CHECK(llabs(lk_beat_at(&node, t) - b0 - LK_UBEAT / 2) <= 2);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 0, 20000000) == 0);    /* two halves: the bar's 1 a beat on, no offset */
+    CHECK(jbl.nudge == 2 && jbl.nudge_8ths == 8 && jbl_nudge_us(&jbl, 500000, 0) == 0);
+    CHECK(llabs(lk_beat_at(&node, t) - b0 - LK_UBEAT) <= 2);
+    n = nudged(in);
+    jbl_step(&jbl, &node, &st, 1, 20100000, &n, 4);
+    CHECK(jbl.phase_forces == forces && abs64(jbl.err_us) <= 2);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -1, 0, 20200000) == 0);   /* DOWN: half a beat later, the same offset */
+    CHECK(jbl.nudge == 1 && jbl.nudge_8ths == 4 && llabs(lk_beat_at(&node, t) - b0 - LK_UBEAT / 2) <= 2);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -2, 0, 20300000) == 0 && jbl.nudge == -1 && jbl_nudge_us(&jbl, 500000, 0) == 250000);  /* whole */
+    CHECK(llabs(lk_beat_at(&node, t) - b0 + LK_UBEAT / 2) <= 2);
+    CHECK(lk_mpb(&node) == 500000);                               /* the tempo untouched */
+}
+
+/* +-3 beats in all: past it a nudge is refused whole; a clear forgets them (the session left where it is) */
+static void test_nudge_clamp(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    int64_t ub;
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    for (int i = 0; i < 6; i++)
+        CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 0, 10200000 + i * 1000) == 0);
+    CHECK(jbl.nudge == JBL_NUDGE_MAX);
+    ub = lk_beat_at(&node, 10300000);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 0, 10300000) == -1);
+    CHECK(jbl.nudge == 6 && jbl.nudges == 6 && lk_beat_at(&node, 10300000) == ub);     /* nothing moved */
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -12, 0, 10300000) == 0 && jbl.nudge == -6);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -1, 0, 10300000) == -1);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 0, 0, 10300000) == -1);
+    ub = lk_beat_at(&node, 10400000);
+    jbl_nudge_clear(&jbl);
+    CHECK(jbl.nudge == 0 && jbl.nudge_8ths == 0 && lk_beat_at(&node, 10400000) == ub);
+}
+
+/* a nudge while a start is armed: it re-targets the moved grid's next bar line; while playing, the session's playing
+ * state is kept (its bar B is a bar line of the moved grid too) */
+static void test_nudge_armed(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    int64_t bar = 4 * (int64_t)LK_UBEAT, sent;
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    CHECK(st.armed);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 0, 10200000) == 0);
+    CHECK(st.armed && st.ub % bar == 0 && st.ub - lk_beat_at(&node, 10200000) >= LK_UBEAT * 3 / 10);
+    CHECK(st.ub - lk_beat_at(&node, 10200000) <= bar + LK_UBEAT * 3 / 10);
+    sent = poll_start(10200000, 16000000, 1);
+    CHECK(sent && lk_playing(&node) && lk_play_beat(&node) % bar == 0);
+    /* the start lands on the nudged grid: its bar line is half a tracked beat before a tracked beat */
+    {
+        int64_t t_bar = lk_time_at(&node, lk_play_beat(&node));
+        int64_t r = ((t_bar - 10000000 + 250000) % 500000 + 500000) % 500000;
+        CHECK(r <= 2 || r >= 499998);
+    }
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -1, 0, sent + 1000000) == 0 && lk_playing(&node));
+}
+
+/* LINK mode: refused; not settled: no force, the offset kept for the follower */
+static void test_nudge_passive_unsettled(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    struct jbl_in n;
+    int64_t ub;
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    in.passive = 1;
+    ub = lk_beat_at(&node, 10200000);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 0, 10200000) == -1 && jbl.nudge == 0 && lk_beat_at(&node, 10200000) == ub);
+    in.passive = 0;
+    CHECK(jbl_nudge(&jbl, &node, &st, 0, &in, 1, 0, 10200000) == 0 && jbl.nudge == 1);
+    CHECK(lk_beat_at(&node, 10200000) == ub);                     /* no force without the session's state */
+    n = nudged(in);
+    jbl_step(&jbl, &node, &st, 1, 10300000, &n, 4);               /* the follower puts the session there */
+    CHECK(abs64(grid_error(10000000 - 250000)) <= 2);
+}
+
+/* folded: half a beat of Link's; the offset in tracked time, so it means the same music at another fold */
+static void test_nudge_fold(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    CHECK(jbl_half_8ths(-2) == 16 && jbl_half_8ths(-1) == 8 && jbl_half_8ths(0) == 4 && jbl_half_8ths(1) == 2 && jbl_half_8ths(2) == 1);
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 0, 10200000) == 0);    /* an off-beat lock fixed at fold 1 */
+    CHECK(jbl_nudge_us(&jbl, 500000, 0) == 250000);
+    CHECK(jbl_nudge_us(&jbl, 500000, 1) == 0);                    /* x2: a whole beat of the folded grid */
+    CHECK(jbl_nudge_us(&jbl, 500000, -1) == 250000);              /* /2: still the on-beats */
+    jbl_nudge_clear(&jbl);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 1, 10300000) == 0);    /* at x2: a quarter of a tracked beat */
+    CHECK(jbl.nudge == 1 && jbl_nudge_us(&jbl, 500000, 1) == 125000 && jbl_nudge_us(&jbl, 500000, 0) == 125000);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -1, 1, 10400000) == 0 && jbl_nudge_us(&jbl, 500000, 1) == 0);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -1, -2, 10500000) == 0);  /* at /4: two tracked beats */
+    CHECK(jbl_nudge_us(&jbl, 500000, -2) == 1000000 && jbl_nudge_us(&jbl, 500000, 0) == 0);
+}
+
+/* the MIDI clock from the session around a nudge (bridge.c publishes a map every few ms, midi.c ticks on it): one clock
+ * per grid time, never two close together, never one missing; the clock's beat (tick 24 n) moves with the session */
+static uint32_t clock_around_nudge(int halves, int32_t mpb, int64_t *min_gap, uint32_t *resyncs, int64_t *tick0_err)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = (double)mpb};
+    struct jc_map m;
+    struct jc_ticker c;
+    struct jc_fire f;
+    int64_t t, last = -1, gap = INT64_MAX, next_map = 0, t_nudge = 13000000 + 7 * (mpb / 24) + 333, t_end = 17000000;
+    uint32_t clocks = 0;
+    int nudged_yet = 0;
+    start(10000000);
+    lk_set_tempo(&node, mpb, 10000000);
+    jbl_step(&jbl, &node, &st, 1, 10050000, &in, 4);
+    jc_map_make(&m, 12000000, lk_beat_at(&node, 12000000), lk_mpb(&node), 0);
+    jc_ticker_init(&c, 4);
+    if (jc_begin(&c, &m, 12000000) != 0)
+        return 0;
+    t = c.t_due;
+    *tick0_err = 0;
+    while (t < t_end) {
+        if (!nudged_yet && t >= t_nudge) {
+            jbl_nudge(&jbl, &node, &st, 1, &in, halves, 0, t_nudge);
+            nudged_yet = 1;
+        }
+        if (t >= next_map) {                                      /* every 5 ms, as bridge.c's PUBLISH_US */
+            jc_map_make(&m, t, lk_beat_at(&node, t), lk_mpb(&node), 0);
+            next_map = t + 5000;
+        }
+        if (t >= 13500000) {                                      /* after it: the ticks are the session's */
+            int64_t e = llabs(lk_beat_at(&node, t) - jc_tick_ub(c.n)) * mpb / LK_UBEAT;
+            if (e > *tick0_err)
+                *tick0_err = e;
+        }
+        jc_step(&c, &m, t, &f);
+        for (unsigned i = 0; i < f.n; i++)
+            if (f.bytes[i] == JC_CLOCK) {
+                clocks++;
+                if (last >= 0 && t - last < gap)
+                    gap = t - last;
+                last = t;
+            }
+        t = f.next;
+    }
+    *min_gap = gap;
+    *resyncs = c.resyncs;
+    return clocks;
+}
+
+static void test_nudge_clock(void)
+{
+    static const int halves[] = {1, -1, 2, -2, 3, -6};
+    static const int32_t mpbs[] = {500000, 468750, 461538};     /* 120, 128, 130 BPM */
+    for (unsigned j = 0; j < sizeof mpbs / sizeof mpbs[0]; j++)
+        for (unsigned i = 0; i < sizeof halves / sizeof halves[0]; i++) {
+            int64_t gap, err, tick = mpbs[j] / 24;
+            uint32_t resyncs, n = clock_around_nudge(halves[i], mpbs[j], &gap, &resyncs, &err);
+            int64_t grid = (int64_t)llround(5000000.0 / ((double)mpbs[j] / 24.0));   /* the grid times in 5 s */
+            CHECK(n >= grid - 1 && n <= grid + 1);                                  /* (the window's ends) */
+            CHECK(gap >= tick - 2);                                                 /* never two in a row, none skipped */
+            CHECK(resyncs == 1);                                                    /* one jump, at the nudge */
+            CHECK(err <= 2);                                                        /* tick 24 n on session beat n */
+            printf("beatlink: nudge %+d/2 at %.2f BPM: %u clocks (grid %lld), min gap %lld us of %lld, %u resync\n", halves[i],
+                   60e6 / mpbs[j], n, (long long)grid, (long long)gap, (long long)tick, resyncs);
+        }
+}
+
 int main(void)
 {
+    test_nudge_half();
+    test_nudge_clamp();
+    test_nudge_armed();
+    test_nudge_passive_unsettled();
+    test_nudge_fold();
+    test_nudge_clock();
     test_session_offset();
     test_bar_shift();
     test_bar_moves();

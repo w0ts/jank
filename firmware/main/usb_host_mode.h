@@ -21,6 +21,7 @@ void usb_midi_host_list(struct jk_usb *u);
 /* usb_uac_host.c: one hosted device's audio into the beat tracker's ring (usb_audio.h uac_feed) */
 esp_err_t usb_uac_host_start(void);
 void usb_uac_host_list(struct jk_usb *u);        /* its name and format */
+int usb_uac_host_id(uint16_t *vid, uint16_t *pid);   /* 1: a device streams, its VID:PID (beat_latency's key, core/jank_lat.h) */
 
 /* usbrole.c: the role at the start, then the role task */
 uint8_t usbrole_boot(void);                      /* enum jur_stack to start: reads the setting, the CC chip, VBUS */

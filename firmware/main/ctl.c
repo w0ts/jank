@@ -146,6 +146,21 @@ static void run_ble(enum jk_ctl_action a)
 }
 #endif
 
+/* `nudge beat <b>` (core/jank_core.h jk_ctl_nudge): the beat task applies it (beat_nudge); the answer is the user's total
+ * and the downbeat estimator's view before it */
+static void run_nudge(const char *line)
+{
+    static const char *const why[] = {"err link mode\n", "err no beat yet\n", "err nudge beat at its limit, -3 to 3 beats in all\n", "err busy\n"};
+    int halves = 0, rc;
+    int8_t total = 0;
+    char b[8], view[96];
+    rc = jk_ctl_nudge(line, &halves) ? BEAT_NUDGE_LIMIT : beat_nudge(halves, &total, view, sizeof view);
+    if (rc == BEAT_NUDGE_OK)
+        snprintf(s_out, sizeof s_out, "nudge_beats=%s\n%sok\n", jk_half_beats(total, b), view);
+    else
+        strlcpy(s_out, why[-rc - 1 < 4 ? -rc - 1 : 3], sizeof s_out);
+}
+
 static void run_line(const char *line)
 {
     struct jk_cfg cfg;
@@ -202,6 +217,8 @@ static void run_line(const char *line)
         else
             snprintf(s_out, sizeof s_out, "fold=%s\nok\n", jfo_name(exp));
     }
+    if (a == JK_CTL_NUDGE)
+        run_nudge(line);
     if (a == JK_CTL_TEMPO || a == JK_CTL_PLAY || a == JK_CTL_STOP) {
         int32_t mpb = 0;
         int r = a == JK_CTL_TEMPO ? (jk_ctl_tempo(line, &mpb) ? -1 : bridge_tempo(mpb)) : bridge_play(a == JK_CTL_PLAY);
