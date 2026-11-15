@@ -248,6 +248,7 @@ def make_handler(app: App):
                 length = int(self.headers.get("Content-Length") or 0)
                 if name == "tab_audio":
                     if length > TAB_MAX_S * SAMPLE_RATE * 4:
+                        self.rfile.read(min(length, 16 << 20))      # read it off the socket, or the client sees a reset
                         raise ValueError(f"tab audio: more than {TAB_MAX_S:g} s in one post")
                     rate = int(parse_qs(query).get("rate", ["0"])[0])
                     app.tab_audio(self.rfile.read(length), rate)
