@@ -240,6 +240,7 @@
       <div class="now" id="now">No track</div>
       <div class="row" style="margin-top:6px">
         <button class="primary" id="play">Play</button>
+        <button id="next" title="the next track; with &quot;then random&quot;, a random one">Next</button>
         <label>then <select id="auto"><option value="next">next</option><option value="random">random</option><option value="stop">stop</option></select></label>
         <span class="num muted" id="time">0:00 / 0:00</span>
       </div>
@@ -1088,6 +1089,14 @@ function randomTrack(path, rnd = Math.random) {
 // what follows a track that ran off its end: the "then" choice (next / random / stop), remembered in this browser
 const AFTER_KEY = 'jank-player-after';
 function afterTrack(mode, path) { return mode === 'next' ? nextTrack(path) : mode === 'random' ? randomTrack(path) : null; }
+// the Next button (the user: "should respect random"): random picks any other track, else the next one in the list,
+// back to the first after the last ("stop" only matters at a track's end)
+function skipTrack(mode, path) {
+  if (mode === 'random') return randomTrack(path);
+  const list = shown.length ? shown : library;
+  return nextTrack(path) || (list.length && list[0].path !== path ? list[0] : null);
+}
+$('next').addEventListener('click', () => { const n = skipTrack($('auto').value, S && S.path); if (n) load(n.path); });
 try { const v = localStorage.getItem(AFTER_KEY); if (v === 'next' || v === 'random' || v === 'stop') $('auto').value = v; } catch (e) { /* not remembered */ }
 $('auto').addEventListener('change', () => { try { localStorage.setItem(AFTER_KEY, $('auto').value); } catch (e) { /* not remembered */ } });
 
