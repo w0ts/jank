@@ -4,7 +4,14 @@
  * clicks: a phone's pair window (BLE builds; the LED blinks blue 4 times a second until a phone connects or it closes).
  * Held 1.5 s and let go: MODE JANK <-> the Wi-Fi network, a restart.
  * Held 10 s: download mode, for flashing. The LED: the session's beat, inverted on the Wi-Fi network; with AUTO BAR
- * locked the bar's 1 flashes amber. */
+ * locked the bar's 1 flashes amber.
+ *
+ * Boards with the D-pad (board.h BOARD_BTN_*: the mini 2.2, the XIAO's UI bench): UP, DOWN, YES and NO (the button above)
+ * drive the screens and menus of uiscreen.c / core/jank_oled.h, polled here every 5 ms and debounced (JB_DEBOUNCE_MS),
+ * no interrupt. With a screen, NO is the menus' NO; three NO presses still open the pair window (the third one's release
+ * then does nothing) and 10 s still means download mode; the click, double click and long hold are the menus' business.
+ * Without a screen, NO keeps all of the above, and UP / DOWN / YES act as on HOME. The RGB LEDs speak the LED language
+ * (core/jank_led.h); the XIAO's one plain LED keeps the beat as before. */
 #include <string.h>
 #include "app.h"
 #include "board.h"
@@ -13,10 +20,16 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "jank_led.h"
 #include "led_strip.h"
+#include "oled.h"
+#include "uiscreen.h"
 
 #define POLL_MS 5u
-#define LED_EVERY_MS 20u
+/* the screen's state is kept (a snapshot 10 times a second) for a screen, a D-pad or the RGB LEDs' language: not on the
+ * plain XIAO, which stays as it was */
+#define UI_STATE (uis_has_screen() || BOARD_LED_RGB_GPIO >= 0 || BOARD_BTN_UP_GPIO >= 0 || BOARD_BTN_DOWN_GPIO >= 0 || BOARD_BTN_YES_GPIO >= 0)
+#define LED_EVERY_MS 20u                 /* the RGB LEDs are refreshed every frame: a dip in a Wi-Fi burst is repaired */
 
 void app_bootloader(void);
 void app_reboot(void);
@@ -29,13 +42,18 @@ static SemaphoreHandle_t s_scanning;     /* one sweep at a time: the button's or
 static enum jl_event s_event;
 static uint32_t s_event_at, s_event_group;
 
+static struct uis_led s_led;           /* the state the screen shows, for the LED language */
+
+/* LED1 shows it; LED2 too on USB power only (on the cell one LED at a time: the board README's 24 mA) */
 static void led_show(uint8_t r, uint8_t g, uint8_t b)
 {
 #if BOARD_LED_RGB_GPIO >= 0
-    if (r || g || b)
+    led_strip_clear(s_strip);
+    if (r || g || b) {
         led_strip_set_pixel(s_strip, 0, r, g, b);
-    else
-        led_strip_clear(s_strip);
+        if (BOARD_LED_COUNT > 1 && s_led.on_usb)
+            led_strip_set_pixel(s_strip, BOARD_LED_COUNT - 1, r, g, b);
+    }
     led_strip_refresh(s_strip);
 #else
     gpio_set_level(BOARD_LED_MONO_GPIO, !(r || g || b));   /* active low */
@@ -74,6 +92,17 @@ static void led_step(uint32_t now)
 #endif
     app_cfg_get(&cfg);
     joined = bridge_beat(&beat, &mpb);
+#if BOARD_LED_RGB_GPIO >= 0
+    {
+        struct jlg_state s = {now, 0, s_led.batt_pct, s_led.on_usb, (uint8_t)joined, s_led.running, s_led.armed, s_led.low_conf,
+                              s_led.bar_locked, beat, mpb, cfg.quantum};
+        if (!s_led.valid)
+            s.batt_pct = -1;
+        jlg_color(&s, c);
+        led_show(c[0], c[1], c[2]);
+        return;
+    }
+#endif
     lit = jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum);
     if (joined && lit != (cfg.net == JK_NET_WIFI) && beat_bar_state() == 2 && jk_led_bar_one(beat, cfg.quantum))
         led_show(JK_LED_ONE_RGB);        /* AUTO BAR locked: the bar's 1 flashes amber (the music's 1) */
@@ -203,6 +232,22 @@ esp_err_t ui_scan_table(struct js_table *out)
 
 static void on_button(enum jb_event e)
 {
+    if (uis_has_screen()) {              /* the click, double click and long hold are the menus' (GROUP, NETWORK) */
+        if (e == JB_TRIPLE) {
+#if CONFIG_JANK_BLE_MIDI
+            if (ble_midi_pair() == 0) {
+                uis_cancel_no();
+                return;
+            }
+#endif
+        } else if (e == JB_DOWNLOAD) {
+            uis_boot_screen();
+            vTaskDelay(pdMS_TO_TICKS(100));   /* the frame goes out first */
+            app_bootloader();
+            return;
+        } else
+            return;
+    }
     switch (e) {
     case JB_CLICK:
         midi_resync();
@@ -232,6 +277,48 @@ static void on_button(enum jb_event e)
     }
 }
 
+/* the D-pad: a level holds JB_DEBOUNCE_MS before it counts */
+struct pad {
+    int gpio;
+    uint8_t raw, level;
+    uint32_t t_raw;
+};
+static struct pad s_pad[JO_BTNS] = {
+    [JO_UP] = {BOARD_BTN_UP_GPIO, 0, 0, 0},
+    [JO_DOWN] = {BOARD_BTN_DOWN_GPIO, 0, 0, 0},
+    [JO_NO] = {BOARD_BUTTON_GPIO, 0, 0, 0},
+    [JO_YES] = {BOARD_BTN_YES_GPIO, 0, 0, 0},
+};
+
+static int pressed(int gpio) { return gpio >= 0 && !gpio_get_level(gpio); }   /* to GND, pulled up */
+
+/* NO: the board's button (BOOT), or the bench's second one */
+static int no_pressed(void)
+{
+    int level = gpio_get_level(BOARD_BUTTON_GPIO);
+    return (BOARD_BUTTON_ACTIVE_LOW ? !level : level) || pressed(BOARD_BTN_NO2_GPIO);
+}
+
+static void pads_step(uint32_t now, int no)
+{
+    for (int i = 0; i < JO_BTNS; i++) {
+        struct pad *p = &s_pad[i];
+        uint8_t raw = (uint8_t)(i == JO_NO ? no : pressed(p->gpio));
+        if (i == JO_NO && !uis_has_screen())
+            continue;                    /* NO is the one-button UI's without a screen */
+        if (p->gpio < 0 && i != JO_NO)
+            continue;
+        if (raw != p->raw) {
+            p->raw = raw;
+            p->t_raw = now;
+        }
+        if (p->raw != p->level && now - p->t_raw >= JB_DEBOUNCE_MS) {
+            p->level = p->raw;
+            uis_button((enum jo_btn)i, p->level, now);
+        }
+    }
+}
+
 static void ui_task(void *arg)
 {
     struct jb_button b;
@@ -240,10 +327,14 @@ static void ui_task(void *arg)
     jb_init(&b);
     js_auto_init(&s_auto, bridge_ms());
     last_auto = bridge_ms();
+    uis_start(bridge_ms());
     for (;;) {
         uint32_t now = bridge_ms();
-        int level = gpio_get_level(BOARD_BUTTON_GPIO);
-        on_button(jb_step(&b, BOARD_BUTTON_ACTIVE_LOW ? !level : level, now));
+        int no = no_pressed();
+        pads_step(now, no);
+        on_button(jb_step(&b, no, now));
+        if (UI_STATE)
+            uis_step(now, &s_led);
         led_step(now);
         if ((uint32_t)(now - last_auto) >= AUTO_CHECK_MS) {
             last_auto = now;
@@ -256,7 +347,7 @@ static void ui_task(void *arg)
 static esp_err_t led_up(void)
 {
 #if BOARD_LED_RGB_GPIO >= 0
-    led_strip_config_t strip = {.strip_gpio_num = BOARD_LED_RGB_GPIO, .max_leds = 1, .led_model = LED_MODEL_WS2812, .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB};
+    led_strip_config_t strip = {.strip_gpio_num = BOARD_LED_RGB_GPIO, .max_leds = BOARD_LED_COUNT, .led_model = LED_MODEL_WS2812, .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB};
     led_strip_rmt_config_t rmt = {.clk_src = RMT_CLK_SRC_DEFAULT, .resolution_hz = 10000000};
     return led_strip_new_rmt_device(&strip, &rmt, &s_strip);
 #else
@@ -265,11 +356,24 @@ static esp_err_t led_up(void)
 #endif
 }
 
+esp_err_t ui_screen_early(void)
+{
+    uis_init();
+    uis_open_screen();                   /* (none: the LED language) */
+    return ESP_OK;
+}
+
 esp_err_t ui_start(void)
 {
     esp_err_t e = ESP_OK;
+    static const int PADS[] = {BOARD_BTN_UP_GPIO, BOARD_BTN_DOWN_GPIO, BOARD_BTN_YES_GPIO, BOARD_BTN_NO2_GPIO};
     gpio_config_t c = {.pin_bit_mask = 1ull << BOARD_BUTTON_GPIO, .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE};
+    for (size_t i = 0; i < sizeof PADS / sizeof PADS[0]; i++)
+        if (PADS[i] >= 0)
+            c.pin_bit_mask |= 1ull << PADS[i];
     e = gpio_config(&c);
+    if (e == ESP_OK)
+        e = oled_start();
     s_scanning = xSemaphoreCreateMutex();
     if (!s_scanning)
         return ESP_ERR_NO_MEM;
@@ -277,5 +381,5 @@ esp_err_t ui_start(void)
         e = led_up();
     if (e != ESP_OK)
         return e;
-    return xTaskCreatePinnedToCore(ui_task, "ui", 4096, NULL, 5, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    return xTaskCreatePinnedToCore(ui_task, "ui", 6144, NULL, 5, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
