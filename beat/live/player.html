@@ -36,9 +36,12 @@
   /* the XIAO card never moves the layout: it takes the device's width without widening the column (width 0 + min-width
      100 %), every changing line keeps its height, stays on one line and is cut with "..." */
   #leftcol > #xiaocard { width:0; min-width:100%; box-sizing:border-box; }
-  #xiaocard .row, #xiaocard #accmodel, #xiaocard #accxstats { min-height:1.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-wrap:nowrap; }
+  #xiaocard .row { min-height:1.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-wrap:nowrap; }
+  /* the numbers: one short labelled line each, a fixed count per block, so the card's height never moves */
+  #xiaocard .ln { min-height:1.4em; line-height:1.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #xiaocard .ln b { font-weight:600; opacity:.9; }
   /* the status line wraps onto exactly two lines (always two lines tall, so its height never changes) */
-  #xiaocard #xmsg { white-space:normal; overflow:hidden; line-height:1.4em; height:2.8em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  #xiaocard #xmsg { overflow:hidden; }
   #xiaocard #accmodel, #xiaocard #accxstats, #xiaocard #calibmsg, #xiaocard #autolatmsg { display:block; }
   #xiaocard #calibmsg, #xiaocard #autolatmsg { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #xiaocard #xaudio { display:inline-block; min-width:9.5em; text-align:center; }
@@ -1361,23 +1364,38 @@ async function askXiao() {
         const t = jxText(ev.data);
         if (t !== null) onXiaoLineText(t, ev.timeStamp || performance.now());
       };
-      XIAO.portMsg = port ? 'MIDI port "' + port.name + '"' : 'no MIDI port named jank';
+      XIAO.portMsg = port ? 'port "' + port.name + '"' : 'no port named jank';
       if (port && XIAO.out) { askGet(); askStatus(); }             // at once, not after the first period (reads only)
     };
     access.onstatechange = attach;
     attach();
   } catch (e) { XIAO.portMsg = 'no MIDI access: ' + e.message; }
 }
+// a block of labelled lines, one per [label, text], always the same count, so the card keeps its height
+function setLines(id, rows) {
+  $(id).replaceChildren(...rows.map(([label, text]) => {
+    const d = document.createElement('div');
+    d.className = 'ln';
+    if (label) { const b = document.createElement('b'); b.textContent = label + ': '; d.append(b); }
+    d.append(text || '\u00a0');
+    return d;
+  }));
+}
 const f1 = (v, d = 1) => (v === null || v === undefined ? '-' : Number(v).toFixed(d));
 function showAccuracy(b) {
   if (!b || !b.xiao) return;
   const m = b.model || {};
-  $('accmodel').textContent = 'ref ' + f1(b.ref_bpm, 2) + ' BPM, ' + b.ref_beats + ' beats | this track: Link phase forces ' + f1(b.xiao_phase_forces, 0) + ', tempo sets ' + f1(b.xiao_tempo_sets, 0) + ', gaps ' + f1(b.xiao_gaps, 0) +
-    ' | latencies: speakers ' + f1(m.speakers_latency_ms) + ', jank ' + f1(m.jank_latency_ms) + ', FIFO ' + f1(m.fifo_ms) +
-    ', beat_latency ' + f1(m.beat_latency_ms, 0) + ' ms -> XIAO predicted ' + f1(m.predicted_xiao_ms) + ' ms';
+  setLines('accmodel', [
+    ['This track', 'ref ' + f1(b.ref_bpm, 2) + ' BPM, ' + b.ref_beats + ' beats, phase forces ' + f1(b.xiao_phase_forces, 0) +
+      ', tempo sets ' + f1(b.xiao_tempo_sets, 0) + ', gaps ' + f1(b.xiao_gaps, 0)],
+    ['Latencies', 'speakers ' + f1(m.speakers_latency_ms) + ', jank ' + f1(m.jank_latency_ms) + ', buffer ' + f1(m.fifo_ms) +
+      ', beat_latency ' + f1(m.beat_latency_ms, 0) + ' ms → XIAO predicted ' + f1(m.predicted_xiao_ms) + ' ms'],
+  ]);
   const s = XIAO.stats;
-  $('accxstats').textContent = s ? 'XIAO: cpu ' + f1(s.cpu_pct) + ' %, hop max ' + s.hop_max_us + ' us, gaps ' + s.gaps + ', tempo sets ' + s.tempo_sets +
-    ', phase forces ' + s.phase_forces + ', err ' + f1(s.err_us / 1000, 2) + ' ms, heap min ' + s.heap_min : 'XIAO: no `beat` numbers yet';
+  setLines('accxstats', s ? [
+    ['XIAO load', 'cpu ' + f1(s.cpu_pct) + ' %, hop max ' + s.hop_max_us + ' us, heap min ' + s.heap_min + ', gaps ' + s.gaps],
+    ['XIAO tracking', 'tempo sets ' + s.tempo_sets + ', phase forces ' + s.phase_forces + ', err ' + f1(s.err_us / 1000, 2) + ' ms'],
+  ] : [['XIAO', 'no `beat` numbers yet'], ['', '']]);
   const sug = m.suggested_latency_ms;
   $('calib').disabled = sug === null || sug === undefined || !XIAO.out || b.link.n < 8;
   $('calibmsg').textContent = sug === null || sug === undefined ? 'needs 8+ Link beats and the XIAO\'s latency'
@@ -1460,9 +1478,9 @@ function showXiao(x, bench) {
   // the Mac's side, not the XIAO's (the user: "it sits in the XIAO audio beat tracker section"): the player's buffer that
   // feeds the "jank" USB output; its underruns are the Mac running late (silence sent), the XIAO's own counters are `gaps`
   const ms = n => f1(n / 44.1, 0);
-  const audio = 'Mac → ' + x.device + ' USB audio: buffer ' + f1(x.fifo_ms) + ' ms (aim ' + ms(x.fifo_target) + ' ms), slips ' + (x.dropped + x.repeated) + ', Mac underruns ' + x.underruns;
+  const audio = x.device + ' USB audio: buffer ' + f1(x.fifo_ms) + ' ms (aim ' + ms(x.fifo_target) + ' ms), slips ' + (x.dropped + x.repeated) + ', Mac underruns ' + x.underruns;
   const err = XIAO.err && now - XIAO.errAt < 5000 ? ' | XIAO: ' + XIAO.err : '';
-  $('xmsg').textContent = XIAO.portMsg + stale + err + ' | ' + audio;
+  setLines('xmsg', [['MIDI', XIAO.portMsg + stale + err], ['Mac → jank', audio]]);
   showAccuracy(bench);
 }
 
