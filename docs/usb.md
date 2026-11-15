@@ -26,9 +26,12 @@ once (it changes the partition table and the bootloader; see [boards.md](boards.
    and `UPDATE.TXT`, which says what happened. macOS may complain that the drive was not ejected: it was pulled while
    mounted, as with any UF2 board.
 
-Refused, with the reason in `UPDATE.TXT` and the old firmware still running (a restart all the same): an image bigger than
-the slot or with a header the loader refuses, a failed check, an update over MIDI going on, a running image not confirmed
-yet (see Rollback: after an update, wait until it has talked to a computer for 20 s), a copy cut short and then ejected.
+Refused, with the reason in `UPDATE.TXT` after a restart and the old firmware still running: an image bigger than the slot
+or with a header the loader refuses, a failed check, a copy cut short and then ejected. Refused **without** a restart (the
+reason only in the control line's `drive` answer), because a restart then would cost something: the running image not
+confirmed yet (the bootloader would roll it back; see Rollback: after an update, wait until it has talked to a computer for
+20 s), or an update over MIDI going on (it would be cut off). The drive and an update over MIDI never write the spare slot
+at once: each takes it under a lock (`slot_take`). A copy started again over a cancelled one starts afresh.
 A file that is not an image (notes, the macOS `._` files, `.fseventsd`) is kept in RAM while the drive is mounted, so the
 computer reads back what it wrote; nothing of it survives a restart.
 

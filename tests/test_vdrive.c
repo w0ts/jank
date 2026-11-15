@@ -77,7 +77,10 @@ static void host_write(uint32_t lba, const uint8_t *data)
 {
     struct jv_op op;
     const uint8_t *early;
-    switch (jv_write(&s_d, lba, data, &op)) {
+    enum jv_kind k = jv_write(&s_d, lba, data, &op);
+    if (k == JV_W_REWRITE)                         /* as drive.c: compare with the slot first */
+        k = jv_rewrite(&s_d, lba, data, memcmp(s_slot + op.offset, data, JV_SECTOR) != 0, &op);
+    switch (k) {
     case JV_W_START:
         s_starts++;
         flash_write(&op, data);
@@ -446,6 +449,27 @@ static void test_not_images(void)
         len = make_image(s_img, good, 2, 1);
         copy_file("JANK    BIN", s_img, len, IN_ORDER);
         CHECK(s_starts == 2 && s_phase == JV_DONE && !memcmp(s_slot, s_img, len) && s_flash_faults == 0);
+    }
+    /* a copy cancelled half way (no FAT, no directory written: its clusters stay free), then another image copied into
+     * the same clusters: its header comes as a rewrite of the first's first sector and starts the stream afresh */
+    {
+        static const uint32_t a[] = {300000, 2000}, b[] = {12345, 99999, 7};
+        static uint8_t first[JV_SLOT_MAX];
+        uint32_t la, lb;
+        mount(NULL);
+        la = make_image(first, a, 2, 1);
+        {
+            uint16_t c = free_run(la);
+            static uint8_t sec[JV_SECTOR];
+            for (uint32_t k = 0; k < la / JV_SECTOR / 2u; k++) {
+                memcpy(sec, first + k * JV_SECTOR, JV_SECTOR);
+                host_write(JV_DATA_LBA + c - 2u + k, sec);
+            }
+            CHECK(s_phase == JV_STREAM);
+        }
+        lb = make_image(s_img, b, 3, 1);
+        copy_file("JANK    BIN", s_img, lb, IN_ORDER);
+        CHECK(s_starts == 2 && s_phase == JV_DONE && jv_image_len(&s_d) == lb && !memcmp(s_slot, s_img, lb) && s_flash_faults == 0);
     }
     /* writes to the made-up files are dropped: jank.html reads the same */
     {

@@ -38,6 +38,7 @@
 #define RX_TEXT_MAX 64u
 #define NOTIFY_TRIES 40                /* a line's answer waits up to 40 x 5 ms for NimBLE's buffers */
 #define NOTIFY_WAIT_MS 5
+#define WRITE_MAX_US 1000000           /* one answer waits for buffers 1 s in all at most: the control task is not held longer */
 #define TASK_EVERY_MS 100u             /* the task looks at the window and the HOME line this often */
 #define TASK_STACK 4096
 #define TASK_PRIO 2                    /* below the control task (4): the HOME line is the least urgent thing here */
@@ -332,12 +333,12 @@ static void stack_down(void)
 }
 
 /* one packet as one notification; tries 0: dropped when NimBLE has no buffer free */
-static int notify(const uint8_t *pkt, size_t len, int tries)
+static int notify(const uint8_t *pkt, size_t len, int tries, int64_t until_us)
 {
     for (;;) {
         struct os_mbuf *om = ble_hs_mbuf_from_flat(pkt, (uint16_t)len);
         int rc = om ? ble_gatts_notify_custom(s_conn, s_val_handle, om) : BLE_HS_ENOMEM;   /* om is consumed either way */
-        if (rc != BLE_HS_ENOMEM || tries-- <= 0)
+        if (rc != BLE_HS_ENOMEM || tries-- <= 0 || esp_timer_get_time() >= until_us)
             return rc;
         vTaskDelay(pdMS_TO_TICKS(NOTIFY_WAIT_MS));
     }
@@ -350,6 +351,7 @@ struct tx {
     size_t len, cap;
     uint16_t ms;
     int tries, rc;
+    int64_t until_us;
 };
 
 static void tx_begin(struct tx *t, int tries)
@@ -359,13 +361,14 @@ static void tx_begin(struct tx *t, int tries)
     t->len = 0;
     t->ms = (uint16_t)((esp_timer_get_time() / 1000) & 0x1FFF);
     t->tries = tries;
+    t->until_us = esp_timer_get_time() + WRITE_MAX_US;
     t->rc = 0;
 }
 
 static void tx_flush(struct tx *t)
 {
     if (t->len && !t->rc)
-        t->rc = notify(t->pkt, t->len, t->tries);
+        t->rc = notify(t->pkt, t->len, t->tries, t->until_us);
     t->len = 0;
 }
 
@@ -378,7 +381,7 @@ static void tx_msg(struct tx *t, const uint8_t *msg, size_t n)
     if (jbm_pack(msg, n, t->ms, t->pkt, &t->len, t->cap))
         return;
     while (!t->rc && (l = jbm_sysex_packet(msg, n, &at, t->ms, t->pkt, t->cap)) != 0)
-        t->rc = notify(t->pkt, l, t->tries);   /* a cut message: the reader ends it at the next F0 */
+        t->rc = notify(t->pkt, l, t->tries, t->until_us);   /* a cut message: the reader ends it at the next F0 */
 }
 
 static int listening(void) { return s_synced && s_conn != BLE_HS_CONN_HANDLE_NONE && s_notify; }

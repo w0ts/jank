@@ -101,6 +101,11 @@ struct jv_op {
 };
 /* the host wrote one sector: data is JV_SECTOR bytes */
 enum jv_kind jv_write(struct jv *d, uint32_t lba, const uint8_t *data, struct jv_op *op);
+/* after JV_W_REWRITE, once the firmware has compared the sector with the slot (differs: 1 when the slot holds other
+ * bytes): the image's first sector written again with another image header is a new copy over a half-finished one in
+ * the same clusters (a cancelled copy leaves the run free): the stream starts afresh -> JV_W_START (op set as for it).
+ * Otherwise -> JV_W_REWRITE, or JV_W_IGNORED when nothing differs. */
+enum jv_kind jv_rewrite(struct jv *d, uint32_t lba, const uint8_t *data, int differs, struct jv_op *op);
 /* after JV_W_START: the cached sectors that belong to the new image, one at a time -> 1 and data/op set; 0 none left.
  * Write each as JV_W_IMAGE. */
 int jv_take_early(struct jv *d, const uint8_t **data, struct jv_op *op);

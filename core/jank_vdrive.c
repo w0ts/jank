@@ -314,6 +314,18 @@ enum jv_kind jv_write(struct jv *d, uint32_t lba, const uint8_t *data, struct jv
     return JV_W_IMAGE;
 }
 
+enum jv_kind jv_rewrite(struct jv *d, uint32_t lba, const uint8_t *data, int differs, struct jv_op *op)
+{
+    if (!differs)
+        return JV_W_IGNORED;
+    if (image_index(d, lba) == 0 && jo_header_ok(data, JV_SECTOR)) {
+        start_image(d, lba);
+        image_op(d, 0, op);
+        return JV_W_START;
+    }
+    return JV_W_REWRITE;
+}
+
 int jv_take_early(struct jv *d, const uint8_t **data, struct jv_op *op)
 {
     for (uint32_t i = 0; i < d->ncache; i++) {

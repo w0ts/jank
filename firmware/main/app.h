@@ -112,7 +112,10 @@ void ota_mark_valid(void);
 /* drive.c: the JANK drive, made up (core/jank_vdrive.h): jank.html on it, a jank.bin copied onto it streams into the spare
  * app slot and is installed */
 esp_err_t drive_start(void);
-bool drive_busy(void);                                       /* an image is streaming into the spare slot */
+/* the spare app slot's one writer at a time: the drive's stream or an update over MIDI (taken under a lock) */
+enum slot_user { SLOT_FREE = 0, SLOT_DRIVE, SLOT_MIDI };
+bool slot_take(enum slot_user who);                          /* true: who has it now (or had it already) */
+void slot_give(enum slot_user who);
 #ifdef JANK_CLOCK_PROBE
 esp_err_t probe_start(void);                                 /* clkprobe.c: a test build's pin probe */
 void probe_mark(int64_t due, int64_t isr_now);
