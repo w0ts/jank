@@ -36,6 +36,13 @@ What it took: the alarm goes 2 us early (`CLK_LEAD_US`: interrupt entry ~2.0 us,
 once, not on a bit boundary), and core 1 runs the clock interrupt alone: with TinyUSB's task on core 1 the worst tick was
 37 us (a critical section there masks the level-3 interrupt).
 
+**Bench outputs on the XIAO** (every XIAO build, `BOARD_BENCH_CLK_GPIO` in `main/board.h`): pad **D1 (GPIO2) = CLK**
+changes level on every MIDI clock, so each tick is an edge (rising and falling in turn); pad **D0 (GPIO1) = RST** goes high
+with each MIDI start and low at the next clock. Both are written in the clock's interrupt right after the UART starts the
+tick's first byte, so an edge sits with that byte's start bit (a start tick's first byte is the FA). Into an audio
+interface as above: each pad through 1 kohm into a line input's tip (Fireface: one input each, 96 kHz if it can), the
+XIAO's GND to the sleeves. 3.3 V logic: no 5 V, no current to speak of.
+
 **Over USB-MIDI** (the Mac's Link library against arrival times, `aalink`): sd 110 to 240 us, p99 about 1 ms, a mean of
 0.4 to 0.6 ms late. USB full speed polls every 1 ms, so this path is bounded by USB; a computer is better served by Link
 itself, over the stick's network adapter.

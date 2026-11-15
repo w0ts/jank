@@ -16,6 +16,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/uart_ll.h"
+#ifdef BOARD_BENCH_CLK_GPIO
+#include "hal/gpio_ll.h"
+#include "soc/gpio_struct.h"
+#endif
 #include "soc/uart_periph.h"
 
 #define MIDI_UART UART_NUM_1
@@ -33,6 +37,38 @@ static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static DRAM_ATTR struct jc_map s_map;
 static DRAM_ATTR struct jc_ticker s_tick;
 static uint8_t s_running;
+#ifdef BOARD_BENCH_CLK_GPIO
+static DRAM_ATTR uint8_t s_bench_clk;   /* the CLK pin's level: it changes on every F8 */
+static DRAM_ATTR uint8_t s_bench_rst;   /* the RST pin is high: low again at the next clock */
+
+/* the bench pins (board.h), in the clock's interrupt: register writes only (gpio_ll, inline), the state in DRAM */
+static void IRAM_ATTR bench_pins(const struct jc_fire *f)
+{
+    for (unsigned i = 0; i < f->n; i++) {
+        if (f->bytes[i] == JC_START) {
+            gpio_ll_set_level(&GPIO, BOARD_BENCH_RST_GPIO, 1);
+            s_bench_rst = 2;            /* (this tick's own F8 follows: low at the one after) */
+        } else if (f->bytes[i] == JC_CLOCK) {
+            s_bench_clk ^= 1u;
+            gpio_ll_set_level(&GPIO, BOARD_BENCH_CLK_GPIO, s_bench_clk);
+            if (s_bench_rst && --s_bench_rst == 0)
+                gpio_ll_set_level(&GPIO, BOARD_BENCH_RST_GPIO, 0);
+        }
+    }
+}
+
+static esp_err_t bench_pins_up(void)
+{
+    gpio_config_t c = {.pin_bit_mask = (1ull << BOARD_BENCH_CLK_GPIO) | (1ull << BOARD_BENCH_RST_GPIO), .mode = GPIO_MODE_OUTPUT,
+                       .pull_up_en = GPIO_PULLUP_DISABLE, .pull_down_en = GPIO_PULLDOWN_DISABLE, .intr_type = GPIO_INTR_DISABLE};
+    esp_err_t e = gpio_config(&c);
+    if (e == ESP_OK)
+        e = gpio_set_level(BOARD_BENCH_CLK_GPIO, 0);
+    if (e == ESP_OK)
+        e = gpio_set_level(BOARD_BENCH_RST_GPIO, 0);
+    return e;
+}
+#endif
 
 static void IRAM_ATTR arm(gptimer_handle_t timer, int64_t at, int64_t now)
 {
@@ -54,6 +90,9 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
         probe_mark((int64_t)ev->alarm_value + CLK_LEAD_US, now);
 #endif
     uart_ll_write_txfifo(UART_LL_GET_HW(MIDI_UART), f.bytes, f.n);
+#ifdef BOARD_BENCH_CLK_GPIO
+    bench_pins(&f);                      /* right after the UART starts the byte: the edge sits with the start bit */
+#endif
     woken = usb_midi_isr(f.bytes, f.n);
     arm(timer, f.next - CLK_LEAD_US, now);
     return woken;
@@ -150,6 +189,10 @@ esp_err_t midi_start(void)
     esp_err_t e = uart_up();
     if (e == ESP_OK)
         e = source_pin_up();
+#ifdef BOARD_BENCH_CLK_GPIO
+    if (e == ESP_OK)
+        e = bench_pins_up();             /* before the timer: its interrupt drives them from the first tick */
+#endif
     if (e != ESP_OK)
         return e;
 #ifdef JANK_CLOCK_PROBE

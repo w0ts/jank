@@ -25,6 +25,11 @@
 #define BOARD_LINE_DETECT_GPIO (-1)
 #define BOARD_PUMP_GPIO (-1)
 #define BOARD_USBPORT_TUSB320 0
+/* Bench outputs (midi.c, from the clock's interrupt, beside the UART byte): D1 = GPIO2 changes level on every MIDI clock
+ * (F8), D0 = GPIO1 goes high with each MIDI start (FA) and low at the next clock. 3.3 V logic: into an audio interface
+ * through 1 kohm (docs/midi.md). The XIAO only: the PCBs have real CLK / RST outputs (through the pump) on their own pins. */
+#define BOARD_BENCH_CLK_GPIO 2
+#define BOARD_BENCH_RST_GPIO 1
 #elif CONFIG_JANK_BOARD_MINI22
 /* jank mini 2.2, battery order (ESP32-S3FH4R2), from hardware/mini2/parts.py and README.md on hw/mini2.2 (2026-11-15,
  * being routed: check again when it is ordered). Only what this firmware drives so far: NO (the BOOT button, SW1), the two
