@@ -265,6 +265,32 @@ def test_shift_command_moves_the_link_bar_and_rejects_bad_values(source):
             app.command("shift", bad)
 
 
+def test_a_nudge_makes_the_bar_manual_and_is_logged_as_a_hand_label(source, tmp_path):
+    app, link = make_app(source)
+    logs = tmp_path / "nudges"
+    app.command("shift", {"beats": 1})                                 # no log folder: nothing written
+    assert app.status()["bar"]["state"] == "manual" and not logs.exists()
+    app.nudge_dir = logs
+    app.command("shift", {"beats": -0.5})
+    rows = [json.loads(x) for x in next(logs.glob("nudges-*.jsonl")).read_text().splitlines()]
+    assert len(rows) == 1 and rows[0]["nudge_beats"] == -0.5 and rows[0]["state"] == "manual"
+    assert {"scores", "phi", "lead", "count", "t_beat", "user_phi", "track", "position_s"} <= rows[0].keys()
+
+
+def test_autobar_command(source):
+    app, link = make_app(source)
+    assert app.status()["bar"]["state"] == "listening"
+    app.command("autobar", {"on": False})
+    assert app.status()["bar"]["state"] == "off"
+    app.command("shift", {"beats": 1})
+    assert app.status()["bar"]["state"] == "off"                       # off stays off
+    app.command("autobar", {"on": True})
+    assert app.status()["bar"]["state"] == "listening"
+    for bad in ({"on": 1}, {"on": "yes"}, {}):
+        with pytest.raises((ValueError, KeyError)):
+            app.command("autobar", bad)
+
+
 def test_transport_command_leads_the_session_in_link_mode_only(source):
     app, link = make_app(source)
     with pytest.raises(ValueError):                                    # AUDIO mode: the tracker decides (Stop = hold)

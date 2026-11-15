@@ -12,12 +12,14 @@ import sys
 import threading
 import time
 import webbrowser
+from dataclasses import asdict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from live.clockmap import ClockMap
 from live.controller import LinkController
+from live.downbeat import BarView
 from live.engine import Engine
 from live.link_port import RealLink, SimLink
 from live.runner import run
@@ -28,6 +30,7 @@ PAGE = Path(__file__).resolve().parent / "player.html"
 TRAKTOR_INDEX = ROOT / "data" / "traktor" / "index.json"
 TRACKS_DIR = Path.home() / "Music" / "Tracks"
 ACCURACY_DIR = ROOT / "runs" / "accuracy"      # player --xiao: one CSV a day of the accuracy windows
+NUDGE_DIR = ROOT / "runs" / "downbeat"         # one JSON line per NUDGE BEAT: hand labels for the downbeat refit
 DEFAULT_PORT = 8791
 MAX_OFFSET_MS = 200.0
 FOLDS = (0.25, 0.5, 1.0, 2.0, 4.0)   # x2 / /2 steps, two either way
@@ -66,6 +69,7 @@ class App:
         self.range = bpm_range
         self.xiao = None     # live.xiao.XiaoOutput with --xiao: the track's mid also goes to the jank XIAO
         self.bench = None    # live.bench.XiaoBench with --xiao: the accuracy of the XIAO, this tracker and Link
+        self.nudge_dir: Path | None = None   # the nudge log's folder (main: NUDGE_DIR); None: no log
 
     def status(self) -> dict:
         st = self.source.state()
@@ -83,6 +87,7 @@ class App:
             "peers": self.link.peers(), "phase_ms": self.controller.phase_err_ms,
             "offset_ms": self.clock.user_offset_us / 1000.0,
             **self._beat_now(es),
+            "bar": bar_status(es.bar, self.controller.bar_moves),
             "xiao": self.xiao.status() if self.xiao is not None else None,
             "bench": self.bench.status() if self.bench is not None else None,
         }
@@ -99,6 +104,22 @@ class App:
             return {"beat": (self.engine.stream_time - t_beat) / period, "beat_bpm": 60.0 / period,
                     "beat_from": "estimate"}
         return {"beat": None, "beat_bpm": None, "beat_from": None}
+
+    def _log_nudge(self, beats: float, before: BarView) -> None:
+        """Each NUDGE BEAT is a hand label for a later refit: one JSON line with the estimator's state and scores before
+        it and the phase Link's bar calls the 1 after it (runs/ is git-ignored)."""
+        if self.nudge_dir is None:
+            return
+        st = self.source.state()
+        user_phi = None
+        if before.count is not None and before.t_beat is not None and self.controller.beat_offset % 1.0 == 0.0:
+            user_phi = self.controller.link_bar_phase(before.count, before.t_beat)
+        row = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "track": st.path, "position_s": round(st.position_s, 3),
+               "rate": st.rate, "nudge_beats": beats, "beat_offset": self.controller.beat_offset,
+               "user_phi": user_phi, **asdict(before)}
+        self.nudge_dir.mkdir(parents=True, exist_ok=True)
+        with (self.nudge_dir / f"nudges-{time.strftime('%Y%m%d')}.jsonl").open("a") as f:
+            f.write(json.dumps(row) + "\n")
 
     def command(self, name: str, body: dict) -> None:
         if name in ("xiao_beat", "xiao_stats"):
@@ -140,6 +161,12 @@ class App:
             if beats == 0 or abs(beats) > MAX_SHIFT_BEATS or (beats * 2) % 1:
                 raise ValueError(f"shift {beats} beats: halves, 0.5..{MAX_SHIFT_BEATS} either way")
             self.controller.shift_beats(beats)
+            self._log_nudge(beats, self.engine.bar_nudge())
+        elif name == "autobar":
+            on = body["on"]
+            if not isinstance(on, bool):
+                raise ValueError(f"on must be true or false, not {on!r}")
+            self.engine.set_autobar(on)
         elif name == "hold":
             hold = body["hold"]
             if not isinstance(hold, bool):
@@ -166,6 +193,12 @@ class App:
             self.controller.set_session_playing(playing)
         else:
             raise KeyError(name)
+
+
+def bar_status(bar: BarView, moves: int) -> dict:
+    """The downbeat estimator for the page: state, the 1's phase, lead and confidence, Link moves made."""
+    return {"state": bar.state, "phi": bar.phi, "lead": round(bar.lead, 3), "conf": round(bar.conf, 3),
+            "scores": None if bar.scores is None else [round(x, 3) for x in bar.scores], "moves": moves}
 
 
 def make_handler(app: App):
@@ -241,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
     controller = LinkController(link, clock)
     engine = Engine(*args.range, min_confidence=args.min_confidence)
     app = App(source, engine, link, controller, clock, load_library(), tuple(args.range))
+    app.nudge_dir = NUDGE_DIR
     if xiao is not None:
         from live.accuracy import load_beats
         from live.bench import XiaoBench
