@@ -96,6 +96,23 @@ def test_start_wins_over_the_gate_until_it_re_arms(engine):
     assert engine.status().gated
 
 
+def test_silence_ends_a_starts_override(engine):
+    """M2h, as jank's firmware: silence belongs to the automatic layer: it stops at once and ends a Start's override,
+    so the next music waits for the gate (no new Start needed: the hold stays off)."""
+    engine.conf["v"] = 0.3
+    engine.resync()
+    engine.estimator = StubEstimator()
+    assert not engine.status().gated
+    engine._silent_s = SILENCE_S                  # 0.5 s of silence
+    st = engine.status()
+    assert st.silent and st.published.mode == "stopped"
+    engine._silent_s = 0.0                        # music again, the confidence still low: the gate holds it
+    st = engine.status()
+    assert st.gated and not st.held and st.published.mode == "stopped"
+    engine.conf["v"] = 0.56
+    assert engine.status().published.mode == "steady"
+
+
 @pytest.mark.skipif(not GTZAN.exists(), reason="GTZAN not downloaded")
 def test_silence_stops_within_half_a_second_and_starts_over():
     e = Engine(90, 180)

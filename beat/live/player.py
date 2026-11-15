@@ -311,6 +311,8 @@ def main(argv: list[str] | None = None) -> int:
     clock = ClockMap(args.offset_ms)
     controller = LinkController(link, clock)
     engine = Engine(*args.range, min_confidence=args.min_confidence)
+    if not args.xiao:       # power-on: the user's layer stopped until YES (jank M2h); --xiao: the page shows the XIAO's
+        engine.hold = True
     if not args.xiao:       # AUTO RANGE's reference and the /2 anchor's place come from this program's own Link session
         engine.session_bpm = lambda: link.tempo() if link.playing() else None
         engine.place_fn = lambda t: link.beat_at(clock.to_link_us(t)) if link.playing() else None
