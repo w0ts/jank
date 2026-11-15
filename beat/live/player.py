@@ -204,7 +204,7 @@ def make_handler(app: App):
             else:
                 self._json(HTTPStatus.OK, app.status())
 
-        def log_message(self, *_) -> None:     # the console carries the tracker's lines, not every poll
+        def log_message(self, *_) -> None:     # no line per request
             return
 
     return Handler
@@ -259,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_browser:
         webbrowser.open(url)
     try:
-        run(source, engine, clock, link, controller, prefix="local model (the XIAO is on Link: its tempo and peers are on the page)  " if xiao is not None else "")
+        run(source, engine, clock, link, controller, out=None)     # the page shows the state: no line a second here
     except KeyboardInterrupt:
         pass
     finally:
