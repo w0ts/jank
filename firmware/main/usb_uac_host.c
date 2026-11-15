@@ -36,6 +36,9 @@
 #define XFERS 4u                         /* transfers in flight: 8 ms of audio queued at the host */
 #define PACKETS 2u                       /* packets (1 ms frames) a transfer */
 #define CTRL_TIMEOUT_MS 1000u
+#define CTRL_DATA_MAX 128u               /* a RANGE answer (98 bytes) rounded up to EP0's packet size, 64 at most */
+#define OPEN_HANDLES 8u                      /* handles the worker holds open at once (setting up, streaming) */
+#define WAITING_MAX 4u                   /* devices passed over while another streams: tried again when it leaves */
 #define STOP_WAIT_MS 200u
 #define CLIENT_PRIO 22                   /* the packets' callbacks run in it: above Wi-Fi's app tasks, under the MIDI task */
 #define WORKER_PRIO 5
@@ -54,6 +57,9 @@ static usb_host_client_handle_t s_client;
 static QueueHandle_t s_events;
 static SemaphoreHandle_t s_ctrl_done;
 static usb_transfer_t *s_ctrl;
+static volatile uint8_t s_ctrl_out;      /* a control transfer is with the library (set before submit, cleared by on_ctrl) */
+static usb_device_handle_t s_open[OPEN_HANDLES];   /* the worker's: what this client has open, so a gone handle is closed once */
+static uint8_t s_waiting[WAITING_MAX];   /* the worker's: addresses passed over */
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 
 /* the device being streamed; h set = in use. Fields below `active` are the worker's, read by the client task's callbacks
@@ -132,16 +138,28 @@ static void on_audio(usb_transfer_t *t)
 static void on_ctrl(usb_transfer_t *t)
 {
     (void)t;
+    s_ctrl_out = 0;
     xSemaphoreGive(s_ctrl_done);
+}
+
+static uint16_t ep0_mps(usb_device_handle_t h)
+{
+    usb_device_info_t info;
+    return usb_host_device_info(h, &info) == ESP_OK && info.bMaxPacketSize0 ? info.bMaxPacketSize0 : 64u;
 }
 
 /* a control request with its data stage (out: data to send; in: room for the answer); the worker task only */
 static esp_err_t control(usb_device_handle_t h, const uint8_t setup[8], const uint8_t *out, uint8_t *in, size_t *got)
 {
-    uint16_t len = (uint16_t)(setup[6] | setup[7] << 8);
+    uint16_t len = (uint16_t)(setup[6] | setup[7] << 8), mps = ep0_mps(h);
+    /* an IN data stage asks for whole packets of EP0's size (usb_types_stack.h, as usb_host.c's own requests do) */
+    size_t want = (setup[0] & 0x80u) ? (size_t)(len + mps - 1u) / mps * mps : len;
     esp_err_t e;
-    if (8u + len > s_ctrl->data_buffer_size)
+    if (s_ctrl_out)
+        return ESP_ERR_INVALID_STATE;    /* a timed-out transfer is still out: its buffer is not ours */
+    if (8u + want > s_ctrl->data_buffer_size)
         return ESP_ERR_INVALID_SIZE;
+    xSemaphoreTake(s_ctrl_done, 0);      /* a late completion's token, if one was left */
     memcpy(s_ctrl->data_buffer, setup, 8);
     if (out && len)
         memcpy(s_ctrl->data_buffer + 8, out, len);
@@ -149,22 +167,23 @@ static esp_err_t control(usb_device_handle_t h, const uint8_t setup[8], const ui
     s_ctrl->bEndpointAddress = 0;
     s_ctrl->callback = on_ctrl;
     s_ctrl->context = NULL;
-    s_ctrl->num_bytes = 8 + len;
+    s_ctrl->num_bytes = (int)(8u + want);
+    s_ctrl_out = 1;
     e = usb_host_transfer_submit_control(s_client, s_ctrl);
-    if (e != ESP_OK)
+    if (e != ESP_OK) {
+        s_ctrl_out = 0;
         return e;
-    if (xSemaphoreTake(s_ctrl_done, pdMS_TO_TICKS(CTRL_TIMEOUT_MS)) != pdTRUE) {
-        /* what espressif/usb_host_uac does on a lost control transfer (uac_control_transfer) */
-        usb_host_endpoint_halt(h, 0);
-        usb_host_endpoint_flush(h, 0);
-        usb_host_endpoint_clear(h, 0);
-        xSemaphoreTake(s_ctrl_done, pdMS_TO_TICKS(CTRL_TIMEOUT_MS));
-        return ESP_ERR_TIMEOUT;
     }
+    /* No recovery on a timeout: the library has no control timeout and refuses to halt EP0 (usbh.c check_ep_addr), so the
+     * transfer stays out until the device answers or leaves; until then no other control request goes (s_ctrl_out). */
+    if (xSemaphoreTake(s_ctrl_done, pdMS_TO_TICKS(CTRL_TIMEOUT_MS)) != pdTRUE)
+        return ESP_ERR_TIMEOUT;
     if (s_ctrl->status != USB_TRANSFER_STATUS_COMPLETED)
         return ESP_ERR_INVALID_RESPONSE;
     if (in && got) {
         size_t n = s_ctrl->actual_num_bytes > 8 ? (size_t)s_ctrl->actual_num_bytes - 8u : 0u;
+        if (n > len)
+            n = len;                     /* never past wLength: the caller's buffer holds that much */
         memcpy(in, s_ctrl->data_buffer + 8, n);
         *got = n;
     }
@@ -271,6 +290,42 @@ static esp_err_t start_stream(usb_device_handle_t h, const struct ju_alt *a, uin
     return ESP_OK;
 }
 
+static int track(usb_device_handle_t h, int add)
+{
+    for (uint32_t i = 0; i < OPEN_HANDLES; i++)
+        if (add ? !s_open[i] : s_open[i] == h) {
+            s_open[i] = add ? h : NULL;
+            return 1;
+        }
+    return 0;
+}
+
+static esp_err_t open_dev(uint8_t address, usb_device_handle_t *h)
+{
+    esp_err_t e = usb_host_device_open(s_client, address, h);
+    if (e == ESP_OK && !track(*h, 1)) {
+        usb_host_device_close(s_client, *h);
+        e = ESP_ERR_NO_MEM;
+    }
+    return e;
+}
+
+/* closes a handle this client holds, once: a device gone while add_device had it may already be closed and freed */
+static void close_dev(usb_device_handle_t h)
+{
+    if (track(h, 0))
+        usb_host_device_close(s_client, h);
+}
+
+static void wait_for_stream(uint8_t address)
+{
+    for (uint32_t i = 0; i < WAITING_MAX; i++)
+        if (!s_waiting[i] || s_waiting[i] == address) {
+            s_waiting[i] = address;
+            return;
+        }
+}
+
 static void add_device(uint8_t address)
 {
     usb_device_handle_t h;
@@ -279,19 +334,21 @@ static void add_device(uint8_t address)
     struct ju_pick pick;
     const struct ju_alt *a;
     esp_err_t e;
-    if (s_dev.h)
-        return;                          /* one stream: the first device keeps it */
-    if (usb_host_device_open(s_client, address, &h) != ESP_OK)
+    if (s_dev.h) {
+        wait_for_stream(address);        /* one stream: the first device keeps it; this one is tried when it leaves */
+        return;
+    }
+    if (open_dev(address, &h) != ESP_OK)
         return;
     if (usb_host_get_active_config_descriptor(h, &c) != ESP_OK || !ju_parse((const uint8_t *)c, c->wTotalLength, &d)) {
-        usb_host_device_close(s_client, h);
+        close_dev(h);
         return;                          /* no audio out of it: not ours */
     }
     if (d.uac2)
         ask_clocks(h, &d);
     if (ju_choose(&d, &pick)) {
         ESP_LOGW(TAG, "device %u: audio, but no 44.1 / 48 kHz stream that fits", address);
-        usb_host_device_close(s_client, h);
+        close_dev(h);
         return;
     }
     a = &d.alt[pick.index];
@@ -311,7 +368,7 @@ static void add_device(uint8_t address)
     }
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "device %u: %s", address, esp_err_to_name(e));
-        usb_host_device_close(s_client, h);
+        close_dev(h);
         return;
     }
     ESP_LOGI(TAG, "device %u '%s': UAC %s, itf %u alt %u, %lu Hz, %u ch, %u bits, mps %u", address, s_dev.name, d.uac2 ? "2.0" : "1.0",
@@ -339,8 +396,17 @@ static void remove_device(usb_device_handle_t h)
         s_dev.rate = 0;
         s_dev.name[0] = 0;
         portEXIT_CRITICAL(&s_mux);
+        close_dev(h);
+        /* the devices passed over get their turn (a stale address fails to open, or is just another candidate) */
+        for (uint32_t i = 0; i < WAITING_MAX; i++)
+            if (s_waiting[i]) {
+                struct event ev = {EV_NEW, s_waiting[i], NULL};
+                s_waiting[i] = 0;
+                xQueueSend(s_events, &ev, 0);
+            }
+        return;
     }
-    usb_host_device_close(s_client, h);
+    close_dev(h);
 }
 
 static void worker_task(void *arg)
@@ -380,7 +446,7 @@ esp_err_t usb_uac_host_start(void)
     if (e == ESP_OK)
         e = usb_host_client_register(&client, &s_client);
     if (e == ESP_OK)
-        e = usb_host_transfer_alloc(8u + JU_RANGE_LEN, 0, &s_ctrl);
+        e = usb_host_transfer_alloc(8u + CTRL_DATA_MAX, 0, &s_ctrl);
     if (e != ESP_OK)
         return e;
     if (xTaskCreatePinnedToCore(client_task, "usb_uac_cl", 3072, NULL, CLIENT_PRIO, NULL, 0) != pdPASS)

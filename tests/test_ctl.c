@@ -330,14 +330,14 @@ static void test_usb(void)
     CHECK(run("set source mic") == JK_CTL_NONE && cfg.source == JUR_SRC_USB);
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "usb=device\n") && strstr(out, "source=usb\n"));
     /* the XIAO as a device: no CC chip */
-    CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=device\nusb_cc=nochip\n") && !strstr(out, "usb_host_en"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=device\nusb_cc=nochip\n") && !strstr(out, "usb_vbus_out"));
     CHECK(strstr(out, "audio_source=none\n") && !strstr(out, "usb_dev=") && !strstr(out, "usb_audio=") && ends(out, "ok\n"));
     /* the board as a host with a synth on a hub: its MIDI and its audio */
     snap.usb.stack = JUR_STACK_HOST;
-    snap.usb.has_cc = 1;
+    snap.usb.has_port = 1;
     snap.usb.cc = JUR_CC_DEVICE;
     snap.usb.cc_dir = 2;
-    snap.usb.host_en = 1;
+    snap.usb.vbus_on = 1;
     snap.usb.audio = JUR_AUDIO_USB;
     snap.usb.ndev = 2;
     strcpy(snap.usb.dev[0].name, "OP-Z");
@@ -348,7 +348,7 @@ static void test_usb(void)
     snap.usb.audio_channels = 2;
     snap.usb.audio_bits = 24;
     snap.usb.midi_dropped = 3;
-    CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=host\nusb_cc=device\nusb_cc_dir=2\nusb_host_en=1\nusb_vbus=0\n"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=host\nusb_cc=device\nusb_cc_dir=2\nusb_vbus_out=1\nusb_vbus=0\n"));
     CHECK(strstr(out, "audio_source=usb\n") && strstr(out, "usb_dev=OP-Z,midi+audio\n") && strstr(out, "usb_dev=?,midi\n"));
     CHECK(strstr(out, "usb_audio=48000/2/24\n") && strstr(out, "usb_midi_dropped=3\n") && ends(out, "ok\n"));
 }
@@ -361,7 +361,7 @@ static void test_status_size(void)
     snap.link_on = 1;
     snap.armed = 1;
     snap.usb.stack = JUR_STACK_HOST;
-    snap.usb.has_cc = 1;
+    snap.usb.has_port = 1;
     snap.usb.ndev = JK_USB_DEVS;
     snap.usb.audio_rate = 48000;
     for (uint32_t i = 0; i < JK_USB_DEVS; i++) {

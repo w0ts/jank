@@ -24,11 +24,14 @@
 #define BOARD_VBUS_SENSE_GPIO (-1)
 #define BOARD_LINE_DETECT_GPIO (-1)
 #define BOARD_PUMP_GPIO (-1)
+#define BOARD_USBPORT_TUSB320 0
 #elif CONFIG_JANK_BOARD_MINI22
 /* jank mini 2.2, battery order (ESP32-S3FH4R2), from hardware/mini2/parts.py and README.md on hw/mini2.2 (2026-11-15,
  * being routed: check again when it is ordered). Only what this firmware drives so far: NO (the BOOT button, SW1), the two
  * RGB LEDs (WS2812B-2020, GPIO33: one is driven), MIDI OUT 1 (UART1 GPIO21, 68 ohm sinks, a 3V3 source pin), and the USB
- * host mode's parts. The usb order (no U17, no Q9) answers no CC chip: usbrole.c runs it as device only. */
+ * host mode's parts. The usb order (no U17, no Q9) answers no CC chip: it runs as the XIAO does (HOST = a device first,
+ * the host stack after 3 s with no computer; no 5 V of its own). */
+#define BOARD_USBPORT_TUSB320 1                   /* the port HAL: usbport_tusb320.c */
 #define BOARD_BUTTON_GPIO 0
 #define BOARD_BUTTON_ACTIVE_LOW 1
 #define BOARD_LED_RGB_GPIO 33

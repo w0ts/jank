@@ -137,6 +137,21 @@ static void test_uac2(void)
     CHECK(s[0] == 0xA1 && s[1] == 0x02 && s[3] == 0x01 && s[5] == 0x10 && s[6] == JU_RANGE_LEN);
 }
 
+/* a capture endpoint marked "implicit feedback data" (usage 10) carries audio too; an explicit feedback one (01) does not */
+static void test_usage(void)
+{
+    uint8_t x[sizeof UAC2_IF];
+    struct ju_dev d;
+    size_t at = 0;
+    memcpy(x, UAC2_IF, sizeof x);
+    while (at < sizeof x && !(x[at] == 7 && x[at + 1] == 0x05 && x[at + 2] == 0x82))
+        at += x[at];
+    x[at + 3] = 0x25;                  /* iso, async, implicit feedback data */
+    CHECK(ju_parse(x, sizeof x, &d) == 1 && d.alt[0].ep == 0x82);
+    x[at + 3] = 0x15;                  /* iso, async, feedback */
+    CHECK(ju_parse(x, sizeof x, &d) == 0);
+}
+
 static void test_requests(void)
 {
     uint8_t s[8], data[3];
@@ -175,6 +190,7 @@ int main(void)
     test_uac1_continuous();
     test_uac2();
     test_requests();
+    test_usage();
     test_not_ours();
     test_string();
     printf("uacdesc: %d checks, %d failed\n", checks, fails);

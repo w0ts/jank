@@ -161,9 +161,9 @@ struct jk_usb_dev {
 };
 struct jk_usb {
     uint8_t stack;                    /* enum jur_stack: what runs (0 device, 1 host) */
-    uint8_t has_cc;                   /* the CC chip is there and answered */
+    uint8_t has_port;                   /* a port chip is there and answered */
     uint8_t cc, cc_dir;               /* enum jur_cc; 1 CC1, 2 CC2, 0 unknown */
-    uint8_t host_en, vbus, line;      /* the 5 V signal on, VBUS from outside, a plug in the line in */
+    uint8_t vbus_on, vbus, line;      /* jank's 5 V on VBUS, VBUS from outside, a plug in the line in */
     uint8_t audio;                    /* enum jur_audio: what the tracker listens to now */
     uint8_t ndev;
     struct jk_usb_dev dev[JK_USB_DEVS];

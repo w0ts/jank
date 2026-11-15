@@ -31,13 +31,14 @@ static void lib_task(void *arg)
     usb_host_config_t c = {.intr_flags = ESP_INTR_FLAG_LOWMED};
     TaskHandle_t parent = arg;
     esp_err_t e = usb_host_install(&c);
+    if (e == ESP_OK)
+        s_up = 1;                      /* before the caller hears of it: a second start sees it installed */
     xTaskNotify(parent, (uint32_t)e, eSetValueWithOverwrite);
     if (e != ESP_OK) {
         ESP_LOGE(TAG, "install: %s", esp_err_to_name(e));
         vTaskDelete(NULL);
         return;
     }
-    s_up = 1;
     for (;;) {
         uint32_t flags = 0;
         e = usb_host_lib_handle_events(portMAX_DELAY, &flags);

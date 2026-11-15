@@ -89,10 +89,14 @@ The setting `usb` (`set usb device|host`, the menu's USB: DEVICE / HOST later; s
 Where the role comes from (`core/jank_usbrole.c`, host-tested):
 - **XIAO** (no CC chip): with HOST it starts as a device; when no computer configured it within 3 s it restarts once as
   host (as before), so a clock on a charger starts about 3 s late. `set usb device` from a computer brings it back.
-- **jank mini 2.2, battery order** (TUSB320LI): a device on the cable -> the host stack and the 5 V signal (pump, then
-  HOST_EN); a computer or a charger -> HOST_EN low at once and the device stack; nothing -> the host stack, waiting. A
-  different stack is a restart (about a second; the clock stops for it); a stack runs at least 3 s before the next one.
-  The setting DEVICE keeps the CC chip a sink: never 5 V, the charger always charges.
+- **jank mini 2.2, battery order** (TUSB320LI, `main/usbport_tusb320.c`): a device on the cable -> the host stack and
+  the 5 V signal (pump, then HOST_EN); a computer or a charger -> HOST_EN low at once and the device stack; nothing -> the
+  host stack, waiting. Against another dual-role port (a USB-C laptop, tablet or power bank) jank takes the sink side
+  (Try.SNK), so a computer always gets the control line. A different stack is a restart (about a second; the clock stops
+  for it); a stack runs at least 3 s before the next one. The setting DEVICE keeps the port a sink: never 5 V, the charger
+  always charges. The usb order (no TUSB320) behaves as the XIAO.
+- The port chip sits behind a small HAL (`main/usbport.h`: attach state and orientation, set role, prepare and switch
+  VBUS out): another chip (a power-bank IC with its own role logic) is another file, the role logic stays as it is.
 
 `set source auto|line|usb` (AUDIO > SOURCE, stored, default `auto`): AUTO hears the line in when a plug is in, else USB
 audio when a stream is open (the computer's in device mode, the hosted device's in host mode). The line in's own audio
