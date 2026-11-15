@@ -105,9 +105,9 @@ static void put_link(const struct jk_snapshot *s, struct writer *w)
 /* the USB port: what runs, what the CC chip sees, the devices hosted and the audio the tracker hears */
 static void put_usb(const struct jk_usb *u, struct writer *w)
 {
-    put(w, "usb_role=%s\nusb_cc=%s\n", jur_usb_name(u->stack), u->has_cc ? jur_cc_name(u->cc) : "nochip");
-    if (u->has_cc)
-        put(w, "usb_cc_dir=%u\nusb_host_en=%u\nusb_vbus=%u\n", u->cc_dir, u->host_en, u->vbus);
+    put(w, "usb_role=%s\nusb_cc=%s\n", jur_usb_name(u->stack), u->has_port ? jur_cc_name(u->cc) : "nochip");
+    if (u->has_port)
+        put(w, "usb_cc_dir=%u\nusb_vbus_out=%u\nusb_vbus=%u\n", u->cc_dir, u->vbus_on, u->vbus);
     put(w, "line_plugged=%u\naudio_source=%s\n", u->line, jur_audio_name(u->audio));
     for (uint32_t i = 0; i < u->ndev && i < JK_USB_DEVS; i++)
         put(w, "usb_dev=%s,%s%s\n", u->dev[i].name[0] ? u->dev[i].name : "?", u->dev[i].midi ? "midi" : "", u->dev[i].audio ? (u->dev[i].midi ? "+audio" : "audio") : "");

@@ -129,8 +129,9 @@ static void on_as(struct parse *p, const uint8_t *x, uint8_t n)
 
 static void on_endpoint(struct parse *p, const uint8_t *x)
 {
-    /* isochronous, IN, data (not a feedback endpoint); the first one only */
-    if (p->have_ep || (x[3] & 3u) != 1u || !(x[2] & 0x80u) || ((x[3] >> 4) & 3u) != 0u)
+    /* isochronous, IN, carrying audio: usage data (00) or implicit feedback data (10), not an explicit feedback endpoint
+     * (01) or reserved (11) (USB 2.0 Table 9-13); the first one only */
+    if (p->have_ep || (x[3] & 3u) != 1u || !(x[2] & 0x80u) || ((x[3] >> 4) & 1u) != 0u)
         return;
     p->cur.ep = x[2];
     p->cur.mps = (uint16_t)(le16(x + 4) & 0x7FFu);

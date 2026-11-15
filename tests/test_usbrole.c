@@ -4,6 +4,8 @@
 #include <string.h>
 #include "jank_usbrole.h"
 
+#define JUR_TEST_PREP_MS 10u           /* mini 2.2's pump (its README: ~10 ms); any HAL's value works the same */
+
 static int fails, checks;
 #define CHECK(c)                                                  \
     do {                                                          \
@@ -23,7 +25,7 @@ static struct jur_out run(struct jur *r, struct jur_in *in, uint32_t ms, int *re
         jur_step(r, in, &o);
         if (restarted && o.restart)
             *restarted = 1;
-        if (sourced && o.host_en)
+        if (sourced && o.vbus_on)
             *sourced = 1;
         in->now_ms += 10u;
     }
@@ -45,7 +47,7 @@ static void test_boot(void)
     CHECK(jur_boot_stack(&b) == JUR_STACK_HOST);                /* nothing: ready for a device */
     b.vbus = 1;
     CHECK(jur_boot_stack(&b) == JUR_STACK_DEVICE);              /* outside power with no CC role */
-    b.has_cc = 0;
+    b.has_port = 0;
     b.vbus = 0;
     CHECK(jur_boot_stack(&b) == JUR_STACK_DEVICE);              /* the XIAO: the device first ... */
     b.hint = 1u + JUR_STACK_HOST;
@@ -58,57 +60,57 @@ static void test_boot(void)
 static void test_device_setting(void)
 {
     struct jur r;
-    struct jur_in in = {JUR_USB_DEVICE, 1, JUR_CC_DEVICE, 0, 0, 1000};
+    struct jur_in in = {JUR_USB_DEVICE, 1, JUR_CC_DEVICE, 0, 0, 1000, 0};
     int restarted = 0, sourced = 0;
     struct jur_out o;
-    jur_init(&r, JUR_STACK_DEVICE, 1000);
+    jur_init(&r, JUR_STACK_DEVICE, JUR_TEST_PREP_MS, 1000);
     o = run(&r, &in, 10000, &restarted, &sourced);
-    CHECK(!restarted && !sourced && !o.pump && o.want == JUR_STACK_DEVICE);
-    CHECK(o.cc_mode == JUR_CCMODE_UFP && o.cc_write);
+    CHECK(!restarted && !sourced && !o.vbus_prep && o.want == JUR_STACK_DEVICE);
+    CHECK(o.port_mode == JUR_PORT_SINK && o.port_write);
 }
 
 /* HOST with the CC chip: a device attaches -> pump, then HOST_EN 10 ms later; it leaves -> both off at once */
 static void test_host_device_attach(void)
 {
     struct jur r;
-    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_NONE, 0, 0, 1000};
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_NONE, 0, 0, 1000, 0};
     struct jur_out o;
     int restarted = 0;
-    jur_init(&r, JUR_STACK_HOST, 1000);
+    jur_init(&r, JUR_STACK_HOST, JUR_TEST_PREP_MS, 1000);
     o = run(&r, &in, 5000, &restarted, NULL);
-    CHECK(!restarted && !o.host_en && !o.pump && o.want == JUR_STACK_HOST);
-    CHECK(o.cc_mode == JUR_CCMODE_DRP_TRYSRC && o.cc_write);    /* nothing attached: the dual role may be written */
+    CHECK(!restarted && !o.vbus_on && !o.vbus_prep && o.want == JUR_STACK_HOST);
+    CHECK(o.port_mode == JUR_PORT_DUAL && o.port_write);    /* nothing attached: the dual role may be written */
     in.cc = JUR_CC_DEVICE;
     jur_step(&r, &in, &o);
-    CHECK(o.pump && !o.host_en);                                /* the pump first ... */
-    CHECK(!o.cc_write);                                         /* attached: the dual role is not rewritten */
-    in.now_ms += JUR_PUMP_MS - 1u;
+    CHECK(o.vbus_prep && !o.vbus_on);                                /* the pump first ... */
+    CHECK(!o.port_write);                                         /* attached: the dual role is not rewritten */
+    in.now_ms += JUR_TEST_PREP_MS - 1u;
     jur_step(&r, &in, &o);
-    CHECK(o.pump && !o.host_en);
+    CHECK(o.vbus_prep && !o.vbus_on);
     in.now_ms += 1u;
     jur_step(&r, &in, &o);
-    CHECK(o.pump && o.host_en);                                 /* ... HOST_EN once its rail is up */
+    CHECK(o.vbus_prep && o.vbus_on);                                 /* ... HOST_EN once its rail is up */
     in.vbus = 1;                                                /* (Q9 off: VBUS_SENSE means nothing now) */
     jur_step(&r, &in, &o);
-    CHECK(o.host_en);
+    CHECK(o.vbus_on);
     in.vbus = 0;
     in.cc = JUR_CC_NONE;
     jur_step(&r, &in, &o);
-    CHECK(!o.host_en && !o.pump && !o.restart);
+    CHECK(!o.vbus_on && !o.vbus_prep && !o.restart);
 }
 
 /* HOST, host stack running, a charger or a computer plugged: HOST_EN low in the same step, then a restart as device */
 static void test_host_then_charger(void)
 {
     struct jur r;
-    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 0, 0, 1000};
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 0, 0, 1000, 0};
     struct jur_out o;
-    jur_init(&r, JUR_STACK_HOST, 1000);
+    jur_init(&r, JUR_STACK_HOST, JUR_TEST_PREP_MS, 1000);
     o = run(&r, &in, 4000, NULL, NULL);
-    CHECK(o.host_en);
+    CHECK(o.vbus_on);
     in.cc = JUR_CC_HOST;
     jur_step(&r, &in, &o);
-    CHECK(!o.host_en && !o.pump);
+    CHECK(!o.vbus_on && !o.vbus_prep);
     CHECK(o.want == JUR_STACK_DEVICE && o.restart);
 }
 
@@ -116,11 +118,11 @@ static void test_host_then_charger(void)
 static void test_min_run(void)
 {
     struct jur r;
-    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_HOST, 0, 0, 500};
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_HOST, 0, 0, 500, 0};
     struct jur_out o;
-    jur_init(&r, JUR_STACK_HOST, 500);
+    jur_init(&r, JUR_STACK_HOST, JUR_TEST_PREP_MS, 500);
     jur_step(&r, &in, &o);
-    CHECK(o.want == JUR_STACK_DEVICE && !o.restart && !o.host_en);
+    CHECK(o.want == JUR_STACK_DEVICE && !o.restart && !o.vbus_on);
     in.now_ms = 500u + JUR_MIN_RUN_MS - 1u;
     jur_step(&r, &in, &o);
     CHECK(!o.restart);
@@ -133,36 +135,36 @@ static void test_min_run(void)
 static void test_computer_unplugged(void)
 {
     struct jur r;
-    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_HOST, 1, 1, 1000};
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_HOST, 1, 1, 1000, 0};
     struct jur_out o;
     int restarted = 0;
-    jur_init(&r, JUR_STACK_DEVICE, 1000);
+    jur_init(&r, JUR_STACK_DEVICE, JUR_TEST_PREP_MS, 1000);
     o = run(&r, &in, 10000, &restarted, NULL);
-    CHECK(!restarted && o.want == JUR_STACK_DEVICE && !o.host_en);
-    CHECK(!o.cc_write);                                         /* the computer keeps its link: no mode write */
+    CHECK(!restarted && o.want == JUR_STACK_DEVICE && !o.vbus_on);
+    CHECK(!o.port_write);                                         /* the computer keeps its link: no mode write */
     in.cc = JUR_CC_NONE;
     in.vbus = 0;
     jur_step(&r, &in, &o);
-    CHECK(o.cc_write && !o.restart && o.want == JUR_STACK_DEVICE);
+    CHECK(o.port_write && !o.restart && o.want == JUR_STACK_DEVICE);
     in.now_ms += JUR_SETTLE_MS - 10u;
     jur_step(&r, &in, &o);
     CHECK(!o.restart);
     in.now_ms += 10u;
     jur_step(&r, &in, &o);
-    CHECK(o.restart && o.want == JUR_STACK_HOST && !o.host_en);   /* the restart itself sources nothing */
+    CHECK(o.restart && o.want == JUR_STACK_HOST && !o.vbus_on);   /* the restart itself sources nothing */
 }
 
 /* a device that powers VBUS itself (back-feeding through Q9): HOST_EN never turns on */
 static void test_no_source_onto_power(void)
 {
     struct jur r;
-    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 1, 0, 1000};
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 1, 0, 1000, 0};
     int sourced = 0;
-    jur_init(&r, JUR_STACK_HOST, 1000);
+    jur_init(&r, JUR_STACK_HOST, JUR_TEST_PREP_MS, 1000);
     run(&r, &in, 5000, NULL, &sourced);
     CHECK(!sourced);
     /* the device stack running and a device attached: no 5 V before the restart into the host stack */
-    jur_init(&r, JUR_STACK_DEVICE, 1000);
+    jur_init(&r, JUR_STACK_DEVICE, JUR_TEST_PREP_MS, 1000);
     in.vbus = 0;
     in.now_ms = 1000;
     sourced = 0;
@@ -174,24 +176,24 @@ static void test_no_source_onto_power(void)
 static void test_no_cc(void)
 {
     struct jur r;
-    struct jur_in in = {JUR_USB_HOST, 0, JUR_CC_NONE, 0, 0, 200};
+    struct jur_in in = {JUR_USB_HOST, 0, JUR_CC_NONE, 0, 0, 200, 0};
     struct jur_out o;
     int restarted = 0, sourced = 0;
-    jur_init(&r, JUR_STACK_DEVICE, 200);
+    jur_init(&r, JUR_STACK_DEVICE, JUR_TEST_PREP_MS, 200);
     in.now_ms = 200u + JUR_COMPUTER_WAIT_MS - 10u;
     jur_step(&r, &in, &o);
-    CHECK(!o.restart && o.want == JUR_STACK_DEVICE && !o.cc_write);
+    CHECK(!o.restart && o.want == JUR_STACK_DEVICE && !o.port_write);
     in.now_ms += 10u;
     jur_step(&r, &in, &o);
-    CHECK(o.restart && o.want == JUR_STACK_HOST && !o.host_en && !o.pump);
+    CHECK(o.restart && o.want == JUR_STACK_HOST && !o.vbus_on && !o.vbus_prep);
     /* a computer configured it in time: stays a device */
-    jur_init(&r, JUR_STACK_DEVICE, 0);
+    jur_init(&r, JUR_STACK_DEVICE, JUR_TEST_PREP_MS, 0);
     in.now_ms = 0;
     in.computer = 1;
     o = run(&r, &in, 20000, &restarted, &sourced);
     CHECK(!restarted && !sourced && o.want == JUR_STACK_DEVICE);
     /* started as host: stays host (no computer can show up on a host port) */
-    jur_init(&r, JUR_STACK_HOST, 0);
+    jur_init(&r, JUR_STACK_HOST, JUR_TEST_PREP_MS, 0);
     in.now_ms = 0;
     in.computer = 0;
     o = run(&r, &in, 20000, &restarted, &sourced);
@@ -206,14 +208,14 @@ static void test_no_cc(void)
 static void test_setting_to_device(void)
 {
     struct jur r;
-    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 0, 0, 1000};
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 0, 0, 1000, 0};
     struct jur_out o;
-    jur_init(&r, JUR_STACK_HOST, 1000);
+    jur_init(&r, JUR_STACK_HOST, JUR_TEST_PREP_MS, 1000);
     o = run(&r, &in, 4000, NULL, NULL);
-    CHECK(o.host_en);
+    CHECK(o.vbus_on);
     in.setting = JUR_USB_DEVICE;
     jur_step(&r, &in, &o);
-    CHECK(!o.host_en && !o.pump && o.cc_mode == JUR_CCMODE_UFP && o.cc_write && o.restart && o.want == JUR_STACK_DEVICE);
+    CHECK(!o.vbus_on && !o.vbus_prep && o.port_mode == JUR_PORT_SINK && o.port_write && o.restart && o.want == JUR_STACK_DEVICE);
 }
 
 static void test_line(void)
@@ -253,6 +255,61 @@ static void test_names(void)
     CHECK(!strcmp(jur_cc_name(9), "?"));
 }
 
+/* another port HAL (a power-bank IC whose boost is ready at once): prep_ms 0, VBUS on in the step the device attaches */
+static void test_other_hal(void)
+{
+    struct jur r;
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 0, 0, 1000, 0};
+    struct jur_out o;
+    jur_init(&r, JUR_STACK_HOST, 0, 1000);
+    jur_step(&r, &in, &o);
+    CHECK(o.vbus_prep && o.vbus_on);
+    in.cc = JUR_CC_HOST;
+    jur_step(&r, &in, &o);
+    CHECK(!o.vbus_prep && !o.vbus_on);
+}
+
+/* after jank's own VBUS goes off, the charge left on the connector is not "outside power": no restart for it */
+static void test_vbus_holdoff(void)
+{
+    struct jur r;
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 0, 0, 1000, 0};
+    struct jur_out o;
+    int restarted = 0;
+    jur_init(&r, JUR_STACK_HOST, JUR_TEST_PREP_MS, 1000);
+    o = run(&r, &in, 4000, NULL, NULL);
+    CHECK(o.vbus_on);
+    in.cc = JUR_CC_NONE;
+    in.vbus = 1;                                                /* the caps seen through Q9 */
+    o = run(&r, &in, JUR_VBUS_HOLDOFF_MS - 30u, &restarted, NULL);
+    CHECK(!restarted && o.want == JUR_STACK_HOST && !o.vbus_on);
+    in.vbus = 0;
+    o = run(&r, &in, 2000, &restarted, NULL);
+    CHECK(!restarted && o.want == JUR_STACK_HOST);
+    /* real outside power after the hold-off: a restart as device */
+    in.vbus = 1;
+    o = run(&r, &in, 100, &restarted, NULL);
+    CHECK(restarted && o.want == JUR_STACK_DEVICE);
+}
+
+/* the HAL failed to prepare its source: VBUS stays off, and the source's time starts again when it works */
+static void test_prep_failed(void)
+{
+    struct jur r;
+    struct jur_in in = {JUR_USB_HOST, 1, JUR_CC_DEVICE, 0, 0, 1000, 1};
+    struct jur_out o;
+    int sourced = 0;
+    jur_init(&r, JUR_STACK_HOST, JUR_TEST_PREP_MS, 1000);
+    o = run(&r, &in, 500, NULL, &sourced);
+    CHECK(!sourced && o.vbus_prep);
+    in.prep_failed = 0;
+    jur_step(&r, &in, &o);
+    CHECK(!o.vbus_on);                                          /* not at once: the rail's time first */
+    in.now_ms += JUR_TEST_PREP_MS;
+    jur_step(&r, &in, &o);
+    CHECK(o.vbus_on);
+}
+
 int main(void)
 {
     test_boot();
@@ -267,6 +324,9 @@ int main(void)
     test_line();
     test_source();
     test_names();
+    test_other_hal();
+    test_vbus_holdoff();
+    test_prep_failed();
     printf("usbrole: %d checks, %d failed\n", checks, fails);
     return fails;
 }
