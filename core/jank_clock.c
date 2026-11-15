@@ -120,7 +120,10 @@ void JC_ISR jc_step(struct jc_ticker *c, const struct jc_map *m, int64_t now, st
     c->n++;
     want = jc_time(m, c->n);
     if (want - scheduled > limit || scheduled - want > limit || now - scheduled > limit) {
-        seek(c, m, now > scheduled ? now : scheduled);
+        /* the clock just sent was due at `scheduled`: the next one at least half a tick later. A jump by whole beats (an
+         * AUTO BAR move) keeps the grid's times, and the new map's tick at `scheduled` itself would be a second F8 at once */
+        int64_t floor_t = scheduled + tick / 2;
+        seek(c, m, now > floor_t ? now : floor_t);
         c->resyncs++;
         o->next = c->t_due;
         return;
