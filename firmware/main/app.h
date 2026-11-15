@@ -55,6 +55,7 @@ int64_t midi_now_us(void);
 void midi_set_quantum(uint32_t quantum);
 void midi_publish(const struct jc_map *m);
 void midi_want(int play);
+int midi_start_pending(void);                        /* a MIDI start waits for its bar line */
 void midi_resync(void);
 void midi_stats(uint32_t *ticks, uint32_t *resyncs);
 
@@ -69,7 +70,7 @@ void bridge_table_stop(struct js_table *out);                /* .. to here */
 uint32_t bridge_peers_heard(void);
 int bridge_beat(int64_t *beat_ub, int32_t *mpb);    /* 1 in a session, with its beat now */
 int bridge_tempo(int32_t mpb);                       /* 0 set; -1 no session to set it in */
-int bridge_play(int play);                           /* 0 started / stopped; -1 no session */
+int bridge_play(int play);                           /* 0 a start armed for the next bar / stopped; -1 no settled session; -2 AUDIO mode */
 void bridge_diag(char *out, size_t cap);             /* the Link clock filter, for `diag` */
 void app_diag(char *out, size_t cap);                /* restarts and the last reset's reason, for `diag` */
 /* fn on the Link peer, with the bridge's lock held and the host time now (the beat tracker steers the session through it) */

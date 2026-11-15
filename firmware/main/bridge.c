@@ -249,7 +249,8 @@ static void follow_transport(int64_t now)
     int want = s_want;
     int automatic = s_cfg.transport == JK_TRANSPORT_AUTO;
     if (jp_joined(&s_peer)) {
-        want = jc_should_play(automatic, jp_playing(&s_peer), jp_peers(&s_peer));
+        if (jp_settled(&s_peer, now))  /* (joined, not settled yet: the last wish held, nothing started on a guess) */
+            want = jc_should_play(automatic, jp_playing(&s_peer), jp_peers(&s_peer));
         s_hop_until = 0;
     } else if (automatic && !s_peer.on && now >= s_hop_until) {
         want = 0;
@@ -264,8 +265,8 @@ static void publish(int64_t now)
 {
     static int64_t next;
     struct jc_map m;
-    if (now < next || !jp_joined(&s_peer) || s_away)
-        return;                       /* no session: the timer keeps the last tempo and phase */
+    if (now < next || !jp_settled(&s_peer, now) || s_away)
+        return;                       /* no settled session: the timer keeps the last tempo and phase (none: no clock) */
     next = now + PUBLISH_US;
     jc_map_make(&m, now, jp_beat_at(&s_peer, now), jp_mpb(&s_peer), (int32_t)s_cfg.offset_10us * 10);
     midi_publish(&m);
@@ -326,6 +327,26 @@ void bridge_apply(const struct jk_cfg *cfg)
     xSemaphoreGive(s_lock);
 }
 
+/* a start not reached yet, and its bar line: one waiting to be sent (play, the tracker), one sent for a bar still ahead,
+ * or the session playing while the MIDI start waits for the next bar line (a peer's start "from now", as Live and the
+ * FM-1 send them). The lock held */
+static int pending_start(int64_t beat_ub, int64_t *bar_ub)
+{
+    if (jp_start_armed(&s_peer, bar_ub))
+        return 1;
+    if (!jp_playing(&s_peer))
+        return 0;
+    if (lk_play_beat(&s_peer.k) > beat_ub) {
+        *bar_ub = lk_play_beat(&s_peer.k);
+        return 1;
+    }
+    if (s_cfg.transport != JK_TRANSPORT_AUTO && midi_start_pending()) {
+        *bar_ub = jst_bar_at_or_after(beat_ub, s_cfg.quantum);
+        return 1;
+    }
+    return 0;
+}
+
 void bridge_snapshot(struct jk_snapshot *s)
 {
     memset(s, 0, sizeof *s);
@@ -350,6 +371,8 @@ void bridge_snapshot(struct jk_snapshot *s)
         s->mpb = jp_mpb(&s_peer);
         s->beat_ub = jp_beat_at(&s_peer, now);
         s->playing = (uint8_t)jp_playing(&s_peer);
+        s->settled = (uint8_t)jp_settled(&s_peer, now);
+        s->armed = (uint8_t)pending_start(s->beat_ub, &s->start_ub);
     }
     xSemaphoreGive(s_lock);
     midi_stats(&s->midi_ticks, &s->midi_resync);
@@ -399,8 +422,12 @@ int bridge_tempo(int32_t mpb)
 int bridge_play(int play)
 {
     int r;
+    struct jk_beat b;
+    beat_stats(&b);
+    if (b.on && b.audio)
+        return -2;                    /* AUDIO mode: the tracker starts and stops the session (jank_beatlink.h) */
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    r = jp_set_playing(&s_peer, play, midi_now_us());
+    r = jp_set_playing(&s_peer, play, s_cfg.quantum, midi_now_us());
     xSemaphoreGive(s_lock);
     return r;
 }

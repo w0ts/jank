@@ -8,13 +8,25 @@ void jbl_init(struct jbl *c) { memset(c, 0, sizeof *c); }
 
 static double bpm_of(double mpb_us) { return 60000000.0 / mpb_us; }
 
-static void stop_session(struct jbl *c, struct lk_node *k, int64_t now)
+static void stop_session(struct jbl *c, struct lk_node *k, struct jst *start, int64_t now)
 {
     if (!c->playing)
         return;
-    lk_set_playing(k, 0, lk_beat_at(k, now), now);
+    jst_cancel(start);
+    if (lk_playing(k))
+        lk_set_playing(k, 0, lk_beat_at(k, now), now);
     c->playing = 0;
     c->stops++;
+}
+
+/* the audio stream closed (LINK mode): the session is left as it is, playing or not; a start not sent yet is dropped */
+static void let_go(struct jbl *c, struct jst *start)
+{
+    if (!c->playing)
+        return;
+    jst_cancel(start);
+    c->playing = 0;
+    c->releases++;
 }
 
 /* the tempo, when it moved more than the deadband */
@@ -55,27 +67,30 @@ int32_t jbl_session_offset_us(int64_t ub_at, int32_t mpb)
     return (int32_t)llround(-(double)(ub_at - whole) * (double)mpb / (double)LK_UBEAT);
 }
 
-/* Link's start on the next bar line at least JBL_START_LEAD_US ahead */
-static void start_session(struct jbl *c, struct lk_node *k, int64_t now, uint32_t quantum)
+/* Link's start on the next bar line, sent JST_LEAD_US before it (jank_start.h); the session playing already: kept */
+static void start_session(struct jbl *c, struct lk_node *k, struct jst *start, int64_t now, uint32_t quantum)
 {
-    int64_t bar = (int64_t)(quantum ? quantum : 1u) * LK_UBEAT;
-    int64_t ub = lk_beat_at(k, now + JBL_START_LEAD_US);
-    int64_t start = (ub / bar + 1) * bar;
-    lk_set_playing(k, 1, start, now);
     c->playing = 1;
+    if (lk_playing(k))
+        return;
+    jst_arm(start, k, now, quantum);
     c->starts++;
 }
 
-void jbl_step(struct jbl *c, struct lk_node *k, int joined, int64_t now, const struct jbl_in *in, uint32_t quantum)
+void jbl_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, int64_t now, const struct jbl_in *in, uint32_t quantum)
 {
-    if (!joined)
+    if (!settled)
         return;
+    if (in->passive) {
+        let_go(c, start);
+        return;
+    }
     if (!in->running || in->period_us <= 0.0) {
-        stop_session(c, k, now);
+        stop_session(c, k, start, now);
         return;
     }
     follow_tempo(c, k, now, in->period_us);
     follow_phase(c, k, now, in);
     if (!c->playing)
-        start_session(c, k, now, quantum);
+        start_session(c, k, start, now, quantum);
 }

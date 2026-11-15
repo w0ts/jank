@@ -163,6 +163,7 @@ static void stop(struct jank_peer *p, int64_t now)
     if (p->on)
         lk_enable(&p->k, 0, now);
     p->on = 0;
+    jst_cancel(&p->start);
 }
 
 void jp_allow(struct jank_peer *p, int allowed, int64_t now_us)
@@ -288,6 +289,34 @@ int jp_input(struct jank_peer *p, const uint8_t *eth, size_t len, uint32_t from,
     return !for_p;
 }
 
+/* another session heard and not measured yet: a join may follow */
+static int others_pending(const struct jank_peer *p)
+{
+    for (uint32_t i = 0; i < LK_OTHERS; i++)
+        if (p->k.other[i].used && !p->k.other[i].measured)
+            return 1;
+    return 0;
+}
+
+int jp_joined(const struct jank_peer *p) { return p->on && lk_peers(&p->k) > 0u; }
+
+int jp_settled(const struct jank_peer *p, int64_t now_us)
+{
+    return jp_joined(p) && now_us - p->t_settle >= (int64_t)JP_SETTLE_US && (p->was_settled || !others_pending(p));
+}
+
+/* the settle hold starts again when the peer is alone or its session changes (a join, a session of its own) */
+static void track_settle(struct jank_peer *p, int64_t now)
+{
+    if (!jp_joined(p) || memcmp(p->sess_seen, p->k.sess, sizeof p->sess_seen)) {
+        memcpy(p->sess_seen, p->k.sess, sizeof p->sess_seen);
+        p->t_settle = now;
+        p->was_settled = 0;
+    } else if (!p->was_settled && jp_settled(p, now)) {
+        p->was_settled = 1;
+    }
+}
+
 void jp_poll(struct jank_peer *p, int64_t now_us)
 {
     if (!p->on)
@@ -297,9 +326,10 @@ void jp_poll(struct jank_peer *p, int64_t now_us)
         p->t_company = now_us;
     else if (now_us - p->t_company > (int64_t)JP_ALONE_MS * 1000)
         stop(p, now_us);
+    track_settle(p, now_us);
+    if (p->on)
+        jst_poll(&p->start, &p->k, now_us, jp_settled(p, now_us));
 }
-
-int jp_joined(const struct jank_peer *p) { return p->on && lk_peers(&p->k) > 0u; }
 int32_t jp_mpb(const struct jank_peer *p) { return lk_mpb(&p->k); }
 int64_t jp_beat_at(const struct jank_peer *p, int64_t now_us) { return lk_beat_at(&p->k, now_us); }
 int jp_playing(const struct jank_peer *p) { return p->on && lk_playing(&p->k); }
@@ -307,16 +337,31 @@ uint32_t jp_peers(const struct jank_peer *p) { return p->on ? lk_peers(&p->k) : 
 
 int jp_set_tempo(struct jank_peer *p, int32_t mpb, int64_t now_us)
 {
-    if (!jp_joined(p))
+    if (!jp_settled(p, now_us))
         return -1;
     lk_set_tempo(&p->k, mpb, now_us);
     return 0;
 }
 
-int jp_set_playing(struct jank_peer *p, int play, int64_t now_us)
+int jp_set_playing(struct jank_peer *p, int play, uint32_t quantum, int64_t now_us)
 {
-    if (!jp_joined(p))
+    if (!jp_settled(p, now_us))
         return -1;
-    lk_set_playing(&p->k, play, lk_beat_at(&p->k, now_us), now_us);
+    if (play) {
+        if (!lk_playing(&p->k))
+            jst_arm(&p->start, &p->k, now_us, quantum);
+        return 0;
+    }
+    jst_cancel(&p->start);
+    if (lk_playing(&p->k))
+        lk_set_playing(&p->k, 0, lk_beat_at(&p->k, now_us), now_us);
     return 0;
+}
+
+int jp_start_armed(const struct jank_peer *p, int64_t *bar_ub)
+{
+    if (!p->on || !p->start.armed)
+        return 0;
+    *bar_ub = p->start.ub;
+    return 1;
 }

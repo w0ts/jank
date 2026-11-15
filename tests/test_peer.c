@@ -453,18 +453,92 @@ static void test_leads(void)
 {
     jp_init(&jp, P, M, 0x1234, stick_out, NULL);
     CHECK(jp_set_tempo(&jp, 400000, 0) == -1);
-    CHECK(jp_set_playing(&jp, 1, 0) == -1);
+    CHECK(jp_set_playing(&jp, 1, 4, 0) == -1);
     pc_start(100000, 500000);
     run_for(6000000);
     CHECK(jp_set_tempo(&jp, 400000, sim_now) == 0);
     run_for(1000000);
     CHECK(lk_mpb(&pc) == 400000);
-    CHECK(jp_set_playing(&jp, 1, sim_now) == 0);
-    run_for(1000000);
+    CHECK(jp_set_playing(&jp, 1, 4, sim_now) == 0);
+    run_for(3000000);
     CHECK(lk_playing(&pc) == 1 && jp_playing(&jp) == 1);
-    CHECK(jp_set_playing(&jp, 0, sim_now) == 0);
+    CHECK(lk_play_beat(&pc) % (4 * (int64_t)LK_UBEAT) == 0);   /* from a bar line */
+    CHECK(jp_set_playing(&jp, 0, 4, sim_now) == 0);
     run_for(1000000);
     CHECK(lk_playing(&pc) == 0);
+}
+
+/* `play`: the start goes out JST_LEAD_US before the next bar line, from that bar; the computer has it before the bar; the
+ * stick's MIDI clock, wanting play once the session plays (bridge.c follow_transport), sends its start on that bar's
+ * tick. Stop: the computer has it within a broadcast, no bar waited for */
+static void test_play_on_the_bar(void)
+{
+    const int64_t bar = 4 * (int64_t)LK_UBEAT;
+    struct jc_map m;
+    struct jc_ticker c;
+    struct jc_fire f;
+    int64_t armed_bar, t_bar, seen = 0, start_tick = -1, t_stop;
+    pc_start(100000, 444444);                        /* 135 BPM */
+    run_for(6000000);
+    CHECK(jp_settled(&jp, sim_now));
+    jc_ticker_init(&c, 4);
+    jc_map_make(&m, sim_now, jp_beat_at(&jp, sim_now), jp_mpb(&jp), 0);
+    CHECK(jc_begin(&c, &m, sim_now) == 0);
+    CHECK(jp_set_playing(&jp, 1, 4, sim_now) == 0);
+    CHECK(jp_start_armed(&jp, &armed_bar) && armed_bar % bar == 0);
+    CHECK(armed_bar - jp_beat_at(&jp, sim_now) >= (int64_t)JST_LEAD_US * LK_UBEAT / 444444 - 1);
+    CHECK(!lk_playing(&jp.k));                       /* nothing sent yet */
+    t_bar = lk_time_at(&jp.k, armed_bar);
+    while (sim_now < t_bar + 2000000) {
+        int want = jp_playing(&jp);
+        if (!seen && lk_playing(&pc))
+            seen = sim_now;
+        jc_map_make(&m, sim_now, jp_beat_at(&jp, sim_now), jp_mpb(&jp), 0);
+        jc_want(&c, want);
+        while (c.t_due <= sim_now) {
+            int64_t n = c.n;
+            jc_step(&c, &m, sim_now, &f);
+            for (int i = 0; i < f.n; i++)
+                if (f.bytes[i] == JC_START && start_tick < 0)
+                    start_tick = n;
+        }
+        run_for(500);
+    }
+    CHECK(seen && seen < t_bar);                     /* the computer knew before the bar */
+    CHECK(seen >= t_bar - JST_LEAD_US);              /* .. and not a bar early */
+    CHECK(lk_play_beat(&pc) == armed_bar && lk_play_beat(&jp.k) == armed_bar);
+    CHECK(start_tick >= 0 && start_tick % (24 * 4) == 0 && jc_tick_ub(start_tick) == armed_bar);   /* MIDI start on bar B */
+    printf("peer: start on bar %lld, the computer had it %lld ms before\n", (long long)(armed_bar / LK_UBEAT), (long long)((t_bar - seen) / 1000));
+    CHECK(jp_set_playing(&jp, 1, 4, sim_now) == 0 && !jp_start_armed(&jp, &armed_bar));   /* playing already: nothing */
+    t_stop = sim_now;
+    CHECK(jp_set_playing(&jp, 0, 4, sim_now) == 0);
+    while (lk_playing(&pc) && sim_now < t_stop + 2000000)
+        run_for(500);
+    CHECK(!lk_playing(&pc) && sim_now - t_stop < 300000);
+}
+
+/* coming up: the stick follows the computer's session at 135 BPM. Until it has settled it sets no tempo and starts
+ * nothing; a play asked for meanwhile is refused; the computer's tempo is never 120 */
+static void test_settles_first(void)
+{
+    int64_t joined = 0, settled = 0;
+    pc_start(100000, 444444);
+    while (sim_now < 12000000 && !settled) {
+        if (!joined && jp_joined(&jp)) {
+            joined = sim_now;
+            CHECK(jp_set_tempo(&jp, 500000, sim_now) == -1);
+            CHECK(jp_set_playing(&jp, 1, 4, sim_now) == -1);
+        }
+        if (!settled && jp_settled(&jp, sim_now))
+            settled = sim_now;
+        CHECK(lk_mpb(&pc) == 444444);
+        run_for(500);
+    }
+    CHECK(joined && settled && settled - joined >= JP_SETTLE_US - 500);   /* (seen one 500 us step after the poll that joined) */
+    CHECK(jp_mpb(&jp) == 444444 && !lk_playing(&pc));
+    printf("peer: joined after %lld ms, settled %lld ms later\n", (long long)((joined - 1000000) / 1000), (long long)((settled - joined) / 1000));
+    jp_leave(&jp, sim_now);                          /* alone again: not settled, nothing armed */
+    CHECK(!jp_settled(&jp, sim_now) && jp_set_playing(&jp, 1, 4, sim_now) == -1);
 }
 
 static void test_ticks_on_the_session(void)
@@ -524,6 +598,8 @@ int main(void)
     test_joins_session();
     test_follows();
     test_leads();
+    test_play_on_the_bar();
+    test_settles_first();
     test_ticks_on_the_session();
     test_drift_and_wifi();
     test_leave();

@@ -24,6 +24,7 @@ static int sent_nothing(void *ctx, uint32_t ip, uint16_t port, const uint8_t *p,
 
 static struct lk_node node;
 static struct jbl jbl;
+static struct jst st;
 
 static void start(int64_t now)
 {
@@ -31,6 +32,8 @@ static void start(int64_t now)
     lk_init(&node, &cfg, 7, 500000);
     lk_enable(&node, 1, now);
     jbl_init(&jbl);
+    jst_cancel(&st);
+    st.commits = st.moves = 0;
 }
 
 /* the session's beat grid against a tracked beat: us off, in (-mpb/2, mpb/2] */
@@ -47,18 +50,18 @@ static void test_phase_forced_past_5ms(void)
 {
     struct jbl_in in = {.running = 1, .beat_us = 10000000 + 40000, .period_us = 500000};
     start(10000000);
-    jbl_step(&jbl, &node, 1, 10100000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
     CHECK(jbl.phase_forces == 1 && jbl.tempo_sets == 0);
     CHECK(jbl.err_us > 39000 && jbl.err_us < 41000);
     CHECK(abs64(grid_error(in.beat_us)) <= 2);
     CHECK(abs64(grid_error(in.beat_us + 5 * 500000)) <= 2);
-    jbl_step(&jbl, &node, 1, 10600000, &in, 4);      /* the same grid again: nothing to do */
+    jbl_step(&jbl, &node, &st, 1, 10600000, &in, 4);      /* the same grid again: nothing to do */
     CHECK(jbl.phase_forces == 1);
     in.beat_us += 4000;                              /* 4 ms: inside */
-    jbl_step(&jbl, &node, 1, 11100000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 11100000, &in, 4);
     CHECK(jbl.phase_forces == 1);
     in.beat_us += 4000;                              /* 8 ms from the grid: past 5 */
-    jbl_step(&jbl, &node, 1, 11600000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 11600000, &in, 4);
     CHECK(jbl.phase_forces == 2 && abs64(grid_error(in.beat_us)) <= 2);
 }
 
@@ -66,50 +69,114 @@ static void test_tempo_deadband(void)
 {
     struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
     start(10000000);
-    jbl_step(&jbl, &node, 1, 10100000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
     CHECK(jbl.tempo_sets == 0 && lk_mpb(&node) == 500000);
     in.period_us = 60e6 / 120.01;                    /* 0.01 BPM: inside the band */
-    jbl_step(&jbl, &node, 1, 10200000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 10200000, &in, 4);
     CHECK(jbl.tempo_sets == 0 && lk_mpb(&node) == 500000);
     in.period_us = 60e6 / 120.05;                    /* 0.05 BPM */
-    jbl_step(&jbl, &node, 1, 10300000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 10300000, &in, 4);
     CHECK(jbl.tempo_sets == 1 && lk_mpb(&node) == (int32_t)llround(60e6 / 120.05));
     in.period_us = 495000;                           /* 121.2 BPM */
     in.beat_us = 10300000;
-    jbl_step(&jbl, &node, 1, 10400000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 10400000, &in, 4);
     CHECK(jbl.tempo_sets == 2 && lk_mpb(&node) == 495000);
     CHECK(abs64(grid_error(in.beat_us)) <= 5000 || jbl.phase_forces >= 1);   /* the tempo change kept the beat at the time: then the grid is followed */
-    jbl_step(&jbl, &node, 1, 10500000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 10500000, &in, 4);
     CHECK(abs64(grid_error(in.beat_us)) <= 5000);
+}
+
+/* polls the start every 2 ms from t to t_end (as the bridge's task does): the time it went out, 0 none */
+static int64_t poll_start(int64_t t, int64_t t_end, int allowed)
+{
+    for (; t <= t_end; t += 2000)
+        if (jst_poll(&st, &node, t, allowed))
+            return t;
+    return 0;
 }
 
 static void test_transport(void)
 {
     struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
-    int64_t bar = 4 * (int64_t)LK_UBEAT;
+    int64_t bar = 4 * (int64_t)LK_UBEAT, sent, t_bar;
     start(10000000);
-    jbl_step(&jbl, &node, 1, 10100000, &in, 4);
-    CHECK(jbl.starts == 1 && jbl.playing && lk_playing(&node));
-    CHECK(lk_play_beat(&node) % bar == 0 && lk_play_beat(&node) > lk_beat_at(&node, 10100000));
-    CHECK(lk_play_beat(&node) - lk_beat_at(&node, 10100000) >= LK_UBEAT * 3 / 10 - 1);   /* at least the lead, 150 ms */
-    jbl_step(&jbl, &node, 1, 10300000, &in, 4);
-    CHECK(jbl.starts == 1);                          /* running on: no second start */
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    CHECK(jbl.starts == 1 && jbl.playing && st.armed && !lk_playing(&node));    /* armed: nothing sent before its time */
+    CHECK(st.ub % bar == 0 && st.ub - lk_beat_at(&node, 10100000) >= LK_UBEAT * 3 / 10);   /* a bar line, the lead ahead */
+    t_bar = lk_time_at(&node, st.ub);
+    sent = poll_start(10100000, 14000000, 1);
+    CHECK(sent >= t_bar - JST_LEAD_US && sent < t_bar - JST_LEAD_US + 2000);   /* the lead before the bar, no sooner */
+    CHECK(lk_playing(&node) && lk_play_beat(&node) == st.ub && !st.armed);   /* playing from bar B, set at `sent` */
+    CHECK(node.ss.ts < lk_time_at(&node, st.ub) + node.icpt);                 /* its time stamp is the setting's, before B */
+    jbl_step(&jbl, &node, &st, 1, sent + 200000, &in, 4);
+    CHECK(jbl.starts == 1 && !st.armed);             /* running on: no second start */
     in.running = 0;
-    jbl_step(&jbl, &node, 1, 20000000, &in, 4);
-    CHECK(jbl.stops == 1 && !jbl.playing && !lk_playing(&node));
-    jbl_step(&jbl, &node, 1, 20200000, &in, 4);
+    jbl_step(&jbl, &node, &st, 1, 20000000, &in, 4);
+    CHECK(jbl.stops == 1 && !jbl.playing && !lk_playing(&node));             /* stop: at once */
+    jbl_step(&jbl, &node, &st, 1, 20200000, &in, 4);
     CHECK(jbl.stops == 1);                           /* stopped stays stopped */
     in.running = 1;
     in.beat_us = 20300000;
-    jbl_step(&jbl, &node, 1, 20400000, &in, 3);
-    CHECK(jbl.starts == 2 && lk_playing(&node) && lk_play_beat(&node) % (3 * (int64_t)LK_UBEAT) == 0);
+    jbl_step(&jbl, &node, &st, 1, 20400000, &in, 3);
+    CHECK(jbl.starts == 2 && st.armed && st.ub % (3 * (int64_t)LK_UBEAT) == 0);
+    in.running = 0;                                  /* stopped before its bar: the start is never sent */
+    jbl_step(&jbl, &node, &st, 1, 20450000, &in, 3);
+    CHECK(!st.armed && poll_start(20450000, 24000000, 1) == 0 && !lk_playing(&node));
+}
+
+/* the audio stream closes (LINK mode): the session stays as it is; a start not sent is dropped */
+static void test_passive(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    poll_start(10100000, 14000000, 1);
+    CHECK(lk_playing(&node));
+    in.passive = 1;
+    in.running = 0;
+    jbl_step(&jbl, &node, &st, 1, 15000000, &in, 4);
+    CHECK(lk_playing(&node) && !jbl.playing && jbl.stops == 0 && jbl.releases == 1);
+    in.passive = 0;                                  /* AUDIO again, the session playing: taken over, not restarted */
+    in.running = 1;
+    jbl_step(&jbl, &node, &st, 1, 16000000, &in, 4);
+    CHECK(jbl.playing && !st.armed && jbl.starts == 1);
+    start(30000000);                                 /* armed, then LINK mode before its bar: nothing is sent */
+    jbl_step(&jbl, &node, &st, 1, 30100000, &in, 4);
+    CHECK(st.armed);
+    in.passive = 1;
+    jbl_step(&jbl, &node, &st, 1, 30150000, &in, 4);
+    CHECK(!st.armed && poll_start(30150000, 34000000, 1) == 0 && !lk_playing(&node));
+}
+
+/* the start's own rules */
+static void test_start_rules(void)
+{
+    int64_t q = 4 * (int64_t)LK_UBEAT, t_bar, b;
+    CHECK(jst_bar_at_or_after(0, 4) == 0);
+    CHECK(jst_bar_at_or_after(1, 4) == q);
+    CHECK(jst_bar_at_or_after(q, 4) == q);
+    CHECK(jst_bar_at_or_after(-1, 4) == 0);
+    CHECK(jst_bar_at_or_after(-q - 1, 4) == -q);
+    CHECK(jst_bar_at_or_after(2500000, 3) == 3000000);
+    start(10000000);
+    jst_arm(&st, &node, 10000000, 4);
+    b = st.ub;
+    jst_arm(&st, &node, 10500000, 4);                /* armed already: the same bar */
+    CHECK(st.ub == b);
+    t_bar = lk_time_at(&node, b);
+    CHECK(poll_start(10000000, t_bar, 0) == 0 && st.armed && st.ub == b + q);   /* not allowed (unsettled): the next bar */
+    CHECK(st.moves == 1);
+    t_bar = lk_time_at(&node, st.ub);
+    CHECK(jst_poll(&st, &node, t_bar - JST_LATE_US + 1000, 1) == 0 && st.ub == b + 2 * q);   /* too late: the next bar */
+    lk_set_playing(&node, 1, lk_beat_at(&node, t_bar), t_bar);    /* another peer started the session */
+    CHECK(jst_poll(&st, &node, t_bar + 1000, 1) == 0 && !st.armed && st.commits == 0);
 }
 
 static void test_not_joined(void)
 {
     struct jbl_in in = {.running = 1, .beat_us = 10040000, .period_us = 400000};
     start(10000000);
-    jbl_step(&jbl, &node, 0, 10100000, &in, 4);
+    jbl_step(&jbl, &node, &st, 0, 10100000, &in, 4);
     CHECK(jbl.tempo_sets == 0 && jbl.phase_forces == 0 && jbl.starts == 0 && lk_mpb(&node) == 500000);
 }
 
@@ -121,7 +188,7 @@ static void test_drifting_tracked_grid(void)
     start(10000000);
     for (int i = 0; i < 200; i++, now += 500000) {
         in.beat_us = 10000000 + (int64_t)i * 500005;
-        jbl_step(&jbl, &node, 1, now, &in, 4);
+        jbl_step(&jbl, &node, &st, 1, now, &in, 4);
     }
     CHECK(jbl.tempo_sets == 0);                      /* 0.0012 BPM */
     CHECK(jbl.phase_forces <= 1);                    /* 200 beats x 5 us = 1 ms in all */
@@ -145,6 +212,8 @@ int main(void)
     test_phase_forced_past_5ms();
     test_tempo_deadband();
     test_transport();
+    test_passive();
+    test_start_rules();
     test_not_joined();
     test_drifting_tracked_grid();
     printf("beatlink: %d checks, %d failed\n", checks, fails);

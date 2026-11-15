@@ -160,6 +160,13 @@ static void test_status_link(void)
     CHECK(strstr(out, "link=1\n") && strstr(out, "link_ip=169.254.1.2\n") && strstr(out, "link_peers=2\n"));
     CHECK(strstr(out, "bpm=120.00\n") && strstr(out, "beat=12.500\n") && strstr(out, "playing=1\n"));
     CHECK(strstr(out, "midi_ticks=300\n"));
+    CHECK(strstr(out, "settled=0\narmed=0\n") && !strstr(out, "start="));
+    snap.settled = 1;
+    snap.armed = 1;
+    snap.start_ub = 16000000;
+    CHECK(run("status") == JK_CTL_NONE);
+    CHECK(strstr(out, "settled=1\narmed=1\nstart=16.000\n"));       /* the bar line the transport starts on */
+    snap.armed = 0;
     snap.beat_ub = -1500000;
     snap.mpb = 400000;
     CHECK(run("status") == JK_CTL_NONE);

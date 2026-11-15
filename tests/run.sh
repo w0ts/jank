@@ -9,7 +9,7 @@ CC="${CC:-cc}"
 FLAGS="-std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -I$HERE/core"
 
 CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c"
-LINK="$HERE/third_party/link/link.c"
+LINK="$HERE/third_party/link/link.c $HERE/core/jank_start.c"
 for t in core ctl ui; do
     "$CC" $FLAGS "$HERE/tests/test_$t.c" $CORE -o "$OUT/test_$t"
     "$OUT/test_$t"
@@ -25,7 +25,7 @@ python3 "$HERE/tests/test_ota.py" "$OUT/ota_replay" "$OUT/ota"
 "$OUT/test_sysex"
 "$OUT/test_clock"
 if [ -f "$HERE/core/jank_peer.c" ]; then
-    "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_peer.c" "$HERE/core/jank_peer.c" "$HERE/core/jank_clock.c" $CORE "$LINK" -o "$OUT/test_peer"
+    "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_peer.c" "$HERE/core/jank_peer.c" "$HERE/core/jank_clock.c" $CORE $LINK -o "$OUT/test_peer"
     "$OUT/test_peer"
 fi
 
@@ -34,7 +34,7 @@ fi
 "$OUT/test_uac_desc"
 
 # The beat tracker as the Link session's master.
-"$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_beatlink.c" "$HERE/core/jank_beatlink.c" "$LINK" -lm -o "$OUT/test_beatlink"
+"$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_beatlink.c" "$HERE/core/jank_beatlink.c" $LINK -lm -o "$OUT/test_beatlink"
 "$OUT/test_beatlink"
 
 # The beat tracker. BEAT_WAV_DIR (mono 44.1 kHz WAVs, see test_beat.c) adds the run on audio against madmom's results.
@@ -45,7 +45,7 @@ FM1BASE="${FM1BASE:-$HERE/../optimist/fm1base}"
 if [ ! -f "$FM1BASE/wifi/wifi_jank.c" ]; then echo "crosscheck: no fm1-base Wi-Fi sources at $FM1BASE (set FM1BASE to an Optimist checkout's fm1base)"; exit 1; fi
 OPT="$FM1BASE/wifi"
 # The harness pulls in Optimist's FM-1 side of the air format at test time only: nothing of it is copied here or shipped.
-"$CC" -std=gnu11 -g -O1 -Wall -fsanitize=address,undefined -fno-sanitize-recover=all -I"$HERE/core" -I"$OPT" -I"$HERE/third_party/link" "$HERE/tests/crosscheck_optimist.c" "$HERE/core/jank_peer.c" $CORE "$LINK" -o "$OUT/crosscheck"
+"$CC" -std=gnu11 -g -O1 -Wall -fsanitize=address,undefined -fno-sanitize-recover=all -I"$HERE/core" -I"$OPT" -I"$HERE/third_party/link" "$HERE/tests/crosscheck_optimist.c" "$HERE/core/jank_peer.c" $CORE $LINK -o "$OUT/crosscheck"
 "$OUT/crosscheck"
 
 if command -v node >/dev/null; then

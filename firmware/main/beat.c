@@ -121,7 +121,7 @@ static void restart_tracker(void)
 static void step_link(struct jank_peer *p, int64_t now, void *arg)
 {
     const struct step_ctx *c = arg;
-    jbl_step(&s_jbl, &p->k, jp_joined(p), now, &c->in, c->quantum);
+    jbl_step(&s_jbl, &p->k, &p->start, jp_settled(p, now), now, &c->in, c->quantum);
 }
 
 /* what the tracker says, as the session's master wants it: a tracked beat in Link host time and the grid's period */
@@ -134,6 +134,7 @@ static void make_input(const struct jk_cfg *cfg, struct jbl_in *in, enum jb_mode
     *mode = jb_mode_at(&s_mode, now_s);
     *bpm = 0.0;
     memset(in, 0, sizeof *in);
+    in->passive = (uint8_t)!u.open;            /* LINK mode: the tracker neither starts nor stops the session */
     if (!u.open || *mode == JB_STOPPED || !jb_mode_bpm_at(&s_mode, now_s, bpm) || !jb_mode_grid(&s_mode, &tb, &period))
         return;
     if (!uac_sample_time((int64_t)llround(tb * (double)UAC_RATE), &us))
