@@ -9,8 +9,8 @@
  * in (its length comes from its own headers), esp_ota_set_boot_partition checks it (segments, SHA-256: esp_image_verify)
  * and picks it for the next start; the stick restarts when the computer has been quiet for QUIET_MS (it is still writing
  * the file's directory entry and FAT just after the data), or at an eject. A refusal (not an image that fits, a running
- * image not confirmed yet, an update over MIDI going on, a failed check, a copy cut short and ejected) is a restart too,
- * with the reason in UPDATE.TXT. Rollback (ota.c) is unchanged: the new image must confirm itself.
+ * image not confirmed yet, an update over MIDI going on, the session or the MIDI clock playing, a failed check, a copy cut
+ * short and ejected) is a restart too, with the reason in UPDATE.TXT, when the restart costs nothing (finish). Rollback (ota.c) is unchanged: the new image must confirm itself.
  *
  * TinyUSB's own MSC glue (esp_tinyusb's tinyusb_msc.c) is not used: scripts/patch_tinyusb.sh makes its TinyUSB callbacks
  * weak (third_party/esp_tinyusb-msc-weak.patch) and these take their place; its storage is never installed, so its mount
@@ -157,6 +157,8 @@ static const char *start_refused(void)
         return "no spare app slot";
     if (running_unconfirmed())
         return "the running firmware is not confirmed yet (it confirms itself once a computer has talked to it for 20 s)";
+    if (bridge_is_playing())
+        return JK_STOP_FIRST;
     if (!slot_take(SLOT_DRIVE))
         return "an update over MIDI is running";
     return NULL;
@@ -236,7 +238,10 @@ static void write_sector(uint32_t lba, const uint8_t *data)
     }
     if (k == JV_W_START)
         e = start(lba, data, &op);
-    else if (k == JV_W_IMAGE || k == JV_W_REWRITE) {
+    else if ((k == JV_W_IMAGE || k == JV_W_REWRITE) && bridge_is_playing()) {
+        s_refused = JK_STOP_FIRST;        /* playing started during the copy: no more erases; copy it again once stopped */
+        jv_fail(&s_d);
+    } else if (k == JV_W_IMAGE || k == JV_W_REWRITE) {
         e = k == JV_W_IMAGE ? flash_op(&op, data) : flash_rewrite(&op, data);
         if (e == ESP_OK)
             jv_written(&s_d, &op, read_slot, NULL);
@@ -347,15 +352,15 @@ int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, u
 /* --- the install --- */
 
 /* The note for UPDATE.TXT, then the restart once the computer is quiet. A restart that would cost something is not made:
- * with the running image not confirmed yet (the bootloader would roll it back) or an update over MIDI running (it would
- * be cut off), a refusal is only noted (`drive` on the control line says why) and the stick runs on. installed: the new
+ * with the running image not confirmed yet (the bootloader would roll it back), the session or the MIDI clock playing (the
+ * clock would stop) or an update over MIDI running (it would be cut off), a refusal is only noted (`drive` on the control line says why) and the stick runs on. installed: the new
  * image is the boot choice, the restart is the point. */
 static void finish(const char *text, const char *slot, bool installed)
 {
     uint32_t done_at = now_ms();
     ESP_LOGW(TAG, "%s", text);
-    if (!installed && (running_unconfirmed() || !slot_take(SLOT_DRIVE))) {
-        ESP_LOGW(TAG, "no restart now: it would roll back the new firmware or cut an update over MIDI");
+    if (!installed && (running_unconfirmed() || bridge_is_playing() || !slot_take(SLOT_DRIVE))) {
+        ESP_LOGW(TAG, "no restart now: it would roll back the new firmware, stop the clock or cut an update over MIDI");
         return;
     }
     drive_note(slot, text);

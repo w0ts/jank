@@ -37,6 +37,31 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
     return 0;
 }
 
+int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b)
+{
+    return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source;
+}
+
+enum jk_save jk_save_on_change(uint8_t *pending, int changed, int playing, int restart_follows)
+{
+    if (!changed && !*pending)
+        return JK_SAVE_NONE;
+    if (playing && !restart_follows) {
+        *pending = 1;
+        return JK_SAVE_LATER;
+    }
+    *pending = 0;
+    return JK_SAVE_NOW;
+}
+
+int jk_save_due(uint8_t *pending, int playing)
+{
+    if (!*pending || playing)
+        return 0;
+    *pending = 0;
+    return 1;
+}
+
 struct writer {
     char *p;
     size_t cap, n;

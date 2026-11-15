@@ -53,6 +53,10 @@ static void do_begin(const struct jo_cmd *c)
         say(JO_E_STATE, 0);
         return;
     }
+    if (bridge_is_playing()) {             /* flash erases would stall USB, Wi-Fi and the tracker: stop first */
+        say(JO_E_PLAYING, 0);
+        return;
+    }
     if (!slot_take(SLOT_MIDI)) {           /* a jank.bin from the drive has the slot (streaming, or installed) */
         say(JO_E_BUSY, 0);
         return;
@@ -80,6 +84,11 @@ static void do_begin(const struct jo_cmd *c)
 static void do_data(const struct jo_cmd *c)
 {
     enum jo_err e = jo_data(&s_jo, c, now_ms());
+    if (e == JO_OK && bridge_is_playing()) {   /* playing started during the transfer: stopped, send it again once stopped */
+        drop_flash();
+        say(JO_E_PLAYING, 0);
+        return;
+    }
     if (e == JO_OK) {
         esp_err_t r = esp_ota_write(s_handle, c->data, c->n);
         if (r != ESP_OK) {

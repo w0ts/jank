@@ -159,6 +159,8 @@ static void test_reply(void)
     assert(jo_reply(JO_OK_DUP, 120, out, sizeof out) == 7 && !strcmp(out, "ok 120\n"));
     assert(jo_reply(JO_E_GAP, 240, out, sizeof out) && !strcmp(out, "err gap 240\n"));
     assert(jo_reply(JO_E_CRC, 0, out, sizeof out) && !strcmp(out, "err crc 0\n"));
+    assert(jo_reply(JO_E_PLAYING, 0, out, sizeof out) && !strcmp(out, "err playing 0\n"));
+    assert(jo_reply(JO_E_PLAYING + 1, 0, out, sizeof out) && !strcmp(out, "err arg 0\n"));
     assert(jo_reply(JO_E_ARG, 0, out, 4) == 0);
 }
 

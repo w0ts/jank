@@ -351,7 +351,12 @@ static int pending_start(int64_t beat_ub, int64_t *bar_ub)
 
 void bridge_snapshot(struct jk_snapshot *s)
 {
+    int8_t rssi;
+    uint8_t channel;
     memset(s, 0, sizeof *s);
+    /* the Wi-Fi driver's own call outside the bridge's lock: the HOME push and the control line take this snapshot, and
+     * the bridge's task (frames, Link) must never wait behind a Wi-Fi API call (the timing audit's fix 3) */
+    radio_network_info(&rssi, &channel);
     xSemaphoreTake(s_lock, portMAX_DELAY);
     int64_t now = midi_now_us();
     s->b = s_b;
@@ -365,7 +370,8 @@ void bridge_snapshot(struct jk_snapshot *s)
     s->lat_usb_max_us = s_lat_usb_max;
     s->wifi_up = (uint8_t)radio_network_up();
     s->wifi_ip = jn_ip(&s_net);
-    radio_network_info(&s->wifi_rssi, &s->wifi_channel);
+    s->wifi_rssi = rssi;
+    s->wifi_channel = channel;
     s->link_on = s_peer.on;
     s->link_ip = s_peer.ip;
     s->link_peers = jp_peers(&s_peer);
@@ -424,6 +430,18 @@ int bridge_tempo(int32_t mpb)
     r = jp_set_tempo(&s_peer, mpb, midi_now_us());
     xSemaphoreGive(s_lock);
     return r;
+}
+
+int bridge_is_playing(void)
+{
+    int playing = 0;
+    if (!s_lock)
+        return midi_is_playing();      /* (before bridge_start) */
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (jp_joined(&s_peer))
+        playing = jp_playing(&s_peer);
+    xSemaphoreGive(s_lock);
+    return playing || midi_is_playing();
 }
 
 int bridge_play(int play)

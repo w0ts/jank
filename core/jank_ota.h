@@ -32,7 +32,8 @@ enum jo_err {
     JO_E_CRC,                            /* a chunk's CRC, or the image's */
     JO_E_HEADER,                         /* not an ESP32-S3 image */
     JO_E_SHORT,                          /* end before the last byte */
-    JO_E_IDLE                            /* dropped after JO_IDLE_MS */
+    JO_E_IDLE,                           /* dropped after JO_IDLE_MS */
+    JO_E_PLAYING                         /* the session or the MIDI clock plays: no flash writes now (stop first) */
 };
 
 struct jo_cmd {

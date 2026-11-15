@@ -207,6 +207,7 @@ static void ctl_task(void *arg)
     for (;;) {
         size_t n;
         ++s_beats;
+        app_cfg_flush(0);                      /* a change made while playing: saved once stopped */
         n = xMessageBufferReceive(s_in, chunk, sizeof chunk, pdMS_TO_TICKS(CTL_TICK_MS));
         if (!n) {
             ota_idle();
