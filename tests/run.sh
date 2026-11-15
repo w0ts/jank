@@ -8,7 +8,7 @@ mkdir -p "$OUT"
 CC="${CC:-cc}"
 FLAGS="-std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -I$HERE/core"
 
-CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c"
+CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_phone.c"
 LINK="$HERE/third_party/link/link.c $HERE/core/jank_start.c"
 for t in core ctl ui; do
     "$CC" $FLAGS "$HERE/tests/test_$t.c" $CORE -o "$OUT/test_$t"
@@ -25,6 +25,13 @@ python3 "$HERE/tests/test_ota.py" "$OUT/ota_replay" "$OUT/ota"
 "$OUT/test_sysex"
 "$CC" $FLAGS "$HERE/tests/test_blemidi.c" "$HERE/core/jank_blemidi.c" "$HERE/core/jank_sysex.c" -o "$OUT/test_blemidi"
 "$OUT/test_blemidi"
+# the packets the firmware sends, for the page's port of the framing (tests/test_page.js)
+"$OUT/test_blemidi" --vectors "$OUT/blemidi_vectors.json"
+# the phone link (Bluetooth on/off, the HOME line) and the made-up JANK drive that streams jank.bin into the spare slot
+"$CC" $FLAGS "$HERE/tests/test_phone.c" $CORE -o "$OUT/test_phone"
+"$OUT/test_phone"
+"$CC" $FLAGS "$HERE/tests/test_vdrive.c" "$HERE/core/jank_vdrive.c" "$HERE/core/jank_ota.c" -o "$OUT/test_vdrive"
+"$OUT/test_vdrive"
 "$OUT/test_clock"
 if [ -f "$HERE/core/jank_peer.c" ]; then
     "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_peer.c" "$HERE/core/jank_peer.c" "$HERE/core/jank_clock.c" $CORE $LINK -o "$OUT/test_peer"
@@ -51,7 +58,7 @@ OPT="$FM1BASE/wifi"
 "$OUT/crosscheck"
 
 if command -v node >/dev/null; then
-    node "$HERE/tests/test_page.js"
+    BLEMIDI_VECTORS="$OUT/blemidi_vectors.json" node "$HERE/tests/test_page.js"
 else
     echo "page: node not found, control page logic NOT tested"
     exit 1

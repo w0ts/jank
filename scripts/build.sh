@@ -18,7 +18,4 @@ cd "$SRC/jank/firmware"
 SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.usb;sdkconfig.$BOARD;sdkconfig.beat$EXTRA" idf.py -B "$JANK_SCRATCH/build-$VARIANT" -D SDKCONFIG="$JANK_SCRATCH/sdkconfig.$VARIANT" set-target esp32s3
 # ninja itself, so that the number of jobs can be held down (JANK_JOBS, default 4) and the build can run niced
 nice -n 19 ninja -C "$JANK_SCRATCH/build-$VARIANT" -j "${JANK_JOBS:-4}"
-# the drive's name: fatfsgen has no option for it, and FAT's label is plain bytes with no checksum (boot sector, root entry)
-if [ -f "$JANK_SCRATCH/build-$VARIANT/storage.bin" ]; then
-    python3 -c "import sys; p = sys.argv[1]; d = open(p, 'rb').read(); n = d.count(b'Espressif  '); open(p, 'wb').write(d.replace(b'Espressif  ', b'JANK       ')); print('drive label JANK:', n, 'places')" "$JANK_SCRATCH/build-$VARIANT/storage.bin"
-fi
+# (no storage.bin any more: the JANK drive is made up by the firmware, drive.c)

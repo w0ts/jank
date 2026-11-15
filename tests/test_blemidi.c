@@ -174,8 +174,181 @@ static void test_malformed(void)
     }
 }
 
-int main(void)
+/* the sender's rule (firmware/main/ble_midi.c, page/jank.html bleSend): whole messages packed while they fit, a packet
+ * sent when the next one does not, a message too big for an empty packet split on its own -> packets in out, their count */
+struct packets {
+    uint8_t p[64][600];
+    size_t n[64];
+    size_t count;
+};
+
+static void flush(struct packets *o, const uint8_t *pkt, size_t len)
 {
+    assert(o->count < 64 && len <= sizeof o->p[0]);
+    memcpy(o->p[o->count], pkt, len);
+    o->n[o->count++] = len;
+}
+
+static size_t send_all(const uint8_t *const *msgs, const size_t *lens, size_t count, size_t cap, uint16_t ms, struct packets *o)
+{
+    uint8_t pkt[600];
+    size_t len = 0;
+    o->count = 0;
+    for (size_t i = 0; i < count; ++i) {
+        size_t at = 0, l;
+        if (jbm_pack(msgs[i], lens[i], ms, pkt, &len, cap))
+            continue;
+        if (len) {
+            flush(o, pkt, len);
+            len = 0;
+        }
+        if (jbm_pack(msgs[i], lens[i], ms, pkt, &len, cap))
+            continue;
+        while ((l = jbm_sysex_packet(msgs[i], lens[i], &at, ms, pkt, cap)) != 0)
+            flush(o, pkt, l);
+    }
+    if (len)
+        flush(o, pkt, len);
+    return o->count;
+}
+
+/* the text of a control line's frames, through packets and back */
+static void check_lines(const char *text, size_t cap, size_t want_packets)
+{
+    static uint8_t frames[40][JX_FRAME_MAX];
+    const uint8_t *msgs[40];
+    size_t lens[40], count = 0, n = strlen(text);
+    static struct packets o;
+    struct jbm_in in;
+    struct sink s = {.n = 0};
+    struct jx_in x;
+    char back[1024];
+    size_t got = 0;
+    for (size_t at = 0; at < n; at += JX_TEXT_MAX, ++count) {
+        size_t k = n - at < JX_TEXT_MAX ? n - at : JX_TEXT_MAX;
+        lens[count] = jx_frame(text + at, k, frames[count]);
+        msgs[count] = frames[count];
+    }
+    assert(send_all(msgs, lens, count, cap, 77, &o) == want_packets);
+    jbm_init(&in);
+    jx_init(&x);
+    for (size_t i = 0; i < o.count; ++i) {
+        assert(o.n[i] <= cap);
+        decode_ok(&in, o.p[i], o.n[i], &s);
+    }
+    for (size_t i = 0; i < s.n; ++i) {
+        int c = jx_feed(&x, s.bytes[i]);
+        if (c >= 0)
+            back[got++] = (char)c;
+    }
+    assert(got == n && !memcmp(back, text, n));
+}
+
+static void test_pack(void)
+{
+    const uint8_t a[] = {0xF0, 0x7D, 0x4A, 0x4B, 'o', 'k', 0xF7};
+    const uint8_t note[] = {0x90, 0x3C, 0x40};
+    uint8_t pkt[32];
+    size_t len = 0;
+    /* two whole messages in one packet: header, then ts F0 .. ts F7 each */
+    assert(jbm_pack(a, sizeof a, 0x1ABC, pkt, &len, sizeof pkt) == 1 && len == 10);
+    assert(jbm_pack(a, sizeof a, 0x1ABC, pkt, &len, sizeof pkt) == 1 && len == 19);
+    const uint8_t want[] = {0xB5, 0xBC, 0xF0, 0x7D, 0x4A, 0x4B, 'o', 'k', 0xBC, 0xF7, 0xBC, 0xF0, 0x7D, 0x4A, 0x4B, 'o', 'k', 0xBC, 0xF7};
+    assert(!memcmp(pkt, want, sizeof want));
+    assert(jbm_pack(a, sizeof a, 0x1ABC, pkt, &len, 27) == 0 && len == 19);   /* 19 + 9 > 27: unchanged */
+    assert(jbm_pack(a, sizeof a, 0x1ABC, pkt, &len, 28) == 1 && len == 28);   /* exactly full */
+    len = 0;
+    assert(jbm_pack(a, sizeof a, 0, pkt, &len, 9) == 0 && len == 0);           /* 1 + 7 + 2 = 10 */
+    assert(jbm_pack(a, sizeof a, 0, pkt, &len, 10) == 1);
+    len = 0;
+    assert(jbm_pack(note, sizeof note, 0, pkt, &len, sizeof pkt) == 0);        /* SysEx only */
+    /* answers as they go out: `get` (about 250 characters) in 9 frames */
+    check_lines("ok\n", 182, 1);
+    check_lines("group=1\nchannel=1\nname=jank\nfilter=link\npeer=on\ntransport=link\nquantum=4\noffset=0.00\nbeat=on\n"
+                "beat_latency=25\nble=pair\nnet=jank\nssid=\npass=none\nmac=02:6a:6b:aa:bb:cc\nversion=0.1.0\nok\n",
+                182, 2);                                                       /* 7 frames of 37 = 4 a packet of 182 */
+    check_lines("group=1\nchannel=1\nname=jank\nfilter=link\nok\n", 20, 4);  /* the default MTU: each frame split in two */
+    check_lines("x\n", 10, 1);                                                 /* 1 + 7 + 2 */
+}
+
+static void hex_array(FILE *f, const uint8_t *b, size_t n)
+{
+    fputc('[', f);
+    for (size_t i = 0; i < n; ++i)
+        fprintf(f, "%s%u", i ? "," : "", b[i]);
+    fputc(']', f);
+}
+
+/* vectors for the page's port of this framing (tests/test_page.js reads them: the same packets byte for byte) */
+static void write_vectors(const char *path)
+{
+    static const char *const texts[] = {"get\n", "ok\n", "set name a jank with a long name\nset quantum 4\n", "status\n"};
+    static const size_t caps[] = {9, 20, 23, 64, 182, 244};
+    static struct packets o;
+    FILE *f = fopen(path, "w");
+    int first = 1;
+    assert(f);
+    fputs("{\"send\":[", f);
+    for (size_t t = 0; t < sizeof texts / sizeof texts[0]; ++t)
+        for (size_t c = 0; c < sizeof caps / sizeof caps[0]; ++c) {
+            uint8_t frames[8][JX_FRAME_MAX];
+            const uint8_t *msgs[8];
+            size_t lens[8], count = 0, n = strlen(texts[t]);
+            for (size_t at = 0; at < n; at += JX_TEXT_MAX, ++count) {
+                lens[count] = jx_frame(texts[t] + at, n - at < JX_TEXT_MAX ? n - at : JX_TEXT_MAX, frames[count]);
+                msgs[count] = frames[count];
+            }
+            send_all(msgs, lens, count, caps[c], (uint16_t)(1000u + 37u * c), &o);
+            fprintf(f, "%s{\"text\":\"", first ? "" : ",");
+            for (const char *p = texts[t]; *p; ++p)
+                fputs(*p == '\n' ? "\\n" : (char[2]){*p, 0}, f);
+            fprintf(f, "\",\"cap\":%zu,\"ms\":%u,\"packets\":[", caps[c], 1000u + 37u * (unsigned)c);
+            for (size_t i = 0; i < o.count; ++i) {
+                if (i)
+                    fputc(',', f);
+                hex_array(f, o.p[i], o.n[i]);
+            }
+            fputs("]}", f);
+            first = 0;
+        }
+    /* packets as other senders write them: what the decoder makes of them, and whether it took each one */
+    {
+        static const uint8_t p1[] = {0x80, 0x81, 0xF0, 0x7D, 0x4A, 0x82, 0xF8, 0x4B, 'g'};
+        static const uint8_t p2[] = {0x80, 'e', 't', 0x0A, 0x83, 0xF7, 0x84, 0x90, 0x3C, 0x40, 0x3E, 0x41, 0x85, 0x40, 0x00};
+        static const uint8_t p3[] = {0x80, 0x80, 0xC1, 0x05, 0x06, 0x81, 0xE0, 0x00, 0x40, 0x82, 0xF3, 0x02, 0x82, 0xF6};
+        static const uint8_t p4[] = {0x40, 0x80, 0xF8};
+        static const uint8_t p5[] = {0x80, 0x80, 0xF0, 0x7D};
+        static const uint8_t p6[] = {0x80, 0x80, 0xF7};
+        static const uint8_t p7[] = {0x80, 0x3C, 0x40};
+        static const uint8_t p8[] = {0x80};
+        const uint8_t *ps[] = {p1, p2, p3, p5, p4, p6, p7, p8};
+        const size_t ns[] = {sizeof p1, sizeof p2, sizeof p3, sizeof p5, sizeof p4, sizeof p6, sizeof p7, sizeof p8};
+        struct jbm_in in;
+        struct sink s = {.n = 0};
+        jbm_init(&in);
+        fputs("],\"decode\":{\"packets\":[", f);
+        for (size_t i = 0; i < sizeof ps / sizeof ps[0]; ++i) {
+            if (i)
+                fputc(',', f);
+            hex_array(f, ps[i], ns[i]);
+        }
+        fputs("],\"results\":[", f);
+        for (size_t i = 0; i < sizeof ps / sizeof ps[0]; ++i)
+            fprintf(f, "%s%d", i ? "," : "", jbm_decode(&in, ps[i], ns[i], collect, &s));
+        fputs("],\"bytes\":", f);
+        hex_array(f, s.bytes, s.n);
+        fputs("}}\n", f);
+    }
+    assert(fclose(f) == 0);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc == 3 && !strcmp(argv[1], "--vectors")) {
+        write_vectors(argv[2]);
+        return 0;
+    }
+    test_pack();
     test_control_line_every_payload();
     test_beat_report();
     test_packet_layout();

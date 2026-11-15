@@ -52,6 +52,10 @@ static void do_begin(const struct jo_cmd *c)
         say(JO_E_STATE, 0);
         return;
     }
+    if (drive_busy()) {                    /* a jank.bin is streaming in from the drive into the same slot */
+        say(JO_E_BUSY, 0);
+        return;
+    }
     e = jo_begin(&s_jo, c->size, c->crc, slot->size, now_ms());
     if (e != JO_OK) {
         say(e, s_jo.offset);

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The button, the LED and the group scan.
- * Click: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air. Held 1.5 s and let go: MODE JANK <-> the Wi-Fi network, a restart.
+ * Click: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air. Three
+ * clicks: a phone's pair window (BLE builds; the LED blinks blue 4 times a second until a phone connects or it closes).
+ * Held 1.5 s and let go: MODE JANK <-> the Wi-Fi network, a restart.
  * Held 10 s: download mode, for flashing. The LED: the session's beat, inverted on the Wi-Fi network. */
 #include <string.h>
 #include "app.h"
@@ -62,6 +64,13 @@ static void led_step(uint32_t now)
         return;
     }
     s_event = JL_NONE;
+#if CONFIG_JANK_BLE_MIDI
+    if (ble_midi_advertising()) {      /* a pair window, no phone yet: a fast blue blink instead of the beat */
+        jl_pair_lit(now, c);
+        led_show(c[0], c[1], c[2]);
+        return;
+    }
+#endif
     app_cfg_get(&cfg);
     joined = bridge_beat(&beat, &mpb);
     if (!jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum))
@@ -196,6 +205,17 @@ static void on_button(enum jb_event e)
         break;
     case JB_DOUBLE:
         scan_groups();
+        break;
+    case JB_TRIPLE:                      /* the phone's pair window; refused (setting off, or no Bluetooth): red pulses */
+#if CONFIG_JANK_BLE_MIDI
+        if (ble_midi_pair() == 0)
+            break;
+#endif
+        {
+            struct jk_cfg cfg;
+            app_cfg_get(&cfg);
+            led_event(JL_NO_GROUP, cfg.group);
+        }
         break;
     case JB_LONG:
         switch_network();

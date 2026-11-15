@@ -44,6 +44,10 @@ static uint32_t s_beat_n;              /* beats tracked since the start (the rep
 static uint32_t s_hops, s_hop_max_us;
 static uint64_t s_busy_us, s_busy_cycles, s_frames_timed;
 static int64_t s_win_start, s_win_busy;
+static int32_t s_win_peak;             /* the input's largest |sample| in this window */
+static float s_win_act;                /* the network's largest activation in this window */
+static int16_t s_level_db = -99;       /* the last window's: dBFS, and the activation in percent */
+static uint8_t s_conf_pct;
 
 struct step_ctx {
     struct jbl_in in;
@@ -93,17 +97,15 @@ static void report(char kind, double at_s)
     }
     size_t n = jx_beat_line(line, sizeof line, kind, s_beat_n, (int32_t)llround(bpm * 100.0), (unsigned)mode, u.open, extra, link);
     if (n)
-        usb_beat_line(line, n);
-#if CONFIG_JANK_BLE_MIDI
-    if (n)
-        ble_midi_push(line, n);
-#endif
+        usb_beat_line(line, n);        /* (not to a phone: it gets the HOME line, level and activation included) */
 }
 
 static void on_frame(void *ctx, const struct jb_frame *f)
 {
     (void)ctx;
     s_hops++;
+    if (f->act > s_win_act)
+        s_win_act = f->act;
     if (f->beat) {
         jb_mode_update(&s_mode, f->time);
         s_beat_seen = 1;
@@ -175,6 +177,8 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.err_us = s_jbl.err_us;
     b.offset_us = uac_offset_us();
     b.latency_us = cfg->beat_latency_ms * 1000;
+    b.level_db = s_level_db;
+    b.conf_pct = s_conf_pct;
     portENTER_CRITICAL(&s_mux);
     s_pub = b;
     portEXIT_CRITICAL(&s_mux);
@@ -186,6 +190,11 @@ static void work(const int16_t *x, size_t n)
     uint32_t h0 = s_hops;
     int64_t t0 = esp_timer_get_time();
     uint32_t c0 = esp_cpu_get_cycle_count();
+    for (size_t i = 0; i < n; i++) {
+        int32_t a = x[i] < 0 ? -(int32_t)x[i] : x[i];
+        if (a > s_win_peak)
+            s_win_peak = a;
+    }
     jb_beat_push_s16(&s_b, x, n, on_frame, NULL);
     uint32_t cycles = esp_cpu_get_cycle_count() - c0;
     int64_t us = esp_timer_get_time() - t0;
@@ -229,6 +238,11 @@ static void beat_task(void *arg)
             cpu_x10 = (uint32_t)(s_win_busy * 1000 / (now - s_win_start));
             s_win_start = now;
             s_win_busy = 0;
+            /* the second's input peak in dBFS (full scale 32768; silence and anything below -99 dB: -99) and activation */
+            s_level_db = s_win_peak > 0 ? (int16_t)fmax(-99.0, floor(20.0 * log10((double)s_win_peak / 32768.0) + 0.5)) : -99;
+            s_conf_pct = (uint8_t)fmin(100.0, fmax(0.0, floor((double)s_win_act * 100.0 + 0.5)));
+            s_win_peak = 0;
+            s_win_act = 0.0f;
             report('t', (double)s_samples / (double)UAC_RATE);
         }
         if (!s_beat_seen && now - last_step < STEP_EVERY_US)
