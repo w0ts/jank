@@ -398,7 +398,7 @@ const QR = (() => {
                                one step fixes an off-beat lock, two move the bar's 1 by a beat. AUTO BAR goes MANUAL
                                (an M under the boxes) until AUTO BAR is picked again or the tempo starts over
                 BAR MARKS   AUDIO mode, AUTO BAR on: a bar under the first box = LOCKED (the bar's 1 is the music's 1),
-                            the tick right of the boxes = how sure; nothing under the boxes = still listening
+                            the line under the boxes = how sure; nothing under the boxes = still listening
                 YES + UP/DOWN  AUDIO mode: nudge the timing 1 ms (the AUDIO IN offset: every output; repeats while held;
                                1 s overlay "NUDGE MS +3"). A combo cancels the NO / YES release action.
      MENU     AUDIO, LINK TRANSPORT (LINK mode: IGNORE = the clocks run on Link's tempo and beat, own Start / Stop only;
@@ -764,21 +764,21 @@ const OLED = (() => {
     }
   }
   // the downbeat estimator under the AUDIO boxes (bar: { state 'off'|'listening'|'locked'|'manual', conf 0..1 } or null):
-  // LOCKED lights the 1's box (a bar under the first box: the bar's 1 is the music's), a small tick right of the boxes
-  // grows with the confidence (listening and locked), MANUAL writes an M under the first box; OFF: nothing
+  // LOCKED lights the 1's box (a bar under the first box: the bar's 1 is the music's), a 1-pixel tick under the four boxes
+  // grows with the confidence (the lead against the commit level; listening and locked), MANUAL writes an M; OFF: nothing
   function barMarks(fb, bar, x0, y, w, h, gap) {
     if (!bar || bar.state === 'off') return;
     if (bar.state === 'manual') { text(fb, 'M', x0, y + h + 3, 1, 1); return; }
     if (bar.state === 'locked') rect(fb, x0, y + h + 1, w, 2, 1);
-    const n = Math.round(h * clamp(bar.conf || 0, 0, 1)), xr = x0 + 4 * (w + gap);     // x 127: one pixel past the gap
-    if (n > 0) rect(fb, xr, y + h - n, 1, n, 1);
+    const n = Math.round((4 * (w + gap) - gap) * clamp(bar.conf || 0, 0, 1));          // up to the boxes' width
+    if (n > 0) rect(fb, x0, y + h + 4, n, 1, 1);
   }
   // HOME has two layouts, each designed for its content. Less is better: the UI explains itself.
   //   top bar: the transport icon (triangle = playing, blinking = waiting, square = stopped), in LINK mode the transport
   //            option's icon (LT_ICONS), the network's name (truncated), network icon, USB plug, battery
   //   AUDIO (line in plugged):
   //     y9   BPM x3 (left); four beat boxes (right), the current beat's box filled; under them the AUTO BAR marks
-  //          (barMarks: the 1's box lit when LOCKED, an M when MANUAL; the confidence tick at x 127)
+  //          (barMarks: the 1's box lit when LOCKED, an M when MANUAL; the confidence line under the boxes)
   //     y31  IN bar (smoothed short-term RMS in dBFS, min / max lines over the last few seconds, tick = -60 silence)   y44  CF bar (tick = threshold); each value is written inside its bar
   //     y57  status line, cycling every STATUS_CYCLE_MS: the Link peers (none: empty)
   //   LINK (no line in): BPM x4, four wide beat boxes across the width, the same status line at y57
@@ -1442,7 +1442,7 @@ function tempoStep(d) {
 
 /* the downbeat estimator for the screen, { state, conf } or null: the player's own (status.bar), or with --xiao the
    XIAO's (its `status`: bar=off|listening|locked|manual, bar_lead in score units) */
-const BAR_CONF_FULL = 3;                         // live/downbeat.py CONF_FULL: the tick is full at this lead
+const BAR_CONF_FULL = 2;                         // the commit level (live/downbeat.py: conf = lead / commit): the tick is full here
 function barNow(s, now) {
   if (s.xiao) {
     const st = XIAO.status;

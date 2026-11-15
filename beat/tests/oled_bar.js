@@ -23,17 +23,17 @@ function home(bar) {
   return fb;
 }
 const underOne = fb => [...Array(9).keys()].every(i => lit(fb, 87 + i, 19) && lit(fb, 87 + i, 20));
-const tick = fb => [...Array(9).keys()].filter(j => lit(fb, 127, 9 + j)).length;
-const mRows = fb => [...Array(7).keys()].some(j => lit(fb, 87, 21 + j));
+const tick = fb => [...Array(39).keys()].filter(i => lit(fb, 87 + i, 22)).length;   // the confidence line under the boxes
+const mRows = fb => lit(fb, 87, 24) && lit(fb, 89, 24) && lit(fb, 91, 24);              // the M glyph's middle row, #.#.#
 
 let fb = home({ state: 'locked', conf: 1 });
 ok(underOne(fb), 'locked: the first box is lit underneath');
-ok(tick(fb) === 9, 'full confidence: a 9 px tick');
+ok(tick(fb) === 39, 'full confidence: the line under all four boxes');
 ok(!mRows(fb), 'no M when locked');
 fb = home({ state: 'listening', conf: 1 / 3 });
-ok(!underOne(fb) && tick(fb) === 3, 'listening: no mark, a 3 px tick');
+ok(!underOne(fb) && tick(fb) === 13, 'listening: no mark, a third of the line');
 fb = home({ state: 'manual', conf: 1 });
-ok(mRows(fb) && !underOne(fb) && tick(fb) === 0, 'manual: an M, no tick');
+ok(mRows(fb) && !underOne(fb) && [...Array(30).keys()].every(i => !lit(fb, 96 + i, 22)), 'manual: an M, no line');
 fb = home({ state: 'off', conf: 1 });
 ok(!mRows(fb) && !underOne(fb) && tick(fb) === 0, 'off: nothing');
 fb = home(null);
