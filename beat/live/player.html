@@ -189,6 +189,11 @@
       <button id="calib" disabled>Calibrate</button>
       <span id="calibmsg" class="num" style="font-size:12px"></span>
     </div>
+    <div class="row" style="margin-top:6px">
+      <label><input type="checkbox" id="autolat" checked> Auto latency</label>
+      <span id="autolatmsg" class="num" style="font-size:12px"></span>
+    </div>
+    <div id="autolathint" class="num" style="font-size:12px;color:#e0a84f" hidden></div>
   </div>
 
   </div>
@@ -1347,9 +1352,64 @@ function showAccuracy(b) {
   $('calibmsg').textContent = sug === null || sug === undefined ? 'needs 8+ Link beats and the XIAO\'s latency'
     : 'Link is ' + f1(b.link.mean_ms) + ' ms off: set beat_latency ' + f1(m.beat_latency_ms, 0) + ' -> ' + sug + ' ms (not stored on the XIAO)';
 }
+/* Auto latency: the player works out the XIAO's beat_latency from the two output paths (live/latency.py: speaker path -
+   jank path, in /api/status) and sends `set beat_latency` when --xiao starts, when the XIAO's audio source turns to USB
+   (a new stream, or a restart) and whenever the suggestion moves by more than AUTOLAT_MIN_CHANGE_MS (at most one send per
+   AUTOLAT_MIN_GAP_MS). Calibrate and NUDGE MS are the user's: they switch it off for the session ("manual"). */
+const AUTOLAT_MIN_CHANGE_MS = 2;
+const AUTOLAT_MIN_GAP_MS = 2000;
+const TAB_PATH_CONSTANT_MS = 0;        // Tab audio: both sinks are delayed to the same reported latency, so the paths differ by this
+function autoLatNew() { return { on: true, manual: false, sent: null, sentAt: -1e9, wasUsb: false }; }
+/* ev: tick {sug (ms or null), usb (the XIAO's source is USB), now} | manual | auto | reconnect. -> { st, send (ms or null) } */
+function autoLatStep(st, ev) {
+  switch (ev.type) {
+    case 'manual': return { st: { ...st, on: false, manual: true }, send: null };
+    case 'auto': return { st: { ...st, on: true, manual: false, sent: null }, send: null };
+    case 'reconnect': return { st: { ...st, sent: null, wasUsb: false }, send: null };
+    case 'tick': {
+      const next = { ...st, wasUsb: !!ev.usb };
+      if (!st.on || !ev.usb || !Number.isFinite(ev.sug)) return { st: next, send: null };
+      const sug = Math.round(ev.sug);
+      const first = st.sent === null || !st.wasUsb;
+      const moved = Math.abs(sug - st.sent) > AUTOLAT_MIN_CHANGE_MS && ev.now - st.sentAt >= AUTOLAT_MIN_GAP_MS;
+      if (!first && !moved) return { st: next, send: null };
+      return { st: { ...next, sent: sug, sentAt: ev.now }, send: sug };
+    }
+    default: return { st, send: null };
+  }
+}
+/* the suggestion for the pane: the player's paths, or (Tab audio, listening through jank) the aligned sinks' constant */
+function autoLatSuggestion(pane, tabState, tabToJank, statusSug) {
+  if (pane === 'tab') return tabState === 'listening' && tabToJank ? TAB_PATH_CONSTANT_MS : null;
+  return Number.isFinite(statusSug) ? statusSug : null;
+}
+function autoLatLabel(st, sug, usb, sentNow) {
+  if (st.manual) return 'manual' + (st.sent === null ? '' : ' (auto had sent ' + st.sent + ' ms)');
+  if (!st.on) return 'off';
+  if (!usb) return 'waiting: the XIAO\'s source is not USB';
+  if (!Number.isFinite(sug)) return 'waiting for a suggestion';
+  return 'auto: ' + (st.sent === null ? sug : st.sent) + ' ms' + (sentNow ? ' (sent)' : '');
+}
+const AL = { st: autoLatNew(), out: null, sentNow: 0 };
+function autoLatApply(ev) { const r = autoLatStep(AL.st, ev); AL.st = r.st; $('autolat').checked = AL.st.on; return r.send; }
+function autoLatencyTick(now) {
+  if (!XIAO.out) return;
+  if (AL.out !== XIAO.out) { AL.out = XIAO.out; autoLatApply({ type: 'reconnect' }); }
+  const usb = !!XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS && XIAO.status.audio_source === 'usb';
+  const toJank = !!(TAB.mode && TAB.mode.includes('jank'));
+  const sug = autoLatSuggestion(pane, TAB.state, toJank, S ? S.suggested_beat_latency_ms : null);
+  const send = autoLatApply({ type: 'tick', sug, usb, now });
+  if (send !== null) { xiaoSend('set beat_latency ' + send); AL.sentNow = now; }
+  $('autolatmsg').textContent = autoLatLabel(AL.st, sug, usb, now - AL.sentNow < 3000);
+  const sp = S && S.speaker;
+  $('autolathint').hidden = !(sp && sp.wireless);
+  $('autolathint').textContent = sp && sp.wireless ? 'wireless output (' + sp.device + ', ' + sp.latency_ms + ' ms): auto latency may be off, use Calibrate' : '';
+}
+$('autolat').onchange = () => autoLatApply({ type: $('autolat').checked ? 'auto' : 'manual' });
 $('calib').onclick = () => {
   const sug = S && S.bench && S.bench.model ? S.bench.model.suggested_latency_ms : null;
   if (sug === null || sug === undefined) return;
+  autoLatApply({ type: 'manual' });
   xiaoSend('set beat_latency ' + sug);
   $('calibmsg').textContent = 'sent: set beat_latency ' + sug + ' (the next 16 beats show the result)';
 };
@@ -1362,6 +1422,7 @@ function showXiao(x, bench) {
   if (XIAO.out && now - XIAO.statusAskedAt > XIAO_STATUS_MS) askStatus();
   if (XIAO.out && !dev.link && now - XIAO.homeAskedAt > XIAO_HOME_MS) askHome();       // AUDIO: the meter's numbers, 4 a second (reads only)
   if (XIAO.out && !XIAO.cfg && now - XIAO.cfgAskedAt > 3000) askGet();         // (asked again if the answer was lost)
+  autoLatencyTick(now);
   syncXiaoMode(now);
   const stale = XIAO.port && XIAO.lastLineAt && now - XIAO.lastLineAt > XIAO_SILENT_MS ? ' | no report for ' + Math.round((now - XIAO.lastLineAt) / 1000) + ' s' : '';
   if (XIAO.rep && now - XIAO.repAt > XIAO_REPORT_FRESH_MS) { $('xaudio').textContent = 'no report'; $('xaudio').classList.remove('on'); }
@@ -1906,6 +1967,7 @@ function armHint(b) {
 function dropHint() { clearTimeout(dev.hintTimer); ui.hint = null; }
 function comboStep(mod, d) {
   if (dev.link) return;                                          // LINK mode: the session owns the bar and the timing
+  if (mod === 'yes') autoLatApply({ type: 'manual' });           // NUDGE MS is the user's own latency: Auto latency off
   if (S && S.xiao) { showOverlay('TRACKER LEADS', ''); return; } // --xiao: the nudges are the XIAO tracker's (not on it yet)
   if (mod === 'no') { api('shift', { beats: d * NUDGE_BEATS }); showOverlay('NUDGE BEAT', d > 0 ? '+1/2' : '-1/2'); }
   else {

@@ -24,6 +24,7 @@ from live.clockmap import ClockMap
 from live.controller import LinkController
 from live.downbeat import BarView
 from live.engine import Engine
+from live.latency import path_latencies
 from live.link_port import RealLink, SimLink
 from live.runner import run
 from live.tracker import SAMPLE_RATE
@@ -72,6 +73,7 @@ class App:
         self.library = library
         self.bpm_by_path = {r["path"]: r["bpm"] for r in library}
         self.range = bpm_range
+        self.speaker_name = ""   # the speakers' device (--xiao): a wireless one makes the suggested beat_latency unsure
         self.xiao = None     # live.xiao.XiaoOutput with --xiao: the track's mid also goes to the jank XIAO
         self.bench = None    # live.bench.XiaoBench with --xiao: the accuracy of the XIAO, this tracker and Link
         self.nudge_dir: Path | None = None   # the nudge log's folder (main: NUDGE_DIR); None: no log
@@ -94,9 +96,19 @@ class App:
             **self._beat_now(es),
             "bar": bar_status(es.bar, self.controller.bar_moves),
             "tab": self.source.tab_active(),
-            "xiao": self.xiao.status() if self.xiao is not None else None,
+            **self._latency_status(),
             "bench": self.bench.status() if self.bench is not None else None,
         }
+
+    def _latency_status(self) -> dict:
+        """xiao (its stream's numbers + path_ms), speaker (device, latency, path_ms, wireless) and the beat_latency the two
+        paths suggest (live/latency.py); all None without --xiao."""
+        if self.xiao is None:
+            return {"xiao": None, "speaker": None, "suggested_beat_latency_ms": None}
+        x = self.xiao.status()
+        paths = path_latencies(self.source.latency_ms, self.speaker_name, x)
+        return {"xiao": {**x, **paths["xiao"]}, "speaker": paths["speaker"],
+                "suggested_beat_latency_ms": paths["suggested_beat_latency_ms"]}
 
     def tab_audio(self, data: bytes, rate: int) -> None:
         """A block of a browser tab's audio (little-endian float32, mono, 44.1 kHz; the last sample is 'now') goes to the
@@ -308,6 +320,7 @@ def main(argv: list[str] | None = None) -> int:
         from live.accuracy import load_beats
         from live.bench import XiaoBench
         app.xiao = xiao
+        app.speaker_name = speaker_device_name(source)
         source.tap = xiao.push
         app.bench = XiaoBench(link.now_us, source, engine, clock, xiao, load_beats(TRAKTOR_INDEX, TRACKS_DIR),
                               ACCURACY_DIR / f"accuracy-{time.strftime('%Y%m%d')}.csv", tuple(args.range))
@@ -332,6 +345,12 @@ def main(argv: list[str] | None = None) -> int:
             app.bench.close()
             xiao.close()
     return 0
+
+
+def speaker_device_name(source) -> str:
+    """The name of the output device the player's own stream plays on."""
+    import sounddevice as sd
+    return str(sd.query_devices(source._stream.device)["name"])
 
 
 def make_xiao():
