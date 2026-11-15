@@ -184,9 +184,9 @@ def drive(drv: Driver, est, f0: int, seconds: float) -> int:
     return f0 + n
 
 
-def test_a_tempo_jump_a_stop_and_silence_reset_the_count():
+def test_a_stop_and_silence_reset_the_count_and_a_tempo_jump_when_asked():
     db = fresh()
-    drv, est = Driver(db), FakeEstimator()
+    drv, est = Driver(db, jump_reset=True), FakeEstimator()
     drv.trace = []
     f = drive(drv, est, 0, 8.0)
     assert decisions(db)[-1][1] > 8
@@ -205,9 +205,9 @@ def test_a_tempo_jump_a_stop_and_silence_reset_the_count():
     assert not db.counting
 
 
-def test_no_jump_reset_when_switched_off():
+def test_a_tempo_jump_is_not_a_reset_by_default():
     db = fresh()
-    drv, est = Driver(db, jump_reset=False), FakeEstimator()
+    drv, est = Driver(db), FakeEstimator()
     f = drive(drv, est, 0, 8.0)
     est.jump_next = True
     drive(drv, est, f, 2.0)
@@ -226,7 +226,7 @@ def test_shadow_beats_keep_the_segments_before_the_first_counted_beat():
             db.set_grid(beat_frames[f], TB, P, running=beat_frames[f] >= TB + 4 * P)
         end = f
     first = entries(db)[0]
-    assert first[1] == 0 and first[2] == pytest.approx(TB + 5 * P)     # the first counted beat
+    assert first[1] == 0 and first[2] == pytest.approx(TB + 4 * P)     # the shadow beat on the frame counting starts at
     assert first[3][NF - 2] > 0                                        # nov_bar_all: a "before" bar existed
     assert end == 999
 
