@@ -81,7 +81,7 @@ class App:
             "playing": st.playing, "rate": st.rate, "volume": st.volume,
             "traktor_bpm": traktor, "expected_bpm": expected,
             "mode": es.mode, "bpm": es.bpm, "confidence": es.confidence, "silent": es.silent, "gated": es.gated,
-            "min_confidence": self.engine.min_confidence, "hold": es.held, "fold": self.engine.fold, "level_db": self.engine.level_db, "level_fast_db": self.engine.level_fast_db,
+            "min_confidence": self.engine.min_confidence, "hold": es.held, "fold": es.fold, "fold_auto": es.fold_auto, "autobar": es.autobar, "level_db": self.engine.level_db, "level_fast_db": self.engine.level_fast_db,
             "source": "link" if self.controller.passive else "audio",
             "link_playing": self.link.playing(), "link_bpm": self.link.tempo(),
             "peers": self.link.peers(), "phase_ms": self.controller.phase_err_ms,
@@ -162,11 +162,8 @@ class App:
                 raise ValueError(f"shift {beats} beats: halves, 0.5..{MAX_SHIFT_BEATS} either way")
             self.controller.shift_beats(beats)
             self._log_nudge(beats, self.engine.bar_nudge())
-        elif name == "autobar":
-            on = body["on"]
-            if not isinstance(on, bool):
-                raise ValueError(f"on must be true or false, not {on!r}")
-            self.engine.set_autobar(on)
+        elif name == "autobar":                  # off / start / always (true = start, false = off: the old API)
+            self.engine.set_autobar(body["mode"] if "mode" in body else body["on"])
         elif name == "hold":
             hold = body["hold"]
             if not isinstance(hold, bool):
@@ -273,6 +270,9 @@ def main(argv: list[str] | None = None) -> int:
     clock = ClockMap(args.offset_ms)
     controller = LinkController(link, clock)
     engine = Engine(*args.range, min_confidence=args.min_confidence)
+    if not args.xiao:       # AUTO RANGE's reference and the /2 anchor's place come from this program's own Link session
+        engine.session_bpm = lambda: link.tempo() if link.playing() else None
+        engine.place_fn = lambda t: link.beat_at(clock.to_link_us(t)) if link.playing() else None
     app = App(source, engine, link, controller, clock, load_library(), tuple(args.range))
     app.nudge_dir = NUDGE_DIR
     if xiao is not None:

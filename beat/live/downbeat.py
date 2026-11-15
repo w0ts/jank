@@ -57,6 +57,22 @@ WEIGHTS = Path(__file__).resolve().parent.parent / "studies" / "downbeat" / "res
 OFF, LISTENING, LOCKED, MANUAL = "off", "listening", "locked", "manual"
 
 
+AUTOBAR_MODES = ("off", "start", "always")
+
+
+def autobar_mode(value) -> str:
+    """AUTO BAR's setting from the API or the device: off / start / always, or the old true (= start) / false (= off)."""
+    if value is True:
+        return "start"
+    if value is False:
+        return "off"
+    if value == "on":
+        return "start"
+    if value in AUTOBAR_MODES:
+        return value
+    raise ValueError(f"autobar {value!r}: one of {AUTOBAR_MODES} (or true / false)")
+
+
 @dataclass(frozen=True)
 class Model:
     w: np.ndarray                         # (NF * 4,): w[f * 4 + p]
@@ -418,6 +434,7 @@ class Driver:
     def __init__(self, downbeat: Downbeat, jump_reset: bool = False) -> None:
         self.db = downbeat
         self.jump_reset = jump_reset             # a tempo jump (ModeBpm.jumps) resets the bar
+        self.autobar = "start" if downbeat.auto else "off"   # off / start / always: when Link's bar may be moved
         self.trace: list[tuple] | None = None
 
     def chunk(self, estimator, f0: int, bands: np.ndarray, found: list[float], now: float, silent: bool) -> None:
@@ -452,6 +469,13 @@ class Driver:
         else:
             self.event("grid", frame, t, grid[0], grid[1], float(running))
 
+    def set_autobar(self, value) -> str:
+        """AUTO BAR's three settings (off / start / always; true = start, false = off). The estimator runs unless off;
+        when its moves are allowed (start: only at a start) is the engine's and the controller's rule."""
+        self.autobar = autobar_mode(value)
+        self.db.set_auto(self.autobar != "off")
+        return self.autobar
+
     def event(self, kind: str, frame: int, *args: float) -> None:
         if kind == "grid":
             self.db.set_grid(args[0], args[1], args[2], bool(args[3]))
@@ -464,7 +488,7 @@ class Driver:
         elif kind == "nudge":
             self.db.nudge()
         elif kind == "auto":
-            self.db.set_auto(bool(args[0]))
+            self.set_autobar(bool(args[0]) if self.autobar == "off" or not args[0] else self.autobar)
         else:
             raise ValueError(kind)
         if self.trace is not None:

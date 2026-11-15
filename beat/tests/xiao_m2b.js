@@ -9,8 +9,9 @@ const consts = ['XIAO_STATUS_FRESH_MS', 'XIAO_PLAY_WAIT_MS', 'XIAO_HOME_FRESH_MS
 let checks = 0;
 const ok = (c, msg) => { assert.ok(c, msg); checks++; };
 const eq = (a, b) => { assert.deepStrictEqual(a, b); checks++; };
-const fns = ['xiaoOutputs', 'parseHome', 'xiaoMeters', 'meterNumbers', 'bleNow', 'beatStats'];
-const P = new Function(consts + '\n' + fns.map(grab).join('\n') + '; return { ' + fns.join(', ') + ' };')();
+const fns = ['xiaoOutputs', 'homeMode', 'parseHome', 'foldNow', 'foldNext', 'autoBarFrom', 'xiaoMeters', 'meterNumbers', 'bleNow', 'beatStats'];
+const AUTOBAR = 'const AUTOBAR_WORDS = ["off", "start", "always"];\n';
+const P = new Function(AUTOBAR + consts + '\n' + fns.map(grab).join('\n') + '; return { ' + fns.join(', ') + ' };')();
 
 // the clock outputs: status outputs= / hold=, with a play / stop the page sent and no status has answered yet
 const st = (o = {}) => Object.assign({ outputs: 'stopped', hold: 0 }, o);
@@ -29,7 +30,7 @@ eq(P.xiaoOutputs(st({ outputs: 'running' }), 1000, 1500, { cmd: 'play', at: 1200
 
 // `home`
 const H = 'home=h 12400 0 1 2 4 1 0 87 -23 64 -30 -12';
-eq(P.parseHome(H), { bpm: 124, net: '0', transport: 1, bar: 2, quantum: 4, linkPeers: 1, airPeers: 0, batt: 87, level: -23, conf: 64, min: -30, max: -12 });
+eq(P.parseHome(H), { bpm: 124, net: '0', transport: 1, bar: 2, quantum: 4, linkPeers: 1, airPeers: 0, batt: 87, level: -23, conf: 64, min: -30, max: -12, mode: null, fold: null });     // (an older firmware: no mode token)
 const none = P.parseHome('home=h 0 0 0 0 4 0 0 - - - - -');
 eq([none.batt, none.level, none.conf, none.min, none.max, none.bpm], [null, null, null, null, null, 0]);
 eq(P.parseHome('ok'), null);

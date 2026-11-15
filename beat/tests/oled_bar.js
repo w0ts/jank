@@ -51,7 +51,7 @@ ok(ui.screen === 'edit' && ui.edit.field === 'autobar' && ui.edit.val === 1, 'AU
 OLED.press(ui, 'yes', 0, c);                      // YES, unchanged: picked again
 ok(fields.length === 1 && fields[0][0] === 'autobar' && fields[0][1] === 1, 'picked again: setField autobar 1');
 OLED.press(ui, 'yes', 0, c);
-OLED.press(ui, 'up', 0, c);                       // OFF (choices cycle)
+OLED.press(ui, 'down', 0, c);                     // OFF (choices cycle: OFF, AT START, ALWAYS)
 ok(fields.length === 1, 'not applied before YES');
 OLED.press(ui, 'yes', 0, c);
 ok(fields.length === 2 && fields[1][1] === 0, 'OFF on YES');
