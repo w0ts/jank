@@ -51,7 +51,11 @@ void beat_stats(struct jk_beat *out);
 uint8_t beat_bar_state(void);
 /* AUDIO mode (the tracker on and its source sounding, core/jank_live.h) and the tracker locked on a steady beat; cheap
  * (the bridge's task asks it at every step) */
-void beat_state(uint8_t *audio, uint8_t *locked);                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
+void beat_state(uint8_t *audio, uint8_t *locked);
+/* AUDIO mode's fold (core/jank_fold.h): dir +1 x2, -1 /2, 0 back to 1; taken by the beat task within 5 ms. Returns the
+ * new exp (fold 2^exp), -99 in LINK mode */
+int beat_fold(int dir);
+void beat_fold_resync(void);                                /* Start after Stop: fold 1, as a resync */                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
 
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);

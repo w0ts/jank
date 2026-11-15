@@ -32,8 +32,8 @@ The setting `ble` (`set ble pair|auto|off`, saved):
   2 s when nothing changed:
 
   ```
-  h <bpm x100> <net> <transport> <bar> <quantum> <link peers> <air peers> <battery> <level> <conf> <min> <max>
-  h 12000 j3 1 275 4 2 0 - -24 87 -31 -18
+  h <bpm x100> <net> <transport> <bar> <quantum> <link peers> <air peers> <battery> <level> <conf> <min> <max> <mode>
+  h 12000 j3 1 275 4 2 0 - -24 87 -31 -18 1
   ```
 
   `net` is `j<group>` (MODE JANK) or `w1`/`w0` (on the Wi-Fi network / looking for it); `transport` 0 stopped, 1
@@ -41,7 +41,7 @@ The setting `ble` (`set ble pair|auto|off`, saved):
   place in the bar in hundredths of a beat (`-` with no session); `battery` percent (`-`: no board has a gauge yet);
   `level` the input meter (RMS over 0.3 s, a value every 250 ms, dBFS), `conf` the tracker's beat activation peak over
   the last second in percent, `min` / `max` the meter's lowest and highest values over the last 3 s (`-` with no audio
-  stream). `home` on the control line answers
+  stream), `mode` 1 AUDIO (the source has sound: the tracker leads, play / stop hold the outputs) or 0 LINK. `home` on the control line answers
   the same line (the page polls it over USB).
 - **Nothing else**: no beat reports (they stay on USB), no MIDI clock (connection events 30..60 ms apart, some given up to
   Wi-Fi, cannot carry 24 PPQN), no screen.

@@ -468,6 +468,8 @@ int bridge_play(int play)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     if (audio) {
         jho_set(&s_hold, !play);      /* AUDIO mode: Stop / Start of the outputs; the tracker keeps the session (jank_hold.h) */
+        if (play && s_hold.arming)
+            beat_fold_resync();       /* Start: a resync, the fold back to 1 (the emulator's setHold) */
         follow_transport(midi_now_us());   /* the clocks stop now, not at the bridge's next step */
     } else {
         r = jp_set_playing(&s_peer, play, s_cfg.quantum, midi_now_us());

@@ -232,6 +232,15 @@ static void test_session_commands(void)
     CHECK(run("tempo") == JK_CTL_NONE && strstr(out, "err ") == out);
     CHECK(jk_ctl_tempo("tempo -5", &mpb) == -1);
     CHECK(run("play") == JK_CTL_PLAY && out[0] == 0);
+    {
+        int dir = 9;                                    /* AUDIO mode's fold: the caller answers fold=<f> ok, or err link mode */
+        CHECK(run("fold x2") == JK_CTL_FOLD && out[0] == 0);
+        CHECK(!jk_ctl_fold("fold x2", &dir) && dir == 1 && !jk_ctl_fold(" fold /2 ", &dir) && dir == -1);
+        CHECK(!jk_ctl_fold("fold 1", &dir) && dir == 0);
+        CHECK(jk_ctl_fold("fold x3", &dir) == -1 && jk_ctl_fold("fold", &dir) == -1 && jk_ctl_fold("folder x2", &dir) == -1);
+        CHECK(run("fold x3") == JK_CTL_NONE && strstr(out, "err fold"));
+        CHECK(run("fold") == JK_CTL_NONE && strstr(out, "err fold"));
+    }
     CHECK(run("stop") == JK_CTL_STOP && out[0] == 0);
     CHECK(run("play now") == JK_CTL_NONE && strstr(out, "err ") == out);
 }
@@ -323,26 +332,33 @@ static void test_beat(void)
                                  .peak_db = -6, .conf_pct = 73};
     snap.hold = 1;
     snap.outputs = JHO_STOPPED;
+    snap.beat.fold_exp = -1;
+    snap.beat.fold_manual = 1;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "outputs=stopped\nfold=0.5\nfold_manual=1\n"));
+    snap.beat.fold_exp = 0;
+    snap.beat.fold_manual = 0;
     CHECK(run("beat") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=1\nrms_db=-21\nrms_min_db=-30\nrms_max_db=-14\npeak_db=-6\nconf=73\n"));
-    CHECK(run("status") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=1\nhold=1\noutputs=stopped\nrms_db=-21\nrms_min_db=-30\n"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=1\nhold=1\noutputs=stopped\nfold=1\nfold_manual=0\nrms_db=-21\nrms_min_db=-30\n"));
     CHECK(strstr(out, "rms_max_db=-14\npeak_db=-6\nconf=73\n") && ends(out, "ok\n"));
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .level_db = -99, .level_min_db = -99, .level_max_db = -99, .peak_db = -99};
     snap.hold = 0;
     snap.outputs = JHO_ARMED;                               /* a stream of zeros: open, no sound, LINK mode */
-    CHECK(run("status") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=0\nhold=0\noutputs=armed\nrms_db=-99\n"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=0\nhold=0\noutputs=armed\nfold=1\n"));
 }
 
 /* AUTO BAR: the setting (on by default; `on` again counts as picked again) and the estimator in status and beat */
 static void test_autobar(void)
 {
     setup();
-    CHECK(cfg.autobar == 1 && cfg.autobar_picks == 0);
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=on\n"));
-    CHECK(run("set autobar off") == JK_CTL_CFG_CHANGED && cfg.autobar == 0 && cfg.autobar_picks == 0);
+    CHECK(cfg.autobar == JK_AUTOBAR_START && cfg.autobar_picks == 0);              /* AT START by default */
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=start\n"));
+    CHECK(run("set autobar off") == JK_CTL_CFG_CHANGED && cfg.autobar == JK_AUTOBAR_OFF && cfg.autobar_picks == 0);
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=off\n"));
-    CHECK(run("set autobar on") == JK_CTL_CFG_CHANGED && cfg.autobar == 1 && cfg.autobar_picks == 1);
-    CHECK(run("set autobar on") == JK_CTL_CFG_CHANGED && cfg.autobar_picks == 2);      /* picked again */
-    CHECK(run("set autobar yes") == JK_CTL_NONE && strstr(out, "err") && cfg.autobar == 1);
+    CHECK(run("set autobar on") == JK_CTL_CFG_CHANGED && cfg.autobar == JK_AUTOBAR_START && cfg.autobar_picks == 1);   /* on = start */
+    CHECK(run("set autobar start") == JK_CTL_CFG_CHANGED && cfg.autobar_picks == 2);   /* picked again */
+    CHECK(run("set autobar always") == JK_CTL_CFG_CHANGED && cfg.autobar == JK_AUTOBAR_ALWAYS && cfg.autobar_picks == 3);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=always\n"));
+    CHECK(run("set autobar yes") == JK_CTL_NONE && strstr(out, "err") && cfg.autobar == JK_AUTOBAR_ALWAYS);
     snap.beat = (struct jk_beat){.bar = 2, .bar_phi = 3, .bar_lead_x100 = 241, .bar_moves = 4};
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "bar=locked\nbar_phi=3\nbar_lead=2.41\n") && ends(out, "ok\n"));
     snap.beat = (struct jk_beat){.bar = 1, .bar_phi = -1, .bar_lead_x100 = -5};
@@ -361,9 +377,11 @@ static void test_save(void)
     jk_cfg_defaults(&a);
     b = a;
     CHECK(!jk_cfg_stored_differs(&a, &b));
-    b.autobar = 0;                                      /* a bench setting: not stored */
-    b.beat_latency_ms = 10;
+    b.beat_latency_ms = 10;                             /* a bench setting: not stored */
     CHECK(!jk_cfg_stored_differs(&a, &b));
+    b.autobar = JK_AUTOBAR_ALWAYS;                      /* stored apart ("usb1"), as SOURCE */
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
     b.ble = JK_BLE_AUTO;                                /* the release blob's pad byte: stored */
     CHECK(jk_cfg_stored_differs(&a, &b));
     b = a;
@@ -505,6 +523,8 @@ static void test_status_size(void)
     snap.outputs = JHO_RUNNING;
     snap.beat.level_db = snap.beat.level_min_db = snap.beat.level_max_db = snap.beat.peak_db = -99;
     snap.beat.conf_pct = 100;
+    snap.beat.fold_exp = -2;                                          /* "0.25" */
+    snap.beat.fold_manual = 1;
     CHECK(jk_ctl_line("status", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest status: %zu bytes\n", strlen(big));
     CHECK(strstr(big, "bar=manual\n") && strstr(big, "ble_state=connected\n") && strstr(big, "usb_role=host\n"));

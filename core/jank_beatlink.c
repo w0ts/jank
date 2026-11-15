@@ -102,6 +102,10 @@ int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settle
     int n;
     if (!settled || in->passive || in->held || !in->running || !bar->locked || (c->bar_seen && bar->seq == c->bar_seq))
         return 0;
+    if (in->bar_mode == JBL_BAR_OFF)
+        return 0;
+    if (in->bar_mode == JBL_BAR_START && !in->bar_now && lk_playing(k) && !start->armed && lk_play_beat(k) <= lk_beat_at(k, now))
+        return 0;                       /* AT START: the session plays (its start reached): the 1 waits for the next start */
     if (c->err_us > JBL_PHASE_US || c->err_us < -JBL_PHASE_US)
         return 0;
     c->bar_seq = bar->seq;
@@ -142,6 +146,6 @@ void jbl_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, 
     }
     follow_tempo(c, k, now, in->period_us);
     follow_phase(c, k, now, in);
-    if (!c->playing)
+    if (!c->playing && !in->bar_wait)
         start_session(c, k, start, now, quantum);
 }

@@ -290,6 +290,44 @@ static void test_bar_moves(void)
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10900000, &in, &bar) != 0);    /* the waiting decision, now */
 }
 
+/* AUTO BAR AT START: the 1 is placed while the start is armed (it lands on it), never while the session plays; once at a
+ * new start for the bar (bar_now); START WAIT holds the tracker's start; ALWAYS moves mid-play (test_bar_moves) */
+static void test_bar_at_start(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000, .bar_mode = JBL_BAR_START};
+    struct jbl_bar bar = {.locked = 1, .seq = 1, .count = 7, .phi = 2, .beat_us = 10000000 + 4 * 500000};
+    int64_t ub;
+    start(10000000);
+    in.bar_wait = 1;                                             /* the estimator listening: the start waits */
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    CHECK(!st.armed && jbl.starts == 0 && !jbl.playing);
+    in.bar_wait = 0;                                             /* found (or the wait is over): armed */
+    jbl_step(&jbl, &node, &st, 1, 10150000, &in, 4);
+    CHECK(st.armed && jbl.starts == 1);
+    ub = lk_beat_at(&node, bar.beat_us);
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10200000, &in, &bar) == jbl_bar_shift(ub, 7, 2));   /* armed: placed */
+    CHECK(st.armed && st.ub % (4 * (int64_t)LK_UBEAT) == 0);     /* the start re-targeted onto the moved bar line */
+    CHECK(poll_start(10200000, 16000000, 1) != 0 && lk_playing(&node));
+    CHECK(((lk_beat_at(&node, bar.beat_us) / LK_UBEAT) % 4 + 4) % 4 == (7 - 2) % 4);
+    bar.seq = 2;                                                 /* a later decision while playing: no move */
+    bar.phi = 3;
+    ub = lk_beat_at(&node, bar.beat_us);
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17000000, &in, &bar) == 0 && lk_beat_at(&node, bar.beat_us) == ub);
+    bar.seq = 3;
+    in.bar_now = 1;                                              /* a new start for the bar (a fold change, a resync) */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17100000, &in, &bar) == jbl_bar_shift(ub, 7, 3));
+    in.bar_now = 0;
+    in.bar_mode = JBL_BAR_OFF;                                   /* OFF: nothing */
+    bar.seq = 4;
+    bar.phi = 1;
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17200000, &in, &bar) == 0);
+    in.bar_mode = JBL_BAR_START;                                 /* stopped: the next decision places it (the next start) */
+    lk_set_playing(&node, 0, lk_beat_at(&node, 17300000), 17300000);
+    bar.seq = 5;
+    ub = lk_beat_at(&node, bar.beat_us);
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17400000, &in, &bar) == jbl_bar_shift(ub, 7, 1));
+}
+
 int main(void)
 {
     test_session_offset();
@@ -300,6 +338,7 @@ int main(void)
     test_transport();
     test_passive();
     test_held();
+    test_bar_at_start();
     test_start_rules();
     test_not_joined();
     test_drifting_tracked_grid();

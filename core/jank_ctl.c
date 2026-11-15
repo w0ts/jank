@@ -2,6 +2,7 @@
 /* The control line protocol (jank_core.h): get, set, status. */
 #include "jank_core.h"
 #include "jank_phone.h"
+#include "jank_fold.h"
 #include "jank_hold.h"
 #include "jank_usbrole.h"
 #include <stdarg.h>
@@ -19,7 +20,7 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->quantum = 4;
     c->beat = 1;
     c->beat_latency_ms = JK_BEAT_LATENCY_DEFAULT_MS;
-    c->autobar = 1;
+    c->autobar = JK_AUTOBAR_START;
     c->ble = JK_BLE_PAIR;
     c->usb = JUR_USB_DEVICE;
     c->source = JUR_SRC_AUTO;
@@ -40,7 +41,7 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
 
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b)
 {
-    return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source;
+    return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source || a->autobar != b->autobar;
 }
 
 enum jk_save jk_save_on_change(uint8_t *pending, int changed, int playing, int restart_follows)
@@ -90,6 +91,17 @@ static const char *on_off(uint32_t v) { return v ? "on" : "off"; }
 
 static const char *const BLE_NAMES[] = {"pair", "off", "auto"};   /* by enum jk_ble */
 
+static const char *const AUTOBAR_NAMES[] = {"off", "start", "always"};   /* by enum jk_autobar */
+static const char *autobar_name(uint32_t v) { return v <= JK_AUTOBAR_ALWAYS ? AUTOBAR_NAMES[v] : AUTOBAR_NAMES[JK_AUTOBAR_START]; }
+static int parse_name3(const char *s, const char *const names[3], uint8_t *out)
+{
+    for (uint8_t i = 0; i < 3; i++)
+        if (!strcmp(s, names[i])) {
+            *out = i;
+            return 0;
+        }
+    return -1;
+}
 static const char *ble_name(uint32_t v) { return v <= JK_BLE_AUTO ? BLE_NAMES[v] : BLE_NAMES[JK_BLE_PAIR]; }
 
 static void put_ip(struct writer *w, const char *key, uint32_t ip)
@@ -101,7 +113,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
 {
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%s%d.%02d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_10us < 0 ? "-" : "", abs(c->offset_10us) / 100, abs(c->offset_10us) % 100);
-    put(w, "beat=%s\nbeat_latency=%d\nautobar=%s\n", on_off(c->beat), c->beat_latency_ms, on_off(c->autobar));
+    put(w, "beat=%s\nbeat_latency=%d\nautobar=%s\n", on_off(c->beat), c->beat_latency_ms, autobar_name(c->autobar));
     put(w, "ble=%s\n", ble_name(c->ble));
     put(w, "usb=%s\nsource=%s\n", jur_usb_name(c->usb), jur_src_name(c->source));
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
@@ -140,7 +152,8 @@ static void put_link(const struct jk_snapshot *s, struct writer *w)
 static void put_audio(const struct jk_snapshot *s, struct writer *w)
 {
     const struct jk_beat *t = &s->beat;
-    put(w, "audio=%u\naudio_live=%u\nhold=%u\noutputs=%s\n", t->audio, t->audio_live, s->hold, jho_icon_name(s->outputs));
+    put(w, "audio=%u\naudio_live=%u\nhold=%u\noutputs=%s\nfold=%s\nfold_manual=%u\n", t->audio, t->audio_live, s->hold, jho_icon_name(s->outputs),
+        jfo_name(t->fold_exp), t->fold_manual);
     put(w, "rms_db=%d\nrms_min_db=%d\nrms_max_db=%d\npeak_db=%d\nconf=%u\n", t->level_db, t->level_min_db, t->level_max_db, t->peak_db, t->conf_pct);
 }
 
@@ -305,10 +318,14 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
         return parse_on_off(val, &c->peer);
     if (!strcmp(key, "beat"))
         return parse_on_off(val, &c->beat);
-    if (!strcmp(key, "autobar")) {         /* on, even when on already: picked again (MANUAL ends) */
-        if (parse_on_off(val, &c->autobar))
+    if (!strcmp(key, "autobar")) {         /* on (= start), start, always, even when so already: picked again (MANUAL ends) */
+        uint8_t v;
+        if (!strcmp(val, "on"))
+            v = JK_AUTOBAR_START;
+        else if (parse_name3(val, AUTOBAR_NAMES, &v))
             return -1;
-        if (c->autobar)
+        c->autobar = v;
+        if (v != JK_AUTOBAR_OFF)
             c->autobar_picks++;
         return 0;
     }
@@ -409,6 +426,23 @@ int jk_ctl_tempo(const char *line, int32_t *mpb)
     return 0;
 }
 
+int jk_ctl_fold(const char *line, int *dir)
+{
+    char buf[32], *s = trim(line, buf, sizeof buf);
+    if (!s || strncmp(s, "fold ", 5))
+        return -1;
+    s += 5;
+    if (!strcmp(s, "x2"))
+        *dir = 1;
+    else if (!strcmp(s, "/2"))
+        *dir = -1;
+    else if (!strcmp(s, "1"))
+        *dir = 0;
+    else
+        return -1;
+    return 0;
+}
+
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap)
 {
     struct writer w = {out, cap, 0};
@@ -438,6 +472,12 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
             return JK_CTL_TEMPO;
         put(&w, "err tempo is 20 to 999 BPM\n");
     }
+    else if (!strncmp(s, "fold", 4) && (!s[4] || s[4] == ' ')) {
+        int dir;
+        if (!jk_ctl_fold(s, &dir))
+            return JK_CTL_FOLD;
+        put(&w, "err fold x2, /2 or 1\n");
+    }
     else if (!strcmp(s, "home")) {
         char h[64];
         if (jph_home_line(cfg, snap, now_ms, h, sizeof h))
@@ -447,7 +487,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     } else if (!strcmp(s, "ble pair") || !strcmp(s, "ble close"))
         return s[4] == 'p' ? JK_CTL_BLE_PAIR : JK_CTL_BLE_CLOSE;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|autobar|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nble pair|close\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|autobar|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nble pair|close\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;
