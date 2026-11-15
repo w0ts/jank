@@ -18,7 +18,7 @@
   input[type=text], input[type=search], select { font:inherit; padding:6px 8px; border-radius:7px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
   input[type=search] { width:100%; }
   input[type=range] { width:100%; }
-  #list { max-height:220px; overflow:auto; border:1px solid var(--line); border-radius:7px; margin-top:8px; }
+  #list { flex:1 1 0; min-height:260px; overflow:auto; border:1px solid var(--line); border-radius:7px; margin-top:8px; }
   #list div { padding:5px 8px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; border-bottom:1px solid var(--line); }
   #list div:hover { background:var(--bg); }
   #list span.b { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
@@ -30,9 +30,17 @@
   #err { color:var(--bad); min-height:1.2em; }
   .device { overflow-x:auto; }
   /* the device keeps its true size (its svg is sized in PX_PER_MM); the XIAO card sits to its right, below it when narrow */
-  #devwrap { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
-  #devwrap > .device { flex:0 0 auto; max-width:100%; }
-  #devwrap > #xiaocard { flex:1 1 380px; min-width:0; }
+  #devwrap { display:flex; flex-wrap:wrap; gap:12px; align-items:stretch; }
+  #leftcol { flex:0 1 auto; max-width:100%; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  #leftcol > .device { flex:0 0 auto; }
+  #rightcol { flex:1 1 420px; min-width:0; display:flex; flex-direction:column; gap:12px; }
+  .tabs { display:flex; gap:3px; margin-bottom:-13px; position:relative; z-index:1; padding-left:10px; }
+  .tabs button { border-radius:8px 8px 0 0; border-bottom-color:var(--line); background:var(--bg); color:var(--muted); padding:7px 16px; }
+  .tabs button[aria-selected="true"] { background:var(--card); color:var(--fg); font-weight:600; border-bottom-color:var(--card); }
+  /* the column is as tall as the left one: the track list takes the rest and scrolls inside (260 px at least when wrapped) */
+  .tabpanel { display:flex; flex-direction:column; gap:10px; border-top-left-radius:0; flex:1 1 auto; min-height:0; }
+  .tabpanel > [data-pane="player"] { flex:1 1 0; min-height:0; display:flex; flex-direction:column; }
+  .tabpanel .ctl { border-top:1px solid var(--line); padding-top:8px; }
   .device svg { display:block; flex:none; margin:0 auto; outline:none; touch-action:none; user-select:none; -webkit-user-select:none; }
   .device .lid { fill:#8d9094; stroke:#5d6064; stroke-width:.5; }
   .device .lidshade { fill:none; stroke:#a9acb0; stroke-width:.4; }
@@ -85,12 +93,9 @@
 </head>
 <body>
 <main>
-  <div class="card">
-    <h1>Beat Player</h1>
-    <div class="muted">What plays here is what the beat tracker hears. This program is the Link master; Ableton Live follows.</div>
-  </div>
 
   <div id="devwrap">
+  <div id="leftcol">
   <div class="card device">
     <div class="devpanel" id="viewbar">
       <label>Screen <select id="scr"><option value="1.54">1.54 in</option><option value="2.42">2.42 in</option><option value="none">no screen</option></select></label>
@@ -171,7 +176,6 @@
       <b>XIAO audio beat tracker</b>
       <span id="xaudio" class="xaudio">no report yet</span>
     </div>
-    <div class="num muted" style="font-size:12px;margin:2px 0 6px">The XIAO's own tracker on the music it hears over USB audio: not the Link session (that is on the device screen above) and not the screen itself.</div>
     <div class="row">
       <span id="xbeat" title="flashes on each beat the XIAO's tracker hears" style="display:inline-block;width:14px;height:14px;border-radius:7px;background:#333"></span>
       <span><b id="xbpm" class="num">---</b> BPM heard</span>
@@ -179,10 +183,6 @@
       <span>beats heard <b id="xn" class="num">-</b></span>
     </div>
     <div id="xmsg" class="num" style="opacity:.7"></div>
-    <table id="acc" class="num" style="margin-top:8px;border-collapse:collapse;font-size:12px">
-      <thead><tr><th style="text-align:left">Accuracy (last 16 beats, + = late)</th><th>XIAO</th><th>player</th><th>Link (Live)</th></tr></thead>
-      <tbody id="accrows"></tbody>
-    </table>
     <div id="accmodel" class="num" style="opacity:.8;font-size:12px;margin-top:4px"></div>
     <div id="accxstats" class="num" style="opacity:.8;font-size:12px"></div>
     <div class="row" style="margin-top:6px">
@@ -195,27 +195,23 @@
     </div>
     <div id="autolathint" class="num" style="font-size:12px;color:#e0a84f" hidden></div>
   </div>
-
   </div>
-
-  <div class="card" id="panebar">
-    <div class="row" role="tablist">
+  <div id="rightcol">
+    <div class="tabs" role="tablist">
       <button id="panebtn-player" role="tab" type="button">Player</button>
       <button id="panebtn-tab" role="tab" type="button">Tab audio</button>
     </div>
-  </div>
-
-  <div class="card" data-pane="player">
+    <div class="card tabpanel">
+  <div data-pane="player">
     <input id="q" type="search" placeholder="Search your Traktor tracks…" autocomplete="off">
     <div id="list"></div>
-    <div class="row" style="margin-top:8px">
+    <div class="row" style="margin-top:6px">
       <input id="path" type="text" placeholder="…or any audio file path" style="flex:1; min-width:200px">
       <button id="loadpath">Open</button>
     </div>
     <div id="err"></div>
   </div>
-
-  <div class="card" id="tabcard" data-pane="tab">
+  <div id="tabcard" data-pane="tab">
     <div class="row">
       <b>Listen to a tab</b>
       <button id="tabbtn" class="primary">Listen to a tab</button>
@@ -224,35 +220,36 @@
     <div class="muted" style="font-size:12px;margin:4px 0">Pick a Chrome tab (YouTube, say) and tick "Share tab audio". The tab goes quiet and this page plays it instead: to the speakers (the Volume slider) and, with --xiao, to the "jank" USB audio output at full level; without --xiao, to the speakers and this player's tracker.</div>
     <div id="tabstat" class="num" style="font-size:13px"></div>
     <div id="tablat" class="num muted" style="font-size:12px"></div>
-    <div class="muted" style="font-size:12px;margin-top:4px">The accuracy panel needs annotated tracks: a tab has no reference beat grid, so it shows nothing for a tab.</div>
+    <div class="muted" style="font-size:12px;margin-top:4px">The accuracy numbers (the CSV log, Calibrate) need annotated tracks: a tab has no reference beat grid, so they show nothing for a tab.</div>
   </div>
 
-  <div class="card" data-pane="player">
-    <div class="now" id="now">No track</div>
+  <div class="ctl">
+    <div data-pane="player">
+      <div class="now" id="now">No track</div>
+      <div class="row" style="margin-top:6px">
+        <button class="primary" id="play">Play</button>
+        <label><input type="checkbox" id="auto" checked> play the next track</label>
+        <span class="num muted" id="time">0:00 / 0:00</span>
+      </div>
+      <input id="seek" type="range" min="0" max="1000" value="0" style="margin-top:6px;width:100%">
+      <div class="row" style="margin-top:8px">
+        <strong>Pitch</strong>
+        <span id="pitchval" class="num">+0.00 %</span>
+        <button id="reset">0</button>
+        <label class="muted">range
+          <select id="range"><option value="8">±8 %</option><option value="16">±16 %</option><option value="50">±50 %</option></select>
+        </label>
+      </div>
+      <input id="pitch" type="range" min="-8" max="8" step="0.01" value="0" style="width:100%">
+    </div>
     <div class="row" style="margin-top:8px">
-      <button class="primary" id="play">Play</button>
-      <label><input type="checkbox" id="auto" checked> play the next track</label>
-      <span class="num muted" id="time">0:00 / 0:00</span>
-    </div>
-    <input id="seek" type="range" min="0" max="1000" value="0" style="margin-top:8px">
-  </div>
-
-  <div class="card">
-    <div class="row">
-      <strong>Pitch</strong>
-      <span id="pitchval" class="num">+0.00 %</span>
-      <button id="reset">0</button>
-      <label class="muted">range
-        <select id="range"><option value="8">±8 %</option><option value="16">±16 %</option><option value="50">±50 %</option></select>
-      </label>
-    </div>
-    <input id="pitch" type="range" min="-8" max="8" step="0.01" value="0">
-    <div class="row" style="margin-top:10px">
       <strong>Volume</strong>
       <span id="volval" class="num muted">100 %</span>
-      <span class="muted">(what you hear; the tracker always gets the full signal)</span>
     </div>
-    <input id="vol" type="range" min="0" max="100" step="1" value="100">
+    <input id="vol" type="range" min="0" max="100" step="1" value="100" style="width:100%">
+  </div>
+    </div>
+  </div>
   </div>
 
 </main>
@@ -1326,20 +1323,7 @@ async function askXiao() {
 }
 const f1 = (v, d = 1) => (v === null || v === undefined ? '-' : Number(v).toFixed(d));
 function showAccuracy(b) {
-  if (!b || !b.xiao) { $('accrows').replaceChildren(); return; }
-  const cols = ['xiao', 'player', 'link'];
-  const rows = [
-    ['beats', c => String(b[c].n)],
-    ['offset ms', c => f1(b[c].mean_ms) + ' ± ' + f1(b[c].sd_ms)],
-    ['within 20 ms', c => f1(b[c].within_pct, 0) + ' %'],
-    ['BPM err', c => f1(b[c].bpm_err, 2) + (b[c].bpm ? ' (' + f1(b[c].bpm, 2) + ')' : '')],
-    ['lock s', c => f1(b[c].lock_s)],
-  ];
-  $('accrows').replaceChildren(...rows.map(([name, fn]) => {
-    const tr = document.createElement('tr');
-    for (const v of [name, ...cols.map(fn)]) { const td = document.createElement('td'); td.textContent = v; td.style.padding = '1px 8px'; tr.append(td); }
-    return tr;
-  }));
+  if (!b || !b.xiao) return;
   const m = b.model || {};
   $('accmodel').textContent = 'ref ' + f1(b.ref_bpm, 2) + ' BPM, ' + b.ref_beats + ' beats | this track: Link phase forces ' + f1(b.xiao_phase_forces, 0) + ', tempo sets ' + f1(b.xiao_tempo_sets, 0) + ', gaps ' + f1(b.xiao_gaps, 0) +
     ' | latencies: speakers ' + f1(m.speakers_latency_ms) + ', jank ' + f1(m.jank_latency_ms) + ', FIFO ' + f1(m.fifo_ms) +
@@ -2328,7 +2312,7 @@ function setPane(to) {
   if (plan.pausePlayer) api('play', { playing: false });
   if (plan.stopTab) tabStop('Stopped listening: back on the Player tab.');
   for (const el of document.querySelectorAll('[data-pane]')) el.hidden = el.dataset.pane !== pane;
-  for (const n of ['player', 'tab']) { const b = $('panebtn-' + n); b.classList.toggle('primary', n === pane); b.setAttribute('aria-selected', String(n === pane)); }
+  for (const n of ['player', 'tab']) { const b = $('panebtn-' + n); b.setAttribute('aria-selected', String(n === pane)); }
   try { localStorage.setItem(PANE_KEY, pane); } catch (e) { /* not remembered */ }
 }
 $('panebtn-player').onclick = () => setPane('player');
