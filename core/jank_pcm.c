@@ -125,6 +125,66 @@ size_t jp_rs_run(struct jp_rs *r, const int16_t *in, size_t n, int16_t *out, siz
     return w;
 }
 
+int jp_cr_init(struct jp_cr *r, uint32_t in_rate_num, uint32_t in_rate_den, uint32_t out_rate)
+{
+    uint64_t num = in_rate_num, den = (uint64_t)in_rate_den * out_rate, g;
+    memset(r, 0, sizeof *r);
+    if (!num || !den)
+        return -1;
+    g = num;                            /* gcd */
+    for (uint64_t b = den; b;) {
+        uint64_t t = g % b;
+        g = b;
+        b = t;
+    }
+    num /= g;
+    den /= g;
+    if (den > 65535u || num > 65535u)
+        return -1;                      /* (ph x 32768 / den stays in 32 bits) */
+    r->num = (uint32_t)num;
+    r->den = (uint32_t)den;
+    jp_cr_reset(r);
+    return 0;
+}
+
+void jp_cr_reset(struct jp_cr *r)
+{
+    memset(r->x, 0, sizeof r->x);
+    r->ph = 2u * r->den;                /* output 0 sits on input 0, which is x[1] once inputs 0..2 are in */
+}
+
+/* Catmull-Rom between x[1] and x[2] at t = f / 32768, in doubled coefficients so that every term is an integer */
+static int16_t cr_one(const int16_t *x, int32_t f)
+{
+    int64_t a = -x[0] + 3 * x[1] - 3 * x[2] + x[3];
+    int64_t b = 2 * x[0] - 5 * x[1] + 4 * x[2] - x[3];
+    int64_t c = x[2] - x[0];
+    int64_t y = ((a * f) >> 15) + b;
+    y = ((y * f) >> 15) + c;
+    y = ((y * f) >> 15) + 2 * x[1];     /* twice the value */
+    y = (y + 1) >> 1;
+    return (int16_t)(y > 32767 ? 32767 : y < -32768 ? -32768 : y);
+}
+
+size_t jp_cr_run(struct jp_cr *r, const int16_t *in, size_t n, int16_t *out, size_t cap)
+{
+    size_t w = 0;
+    for (size_t i = 0; i < n; i++) {
+        r->x[0] = r->x[1];
+        r->x[1] = r->x[2];
+        r->x[2] = r->x[3];
+        r->x[3] = in[i];
+        /* x[1] is input k - 2 now; every output whose position is in [k - 2, k - 1) */
+        while (r->ph < r->den) {
+            if (w < cap)
+                out[w++] = cr_one(r->x, (int32_t)((r->ph << 15) / r->den));
+            r->ph += r->num;
+        }
+        r->ph -= r->den;
+    }
+    return w;
+}
+
 uint32_t jp_rs_delay_us(const struct jp_rs *r, uint32_t in_rate)
 {
     if ((r->up == 1u && r->down == 1u) || !in_rate)

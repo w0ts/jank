@@ -102,7 +102,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%s%d.%02d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_10us < 0 ? "-" : "", abs(c->offset_10us) / 100, abs(c->offset_10us) % 100);
     put(w, "beat=%s\nbeat_latency=%d\nautobar=%s\n", on_off(c->beat), c->beat_latency_ms, on_off(c->autobar));
     put(w, "ble=%s\n", ble_name(c->ble));
-    put(w, "usb=%s\nsource=%s\n", jur_usb_name(c->usb), jur_src_name(c->source));
+    put(w, "usb=%s\nsource=%s\nline_gain=%d\n", jur_usb_name(c->usb), jur_src_name(c->source), c->line_gain_db);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "version=%s\nok\n", JK_VERSION);
@@ -255,6 +255,8 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
         c->offset_10us = (int16_t)v;
     else if (!strcmp(key, "beat_latency") && !parse_int(val, JK_BEAT_LATENCY_MIN_MS, JK_BEAT_LATENCY_MAX_MS, &v))
         c->beat_latency_ms = (int16_t)v;
+    else if (!strcmp(key, "line_gain") && !parse_int(val, JK_LINE_GAIN_MIN_DB, JK_LINE_GAIN_MAX_DB, &v))
+        c->line_gain_db = (int8_t)v;
     else
         return -1;
     return 0;
@@ -436,7 +438,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     } else if (!strcmp(s, "ble pair") || !strcmp(s, "ble close"))
         return s[4] == 'p' ? JK_CTL_BLE_PAIR : JK_CTL_BLE_CLOSE;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|autobar|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nble pair|close\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|autobar|ble|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nble pair|close\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

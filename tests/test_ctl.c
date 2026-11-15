@@ -313,6 +313,14 @@ static void test_beat(void)
     CHECK(run("set beat_latency 40") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 40);
     CHECK(run("set beat off") == JK_CTL_CFG_CHANGED && cfg.beat == 0);
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "beat=off\nbeat_latency=40\n"));
+    /* LINE IN gain: -12..+12 dB, a bench setting (not stored: no save, jk_cfg_stored_differs) */
+    CHECK(cfg.line_gain_db == 0 && run("get") == JK_CTL_NONE && strstr(out, "source=auto\nline_gain=0\n"));
+    {
+        struct jk_cfg before = cfg;
+        CHECK(run("set line_gain -12") == JK_CTL_CFG_CHANGED && cfg.line_gain_db == -12 && !jk_cfg_stored_differs(&before, &cfg));
+    }
+    CHECK(run("set line_gain 13") == JK_CTL_NONE && strstr(out, "err") && cfg.line_gain_db == -12);
+    CHECK(run("set line_gain 6") == JK_CTL_CFG_CHANGED && cfg.line_gain_db == 6 && run("get") == JK_CTL_NONE && strstr(out, "line_gain=6\n"));
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .mode = 1, .bpm_x100 = 12345, .heap_min = 90000, .cpu_pct_x10 = 253, .packets = 77};
     CHECK(run("beat") == JK_CTL_NONE);
     CHECK(strstr(out, "mode=steady\n") && strstr(out, "bpm=123.45\n") && strstr(out, "heap_min=90000\n"));
