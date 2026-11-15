@@ -236,6 +236,19 @@ static void test_whole_beat_move(void)
     }
 }
 
+/* NUDGE BEAT moves the session's beats by half beats (12 ticks): the grid's times stay too, one F8 per grid time */
+static void test_half_beat_move(void)
+{
+    static const int64_t moves[] = {500000, -500000, 1500000, -2500000};
+    const int64_t tick = 500000 / 24, t_end = 4000000;
+    for (unsigned i = 0; i < sizeof moves / sizeof moves[0]; i++) {
+        int64_t gap;
+        uint32_t resyncs, n = run_with_move(moves[i], 1000000 + 7 * tick + 1, t_end, &gap, &resyncs);
+        CHECK(n == 192 && gap >= tick - 1 && resyncs == 1);
+        printf("clock: half-beat move %+lld ub: %u clocks, min gap %lld us\n", (long long)moves[i], n, (long long)gap);
+    }
+}
+
 static uint32_t count(const struct jc_fire *f, uint8_t b)
 {
     uint32_t c = 0;
@@ -425,6 +438,7 @@ int main(void)
     test_slew();
     test_resync();
     test_whole_beat_move();
+    test_half_beat_move();
     test_start_on_the_bar();
     test_click_resync();
     test_free_run_through_a_scan();

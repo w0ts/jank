@@ -9,7 +9,8 @@
 
 #define NS "jank"
 #define KEY "cfg1"
-#define KEY_USB "usb1"                 /* USB DEVICE / HOST, AUDIO > SOURCE and AUTO BAR, three bytes, apart from the release's blob */
+#define KEY_USB "usb1"                 /* USB DEVICE / HOST, AUDIO > SOURCE, AUTO BAR, USB MIDI CLOCK: four bytes, apart from the release's blob */
+#define KEY_LAT "lat1"                 /* beat_latency per audio source (core/jank_lat.h jla_pack) */
 /* what is stored is the struct up to the beat-follow bench settings: a stick flashed with this build keeps its group, name
  * and Wi-Fi, and one flashed back to the release reads the same blob (no setting of the bench build is saved) */
 #define STORED_SIZE JK_CFG_STORED
@@ -24,17 +25,32 @@ static int valid(const struct jk_cfg *c)
 
 static void load_usb(nvs_handle_t h, struct jk_cfg *c)
 {
-    uint8_t u[3];                      /* usb, source, autobar (the last one since M2c: a 2-byte blob keeps AUTO BAR's default) */
+    uint8_t u[4];                      /* usb, source, autobar (since M2c), usbmidi (since M2d): a shorter blob keeps the defaults */
     size_t n = sizeof u;
     esp_err_t e = nvs_get_blob(h, KEY_USB, u, &n);
-    if (e == ESP_OK && (n == 2u || n == 3u) && u[0] <= JUR_USB_HOST && u[1] <= JUR_SRC_LINK && (n == 2u || u[2] <= JK_AUTOBAR_ALWAYS)) {
+    if (e == ESP_OK && n >= 2u && u[0] <= JUR_USB_HOST && u[1] <= JUR_SRC_LINK && (n < 3u || u[2] <= JK_AUTOBAR_ALWAYS) && (n < 4u || u[3] <= 1u)) {
         c->usb = u[0];
         c->source = u[1];
-        if (n == 3u)
+        if (n >= 3u)
             c->autobar = u[2];
+        if (n >= 4u)
+            c->usbmidi = u[3];
     } else if (e != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGW(TAG, "stored USB settings ignored: %s, %u bytes", esp_err_to_name(e), (unsigned)n);
     }
+}
+
+/* beat_latency per audio source (core/jank_lat.h); the live value is the computer's until usbrole.c sees another source */
+static void load_lat(nvs_handle_t h, struct jk_cfg *c)
+{
+    uint8_t b[JLA_PACKED];
+    size_t n = sizeof b;
+    esp_err_t e = nvs_get_blob(h, KEY_LAT, b, &n);
+    if (e == ESP_OK && jla_unpack(&c->lat, b, n) != 0)
+        ESP_LOGW(TAG, "stored latencies ignored: %u bytes", (unsigned)n);
+    else if (e != ESP_OK && e != ESP_ERR_NVS_NOT_FOUND)
+        ESP_LOGW(TAG, "stored latencies ignored: %s", esp_err_to_name(e));
+    jk_lat_select(c, &c->lat_key);
 }
 
 void store_load(struct jk_cfg *c)
@@ -57,6 +73,7 @@ void store_load(struct jk_cfg *c)
     } else if (e != ESP_ERR_NVS_NOT_FOUND)
         ESP_LOGW(TAG, "stored settings ignored: %s, %u bytes", esp_err_to_name(e), (unsigned)n);
     load_usb(h, c);
+    load_lat(h, c);
     nvs_close(h);
 }
 
@@ -68,8 +85,12 @@ esp_err_t store_save(const struct jk_cfg *c)
         return e;
     e = nvs_set_blob(h, KEY, c, STORED_SIZE);
     if (e == ESP_OK) {
-        const uint8_t u[3] = {c->usb, c->source, c->autobar};
+        const uint8_t u[4] = {c->usb, c->source, c->autobar, c->usbmidi};
         e = nvs_set_blob(h, KEY_USB, u, sizeof u);
+    }
+    if (e == ESP_OK) {
+        uint8_t b[JLA_PACKED];
+        e = nvs_set_blob(h, KEY_LAT, b, jla_pack(&c->lat, b, sizeof b));
     }
     if (e == ESP_OK)
         e = nvs_commit(h);

@@ -104,6 +104,19 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   eq(box.setCommand("autobar", "on"), null);
   ok(/id="c-bluetooth"/.test(html) && (html.match(/id="c-ble"/g) || []).length === 1, "one element per id: the Bluetooth button apart from its setting");
   ok(/id="c-source"/.test(html) && /id="c-autobar"/.test(html) && /id="t-up"/.test(html) && /id="t-down"/.test(html), "source, AUTO BAR, x2 / ÷2 on the page");
+  // M2d: the USB MIDI clock setting, the nudges in AUDIO mode
+  eq(box.setCommand("usbmidi", "off"), "set usbmidi off");
+  eq(box.setCommand("usbmidi", "no"), null);
+  eq([box.nudgeCommand("beat", 1), box.nudgeCommand("beat", -1), box.nudgeCommand("ms", 1), box.nudgeCommand("ms", -1)],
+     ["nudge beat +0.5", "nudge beat -0.5", "nudge ms +1", "nudge ms -1"]);
+  ok(/earlier \(\+1\.5 beats in all\)/.test(box.nudgeSaid("beat", 1, { nudge_beats: "1.5" })), "the total after a nudge");
+  ok(/later \(-0\.5 beats/.test(box.nudgeSaid("beat", -1, { nudge_beats: "-0.5" })), "a nudge later");
+  eq(box.nudgeSaid("ms", 1, { beat_latency: "26" }), "Audio in offset +26 ms.");
+  eq(box.nudgeSaid("ms", -1, { beat_latency: "-3" }), "Audio in offset -3 ms.");
+  ok(/AUDIO mode/.test(box.nudgeError("err link mode")) && /limit/.test(box.nudgeError("err nudge beat at its limit, -3 to 3 beats in all")), "nudge errors in words");
+  eq(box.nudgeError("err odd"), "err odd");
+  for (const id of ["nudges", "n-beat-down", "n-beat-up", "n-ms-down", "n-ms-up", "c-usbmidi", "c-beat_latency_src"])
+    ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
 }
 eq(box.parseHome("h 12000 w1 2 150 3 2 0 - - -").transport, "armed");
 eq(box.parseHome("h 12000 x3 1 275 4 2 0 - - -"), null);

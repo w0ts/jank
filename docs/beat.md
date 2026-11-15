@@ -17,8 +17,8 @@ JANK_SCRATCH=$PWD/../usbaudio-scratch JANK_JOBS=3 scripts/build.sh xiao
 The app image is `$JANK_SCRATCH/build-xiao/jank.bin`. The build makes `third_party/esp_tinyusb` from the registry's 3.0.0
 with `third_party/esp_tinyusb-uac2.patch` (the audio class on) and sets the CPU to 240 MHz (`firmware/sdkconfig.beat`;
 the release runs 160). It installs over a stick running fw/ota with `python scripts/ota.py <jank.bin>` (app only: the
-bootloader and the partition table stay). Settings in NVS are kept; the beat settings are not stored and start at their
-defaults (`beat on`, `beat_latency 25`, `autobar on`).
+bootloader and the partition table stay). Settings in NVS are kept; `beat` is not stored and starts on; `autobar` (AT
+START by default) and, since M2d, `beat_latency` per audio source (the computer's 25 by default) are stored.
 
 **Rollback.** The new image confirms itself only after the computer has configured USB *and* spoken on the MIDI control
 line (ota.py's `get` after the restart does that, as does a control page), and it has run 20 s. Not confirmed within
@@ -36,8 +36,8 @@ the old image back (`main/ota.c`, `main/usb.c`).
    the music stops, Link stops; when it starts again, Link starts on the next bar (quantum 4).
 4. Line up the phase by ear with the page's **Latency, ms** (or `set beat_latency <-300..300>`): the music is heard that
    long after its samples reach the stick (speaker output and USB buffering); negative when the stick gets the audio
-   after the speakers play it. Default 25; not stored (back to 25 at each start; the set itself writes no flash: the
-   stored settings are unchanged and NVS skips an identical blob). `set beat off` stops the
+   after the speakers play it. Default 25 for the computer's audio; since M2d stored per audio source (the computer, each
+   hosted USB device, the line in: docs/firmware.md), saved once the session and the clock are stopped. `set beat off` stops the
    tracker steering Link and leaves everything else as it was.
 
 ## Beat reports
@@ -91,5 +91,5 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   grid's beats, scores the 4 phases from 22 accent features of the tracker's own 81 bands, and once the best phase leads
   by 2.0 the session's bar moves onto it in whole beats (`jbl_bar_step`, the tempo untouched; an armed start re-targets the
   moved grid's next bar line). A later move needs a lead of 3.0 held 8 beats. Reset (listening again, the bar left where
-  it is): the tracker stopped, a new audio stream (a tempo jump is not one: `DOWN_JUMP_RESET` in beat.c). MANUAL comes with a beat nudge (none on the XIAO yet);
+  it is): the tracker stopped, a new audio stream (a tempo jump is not one: `DOWN_JUMP_RESET` in beat.c). MANUAL comes with a beat nudge (`nudge beat`, docs/firmware.md);
   `set autobar on` again ends it. The LED's bar flash turns amber while locked. RAM: 2.2 KB plus a 2.9 KB segment ring in PSRAM.

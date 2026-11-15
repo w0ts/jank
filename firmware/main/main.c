@@ -50,6 +50,7 @@ void app_cfg_set(const struct jk_cfg *c)
     xSemaphoreGive(s_cfg_lock);
     xSemaphoreGive(s_set_lock);
     bridge_apply(c);
+    usb_midi_clock(c->usbmidi);
 #if CONFIG_JANK_BLE_MIDI
     ble_midi_setting(c->ble);
 #endif
@@ -126,6 +127,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_register_shutdown_handler(flush_at_restart));
     ESP_ERROR_CHECK(nvs_up());
     store_load(&s_cfg);
+    usb_midi_clock(s_cfg.usbmidi);
     ESP_ERROR_CHECK(esp_efuse_mac_get_default(efuse));
     jk_mac_from_efuse(efuse, mac);
     memcpy(peer_mac, mac, 6);

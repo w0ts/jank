@@ -24,6 +24,8 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->ble = JK_BLE_PAIR;
     c->usb = JUR_USB_DEVICE;
     c->source = JUR_SRC_AUTO;
+    c->usbmidi = 1;                    /* on: the clock went over USB-MIDI before there was a setting (see jk_cfg) */
+    jla_init(&c->lat);                 /* (lat_key: the computer, which beat_latency_ms above is) */
     strcpy(c->name, "jank");
 }
 
@@ -41,7 +43,24 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
 
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b)
 {
-    return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source || a->autobar != b->autobar;
+    return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source || a->autobar != b->autobar
+           || a->usbmidi != b->usbmidi || !jla_same(&a->lat, &b->lat);
+}
+
+int jk_lat_select(struct jk_cfg *c, const struct jla_key *k)
+{
+    int16_t ms = jla_get(&c->lat, k);
+    if (jla_same_key(&c->lat_key, k) && c->beat_latency_ms == ms)
+        return 0;
+    c->lat_key = *k;
+    c->beat_latency_ms = ms;
+    return 1;
+}
+
+void jk_lat_set(struct jk_cfg *c, int ms)
+{
+    jla_set(&c->lat, &c->lat_key, ms);
+    c->beat_latency_ms = jla_get(&c->lat, &c->lat_key);
 }
 
 enum jk_save jk_save_on_change(uint8_t *pending, int changed, int playing, int restart_follows)
@@ -113,7 +132,10 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
 {
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%s%d.%02d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_10us < 0 ? "-" : "", abs(c->offset_10us) / 100, abs(c->offset_10us) % 100);
-    put(w, "beat=%s\nbeat_latency=%d\nautobar=%s\n", on_off(c->beat), c->beat_latency_ms, autobar_name(c->autobar));
+    char src[16];
+    put(w, "beat=%s\nbeat_latency=%d\nbeat_latency_src=%s\nautobar=%s\n", on_off(c->beat), c->beat_latency_ms, jla_name(&c->lat_key, src),
+        autobar_name(c->autobar));
+    put(w, "usbmidi=%s\n", on_off(c->usbmidi));
     put(w, "ble=%s\n", ble_name(c->ble));
     put(w, "usb=%s\nsource=%s\n", jur_usb_name(c->usb), jur_src_name(c->source));
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
@@ -182,7 +204,23 @@ static void put_usb(const struct jk_usb *u, struct writer *w)
         put(w, "usb_midi_dropped=%lu\n", (unsigned long)u->midi_dropped);
 }
 
-static void cmd_status(const struct jk_snapshot *s, uint32_t now_ms, struct writer *w)
+const char *jk_half_beats(int halves, char *out)
+{
+    unsigned mag = (unsigned)(halves < 0 ? -halves : halves) % 100u;
+    snprintf(out, 8, "%s%u%s", halves < 0 ? "-" : "", mag / 2u, mag % 2u ? ".5" : "");
+    return out;
+}
+
+/* NUDGE BEAT and NUDGE MS: the user's nudges kept, the AUDIO IN offset (beat_latency) and the source it is the value of;
+ * the USB-MIDI clock setting */
+static void put_nudge(const struct jk_cfg *c, const struct jk_beat *t, struct writer *w)
+{
+    char b[8], src[16];
+    put(w, "nudge_beats=%s\nbeat_latency=%d\nbeat_latency_src=%s\nusbmidi=%s\n", jk_half_beats(t->nudge_halves, b), c->beat_latency_ms,
+        jla_name(&c->lat_key, src), on_off(c->usbmidi));
+}
+
+static void cmd_status(const struct jk_cfg *c, const struct jk_snapshot *s, uint32_t now_ms, struct writer *w)
 {
     const struct jk_bridge *b = &s->b;
     put(w, "usb=%u\nuptime=%lu\ngroup=%u\nchannel=%u\n", s->usb_up, (unsigned long)s->uptime_s, b->group, b->channel);
@@ -196,6 +234,7 @@ static void cmd_status(const struct jk_snapshot *s, uint32_t now_ms, struct writ
     put_link(s, w);
     put_audio(s, w);
     put_bar(&s->beat, w);
+    put_nudge(c, &s->beat, w);
     if (s->ble_built) {
         static const char *const st[] = {"off", "window", "connected"};
         put(w, "ble_state=%s\nble_left=%lu\n", s->ble_state <= 2u ? st[s->ble_state] : "off", (unsigned long)s->ble_left_s);
@@ -277,7 +316,12 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
     else if (!strcmp(key, "offset") && !parse_hundredths(val, &v) && v >= -JK_OFFSET_MAX_10US && v <= JK_OFFSET_MAX_10US)
         c->offset_10us = (int16_t)v;
     else if (!strcmp(key, "beat_latency") && !parse_int(val, JK_BEAT_LATENCY_MIN_MS, JK_BEAT_LATENCY_MAX_MS, &v))
-        c->beat_latency_ms = (int16_t)v;
+        jk_lat_set(c, (int)v);             /* the value of the source heard now (Calibrate's) */
+    else if (!strcmp(key, "beat_latency_usb") && !parse_int(val, JK_BEAT_LATENCY_MIN_MS, JK_BEAT_LATENCY_MAX_MS, &v)) {
+        static const struct jla_key computer = {JLA_COMPUTER, 0, 0};   /* the computer's, whatever is heard now */
+        jla_set(&c->lat, &computer, (int)v);
+        c->beat_latency_ms = jla_get(&c->lat, &c->lat_key);
+    }
     else
         return -1;
     return 0;
@@ -318,6 +362,8 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
         return parse_on_off(val, &c->peer);
     if (!strcmp(key, "beat"))
         return parse_on_off(val, &c->beat);
+    if (!strcmp(key, "usbmidi"))
+        return parse_on_off(val, &c->usbmidi);
     if (!strcmp(key, "autobar")) {         /* on (= start), start, always, even when so already: picked again (MANUAL ends) */
         uint8_t v;
         if (!strcmp(val, "on"))
@@ -443,6 +489,49 @@ int jk_ctl_fold(const char *line, int *dir)
     return 0;
 }
 
+int jk_ctl_nudge(const char *line, int *halves)
+{
+    char buf[32], *s = trim(line, buf, sizeof buf);
+    long v;
+    if (!s || strncmp(s, "nudge beat ", 11))
+        return -1;
+    s += 11;
+    if (*s == '+' && s[1] != '-')
+        s++;
+    if (parse_hundredths(s, &v) || v % 50 || !v || v < -300 || v > 300)
+        return -1;
+    *halves = (int)(v / 50);
+    return 0;
+}
+
+int jk_nudge_ms(struct jk_cfg *c, int ms)
+{
+    int v = c->beat_latency_ms + ms;
+    v = v < JK_BEAT_LATENCY_MIN_MS ? JK_BEAT_LATENCY_MIN_MS : v > JK_BEAT_LATENCY_MAX_MS ? JK_BEAT_LATENCY_MAX_MS : v;
+    if (v == c->beat_latency_ms)
+        return 0;
+    jk_lat_set(c, v);                  /* the current source's value */
+    return 1;
+}
+
+/* "nudge ms <n>": AUDIO mode only (LINK mode: the session's timing is not the tracker's) */
+static enum jk_ctl_action cmd_nudge_ms(const char *val, struct jk_cfg *cfg, const struct jk_snapshot *snap, struct writer *w)
+{
+    long v;
+    int moved;
+    if (parse_int(val, -JK_NUDGE_MS_STEP_MAX, JK_NUDGE_MS_STEP_MAX, &v) || !v) {
+        put(w, "err nudge ms is -%d to %d, not 0\n", JK_NUDGE_MS_STEP_MAX, JK_NUDGE_MS_STEP_MAX);
+        return JK_CTL_NONE;
+    }
+    if (!snap->beat.on || !snap->beat.audio_live) {
+        put(w, "err link mode\n");
+        return JK_CTL_NONE;
+    }
+    moved = jk_nudge_ms(cfg, (int)v);
+    put(w, "beat_latency=%d\nok\n", cfg->beat_latency_ms);
+    return moved ? JK_CTL_CFG_CHANGED : JK_CTL_NONE;
+}
+
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap)
 {
     struct writer w = {out, cap, 0};
@@ -457,7 +546,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     if (!strcmp(s, "get"))
         cmd_get(cfg, snap, &w);
     else if (!strcmp(s, "status"))
-        cmd_status(snap, now_ms, &w);
+        cmd_status(cfg, snap, now_ms, &w);
     else if (!strcmp(s, "beat"))
         cmd_beat(&snap->beat, &w);
     else if (!strncmp(s, "set ", 4))
@@ -478,6 +567,14 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
             return JK_CTL_FOLD;
         put(&w, "err fold x2, /2 or 1\n");
     }
+    else if (!strncmp(s, "nudge ms ", 9))
+        return cmd_nudge_ms(s + 9, cfg, snap, &w);
+    else if (!strncmp(s, "nudge", 5) && (!s[5] || s[5] == ' ')) {
+        int halves;
+        if (!jk_ctl_nudge(s, &halves))
+            return JK_CTL_NUDGE;
+        put(&w, "err nudge beat +-0.5 to 3 in halves, or nudge ms +-1 to %d\n", JK_NUDGE_MS_STEP_MAX);
+    }
     else if (!strcmp(s, "home")) {
         char h[64];
         if (jph_home_line(cfg, snap, now_ms, h, sizeof h))
@@ -487,7 +584,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     } else if (!strcmp(s, "ble pair") || !strcmp(s, "ble close"))
         return s[4] == 'p' ? JK_CTL_BLE_PAIR : JK_CTL_BLE_CLOSE;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|autobar|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nble pair|close\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|autobar|usbmidi|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nble pair|close\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

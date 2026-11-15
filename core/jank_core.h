@@ -8,6 +8,7 @@
 #define JANK_CORE_H
 #include <stddef.h>
 #include <stdint.h>
+#include "jank_lat.h"
 
 #define JK_VERSION "0.1.0"
 
@@ -132,18 +133,28 @@ struct jk_cfg {
     /* The beat-follow bench build's settings come after everything that is stored (store.c keeps only what is above
      * this line), so they are back at their defaults at every start. */
     uint8_t beat;                     /* 1: the beat tracker steers the Link session */
-    int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX) */
+    int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX):
+                                         the current source's value from `lat` below (stored there, since M2d) */
     uint8_t autobar_picks;            /* counts `set autobar start|always|on`: picked again, it leaves MANUAL even when on */
     /* Stored apart from the blob above (store.c, key "usb1"), so the blob stays 130: USB host mode (core/jank_usbrole.h)
      * and AUTO BAR */
     uint8_t autobar;                  /* enum jk_autobar: the downbeat estimator puts the session's bar on the music's 1 */
     uint8_t usb;                      /* enum jur_usb: USB DEVICE / HOST */
     uint8_t source;                   /* enum jur_src: AUDIO > SOURCE AUTO / LINE / USB */
+    /* Stored in the same small blob since M2d: */
+    uint8_t usbmidi;                  /* 1: the MIDI clock also goes out over USB-MIDI (to the computer, or to hosted gear) */
+    /* Stored in their own blob (store.c, key "lat1") since M2d: beat_latency per audio source (core/jank_lat.h) */
+    struct jla lat;
+    struct jla_key lat_key;           /* the source beat_latency_ms belongs to now (not stored: usbrole.c follows it) */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
 /* what store.c keeps: the release's blob (everything up to the bench settings) and, apart, usb and source */
 #define JK_CFG_STORED offsetof(struct jk_cfg, beat)
+/* the audio source the tracker hears now (usbrole.c): beat_latency_ms becomes that source's value (jank_lat.h). 1 changed */
+int jk_lat_select(struct jk_cfg *c, const struct jla_key *k);
+/* beat_latency_ms set, and the current source's value with it (`set beat_latency`, NUDGE MS, Calibrate) */
+void jk_lat_set(struct jk_cfg *c, int ms);
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b);   /* 1: a save would write something */
 
 /* Saving settings writes flash, and a flash write stops everything but the clock's interrupt for the erase (tens of ms,
@@ -194,6 +205,7 @@ struct jk_beat {
     int8_t bar_phi;                   /* locked: the count position of the 1; else -1 */
     int32_t bar_lead_x100;            /* its lead, score units x 100 */
     uint32_t bar_moves;               /* whole-beat moves of the session's bar */
+    int8_t nudge_halves;              /* NUDGE BEAT: the user's nudges since the last reset, half beats (core/jank_beatlink.h) */
 };
 
 /* the USB port, for `status` (firmware/main/usbrole.c fills it) */
@@ -261,7 +273,8 @@ enum jk_ctl_action {
     JK_CTL_STOP,                      /* out is empty: the caller stops the session, answers ok or err */
     JK_CTL_BLE_PAIR,                  /* out is empty: the caller opens a pair window (jph_pair), answers ok or err */
     JK_CTL_BLE_CLOSE,                 /* out is empty: the caller ends the window and the phone's link, answers ok */
-    JK_CTL_FOLD                       /* out is empty: the caller folds (jk_ctl_fold), answers fold=<f> ok or err link mode */
+    JK_CTL_FOLD,                      /* out is empty: the caller folds (jk_ctl_fold), answers fold=<f> ok or err link mode */
+    JK_CTL_NUDGE                      /* out is empty: the caller nudges the beat (jk_ctl_nudge), answers nudge_beats=<b> ok or err */
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
 #define JK_BPM_MIN_X100 2000u          /* the BPM the tempo command takes, hundredths: Link's own clamp, 20..999 */
@@ -270,6 +283,18 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
 int jk_ctl_tempo(const char *line, int32_t *mpb);
 /* "fold x2" / "fold /2" / "fold 1" (AUDIO mode's x2 / /2, core/jank_fold.h) -> 0 and dir +1 / -1 / 0; -1 not one */
 int jk_ctl_fold(const char *line, int *dir);
+/* NUDGE BEAT and NUDGE MS (AUDIO mode: the device's NO / YES held + UP/DOWN). "nudge beat <b>", b in half beats, signed,
+ * 0.5 to 3 (+0.5, -0.5, 1, -1.5) -> 0 and the half beats (+-1..+-6); -1 not one. The caller nudges (core/jank_beatlink.h
+ * jbl_nudge) and answers `nudge_beats=<total>`, the estimator's view before it, ok; or err link mode, no beat, at the limit */
+int jk_ctl_nudge(const char *line, int *halves);
+/* "nudge ms <n>": the AUDIO IN offset, beat_latency += n (1..JK_NUDGE_MS_STEP_MAX either way), kept within its range
+ * (JK_BEAT_LATENCY_MIN_MS..MAX), as the current audio source's value (jank_lat.h; stored, saved once stopped, as
+ * `set beat_latency`). jk_ctl_line answers beat_latency=<ms> ok (a change:
+ * JK_CTL_CFG_CHANGED), or err link mode. jk_nudge_ms is the same for the device's YES + UP/DOWN: 1 when it moved */
+#define JK_NUDGE_MS_STEP_MAX 10
+int jk_nudge_ms(struct jk_cfg *c, int ms);
+/* half beats as beats: 1 -> "0.5", -3 -> "-1.5", 4 -> "2", 0 -> "0" (out holds 8) */
+const char *jk_half_beats(int halves, char *out);
 
 /* on the session's beat: MODE JANK rests off and flashes on, the Wi-Fi network the other way round. No session: the rest.
  * beat_ub in micro-beats, mpb us a beat. -> 1: lit */

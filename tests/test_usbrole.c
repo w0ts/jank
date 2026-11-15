@@ -244,6 +244,18 @@ static void test_source(void)
     CHECK(jur_source(JUR_SRC_LINK, 1, 0) == JUR_AUDIO_LINE);
 }
 
+/* whose beat_latency is in use (core/jank_lat.h) */
+static void test_lat_key(void)
+{
+    struct jla_key k = {9, 9, 9};
+    CHECK(jur_lat_key(JUR_AUDIO_LINE, JUR_STACK_HOST, 1, 5, 6, &k) == 1 && k.kind == JLA_LINE);
+    CHECK(jur_lat_key(JUR_AUDIO_USB, JUR_STACK_DEVICE, 0, 0, 0, &k) == 1 && k.kind == JLA_COMPUTER);
+    CHECK(jur_lat_key(JUR_AUDIO_USB, JUR_STACK_HOST, 1, 0x1935, 0x000c, &k) == 1 && k.kind == JLA_HOSTED && k.vid == 0x1935 && k.pid == 0x000c);
+    k.kind = JLA_LINE;
+    CHECK(jur_lat_key(JUR_AUDIO_USB, JUR_STACK_HOST, 0, 0, 0, &k) == 0 && k.kind == JLA_LINE);   /* no device yet: as it was */
+    CHECK(jur_lat_key(JUR_AUDIO_NONE, JUR_STACK_DEVICE, 0, 0, 0, &k) == 0 && k.kind == JLA_LINE); /* LINK: as it was */
+}
+
 /* a screenless unit's single NO: USB AUDIO (AUTO) <-> LINK; a plug in the line in: nothing changes */
 static void test_source_toggle(void)
 {
@@ -332,6 +344,7 @@ static void test_prep_failed(void)
 
 int main(void)
 {
+    test_lat_key();
     test_boot();
     test_device_setting();
     test_host_device_attach();

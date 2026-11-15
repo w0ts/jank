@@ -115,6 +115,40 @@ int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settle
     return n;
 }
 
+int jbl_half_8ths(int fold_exp)
+{
+    fold_exp = fold_exp < -2 ? -2 : fold_exp > 2 ? 2 : fold_exp;
+    return fold_exp >= 0 ? 4 >> fold_exp : 4 << -fold_exp;
+}
+
+int jbl_nudge(struct jbl *c, struct lk_node *k, struct jst *start, int settled, const struct jbl_in *in, int halves,
+              int fold_exp, int64_t now)
+{
+    int total = c->nudge + halves;
+    if (!halves || in->passive || total > JBL_NUDGE_MAX || total < -JBL_NUDGE_MAX)
+        return -1;
+    if (settled) {
+        lk_force_beat(k, lk_mpb(k), lk_beat_at(k, now) + (int64_t)halves * (LK_UBEAT / 2), now);
+        jst_retarget(start, k, now);
+    }
+    c->nudge = (int8_t)total;
+    c->nudge_8ths = (uint8_t)(((c->nudge_8ths + halves * jbl_half_8ths(fold_exp)) % 32 + 32) % 32);
+    c->nudges++;
+    return 0;
+}
+
+int64_t jbl_nudge_us(const struct jbl *c, double tracked_period_us, int fold_exp)
+{
+    int beat_8ths = 2 * jbl_half_8ths(fold_exp);      /* one beat of Link's (32 is a multiple of every one) */
+    return (int64_t)llround((double)(c->nudge_8ths % beat_8ths) * tracked_period_us / 8.0);
+}
+
+void jbl_nudge_clear(struct jbl *c)
+{
+    c->nudge = 0;
+    c->nudge_8ths = 0;
+}
+
 /* Link's start on the next bar line, sent JST_LEAD_US before it (jank_start.h); the session playing already: kept */
 static void start_session(struct jbl *c, struct lk_node *k, struct jst *start, int64_t now, uint32_t quantum)
 {

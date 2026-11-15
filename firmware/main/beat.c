@@ -12,6 +12,7 @@
  * beats (jbl_bar_step). Its reset events here: ModeBpm stopped (30 s without a steady beat), a new audio
  * stream (the tracker restarts); a tempo jump only with DOWN_JUMP_RESET. `set autobar off` leaves the bar where it is. */
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include "app.h"
 #include "esp_cpu.h"
@@ -76,7 +77,18 @@ struct step_ctx {
     struct jbl_bar bar;
     uint32_t quantum;
     double bpm;                        /* the tracker's own (unfolded) tempo, 0: none */
+    int8_t nudge;                      /* NUDGE BEAT asked for at this step, half beats (0 none) ... */
+    int8_t nudge_rc;                   /* ... its result (enum beat_nudge_rc) */
 };
+
+/* NUDGE BEAT (core/jank_beatlink.h jbl_nudge): asked by the control line or the device's buttons (beat_nudge, which waits
+ * for the answer), taken by the beat task at its next pass (5 ms) and applied in that pass's step under the bridge's
+ * lock. Under s_mux */
+static struct {
+    int8_t halves, rc, total;
+    uint32_t asked, done;
+    char view[96];                     /* the downbeat estimator before it, for the answer (the refit's hand label) */
+} s_nudge;
 
 /* AUDIO mode's fold and AUTO RANGE (jank_fold.h): the beat task's; the control line asks through s_fold_req */
 enum { FOLD_REQ_NONE = 0, FOLD_REQ_UP, FOLD_REQ_DOWN, FOLD_REQ_ONE, FOLD_REQ_RESET };
@@ -178,6 +190,7 @@ static void restart_tracker(void)
 {
     uac_restart();
     jfo_reset(&s_fold);                /* a resync: fold 1 (Python: resync clears the fold) */
+    jbl_nudge_clear(&s_jbl);           /* a new stream: AUTO BAR's reset event, the user's nudges with it */
     s_bar_now = 1;
     jb_beat_reset(&s_b);
     jb_mode_init(&s_mode);
@@ -228,9 +241,12 @@ static void fold_step(struct jank_peer *p, int64_t now, int settled, struct step
     if (c->in.running) {
         int64_t beat;
         double period;
-        double pos = on ? (double)lk_beat_at(&p->k, c->in.beat_us) / (double)LK_UBEAT : 0.0;
+        /* the user's nudge (jbl_nudge_us): the session's beats sit this long before the folded grid's. A /2 or /4 anchors
+         * on the session's grid as it would be without it (an integer beat there), so the choice is never a tie */
+        int64_t off = jbl_nudge_us(&s_jbl, c->in.period_us, s_fold.exp);
+        double pos = on ? (double)lk_beat_at(&p->k, c->in.beat_us - off) / (double)LK_UBEAT : 0.0;
         jfo_grid(&s_fold, c->in.beat_us, c->in.period_us, on, pos, on ? (double)jp_mpb(p) : 0.0, &beat, &period);
-        c->in.beat_us = beat;
+        c->in.beat_us = beat - off;
         c->in.period_us = period;
     }
     if (s_fold.exp)
@@ -259,6 +275,8 @@ static void step_link(struct jank_peer *p, int64_t now, void *arg)
     struct step_ctx *c = arg;
     int settled = jp_settled(p, now);
     c->in.held = (uint8_t)bridge_session_held();   /* AUDIO mode's Stop with FOLLOW+LEAD (jank_hold.h) */
+    if (c->nudge)                      /* first: the follower below then finds the session where the nudge put it */
+        c->nudge_rc = (int8_t)(jbl_nudge(&s_jbl, &p->k, &p->start, settled, &c->in, c->nudge, s_fold.exp, now) ? BEAT_NUDGE_LIMIT : BEAT_NUDGE_OK);
     fold_step(p, now, settled, c);
     jbl_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, c->quantum);
     jbl_bar_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, &c->bar);
@@ -324,6 +342,7 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     } else
         b.bar_phi = -1;
     b.bar_moves = s_jbl.bar_moves;
+    b.nudge_halves = s_jbl.nudge;
     b.level_db = s_live.rms_db;
     b.level_min_db = s_live.min_db;
     b.level_max_db = s_live.max_db;
@@ -396,6 +415,43 @@ static void take_fold_req(void)
         s_bar_now = 1;                 /* a fold change or a Start: a new start for the bar */
 }
 
+/* a nudge asked for and not answered yet: its half beats (0 none). The step runs in this pass */
+static int8_t take_nudge(void)
+{
+    int8_t h = 0;
+    portENTER_CRITICAL(&s_mux);
+    if (s_nudge.asked != s_nudge.done)
+        h = s_nudge.halves;
+    portEXIT_CRITICAL(&s_mux);
+    return h;
+}
+
+static const char *const BAR_NAME[] = {"off", "listening", "locked", "manual"};
+
+/* the nudge's answer; taken: AUTO BAR goes MANUAL, and the estimator's view before it is logged and answered (the Python
+ * player logs each nudge with it, a hand label for a refit: here the serial log and the answer carry it) */
+static void finish_nudge(int8_t halves, int8_t rc)
+{
+    char view[sizeof s_nudge.view] = "";
+    if (s_down_seg) {
+        struct jd_view v;
+        jd_view(&s_down, &v);
+        snprintf(view, sizeof view, "bar=%s\nbar_phi=%d\nbar_count=%ld\nbar_scores=%.2f,%.2f,%.2f,%.2f\n", BAR_NAME[v.state & 3u],
+                 v.phi, (long)v.count, (double)v.scores[0], (double)v.scores[1], (double)v.scores[2], (double)v.scores[3]);
+        if (rc == BEAT_NUDGE_OK)
+            jd_nudge(&s_down);
+    }
+    if (rc == BEAT_NUDGE_OK)
+        ESP_LOGI(TAG, "nudge %+d/2 beat: total %+d/2, %u nudges; before it %s", halves, s_jbl.nudge, (unsigned)s_jbl.nudges, view);
+    portENTER_CRITICAL(&s_mux);
+    s_nudge.rc = rc;
+    s_nudge.total = s_jbl.nudge;
+    memcpy(s_nudge.view, view, sizeof view);
+    s_nudge.done = s_nudge.asked;
+    s_pub.nudge_halves = s_jbl.nudge;  /* (status says it at once, not at the next publish) */
+    portEXIT_CRITICAL(&s_mux);
+}
+
 static void beat_task(void *arg)
 {
     int16_t x[JB_HOP];
@@ -404,6 +460,7 @@ static void beat_task(void *arg)
     uint32_t cpu_x10 = 0;
     enum jb_mode_kind mode = JB_STOPPED;
     double bpm = 0.0;
+    int8_t nudge;
     (void)arg;
     restart_tracker();
     jlv_init(&s_live);
@@ -421,8 +478,12 @@ static void beat_task(void *arg)
             work(x, n);
         follow_sound(esp_timer_get_time());
         take_fold_req();
-        if (s_down_seg && jd_counting(&s_down) && jb_mode_at(&s_mode, (double)s_samples / (double)UAC_RATE) == JB_STOPPED)
-            jd_stop(&s_down);           /* 30 s without a steady beat: the bar starts over */
+        nudge = take_nudge();
+        if (jb_mode_at(&s_mode, (double)s_samples / (double)UAC_RATE) == JB_STOPPED) {
+            jbl_nudge_clear(&s_jbl);    /* no beat (30 s without a steady one, or none yet): the user's nudges go */
+            if (s_down_seg && jd_counting(&s_down))
+                jd_stop(&s_down);       /* 30 s without a steady beat: the bar starts over */
+        }
         now = esp_timer_get_time();
         if (now - s_win_start >= WINDOW_US) {
             cpu_x10 = (uint32_t)(s_win_busy * 1000 / (now - s_win_start));
@@ -435,7 +496,7 @@ static void beat_task(void *arg)
             s_win_act = 0.0f;
             report('t', (double)s_samples / (double)UAC_RATE);
         }
-        if (!s_beat_seen && now - last_step < STEP_EVERY_US)
+        if (!s_beat_seen && !nudge && now - last_step < STEP_EVERY_US)
             continue;
         s_beat_seen = 0;
         last_step = now;
@@ -448,8 +509,14 @@ static void beat_task(void *arg)
             make_bar(&cfg, &c.bar);
             bar_rules(&c);
             c.quantum = cfg.quantum;
+            c.nudge = nudge;
+            c.nudge_rc = !cfg.beat || !s_audio_live ? BEAT_NUDGE_LINK : mode == JB_STOPPED ? BEAT_NUDGE_NO_BEAT : BEAT_NUDGE_OK;
+            if (c.nudge_rc != BEAT_NUDGE_OK)
+                c.nudge = 0;            /* refused before it reaches the session */
             if (cfg.beat)
                 bridge_with_peer(step_link, &c);
+            if (nudge)
+                finish_nudge(nudge, c.nudge_rc);
         }
         publish(mode, bpm * jfo_factor(&s_fold), &cfg, cpu_x10);
     }
@@ -481,6 +548,40 @@ int beat_fold(int dir)
 }
 
 void beat_fold_resync(void) { __atomic_store_n(&s_fold_req, (uint8_t)FOLD_REQ_RESET, __ATOMIC_RELEASE); }
+
+#define NUDGE_WAIT_MS 200              /* the beat task takes it within a pass (5 ms) unless starved */
+
+int beat_nudge(int halves, int8_t *total, char *view, size_t cap)
+{
+    uint32_t asked;
+    int rc = BEAT_NUDGE_BUSY;
+    if (!halves || halves > JBL_NUDGE_MAX || halves < -JBL_NUDGE_MAX)
+        return BEAT_NUDGE_LIMIT;
+    portENTER_CRITICAL(&s_mux);
+    asked = s_nudge.asked;
+    if (asked == s_nudge.done) {
+        s_nudge.halves = (int8_t)halves;
+        s_nudge.asked = ++asked;
+        rc = BEAT_NUDGE_OK;
+    }
+    portEXIT_CRITICAL(&s_mux);
+    if (rc != BEAT_NUDGE_OK)
+        return rc;                     /* the last one not taken yet */
+    for (int i = 0; i < NUDGE_WAIT_MS / POLL_MS; i++) {
+        vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+        portENTER_CRITICAL(&s_mux);
+        if (s_nudge.done == asked) {
+            rc = s_nudge.rc;
+            *total = s_nudge.total;
+            if (view && cap)
+                strlcpy(view, s_nudge.view, cap);
+            portEXIT_CRITICAL(&s_mux);
+            return rc;
+        }
+        portEXIT_CRITICAL(&s_mux);
+    }
+    return BEAT_NUDGE_BUSY;
+}
 
 void beat_state(uint8_t *audio, uint8_t *locked)
 {

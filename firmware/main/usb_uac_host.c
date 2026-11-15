@@ -73,6 +73,7 @@ static struct {
     uint32_t rate;
     uint32_t packets, errors;             /* under s_mux */
     char name[JK_USB_NAME_MAX + 1];
+    uint16_t vid, pid;                    /* its beat_latency's key (core/jank_lat.h); with name, under s_mux */
     usb_transfer_t *x[XFERS];
 } s_dev;
 
@@ -356,9 +357,16 @@ static void add_device(uint8_t address)
     if (e == ESP_OK) {
         e = select_stream(h, &d, a, pick.rate);
         if (e == ESP_OK) {
+            const usb_device_desc_t *dd = NULL;
             s_dev.h = h;
             s_dev.itf = a->itf;
             usb_host_product_name(h, s_dev.name, sizeof s_dev.name);
+            if (usb_host_get_device_descriptor(h, &dd) == ESP_OK && dd) {
+                portENTER_CRITICAL(&s_mux);
+                s_dev.vid = dd->idVendor;
+                s_dev.pid = dd->idProduct;
+                portEXIT_CRITICAL(&s_mux);
+            }
             e = start_stream(h, a, pick.rate);
             if (e != ESP_OK)
                 s_dev.h = NULL;
@@ -395,6 +403,7 @@ static void remove_device(usb_device_handle_t h)
         s_dev.h = NULL;
         s_dev.rate = 0;
         s_dev.name[0] = 0;
+        s_dev.vid = s_dev.pid = 0;
         portEXIT_CRITICAL(&s_mux);
         close_dev(h);
         /* the devices passed over get their turn (a stale address fails to open, or is just another candidate) */
@@ -452,6 +461,17 @@ esp_err_t usb_uac_host_start(void)
     if (xTaskCreatePinnedToCore(client_task, "usb_uac_cl", 3072, NULL, CLIENT_PRIO, NULL, 0) != pdPASS)
         return ESP_ERR_NO_MEM;
     return xTaskCreatePinnedToCore(worker_task, "usb_uac", 4096, NULL, WORKER_PRIO, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+}
+
+int usb_uac_host_id(uint16_t *vid, uint16_t *pid)
+{
+    int on;
+    portENTER_CRITICAL(&s_mux);
+    on = s_dev.h && s_dev.rate && (s_dev.vid || s_dev.pid);
+    *vid = s_dev.vid;
+    *pid = s_dev.pid;
+    portEXIT_CRITICAL(&s_mux);
+    return on;
 }
 
 void usb_uac_host_list(struct jk_usb *u)
