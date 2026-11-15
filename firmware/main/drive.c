@@ -117,17 +117,48 @@ static int read_slot(void *ctx, uint32_t offset, uint8_t *out, uint32_t n)
     return esp_partition_read(s_slot, offset, out, n) == ESP_OK ? 0 : -1;
 }
 
-/* why an image may not start now, or NULL (esp_ota_begin's own checks, which this file does not call) */
-static const char *start_refused(void)
+/* The spare slot has one writer at a time: this drive or an update over MIDI (ota.c). Taken under a lock, so that the two
+ * cannot both pass their check; the drive keeps it from an image's first sector until the restart (or its failure). */
+static portMUX_TYPE s_slot_mux = portMUX_INITIALIZER_UNLOCKED;
+static uint8_t s_slot_user;               /* enum slot_user */
+
+bool slot_take(enum slot_user who)
+{
+    bool ok;
+    portENTER_CRITICAL(&s_slot_mux);
+    ok = s_slot_user == SLOT_FREE || s_slot_user == who;
+    if (ok)
+        s_slot_user = (uint8_t)who;
+    portEXIT_CRITICAL(&s_slot_mux);
+    return ok;
+}
+
+void slot_give(enum slot_user who)
+{
+    portENTER_CRITICAL(&s_slot_mux);
+    if (s_slot_user == who)
+        s_slot_user = SLOT_FREE;
+    portEXIT_CRITICAL(&s_slot_mux);
+}
+
+/* the running image is a new one not confirmed yet: any restart now puts the old one back (the bootloader marks a
+ * PENDING_VERIFY slot aborted at boot: bootloader_support/src/bootloader_utility.c) */
+static bool running_unconfirmed(void)
 {
     esp_ota_img_states_t st;
     const esp_partition_t *run = esp_ota_get_running_partition();
+    return run && esp_ota_get_state_partition(run, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+/* why an image may not start now, or NULL with the slot taken (esp_ota_begin's own checks, which this file does not call) */
+static const char *start_refused(void)
+{
     if (!s_slot)
         return "no spare app slot";
-    if (ota_busy())
-        return "an update over MIDI is running";
-    if (run && esp_ota_get_state_partition(run, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY)
+    if (running_unconfirmed())
         return "the running firmware is not confirmed yet (it confirms itself once a computer has talked to it for 20 s)";
+    if (!slot_take(SLOT_DRIVE))
+        return "an update over MIDI is running";
     return NULL;
 }
 
@@ -139,19 +170,24 @@ static esp_err_t flash_op(const struct jv_op *op, const uint8_t *data)
     return e == ESP_OK ? esp_partition_write(s_slot, op->offset, data, JV_SECTOR) : e;
 }
 
-/* a sector of the image written again: the page read, the sector put in, the page erased and written back */
-static esp_err_t flash_rewrite(const struct jv_op *op, const uint8_t *data)
+/* 1 when the slot holds other bytes than data at op's sector, 0 the same, -1 unreadable */
+static int slot_differs(const struct jv_op *op, const uint8_t *data)
 {
     uint8_t old[64];
-    uint32_t base = op->offset / JV_PAGE * JV_PAGE;
-    esp_err_t e = ESP_OK;
-    int same = 1;
-    for (uint32_t i = 0; i < JV_SECTOR && same && e == ESP_OK; i += sizeof old) {
-        e = esp_partition_read(s_slot, op->offset + i, old, sizeof old);
-        same = !memcmp(old, data + i, sizeof old);
+    for (uint32_t i = 0; i < JV_SECTOR; i += sizeof old) {
+        if (esp_partition_read(s_slot, op->offset + i, old, sizeof old) != ESP_OK)
+            return -1;
+        if (memcmp(old, data + i, sizeof old))
+            return 1;
     }
-    if (e != ESP_OK || same)
-        return e;
+    return 0;
+}
+
+/* a sector of the image written again with other bytes: the page read, the sector put in, the page erased and written back */
+static esp_err_t flash_rewrite(const struct jv_op *op, const uint8_t *data)
+{
+    uint32_t base = op->offset / JV_PAGE * JV_PAGE;
+    esp_err_t e;
     if (!s_page && !(s_page = heap_caps_malloc(JV_PAGE, MALLOC_CAP_8BIT)))
         return ESP_ERR_NO_MEM;
     e = esp_partition_read(s_slot, base, s_page, JV_PAGE);
@@ -162,45 +198,62 @@ static esp_err_t flash_rewrite(const struct jv_op *op, const uint8_t *data)
     return e == ESP_OK ? esp_partition_write(s_slot, base, s_page, JV_PAGE) : e;
 }
 
-static void image_failed(const char *why, esp_err_t e)
+/* an image's first sector (or a new one over a half-finished copy): refused images are only noted, never a restart */
+static esp_err_t start(uint32_t lba, const uint8_t *data, struct jv_op *op)
 {
-    if (e != ESP_OK)
-        s_flash_err = e;
-    s_refused = why;
-    jv_fail(&s_d);
+    const uint8_t *early;
+    const char *why = start_refused();
+    esp_err_t e;
+    if (why) {
+        s_refused = why;
+        jv_fail(&s_d);
+        ESP_LOGW(TAG, "jank.bin not taken: %s", why);
+        return ESP_OK;
+    }
+    s_refused = NULL;
+    ESP_LOGI(TAG, "an image starts at sector %lu", (unsigned long)lba);
+    e = flash_op(op, data);
+    if (e == ESP_OK)
+        jv_written(&s_d, op, read_slot, NULL);
+    while (e == ESP_OK && jv_take_early(&s_d, &early, op))
+        if ((e = flash_op(op, early)) == ESP_OK)
+            jv_written(&s_d, op, read_slot, NULL);
+    return e;
 }
 
 /* one sector the computer wrote (TinyUSB's task) */
 static void write_sector(uint32_t lba, const uint8_t *data)
 {
     struct jv_op op;
-    const uint8_t *early;
+    const uint8_t prior = s_d.phase;
     enum jv_kind k = jv_write(&s_d, lba, data, &op);
     esp_err_t e = ESP_OK;
-    if (k == JV_W_START) {
-        const char *why = start_refused();
-        if (why) {
-            image_failed(why, ESP_OK);
-            return;
-        }
-        s_refused = NULL;
-        ESP_LOGI(TAG, "an image starts at sector %lu", (unsigned long)lba);
-        e = flash_op(&op, data);
-        if (e == ESP_OK)
-            jv_written(&s_d, &op, read_slot, NULL);
-        while (e == ESP_OK && jv_take_early(&s_d, &early, &op))
-            if ((e = flash_op(&op, early)) == ESP_OK)
-                jv_written(&s_d, &op, read_slot, NULL);
-    } else if (k == JV_W_IMAGE || k == JV_W_REWRITE) {
+    if (k == JV_W_REWRITE) {
+        int differs = slot_differs(&op, data);
+        k = differs < 0 ? JV_W_IGNORED : jv_rewrite(&s_d, lba, data, differs, &op);
+        if (differs < 0)
+            e = ESP_FAIL;
+    }
+    if (k == JV_W_START)
+        e = start(lba, data, &op);
+    else if (k == JV_W_IMAGE || k == JV_W_REWRITE) {
         e = k == JV_W_IMAGE ? flash_op(&op, data) : flash_rewrite(&op, data);
         if (e == ESP_OK)
             jv_written(&s_d, &op, read_slot, NULL);
     }
-    if (e != ESP_OK)
-        image_failed("flash write failed", e);
-    else if (s_d.phase == JV_FAILED && !s_refused)
+    if (e != ESP_OK) {
+        s_flash_err = e;
+        s_refused = "flash write failed";
+        jv_fail(&s_d);
+    } else if (s_d.phase == JV_FAILED && prior == JV_STREAM && !s_refused) {
         s_refused = "not an ESP32-S3 app image that fits the app slot";
-    if ((s_d.phase == JV_DONE || s_d.phase == JV_FAILED) && s_task)
+    }
+    if (s_d.phase == JV_FAILED && prior != JV_FAILED && s_slot_user == SLOT_DRIVE) {
+        slot_give(SLOT_DRIVE);            /* the slot holds nothing chosen: free for another copy or an update over MIDI */
+        if (s_task)
+            xTaskNotifyGive(s_task);      /* a restart to show why, if one is safe */
+    }
+    if (s_d.phase == JV_DONE && prior != JV_DONE && s_task)
         xTaskNotifyGive(s_task);
 }
 
@@ -293,11 +346,19 @@ int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, u
 
 /* --- the install --- */
 
-static void finish(const char *text, const char *slot)
+/* The note for UPDATE.TXT, then the restart once the computer is quiet. A restart that would cost something is not made:
+ * with the running image not confirmed yet (the bootloader would roll it back) or an update over MIDI running (it would
+ * be cut off), a refusal is only noted (`drive` on the control line says why) and the stick runs on. installed: the new
+ * image is the boot choice, the restart is the point. */
+static void finish(const char *text, const char *slot, bool installed)
 {
     uint32_t done_at = now_ms();
-    drive_note(slot, text);
     ESP_LOGW(TAG, "%s", text);
+    if (!installed && (running_unconfirmed() || !slot_take(SLOT_DRIVE))) {
+        ESP_LOGW(TAG, "no restart now: it would roll back the new firmware or cut an update over MIDI");
+        return;
+    }
+    drive_note(slot, text);
     while (!s_eject && now_ms() - s_last_write_ms < QUIET_MS && now_ms() - done_at < FINISH_MAX_MS)
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     esp_restart();                        /* the next start shows the note in UPDATE.TXT */
@@ -314,21 +375,19 @@ static void drive_task(void *arg)
         if (s_d.phase == JV_DONE) {
             esp_err_t e = esp_ota_set_boot_partition(s_slot);   /* esp_image_verify first: segments, checksum, SHA-256 */
             if (e == ESP_OK)
-                finish("jank.bin installed from the drive, restarted", s_slot->label);
+                finish("jank.bin installed from the drive, restarted", s_slot->label, true);
             snprintf(text, sizeof text, "jank.bin not installed: image check failed (%s)", esp_err_to_name(e));
-            finish(text, run_label);
-        } else if (s_d.phase == JV_FAILED) {
+            finish(text, run_label, false);   /* the slot is still the drive's: the restart is made */
+        } else if (s_d.phase == JV_FAILED && s_slot_user != SLOT_DRIVE) {
             snprintf(text, sizeof text, "jank.bin not installed: %s", s_refused ? s_refused : "refused");
-            finish(text, run_label);
+            finish(text, run_label, false);
         } else if (s_eject && s_d.phase == JV_STREAM) {
             snprintf(text, sizeof text, "jank.bin not installed: the copy was not whole (%lu of its sectors came)", (unsigned long)s_d.sectors_in);
-            finish(text, run_label);
+            finish(text, run_label, false);
         }
         s_eject = 0;                      /* an eject with no update on the drive: nothing to do */
     }
 }
-
-bool drive_busy(void) { return s_d.phase == JV_STREAM; }
 
 void drive_state(char *out, size_t cap)
 {

@@ -107,7 +107,7 @@ not arrive.
 
 ## Size
 
-XIAO image with BLE (`sdkconfig.ble` + `ble-tuned`): 1,255,904 bytes; internal RAM left after static use 51,669 B (image
+XIAO image with BLE (`sdkconfig.ble` + `ble-tuned`): 1,256,784 bytes; internal RAM left after static use 51,629 B (image
 M1d without BLE: 29,949 B), because the tuned build moves static buffers to PSRAM. Bluetooth's runtime cost inside the
-chip when on is 13..18 KB (stage 1's estimate, unmeasured); when off, none. The FH4R2 (`sdkconfig.fh4r2`, two 1.6 MB slots):
-see the build's size check in the commit.
+chip when on is 13..18 KB (stage 1's estimate, unmeasured); when off, none. FH4R2 (`sdkconfig.fh4r2`, two 1.6 MB slots):
+1,254,368 B in a 1,638,400 B slot (384,032 B, 23 % free), 54,117 B internal left.
