@@ -8,6 +8,8 @@ int jb_beat_init(struct jb_beat *b)
     jb_fe_init(&b->fe);
     jb_lstm_init(&b->net);
     b->q16 = 0;
+    b->tap = NULL;
+    b->tap_ctx = NULL;
     return jb_dbn_init(&b->dbn, JB_MIN_BPM, JB_MAX_BPM, JB_FPS);
 }
 
@@ -22,8 +24,16 @@ int jb_beat_init_q16(struct jb_beat *b)
 void jb_beat_reset(struct jb_beat *b)
 {
     jb_fe_init(&b->fe);
+    b->fe.tap = b->tap;
+    b->fe.tap_ctx = b->tap_ctx;
     jb_lstm_init(&b->net);
     jb_dbn_reset(&b->dbn);
+}
+
+void jb_beat_set_tap(struct jb_beat *b, jb_fe_tap fn, void *ctx)
+{
+    b->tap = b->fe.tap = fn;
+    b->tap_ctx = b->fe.tap_ctx = ctx;
 }
 
 void jb_beat_push(struct jb_beat *b, const float *x, size_t n, jb_frame_fn fn, void *ctx)

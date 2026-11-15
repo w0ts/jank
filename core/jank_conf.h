@@ -39,9 +39,21 @@
 #define JCF_SILENCE_SAMPLES (JCF_RATE / 2u)
 #define JCF_QUIET_MS_INT16 1073.741824  /* (1e-3 * 32768)^2 */
 
+/* THE LINES (M2i, beat-listener live/follow.py LineLog + line_confidence): the confidence is judged against the grid lines
+ * the outputs actually published, recorded as time passed them, instead of today's grid extended backwards over the
+ * window at its current tempo. That extension assumes one tempo across the 8 s: after any tempo change, even one the
+ * follower took at once, the older beats miss it and the gate stopped the outputs (a 2 % pitch step: 96 % of the time;
+ * with the lines and the glide, 24 %, the level of no step at all: studies/advanced-follow). A line closer than half a
+ * period to the last one recorded is the same line, moved a little by the follower. Kept: JCF_LINES_S, at most
+ * JCF_LINES (the follower's shortest period, 0.2 s, puts 51 in 10 s). */
+#define JCF_LINES 64
+#define JCF_LINES_S (JCF_WINDOW_S + 2.0)
+
 struct jcf {
     double t[JCF_KEEP];                 /* the tracker's beat times, ascending, oldest first */
     uint16_t n;
+    double line[JCF_LINES];             /* the published grid's lines, ascending, oldest first */
+    uint16_t lines;
     uint32_t quiet;                     /* samples of quiet in a row (capped) */
     uint8_t silent;                     /* quiet for JCF_SILENCE_SAMPLES: confidence 0, no beats kept */
     uint32_t silences;                  /* silences begun (for `beat`) */
@@ -59,6 +71,14 @@ int jcf_samples(struct jcf *c, uint64_t sumsq, size_t n);
 void jcf_beat(struct jcf *c, double t);
 /* the confidence now with the defaults (JCF_WINDOW_S, JCF_DELAY_S, JCF_TOL); silent: 0 */
 double jcf_confidence(const struct jcf *c, int has_grid, double t0, double period, double now);
+/* THE LINES: the published grid at now (has_grid 0: none, e.g. while stopped) records the lines time has passed */
+void jcf_line_tick(struct jcf *c, int has_grid, double t0, double period, double now);
+/* line_confidence itself: the beats against the lines recorded, the margin from the grid's period (has_period 0: None) */
+double jcf_lines_confidence(const double *beats, size_t n, const double *lines, size_t m, int has_period, double period,
+                            double now, double window_s, double delay_s, double tol);
+/* the confidence now against the lines (the defaults; silent: 0, and no tick). The grid ticks the lines first while the
+ * follower gives a tempo (tick 1; studies/advanced-follow/replay.py: not while stopped); its period sets the margin */
+double jcf_line_confidence(struct jcf *c, int tick, int has_grid, double t0, double period, double now);
 /* 0..1 as percent, rounded (the status, the HOME line) */
 uint8_t jcf_pct(double conf);
 

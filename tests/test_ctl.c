@@ -573,6 +573,9 @@ static void test_status_size(void)
     snap.beat.fold_exp = -2;                                          /* "0.25" */
     snap.beat.fold_manual = 1;
     snap.beat.nudge_halves = -5;                                      /* "-2.5" */
+    snap.beat.follow = 0;                                             /* "stopped" (jb_follow.h JF_STOPPED) */
+    snap.beat.drift_ppm = -2147483647 - 1;                            /* the follow lines at their longest */
+    snap.beat.rate_x10000 = -2147483647 - 1;
     cfg.lat_key = (struct jla_key){JLA_HOSTED, 0xFFFF, 0xFFFF};       /* "host:ffff:ffff" */
     jla_set(&cfg.lat, &cfg.lat_key, JK_BEAT_LATENCY_MAX_MS);          /* (a shift of -600 needs a base of 300 first) */
     jla_set_trim(&cfg.lat, &cfg.lat_key, -600);                       /* lat_trim=-600 */
@@ -612,10 +615,39 @@ static void test_lowconf(void)
     CHECK(run("help") == JK_CTL_NONE && strstr(out, "|usbmidi|lowconf|threshold|"));
 }
 
+/* ADVANCED FOLLOW (M2i): set rate on|off (on by default, stored); get says it; status the follower's state, drift and the
+ * last ratio taken; beat all of the rate's numbers */
+static void test_follow(void)
+{
+    struct jk_cfg before;
+    setup();
+    CHECK(cfg.rate == 1);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nthreshold=80\nrate=on\n"));
+    before = cfg;
+    CHECK(run("set rate off") == JK_CTL_CFG_CHANGED && cfg.rate == 0 && jk_cfg_stored_differs(&before, &cfg));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nrate=off\n"));
+    CHECK(run("set rate maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.rate == 0);
+    CHECK(run("set rate on") == JK_CTL_CFG_CHANGED && cfg.rate == 1);
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .conf_pct = 97, .follow = 2 /* glide */, .drift_ppm = -35,
+                                 .rate_x10000 = 10203, .manoeuvres = 2, .rate_on = 1, .rate_active = 1, .rate_events = 7,
+                                 .rate_taken = 3, .rate_refused = 4, .rate_ignored = 1, .rate_us = 3120, .rate_max_us = 95};
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nfollow=glide\ndrift_ppm=-35\nrate_ratio=1.0203\n"));
+    CHECK(!strstr(out, "rate_events="));
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nfollow=glide\ndrift_ppm=-35\nrate_ratio=1.0203\nmanoeuvres=2\nrate=on\nrate_active=1\n"));
+    CHECK(strstr(out, "\nrate_events=7\nrate_taken=3\nrate_refused=4\nrate_ignored=1\nrate_us=3120\nrate_max_us=95\n"));
+    snap.beat.rate_on = 0;                                            /* no PSRAM for its ring: off whatever the setting */
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nrate=off\n"));
+    snap.beat.follow = 1;                                             /* lock */
+    snap.beat.rate_x10000 = 9700;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nfollow=lock\n") && strstr(out, "\nrate_ratio=0.9700\n"));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|ble|"));
+}
+
 int main(void)
 {
     test_defaults();
     test_lowconf();
+    test_follow();
     test_beat();
     test_autobar();
     test_nudge();

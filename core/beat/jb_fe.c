@@ -90,6 +90,8 @@ static void frame_features(struct jb_fe *fe, float *feat)
         fe->buf[i + 1] = fe->ring[(start + i + 1) & (JB_FRAME - 1)] * w1;
     }
     magnitudes(fe->buf, mag);
+    if (fe->tap)
+        fe->tap(fe->tap_ctx, fe->frame, mag);
     const float *val = beat_fb_val;
     for (int j = 0; j < BEAT_BANDS; ++j) {
         float s = 0.0f;

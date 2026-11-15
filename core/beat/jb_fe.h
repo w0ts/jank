@@ -18,6 +18,11 @@
 #define JB_HOP 441                     /* 100 frames a second */
 #define JB_FPS 100
 
+/* A frame's |FFT| (bins 0 .. the filterbank's highest), given to a tap during the frame's work: the spectral rate
+ * (jb_rate.h) reads the tracker's own spectrum instead of computing a second one. index: the frame's (jb_fe_last_frame
+ * once it is done). */
+typedef void (*jb_fe_tap)(void *ctx, int64_t index, const float *mag);
+
 struct jb_fe {
     float ring[JB_FRAME];              /* the last 2048 samples, sample n at n mod 2048 */
     float buf[JB_FRAME];               /* the FFT's work area */
@@ -25,6 +30,8 @@ struct jb_fe {
     uint8_t have_prev;
     int64_t n;                         /* samples taken in */
     int64_t frame;                     /* the next frame to compute */
+    jb_fe_tap tap;                     /* NULL: none (jb_fe_init clears it) */
+    void *tap_ctx;
 };
 
 void jb_fe_init(struct jb_fe *fe);

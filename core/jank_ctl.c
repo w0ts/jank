@@ -28,6 +28,7 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->usbmidi = 1;                    /* on: the clock went over USB-MIDI before there was a setting (see jk_cfg) */
     c->lowconf = JCF_STOP;             /* the emulator's default: STOP / START at 80 % (player.py DEFAULT_MIN_CONFIDENCE) */
     c->threshold = JCF_THRESHOLD_DEFAULT;
+    c->rate = 1;                       /* the spectral rate on (M2i) */
     jla_init(&c->lat);                 /* (lat_key: the computer, which beat_latency_ms above is) */
     strcpy(c->name, "jank");
 }
@@ -47,7 +48,7 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b)
 {
     return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source || a->autobar != b->autobar
-           || a->usbmidi != b->usbmidi || a->lowconf != b->lowconf || a->threshold != b->threshold || !jla_same(&a->lat, &b->lat);
+           || a->usbmidi != b->usbmidi || a->lowconf != b->lowconf || a->threshold != b->threshold || a->rate != b->rate || !jla_same(&a->lat, &b->lat);
 }
 
 int jk_lat_select(struct jk_cfg *c, const struct jla_key *k)
@@ -153,7 +154,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put_lat(c, w);
     put(w, "beat_latency_src=%s\nautobar=%s\n", jla_name(&c->lat_key, src), autobar_name(c->autobar));
     put(w, "usbmidi=%s\n", on_off(c->usbmidi));
-    put(w, "lowconf=%s\nthreshold=%u\n", lowconf_name(c->lowconf), c->threshold);
+    put(w, "lowconf=%s\nthreshold=%u\nrate=%s\n", lowconf_name(c->lowconf), c->threshold, on_off(c->rate));
     put(w, "ble=%s\n", ble_name(c->ble));
     put(w, "usb=%s\nsource=%s\n", jur_usb_name(c->usb), jur_src_name(c->source));
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
@@ -195,6 +196,24 @@ static void put_conf(const struct jk_cfg *c, const struct jk_beat *t, struct wri
         lowconf_name(c->lowconf));
 }
 
+static const char *const FOLLOW_NAME[] = {"stopped", "lock", "glide", "?"};
+
+/* the advanced beat follow (M2i): the follower's state (lock: ModeBpm's grid, glide: the Kalman follower), its drift and
+ * the last rate ratio it took (status: these; its 1920 bytes are nearly full). full (beat): also the spectral rate's
+ * setting, whether it runs, its steps and their fate, its CPU */
+static void put_follow(const struct jk_cfg *c, const struct jk_beat *t, struct writer *w, int full)
+{
+    int32_t r = t->rate_x10000;
+    uint32_t mag = r < 0 ? 0u - (uint32_t)r : (uint32_t)r;
+    put(w, "follow=%s\ndrift_ppm=%ld\nrate_ratio=%s%lu.%04lu\n", FOLLOW_NAME[t->follow & 3u], (long)t->drift_ppm, r < 0 ? "-" : "",
+        (unsigned long)(mag / 10000u), (unsigned long)(mag % 10000u));
+    if (!full)
+        return;
+    put(w, "manoeuvres=%lu\nrate=%s\nrate_active=%u\n", (unsigned long)t->manoeuvres, on_off(c->rate && t->rate_on), t->rate_active);
+    put(w, "rate_events=%lu\nrate_taken=%lu\nrate_refused=%lu\nrate_ignored=%lu\nrate_us=%lu\nrate_max_us=%lu\n", (unsigned long)t->rate_events,
+        (unsigned long)t->rate_taken, (unsigned long)t->rate_refused, (unsigned long)t->rate_ignored, (unsigned long)t->rate_us, (unsigned long)t->rate_max_us);
+}
+
 /* the tracker's source: open, sound (AUDIO mode), AUDIO mode's Stop, the outputs; the input meter and the confidence */
 static void put_audio(const struct jk_cfg *c, const struct jk_snapshot *s, struct writer *w)
 {
@@ -203,6 +222,7 @@ static void put_audio(const struct jk_cfg *c, const struct jk_snapshot *s, struc
         jfo_name(t->fold_exp), t->fold_manual);
     put(w, "rms_db=%d\nrms_min_db=%d\nrms_max_db=%d\npeak_db=%d\n", t->level_db, t->level_min_db, t->level_max_db, t->peak_db);
     put_conf(c, t, w);
+    put_follow(c, t, w, 0);
 }
 
 static const char *const BAR_NAME[] = {"off", "listening", "locked", "manual"};
@@ -395,6 +415,8 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
         return parse_on_off(val, &c->beat);
     if (!strcmp(key, "usbmidi"))
         return parse_on_off(val, &c->usbmidi);
+    if (!strcmp(key, "rate"))              /* the advanced beat follow's spectral rate (core/beat/jb_rate.h) */
+        return parse_on_off(val, &c->rate);
     if (!strcmp(key, "lowconf"))           /* LOW CONFIDENCE: KEEP RUNNING or STOP / START (jank_conf.h) */
         return parse_pair(val, "run", "stop", &c->lowconf);
     if (!strcmp(key, "autobar")) {         /* on (= start), start, always, even when so already: picked again (MANUAL ends) */
@@ -450,6 +472,7 @@ static void cmd_beat(const struct jk_cfg *c, const struct jk_beat *t, struct wri
     put(w, "rms_db=%d\nrms_min_db=%d\nrms_max_db=%d\npeak_db=%d\n", t->level_db, t->level_min_db, t->level_max_db, t->peak_db);
     put_conf(c, t, w);
     put(w, "mode=%s\nbpm=%lu.%02lu\n", MODE_NAME[t->mode & 3u], (unsigned long)(bpm / 100u), (unsigned long)(bpm % 100u));
+    put_follow(c, t, w, 1);
     put(w, "heap_free=%lu\nheap_min=%lu\nheap_largest=%lu\nstack_free=%lu\n", (unsigned long)t->heap_free, (unsigned long)t->heap_min, (unsigned long)t->heap_largest, (unsigned long)t->stack_free);
     put(w, "psram_free=%lu\npsram_min=%lu\n", (unsigned long)t->psram_free, (unsigned long)t->psram_min);
     put(w, "cpu_pct=%lu.%lu\nhop_avg_us=%lu\nhop_max_us=%lu\nhop_avg_cycles=%lu\nhops=%lu\n", (unsigned long)(t->cpu_pct_x10 / 10u), (unsigned long)(t->cpu_pct_x10 % 10u), (unsigned long)t->hop_avg_us, (unsigned long)t->hop_max_us, (unsigned long)t->hop_avg_cycles, (unsigned long)t->hops);
@@ -616,7 +639,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     } else if (!strcmp(s, "ble pair") || !strcmp(s, "ble close"))
         return s[4] == 'p' ? JK_CTL_BLE_PAIR : JK_CTL_BLE_CLOSE;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nble pair|close\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nble pair|close\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

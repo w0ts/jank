@@ -146,6 +146,9 @@ struct jk_cfg {
     /* ... and since M2e: LOW CONFIDENCE (core/jank_conf.h) */
     uint8_t lowconf;                  /* enum jcf_lowconf: KEEP RUNNING (0) or STOP / START (1, the default, as the emulator) */
     uint8_t threshold;                /* percent 0..100: STOP / START gates the outputs under it (0: never) */
+    /* ... and since M2i: the advanced beat follow's spectral rate (core/beat/jb_rate.h) */
+    uint8_t rate;                     /* 1 (default): a pitch move read from the spectrum steers the follower; 0: the beats alone
+                                         (CPU: the rate costs ~0.4 % of core 0 while it runs) */
     /* Stored in their own blob (store.c, key "lat1") since M2d: beat_latency per audio source (core/jank_lat.h) */
     struct jla lat;
     struct jla_key lat_key;           /* the source beat_latency_ms belongs to now (not stored: usbrole.c follows it) */
@@ -177,7 +180,7 @@ size_t jk_intr_summary(const char *dump, char *out, size_t cap);
 /* drive and MIDI updates: refused while playing ("stop first"): flash erases would stall USB, Wi-Fi and the tracker */
 #define JK_STOP_FIRST "the session or the MIDI clock is playing: stop first"
 
-#define JK_CTL_OUT_MAX 1920u         /* the firmware's answer buffer (ctl.c): the longest status (1798 since M2h, tests/test_ctl.c) fits with its ok; under usb.c's 2048 */
+#define JK_CTL_OUT_MAX 1920u         /* the firmware's answer buffer (ctl.c): the longest status (1859 since M2i, tests/test_ctl.c) fits with its ok; under usb.c's 2048 */
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
 struct jk_beat {
@@ -215,6 +218,17 @@ struct jk_beat {
     int32_t bar_lead_x100;            /* its lead, score units x 100 */
     uint32_t bar_moves;               /* whole-beat moves of the session's bar */
     int8_t nudge_halves;              /* NUDGE BEAT: the user's nudges since the last reset, half beats (core/jank_beatlink.h) */
+    /* the advanced beat follow (M2i, core/beat/jb_follow.h, jb_rate.h); conf_pct above is against the published lines */
+    uint8_t follow;                   /* enum jb_follow_state: 0 stopped, 1 lock (ModeBpm's grid), 2 glide (the Kalman follower) */
+    int32_t drift_ppm;                /* the glide's period change a beat, parts per million (+: slowing down) */
+    uint32_t manoeuvres;              /* the glide's tempo moves taken from the beats */
+    uint8_t rate_on;                  /* the spectral rate: the setting, and its RAM there (PSRAM) */
+    uint8_t rate_active;              /* ... running (only while the glide runs) */
+    int32_t rate_x10000;              /* the last ratio the follower took, x 10000 (10000: none yet) */
+    uint32_t rate_events, rate_taken, rate_refused, rate_ignored;   /* steps proposed; taken, refused by the next beat,
+                                                                       not judged (no trusted glide) */
+    uint32_t rate_us;                 /* the rate's work over the last second, us (1000 = 0.1 % of core 0) */
+    uint32_t rate_max_us;             /* its longest frame (a block's match) over the last second */
 };
 
 /* the USB port, for `status` (firmware/main/usbrole.c fills it) */
