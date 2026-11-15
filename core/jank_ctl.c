@@ -16,6 +16,7 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->quantum = 4;
     c->beat = 1;
     c->beat_latency_ms = JK_BEAT_LATENCY_DEFAULT_MS;
+    c->autobar = 1;
     strcpy(c->name, "jank");
 }
 
@@ -65,7 +66,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
 {
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%s%d.%02d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_10us < 0 ? "-" : "", abs(c->offset_10us) / 100, abs(c->offset_10us) % 100);
-    put(w, "beat=%s\nbeat_latency=%d\n", on_off(c->beat), c->beat_latency_ms);
+    put(w, "beat=%s\nbeat_latency=%d\nautobar=%s\n", on_off(c->beat), c->beat_latency_ms, on_off(c->autobar));
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "version=%s\nok\n", JK_VERSION);
@@ -98,6 +99,16 @@ static void put_link(const struct jk_snapshot *s, struct writer *w)
     put(w, "midi_ticks=%lu\nmidi_resync=%lu\n", (unsigned long)s->midi_ticks, (unsigned long)s->midi_resync);
 }
 
+static const char *const BAR_NAME[] = {"off", "listening", "locked", "manual"};
+
+/* the downbeat estimator (AUTO BAR): its state, the 1's count position (-1 none) and its lead */
+static void put_bar(const struct jk_beat *t, struct writer *w)
+{
+    int32_t lead = t->bar_lead_x100;
+    uint32_t mag = lead < 0 ? (uint32_t)-lead : (uint32_t)lead;
+    put(w, "bar=%s\nbar_phi=%d\nbar_lead=%s%lu.%02lu\n", BAR_NAME[t->bar & 3u], t->bar_phi, lead < 0 ? "-" : "", (unsigned long)(mag / 100u), (unsigned long)(mag % 100u));
+}
+
 static void cmd_status(const struct jk_snapshot *s, uint32_t now_ms, struct writer *w)
 {
     const struct jk_bridge *b = &s->b;
@@ -110,6 +121,7 @@ static void cmd_status(const struct jk_snapshot *s, uint32_t now_ms, struct writ
     put(w, "tx_fail=%lu\nqueue_full=%lu\nscan_lost=%lu\n", (unsigned long)s->tx_fail, (unsigned long)s->queue_full, (unsigned long)s->scan_lost);
     put(w, "lat_air_us=%lu\nlat_air_max_us=%lu\nlat_usb_us=%lu\nlat_usb_max_us=%lu\n", (unsigned long)s->lat_air_us, (unsigned long)s->lat_air_max_us, (unsigned long)s->lat_usb_us, (unsigned long)s->lat_usb_max_us);
     put_link(s, w);
+    put_bar(&s->beat, w);
     for (uint32_t i = 0; i < JK_PEERS; i++) {
         const struct jk_peer *p = &b->peer[i];
         if (!p->used || now_ms - p->t_heard >= JK_HEARD_MS)
@@ -227,6 +239,13 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
         return parse_on_off(val, &c->peer);
     if (!strcmp(key, "beat"))
         return parse_on_off(val, &c->beat);
+    if (!strcmp(key, "autobar")) {         /* on, even when on already: picked again (MANUAL ends) */
+        if (parse_on_off(val, &c->autobar))
+            return -1;
+        if (c->autobar)
+            c->autobar_picks++;
+        return 0;
+    }
     return set_number(c, key, val);
 }
 
@@ -260,7 +279,9 @@ static void cmd_beat(const struct jk_beat *t, struct writer *w)
     put(w, "cpu_pct=%lu.%lu\nhop_avg_us=%lu\nhop_max_us=%lu\nhop_avg_cycles=%lu\nhops=%lu\n", (unsigned long)(t->cpu_pct_x10 / 10u), (unsigned long)(t->cpu_pct_x10 % 10u), (unsigned long)t->hop_avg_us, (unsigned long)t->hop_max_us, (unsigned long)t->hop_avg_cycles, (unsigned long)t->hops);
     put(w, "packets=%lu\ngaps=%lu\noverflows=%lu\nresets=%lu\n", (unsigned long)t->packets, (unsigned long)t->gaps, (unsigned long)t->overflows, (unsigned long)t->resets);
     put(w, "tempo_sets=%lu\nphase_forces=%lu\nstarts=%lu\nstops=%lu\n", (unsigned long)t->tempo_sets, (unsigned long)t->phase_forces, (unsigned long)t->starts, (unsigned long)t->stops);
-    put(w, "err_us=%ld\noffset_us=%ld\nlatency_us=%ld\nok\n", (long)t->err_us, (long)t->offset_us, (long)t->latency_us);
+    put(w, "err_us=%ld\noffset_us=%ld\nlatency_us=%ld\n", (long)t->err_us, (long)t->offset_us, (long)t->latency_us);
+    put_bar(t, w);
+    put(w, "bar_moves=%lu\nok\n", (unsigned long)t->bar_moves);
 }
 
 /* the line without the spaces and CR around it, in buf */
@@ -339,7 +360,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         put(&w, "err tempo is 20 to 999 BPM\n");
     }
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|autobar|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

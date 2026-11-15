@@ -67,6 +67,39 @@ int32_t jbl_session_offset_us(int64_t ub_at, int32_t mpb)
     return (int32_t)llround(-(double)(ub_at - whole) * (double)mpb / (double)LK_UBEAT);
 }
 
+int jbl_bar_shift(int64_t ub_at, int32_t count, int phi)
+{
+    int64_t whole = floor_div(ub_at + LK_UBEAT / 4, LK_UBEAT);
+    int64_t n = ((int64_t)count - phi - whole) % 4;
+    if (n < 0)
+        n += 4;
+    return n == 3 ? -1 : (int)n;
+}
+
+void jbl_shift_bar(struct jbl *c, struct lk_node *k, struct jst *start, int n, int64_t t)
+{
+    if (!n)
+        return;
+    lk_force_beat(k, lk_mpb(k), lk_beat_at(k, t) + (int64_t)n * LK_UBEAT, t);
+    jst_retarget(start, k, t);
+    c->bar_moves++;
+}
+
+int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, int64_t now, const struct jbl_in *in,
+                 const struct jbl_bar *bar)
+{
+    int n;
+    if (!settled || in->passive || !in->running || !bar->locked || (c->bar_seen && bar->seq == c->bar_seq))
+        return 0;
+    if (c->err_us > JBL_PHASE_US || c->err_us < -JBL_PHASE_US)
+        return 0;
+    c->bar_seq = bar->seq;
+    c->bar_seen = 1;
+    n = jbl_bar_shift(lk_beat_at(k, bar->beat_us), bar->count, bar->phi);
+    jbl_shift_bar(c, k, start, n, now);
+    return n;
+}
+
 /* Link's start on the next bar line, sent JST_LEAD_US before it (jank_start.h); the session playing already: kept */
 static void start_session(struct jbl *c, struct lk_node *k, struct jst *start, int64_t now, uint32_t quantum)
 {

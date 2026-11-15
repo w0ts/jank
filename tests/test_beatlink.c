@@ -206,9 +206,62 @@ static void test_session_offset(void)
     CHECK(jbl_session_offset_us(10 * (int64_t)LK_UBEAT + 500001, mpb) == 250000);   /* ... ahead */
 }
 
+static void test_bar_shift(void)
+{
+    const int64_t B = LK_UBEAT;
+    CHECK(jbl_bar_shift(100 * B, 7, 2) == 1);                     /* beat 7 is bar position 1: session 100 -> 101 */
+    CHECK(jbl_bar_shift(100 * B, 7, 3) == 0);
+    CHECK(jbl_bar_shift(100 * B, 7, 0) == -1);                    /* position 3: 100 -> 99 */
+    CHECK(jbl_bar_shift(100 * B, 7, 1) == 2);
+    CHECK(jbl_bar_shift(100 * B + B / 2, 7, 3) == 0);             /* half a beat off (a half nudge): the same beat */
+    CHECK(jbl_bar_shift(100 * B - 20000, 7, 3) == 0);             /* 20 ms early: the same beat */
+    CHECK(jbl_bar_shift(-3 * B, 1, 0) == 0);                      /* before the session's beat 0 */
+}
+
+/* AUTO BAR: the session's bar moves whole beats onto the 1, once a decision, the phase in tolerance, the tempo kept;
+ * an armed start re-targets the moved grid's next bar line */
+static void test_bar_moves(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    struct jbl_bar bar = {.locked = 1, .seq = 5, .count = 7, .phi = 2};
+    int64_t bar_ub = 4 * (int64_t)LK_UBEAT, ub;
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);             /* in phase (the session started at the tracked beat) */
+    CHECK(st.armed);
+    bar.beat_us = 10000000 + 4 * 500000;                          /* a counted beat on the grid */
+    ub = lk_beat_at(&node, bar.beat_us);
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10200000, &in, &bar) == jbl_bar_shift(ub, 7, 2));
+    CHECK(((lk_beat_at(&node, bar.beat_us) / LK_UBEAT) % 4 + 4) % 4 == (7 - 2) % 4);   /* that beat is now position 1 */
+    CHECK(lk_mpb(&node) == 500000 && abs64(grid_error(bar.beat_us)) <= 2);              /* tempo and phase kept */
+    CHECK(st.armed && st.ub % bar_ub == 0 && st.ub - lk_beat_at(&node, 10200000) >= LK_UBEAT * 3 / 10);
+    CHECK(jbl.bar_moves == (jbl_bar_shift(ub, 7, 2) != 0));
+    ub = lk_beat_at(&node, bar.beat_us);
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10300000, &in, &bar) == 0);   /* the same decision: nothing more */
+    CHECK(lk_beat_at(&node, bar.beat_us) == ub);
+    bar.seq = 6;
+    bar.phi = 3;                                                  /* a later move: position 0 */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10400000, &in, &bar) == -1);        /* position 1 -> 0: a beat back */
+    CHECK(((lk_beat_at(&node, bar.beat_us) / LK_UBEAT) % 4 + 4) % 4 == 0);
+    bar.seq = 7;
+    bar.phi = 0;
+    bar.locked = 0;                                               /* listening / manual / off: no move */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10500000, &in, &bar) == 0);
+    bar.locked = 1;
+    in.passive = 1;                                               /* LINK mode: the session's bar is not ours */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10600000, &in, &bar) == 0);
+    in.passive = 0;
+    jbl.err_us = 9000;                                            /* the phase out of tolerance: wait */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10700000, &in, &bar) == 0);
+    jbl.err_us = 0;
+    CHECK(jbl_bar_step(&jbl, &node, &st, 0, 10800000, &in, &bar) == 0);    /* not settled */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10900000, &in, &bar) != 0);    /* the waiting decision, now */
+}
+
 int main(void)
 {
     test_session_offset();
+    test_bar_shift();
+    test_bar_moves();
     test_phase_forced_past_5ms();
     test_tempo_deadband();
     test_transport();

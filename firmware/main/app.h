@@ -48,6 +48,7 @@ void usb_serial_write(const char *text, size_t n);                 /* the contro
 struct jank_peer;
 esp_err_t beat_start(void);
 void beat_stats(struct jk_beat *out);
+uint8_t beat_bar_state(void);                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
 
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);

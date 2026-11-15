@@ -41,6 +41,10 @@ fi
 "$CC" $FLAGS -std=c11 -I"$HERE/core/beat" "$HERE/tests/test_beat.c" "$HERE"/core/beat/*.c -lm -o "$OUT/test_beat"
 "$OUT/test_beat" "$HERE/tests/beat_ref"
 
+# AUTO BAR: the downbeat estimator against beat-listener's live/downbeat.py (golden vectors, tests/down_ref).
+"$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_down.c" "$HERE/core/beat/jb_down.c" "$HERE/core/beat/down_model.c" -lm -o "$OUT/test_down"
+"$OUT/test_down" "$HERE/tests/down_ref"
+
 FM1BASE="${FM1BASE:-$HERE/../optimist/fm1base}"
 if [ ! -f "$FM1BASE/wifi/wifi_jank.c" ]; then echo "crosscheck: no fm1-base Wi-Fi sources at $FM1BASE (set FM1BASE to an Optimist checkout's fm1base)"; exit 1; fi
 OPT="$FM1BASE/wifi"

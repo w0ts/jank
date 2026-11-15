@@ -9,6 +9,7 @@ idf_component_register(
          "usb_audio.c" "beat.c"
          "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c" "${core}/jank_start.c"
          "${beat}/jb_beat.c" "${beat}/jb_dbn.c" "${beat}/jb_fe.c" "${beat}/jb_lstm.c" "${beat}/jb_lstm_q16.c" "${beat}/jb_mode.c" "${beat}/beat_model.c"
+         "${beat}/jb_down.c" "${beat}/down_model.c"
          "${link}/link.c"
     INCLUDE_DIRS "." "${core}" "${link}" "${beat}"
     PRIV_REQUIRES app_update fatfs wear_levelling esp_partition usb esp_wifi esp_event esp_netif nvs_flash esp_driver_gptimer esp_driver_uart esp_driver_gpio esp_driver_mcpwm esp_timer hal soc esp_hw_support esp_system heap

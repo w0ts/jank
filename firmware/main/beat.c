@@ -5,7 +5,12 @@
  * shipped; our own network replaces them.
  *
  * Core 0, below the Wi-Fi and Link tasks (priority 3), woken every 5 ms: it takes what the ring holds, 441 samples (one
- * 10 ms hop) at a time, so one pass of work is one frame. Core 1 stays the MIDI clock's alone. */
+ * 10 ms hop) at a time, so one pass of work is one frame. Core 1 stays the MIDI clock's alone.
+ *
+ * AUTO BAR: the downbeat estimator (core/beat/jb_down.c, weights from the user's Traktor grids and audio) runs on the
+ * same frames and on ModeBpm's grid; when it knows the 1, the bridge's step moves the session's bar onto it in whole
+ * beats (jbl_bar_step). Its reset events here: ModeBpm stopped (30 s without a steady beat), a tempo jump
+ * (DOWN_JUMP_RESET), a new audio stream (the tracker restarts). `set autobar off` leaves the bar where it is. */
 #include <math.h>
 #include <string.h>
 #include "app.h"
@@ -20,6 +25,7 @@
 #include "jank_peer.h"
 #include "jank_sysex.h"
 #include "jb_beat.h"
+#include "jb_down.h"
 #include "jb_mode.h"
 #include "usb_audio.h"
 
@@ -28,6 +34,7 @@
 #define POLL_MS 5
 #define STEP_EVERY_US 250000           /* the Link session is looked after this often, and at each tracked beat */
 #define WINDOW_US 1000000              /* the CPU share is over this long */
+#define DOWN_JUMP_RESET 1              /* a tempo jump (jb_mode's jumps) resets the bar, as designed; 0: the count goes on */
 
 static const char *TAG = "beat";
 static struct jb_beat s_b;
@@ -36,6 +43,9 @@ static struct jbl s_jbl;
 static TaskHandle_t s_task;
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static struct jk_beat s_pub;           /* published to beat_stats, under s_mux */
+static struct jb_down s_down;          /* the downbeat estimator, the beat task's own */
+static jd_seg_row *s_down_seg;         /* its segment ring (2.9 KB), in PSRAM when there is some */
+static uint8_t s_autobar = 1, s_autobar_picks;     /* the setting as last applied */
 
 /* the task's own */
 static int64_t s_samples;              /* samples given to the tracker since its start */
@@ -47,6 +57,7 @@ static int64_t s_win_start, s_win_busy;
 
 struct step_ctx {
     struct jbl_in in;
+    struct jbl_bar bar;
     uint32_t quantum;
 };
 
@@ -96,16 +107,45 @@ static void report(char kind, double at_s)
         usb_beat_line(line, n);
 }
 
+/* a tracked beat to the downbeat estimator, after ModeBpm took it (live/downbeat.py Driver.tracked) */
+static void down_tracked(double t, int jumps_before)
+{
+    double tb, period;
+    int running;
+    if (DOWN_JUMP_RESET && s_mode.jumps != jumps_before && jd_counting(&s_down))
+        jd_reset(&s_down);              /* a tempo jump: a new bar to find */
+    running = jb_mode_at(&s_mode, t) != JB_STOPPED;
+    if (!jb_mode_grid(&s_mode, &tb, &period))
+        jd_stop(&s_down);
+    else if (!running && jd_counting(&s_down))
+        jd_stop(&s_down);               /* ModeBpm stopped: a reset; shadow beats from its next grid on */
+    else
+        jd_grid(&s_down, t, tb, period, running);
+}
+
 static void on_frame(void *ctx, const struct jb_frame *f)
 {
     (void)ctx;
     s_hops++;
+    if (s_down_seg && jd_frame(&s_down, f->index, f->bands))
+        s_beat_seen = 1;                /* a decision: the session's bar is looked after now */
     if (f->beat) {
+        int jumps = s_mode.jumps;
         jb_mode_update(&s_mode, f->time);
+        if (s_down_seg)
+            down_tracked(f->time, jumps);
         s_beat_seen = 1;
         s_beat_n++;
         report('b', f->time);
     }
+}
+
+static void restart_down(void)
+{
+    if (!s_down_seg)
+        return;
+    jd_init(&s_down, s_down_seg);       /* the frame count starts over with the tracker */
+    jd_set_auto(&s_down, s_autobar);
 }
 
 static void restart_tracker(void)
@@ -113,15 +153,46 @@ static void restart_tracker(void)
     uac_restart();
     jb_beat_reset(&s_b);
     jb_mode_init(&s_mode);
+    restart_down();
     s_samples = 0;
     s_beat_seen = 0;
+}
+
+/* AUTO BAR: the setting, and `set autobar on` again = picked again (MANUAL ends) */
+static void apply_autobar(const struct jk_cfg *cfg)
+{
+    if (!s_down_seg || (cfg->autobar == s_autobar && cfg->autobar_picks == s_autobar_picks))
+        return;
+    s_autobar = cfg->autobar;
+    s_autobar_picks = cfg->autobar_picks;
+    jd_set_auto(&s_down, s_autobar);
+}
+
+/* the downbeat estimator as the bridge's bar step wants it: a LOCKED decision and its beat in Link host time */
+static void make_bar(const struct jk_cfg *cfg, struct jbl_bar *bar)
+{
+    struct jd_view v;
+    int64_t us;
+    memset(bar, 0, sizeof *bar);
+    if (!s_down_seg)
+        return;
+    jd_view(&s_down, &v);
+    if (v.state != JD_LOCKED || v.phi < 0 || !uac_sample_time((int64_t)llround(v.t_beat * (double)UAC_RATE), &us))
+        return;
+    bar->locked = 1;
+    bar->seq = v.seq;
+    bar->count = v.count;
+    bar->phi = v.phi;
+    bar->beat_us = us + (int64_t)cfg->beat_latency_ms * 1000;
 }
 
 /* the bridge's task, holding its lock */
 static void step_link(struct jank_peer *p, int64_t now, void *arg)
 {
     const struct step_ctx *c = arg;
-    jbl_step(&s_jbl, &p->k, &p->start, jp_settled(p, now), now, &c->in, c->quantum);
+    int settled = jp_settled(p, now);
+    jbl_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, c->quantum);
+    jbl_bar_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, &c->bar);
 }
 
 /* what the tracker says, as the session's master wants it: a tracked beat in Link host time and the grid's period */
@@ -171,6 +242,15 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.err_us = s_jbl.err_us;
     b.offset_us = uac_offset_us();
     b.latency_us = cfg->beat_latency_ms * 1000;
+    if (s_down_seg) {
+        struct jd_view v;
+        jd_view(&s_down, &v);
+        b.bar = v.state;
+        b.bar_phi = v.phi;
+        b.bar_lead_x100 = (int32_t)lroundf(v.lead * 100.0f);
+    } else
+        b.bar_phi = -1;
+    b.bar_moves = s_jbl.bar_moves;
     portENTER_CRITICAL(&s_mux);
     s_pub = b;
     portEXIT_CRITICAL(&s_mux);
@@ -220,6 +300,8 @@ static void beat_task(void *arg)
         }
         while ((n = uac_pull(x, JB_HOP)) != 0u)
             work(x, n);
+        if (s_down_seg && jd_counting(&s_down) && jb_mode_at(&s_mode, (double)s_samples / (double)UAC_RATE) == JB_STOPPED)
+            jd_stop(&s_down);           /* 30 s without a steady beat: the bar starts over */
         now = esp_timer_get_time();
         if (now - s_win_start >= WINDOW_US) {
             cpu_x10 = (uint32_t)(s_win_busy * 1000 / (now - s_win_start));
@@ -232,9 +314,11 @@ static void beat_task(void *arg)
         s_beat_seen = 0;
         last_step = now;
         app_cfg_get(&cfg);
+        apply_autobar(&cfg);
         {
             struct step_ctx c;
             make_input(&cfg, &c.in, &mode, &bpm);
+            make_bar(&cfg, &c.bar);
             c.quantum = cfg.quantum;
             if (cfg.beat)
                 bridge_with_peer(step_link, &c);
@@ -255,6 +339,15 @@ void beat_stats(struct jk_beat *out)
     out->psram_min = (uint32_t)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM);
 }
 
+uint8_t beat_bar_state(void)
+{
+    uint8_t s;
+    portENTER_CRITICAL(&s_mux);
+    s = s_pub.bar;
+    portEXIT_CRITICAL(&s_mux);
+    return s;
+}
+
 esp_err_t beat_start(void)
 {
     jbl_init(&s_jbl);
@@ -263,6 +356,15 @@ esp_err_t beat_start(void)
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "int16 network weights in RAM: %u bytes", (unsigned)jb_lstm_q16_ram());
+    /* AUTO BAR's segment ring: PSRAM when there is some, else internal RAM; none at all: no AUTO BAR, the rest runs */
+    s_down_seg = heap_caps_malloc(sizeof(jd_seg_row) * JD_SEGS, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_down_seg)
+        s_down_seg = heap_caps_malloc(sizeof(jd_seg_row) * JD_SEGS, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (s_down_seg) {
+        jd_init(&s_down, s_down_seg);
+        ESP_LOGI(TAG, "AUTO BAR: %u bytes + a %u-byte segment ring", (unsigned)sizeof s_down, (unsigned)(sizeof(jd_seg_row) * JD_SEGS));
+    } else
+        ESP_LOGE(TAG, "AUTO BAR: no RAM for its segment ring, off");
     ESP_LOGW(TAG, "BEAT-FOLLOW BENCH BUILD: madmom's weights, CC BY-NC-SA 4.0, never ship");
     return xTaskCreatePinnedToCore(beat_task, "beat", BEAT_STACK, NULL, BEAT_PRIO, &s_task, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

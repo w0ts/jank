@@ -27,6 +27,12 @@ void jst_arm(struct jst *s, const struct lk_node *k, int64_t now, uint32_t quant
 
 void jst_cancel(struct jst *s) { s->armed = 0; }
 
+void jst_retarget(struct jst *s, const struct lk_node *k, int64_t now)
+{
+    if (s->armed)
+        s->ub = next_bar(k, now, s->quantum);
+}
+
 int jst_poll(struct jst *s, struct lk_node *k, int64_t now, int allowed)
 {
     int64_t t_bar, fresh;

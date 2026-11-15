@@ -271,6 +271,18 @@ uint32_t jk_next_group(uint32_t group)
     return group >= JK_GROUP_MIN && group < JK_GROUP_MAX ? group + 1u : JK_GROUP_MIN;
 }
 
+int jk_led_bar_one(int64_t beat_ub, uint32_t quantum)
+{
+    const int64_t beat = 1000000;
+    int64_t at = beat_ub % beat, index;
+    if (at < 0)
+        at += beat;
+    index = (beat_ub - at) / beat;
+    quantum = quantum ? quantum : 1u;
+    index %= (int64_t)quantum;
+    return index == 0;                 /* (C's remainder keeps the sign: -1 stays -1, only multiples of quantum give 0) */
+}
+
 int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum)
 {
     const int64_t beat = 1000000;
