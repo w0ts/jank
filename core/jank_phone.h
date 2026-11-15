@@ -54,7 +54,7 @@ const char *jph_state_name(const struct jph *p);                       /* "off",
  *   quantum    beats a bar
  *   link peers Link peers in the session, the stick not counted
  *   air peers  units heard on the group's channel (MODE JANK; 0 on Wi-Fi)
- *   battery    percent, "-" with no gauge (no board measures one yet)
+ *   battery    percent, "-" with no gauge (jank mini 2.2 reads its cell: firmware/main/linein.c)
  *   level      the beat tracker's input peak over the last second, dBFS (-99 .. 0); "-" with no audio stream
  *   conf       the tracker's beat activation peak over the last second, percent; "-" with no audio stream
  * -> its length, 0 when it does not fit */

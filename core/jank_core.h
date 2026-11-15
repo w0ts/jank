@@ -114,6 +114,8 @@ enum jk_net {
 #define JK_BEAT_LATENCY_MIN_MS (-300)   /* negative: the stick hears the audio after the speakers do (player --xiao) */
 #define JK_BEAT_LATENCY_MAX_MS 300
 #define JK_BEAT_LATENCY_DEFAULT_MS 25
+#define JK_LINE_GAIN_MIN_DB (-12)        /* LINE IN gain (core/jank_line.h JL_GAIN_*) */
+#define JK_LINE_GAIN_MAX_DB 12
 struct jk_cfg {
     uint8_t group, filter;
     uint8_t peer;                     /* 1: jank is a Link peer itself */
@@ -135,6 +137,7 @@ struct jk_cfg {
     /* USB host mode (core/jank_usbrole.h): stored apart from the blob above (store.c, key "usb1"), so the blob stays 130 */
     uint8_t usb;                      /* enum jur_usb: USB DEVICE / HOST */
     uint8_t source;                   /* enum jur_src: AUDIO > SOURCE AUTO / LINE / USB */
+    int8_t line_gain_db;              /* LINE IN gain, JK_LINE_GAIN_MIN_DB..MAX (a bench setting: not stored, 0 at every start) */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
@@ -162,7 +165,7 @@ size_t jk_intr_summary(const char *dump, char *out, size_t cap);
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
 struct jk_beat {
     uint8_t on;                       /* the setting */
-    uint8_t audio;                    /* the computer's audio stream is open */
+    uint8_t audio;                    /* the tracker's source is open: USB audio's stream, or the LINE IN (linein.c) */
     uint8_t mode;                     /* 0 stopped, 1 steady, 2 speeding up, 3 slowing down */
     int32_t bpm_x100;                 /* the tracker's published tempo, 0: none */
     uint32_t hops;                    /* 10 ms frames computed */
