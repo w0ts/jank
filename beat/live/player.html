@@ -374,6 +374,7 @@ const QR = (() => {
    ctx, read by the UI (the host fills it from /api/status and its own emulated state): link (mode is LINK; the host derives it from the line-in plug detect: plugged = AUDIO, unplugged = LINK), bpm
    (audio mode, after the half/double fold), linkBpm, mode, conf 0..1, th percent, levelDb (dBFS), silent, gated, hold,
    playing (Link transport), running / armed (the transport icon), trackerLeads (--xiao in AUDIO: UP/DOWN/YES do nothing), peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
+   autoBar (the AUTO BAR setting), bar (the downbeat estimator: { state, conf } or null),
    offs [MIDI OUT 1, MIDI OUT 2, CLK] in ms, rate (index into the clock divisions), boot, splash.
    net: { mode 0 JANK | 1 LINK CLIENT | 2 LINK AP | 3 SETUP, prev (mode to return to after SETUP), group (the jank GROUP 1..9: the units on the same group form one Link session over open Wi-Fi frames, no router), ssid, pass, appass, apName,
    status, ip, apClients, scan [{name, bars}], setupName }, groupPeers, setup (mode is SETUP), qr { size, mod }, saved.
@@ -394,14 +395,18 @@ const QR = (() => {
                             not reached yet, one that resolves by itself (the next bar line, the tracker locking on
                             music it hears) or by YES; never shown for a session that is merely stopped
                 NO + UP/DOWN   AUDIO mode: NUDGE BEAT, half a beat relative to the tracked phase (1 s overlay "NUDGE BEAT +1/2"):
-                               one step fixes an off-beat lock, two move the bar's 1 by a beat
+                               one step fixes an off-beat lock, two move the bar's 1 by a beat. AUTO BAR goes MANUAL
+                               (an M under the boxes) until AUTO BAR is picked again or the tempo starts over
+                BAR MARKS   AUDIO mode, AUTO BAR on: a bar under the first box = LOCKED (the bar's 1 is the music's 1),
+                            the tick right of the boxes = how sure; nothing under the boxes = still listening
                 YES + UP/DOWN  AUDIO mode: nudge the timing 1 ms (the AUDIO IN offset: every output; repeats while held;
                                1 s overlay "NUDGE MS +3"). A combo cancels the NO / YES release action.
      MENU     AUDIO, LINK TRANSPORT (LINK mode: IGNORE = the clocks run on Link's tempo and beat, own Start / Stop only;
               FOLLOW = they also start / stop with the session; FOLLOW+LEAD = and our Start / Stop starts / stops the session),
-              NETWORK, OFFSET, CLK RATE, DISPLAY, BATTERY (UP/DOWN move; the mode is not a setting: plugging in the line = AUDIO)
+              AUTO BAR (AUDIO mode: ON = the bar's 1 found in the music, Link's bar moved onto it; OFF = left where it is),
+              NETWORK, USB, OFFSET, CLK RATE, DISPLAY, BATTERY (UP/DOWN move; the mode is not a setting: plugging in the line = AUDIO)
                 YES on AUDIO / OFFSET -> SUB                    YES on NETWORK -> NET
-                YES on CLK RATE -> EDIT                         YES on BATTERY -> INFO       NO -> HOME
+                YES on CLK RATE / AUTO BAR -> EDIT              YES on BATTERY -> INFO       NO -> HOME
      SUB      a list of EDITS: UP/DOWN move, YES -> EDIT, NO -> MENU
                 DISPLAY: BRIGHTNESS (10..100 %), SCREEN OFF (NEVER / 30 S / 1 MIN / 5 MIN without a button; the first
                          press on a dark screen only wakes it; SETUP keeps the screen on)
@@ -539,10 +544,14 @@ const OLED = (() => {
     // the USB port's role; MIDI and USB audio work in both (host: battery units, the gear has its own power)
     usbrole: { title: 'USB', opts: ['DEVICE', 'HOST'], get: c => c.usbRole,
                help: [['TO A COMPUTER', 'MIDI + AUDIO'], ['TO SELF-POWERED', 'MIDI + AUDIO GEAR']] },
+    // the downbeat estimator (AUDIO mode): ON finds the bar's 1 in the music and moves Link's bar onto it. A NUDGE BEAT
+    // makes it MANUAL (an M on HOME) until AUTO BAR is picked again (YES on ON, even unchanged) or the tempo starts over
+    autobar: { title: 'AUTO BAR', opts: ['OFF', 'ON'], get: c => (c.autoBar ? 1 : 0), live: false, repick: true,
+               help: [['THE BAR 1 STAYS', 'WHERE IT IS'], ['FINDS BEAT 1 IN THE', 'MUSIC. NUDGE: MANUAL']] },
   };
   const helpOf = (sp, v) => (sp.opts ? sp.help[v] : sp.help) || ['', ''];
   const MENU = [                                                    // the top-level menu, in order
-    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'OFFSET', sub: 'offsets' },
+    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'OFFSET', sub: 'offsets' },
     { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
   ];
   // sub-menus: a title and the EDITS they list
@@ -571,8 +580,8 @@ const OLED = (() => {
   function endEdit(ui, c, keep) {
     const e = ui.edit, sp = EDITS[e.field];
     ui.edit = null; ui.screen = e.ret;
-    if (sp.live === false) {                                         // applied only when confirmed
-      if (keep && e.val !== e.orig) {
+    if (sp.live === false) {                                         // applied only when confirmed (repick: also unchanged)
+      if (keep && (e.val !== e.orig || sp.repick)) {
         if (e.field === 'netmode' && e.val === SETUP) ui.screen = 'confirm';      // stopping the device needs a second YES
         else c.setField(e.field, e.val);
       }
@@ -754,11 +763,22 @@ const OLED = (() => {
       else frame(fb, x, y, w, h, 1);
     }
   }
+  // the downbeat estimator under the AUDIO boxes (bar: { state 'off'|'listening'|'locked'|'manual', conf 0..1 } or null):
+  // LOCKED lights the 1's box (a bar under the first box: the bar's 1 is the music's), a small tick right of the boxes
+  // grows with the confidence (listening and locked), MANUAL writes an M under the first box; OFF: nothing
+  function barMarks(fb, bar, x0, y, w, h, gap) {
+    if (!bar || bar.state === 'off') return;
+    if (bar.state === 'manual') { text(fb, 'M', x0, y + h + 3, 1, 1); return; }
+    if (bar.state === 'locked') rect(fb, x0, y + h + 1, w, 2, 1);
+    const n = Math.round(h * clamp(bar.conf || 0, 0, 1)), xr = x0 + 4 * (w + gap);     // x 127: one pixel past the gap
+    if (n > 0) rect(fb, xr, y + h - n, 1, n, 1);
+  }
   // HOME has two layouts, each designed for its content. Less is better: the UI explains itself.
   //   top bar: the transport icon (triangle = playing, blinking = waiting, square = stopped), in LINK mode the transport
   //            option's icon (LT_ICONS), the network's name (truncated), network icon, USB plug, battery
   //   AUDIO (line in plugged):
-  //     y9   BPM x3 (left); four beat boxes (right), the current beat's box filled
+  //     y9   BPM x3 (left); four beat boxes (right), the current beat's box filled; under them the AUTO BAR marks
+  //          (barMarks: the 1's box lit when LOCKED, an M when MANUAL; the confidence tick at x 127)
   //     y31  IN bar (smoothed short-term RMS in dBFS, min / max lines over the last few seconds, tick = -60 silence)   y44  CF bar (tick = threshold); each value is written inside its bar
   //     y57  status line, cycling every STATUS_CYCLE_MS: the Link peers (none: empty)
   //   LINK (no line in): BPM x4, four wide beat boxes across the width, the same status line at y57
@@ -785,6 +805,7 @@ const OLED = (() => {
     }
     text(fb, c.bpm ? c.bpm.toFixed(1) : '---', 2, 9, 3, 1);
     beatBoxes(fb, c, 87, 9, 9, 9, 1);
+    barMarks(fb, c.bar, 87, 9, 9, 9, 1);
     valueBar(fb, 31, (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, 'IN ' + Math.round(c.levelDb) + 'dB');
     for (const db of [c.levelMin, c.levelMax]) xorCol(fb, 3 + Math.round(121 * clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1)), 32, 41);   // min / max lines
     valueBar(fb, 44, c.conf, c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%');
@@ -792,12 +813,13 @@ const OLED = (() => {
   }
   function drawMenu(fb, ui, c) {
     titleBar(fb, 'MENU', (ui.cursor + 1) + '/' + MENU.length);
-    const vals = ['', LT_SHORT[c.ltMode], NET_SHORT[c.net.mode], '', RATES_SHORT[c.rate], '', c.fitted ? c.batt + '%' : '-'];
+    const vals = { 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': c.autoBar ? 'ON' : 'OFF', NETWORK: NET_SHORT[c.net.mode],
+                   USB: EDITS.usbrole.opts[c.usbRole], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' };
     for (let k = 0; k < VISIBLE; k++) {
       const i = ui.top + k; if (i >= MENU.length) break;
       const y = 11 + k * 9, sel = i === ui.cursor, v = sel ? 0 : 1;
       if (sel) rect(fb, 0, y - 1, W, 9, 1);
-      text(fb, MENU[i].name, 4, y, 1, v); textR(fb, vals[i], W - 4, y, 1, v);
+      text(fb, MENU[i].name, 4, y, 1, v); textR(fb, vals[MENU[i].name] || '', W - 4, y, 1, v);
     }
   }
   function drawSub(fb, ui, c) {
@@ -1088,6 +1110,8 @@ function beatStats(lines) {
   for (const l of lines) {
     const m = /^([a-z_]+)=(-?[0-9.]+)$/.exec(l.trim());
     if (m) out[m[1]] = Number(m[2]);
+    const w = /^bar=([a-z]+)$/.exec(l.trim());           // `status`: the downbeat estimator's state, a word
+    if (w) out.bar = w[1];
   }
   return out;
 }
@@ -1222,9 +1246,9 @@ function showXiao(x, bench) {
 
 // ---- jank mini 2.2 emulator host: power, D-pad, indicator light, battery, jacks; the screen UI is the OLED module above ----
 let S = null, tPoll = 0;
-const holdUntil = { th: 0, off: 0, mode: 0, hold: 0, tempo: 0, fold: 0 };     // keep a local value until the server has caught up
+const holdUntil = { th: 0, off: 0, mode: 0, hold: 0, tempo: 0, fold: 0, autobar: 0 };     // keep a local value until the server has caught up
 const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: false, no: false, yes: false },
-              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1,
+              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, autoBar: true, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1,
               repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
               net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
 /* remembered in this browser (localStorage; a blocked storage only means nothing is remembered): the test panel
@@ -1294,6 +1318,10 @@ function syncFromStatus(s) {
   const xs = s.xiao && XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS ? XIAO.status : null;
   if (s.link_playing) dev.startAsked = false;   // the start was reached: a later stop by a peer is a stop, not "armed"
   if (now > holdUntil.tempo) dev.linkBpm = s.xiao ? (xs && xs.bpm > 0 ? xs.bpm : null) : s.link_bpm;   // --xiao: never SimLink's 120
+  if (now > holdUntil.autobar) {                            // AUTO BAR: the player's (or the XIAO's) setting is the truth
+    if (s.xiao) { if (xs && xs.bar) dev.autoBar = xs.bar !== 'off'; }
+    else if (s.bar) dev.autoBar = s.bar.state !== 'off';
+  }
 }
 const hold = key => { holdUntil[key] = performance.now() + 1200; };
 
@@ -1319,6 +1347,11 @@ function setField(field, val) {
   else if (field === 'group') dev.net.group = val + 1;       // emu: the choice index 0..8 = GROUP 1..9
   else if (field === 'insrc') { dev.inSrc = val; syncModeFromPlug(); }     // emu: the source picks AUDIO / LINK with the plug
   else if (field === 'usbrole') dev.usbRole = val;          // emu: DEVICE (to a computer) / HOST (self-powered gear)
+  else if (field === 'autobar') {                           // the player's downbeat estimator, or the XIAO's (--xiao)
+    dev.autoBar = val === 1; hold('autobar');
+    if (S && S.xiao) xiaoSend('set autobar ' + (dev.autoBar ? 'on' : 'off'));
+    else api('autobar', { on: dev.autoBar });
+  }
   saveDevice();
 }
 // low confidence: STOP / START sends the threshold; KEEP RUNNING sends 0 (never gate), the threshold stays for later
@@ -1407,6 +1440,18 @@ function tempoStep(d) {
   return S && S.bpm ? S.bpm * dev.foldK : 0;
 }
 
+/* the downbeat estimator for the screen, { state, conf } or null: the player's own (status.bar), or with --xiao the
+   XIAO's (its `status`: bar=off|listening|locked|manual, bar_lead in score units) */
+const BAR_CONF_FULL = 3;                         // live/downbeat.py CONF_FULL: the tick is full at this lead
+function barNow(s, now) {
+  if (s.xiao) {
+    const st = XIAO.status;
+    if (!st || now - XIAO.statusAt > XIAO_STATUS_FRESH_MS || !st.bar) return null;
+    return { state: st.bar, conf: clampN((st.bar_lead || 0) / BAR_CONF_FULL, 0, 1) };
+  }
+  return s.bar ? { state: s.bar.state, conf: s.bar.conf } : null;
+}
+
 /* --xiao: the XIAO's session now (xiaoLink), or null */
 const xiaoNow = now => xiaoLink(XIAO.status, XIAO.statusAt, now, XIAO.cfg ? XIAO.cfg.quantum : 4, XIAO.sent);
 function beatInfo(now) {
@@ -1447,7 +1492,7 @@ function buildCtx(now, beat) {
     beatMs: beat ? beat.ms : 0, usb: $('usb').checked, fitted: $('bat').checked,
     batt: battLevel(), lineIn, bright: dev.bright, sleep: dev.sleep, inOff: dev.inOff, offs: dev.offs, rate: dev.rate, boot: dev.boot, splash: now - dev.powerOnAt < 800,
     net: netCtx(now), wifiQ: wifiQuality(now), groupPeers: $('wifi').value === 'none' ? 0 : xp ? xp.group : 3, setup: dev.net.mode === 3, qr: QR_CODE, saved: now < dev.savedUntil,
-    inSrc: dev.inSrc, usbRole: dev.usbRole,
+    inSrc: dev.inSrc, usbRole: dev.usbRole, autoBar: dev.autoBar, bar: barNow(s, now),
     tempoStep, setField, setHold, linkStartStop,
   };
 }

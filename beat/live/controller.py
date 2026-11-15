@@ -10,6 +10,7 @@ import math
 from dataclasses import dataclass
 
 from live.clockmap import ClockMap
+from live.downbeat import LOCKED, BarView, link_shift
 from live.link_port import QUANTUM, LinkPort
 
 DEADBAND_BPM = 0.02
@@ -24,6 +25,7 @@ class Snapshot:
     mode: str                                  # steady / speeding_up / slowing_down / stopped
     bpm: float | None
     grid: tuple[float, float] | None           # (stream time of a beat in s, period in s)
+    bar: BarView | None = None                 # the downbeat estimator (None: the bar is not ours to move)
 
 
 class LinkController:
@@ -36,6 +38,8 @@ class LinkController:
         self.pending_start = True
         self._last_force_us = -1e18
         self.beat_offset = 0.0      # the user's NUDGE BEAT, in beats (halves): Link's beats sit this far from the tracked ones
+        self.bar_moves = 0          # whole-beat moves made for the downbeat estimator
+        self._bar_seq = -1          # its last decision acted on
 
     def tick(self, snap: Snapshot) -> None:
         if not self.clock.ready:
@@ -53,8 +57,29 @@ class LinkController:
             return
         self._follow_tempo(snap.bpm, now)
         locked = self._follow_phase(snap.grid, now)
+        if locked:
+            self._follow_bar(snap.bar)
         if self.pending_start and locked:
             self._start_on_next_bar(now)
+
+    def _follow_bar(self, bar: BarView | None) -> None:
+        """The downbeat estimator LOCKED on a phase: at each of its decisions (one a counted beat), Link's bar is put on
+        its 1 by a whole-beat move, if it is not there (the first move, a later one, or Link's count slipped). Only
+        with the phase in tolerance: then Link's beat at the counted beat is unambiguous."""
+        if bar is None or bar.state != LOCKED or bar.seq == self._bar_seq:
+            return
+        if bar.t_beat is None or bar.count is None or bar.phi is None:
+            return
+        self._bar_seq = bar.seq
+        n = link_shift(bar.count, bar.phi, self.link.beat_at(self.clock.to_link_us(bar.t_beat)))
+        if n:
+            self.shift_beats(n)
+            self.bar_moves += 1
+
+    def link_bar_phase(self, count: int, t_beat: float) -> int:
+        """The count position (mod 4) that Link's bar calls its 1 at a counted beat (the nudge log's hand label)."""
+        whole = math.floor(self.link.beat_at(self.clock.to_link_us(t_beat)) + 0.25)
+        return (count - whole) % 4
 
     def _follow_tempo(self, bpm: float, now: float) -> None:
         bpm = min(max(bpm, MIN_BPM), MAX_BPM)
@@ -84,7 +109,8 @@ class LinkController:
     def shift_beats(self, n: float) -> None:
         """NUDGE BEAT (the device's NO + UP/DOWN), n in beats, halves allowed: Link's beats jump by n now, and the
         phase follower keeps them n beats from the tracked ones from then on. A half beat moves Link onto the off-beats
-        (the fix for a tracker locked on the off-beat); two halves move the bar's 1 by a beat."""
+        (the fix for a tracker locked on the off-beat); two halves move the bar's 1 by a beat. The downbeat estimator's
+        moves come through here too, whole beats only: beat_offset's half-beat part stays as the user left it."""
         if self.passive:
             raise ValueError("following the Link session: the bar is the session's")
         now = self.link.now_us()
