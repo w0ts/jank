@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# The jank mini 2.2's module since 2026-11-15, ESP32-S3-WROOM-1U-N8R2: 8 MB quad flash (the XIAO's size and partition
+# table, partitions_usb.csv) and 2 MB quad PSRAM (the XIAO's is octal). After sdkconfig.xiao, in place of sdkconfig.fh4r2:
+# JANK_VARIANT=mini22 JANK_EXTRA_DEFAULTS="sdkconfig.ble;sdkconfig.n8r2;sdkconfig.mini22" scripts/build.sh xiao
+CONFIG_SPIRAM_MODE_QUAD=y
