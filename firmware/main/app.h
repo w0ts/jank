@@ -82,9 +82,20 @@ esp_err_t ui_start(void);
 esp_err_t ui_scan_table(struct js_table *out);               /* blocks about 1.05 s; joins nothing */
 
 /* ctl.c: the control protocol on the serial */
+enum ctl_src { CTL_SRC_USB, CTL_SRC_BLE, CTL_SRC_COUNT };
 esp_err_t ctl_start(void);
-void ctl_serial_rx(const uint8_t *data, size_t n);
+void ctl_serial_rx(const uint8_t *data, size_t n);           /* = ctl_line_rx(CTL_SRC_USB, ..) */
+void ctl_line_rx(enum ctl_src src, const uint8_t *data, size_t n);   /* text of the control line, from src */
+void ctl_reply(const char *text, size_t n);                  /* the answer to the line being run, to where it came from */
 uint32_t ctl_beats(void);                                    /* counts up while the task runs */
+
+#if CONFIG_JANK_BLE_MIDI
+/* ble_midi.c: a BLE MIDI peripheral carrying the control line's SysEx and the beat reports */
+esp_err_t ble_midi_start(const uint8_t mac[6]);
+void ble_midi_write(const char *text, size_t n);             /* control line text, as SysEx frames; waits for buffers */
+void ble_midi_push(const char *text, size_t n);              /* a beat report; dropped when busy or full */
+void ble_midi_diag(char *out, size_t cap);
+#endif
 
 /* ota.c: firmware updates over the control line, and the rollback's confirmation */
 bool ota_busy(void);                                         /* a transfer over MIDI is running */

@@ -31,7 +31,9 @@ struct slot {
 };
 
 static const char *TAG = "bridge";
-static struct slot s_slot[SLOTS];
+/* PSRAM when CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY (sdkconfig.ble-tuned): tasks only touch them, and NCM and Wi-Fi copy
+ * a frame out before sending it; internal otherwise */
+static EXT_RAM_BSS_ATTR struct slot s_slot[SLOTS];
 static QueueHandle_t s_free, s_work;
 static SemaphoreHandle_t s_lock;
 static struct jk_bridge s_b;

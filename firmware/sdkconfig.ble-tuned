@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# BLE MIDI, shrunk: after sdkconfig.ble. One connection, peripheral only, fewer buffers, NimBLE's pools in PSRAM.
+# JANK_VARIANT=ble-tuned JANK_EXTRA_DEFAULTS="sdkconfig.ble;sdkconfig.ble-tuned" scripts/build.sh
+# Each option's effect is in its Kconfig help (components/bt/host/nimble/Kconfig.in, components/bt/controller/esp32c3/
+# Kconfig.in, which the S3 shares) and the RAM guide (api-guides/performance/ram-usage.rst).
+
+# NimBLE host: one phone, peripheral only (no central, no scanning, no GATT client)
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_GATT_CLIENT=n
+CONFIG_BT_NIMBLE_MAX_BONDS=2
+CONFIG_BT_NIMBLE_MAX_CCCDS=2
+CONFIG_BT_NIMBLE_GATT_MAX_PROCS=2
+CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=n
+# its buffers: one SysEx frame (<= 60 bytes) in flight at a time each way
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=8
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=8
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=8
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=12
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=4
+# the host's pools (msys, transport, NPL) from PSRAM (esp_nimble_mem.c: MALLOC_CAP_SPIRAM); the controller's own heap
+# stays internal (controller/esp32c3/bt.c: MALLOC_CAP_INTERNAL|MALLOC_CAP_DMA)
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+
+# controller: 828 bytes per activity (Kconfig help); one advertising set + one connection
+CONFIG_BT_CTRL_BLE_MAX_ACT=2
+CONFIG_BT_CTRL_BLE_SCAN_DUPL=n
+CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_SUPP=n
+CONFIG_BT_CTRL_DTM_ENABLE=n
+
+# static buffers that only tasks touch, to PSRAM (EXT_RAM_BSS_ATTR: the bridge's frame slots, bridge.c)
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y

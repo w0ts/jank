@@ -94,6 +94,10 @@ static void report(char kind, double at_s)
     size_t n = jx_beat_line(line, sizeof line, kind, s_beat_n, (int32_t)llround(bpm * 100.0), (unsigned)mode, u.open, extra, link);
     if (n)
         usb_beat_line(line, n);
+#if CONFIG_JANK_BLE_MIDI
+    if (n)
+        ble_midi_push(line, n);
+#endif
 }
 
 static void on_frame(void *ctx, const struct jb_frame *f)

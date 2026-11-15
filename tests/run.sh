@@ -23,6 +23,8 @@ done
 python3 "$HERE/tests/test_ota.py" "$OUT/ota_replay" "$OUT/ota"
 "$OUT/test_net"
 "$OUT/test_sysex"
+"$CC" $FLAGS "$HERE/tests/test_blemidi.c" "$HERE/core/jank_blemidi.c" "$HERE/core/jank_sysex.c" -o "$OUT/test_blemidi"
+"$OUT/test_blemidi"
 "$OUT/test_clock"
 if [ -f "$HERE/core/jank_peer.c" ]; then
     "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_peer.c" "$HERE/core/jank_peer.c" "$HERE/core/jank_clock.c" $CORE $LINK -o "$OUT/test_peer"
