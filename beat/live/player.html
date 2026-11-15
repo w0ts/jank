@@ -1899,7 +1899,17 @@ const linePlugged = now => (S && S.xiao ? !!XIAO.status && now - XIAO.statusAt <
 
 // the screen goes dark after SLEEP_MS[dev.sleep] without a button (0 = never); SETUP keeps it on (its QR must show); no screen: never
 const SLEEP_MS = [0, 30000, 60000, 300000];
-const asleep = now => view.scr !== 'none' && SLEEP_MS[dev.sleep] > 0 && dev.net.mode !== 3 && now - dev.lastInput > SLEEP_MS[dev.sleep];
+const asleep = now => view.scr !== 'none' && SLEEP_MS[dev.sleep] > 0 && dev.net.mode !== 3 &&
+  now - Math.max(dev.lastInput, AUDIO_WAKE.at) > SLEEP_MS[dev.sleep];
+// an audio event wakes the screen too (the user, 2026-11-15): the beat lost, the beat back, the BPM moved by more than
+// 0.1 since the last wake. It counts as activity for the sleep timer only: a button press still acts as on a lit screen
+const AUDIO_WAKE = { at: -1e9, had: false, bpm: 0, minBpmStep: 0.1 };
+function audioWake(now, c) {
+  const has = c.bpm > 0;
+  const moved = has && AUDIO_WAKE.had && Math.abs(c.bpm - AUDIO_WAKE.bpm) > AUDIO_WAKE.minBpmStep;
+  if (has !== AUDIO_WAKE.had || moved) { AUDIO_WAKE.at = now; AUDIO_WAKE.bpm = has ? c.bpm : 0; }
+  AUDIO_WAKE.had = has;
+}
 function paintScreen(now, c) {
   if (view.scr === 'none') return;
   fb.fill(0);
@@ -1953,6 +1963,7 @@ function updateMeter(now) {
 function frame(now) {
   updateMeter(now);
   const beat = beatInfo(now), c = buildCtx(now, beat);
+  audioWake(now, c);
   const [r, g] = lightMix(now, c, beat);
   paintLight(r, g);
   paintScreen(now, c);
