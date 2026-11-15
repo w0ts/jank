@@ -1148,6 +1148,40 @@ const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: fal
               link: false, hold: false, clocks: true, ltMode: 2, linkBpm: 120, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1,
               repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
               net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
+/* remembered in this browser (localStorage; a blocked storage only means nothing is remembered): the test panel
+   (Wi-Fi, USB, battery, battery level, line in) and the device's emulator-only settings. The settings the player owns
+   (threshold, low confidence, input offset, fold, hold) come back from the player itself. Passwords are not kept. */
+const PANEL_KEY = 'beatEmuPanel', DEV_KEY = 'beatEmuDevice';
+const PANEL_IDS = ['wifi', 'usb', 'bat', 'battlvl', 'linein'];
+const DEV_FIELDS = ['ltMode', 'gain', 'bright', 'sleep', 'offs', 'rate'];
+const NET_FIELDS = ['mode', 'group', 'ssid', 'apName'];
+const loadJson = key => { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; } };
+const saveJson = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { /* not remembered */ } };
+function savePanel() {
+  const o = {};
+  for (const id of PANEL_IDS) o[id] = $(id).type === 'checkbox' ? $(id).checked : $(id).value;
+  saveJson(PANEL_KEY, o);
+}
+function restorePanel() {
+  const o = loadJson(PANEL_KEY);
+  for (const id of PANEL_IDS) {
+    if (!(id in o)) continue;
+    if ($(id).type === 'checkbox') $(id).checked = !!o[id]; else $(id).value = String(o[id]);
+  }
+  for (const id of PANEL_IDS) { $(id).addEventListener('change', savePanel); $(id).addEventListener('input', savePanel); }
+}
+function saveDevice() {
+  const o = { net: {} };
+  for (const k of DEV_FIELDS) o[k] = dev[k];
+  for (const k of NET_FIELDS) o.net[k] = k === 'mode' && dev.net.mode === 3 ? dev.net.prev : dev.net[k];   // never come back in SETUP
+  saveJson(DEV_KEY, o);
+}
+function restoreDevice() {
+  const o = loadJson(DEV_KEY);
+  for (const k of DEV_FIELDS) if (k in o && typeof o[k] === typeof dev[k]) dev[k] = Array.isArray(dev[k]) ? o[k].slice(0, dev[k].length) : o[k];
+  for (const k of NET_FIELDS) if (o.net && k in o.net && typeof o.net[k] === typeof dev.net[k]) dev.net[k] = o.net[k];
+}
+restoreDevice();
 const SETUP_NAME = 'jank-setup-a3f9';                // emu: the real one ends in the chip id
 const SCAN = [{ name: 'HomeNet', bars: 3 }, { name: 'jank-studio', bars: 2 }, { name: 'Cafe Guest', bars: 1 }, { name: 'FritzBox 7590', bars: 2 }];   // emu: a fake scan
 const QR_CODE = QR.encode('WIFI:S:' + SETUP_NAME + ';T:nopass;;');
@@ -1203,6 +1237,7 @@ function setField(field, val) {
   else if (field === 'appass') dev.net.appass = val;
   else if (field === 'apname') dev.net.apName = val;
   else if (field === 'group') dev.net.group = val + 1;       // emu: the choice index 0..8 = GROUP 1..9
+  saveDevice();
 }
 // low confidence: STOP / START sends the threshold; KEEP RUNNING sends 0 (never gate), the threshold stays for later
 function sendThreshold() { hold('th'); api('threshold', { min_confidence: dev.confStop ? dev.th / 100 : 0 }); }
@@ -1476,6 +1511,7 @@ window.addEventListener('blur', () => { for (const b of ['up', 'down', 'no', 'ye
 // the mode follows the line-in plug detect (GPIO16 on the board): plugged = AUDIO, unplugged = LINK; sent at load and on every change
 const syncModeFromPlug = () => setField('mode', $('linein').checked ? 0 : 1);
 $('linein').onchange = syncModeFromPlug;
+restorePanel();                                       // the remembered panel; the mode follows the restored plug
 syncModeFromPlug();
 setPower(true);
 requestAnimationFrame(frame);
