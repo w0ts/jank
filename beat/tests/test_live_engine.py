@@ -71,6 +71,31 @@ def test_threshold_gates_with_hysteresis(engine):
     assert engine.status().published.mode == "steady"
 
 
+def test_start_wins_over_the_gate_until_it_re_arms(engine):
+    """M2g, as jank's firmware (core/jank_hold.h gate_off): the device's Start (resync) disarms the confidence gate; it
+    re-arms once the confidence reached the threshold + HYSTERESIS; a Stop (hold) ends the disarm; silence is not
+    disarmed (it is not this gate)."""
+    engine.conf["v"] = 0.3
+    assert engine.status().gated
+    engine.resync()                               # the device's Start at conf 0.3, under 0.5
+    engine.estimator = StubEstimator()            # (locked again)
+    st = engine.status()
+    assert not st.gated and st.published.mode == "steady"
+    engine.conf["v"] = 0.52                       # the threshold, not + hysteresis: still disarmed
+    engine.status()
+    engine.conf["v"] = 0.3
+    assert not engine.status().gated
+    engine.conf["v"] = 0.56                       # re-armed
+    assert not engine.status().gated
+    engine.conf["v"] = 0.3                        # a drop now gates, as before
+    assert engine.status().gated
+    engine.resync()
+    assert not engine.status().gated
+    engine.hold = True                            # Stop ends the disarm
+    engine.hold = False
+    assert engine.status().gated
+
+
 @pytest.mark.skipif(not GTZAN.exists(), reason="GTZAN not downloaded")
 def test_silence_stops_within_half_a_second_and_starts_over():
     e = Engine(90, 180)
