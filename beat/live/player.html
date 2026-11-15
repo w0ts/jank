@@ -154,13 +154,10 @@
         <rect id="oledBezel" class="bezel" rx="1.6" x="0" y="0" width="1" height="1"/>
         <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="128" height="64" xmlns="http://www.w3.org/1999/xhtml"></canvas></foreignObject>
       </g>
-      <!-- the screenless unit: a plain lid, a window over the 2 RGB LEDs (the LED language of core/jank_led.h) -->
-      <g id="ledView" hidden>
-        <rect id="ledBezel" class="bezel" rx="2.2" x="20" y="16" width="32" height="12"/>
-        <circle id="ledGlow0" cx="29" cy="22" r="5.6" filter="url(#seam)" opacity="0" fill="#000"/>
-        <circle id="ledGlow1" cx="43" cy="22" r="5.6" filter="url(#seam)" opacity="0" fill="#000"/>
-        <circle id="led0" cx="29" cy="22" r="3.4" fill="#1c1e20" stroke="#34373b" stroke-width=".3"/>
-        <circle id="led1" cx="43" cy="22" r="3.4" fill="#1c1e20" stroke="#34373b" stroke-width=".3"/>
+      <!-- the 4 beat LEDs on every unit (the board's row, 2026-11-15: LED1..LED4 at x 3.0 / 10.5 / 18.0 / 25.5, y 54.6,
+           below both screens): a small hole in the lid over each; beat n lights LED n (the LED language of core/jank_led.h) -->
+      <g id="ledView">
+        <g id="ledGlows"></g><g id="ledHoles"></g>
       </g>
       <!-- D-pad at the bottom right: cross centre (61.5, 62.2), button pads 6.5 mm from the centre, arms 6 mm wide -->
       <g id="dpad">
@@ -1882,7 +1879,7 @@ function paintLight(r, g) {
   $('seamGlow').setAttribute('opacity', Math.min(0.35, v * 0.45).toFixed(3));
 }
 
-/* ---- the screenless unit: two RGB LEDs say what the screen would (core/jank_led.c, jlg_color), plus the source flash ----
+/* ---- the 4 beat LEDs (every unit): they say what the screen would (core/jank_led.c, jlg_color), plus the source flash ----
    Values 0..255 as the firmware drives them (low: the LEDs are bright). st: now (ms), flash { until, rgb } (the source
    flash), pair (a pair window is open, no phone yet), battPct (-1: no gauge), onUsb, joined (in a Link session), running,
    armed, lowConf (the confidence is under the threshold), barLocked (AUTO BAR locked), barOne (this beat is the bar's 1),
@@ -1915,15 +1912,31 @@ function ledState(now, c, beat) {
   return { now, flash: dev.srcFlash, pair: c.ble.left != null && !c.ble.phone, battPct: c.fitted ? c.batt : -1, onUsb: c.usb,
            joined: link && (c.peers > 0 || c.running), running: c.running, armed: c.armed, lowConf: !dev.link && c.gated,
            barLocked: !!c.bar && c.bar.state === 'locked', barOne: !!beat && ((beat.n % 4) + 4) % 4 === 0,
+           beatIdx: beat ? ((beat.n % 4) + 4) % 4 : -1,
            beatMs: beat ? beat.ms : 1e9, bpm: beat ? beat.bpm : 0 };
 }
+// the 4 LEDs (board mm): beat n's flash on LED n only; every other state (pair, battery, armed, breathing, the source
+// flash) on all four, as the two LEDs showed it before
+const LED_X = [3.0, 10.5, 18.0, 25.5], LED_Y = 54.6, LED_HOLE_R = 1.2, LED_GLOW_R = 3.2;
+function ledColors(st) {
+  const rgb = ledColor(st);
+  const beatFlash = !(st.flash && st.now < st.flash.until) && !st.pair && st.running && st.joined;
+  return LED_X.map((_, i) => (!beatFlash || i === st.beatIdx ? rgb : [0, 0, 0]));
+}
+(function makeLeds() {
+  const ns = 'http://www.w3.org/2000/svg', mk = (tag, a) => { const e = document.createElementNS(ns, tag); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  LED_X.forEach((x, i) => {
+    $('ledGlows').append(mk('circle', { id: 'ledGlow' + i, cx: x, cy: LED_Y, r: LED_GLOW_R, filter: 'url(#seam)', opacity: 0, fill: '#000' }));
+    $('ledHoles').append(mk('circle', { id: 'led' + i, cx: x, cy: LED_Y, r: LED_HOLE_R, fill: '#1c1e20', stroke: '#34373b', 'stroke-width': '.3' }));
+  });
+})();
 function paintLeds(now, c, beat) {
-  const rgb = powered() && !dev.boot ? ledColor(ledState(now, c, beat)) : [0, 0, 0];
-  const lit = rgb.some(v => v > 0), col = ledPaint(rgb), css = `rgb(${col[0]},${col[1]},${col[2]})`;
-  for (const i of [0, 1]) {
+  const on = powered() && !dev.boot, cols = on ? ledColors(ledState(now, c, beat)) : LED_X.map(() => [0, 0, 0]);
+  cols.forEach((rgb, i) => {
+    const lit = rgb.some(v => v > 0), col = ledPaint(rgb), css = `rgb(${col[0]},${col[1]},${col[2]})`;
     $('led' + i).setAttribute('fill', lit ? css : '#1c1e20');
     $('ledGlow' + i).setAttribute('fill', css); $('ledGlow' + i).setAttribute('opacity', lit ? '0.55' : '0');
-  }
+  });
 }
 /* one NO click without a screen: USB AUDIO <-> LINK, as the source (AUTO <-> LINK). The line in is mechanical: plugged, NO
    does nothing. Returns null (nothing) or the new source and its colour flash (cyan = USB AUDIO, purple = LINK) */
@@ -2004,7 +2017,7 @@ function frame(now) {
   const [r, g] = lightMix(now, c, beat);
   paintLight(r, g);
   paintScreen(now, c);
-  if (view.scr === 'none') paintLeds(now, c, beat);
+  paintLeds(now, c, beat);                               // the 4 beat LEDs: on every unit
   const e = clicker(clickNo, 'tick', performance.now()); if (e) noEvent(e, performance.now());      // a click is said 350 ms after its release
   paintArms();
   $('battv').textContent = battLevel() + ' %';
@@ -2291,7 +2304,6 @@ function applyView() {
   $('dev').style.width = (VIEW_MM.w * PX_PER_MM) + 'px'; $('dev').style.height = (VIEW_MM.h * PX_PER_MM) + 'px';
   $('scr').value = view.scr;
   $('oledView').toggleAttribute('hidden', view.scr === NO_SCREEN);
-  $('ledView').toggleAttribute('hidden', view.scr !== NO_SCREEN);
   if (view.scr === NO_SCREEN) return;
   const m = SCREENS[view.scr], set = (id, o) => { for (const key in o) $(id).setAttribute(key, o[key]); };
   set('oledBezel', { x: m.cx - m.ww / 2, y: m.cy - m.wh / 2, width: m.ww, height: m.wh });
