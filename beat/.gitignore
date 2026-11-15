@@ -1,0 +1,10 @@
+data
+.venv/
+runs/
+__pycache__/
+.uv-cache/
+.uv-python/
+bin/
+tracks/
+.numba-cache/
+logs/

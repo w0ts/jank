@@ -1,0 +1,1555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beat Player</title>
+<style>
+  :root { --bg:#f6f6f4; --fg:#1b1b1b; --muted:#6b6b6b; --line:#d9d9d4; --card:#fff; --accent:#2a6fdb; --ok:#1e8a4c; --bad:#c2410c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#ececec; --muted:#9a9a9a; --line:#333; --card:#1e1e1e; --accent:#6aa0ff; --ok:#4cc38a; --bad:#ff8a4c; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.4 -apple-system, system-ui, sans-serif; }
+  main { max-width:880px; margin:0 auto; padding:16px; display:grid; gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  h1 { font-size:17px; margin:0; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; min-width:90px; }
+  input[type=text], input[type=search], select { font:inherit; padding:6px 8px; border-radius:7px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+  input[type=search] { width:100%; }
+  input[type=range] { width:100%; }
+  #list { max-height:220px; overflow:auto; border:1px solid var(--line); border-radius:7px; margin-top:8px; }
+  #list div { padding:5px 8px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; border-bottom:1px solid var(--line); }
+  #list div:hover { background:var(--bg); }
+  #list span.b { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .now { font-weight:600; overflow-wrap:anywhere; }
+  .muted { color:var(--muted); }
+  .num { font-variant-numeric:tabular-nums; }
+  .big { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
+  .big div { text-align:center; }
+  .big .v { font-size:30px; font-weight:650; font-variant-numeric:tabular-nums; }
+  .big .k { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  #pitchval { font-size:20px; font-weight:600; min-width:90px; display:inline-block; }
+  #err { color:var(--bad); min-height:1.2em; }
+  .device { overflow-x:auto; }
+  .device svg { display:block; flex:none; margin:0 auto; outline:none; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .device .lid { fill:#8d9094; stroke:#5d6064; stroke-width:.5; }
+  .device .lidshade { fill:none; stroke:#a9acb0; stroke-width:.4; }
+  .device .port { fill:#16171a; stroke:#4a4d50; stroke-width:.35; }
+  .device .pending { fill:none; stroke:#7a7d80; stroke-width:.35; stroke-dasharray:.9 .7; }
+  .device .plug { fill:#d8b14a; stroke:#8a6d1c; stroke-width:.25; }
+  .device .lbl { fill:#4a4d50; font-size:2.3px; text-anchor:middle; font-family:-apple-system, system-ui, sans-serif; }
+  .device .lbl.l { text-anchor:start; } .device .lbl.r { text-anchor:end; }
+  .device .lbl.pend { fill:#7a7d80; font-style:italic; font-size:1.4px; }
+  .device .brand { fill:#4a4d50; font-size:3px; text-anchor:middle; font-family:-apple-system, system-ui, sans-serif; letter-spacing:.1px; }
+  .device .win { fill:#202225; stroke:#5d6064; stroke-width:.4; }
+  .device .frost { fill:#34373b; opacity:.9; }
+  .device .led { mix-blend-mode:screen; }
+  .device .bezel { fill:#0b0c0d; stroke:#5d6064; stroke-width:.4; }
+  .device .btnarm { fill:#2c2e31; stroke:#16171a; stroke-width:.3; cursor:pointer; }
+  .device .btnarm.on { fill:#4b4f54; }
+  .device .glyph { fill:#c9ccd0; font-size:3.2px; text-anchor:middle; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
+  .device .glyph.s { font-size:2.5px; }
+  .device .toggle { cursor:pointer; }
+  .device .slot { fill:#16171a; stroke:#4a4d50; stroke-width:.3; }
+  .device .lever { fill:#d6d8db; stroke:#6d7074; stroke-width:.3; }
+  .device canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#04060a; }
+  [hidden] { display:none !important; }
+  /* setup page (a phone-sized panel) */
+  #sp-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:50; padding:12px; }
+  .sp-phone { width:360px; max-width:100%; max-height:92vh; overflow:auto; background:var(--card); color:var(--fg); border:8px solid #1c1c1e; border-radius:30px; padding:18px 16px 20px; display:grid; gap:12px; font-size:15px; }
+  .sp-head { display:flex; justify-content:space-between; align-items:center; font-size:18px; }
+  .sp-head button { border:0; background:none; font-size:26px; line-height:1; padding:0 6px; color:var(--muted); }
+  .sp-sub { color:var(--muted); font-size:13px; margin-top:-6px; }
+  .sp-phone label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
+  .sp-phone input, .sp-phone select { font:inherit; font-size:15px; color:var(--fg); padding:9px 10px; border-radius:9px; border:1px solid var(--line); background:var(--bg); width:100%; }
+  .sp-phone fieldset { border:1px solid var(--line); border-radius:10px; padding:8px 10px 10px; display:grid; gap:8px; }
+  .sp-phone legend { color:var(--muted); font-size:13px; padding:0 4px; }
+  #sp-jank, #sp-client, #sp-ap-box { display:grid; gap:12px; }
+
+  .sp-actions { display:flex; align-items:center; gap:12px; }
+  .sp-actions button { min-width:110px; padding:10px 14px; }
+  #sp-msg { color:var(--ok); font-weight:600; }
+  .seg { display:flex; justify-content:center; margin-bottom:10px; }
+  .devrow { justify-content:center; margin-top:8px; text-align:center; }
+  .devpanel { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:6px 14px; margin-top:10px; font-size:14px; }
+  .devpanel select { max-width:100%; }
+  .devpanel label { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .devpanel input[type=range] { flex:1; min-width:90px; width:auto; }
+  .meter { position:relative; height:14px; border-radius:7px; background:var(--bg); border:1px solid var(--line); margin-top:8px; overflow:hidden; }
+  #confbar { height:100%; width:0; background:var(--ok); transition:width .15s; }
+  #confmark { position:absolute; top:0; bottom:0; width:2px; background:var(--fg); left:50%; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>Beat Player</h1>
+    <div class="muted">What plays here is what the beat tracker hears. This program is the Link master; Ableton Live follows.</div>
+  </div>
+
+  <div class="card device">
+    <div class="devpanel" id="viewbar">
+      <label>Screen <select id="scr"><option value="1.3">1.3 in</option><option value="1.54">1.54 in</option><option value="2.42">2.42 in</option></select></label>
+    </div>
+    
+    <svg id="dev" viewBox="-22 -13 116 89" tabindex="0" aria-label="jank mini 2.2 emulator, top view, 1 unit = 1 mm">
+      <defs>
+        <filter id="seam" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="1.3"/></filter>
+        <linearGradient id="lidg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9da1"/><stop offset="1" stop-color="#83868a"/></linearGradient>
+      </defs>
+      <!-- all coordinates are board millimetres: the board is 0..72 x 0..72, the case 75.6 x 75.6 outside (-1.8 .. 73.8) -->
+      <g id="jacks">
+        <rect x="15.1" y="-5" width="5" height="3.2" rx="1" class="port"/>
+        <g id="linePlug" visibility="hidden"><rect x="16.8" y="-13" width="1.6" height="7" rx=".5" class="plug"/><rect x="16.3" y="-7.2" width="2.6" height="1.8" class="plug"/></g>
+        <rect x="31.6" y="-4.4" width="9" height="2.6" rx="1.2" class="port"/>
+        <rect x="46.1" y="-5" width="4.4" height="3.2" rx="1" class="port"/>
+        <rect x="52.7" y="-5" width="4.4" height="3.2" rx="1" class="port"/>
+        <rect x="-5.2" y="4" width="3.4" height="4.8" rx="1.1" class="port"/>
+        <rect x="73.8" y="4" width="3.4" height="4.8" rx="1.1" class="port"/>
+        <rect x="-5.4" y="16" width="3.6" height="13" rx="1.4" class="port"/>
+        <rect x="73.8" y="16" width="3.6" height="13" rx="1.4" class="port"/>
+      </g>
+      <rect x="-1.8" y="-1.8" width="75.6" height="75.6" rx="4.5" fill="url(#lidg)" class="lid"/>
+      <rect x="-.6" y="-.6" width="73.2" height="73.2" rx="3.6" class="lidshade"/>
+      <!-- faint glow of the board's LEDs through the lid seam on the left wall -->
+      <ellipse id="seamGlow" cx="-1.4" cy="40" rx=".8" ry="5" filter="url(#seam)" opacity="0" fill="#000"/>
+      <!-- edge labels -->
+      <text x="17.6" y="2.6" class="lbl">LINE IN</text><text x="36.1" y="2.6" class="lbl">USB-C</text>
+      <text x="48.3" y="2.6" class="lbl">CLK</text><text x="54.9" y="2.6" class="lbl">RST</text>
+      <text x="-6.5" y="7.2" class="lbl r">MIDI OUT 1</text><text x="-6.5" y="23.3" class="lbl r">DIN 1</text>
+      <text x="78.4" y="7.2" class="lbl l">MIDI OUT 2</text><text x="78.4" y="23.3" class="lbl l">DIN 2</text>
+      <!-- power toggle on the left wall (J11 at (5.0, 49.5), axis y 54.5) -->
+      <g id="pwr" class="toggle">
+        <rect x="-5.9" y="48" width="4.4" height="9" rx="1" class="slot"/>
+        <rect id="lever" x="-7.3" y="49.2" width="4.8" height="3.6" rx="1" class="lever"/>
+        <rect x="-10" y="44" width="10" height="17" fill="transparent"/>
+      </g>
+      <text x="-3" y="46.4" class="lbl r">ON</text><text x="-3" y="60" class="lbl r">OFF</text>
+      <!-- the OLED: lid window and active area at the chosen module's size and place (SCREENS below), same 128 x 64 pixels -->
+      <g id="oledView">
+        <rect id="oledBezel" class="bezel" rx="1.6" x="0" y="0" width="1" height="1"/>
+        <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="128" height="64" xmlns="http://www.w3.org/1999/xhtml"></canvas></foreignObject>
+      </g>
+      <!-- D-pad at the bottom right: cross centre (61.5, 62.2), button pads 6.5 mm from the centre, arms 6 mm wide -->
+      <g id="dpad">
+        <g id="arm-up" data-b="up"><rect x="58.5" y="52.7" width="6" height="9.5" rx="1" class="btnarm"/><text x="61.5" y="56.7" class="glyph">&#9650;</text></g>
+        <g id="arm-down" data-b="down"><rect x="58.5" y="62.2" width="6" height="9.5" rx="1" class="btnarm"/><text x="61.5" y="69.8" class="glyph">&#9660;</text></g>
+        <g id="arm-no" data-b="no"><rect x="52" y="59.2" width="9.5" height="6" rx="1" class="btnarm"/><text x="55" y="63.2" class="glyph s">NO</text></g>
+        <g id="arm-yes" data-b="yes"><rect x="61.5" y="59.2" width="9.5" height="6" rx="1" class="btnarm"/><text x="68" y="63.2" class="glyph s">YES</text></g>
+        <rect x="58.5" y="59.2" width="6" height="6" class="btnarm" style="pointer-events:none"/>
+      </g>
+      <text x="22" y="69" class="brand">jank mini 2.2</text>
+    </svg>
+    <div id="sizenote" class="muted" style="font-size:12px; text-align:center; margin:6px 0">true size on MacBook Pro 16 at default scaling, browser zoom 100 %</div>
+    <div id="setupbar" class="row devrow" hidden><button id="setupbtn" type="button" class="primary">Open the setup page (as on a phone)</button></div>
+    <div class="devpanel">
+      <label>Wi-Fi <select id="wifi"><option value="good">good</option><option value="weak">weak</option><option value="none">none</option></select></label>
+      <label><input type="checkbox" id="usb" checked> USB plugged</label>
+      <label><input type="checkbox" id="bat" checked> battery fitted</label>
+      <label>Battery <input type="range" id="battlvl" min="0" max="100" value="80"> <b id="battv" class="num">80 %</b></label>
+      <label><input type="checkbox" id="linein" checked> line in plugged</label>
+    </div>
+  </div>
+
+  <div class="card" id="xiaocard" hidden>
+    <div class="row">
+      <b>XIAO</b>
+      <span id="xbeat" style="display:inline-block;width:14px;height:14px;border-radius:7px;background:#333"></span>
+      <span><b id="xbpm" class="num">---</b> BPM</span>
+      <span id="xmode">-</span>
+      <span>beat <b id="xn" class="num">-</b></span>
+      <span id="xaudio">-</span>
+    </div>
+    <div id="xmsg" class="num" style="opacity:.7"></div>
+    <table id="acc" class="num" style="margin-top:8px;border-collapse:collapse;font-size:12px">
+      <thead><tr><th style="text-align:left">Accuracy (last 16 beats, + = late)</th><th>XIAO</th><th>player</th><th>Link (Live)</th></tr></thead>
+      <tbody id="accrows"></tbody>
+    </table>
+    <div id="accmodel" class="num" style="opacity:.8;font-size:12px;margin-top:4px"></div>
+    <div id="accxstats" class="num" style="opacity:.8;font-size:12px"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="calib" disabled>Calibrate</button>
+      <span id="calibmsg" class="num" style="font-size:12px"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <input id="q" type="search" placeholder="Search your Traktor tracks…" autocomplete="off">
+    <div id="list"></div>
+    <div class="row" style="margin-top:8px">
+      <input id="path" type="text" placeholder="…or any audio file path" style="flex:1; min-width:200px">
+      <button id="loadpath">Open</button>
+    </div>
+    <div id="err"></div>
+  </div>
+
+  <div class="card">
+    <div class="now" id="now">No track</div>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" id="play">Play</button>
+      <label><input type="checkbox" id="auto" checked> play the next track</label>
+      <span class="num muted" id="time">0:00 / 0:00</span>
+    </div>
+    <input id="seek" type="range" min="0" max="1000" value="0" style="margin-top:8px">
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <strong>Pitch</strong>
+      <span id="pitchval" class="num">+0.00 %</span>
+      <button id="reset">0</button>
+      <label class="muted">range
+        <select id="range"><option value="8">±8 %</option><option value="16">±16 %</option><option value="50">±50 %</option></select>
+      </label>
+    </div>
+    <input id="pitch" type="range" min="-8" max="8" step="0.01" value="0">
+    <div class="row" style="margin-top:10px">
+      <strong>Volume</strong>
+      <span id="volval" class="num muted">100 %</span>
+      <span class="muted">(what you hear; the tracker always gets the full signal)</span>
+    </div>
+    <input id="vol" type="range" min="0" max="100" step="1" value="100">
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <strong>Confidence</strong>
+      <span id="confval" class="num" style="font-size:20px; font-weight:600; min-width:60px">---</span>
+      <span id="linkstate" class="muted"></span>
+    </div>
+    <div class="meter"><div id="confbar"></div><div id="confmark"></div></div>
+    <div class="row" style="margin-top:10px">
+      <strong>Stop Link below</strong>
+      <span id="thval" class="num">50 %</span>
+      <span class="muted">(0 = never)</span>
+    </div>
+    <input id="th" type="range" min="0" max="100" step="1" value="50">
+  </div>
+
+  <div class="card big">
+    <div><div class="v" id="bpm">---</div><div class="k">tracker BPM</div></div>
+    <div><div class="v" id="mode">---</div><div class="k">mode</div></div>
+    <div><div class="v" id="exp">---</div><div class="k">Traktor × pitch</div></div>
+    <div><div class="v" id="diff">---</div><div class="k">difference</div></div>
+  </div>
+  <div class="card row muted num" id="link">Link: ---</div>
+</main>
+<!-- ===================== SETUP PAGE: the device's web setup form (a draft of the firmware's page) =====================
+     Self-contained: markup, styles (.sp-*) and script (spOpen / spSave / spClose) only touch the dev state and setField(). -->
+<div id="sp-overlay" hidden>
+  <form id="sp-form" class="sp-phone" autocomplete="off">
+    <div class="sp-head"><b>jank setup</b><button type="button" id="sp-x" aria-label="close">&times;</button></div>
+    <div class="sp-sub">connected to <span id="sp-ap"></span> &middot; 192.168.4.1</div>
+    <label>Network mode<select id="sp-net"><option value="0">JANK</option><option value="1">LINK CLIENT</option><option value="2">LINK AP</option></select></label>
+    <div id="sp-jank"><label>Jank group<select id="sp-group"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option></select></label></div>
+    <div id="sp-client">
+      <label>Network<select id="sp-ssid"></select></label>
+      <label>Passkey<input id="sp-pass" type="text" maxlength="63" autocomplete="off"></label>
+    </div>
+    <div id="sp-ap-box">
+      <label>AP name<input id="sp-apname" type="text" maxlength="31" autocomplete="off"></label>
+      <label>AP passkey<input id="sp-appass" type="text" maxlength="63" autocomplete="off"></label>
+    </div>
+    <fieldset><legend>Output offsets (ms)</legend>
+      <label>Audio in<input id="sp-oin" type="number" min="-100" max="100" step="1"></label>
+      <label>MIDI OUT 1<input id="sp-o0" type="number" min="-50" max="50" step="1"></label>
+      <label>MIDI OUT 2<input id="sp-o1" type="number" min="-50" max="50" step="1"></label>
+      <label>CLK OUT<input id="sp-o2" type="number" min="-50" max="50" step="1"></label>
+    </fieldset>
+    <label>Clock rate<select id="sp-rate"></select></label>
+    <label>Screen brightness (%)<input id="sp-bright" type="number" min="10" max="100" step="10"></label>
+    <label>Screen off<select id="sp-sleep"><option value="0">never</option><option value="1">after 30 s</option><option value="2">after 1 min</option><option value="3">after 5 min</option></select></label>
+    <label>Input level (dB)<input id="sp-gain" type="number" min="-12" max="12" step="1"></label>
+    <label>Low confidence<select id="sp-lowconf"><option value="0">Keep running</option><option value="1">Stop / start</option></select></label>
+    <label>Confidence threshold (%)<input id="sp-th" type="number" min="0" max="100" step="5"></label>
+    <div class="sp-actions"><button type="submit" class="primary">Save</button><span id="sp-msg"></span></div>
+  </form>
+</div>
+<script>
+/* Minimal QR encoder: byte mode, error correction L, versions 1-5 (one block each). Used for the setup-mode hotspot code.
+   encode(text) -> { size, mod } with mod[y][x] true for a dark module. */
+const QR = (() => {
+  const EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+  { let x = 1; for (let i = 0; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 256) x ^= 0x11d; } for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255]; }
+  const mul = (a, b) => (a && b ? EXP[LOG[a] + LOG[b]] : 0);
+  function rsEncode(data, n) {                       // remainder of data(x) * x^n by the generator polynomial
+    let g = [1];
+    for (let i = 0; i < n; i++) { const ng = new Array(g.length + 1).fill(0); for (let j = 0; j < g.length; j++) { ng[j] ^= g[j]; ng[j + 1] ^= mul(g[j], EXP[i]); } g = ng; }
+    const res = new Array(n).fill(0);
+    for (const b of data) { const f = b ^ res.shift(); res.push(0); for (let i = 0; i < n; i++) res[i] ^= mul(g[i + 1], f); }
+    return res;
+  }
+  const CAP = { 1: [19, 7], 2: [34, 10], 3: [55, 15], 4: [80, 20], 5: [108, 26] };   // [data codewords, ecc codewords], level L
+  const MASKS = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+    (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => ((x * y) % 2) + ((x * y) % 3) === 0,
+    (x, y) => (((x * y) % 2) + ((x * y) % 3)) % 2 === 0, (x, y) => (((x + y) % 2) + ((x * y) % 3)) % 2 === 0];
+
+  function codewords(bytes, version) {
+    const [nd, ne] = CAP[version], bits = [];
+    const put = (v, n) => { for (let i = n - 1; i >= 0; i--) bits.push((v >>> i) & 1); };
+    put(4, 4); put(bytes.length, 8); bytes.forEach(b => put(b, 8));
+    for (let i = 0; i < 4 && bits.length < nd * 8; i++) bits.push(0);
+    while (bits.length % 8) bits.push(0);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+    for (let pad = 0xec; data.length < nd; pad ^= 0xec ^ 0x11) data.push(pad);
+    return data.concat(rsEncode(data, ne));
+  }
+
+  function build(version, cw, mask) {
+    const size = 17 + 4 * version;
+    const mod = Array.from({ length: size }, () => new Array(size).fill(false));
+    const fn = Array.from({ length: size }, () => new Array(size).fill(false));
+    const set = (x, y, v) => { if (x >= 0 && x < size && y >= 0 && y < size) { mod[y][x] = v; fn[y][x] = true; } };
+    for (let i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+    for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]])
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const d = Math.max(Math.abs(dx), Math.abs(dy)); set(cx + dx, cy + dy, d !== 2 && d !== 4); }
+    if (version >= 2) { const c = size - 7; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(c + dx, c + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1); }
+    const data = (1 << 3) | mask;                                  // level L = 01
+    let rem = data; for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    const fb = ((data << 10) | rem) ^ 0x5412, bit = i => ((fb >>> i) & 1) !== 0;
+    for (let i = 0; i <= 5; i++) set(8, i, bit(i));
+    set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8));
+    for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+    for (let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+    for (let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+    set(8, size - 8, true);
+    let k = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j, y = ((right + 1) & 2) === 0 ? size - 1 - vert : vert;
+        if (!fn[y][x] && k < cw.length * 8) { mod[y][x] = ((cw[k >>> 3] >>> (7 - (k & 7))) & 1) !== 0; k++; }
+      }
+    }
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!fn[y][x] && MASKS[mask](x, y)) mod[y][x] = !mod[y][x];
+    return { size, mod };
+  }
+
+  function penalty(q) {
+    const { size, mod } = q; let p = 0, dark = 0;
+    const lines = [];
+    for (let i = 0; i < size; i++) { lines.push(mod[i].map(v => (v ? 1 : 0)).join('')); lines.push(mod.map(r => (r[i] ? 1 : 0)).join('')); }
+    for (const s of lines) {
+      for (const m of s.matchAll(/0{5,}|1{5,}/g)) p += 3 + m[0].length - 5;
+      p += 40 * ((s.match(/(?=10111010000|00001011101)/g) || []).length);
+    }
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      if (mod[y][x]) dark++;
+      if (x < size - 1 && y < size - 1 && mod[y][x] === mod[y][x + 1] && mod[y][x] === mod[y + 1][x] && mod[y][x] === mod[y + 1][x + 1]) p += 3;
+    }
+    return p + 10 * (Math.ceil(Math.abs(dark * 20 - size * size * 10) / (size * size)) - 1);
+  }
+
+  function encode(text) {
+    const bytes = Array.from(new TextEncoder().encode(text));
+    const version = [1, 2, 3, 4, 5].find(v => bytes.length <= CAP[v][0] - 2);
+    if (!version) throw new Error('QR text too long');
+    const cw = codewords(bytes, version);
+    let best = null, bestP = Infinity;
+    for (let m = 0; m < 8; m++) { const q = build(version, cw, m); const p = penalty(q); if (p < bestP) { bestP = p; best = q; } }
+    return best;
+  }
+  return { encode };
+})();
+</script>
+<script>
+/* ====================================================================================================
+   OLED UI for jank mini 2.2, screen version. 128 x 64, 1 bit per pixel, 5x7 pixel font (scaled x2/x3 for big text).
+   Pure logic: no DOM. Input: press(ui, button, now_ms, ctx) with button 'up' | 'down' | 'no' (left arm) | 'yes'
+   (right arm); output: draw(fb, ui, ctx, now_ms) fills a 128*64 Uint8Array (1 = white pixel). Written so it can be
+   ported to the firmware as it is: one state struct, one input function, one draw function, a tiny font.
+
+   ctx, read by the UI (the host fills it from /api/status and its own emulated state): link (mode is LINK; the host derives it from the line-in plug detect: plugged = AUDIO, unplugged = LINK), bpm
+   (audio mode, after the half/double fold), linkBpm, mode, conf 0..1, th percent, levelDb (dBFS), silent, gated, hold,
+   playing (Link transport), peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
+   offs [MIDI OUT 1, MIDI OUT 2, CLK] in ms, rate (index into the clock divisions), boot, splash.
+   net: { mode 0 JANK | 1 LINK CLIENT | 2 LINK AP | 3 SETUP, prev (mode to return to after SETUP), group (the jank GROUP 1..9: the units on the same group form one Link session over open Wi-Fi frames, no router), ssid, pass, appass, apName,
+   status, ip, apClients, scan [{name, bars}], setupName }, groupPeers, setup (mode is SETUP), qr { size, mod }, saved.
+   ctx actions: tempoStep(+1|-1) -> new BPM shown, setField(name, value), setHold(bool) (stop: hold; start: resync, then release).
+
+   BUTTONS: UP / DOWN / NO (left) / YES (right).
+   SCREENS AND TRANSITIONS
+     HOME     everything at once: mode tag AUDIO|LINK, state (STEADY FASTER SLOWER STOPPED GATED SILENT PLAYING), BPM large,
+              the layouts are described at drawHome.
+                UP / DOWN   LINK mode: Link tempo +/-1 BPM (the host auto-repeats while held).
+                            AUDIO mode: x2 / /2, the tracker's half/double fix. 1 s overlay with the new BPM
+                YES         (on release) Stop / Start of the outputs (MIDI clock, modular clock); the top-left icon shows
+                            it. AUDIO: Stop holds Link and the clocks, Start resyncs and runs. LINK: the device's own
+                            clocks start / stop (and the session, in FOLLOW+LEAD; see LINK TRANSPORT).        NO (on release) -> MENU
+                NO + UP/DOWN   AUDIO mode: NUDGE BEAT, half a beat relative to the tracked phase (1 s overlay "NUDGE BEAT +1/2"):
+                               one step fixes an off-beat lock, two move the bar's 1 by a beat
+                YES + UP/DOWN  AUDIO mode: nudge the timing 1 ms (the AUDIO IN offset: every output; repeats while held;
+                               1 s overlay "NUDGE MS +3"). A combo cancels the NO / YES release action.
+     MENU     AUDIO, LINK TRANSPORT (LINK mode: IGNORE = the clocks run on Link's tempo and beat, own Start / Stop only;
+              FOLLOW = they also start / stop with the session; FOLLOW+LEAD = and our Start / Stop starts / stops the session),
+              NETWORK, OFFSET, CLK RATE, DISPLAY, BATTERY (UP/DOWN move; the mode is not a setting: plugging in the line = AUDIO)
+                YES on AUDIO / OFFSET -> SUB                    YES on NETWORK -> NET
+                YES on CLK RATE -> EDIT                         YES on BATTERY -> INFO       NO -> HOME
+     SUB      a list of EDITS: UP/DOWN move, YES -> EDIT, NO -> MENU
+                DISPLAY: BRIGHTNESS (10..100 %), SCREEN OFF (NEVER / 30 S / 1 MIN / 5 MIN without a button; the first
+                         press on a dark screen only wakes it; SETUP keeps the screen on)
+                AUDIO:  LEVEL (-12..+12 dB, attenuator / boost before the tracker), LOW CONFIDENCE (KEEP RUNNING or
+                        STOP / START: under the threshold the transport stops), THRESHOLD (%)
+                OFFSET: AUDIO IN (-100..+100 ms: the input latency, moves every output; the YES + UP/DOWN nudge
+                        changes it), MIDI OUT 1, MIDI OUT 2, CLK OUT in ms (-50..+50, per output)
+     NET      TYPE (JANK / LINK CLIENT / LINK AP / SETUP, applied on YES) and per mode: JANK: PEERS; CLIENT: NETWORK (-> SCAN),
+              PASSKEY (-> TEXT), STATUS (-> NETINFO); AP: NAME and PASSKEY (-> TEXT), STATUS (-> NETINFO). NO -> MENU.
+              Choosing SETUP goes to CONFIRM ("STOP AND START SETUP?", YES starts, NO back).
+     SCAN     fake scan list with signal bars: UP/DOWN move, YES picks, NO back
+     TEXT     character editor (a-z A-Z 0-9 - _ . ! @ #): UP/DOWN cycle the character at the cursor (the host repeats while held),
+              YES = next character, YES on the empty slot past the end = confirm, NO = delete the last character,
+              NO on an empty text = cancel. Passkeys are masked except at the cursor. Hint: easier: web UI + address
+     SETUP    replaces every screen: the device is stopped, the open hotspot jank-setup-XXXX runs; the screen shows its QR code,
+              the name and 192.168.4.1. NO asks "LEAVE SETUP?": YES returns to the previous network mode and runs again
+     INFO     read-only (battery: %, charging/discharging, estimated volt)  NO or YES -> MENU
+     EDIT     (choices cycle round, numbers stop at their ends) the value drawn inverted (white box, black text). UP/DOWN change it (applied live), YES keeps it and
+              returns to where EDIT was opened (MENU or SUB), NO restores the old value and returns.
+   ==================================================================================================== */
+const OLED = (() => {
+  const W = 128, H = 64;
+  const ROWS = 7;
+  const FONT_SRC = {
+    '0': '.###.|#...#|#..##|#.#.#|##..#|#...#|.###.', '1': '..#..|.##..|..#..|..#..|..#..|..#..|.###.',
+    '2': '.###.|#...#|....#|...#.|..#..|.#...|#####', '3': '.###.|#...#|....#|..##.|....#|#...#|.###.',
+    '4': '...#.|..##.|.#.#.|#..#.|#####|...#.|...#.', '5': '#####|#....|####.|....#|....#|#...#|.###.',
+    '6': '..##.|.#...|#....|####.|#...#|#...#|.###.', '7': '#####|....#|...#.|..#..|.#...|.#...|.#...',
+    '8': '.###.|#...#|#...#|.###.|#...#|#...#|.###.', '9': '.###.|#...#|#...#|.####|....#|...#.|.##..',
+    'A': '.###.|#...#|#...#|#####|#...#|#...#|#...#', 'B': '####.|#...#|#...#|####.|#...#|#...#|####.',
+    'C': '.###.|#...#|#....|#....|#....|#...#|.###.', 'D': '###..|#..#.|#...#|#...#|#...#|#..#.|###..',
+    'E': '#####|#....|#....|####.|#....|#....|#####', 'F': '#####|#....|#....|####.|#....|#....|#....',
+    'G': '.###.|#...#|#....|#.###|#...#|#...#|.####', 'H': '#...#|#...#|#...#|#####|#...#|#...#|#...#',
+    'I': '.###.|..#..|..#..|..#..|..#..|..#..|.###.', 'J': '..###|...#.|...#.|...#.|...#.|#..#.|.##..',
+    'K': '#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#', 'L': '#....|#....|#....|#....|#....|#....|#####',
+    'M': '#...#|##.##|#.#.#|#.#.#|#...#|#...#|#...#', 'N': '#...#|##..#|#.#.#|#..##|#...#|#...#|#...#',
+    'O': '.###.|#...#|#...#|#...#|#...#|#...#|.###.', 'P': '####.|#...#|#...#|####.|#....|#....|#....',
+    'Q': '.###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#', 'R': '####.|#...#|#...#|####.|#.#..|#..#.|#...#',
+    'S': '.####|#....|#....|.###.|....#|....#|####.', 'T': '#####|..#..|..#..|..#..|..#..|..#..|..#..',
+    'U': '#...#|#...#|#...#|#...#|#...#|#...#|.###.', 'V': '#...#|#...#|#...#|#...#|#...#|.#.#.|..#..',
+    'W': '#...#|#...#|#...#|#.#.#|#.#.#|##.##|#...#', 'X': '#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#',
+    'Y': '#...#|#...#|.#.#.|..#..|..#..|..#..|..#..', 'Z': '#####|....#|...#.|..#..|.#...|#....|#####',
+    ',': '.....|.....|.....|.....|.....|.##..|.#...', '.': '.....|.....|.....|.....|.....|.##..|.##..', ':': '.....|.##..|.##..|.....|.##..|.##..|.....',
+    '%': '##..#|##..#|...#.|..#..|.#...|#..##|#..##', '+': '.....|..#..|..#..|#####|..#..|..#..|.....',
+    '-': '.....|.....|.....|#####|.....|.....|.....', '/': '....#|....#|...#.|..#..|.#...|#....|#....',
+    ' ': '.....|.....|.....|.....|.....|.....|.....',
+    'a': '.....|.....|.###.|....#|.####|#...#|.####', 'b': '#....|#....|####.|#...#|#...#|#...#|####.',
+    'c': '.....|.....|.###.|#....|#....|#...#|.###.', 'd': '....#|....#|.####|#...#|#...#|#...#|.####',
+    'e': '.....|.....|.###.|#...#|#####|#....|.###.', 'f': '..##.|.#..#|.#...|###..|.#...|.#...|.#...',
+    'g': '.....|.####|#...#|#...#|.####|....#|.###.', 'h': '#....|#....|#.##.|##..#|#...#|#...#|#...#',
+    'i': '..#..|.....|.##..|..#..|..#..|..#..|.###.', 'j': '...#.|.....|..##.|...#.|...#.|#..#.|.##..',
+    'k': '#....|#....|#..#.|#.#..|##...|#.#..|#..#.', 'l': '.##..|..#..|..#..|..#..|..#..|..#..|.###.',
+    'm': '.....|.....|##.#.|#.#.#|#.#.#|#...#|#...#', 'n': '.....|.....|#.##.|##..#|#...#|#...#|#...#',
+    'o': '.....|.....|.###.|#...#|#...#|#...#|.###.', 'p': '.....|####.|#...#|#...#|####.|#....|#....',
+    'q': '.....|.####|#...#|#...#|.####|....#|....#', 'r': '.....|.....|#.##.|##..#|#....|#....|#....',
+    's': '.....|.....|.####|#....|.###.|....#|####.', 't': '.#...|.#...|###..|.#...|.#...|.#..#|..##.',
+    'u': '.....|.....|#...#|#...#|#...#|#..##|.##.#', 'v': '.....|.....|#...#|#...#|#...#|.#.#.|..#..',
+    'w': '.....|.....|#...#|#...#|#.#.#|#.#.#|.#.#.', 'x': '.....|.....|#...#|.#.#.|..#..|.#.#.|#...#',
+    'y': '.....|#...#|#...#|.####|....#|....#|.###.', 'z': '.....|.....|#####|...#.|..#..|.#...|#####',
+    '_': '.....|.....|.....|.....|.....|.....|#####', '!': '..#..|..#..|..#..|..#..|..#..|.....|..#..',
+    '@': '.###.|#...#|#.###|#.#.#|#.###|#....|.###.', '#': '.#.#.|#####|.#.#.|.#.#.|.#.#.|#####|.#.#.',
+    '*': '.....|#.#.#|.###.|#####|.###.|#.#.#|.....',
+  };
+  const FONT = {};
+  for (const k of Object.keys(FONT_SRC)) FONT[k] = FONT_SRC[k].split('|');
+  const NARROW = { '.': 1, ':': 1, ',': 1 };                 // glyphs drawn from column 1, two columns wide
+  const adv = ch => (NARROW[ch] ? 3 : ch === ' ' ? 4 : 6);
+
+  const px = (fb, x, y, v) => { if (x >= 0 && x < W && y >= 0 && y < H) fb[y * W + x] = v; };
+  const rect = (fb, x, y, w, h, v) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(fb, x + i, y + j, v); };
+  const frame = (fb, x, y, w, h, v) => { rect(fb, x, y, w, 1, v); rect(fb, x, y + h - 1, w, 1, v); rect(fb, x, y, 1, h, v); rect(fb, x + w - 1, y, 1, h, v); };
+  const xorCol = (fb, x, y0, y1) => { for (let y = y0; y <= y1; y++) if (x >= 0 && x < W && y >= 0 && y < H) fb[y * W + x] ^= 1; };
+  const textW = (s, sc) => { let w = 0; for (const ch of s) w += adv(ch) * sc; return Math.max(0, w - sc); };
+  function text(fb, s, x, y, sc, v) {
+    let cx = x;
+    for (const ch of String(s)) {
+      const g = FONT[ch] || FONT[' '], off = NARROW[ch] || 0;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < 5; c++) if (g[r][c] === '#') rect(fb, cx + (c - off) * sc, y + r * sc, sc, sc, v);
+      cx += adv(ch) * sc;
+    }
+  }
+  const textR = (fb, s, xr, y, sc, v) => text(fb, s, xr - textW(String(s), sc), y, sc, v);
+  const textC = (fb, s, y, sc, v) => text(fb, s, Math.round((W - textW(String(s), sc)) / 2), y, sc, v);
+
+  const RATES = ['1/4', '1/8', '1/16', '1/32', '24 PPQN'];          // the modular CLK output's division
+  const RATES_SHORT = ['1/4', '1/8', '1/16', '1/32', '24P'];
+  const DEFAULT_RATE = 2;
+  const NET_MODES = ['JANK', 'LINK CLIENT', 'LINK AP', 'SETUP'], NET_SHORT = ['JANK', 'CLIENT', 'AP', 'SETUP'];
+  const SETUP = 3;
+  const CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.!@#';
+  const MAX_TEXT = 63;
+  // what EDIT can change: opts = a list of choices (value = index), else a number lo..hi in steps
+  // help: two short lines (21 characters at most) under the value; for a list of choices, one pair per choice
+  const LATER = '+ LATER  - EARLIER';
+  const SLEEP_NAMES = ['NEVER', '30 S', '1 MIN', '5 MIN'];
+  const LT_MODES = ['IGNORE', 'FOLLOW', 'FOLLOW+LEAD'];                // index = dev.ltMode; default FOLLOW+LEAD (2)
+  const LT_SHORT = ['IGNORE', 'FOLLOW', 'LEAD'];
+  // the HOME top bar's LINK-mode transport icons, 1-bit rows ('#' = lit): IGNORE = a crossed circle (our own start only),
+  // FOLLOW = an arrow coming in (the session's start / stop), FOLLOW+LEAD = a double arrow (in and out)
+  const LT_ICONS = [
+    ['..###..', '.#...##', '#...#.#', '#..#..#', '#.#...#', '##...#.', '..###..'],
+    ['...#.....', '..##.....', '.#######.', '########.', '.#######.', '..##.....', '...#.....'],
+    ['.........', '..#...#..', '.##...##.', '#########', '.##...##.', '..#...#..', '.........'],
+  ];
+  const NET_ICON_XR = 86;                                            // the network icon's right edge: a gap before the plug
+  const USB_ICON = ['.....####..', '.....######', '#########..', '.....######', '.....####..'];
+  function icon(fb, rows, x, y) { rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') px(fb, x + i, y + j, 1); }); }                       // the menu row (LINK TRANSPORT + value fits 21 characters)
+  const EDITS = {
+    netmode: { title: 'NETWORK', opts: NET_MODES, get: c => c.net.mode, live: false,      // applied on YES, SETUP asks first
+               help: [['JANK GROUP NETWORK', ''], ['JOIN A WIFI ROUTER', ''], ['OWN WIFI NETWORK', ''], ['STOPS THE DEVICE', 'OPENS SETUP HOTSPOT']] },
+    inoff: { title: 'AUDIO IN', lo: -100, hi: 100, step: 1, unit: ' MS', get: c => c.inOff,     // input latency: moves every output
+             help: ['INPUT LATENCY, MOVES', 'ALL OUTPUTS. + LATER'] },
+    out0: { title: 'MIDI OUT 1', lo: -50, hi: 50, step: 1, unit: ' MS', get: c => c.offs[0], help: ['MIDI OUT 1 TIMING', LATER] },
+    out1: { title: 'MIDI OUT 2', lo: -50, hi: 50, step: 1, unit: ' MS', get: c => c.offs[1], help: ['MIDI OUT 2 TIMING', LATER] },
+    out2: { title: 'CLK OUT', lo: -50, hi: 50, step: 1, unit: ' MS', get: c => c.offs[2], help: ['MODULAR CLOCK TIMING', LATER] },
+    rate: { title: 'CLOCK RATE', opts: RATES, get: c => c.rate,
+            help: [['1 PULSE PER BEAT', 'ON CLK OUT'], ['2 PULSES PER BEAT', 'ON CLK OUT'], ['4 PULSES PER BEAT', 'ON CLK OUT'],
+                   ['8 PULSES PER BEAT', 'ON CLK OUT'], ['24 PULSES PER BEAT', 'ON CLK OUT']] },
+    threshold: { title: 'THRESHOLD', lo: 0, hi: 100, step: 5, unit: '%', get: c => c.th, help: ['BELOW IT: STOP', '(LOW CONFIDENCE)'] },
+    gain: { title: 'LEVEL', lo: -12, hi: 12, step: 1, unit: ' dB', get: c => c.gain, help: ['INPUT LEVEL', '- CUT   + BOOST'] },   // before the tracker
+    ltmode: { title: 'LINK TRANSPORT', opts: LT_MODES, get: c => c.ltMode,      // LINK mode only: the session's start / stop
+              help: [['CLOCKS RUN ON LINK', 'TEMPO, OWN START'], ['CLOCKS START + STOP', 'WITH THE SESSION'],
+                     ['FOLLOWS, AND START/', 'STOP DRIVES LINK']] },
+    bright: { title: 'BRIGHTNESS', lo: 10, hi: 100, step: 10, unit: '%', get: c => c.bright, help: ['SCREEN BRIGHTNESS', 'LOWER SAVES BATTERY'] },
+    sleep: { title: 'SCREEN OFF', opts: SLEEP_NAMES, get: c => c.sleep,
+             help: [['SCREEN STAYS ON', ''], ['DARK AFTER 30 S', 'ANY BUTTON WAKES IT'], ['DARK AFTER 1 MIN', 'ANY BUTTON WAKES IT'],
+                    ['DARK AFTER 5 MIN', 'ANY BUTTON WAKES IT']] },
+    group: { title: 'JANK GROUP', opts: ['1', '2', '3', '4', '5', '6', '7', '8', '9'], get: c => c.net.group - 1, live: false,
+             help: Array(9).fill(['UNITS ON THE SAME', 'GROUP PLAY TOGETHER']) },     // the jank README: GROUP 1..9, no router
+    lowconf: { title: 'LOW CONFIDENCE', opts: ['KEEP RUNNING', 'STOP / START'], get: c => (c.confStop ? 1 : 0),
+               help: [['NEVER STOPS', ''], ['STOPS BELOW THE', 'THRESHOLD']] },
+  };
+  const helpOf = (sp, v) => (sp.opts ? sp.help[v] : sp.help) || ['', ''];
+  const MENU = [                                                    // the top-level menu, in order
+    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'NETWORK', net: true }, { name: 'OFFSET', sub: 'offsets' },
+    { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
+  ];
+  // sub-menus: a title and the EDITS they list
+  const SUBS = { audio: { title: 'AUDIO', rows: ['gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
+                 display: { title: 'DISPLAY', rows: ['bright', 'sleep'] } };
+  const VISIBLE = 6;
+  const OVERLAY_MS = 1000;
+  const METER_MIN_DB = -90, SILENCE_DB = -60;
+  const sgn = v => (v > 0 ? '+' : '') + v;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  const create = () => ({ screen: 'home', cursor: 0, top: 0, ocur: 0, ncur: 0, scur: 0, stop: 0, edit: null, txt: null, leave: false, overlay: null });
+  const editText = (spec, v) => (spec.opts ? spec.opts[v] : (spec.lo < 0 ? sgn(v) : v) + spec.unit);
+
+  function startEdit(ui, field, c) {
+    const orig = EDITS[field].get(c);
+    ui.edit = { field, orig, val: orig, ret: ui.screen };
+    ui.screen = 'edit';
+  }
+  function stepEdit(ui, c, d) {
+    const e = ui.edit, sp = EDITS[e.field];
+    const n = sp.opts ? sp.opts.length : 0;                       // choices cycle round; numbers stop at their ends
+    e.val = sp.opts ? (e.val + d + n) % n : clamp(e.val + sp.step * d, sp.lo, sp.hi);
+    if (sp.live !== false) c.setField(e.field, e.val);              // live
+  }
+  function endEdit(ui, c, keep) {
+    const e = ui.edit, sp = EDITS[e.field];
+    ui.edit = null; ui.screen = e.ret;
+    if (sp.live === false) {                                         // applied only when confirmed
+      if (keep && e.val !== e.orig) {
+        if (e.field === 'netmode' && e.val === SETUP) ui.screen = 'confirm';      // stopping the device needs a second YES
+        else c.setField(e.field, e.val);
+      }
+    } else if (!keep) c.setField(e.field, e.orig);
+  }
+  // NETWORK screen rows for the current mode: { name, val, act } (act = what YES does, null = read-only)
+  function netRows(c) {
+    const n = c.net, rows = [{ name: 'TYPE', val: NET_SHORT[n.mode], act: 'mode', help: ['HOW THE DEVICE JOINS', 'A NETWORK'] }];
+    if (n.mode === 0) rows.push({ name: 'GROUP', val: String(n.group), act: 'group', help: ['UNITS ON THE SAME', 'GROUP PLAY TOGETHER'] },
+                                { name: 'PEERS', val: String(c.groupPeers), act: null, help: ['JANK DEVICES IN', 'THE GROUP'] });
+    else if (n.mode === 1) rows.push({ name: 'NETWORK', val: n.ssid || '-', act: 'ssid', help: ['THE ROUTER TO JOIN', ''] },
+                                     { name: 'PASSKEY', val: '*'.repeat(Math.min(n.pass.length, 6)), act: 'pass', help: ['ITS WIFI PASSKEY', ''] },
+                                     { name: 'STATUS', val: n.status, act: 'status', help: ['CONNECTION STATE', 'AND IP ADDRESS'] });
+    else rows.push({ name: 'NAME', val: n.apName, act: 'apname', help: ['NAME OF THE', 'DEVICE NETWORK'] },
+                   { name: 'PASSKEY', val: '*'.repeat(Math.min(n.appass.length, 6)), act: 'appass', help: ['PASSKEY OF THE', 'DEVICE NETWORK'] },
+                   { name: 'STATUS', val: n.apClients + ' CLIENTS', act: 'status', help: ['ADDRESS AND', 'CONNECTED CLIENTS'] });
+    return rows;
+  }
+  function startText(ui, c, field) {
+    const text = { pass: c.net.pass, appass: c.net.appass, apname: c.net.apName }[field];
+    ui.txt = { field, text, pos: 0, mask: field === 'pass' || field === 'appass' };
+    ui.screen = 'text';
+  }
+  // character editor: UP/DOWN cycle the character at the cursor, YES next (on the empty slot past the end: confirm),
+  // NO deletes the last character (on an empty text: cancel)
+  function pressText(ui, c, btn, d) {
+    const t = ui.txt, n = t.text.length;
+    if (d) {
+      if (t.pos >= n) { if (n < MAX_TEXT) t.text += CHARS[d > 0 ? 0 : CHARS.length - 1]; }
+      else {
+        const i = CHARS.indexOf(t.text[t.pos]), j = i < 0 ? 0 : (i + d + CHARS.length) % CHARS.length;
+        t.text = t.text.slice(0, t.pos) + CHARS[j] + t.text.slice(t.pos + 1);
+      }
+    } else if (btn === 'yes') {
+      if (t.pos >= n) { c.setField(t.field, t.text); ui.txt = null; ui.screen = 'net'; }
+      else t.pos++;
+    } else if (n === 0) { ui.txt = null; ui.screen = 'net'; }
+    else { t.text = t.text.slice(0, -1); t.pos = Math.min(t.pos, t.text.length); }
+  }
+
+  function press(ui, btn, now, c) {
+    const d = btn === 'up' ? 1 : btn === 'down' ? -1 : 0;
+    if (c.setup) {                                                   // SETUP replaces every other screen
+      if (ui.leave) { if (btn === 'yes') c.setField('netmode', c.net.prev); if (!d) ui.leave = false; }
+      else if (btn === 'no') ui.leave = true;
+      return;
+    }
+    if (ui.screen === 'home') {
+      if (d) {
+        const v = c.tempoStep(d);                                  // link: +/-1 BPM; audio: x2 or /2
+        ui.overlay = { until: now + OVERLAY_MS, title: c.link ? 'LINK TEMPO' : (d > 0 ? 'DOUBLE' : 'HALF'), value: v.toFixed(1) };
+      } else if (btn === 'yes') {                                   // Stop / Start the outputs; the transport icon shows it
+        if (c.link) c.linkStartStop(!(c.running || c.armed));     // LINK: the clocks, and the session in FOLLOW+LEAD
+        else c.setHold(c.running || c.armed);                        // AUDIO: follows the icon: running/armed -> Stop (hold), stopped -> Start
+      }
+      else { ui.screen = 'menu'; ui.overlay = null; }
+    } else if (ui.screen === 'menu') {
+      if (d) {
+        ui.cursor = clamp(ui.cursor - d, 0, MENU.length - 1);
+        ui.top = clamp(ui.top, ui.cursor - VISIBLE + 1, ui.cursor);
+      } else if (btn === 'no') ui.screen = 'home';
+      else {
+        const it = MENU[ui.cursor];
+        if (it.net) { ui.screen = 'net'; ui.ncur = 0; }
+        else if (it.edit) startEdit(ui, it.edit, c);
+        else if (it.sub) { ui.screen = 'sub'; ui.sub = it.sub; ui.ocur = 0; }
+        else { ui.screen = 'info'; ui.page = it.info; }
+      }
+    } else if (ui.screen === 'sub') {
+      const rows = SUBS[ui.sub].rows;
+      if (d) ui.ocur = clamp(ui.ocur - d, 0, rows.length - 1);
+      else if (btn === 'no') ui.screen = 'menu';
+      else startEdit(ui, rows[ui.ocur], c);
+    } else if (ui.screen === 'net') {
+      const rows = netRows(c);
+      if (d) ui.ncur = clamp(ui.ncur - d, 0, rows.length - 1);
+      else if (btn === 'no') ui.screen = 'menu';
+      else {
+        const act = rows[ui.ncur].act;
+        if (act === 'mode') startEdit(ui, 'netmode', c);
+        else if (act === 'ssid') { ui.screen = 'scan'; ui.scur = 0; ui.stop = 0; }
+        else if (act === 'group') startEdit(ui, 'group', c);
+        else if (act === 'pass' || act === 'appass' || act === 'apname') startText(ui, c, act);
+        else if (act === 'status') ui.screen = 'netinfo';
+      }
+    } else if (ui.screen === 'scan') {
+      const list = c.net.scan;
+      if (d) { ui.scur = clamp(ui.scur - d, 0, Math.max(0, list.length - 1)); ui.stop = clamp(ui.stop, ui.scur - 4, ui.scur); }
+      else if (btn === 'yes' && list.length) { c.setField('ssid', list[ui.scur].name); ui.screen = 'net'; }
+      else if (btn === 'no') ui.screen = 'net';
+    } else if (ui.screen === 'text') {
+      pressText(ui, c, btn, d);
+    } else if (ui.screen === 'netinfo') {
+      if (!d) ui.screen = 'net';
+    } else if (ui.screen === 'confirm') {
+      if (btn === 'yes') { c.setField('netmode', SETUP); ui.screen = 'net'; }
+      else if (btn === 'no') ui.screen = 'net';
+    } else if (ui.screen === 'info') {
+      if (!d) ui.screen = 'menu';
+    } else if (ui.screen === 'edit') {
+      if (d) stepEdit(ui, c, d);
+      else endEdit(ui, c, btn === 'yes');
+    }
+  }
+
+  const titleBar = (fb, title, right) => {
+    rect(fb, 0, 0, W, 9, 1); text(fb, title, 2, 1, 1, 0); if (right) textR(fb, right, W - 2, 1, 1, 0);
+  };
+  const boxed = (fb, x, y, w, h) => { rect(fb, x, y, w, h, 1); frame(fb, x + 2, y + 2, w - 4, h - 4, 0); };
+  const bar = (fb, x, y, w, frac, tickFrac) => {                 // outlined bar, fill, an XOR tick through it
+    frame(fb, x, y, w, 7, 1); rect(fb, x + 1, y + 1, Math.round((w - 2) * clamp(frac, 0, 1)), 5, 1);
+    if (tickFrac != null) xorCol(fb, x + Math.round((w - 1) * tickFrac), y - 2, y + 8);
+  };
+
+  // a full-width 11 px bar with its value written inside, XOR-ed so it reads over the fill and over the empty part
+  function valueBar(fb, y, frac, tickFrac, label, right) {
+    rect(fb, 3, y + 1, Math.round(122 * clamp(frac, 0, 1)), 9, 1);           // no outline: the fill, its text and the tick only
+    xorCol(fb, 2 + Math.round(123 * tickFrac), y - 1, y + 11);
+    const tmp = new Uint8Array(W * H); text(tmp, label, right ? 123 - textW(label, 1) : 5, y + 2, 1, 1);
+    for (let i = 0; i < tmp.length; i++) fb[i] ^= tmp[i];
+  }
+  // the placeholder jank glyph, 11 x 8: three linked dots (no jank icon exists in ~/GitHub/jank or ~/GitHub/optimist yet)
+  function drawJankGlyph(fb, x, y) {
+    for (const [gx, gy, w, h] of [[0, 5, 3, 3], [4, 0, 3, 3], [8, 5, 3, 3]]) rect(fb, x + gx, y + gy, w, h, 1);
+    for (const [gx, gy] of [[3, 4], [3, 3], [7, 3], [7, 4], [3, 6], [4, 6], [5, 6], [6, 6], [7, 6]]) px(fb, x + gx, y + gy, 1);
+  }
+  // network icon of the top bar, right edge xr: JANK glyph, Wi-Fi bars (CLIENT), bars + AP (AP); crossed out without signal
+  function drawNetIcon(fb, c, xr) {
+    const m = c.net.mode, bars = c.wifi === 'good' ? 3 : c.wifi === 'weak' ? 1 : 0;
+    let left = xr - 10;
+    if (m === 0) drawJankGlyph(fb, xr - 10, 0);
+    else {
+      const bx = m === 2 ? xr - 20 : xr - 7;
+      for (let i = 0; i < 3; i++) { const h = 2 + 2 * i; if (i < bars) rect(fb, bx + 3 * i, 8 - h, 2, h, 1); else rect(fb, bx + 3 * i, 7, 2, 1, 1); }
+      if (m === 2) text(fb, 'AP', xr - 10, 0, 1, 1);
+      left = bx;
+    }
+    if (c.wifi === 'none') for (let i = 0; i < 9; i++) fb[(8 - i) * W + left + i + (m === 0 ? 1 : 0)] ^= 1;
+  }
+  function drawPower(fb, c) {
+    drawNetIcon(fb, c, NET_ICON_XR);
+    if (c.usb) icon(fb, USB_ICON, 92, 1);                            // a plug on its cable
+    if (c.fitted) {
+      frame(fb, 107, 0, 15, 7, 1); rect(fb, 122, 2, 2, 3, 1);
+      rect(fb, 109, 2, Math.round(clamp(c.batt, 0, 100) / 100 * 11), 3, 1);
+    }
+  }
+  // the bottom status line: one item at a time, cycling (as on Optimist)
+  const STATUS_CYCLE_MS = 2000;                                      // 2 s each, as Optimist's STATE line
+  const ARMED_BLINK_MS = 400;
+  // Wi-Fi quality, as Optimist's Wi-Fi page shows it (op_wifi.c wf_q_text): the signal and the rate, then the share of
+  // the frames sent over the last 10 s that needed a retry and that were never acknowledged. Optimist colours them (good /
+  // warn / bad); a 1-bit screen draws a BAD value inverted instead. Same thresholds as Optimist.
+  function wifiItems(q) {
+    if (!q) return [];
+    const pct = n => (q.tx ? Math.round(100 * n / q.tx) : null), retry = pct(q.retried), lost = pct(q.lost);
+    return [
+      { t: q.rssi ? q.rssi + ' dBm  ' + Math.round(q.kbps / 1000) + 'M' : 'NO SIGNAL', bad: !q.rssi || q.rssi < -80 },
+      { t: 'RETRY ' + (retry == null ? '--' : retry + '%'), bad: retry != null && retry >= 30 },
+      { t: 'LOST ' + (lost == null ? '--' : lost + '%'), bad: lost != null && lost >= 10 },
+    ];
+  }
+  function statusLine(fb, c, now, y) {
+    const items = [];                                                // the mode is not listed: the meters (or their absence) say it
+    // Link peers in every network mode (jank is Link too, over its own air); no peers: no peer item
+    if (c.peers > 0) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false });
+    items.push(...wifiItems(c.wifiQ));
+    if (!items.length) return;
+    const it = items[Math.floor(now / STATUS_CYCLE_MS) % items.length];
+    if (it.bad) { rect(fb, 0, y - 1, textW(it.t, 1) + 4, 9, 1); text(fb, it.t, 2, y, 1, 0); }
+    else text(fb, it.t, 2, y, 1, 1);
+  }
+  function beatBoxes(fb, c, x0, y, w, h, gap) {          // the current beat's box is filled for the whole beat; no beat: all empty
+    for (let i = 0; i < 4; i++) {
+      const x = x0 + i * (w + gap), on = c.beatN != null && ((c.beatN % 4) + 4) % 4 === i;
+      if (on) rect(fb, x, y, w, h, 1);
+      else frame(fb, x, y, w, h, 1);
+    }
+  }
+  // HOME has two layouts, each designed for its content. Less is better: the UI explains itself.
+  //   top bar: the transport icon (triangle = playing, blinking = waiting, square = stopped), in LINK mode the transport
+  //            option's icon (LT_ICONS), the network's name (truncated), network icon, USB plug, battery
+  //   AUDIO (line in plugged):
+  //     y9   BPM x3 (left); four beat boxes (right), the current beat's box filled
+  //     y31  IN bar (smoothed short-term RMS in dBFS, min / max lines over the last few seconds, tick = -60 silence)   y44  CF bar (tick = threshold); each value is written inside its bar
+  //     y57  status line, cycling every STATUS_CYCLE_MS: the Link peers (none: empty)
+  //   LINK (no line in): BPM x4, four wide beat boxes across the width, the same status line at y57
+  //   (no line in = LINK mode, so there is no AUDIO layout without a line in)
+  function drawHome(fb, c, now) {
+    // the transport only: silence and low confidence are already on the IN and CF bars
+    const stopped = !c.running;
+    drawPower(fb, c);
+    // the transport: a triangle = playing, a blinking triangle = started and waiting (locking / next bar), a square = stopped
+    const tri = !stopped || (c.armed && Math.floor(now / ARMED_BLINK_MS) % 2 === 0);
+    if (tri) for (let r = 0; r < 7; r++) rect(fb, 2, r, Math.min(r, 6 - r) + 1, 1, 1);
+    else if (!c.armed) rect(fb, 2, 1, 5, 5, 1);
+    // the network's name, right-aligned against the network icon: group (JANK), SSID (CLIENT), AP name (AP); SETUP has its own screen
+    const name = ['JANK GRP ' + c.net.group, c.net.ssid, c.net.apName][c.net.mode], nameRight = [NET_ICON_XR - 10, NET_ICON_XR - 7, NET_ICON_XR - 20][c.net.mode];   // the icon's left edge per mode
+    // LINK mode: the transport option's icon after the transport icon (LT_ICONS); AUDIO mode leads Link anyway: none
+    const lt = c.link ? LT_ICONS[c.ltMode] : null, nameLeft = lt ? 12 + lt[0].length + 4 : 10;
+    if (lt) icon(fb, lt, 12, 0);
+    if (name) textR(fb, fit(name, nameRight - 2 - nameLeft), nameRight - 2, 0, 1, 1);      // right-aligned, next to the network icon
+    if (!c.lineIn) {                                                 // LINK without a line in: big and plain
+      text(fb, c.linkBpm.toFixed(1), 2, 9, 4, 1);
+      beatBoxes(fb, c, 2, 41, 30, 12, 2);
+      statusLine(fb, c, now, 57);
+      return;
+    }
+    text(fb, c.bpm ? c.bpm.toFixed(1) : '---', 2, 9, 3, 1);
+    beatBoxes(fb, c, 87, 9, 9, 9, 1);
+    valueBar(fb, 31, (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, 'IN ' + Math.round(c.levelDb) + 'dB');
+    for (const db of [c.levelMin, c.levelMax]) xorCol(fb, 3 + Math.round(121 * clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1)), 32, 41);   // min / max lines
+    valueBar(fb, 44, c.conf, c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%');
+    statusLine(fb, c, now, 57);
+  }
+  function drawMenu(fb, ui, c) {
+    titleBar(fb, 'MENU', (ui.cursor + 1) + '/' + MENU.length);
+    const vals = ['', LT_SHORT[c.ltMode], NET_SHORT[c.net.mode], '', RATES_SHORT[c.rate], '', c.fitted ? c.batt + '%' : '-'];
+    for (let k = 0; k < VISIBLE; k++) {
+      const i = ui.top + k; if (i >= MENU.length) break;
+      const y = 11 + k * 9, sel = i === ui.cursor, v = sel ? 0 : 1;
+      if (sel) rect(fb, 0, y - 1, W, 9, 1);
+      text(fb, MENU[i].name, 4, y, 1, v); textR(fb, vals[i], W - 4, y, 1, v);
+    }
+  }
+  function drawSub(fb, ui, c) {
+    const sub = SUBS[ui.sub];
+    titleBar(fb, sub.title);
+    sub.rows.forEach((f, i) => {
+      const y = 14 + i * 11, sel = i === ui.ocur, v = sel ? 0 : 1, sp = EDITS[f];
+      if (sel) rect(fb, 0, y - 2, W, 11, 1);
+      text(fb, sp.title, 4, y, 1, v); textR(fb, sp.opts ? (f === 'lowconf' ? (sp.get(c) ? 'STOP' : 'RUN') : sp.opts[sp.get(c)]) : editText(sp, sp.get(c)), W - 4, y, 1, v);
+    });
+  }
+  function drawInfo(fb, ui, c) {
+    titleBar(fb, 'BATTERY');
+    const rows = [];
+    if (!c.fitted) rows.push('NO CELL FITTED', 'POWER ' + (c.usb ? 'USB' : 'NONE'));
+    else {
+      const volt = 3.3 + 0.9 * c.batt / 100;                        // rough: 3.3 V empty, 4.2 V full
+      rows.push('LEVEL ' + c.batt + '%', 'VOLT ' + volt.toFixed(2) + 'V EST', c.usb ? (c.batt < 100 ? 'CHARGING' : 'FULL') : 'DISCHARGING');
+      bar(fb, 4, 50, 120, c.batt / 100, null);
+    }
+    rows.forEach((r, i) => text(fb, r, 4, 14 + i * 11, 1, 1));
+  }
+  function drawEdit(fb, ui) {
+    const e = ui.edit, sp = EDITS[e.field];
+    titleBar(fb, sp.title);
+    const s = editText(sp, e.val);                                    // the menus' one font size, always
+    const w = textW(s, 1) + 12, x = Math.round((W - w) / 2);
+    rect(fb, x, 16, w, 13, 1); text(fb, s, x + 6, 19, 1, 0);                 // the value, inverted
+    const [h1, h2] = helpOf(sp, e.val);
+    textC(fb, h1, 44, 1, 1); textC(fb, h2, 54, 1, 1);                         // what the setting does
+  }
+  const fit = (s, w) => (s.length * 6 > w ? s.slice(0, Math.floor(w / 6)) : s);
+  function drawNet(fb, ui, c) {
+    titleBar(fb, 'NETWORK');
+    netRows(c).forEach((r, i) => {
+      const y = 11 + i * 9, sel = i === ui.ncur, v = sel ? 0 : 1;
+      if (sel) rect(fb, 0, y - 1, W, 9, 1);
+      text(fb, r.name, 4, y, 1, v); textR(fb, fit(r.val, 124 - 8 - textW(r.name, 1)), W - 4, y, 1, v);
+      if (sel) r.help.forEach((l, k) => { if (l) text(fb, l, 2, 49 + 8 * k, 1, 1); });     // what the selected row is
+    });
+  }
+  function drawScan(fb, ui, c) {
+    titleBar(fb, 'NETWORK', c.net.scan.length ? (ui.scur + 1) + '/' + c.net.scan.length : '');
+    if (!c.net.scan.length) { textC(fb, 'NO NETWORKS', 28, 1, 1); return; }
+    for (let k = 0; k < 5; k++) {
+      const i = ui.stop + k, n = c.net.scan[i]; if (!n) break;
+      const y = 11 + k * 10, sel = i === ui.scur, v = sel ? 0 : 1;
+      if (sel) rect(fb, 0, y - 1, W, 10, 1);
+      text(fb, (n.name === c.net.ssid ? '*' : ' ') + fit(n.name, 90), 2, y, 1, v);
+      for (let b = 0; b < 3; b++) { const h = 2 + 2 * b; if (b < n.bars) rect(fb, 112 + 4 * b, y + 7 - h, 3, h, v); else px(fb, 113 + 4 * b, y + 6, v); }
+    }
+  }
+  function drawText(fb, ui, c) {
+    const t = ui.txt, n = t.text.length, start = Math.max(0, t.pos - 18);    // the menus' one font size: 19 cells of 6 px
+    titleBar(fb, t.field === 'apname' ? 'AP NAME' : 'PASSKEY', String(n));
+    for (let k = 0; k < 19; k++) {
+      const i = start + k; if (i > n) break;
+      const x = 7 + k * 6, sel = i === t.pos, real = i < n ? t.text[i] : ' ';
+      if (sel) { rect(fb, x - 1, 15, 7, 11, 1); text(fb, real, x, 17, 1, 0); }
+      else text(fb, t.mask && i < n ? '*' : real, x, 17, 1, 1);
+    }
+    textC(fb, 'YES NEXT  NO DEL', 33, 1, 1);
+    textC(fb, 'easier: web UI', 43, 1, 1);
+    textC(fb, c.net.mode === 2 ? '192.168.4.1' : 'jank.local', 53, 1, 1);
+  }
+  function drawNetInfo(fb, ui, c) {
+    const n = c.net;
+    titleBar(fb, n.mode === 1 ? 'LINK CLIENT' : 'LINK AP');
+    const rows = n.mode === 1 ? ['STATE ' + n.status, 'IP ' + n.ip, 'SSID ' + fit(n.ssid || '-', 100)]
+      : ['IP 192.168.4.1', 'CLIENTS ' + n.apClients, 'NAME ' + n.apName];
+    rows.forEach((r, i) => text(fb, r, 4, 14 + i * 11, 1, 1));
+  }
+  function drawConfirm(fb, title, line1, line2) {
+    titleBar(fb, title); textC(fb, line1, 16, 1, 1); textC(fb, line2, 27, 1, 1); textC(fb, 'YES      NO', 48, 1, 1);
+  }
+  // setup: the open hotspot's QR code (standard Wi-Fi code, dark modules on a lit box so it scans) with the text beside it
+  function drawSetup(fb, ui, c) {
+    if (ui.leave) { drawConfirm(fb, 'SETUP', 'LEAVE SETUP?', 'RUN AGAIN'); return; }
+    rect(fb, 0, 1, 62, 62, 1);
+    const q = c.qr;
+    for (let y = 0; y < q.size; y++) for (let x = 0; x < q.size; x++) if (q.mod[y][x]) rect(fb, 2 + 2 * x, 3 + 2 * y, 2, 2, 0);
+    const a = c.net.setupName.slice(0, 11), b = c.net.setupName.slice(11);
+    text(fb, 'SETUP MODE', 63, 3, 1, 1); text(fb, a, 63, 15, 1, 1); text(fb, b, 63, 24, 1, 1);
+    text(fb, 'open', 63, 37, 1, 1); text(fb, '192.168.4.1', 63, 46, 1, 1); text(fb, 'NO: LEAVE', 63, 56, 1, 1);
+  }
+  function drawOverlays(fb, ui, now) {
+    if (ui.hint) {                                                   // NO / YES held on HOME: what UP / DOWN will do
+      boxed(fb, 6, 12, 116, 40);
+      textC(fb, ui.hint.title, 17, 1, 0); textC(fb, ui.hint.up, 31, 1, 0); textC(fb, ui.hint.down, 42, 1, 0);
+      return;
+    }
+    if (ui.overlay && now < ui.overlay.until) {
+      boxed(fb, 14, 12, 100, 40);
+      const v = ui.overlay.value, sc = [3, 2, 1].find(k => textW(v, k) <= 96) || 1;   // the largest size that fits the box
+      textC(fb, ui.overlay.title, 17, 1, 0); textC(fb, v, 38 - Math.round(7 * sc / 2), sc, 0);
+    }
+  }
+
+  function draw(fb, ui, c, now) {
+    fb.fill(0);
+    if (c.boot) { textC(fb, 'BOOT', 14, 4, 1); textC(fb, 'BOOTLOADER', 48, 1, 1); return; }
+    if (c.splash) { textC(fb, 'JANK', 8, 3, 1); textC(fb, 'MINI 2.2', 34, 2, 1); textC(fb, 'FW EMU', 54, 1, 1); return; }
+    if (c.setup) drawSetup(fb, ui, c);
+    else if (ui.screen === 'home') drawHome(fb, c, now);
+    else if (ui.screen === 'net') drawNet(fb, ui, c);
+    else if (ui.screen === 'scan') drawScan(fb, ui, c);
+    else if (ui.screen === 'text') drawText(fb, ui, c);
+    else if (ui.screen === 'netinfo') drawNetInfo(fb, ui, c);
+    else if (ui.screen === 'confirm') drawConfirm(fb, 'SETUP', 'STOP AND START', 'SETUP?');
+    else if (ui.screen === 'menu') drawMenu(fb, ui, c);
+    else if (ui.screen === 'sub') drawSub(fb, ui, c);
+    else if (ui.screen === 'info') drawInfo(fb, ui, c);
+    else if (ui.screen === 'edit') drawEdit(fb, ui);
+    drawOverlays(fb, ui, now);
+    if (c.saved) { boxed(fb, 30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
+  }
+
+  return { W, H, create, press, draw, DEFAULT_RATE };
+})();
+</script>
+<script>
+const $ = id => document.getElementById(id);
+let library = [], shown = [], prevStatus = null, seeking = false, pitchDragging = false, volDragging = false, thDragging = false;
+
+async function api(name, body) {
+  const r = await fetch('/api/' + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const j = await r.json();
+  $('err').textContent = r.ok ? '' : j.error;
+  return j;
+}
+const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const name = p => p ? p.split('/').slice(-1)[0].replace(/\.[^.]+$/, '') : 'No track';
+
+function renderList() {
+  const q = $('q').value.toLowerCase().trim();
+  const rows = library.filter(t => !q || t.name.toLowerCase().includes(q)).slice(0, 200);
+  shown = rows;                                  // the order "play the next track" follows
+  $('list').replaceChildren(...rows.map(t => {
+    const d = document.createElement('div');
+    const n = document.createElement('span'); n.textContent = t.name.split('/').slice(-1)[0];
+    const b = document.createElement('span'); b.className = 'b'; b.textContent = t.bpm.toFixed(2) + ' BPM';
+    d.append(n, b); d.title = t.name;
+    d.onclick = () => load(t.path);
+    return d;
+  }));
+}
+
+async function load(path) {
+  $('now').textContent = 'Loading…';
+  await api('load', { path });
+  await api('play', { playing: true });
+}
+
+function setPitchUi(rate) {
+  const pct = (rate - 1) * 100;
+  $('pitchval').textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + ' %';
+  if (!pitchDragging) $('pitch').value = pct;
+}
+
+// a track that ran off its end (playing -> stopped at the end): the next one in the shown list (else the library)
+const END_SLACK_S = 0.3;
+function trackEnded(prev, s) {
+  return prev && prev.playing && !s.playing && s.path === prev.path && s.duration_s > 0 && s.position_s >= s.duration_s - END_SLACK_S;
+}
+function nextTrack(path) {
+  for (const list of [shown, library]) {
+    const i = list.findIndex(t => t.path === path);
+    if (i >= 0 && i + 1 < list.length) return list[i + 1];
+  }
+  return null;
+}
+
+function show(s) {
+  if ($('auto').checked && trackEnded(prevStatus, s)) { const n = nextTrack(s.path); if (n) load(n.path); }
+  prevStatus = s;
+  S = s; tPoll = performance.now();
+  syncFromStatus(s);
+  $('now').textContent = name(s.path);
+  $('play').textContent = s.playing ? 'Pause' : 'Play';
+  $('time').textContent = fmt(s.position_s) + ' / ' + fmt(s.duration_s);
+  if (!seeking && s.duration_s > 0) $('seek').value = Math.round(1000 * s.position_s / s.duration_s);
+  setPitchUi(s.rate);
+  $('bpm').textContent = s.bpm ? s.bpm.toFixed(2) : '---';
+  $('mode').textContent = s.mode.replace('_', ' ');
+  $('exp').textContent = s.expected_bpm ? s.expected_bpm.toFixed(2) : '---';
+  if (s.bpm && s.expected_bpm) {
+    const d = s.bpm - s.expected_bpm;
+    $('diff').textContent = (d >= 0 ? '+' : '') + d.toFixed(2);
+    $('diff').className = 'v ' + (Math.abs(d) <= 0.1 ? 'ok' : Math.abs(d) > 0.5 ? 'bad' : '');
+  } else { $('diff').textContent = '---'; $('diff').className = 'v'; }
+  const ph = s.phase_ms == null ? '---' : (s.phase_ms >= 0 ? '+' : '') + s.phase_ms.toFixed(1) + ' ms';
+  $('link').textContent = 'Link peers: ' + s.peers + '   ·   tempo: ' + s.link_bpm.toFixed(2) + '   ·   phase: ' + ph;
+  if (!volDragging) { $('vol').value = Math.round(s.volume * 100); $('volval').textContent = Math.round(s.volume * 100) + ' %'; }
+  const c = Math.round(s.confidence * 100), th = Math.round(s.min_confidence * 100);
+  $('confval').textContent = c + ' %';
+  $('confbar').style.width = c + '%';
+  $('confbar').style.background = s.gated || s.silent ? 'var(--bad)' : 'var(--ok)';
+  $('confmark').style.left = th + '%';
+  if (!thDragging) { $('th').value = th; $('thval').textContent = th + ' %'; }
+  $('linkstate').textContent = s.link_playing ? 'Link transport running'
+    : s.silent ? 'Link stopped: silence' : s.gated ? 'Link stopped: confidence under ' + th + ' %'
+    : 'Link stopped: waiting for a lock and the next bar';
+}
+
+async function poll() {
+  try { const s = await (await fetch('/api/status')).json(); show(s); showXiao(s.xiao, s.bench); } catch (e) { $('err').textContent = 'player not running'; }
+  setTimeout(poll, 100);
+}
+
+/* --xiao: the jank XIAO's own beat reports, straight from its USB MIDI port (Web MIDI with SysEx; the page asks for
+   permission once). The firmware sends F0 7D 'J' 'B' 0x10 "<b|t> <n> <bpm x100> <mode> <audio> [<extra>]" F7: 'b' on
+   each beat it tracks (extra: its lag, us: how long before the report it takes the beat to be heard), 't' once a
+   second (extra: its beat_latency, ms) (jank docs/beat.md). Each 'b' goes to the player dated as the XIAO takes the beat
+   to be heard: the event's own timeStamp (Chrome: when CoreMIDI got the USB packet) on the epoch clock, minus the lag.
+   The control line (F0 7D 'J' 'K' text) reads the XIAO's `beat` numbers every few seconds (a read: it changes nothing);
+   only the Calibrate button sends a setting, `set beat_latency`, and only when pressed (not stored: back to 25 at the
+   XIAO's next start). Only asked for when the player runs with --xiao. */
+const XIAO = { asked: false, port: null, out: null, portMsg: 'asking for MIDI access', lastBeatAt: 0, lastLineAt: 0,
+               latency: null, text: '', lines: [], stats: null, statsAt: 0 };
+const XIAO_FLASH_MS = 120, XIAO_SILENT_MS = 3000, XIAO_STATS_MS = 5000, JX_TEXT_MAX = 30;
+function xiaoReport(data) {
+  const head = [0xf0, 0x7d, 0x4a, 0x42, 0x10];
+  if (data.length < head.length + 1 || data[data.length - 1] !== 0xf7 || head.some((b, i) => data[i] !== b)) return null;
+  const f = String.fromCharCode(...Array.from(data).slice(head.length, data.length - 1)).trim().split(/\s+/);
+  if (f.length < 5 || (f[0] !== 'b' && f[0] !== 't')) return null;
+  const r = { kind: f[0], n: Number(f[1]), bpm: Number(f[2]) / 100, mode: f[3], audio: f[4] === '1' };
+  if (f.length > 5 && Number.isFinite(Number(f[5]))) r[f[0] === 'b' ? 'lagUs' : 'latencyMs'] = Number(f[5]);
+  if (f[0] === 'b' && f.length > 6 && f[6] !== '-' && Number.isFinite(Number(f[6]))) r.linkUs = Number(f[6]);   // the session's beat from it
+  return r;
+}
+/* the epoch ms at which the XIAO takes a reported beat to be heard: received at timeStamp (ms since timeOrigin) */
+function xiaoBeatEpochMs(timeOrigin, timeStamp, lagUs) { return timeOrigin + timeStamp - lagUs / 1000; }
+/* control-line text out of a 'J' 'K' frame, or null */
+function jxText(data) {
+  const head = [0xf0, 0x7d, 0x4a, 0x4b];
+  if (data.length < head.length + 1 || data[data.length - 1] !== 0xf7 || head.some((b, i) => data[i] !== b)) return null;
+  return String.fromCharCode(...Array.from(data).slice(head.length, data.length - 1));
+}
+/* a control line as 'J' 'K' frames of at most 30 characters */
+function jxFrames(line) {
+  const text = line + '\n', frames = [];
+  for (let i = 0; i < text.length; i += JX_TEXT_MAX)
+    frames.push([0xf0, 0x7d, 0x4a, 0x4b, ...Array.from(text.slice(i, i + JX_TEXT_MAX), c => c.charCodeAt(0) & 0x7f), 0xf7]);
+  return frames;
+}
+/* `beat`'s answer (key=value lines up to "ok") -> numbers the player logs */
+function beatStats(lines) {
+  const out = {};
+  for (const l of lines) {
+    const m = /^([a-z_]+)=(-?[0-9.]+)$/.exec(l.trim());
+    if (m) out[m[1]] = Number(m[2]);
+  }
+  return out;
+}
+function onXiaoLineText(t) {
+  XIAO.text += t;
+  let i;
+  while ((i = XIAO.text.indexOf('\n')) >= 0) {
+    const line = XIAO.text.slice(0, i).trim();
+    XIAO.text = XIAO.text.slice(i + 1);
+    if (line === 'ok' || line.startsWith('err')) {
+      const stats = beatStats(XIAO.lines);
+      XIAO.lines = [];
+      if ('phase_forces' in stats) { XIAO.stats = stats; api('xiao_stats', stats); }
+    } else XIAO.lines.push(line);
+  }
+}
+function xiaoSend(line) { if (XIAO.out) for (const f of jxFrames(line)) XIAO.out.send(f); }
+function onXiaoReport(r, ev) {
+  const now = performance.now();
+  XIAO.lastLineAt = now;
+  if (r.kind === 't' && r.latencyMs !== undefined) XIAO.latency = r.latencyMs;
+  if (r.kind === 'b') {                           // the flash: on the report, not on the next poll
+    XIAO.lastBeatAt = now;
+    $('xbeat').style.background = '#7fdc7f';
+    setTimeout(() => { if (performance.now() - XIAO.lastBeatAt >= XIAO_FLASH_MS - 5) $('xbeat').style.background = '#333'; }, XIAO_FLASH_MS);
+    if (r.lagUs !== undefined && ev) api('xiao_beat', { epoch_ms: xiaoBeatEpochMs(performance.timeOrigin, ev.timeStamp, r.lagUs), bpm: r.bpm || null,
+                                                link_ms: r.linkUs === undefined ? null : r.linkUs / 1000 });
+  }
+  $('xbpm').textContent = r.bpm > 0 ? r.bpm.toFixed(2) : '---';
+  $('xmode').textContent = r.mode;
+  $('xn').textContent = String(r.n);
+  $('xaudio').textContent = r.audio ? 'audio in' : 'no audio';
+}
+async function askXiao() {
+  XIAO.asked = true;
+  if (!navigator.requestMIDIAccess) { XIAO.portMsg = 'this browser has no Web MIDI (use Chrome or Edge)'; return; }
+  try {
+    const access = await navigator.requestMIDIAccess({ sysex: true });
+    const find = ports => [...ports.values()].find(p => p.name === 'jank') || [...ports.values()].find(p => /jank/i.test(p.name)) || null;
+    const attach = () => {
+      const port = find(access.inputs);
+      XIAO.out = find(access.outputs);
+      if (port === XIAO.port) return;
+      if (XIAO.port) XIAO.port.onmidimessage = null;
+      XIAO.port = port;
+      if (port) port.onmidimessage = ev => {
+        const r = xiaoReport(ev.data);
+        if (r) { onXiaoReport(r, ev); return; }
+        const t = jxText(ev.data);
+        if (t !== null) onXiaoLineText(t);
+      };
+      XIAO.portMsg = port ? 'MIDI port "' + port.name + '"' : 'no MIDI port named jank';
+    };
+    access.onstatechange = attach;
+    attach();
+  } catch (e) { XIAO.portMsg = 'no MIDI access: ' + e.message; }
+}
+const f1 = (v, d = 1) => (v === null || v === undefined ? '-' : Number(v).toFixed(d));
+function showAccuracy(b) {
+  if (!b || !b.xiao) { $('accrows').replaceChildren(); return; }
+  const cols = ['xiao', 'player', 'link'];
+  const rows = [
+    ['beats', c => String(b[c].n)],
+    ['offset ms', c => f1(b[c].mean_ms) + ' ± ' + f1(b[c].sd_ms)],
+    ['within 20 ms', c => f1(b[c].within_pct, 0) + ' %'],
+    ['BPM err', c => f1(b[c].bpm_err, 2) + (b[c].bpm ? ' (' + f1(b[c].bpm, 2) + ')' : '')],
+    ['lock s', c => f1(b[c].lock_s)],
+  ];
+  $('accrows').replaceChildren(...rows.map(([name, fn]) => {
+    const tr = document.createElement('tr');
+    for (const v of [name, ...cols.map(fn)]) { const td = document.createElement('td'); td.textContent = v; td.style.padding = '1px 8px'; tr.append(td); }
+    return tr;
+  }));
+  const m = b.model || {};
+  $('accmodel').textContent = 'ref ' + f1(b.ref_bpm, 2) + ' BPM, ' + b.ref_beats + ' beats | this track: Link phase forces ' + f1(b.xiao_phase_forces, 0) + ', tempo sets ' + f1(b.xiao_tempo_sets, 0) + ', gaps ' + f1(b.xiao_gaps, 0) +
+    ' | latencies: speakers ' + f1(m.speakers_latency_ms) + ', jank ' + f1(m.jank_latency_ms) + ', FIFO ' + f1(m.fifo_ms) +
+    ', beat_latency ' + f1(m.beat_latency_ms, 0) + ' ms -> XIAO predicted ' + f1(m.predicted_xiao_ms) + ' ms';
+  const s = XIAO.stats;
+  $('accxstats').textContent = s ? 'XIAO: cpu ' + f1(s.cpu_pct) + ' %, hop max ' + s.hop_max_us + ' us, gaps ' + s.gaps + ', tempo sets ' + s.tempo_sets +
+    ', phase forces ' + s.phase_forces + ', err ' + f1(s.err_us / 1000, 2) + ' ms, heap min ' + s.heap_min : 'XIAO: no `beat` numbers yet';
+  const sug = m.suggested_latency_ms;
+  $('calib').disabled = sug === null || sug === undefined || !XIAO.out || b.link.n < 8;
+  $('calibmsg').textContent = sug === null || sug === undefined ? 'needs 8+ Link beats and the XIAO\'s latency'
+    : 'Link is ' + f1(b.link.mean_ms) + ' ms off: set beat_latency ' + f1(m.beat_latency_ms, 0) + ' -> ' + sug + ' ms (not stored on the XIAO)';
+}
+$('calib').onclick = () => {
+  const sug = S && S.bench && S.bench.model ? S.bench.model.suggested_latency_ms : null;
+  if (sug === null || sug === undefined) return;
+  xiaoSend('set beat_latency ' + sug);
+  $('calibmsg').textContent = 'sent: set beat_latency ' + sug + ' (the next 16 beats show the result)';
+};
+function showXiao(x, bench) {
+  $('xiaocard').hidden = !x;
+  if (!x) return;
+  if (!XIAO.asked) askXiao();
+  const now = performance.now();
+  if (XIAO.out && now - XIAO.statsAt > XIAO_STATS_MS) { XIAO.statsAt = now; xiaoSend('beat'); }     // a read
+  const stale = XIAO.port && XIAO.lastLineAt && now - XIAO.lastLineAt > XIAO_SILENT_MS ? ' | no report for ' + Math.round((now - XIAO.lastLineAt) / 1000) + ' s' : '';
+  const audio = 'audio out: ' + x.device + ', FIFO ' + f1(x.fifo_ms) + ' ms (target ' + x.fifo_target + '), slips ' + (x.dropped + x.repeated) + ', underruns ' + x.underruns;
+  $('xmsg').textContent = XIAO.portMsg + stale + ' | ' + audio;
+  showAccuracy(bench);
+}
+
+// ---- jank mini 2.2 emulator host: power, D-pad, indicator light, battery, jacks; the screen UI is the OLED module above ----
+let S = null, tPoll = 0;
+const holdUntil = { th: 0, off: 0, mode: 0, hold: 0, tempo: 0, fold: 0 };     // keep a local value until the server has caught up
+const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: false, no: false, yes: false },
+              link: false, hold: false, clocks: true, ltMode: 2, linkBpm: 120, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1,
+              repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
+              net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
+const SETUP_NAME = 'jank-setup-a3f9';                // emu: the real one ends in the chip id
+const SCAN = [{ name: 'HomeNet', bars: 3 }, { name: 'jank-studio', bars: 2 }, { name: 'Cafe Guest', bars: 1 }, { name: 'FritzBox 7590', bars: 2 }];   // emu: a fake scan
+const QR_CODE = QR.encode('WIFI:S:' + SETUP_NAME + ';T:nopass;;');
+const RATE_NAMES = ['1/4', '1/8', '1/16', '1/32', '24 PPQN'];
+const ui = OLED.create();
+const FLASH_MS = 90;
+const TEMPO_RANGE = [90, 180];                       // the tracker's range (the server enforces its own)
+// battery blink on the light, on battery only: period falls from slowMs at lowPct to fastMs at critPct and below
+const BATT = { lowPct: 30, critPct: 5, slowMs: 3000, fastMs: 300, flashMs: 100 };
+const REPEAT = { firstMs: 400, everyMs: 120 };
+const OLED_ON = [226, 236, 255], OLED_OFF = [4, 6, 10];
+const fb = new Uint8Array(OLED.W * OLED.H);
+const oledCtx = $('oled').getContext('2d');
+const oledImg = oledCtx.createImageData(OLED.W, OLED.H);
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+const battLevel = () => Number($('battlvl').value);
+const powered = () => dev.sw && ($('usb').checked || ($('bat').checked && battLevel() > 0));
+const lowPeriodMs = pct => BATT.fastMs + (BATT.slowMs - BATT.fastMs) * clampN((pct - BATT.critPct) / (BATT.lowPct - BATT.critPct), 0, 1);
+
+function syncFromStatus(s) {
+  const now = performance.now();
+  if (now > holdUntil.th) {                  // the player is the truth: 0 = keep running (our threshold is kept for later)
+    dev.confStop = s.min_confidence > 0;
+    if (dev.confStop) dev.th = Math.round(s.min_confidence * 100);
+  }
+  if (now > holdUntil.off) dev.inOff = Math.round(s.offset_ms);       // the audio input offset is the player's Link offset
+  if (now > holdUntil.hold) dev.hold = !!s.hold;
+  if (now > holdUntil.fold && s.fold) dev.foldK = s.fold;
+  if (now > holdUntil.tempo) dev.linkBpm = s.link_bpm;
+}
+const hold = key => { holdUntil[key] = performance.now() + 1200; };
+
+// what the screen UI changes goes out through here; "emu" = kept in the emulator only, nothing on the server
+function setField(field, val) {
+  if (field === 'threshold') { dev.th = val; sendThreshold(); }
+  else if (field === 'lowconf') { dev.confStop = val === 1; sendThreshold(); }
+  else if (field === 'ltmode') dev.ltMode = val;            // emu: the outputs live in the device
+  else if (field === 'gain') dev.gain = val;
+  else if (field === 'bright') dev.bright = val;            // emu: the panel's contrast
+  else if (field === 'sleep') dev.sleep = val;              // emu                // emu: shifts the input meter only (the tracker hears the player's output)
+  else if (field === 'inoff') { dev.inOff = val; hold('off'); api('offset', { ms: val }); }
+  else if (field === 'out0') dev.offs[0] = val;             // emu
+  else if (field === 'out1') dev.offs[1] = val;             // emu
+  else if (field === 'out2') dev.offs[2] = val;             // emu
+  else if (field === 'rate') dev.rate = val;                // emu
+  else if (field === 'mode') { dev.link = val === 1; dev.foldK = 1; hold('fold'); api('fold', { factor: 1 }); api('mode', { mode: dev.link ? 'link' : 'audio' }); }     // from the line-in plug detect
+  else if (field === 'netmode') setNetMode(val);            // network fields are emu only
+  else if (field === 'ssid') { dev.net.ssid = val; dev.net.changedAt = performance.now(); }
+  else if (field === 'pass') { dev.net.pass = val; dev.net.changedAt = performance.now(); }
+  else if (field === 'appass') dev.net.appass = val;
+  else if (field === 'apname') dev.net.apName = val;
+  else if (field === 'group') dev.net.group = val + 1;       // emu: the choice index 0..8 = GROUP 1..9
+}
+// low confidence: STOP / START sends the threshold; KEEP RUNNING sends 0 (never gate), the threshold stays for later
+function sendThreshold() { hold('th'); api('threshold', { min_confidence: dev.confStop ? dev.th / 100 : 0 }); }
+function setNetMode(v) {
+  const n = dev.net;
+  if (v === 3) { if (n.mode !== 3) n.prev = n.mode; n.mode = 3; setHold(true); return; }     // SETUP: stop operating, open hotspot
+  const wasSetup = n.mode === 3;
+  n.mode = v;
+  if (wasSetup) { setHold(false); spClose(); }                                               // leaving SETUP: resync and run
+}
+// emu: the Wi-Fi quality the firmware would measure (Optimist's plat_wifi_quality: rssi, tx rate, frames sent / retried /
+// lost over the last 10 s), from the panel's Wi-Fi select, wobbling a little so the numbers move. jank's air is broadcast at
+// 1 Mbit/s; a joined network runs faster. 'none' = no frames heard: NO SIGNAL, nothing counted
+const WIFI_EMU = { good: { rssi: -58, retry: 0.04, lost: 0.003 }, weak: { rssi: -79, retry: 0.24, lost: 0.04 } };
+function wifiQuality(now) {
+  const w = WIFI_EMU[$('wifi').value];
+  if (!w) return { rssi: 0, kbps: 0, tx: 0, retried: 0, lost: 0 };
+  const wob = Math.sin(now / 1700), tx = 400;
+  return { rssi: Math.round(w.rssi + 3 * wob), kbps: dev.net.mode === 0 ? 1000 : 24000, tx,
+           retried: Math.round(tx * w.retry * (1 + 0.3 * wob)), lost: Math.round(tx * w.lost * (1 + 0.5 * wob)) };
+}
+function netCtx(now) {
+  const n = dev.net, w = $('wifi').value;
+  let status = 'NO NETWORK', ip = '-';
+  if (n.ssid) {
+    if (w === 'none') status = 'FAILED';
+    else if (now - n.changedAt < 2000) status = 'CONNECTING';
+    else if (n.pass.length < 8) status = 'FAILED';
+    else { status = 'CONNECTED'; ip = '192.168.1.42'; }
+  }
+  return { mode: n.mode, prev: n.prev, group: n.group, ssid: n.ssid, pass: n.pass, appass: n.appass, apName: n.apName, status, ip,
+           apClients: w === 'none' ? 0 : 1, setupName: SETUP_NAME,
+           scan: w === 'none' ? [] : SCAN.map(x => ({ name: x.name, bars: w === 'weak' ? 1 : x.bars })) };
+}
+// LINK mode: the device's own Start / Stop of its clock outputs (emu: the outputs live in the device, the session runs on)
+// LINK mode Stop / Start: IGNORE / FOLLOW = the device's clocks only; FOLLOW+LEAD = also the session (starts on the next bar)
+function linkStartStop(on) {
+  dev.clocks = on || dev.ltMode !== 2;           // leading: stopping the session stops the clocks through FOLLOW, keep them armed
+  if (dev.ltMode === 2) api('transport', { playing: on });
+}
+// the outputs (MIDI clock, modular clock) run: AUDIO = not held and Link playing (the device leads);
+// LINK = started on the device and, when following the session's start/stop, the session playing
+const outputsRun = s => (dev.link ? dev.clocks && (dev.ltMode === 0 || !!s.link_playing) : !dev.hold && !!s.link_playing);
+async function setHold(on) {                  // Stop = hold; Start = resync, then release the hold
+  dev.hold = on; hold('hold');
+  if (!on) { dev.foldK = 1; await api('resync', {}); }
+  await api('hold', { hold: on });
+}
+function tempoStep(d) {
+  if (dev.link) {
+    const bpm = clampN(Math.round(dev.linkBpm) + d, TEMPO_RANGE[0], TEMPO_RANGE[1]);
+    dev.linkBpm = bpm; hold('tempo'); api('tempo', { bpm });
+    return bpm;
+  }
+  dev.foldK = clampN(dev.foldK * (d > 0 ? 2 : 0.5), 0.25, 4);      // x2 / /2: Link gets it too (the player's fold)
+  hold('fold'); api('fold', { factor: dev.foldK });
+  return S && S.bpm ? S.bpm * dev.foldK : 0;
+}
+
+function beatInfo(now) {
+  if (!S || S.beat == null || !S.beat_bpm) return null;
+  const beat = S.beat + (now - tPoll) / 60000 * S.beat_bpm;
+  const n = Math.floor(beat);
+  return { n, ms: (beat - n) * 60000 / S.beat_bpm, from: S.beat_from };
+}
+
+function buildCtx(now, beat) {
+  const s = S || {};
+  const lineIn = $('linein').checked;
+  return {
+    link: dev.link, bpm: s.bpm ? s.bpm * dev.foldK : null, linkBpm: dev.linkBpm, mode: s.mode,
+    conf: s.confidence || 0, th: dev.th, gain: dev.gain, confStop: dev.confStop, levelDb: meter.bar, levelMin: meter.lo, levelMax: meter.hi,
+    silent: !lineIn || !!s.silent, gated: !!s.gated, hold: dev.hold, playing: !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : (s.peers || 0), wifi: $('wifi').value,
+    running: outputsRun(s), ltMode: dev.ltMode,
+    // started but not running yet: AUDIO = not held, Link not started (the tracker locking, or waiting for the next bar);
+    // LINK = our clocks armed and waiting for the session's start (FOLLOW, FOLLOW+LEAD)
+    armed: dev.link ? dev.clocks && dev.ltMode !== 0 && !s.link_playing : !dev.hold && !s.link_playing,
+    // the boxes need a bar (Link's count; the estimate has none) and running outputs: stopped, they stand still
+    beatN: beat && beat.from === 'link' && outputsRun(s) ? beat.n : null,
+    beatMs: beat ? beat.ms : 0, usb: $('usb').checked, fitted: $('bat').checked,
+    batt: battLevel(), lineIn, bright: dev.bright, sleep: dev.sleep, inOff: dev.inOff, offs: dev.offs, rate: dev.rate, boot: dev.boot, splash: now - dev.powerOnAt < 800,
+    net: netCtx(now), wifiQ: wifiQuality(now), groupPeers: $('wifi').value === 'none' ? 0 : 3, setup: dev.net.mode === 3, qr: QR_CODE, saved: now < dev.savedUntil,
+    tempoStep, setField, setHold, linkStartStop,
+  };
+}
+
+// the light: [red, green] 0..1 before the resistor scaling
+function lightMix(now, c, beat) {
+  if (!powered()) return [0, 0];
+  if (dev.boot) return [0.6, 0.6];
+  if (dev.net.mode === 3) return now % 2400 < 1200 ? [0.9, 0.7] : [0, 0];      // setup: slow yellow blink
+  if (now - dev.powerOnAt < 300) return [1, 1];
+  let r = 0, g = 0;
+  const flash = beat && beat.ms < FLASH_MS ? 1 - beat.ms / FLASH_MS : 0;
+  const bar = beat && ((beat.n % 4) + 4) % 4 === 0;
+  if (dev.hold) { /* held stopped: the outputs are quiet */ }
+  else if (dev.link) { if (beat && beat.from === 'link') { g = flash * (bar ? 1 : 0.7); r = bar ? flash * 0.9 : 0; } }
+  else if (c.silent) { /* dark */ }
+  else if (c.gated) r = 0.7;
+  else if (beat && beat.from === 'link') { g = flash * (bar ? 1 : 0.7); r = bar ? flash * 0.9 : 0; }
+  else if (beat) g = flash * 0.3;
+  if (!$('usb').checked && $('bat').checked && battLevel() < BATT.lowPct) {
+    if (now % lowPeriodMs(battLevel()) < BATT.flashMs) { r = 1; g = 0; }      // the low-battery blink interleaves with the beat
+  }
+  return [r, g];
+}
+
+// the board's red and green LEDs have no window in the lid: only a faint glow along the lid seam
+const LED_K = 0.45;                                  // the 1k resistors as fitted
+function paintLight(r, g) {
+  const kr = r * LED_K * 0.85, kg = g * LED_K, v = Math.max(kr, kg);
+  $('seamGlow').setAttribute('fill', `rgb(${Math.round(255 * kr / (v || 1))},${Math.round(230 * kg / (v || 1))},40)`);
+  $('seamGlow').setAttribute('opacity', Math.min(0.35, v * 0.45).toFixed(3));
+}
+
+// the screen goes dark after SLEEP_MS[dev.sleep] without a button (0 = never); SETUP keeps it on (its QR must show)
+const SLEEP_MS = [0, 30000, 60000, 300000];
+const asleep = now => SLEEP_MS[dev.sleep] > 0 && dev.net.mode !== 3 && now - dev.lastInput > SLEEP_MS[dev.sleep];
+function paintScreen(now, c) {
+  fb.fill(0);
+  if (powered() && !asleep(now)) OLED.draw(fb, ui, c, now);
+  const d = oledImg.data, k = dev.bright / 100;
+  const on = OLED_ON.map((v, j) => Math.round(OLED_OFF[j] + (v - OLED_OFF[j]) * k));      // brightness: the lit pixels' level
+  for (let i = 0; i < fb.length; i++) {
+    const col = fb[i] ? on : OLED_OFF;
+    d[4 * i] = col[0]; d[4 * i + 1] = col[1]; d[4 * i + 2] = col[2]; d[4 * i + 3] = 255;
+  }
+  oledCtx.putImageData(oledImg, 0, 0);
+}
+
+const ARM_SHIFT = { up: [0, -.3], down: [0, .3], no: [-.3, 0], yes: [.3, 0] };
+const ARM_CENTER = { up: [61.5, 55.7], down: [61.5, 68.7], no: [55, 62.2], yes: [68, 62.2] };     // board mm
+function paintArms() {
+  for (const b of ['up', 'down', 'no', 'yes']) {
+    const on = dev.held[b], [cx, cy] = ARM_CENTER[b], [dx, dy] = ARM_SHIFT[b];
+    const tf = on ? `translate(${dx} ${dy}) translate(${cx} ${cy}) scale(.94) translate(${-cx} ${-cy})` : '';
+    if (dev.armCache[b] !== tf) {
+      dev.armCache[b] = tf;
+      const g = $('arm-' + b); g.setAttribute('transform', tf); g.firstElementChild.classList.toggle('on', on);
+    }
+  }
+  const lever = powerLeverY();
+  if ($('lever').getAttribute('y') !== String(lever)) $('lever').setAttribute('y', lever);
+}
+const powerLeverY = () => (dev.sw ? 49.2 : 53.8);
+
+// the input meter: updated METER.everyMs (not every frame: the device saves its CPU for audio and Link), the bar eases
+// toward the short-term level, the min / max lines toward the extremes of the last METER.spanMs, all in dB
+const METER = { everyMs: 250, spanMs: 3000, barTauS: 0.6, lineTauS: 0.5, floorDb: -120 };
+const meter = { at: 0, bar: METER.floorDb, lo: METER.floorDb, hi: METER.floorDb, hist: [] };
+function meterInput() {
+  if (!$('linein').checked || !S || S.level_fast_db == null) return METER.floorDb;
+  return Math.min(0, S.level_fast_db + dev.gain);
+}
+function updateMeter(now) {
+  if (now - meter.at < METER.everyMs) return;
+  const dt = meter.at ? (now - meter.at) / 1000 : 1e9;
+  meter.at = now;
+  const db = meterInput();
+  meter.hist.push({ t: now, db });
+  while (meter.hist.length && now - meter.hist[0].t > METER.spanMs) meter.hist.shift();
+  const ease = (from, to, tau) => from + (to - from) * (1 - Math.exp(-dt / tau));
+  meter.bar = ease(meter.bar, db, METER.barTauS);
+  meter.lo = ease(meter.lo, Math.min(...meter.hist.map(h => h.db)), METER.lineTauS);
+  meter.hi = ease(meter.hi, Math.max(...meter.hist.map(h => h.db)), METER.lineTauS);
+}
+
+function frame(now) {
+  updateMeter(now);
+  const beat = beatInfo(now), c = buildCtx(now, beat);
+  const [r, g] = lightMix(now, c, beat);
+  paintLight(r, g);
+  paintScreen(now, c);
+  paintArms();
+  $('battv').textContent = battLevel() + ' %';
+  $('setupbar').hidden = dev.net.mode !== 3;
+  $('linePlug').setAttribute('visibility', $('linein').checked ? 'visible' : 'hidden');
+  requestAnimationFrame(frame);
+}
+
+function setPower(on) {
+  if (on === dev.sw) return;
+  dev.sw = on;
+  if (on) {
+    dev.boot = dev.held.no; dev.powerOnAt = dev.lastInput = performance.now(); ui.screen = 'home'; ui.edit = null; ui.overlay = null;
+  } else dev.boot = false;
+}
+
+// HOME combos (AUDIO mode only): NO held + UP/DOWN = move the bar one beat, YES held + UP/DOWN = nudge the timing 1 ms.
+// So on HOME, NO and YES alone act on release, and only when no combo was used while they were held.
+const onHome = () => ui.screen === 'home' && dev.net.mode !== 3;
+const NUDGE_MS = 1;
+const NUDGE_BEATS = 0.5;           // half a beat: fixes an off-beat lock; two steps move the bar's 1 by a beat
+function showOverlay(title, value) { ui.hint = null; ui.overlay = { until: performance.now() + 1000, title, value }; }
+// NO / YES held on HOME (AUDIO mode) longer than HINT_MS without UP / DOWN: a hint says what UP / DOWN will do
+const HINT_MS = 400;
+// (UP adds half a beat to Link's count, so its beats come half a beat earlier; a + offset makes every output later)
+const HINTS = { no: { title: 'NUDGE BEAT', up: 'UP: 1/2 BEAT EARLY', down: 'DOWN: 1/2 BEAT LATE' },
+                yes: { title: 'NUDGE MS', up: 'UP: 1 MS LATER', down: 'DOWN: 1 MS EARLIER' } };
+function armHint(b) {
+  clearTimeout(dev.hintTimer);
+  dev.hintTimer = setTimeout(() => { if (dev.held[b] && !dev.combo && !dev.link && onHome()) ui.hint = HINTS[b]; }, HINT_MS);
+}
+function dropHint() { clearTimeout(dev.hintTimer); ui.hint = null; }
+function comboStep(mod, d) {
+  if (dev.link) return;                                          // LINK mode: the session owns the bar and the timing
+  if (mod === 'no') { api('shift', { beats: d * NUDGE_BEATS }); showOverlay('NUDGE BEAT', d > 0 ? '+1/2' : '-1/2'); }
+  else {
+    const ms = clampN(dev.inOff + d * NUDGE_MS, -100, 100);         // the nudge moves the audio input offset: every output
+    setField('inoff', ms); showOverlay('NUDGE MS', (ms > 0 ? '+' : '') + ms);
+  }
+}
+function btnDown(b) {
+  if (dev.held[b]) return;
+  dev.held[b] = true;
+  if (!powered() || dev.boot) return;
+  const now = performance.now();
+  if (asleep(now)) { dev.lastInput = now; dev.woke[b] = true; return; }     // a dark screen: the press only wakes it
+  dev.lastInput = now;
+  const ud = b === 'up' || b === 'down', mod = dev.held.no ? 'no' : dev.held.yes ? 'yes' : null;
+  if ((b === 'no' || b === 'yes') && onHome()) { dev.combo = false; dev.deferred[b] = true; armHint(b); return; }     // decided on release
+  let act = () => OLED.press(ui, b, performance.now(), buildCtx(performance.now(), null));
+  if (ud && mod && dev.deferred[mod] && onHome()) {                // the modifier must have been pressed on HOME too
+    dev.combo = true;
+    const d = b === 'up' ? 1 : -1;
+    act = () => comboStep(mod, d);
+    if (mod === 'no') { act(); return; }                         // a beat at a time: no auto-repeat
+  }
+  act();
+  if (ud) dev.repeat[b] = setTimeout(function again() { act(); dev.repeat[b] = setTimeout(again, REPEAT.everyMs); }, REPEAT.firstMs);
+}
+function btnUp(b) {
+  if (!dev.held[b]) return;
+  dev.held[b] = false;
+  clearTimeout(dev.repeat[b]);
+  if (b === 'no' || b === 'yes') dropHint();
+  if (dev.woke[b]) { dev.woke[b] = false; return; }            // the wake-up press does nothing else
+  dev.lastInput = performance.now();
+  if (!dev.deferred[b]) return;                                // only a press that started on HOME acts on release
+  dev.deferred[b] = false;
+  if (powered() && !dev.boot && onHome() && !dev.combo) OLED.press(ui, b, performance.now(), buildCtx(performance.now(), null));
+}
+
+const ptrBtn = new Map();                             // pointer id -> arm: two fingers can hold a combo (NO + UP)
+$('dpad').addEventListener('pointerdown', e => {
+  const g = e.target.closest('[data-b]'); if (!g) return;
+  e.preventDefault(); $('dev').focus(); ptrBtn.set(e.pointerId, g.dataset.b); btnDown(g.dataset.b);
+});
+const ptrEnd = e => { const b = ptrBtn.get(e.pointerId); if (b) { ptrBtn.delete(e.pointerId); btnUp(b); } };
+window.addEventListener('pointerup', ptrEnd);
+window.addEventListener('pointercancel', ptrEnd);
+$('pwr').addEventListener('click', () => setPower(!dev.sw));
+
+const KEY_BTN = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'no', Escape: 'no', Backspace: 'no', ArrowRight: 'yes', Enter: 'yes' };
+const typing = t => ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(t.tagName);
+window.addEventListener('keydown', e => {
+  if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'p' || e.key === 'P') { e.preventDefault(); if (!e.repeat) setPower(!dev.sw); return; }
+  const b = KEY_BTN[e.key]; if (!b) return;
+  e.preventDefault(); if (!e.repeat) btnDown(b);
+});
+window.addEventListener('keyup', e => { const b = KEY_BTN[e.key]; if (b && !typing(e.target)) { e.preventDefault(); btnUp(b); } });
+window.addEventListener('blur', () => { for (const b of ['up', 'down', 'no', 'yes']) btnUp(b); });
+
+// the mode follows the line-in plug detect (GPIO16 on the board): plugged = AUDIO, unplugged = LINK; sent at load and on every change
+const syncModeFromPlug = () => setField('mode', $('linein').checked ? 0 : 1);
+$('linein').onchange = syncModeFromPlug;
+syncModeFromPlug();
+setPower(true);
+requestAnimationFrame(frame);
+
+$('q').oninput = renderList;
+$('loadpath').onclick = () => load($('path').value.trim());
+$('path').onkeydown = e => { if (e.key === 'Enter') load($('path').value.trim()); };
+$('play').onclick = () => api('play', { playing: $('play').textContent === 'Play' });
+$('seek').oninput = () => { seeking = true; };
+$('seek').onchange = async () => {
+  const s = await (await fetch('/api/status')).json();
+  await api('seek', { seconds: s.duration_s * $('seek').value / 1000 });
+  seeking = false;
+};
+$('pitch').oninput = () => { pitchDragging = true; api('rate', { rate: 1 + $('pitch').value / 100 }); };
+$('pitch').onchange = () => { pitchDragging = false; };
+$('vol').oninput = () => { volDragging = true; $('volval').textContent = $('vol').value + ' %'; api('volume', { volume: $('vol').value / 100 }); };
+$('vol').onchange = () => { volDragging = false; };
+$('th').oninput = () => { thDragging = true; $('thval').textContent = $('th').value + ' %'; api('threshold', { min_confidence: $('th').value / 100 }); };
+$('th').onchange = () => { thDragging = false; };
+$('reset').onclick =() => { $('pitch').value = 0; api('rate', { rate: 1 }); };
+$('range').onchange = () => {
+  const r = Number($('range').value);
+  $('pitch').min = -r; $('pitch').max = r;
+};
+
+fetch('/api/library').then(r => r.json()).then(l => { library = l; renderList(); });
+poll();
+</script>
+<script>
+// setup page logic (see the section comment above)
+function spFill() {
+  const n = dev.net, nc = netCtx(performance.now());
+  $('sp-ap').textContent = SETUP_NAME;
+  $('sp-net').value = String(n.prev);
+  $('sp-ssid').replaceChildren(...SCAN.map(x => { const o = document.createElement('option'); o.value = o.textContent = x.name; return o; }));
+  $('sp-group').value = n.group; $('sp-ssid').value = n.ssid; $('sp-pass').value = n.pass; $('sp-apname').value = n.apName; $('sp-appass').value = n.appass;
+  dev.offs.forEach((v, i) => { $('sp-o' + i).value = v; }); $('sp-oin').value = dev.inOff;
+  $('sp-rate').replaceChildren(...RATE_NAMES.map((t, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = t; return o; }));
+  $('sp-rate').value = String(dev.rate); $('sp-th').value = dev.th; $('sp-bright').value = dev.bright; $('sp-sleep').value = String(dev.sleep);
+  $('sp-gain').value = dev.gain; $('sp-lowconf').value = dev.confStop ? '1' : '0';
+  spShowGroups();
+  return nc;
+}
+function spShowGroups() { const m = $('sp-net').value; $('sp-jank').hidden = m !== '0'; $('sp-client').hidden = m !== '1'; $('sp-ap-box').hidden = m !== '2'; }
+function spOpen() { spFill(); $('sp-msg').textContent = ''; $('sp-overlay').hidden = false; }
+function spClose() { $('sp-overlay').hidden = true; }
+function spSave() {
+  const n = dev.net, num = (id, lo, hi) => clampN(Math.round(Number($(id).value) || 0), lo, hi);
+  n.prev = Number($('sp-net').value);                       // the network mode the device returns to when setup is left
+  setField('group', Number($('sp-group').value) - 1);
+  setField('ssid', $('sp-ssid').value); setField('pass', $('sp-pass').value);
+  setField('apname', $('sp-apname').value.trim() || n.apName); setField('appass', $('sp-appass').value);
+  setField('bright', Math.round(num('sp-bright', 10, 100) / 10) * 10); setField('sleep', Number($('sp-sleep').value));
+  setField('inoff', num('sp-oin', -100, 100)); setField('out0', num('sp-o0', -50, 50)); setField('out1', num('sp-o1', -50, 50)); setField('out2', num('sp-o2', -50, 50));
+  setField('rate', Number($('sp-rate').value)); setField('threshold', num('sp-th', 0, 100));
+  setField('gain', num('sp-gain', -12, 12)); setField('lowconf', Number($('sp-lowconf').value));
+  dev.savedUntil = performance.now() + 2000;                // the device screen shows SAVED
+  $('sp-msg').textContent = 'saved';
+}
+$('setupbtn').onclick = spOpen;
+$('sp-x').onclick = spClose;
+$('sp-net').onchange = spShowGroups;
+$('sp-form').onsubmit = e => { e.preventDefault(); spSave(); };
+$('sp-overlay').addEventListener('pointerdown', e => { if (e.target === $('sp-overlay')) spClose(); });
+</script>
+<script>
+// ---- exact size and the screen module. The device SVG is in millimetres; it is drawn at PXMM css px per mm. ----
+const VIEW_MM = { w: 116, h: 89 };                           // the SVG's viewBox, in mm
+// true size on the user's MacBook Pro 16 (Mac16,5): the built-in panel is 3456 x 2234 px at 254 ppi = 345.6 mm wide, and the
+// desktop's scaling "looks like" 1728 x 1117 points, so 1 mm = 1728 / 345.6 = exactly 5 CSS px at browser zoom 100 %.
+// The SVG is never scaled by CSS: a window narrower than the device scrolls sideways.
+const PX_PER_MM = 1728 / 345.6;
+// each module: active area (aw x ah) and the lid window (ww x wh), both centred on (cx, cy); board mm, y down
+const SCREENS = {
+  '1.3':  { aw: 29.42, ah: 14.70, cx: 38.0, cy: 28.6, ww: 32.2, wh: 16.8 },
+  '1.54': { aw: 35.05, ah: 17.52, cx: 38.0, cy: 30.3, ww: 37.8, wh: 19.7 },
+  '2.42': { aw: 55.01, ah: 27.49, cx: 36.0, cy: 19.9, ww: 57.5, wh: 29.5 },
+};
+const VIEW_KEY = 'beatEmuView';
+const view = { scr: '1.54' };                     // the user's choice (2026-11-14): 1.54 inch
+try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')); } catch (e) { /* storage blocked: the default */ }
+if (!(view.scr in SCREENS)) view.scr = '1.54';
+function saveView() { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ scr: view.scr })); } catch (e) { /* not remembered */ } }
+function applyView() {
+  $('dev').style.width = (VIEW_MM.w * PX_PER_MM) + 'px'; $('dev').style.height = (VIEW_MM.h * PX_PER_MM) + 'px';
+  $('scr').value = view.scr;
+  const m = SCREENS[view.scr], set = (id, o) => { for (const key in o) $(id).setAttribute(key, o[key]); };
+  set('oledBezel', { x: m.cx - m.ww / 2, y: m.cy - m.wh / 2, width: m.ww, height: m.wh });
+  set('oledFO', { x: m.cx - m.aw / 2, y: m.cy - m.ah / 2, width: m.aw, height: m.ah });
+}
+$('scr').onchange = () => { view.scr = $('scr').value; saveView(); applyView(); };
+applyView();
+</script>
+</body>
+</html>
