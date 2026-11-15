@@ -220,7 +220,7 @@ esp_err_t usbrole_start(void)
     uint32_t t = now_ms();
     jur_init(&s_role, s_stack, s_port ? s_port->prep_ms : 0u, t);
     jur_line_init(&s_line, pin_level(BOARD_LINE_DETECT_GPIO), t);
-    return xTaskCreatePinnedToCore(role_task, "usbrole", 3072, NULL, ROLE_PRIO, &s_task, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    return xTaskCreatePinnedToCore(role_task, "usbrole", 4096, NULL, ROLE_PRIO, &s_task, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
 void usbrole_snapshot(struct jk_usb *u)

@@ -73,7 +73,8 @@ uint32_t bridge_peers_heard(void);
 int bridge_beat(int64_t *beat_ub, int32_t *mpb);    /* 1 in a session, with its beat now */
 int bridge_tempo(int32_t mpb);                       /* 0 set; -1 no session to set it in */
 int bridge_play(int play);                           /* 0 a start armed for the next bar / stopped; -1 no settled session; -2 AUDIO mode */
-/* the session or the MIDI clock plays: no flash writes now (updates refused, settings saved later; the timing audit) */
+/* the joined session plays, or (transport LINK) the MIDI clock has a start out: no flash writes now (updates refused,
+ * settings saved later; the timing audit). Lock-free (bridge.c) */
 int bridge_is_playing(void);
 void bridge_diag(char *out, size_t cap);             /* the Link clock filter, for `diag` */
 void app_diag(char *out, size_t cap);                /* restarts and the last reset's reason, for `diag` */

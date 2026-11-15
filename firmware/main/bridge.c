@@ -50,6 +50,7 @@ static uint8_t s_air[JK_AIR_MAX + 8];
 static uint32_t s_tx_fail, s_queue_full, s_scan_lost;
 static uint32_t s_lat_air, s_lat_air_max, s_lat_usb, s_lat_usb_max;
 static uint8_t s_want;
+static uint8_t s_playing;             /* bridge_is_playing: written by the bridge task only (follow_transport) */
 static int64_t s_hop_until;
 static struct js_table s_table;
 static volatile uint8_t s_table_on;
@@ -261,6 +262,10 @@ static void follow_transport(int64_t now)
         s_want = (uint8_t)want;
         midi_want(want);
     }
+    /* playing, for the flash rules (bridge_is_playing): the joined session plays, or (transport LINK) the MIDI clock has
+     * a start out or armed. Not the MIDI clock under transport AUTO, where it plays whenever a peer is there (Live open,
+     * stopped): no stop would ever allow an update or a save. Not a session gone: nothing could stop it. */
+    __atomic_store_n(&s_playing, (uint8_t)(jp_joined(&s_peer) && (jp_playing(&s_peer) || (!automatic && midi_is_playing()))), __ATOMIC_RELAXED);
 }
 
 static void publish(int64_t now)
@@ -432,17 +437,9 @@ int bridge_tempo(int32_t mpb)
     return r;
 }
 
-int bridge_is_playing(void)
-{
-    int playing = 0;
-    if (!s_lock)
-        return midi_is_playing();      /* (before bridge_start) */
-    xSemaphoreTake(s_lock, portMAX_DELAY);
-    if (jp_joined(&s_peer))
-        playing = jp_playing(&s_peer);
-    xSemaphoreGive(s_lock);
-    return playing || midi_is_playing();
-}
+/* Read without the bridge's lock: TinyUSB's task asks this for every sector of a drive copy, and the bridge task can sit
+ * on its lock waiting for TinyUSB's queue (to_computer), which only TinyUSB's task empties. */
+int bridge_is_playing(void) { return __atomic_load_n(&s_playing, __ATOMIC_RELAXED); }
 
 int bridge_play(int play)
 {

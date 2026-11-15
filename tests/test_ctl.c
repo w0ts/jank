@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Host tests of the control line protocol, the settings, the LED and the button.
  * Exit status: the number of failed checks. */
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include "jank_core.h"
@@ -438,11 +439,24 @@ static void test_usb(void)
     CHECK(strstr(out, "usb_audio=48000/2/24\n") && strstr(out, "usb_midi_dropped=3\n") && ends(out, "ok\n"));
 }
 
-/* the longest status (a host with four devices, eight peers) fits the firmware's answer buffer (ctl.c OUT_MAX 1400) */
+/* the longest status (a host with four devices, eight peers, every number at its longest) fits the firmware's answer
+ * buffer (JK_CTL_OUT_MAX, ctl.c) with its closing ok */
 static void test_status_size(void)
 {
-    static char big[2048];
+    static char big[4096];
     setup();
+    memset(&snap.b.st, 0xFF, sizeof snap.b.st);
+    snap.usb_up = 1;
+    snap.uptime_s = snap.tx_fail = snap.queue_full = snap.scan_lost = 4294967295u;
+    snap.lat_air_us = snap.lat_air_max_us = snap.lat_usb_us = snap.lat_usb_max_us = 4294967295u;
+    snap.wifi_up = 1;
+    snap.wifi_ip = snap.link_ip = 0xFFFFFFFFu;
+    snap.wifi_rssi = -128;
+    snap.wifi_channel = 255;
+    snap.link_peers = 4294967295u;
+    snap.mpb = 1;
+    snap.beat_ub = snap.start_ub = INT64_MIN + 1;
+    snap.playing = snap.settled = 1;
     snap.link_on = 1;
     snap.armed = 1;
     snap.usb.stack = JUR_STACK_HOST;
@@ -471,7 +485,7 @@ static void test_status_size(void)
     CHECK(jk_ctl_line("status", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest status: %zu bytes\n", strlen(big));
     CHECK(strstr(big, "bar=manual\n") && strstr(big, "ble_state=connected\n") && strstr(big, "usb_role=host\n"));
-    CHECK(strlen(big) < 1400u && ends(big, "ok\n"));
+    CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
 }
 
 int main(void)

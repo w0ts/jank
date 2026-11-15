@@ -142,7 +142,9 @@ class Playing:
         elif text.startswith("ota d "):
             self.chunks += 1
             off = int(text.split()[2])
-            self.pending.append("err playing 0" if self.chunks >= self.at_chunk else "ok %d" % (off + 120))
+            self.pending.append("err playing 0" if 0 < self.at_chunk <= self.chunks else "ok %d" % min(500, off + 120))
+        elif text == "ota end":                      # at_chunk -1: playing started after the last chunk
+            self.pending.append("err playing 0" if self.at_chunk < 0 else "ok 500")
         elif text == "ota abort":
             self.pending.append("ok 0")
 
@@ -151,7 +153,7 @@ class Playing:
 
 
 def test_playing():
-    for at in (0, 2):
+    for at in (0, 2, -1):
         dev = Playing(at)
         try:
             ota.Uploader(dev.send, dev.recv).upload(image(500))
