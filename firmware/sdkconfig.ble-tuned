@@ -31,3 +31,12 @@ CONFIG_BT_CTRL_DTM_ENABLE=n
 
 # static buffers that only tasks touch, to PSRAM (EXT_RAM_BSS_ATTR: the bridge's frame slots, bridge.c)
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+
+# The Wi-Fi and lwIP numbers image M1d ran with on the XIAO. The option above turns SPIRAM_IGNORE_NOTFOUND off, and that
+# changes these defaults (esp_wifi/Kconfig ESP_WIFI_STATIC_RX_BUFFER_NUM and ESP_WIFI_RX_BA_WIN, lwip/Kconfig
+# LWIP_TCP_OOSEQ_MAX_PBUFS: "default 16 if (SPIRAM_TRY_ALLOCATE_WIFI_LWIP && !SPIRAM_IGNORE_NOTFOUND)"), so they are pinned.
+# The dynamic TX buffers cannot be kept: ESP_WIFI_DYNAMIC_TX_BUFFER "depends on !(SPIRAM_TRY_ALLOCATE_WIFI_LWIP &&
+# !SPIRAM_IGNORE_NOTFOUND)"; the build has 16 static ones instead (ESP_WIFI_STATIC_TX_BUFFER_NUM's default).
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=10
+CONFIG_ESP_WIFI_RX_BA_WIN=6
+CONFIG_LWIP_TCP_OOSEQ_MAX_PBUFS=4

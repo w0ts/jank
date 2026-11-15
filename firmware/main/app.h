@@ -90,10 +90,15 @@ void ctl_reply(const char *text, size_t n);                  /* the answer to th
 uint32_t ctl_beats(void);                                    /* counts up while the task runs */
 
 #if CONFIG_JANK_BLE_MIDI
-/* ble_midi.c: a BLE MIDI peripheral carrying the control line's SysEx and the beat reports */
-esp_err_t ble_midi_start(const uint8_t mac[6]);
+/* ble_midi.c: a BLE MIDI peripheral for a phone: the control line's SysEx and the HOME line. Bluetooth is on only for a
+ * pair window or a connected phone (core/jank_phone.h) */
+esp_err_t ble_midi_start(const uint8_t mac[6], uint32_t mode);   /* mode: the `ble` setting, enum jk_ble */
 void ble_midi_write(const char *text, size_t n);             /* control line text, as SysEx frames; waits for buffers */
-void ble_midi_push(const char *text, size_t n);              /* a beat report; dropped when busy or full */
+int ble_midi_pair(void);                                     /* open a pair window: 0, or -1 with the setting off */
+void ble_midi_close(void);                                   /* the window and the phone's link off now */
+void ble_midi_setting(uint32_t mode);                        /* the `ble` setting changed */
+void ble_midi_state(uint8_t *state, uint32_t *left_s);       /* enum jph_state, the window's seconds left */
+int ble_midi_advertising(void);                              /* a pair window is open, no phone yet (the LED blinks) */
 void ble_midi_diag(char *out, size_t cap);
 #endif
 
@@ -104,8 +109,10 @@ void ota_idle(void);                                         /* called about onc
 void ota_validate_start(void);                               /* a new image confirms itself once USB and the control task work */
 void ota_mark_valid(void);
 
-/* drive.c: the JANK drive: wiped at every start, jank.html on it, a jank.bin copied onto it and ejected is installed */
+/* drive.c: the JANK drive, made up (core/jank_vdrive.h): jank.html on it, a jank.bin copied onto it streams into the spare
+ * app slot and is installed */
 esp_err_t drive_start(void);
+bool drive_busy(void);                                       /* an image is streaming into the spare slot */
 #ifdef JANK_CLOCK_PROBE
 esp_err_t probe_start(void);                                 /* clkprobe.c: a test build's pin probe */
 void probe_mark(int64_t due, int64_t isr_now);
@@ -113,7 +120,7 @@ size_t probe_report(char *out, size_t cap, int reset);
 #endif
 void drive_note(const char *slot, const char *text);         /* UPDATE.TXT at the next start, if slot runs (else: rolled back) */
 void drive_note_forget(void);
-void drive_state(char *out, size_t cap);                     /* `drive`: ok, or the start step that failed */                                /* the image is confirmed: the note is said */
+void drive_state(char *out, size_t cap);                     /* `drive`: ok, or the start step that failed; the stream's state */
 
 /* download.c: the ROM's download mode, with USB */
 void usb_to_rom_download(void);                              /* does not return */

@@ -21,6 +21,12 @@ size_t jbm_sysex_packet(const uint8_t *msg, size_t n, size_t *at, uint16_t ms, u
 /* the packets a message of n bytes takes at payload cap (for buffers and tests) */
 size_t jbm_sysex_packet_count(size_t n, size_t cap);
 
+/* Several whole SysEx messages in one packet (a control line's 30-character frames, the HOME line): each goes in as
+ * timestamp, F0 .. data .., timestamp, F7, n + 2 bytes, after the packet's one header. Appends msg to pkt, which holds *len
+ * bytes (0: empty, the header goes in first). -> 1 appended; 0 it does not fit in cap or is no SysEx (pkt unchanged: send
+ * what it holds and start the next; a message that does not fit an empty packet goes by jbm_sysex_packet). */
+int jbm_pack(const uint8_t *msg, size_t n, uint16_t ms, uint8_t *pkt, size_t *len, size_t cap);
+
 struct jbm_in {
     uint8_t in_sysex;                  /* a SysEx runs on into the next packet */
     uint8_t running;                   /* the running status, 0 none */

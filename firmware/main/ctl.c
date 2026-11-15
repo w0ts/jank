@@ -88,12 +88,45 @@ static void run_diag(void)
     reply_out();
 }
 
+/* Lines a phone may not send (docs/ble.md): an update (a dropped link would leave a slot half written), download mode
+ * (only USB can use it), and the Wi-Fi password (the BLE link is not encrypted: no pairing, by the ruling's design, so it
+ * would cross the air in clear text). -> the refusal, or NULL */
+static const char *usb_only(const char *line)
+{
+    while (*line == ' ')
+        line++;
+    if (!strncmp(line, "ota", 3))
+        return "err ota over USB only\n";
+    if (!strncmp(line, "bootloader", 10))
+        return "err bootloader over USB only\n";
+    if (!strncmp(line, "set pass", 8) && (!line[8] || line[8] == ' '))
+        return "err the Wi-Fi password over USB only\n";
+    return NULL;
+}
+
+#if CONFIG_JANK_BLE_MIDI
+/* `ble pair` and `ble close`: answered before they act, so that a phone asking to close still hears ok */
+static void run_ble(enum jk_ctl_action a)
+{
+    if (a == JK_CTL_BLE_PAIR) {
+        strcpy(s_out, ble_midi_pair() ? "err ble is off\n" : "ok\n");
+        reply_out();
+        return;
+    }
+    strcpy(s_out, "ok\n");
+    reply_out();
+    vTaskDelay(pdMS_TO_TICKS(200));
+    ble_midi_close();
+}
+#endif
+
 static void run_line(const char *line)
 {
     struct jk_cfg cfg;
     enum jk_ctl_action a;
-    if (!strncmp(line, "ota", 3) && s_src != CTL_SRC_USB) {
-        ctl_reply("err ota over USB only\n", 22);  /* a dropped BLE link would leave a slot half written */
+    const char *refused = s_src == CTL_SRC_USB ? NULL : usb_only(line);
+    if (refused) {
+        ctl_reply(refused, strlen(refused));
         return;
     }
     if (ota_line(line))
@@ -121,6 +154,14 @@ static void run_line(const char *line)
         app_cfg_set(&cfg);
     if (a == JK_CTL_SCAN) {
         run_scan();
+        return;
+    }
+    if (a == JK_CTL_BLE_PAIR || a == JK_CTL_BLE_CLOSE) {
+#if CONFIG_JANK_BLE_MIDI
+        run_ble(a);
+#else
+        ctl_reply("err no bluetooth in this build\n", 31);
+#endif
         return;
     }
     if (a == JK_CTL_TEMPO || a == JK_CTL_PLAY || a == JK_CTL_STOP) {

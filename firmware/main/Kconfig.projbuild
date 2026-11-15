@@ -12,6 +12,7 @@ menu "jank"
         depends on BT_NIMBLE_ENABLED
         default n
         help
-            The standard BLE MIDI service (main/ble_midi.c): the control line's SysEx and the beat reports, both ways,
-            for a phone or a computer. Needs Bluetooth with NimBLE (firmware/sdkconfig.ble).
+            The standard BLE MIDI service (main/ble_midi.c) for a phone: the control line's SysEx both ways and the
+            HOME line. Bluetooth is on only for a pair window opened on the device, or while a phone stays connected
+            (the setting ble, docs/ble.md). Needs Bluetooth with NimBLE (firmware/sdkconfig.ble).
 endmenu

@@ -1,6 +1,7 @@
 #!/bin/bash
 # The beat-follow bench build's esp_tinyusb: the registry's 3.0.0 (from the component cache) with third_party/esp_tinyusb-uac2.patch,
-# which turns TinyUSB's audio class on (a UAC2 speaker). The result is third_party/esp_tinyusb under the tree given (default: this
+# which turns TinyUSB's audio class on (a UAC2 speaker), and third_party/esp_tinyusb-msc-weak.patch, which makes its mass storage
+# callbacks (tinyusb_msc.c) weak so that the app's own take their place. The result is third_party/esp_tinyusb under the tree given (default: this
 # checkout), where firmware/main/idf_component.yml's override_path finds it. Run by scripts/build.sh; never committed.
 # Usage: scripts/patch_tinyusb.sh [tree]
 set -eu
@@ -14,4 +15,6 @@ rm -rf "$DEST"
 mkdir -p "$TREE/third_party"
 cp -R "$SRC" "$DEST"
 (cd "$DEST" && patch -p1 --silent < "$HERE/third_party/esp_tinyusb-uac2.patch")
-echo "esp_tinyusb with the audio class: $DEST"
+# its TinyUSB mass storage callbacks weak: firmware/main/drive.c serves a made-up volume with its own (the streaming drive)
+(cd "$DEST" && patch -p1 --silent < "$HERE/third_party/esp_tinyusb-msc-weak.patch")
+echo "esp_tinyusb with the audio class and weak MSC callbacks: $DEST"

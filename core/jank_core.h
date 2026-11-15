@@ -97,6 +97,11 @@ enum jk_transport {
     JK_TRANSPORT_LINK = 0,            /* MIDI start/stop follows Link's Start Stop Sync */
     JK_TRANSPORT_AUTO = 1             /* start at the next bar once a session is joined, stop when it is gone */
 };
+enum jk_ble {                         /* Bluetooth for a phone (jank_phone.h, docs/ble.md) */
+    JK_BLE_PAIR = 0,                  /* on only for a pair window asked for on the device, and while the phone stays */
+    JK_BLE_OFF = 1,                   /* never */
+    JK_BLE_AUTO = 2                   /* as pair, plus a window at every start */
+};
 enum jk_net {
     JK_NET_JANK = 0,                   /* MODE JANK's air, in GROUP */
     JK_NET_WIFI = 1                   /* a normal network: ssid and pass; read at start-up */
@@ -119,7 +124,8 @@ struct jk_cfg {
     char name[JK_NAME_MAX + 1];
     char ssid[JK_SSID_MAX + 1];
     char pass[JK_PASS_MAX + 1];       /* never sent back: get says only whether there is one */
-    uint8_t stored_pad;               /* what the compiler padded the release's struct with, so that its size stays 130 */
+    uint8_t ble;                      /* enum jk_ble. In the byte the compiler padded the release's struct with (its size stays
+                                         130): the release stored 0 there, which is the default, JK_BLE_PAIR */
     /* The beat-follow bench build's settings come after everything that is stored (store.c keeps only what is above
      * this line), so they are back at their defaults at every start. */
     uint8_t beat;                     /* 1: the beat tracker steers the Link session */
@@ -143,6 +149,8 @@ struct jk_beat {
     uint32_t heap_free, heap_min, heap_largest;  /* internal heap: now, lowest ever, largest free block */
     uint32_t psram_free, psram_min;   /* the PSRAM heap (XIAO): now, lowest ever; 0 0 when there is none */
     uint32_t stack_free;              /* bytes never used of the tracker task's stack */
+    int16_t level_db;                 /* the input's peak over the last second, dBFS, -99 .. 0 (silence: -99) */
+    uint8_t conf_pct;                 /* the network's beat activation peak over the last second, percent */
     uint32_t tempo_sets, phase_forces, starts, stops;   /* what the tracker did to the Link session */
     int32_t err_us;                   /* the session's beat grid against the tracked beat at the last step, before a correction */
     int32_t offset_us;                /* the clock the audio's samples are mapped to local time with: the offset's value */
@@ -173,6 +181,10 @@ struct jk_snapshot {
     uint32_t midi_ticks;              /* MIDI clocks sent */
     uint32_t midi_resync;             /* the clock had to jump to the session */
     struct jk_beat beat;
+    int8_t batt_pct;                  /* -1: no battery gauge */
+    uint8_t ble_built;                /* the build has Bluetooth for a phone */
+    uint8_t ble_state;                /* enum jph_state (jank_phone.h): off, window, connected */
+    uint32_t ble_left_s;              /* the pair window's seconds left */
     struct jk_bridge b;
 };
 
@@ -184,7 +196,9 @@ enum jk_ctl_action {
     JK_CTL_SCAN,                      /* out is empty: the caller scans and answers with js_table_report */
     JK_CTL_TEMPO,                     /* out is empty: the caller sets the session's tempo (jk_ctl_tempo), answers ok or err */
     JK_CTL_PLAY,                      /* out is empty: the caller starts the session, answers ok or err */
-    JK_CTL_STOP                       /* out is empty: the caller stops the session, answers ok or err */
+    JK_CTL_STOP,                      /* out is empty: the caller stops the session, answers ok or err */
+    JK_CTL_BLE_PAIR,                  /* out is empty: the caller opens a pair window (jph_pair), answers ok or err */
+    JK_CTL_BLE_CLOSE                  /* out is empty: the caller ends the window and the phone's link, answers ok */
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
 #define JK_BPM_MIN_X100 2000u          /* the BPM the tempo command takes, hundredths: Link's own clamp, 20..999 */

@@ -70,6 +70,23 @@ size_t jbm_sysex_packet_count(size_t n, size_t cap)
     return count;
 }
 
+int jbm_pack(const uint8_t *msg, size_t n, uint16_t ms, uint8_t *pkt, size_t *len, size_t cap)
+{
+    const uint8_t ts = (uint8_t)(0x80u | (ms & 0x7Fu));
+    size_t k = *len;
+    if (!is_sysex(msg, n) || (k ? 0u : 1u) + k + n + 2u > cap)
+        return 0;
+    if (!k)
+        pkt[k++] = (uint8_t)(0x80u | ((ms >> 7) & 0x3Fu));
+    pkt[k++] = ts;
+    for (size_t i = 0; i + 1u < n; ++i)
+        pkt[k++] = msg[i];
+    pkt[k++] = ts;
+    pkt[k++] = 0xF7;
+    *len = k;
+    return 1;
+}
+
 void jbm_init(struct jbm_in *in)
 {
     in->in_sysex = 0;
