@@ -238,7 +238,7 @@
       <div class="now" id="now">No track</div>
       <div class="row" style="margin-top:6px">
         <button class="primary" id="play">Play</button>
-        <label><input type="checkbox" id="auto" checked> play the next track</label>
+        <label>then <select id="auto"><option value="next">next</option><option value="random">random</option><option value="stop">stop</option></select></label>
         <span class="num muted" id="time">0:00 / 0:00</span>
       </div>
       <input id="seek" type="range" min="0" max="1000" value="0" style="margin-top:6px;width:100%">
@@ -1066,9 +1066,20 @@ function nextTrack(path) {
   }
   return null;
 }
+// "random": any other track of the shown list (else the library), never the one that just ended
+function randomTrack(path, rnd = Math.random) {
+  const list = shown.length > 1 ? shown : library;
+  const others = list.filter(t => t.path !== path);
+  return others.length ? others[Math.floor(rnd() * others.length)] : null;
+}
+// what follows a track that ran off its end: the "then" choice (next / random / stop), remembered in this browser
+const AFTER_KEY = 'jank-player-after';
+function afterTrack(mode, path) { return mode === 'next' ? nextTrack(path) : mode === 'random' ? randomTrack(path) : null; }
+try { const v = localStorage.getItem(AFTER_KEY); if (v === 'next' || v === 'random' || v === 'stop') $('auto').value = v; } catch (e) { /* not remembered */ }
+$('auto').addEventListener('change', () => { try { localStorage.setItem(AFTER_KEY, $('auto').value); } catch (e) { /* not remembered */ } });
 
 function show(s) {
-  if ($('auto').checked && trackEnded(prevStatus, s)) { const n = nextTrack(s.path); if (n) load(n.path); }
+  if (trackEnded(prevStatus, s)) { const n = afterTrack($('auto').value, s.path); if (n) load(n.path); }
   prevStatus = s;
   S = s; tPoll = performance.now();
   syncFromStatus(s);
