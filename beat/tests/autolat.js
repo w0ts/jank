@@ -1,6 +1,6 @@
 // node autolat.js PLAYER_HTML: the page's Auto latency: the first send, the 2 ms debounce and the 2 s gap, the USB gate,
-// manual (Calibrate / NUDGE MS) turning it off for the session, switching it back on, a reconnect, the Tab audio
-// suggestion and the labels
+// manual (the checkbox; M2h: Calibrate and NUDGE MS set the AUDIO SHIFT on top and never turn it off) for the session,
+// switching it back on, a reconnect, the Tab audio suggestion, Calibrate's shift and the labels
 const fs = require('fs');
 const assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
@@ -9,7 +9,7 @@ const konst = name => html.match(new RegExp('const ' + name + ' = ([0-9.-]+);'))
 let checks = 0;
 const eq = (a, b) => { assert.deepStrictEqual(a, b); checks++; };
 const consts = ['AUTOLAT_MIN_CHANGE_MS', 'AUTOLAT_MIN_GAP_MS', 'TAB_PATH_CONSTANT_MS'].map(konst).join('\n');
-const fns = ['autoLatNew', 'autoLatStep', 'autoLatSuggestion', 'autoLatLabel'];
+const fns = ['autoLatNew', 'autoLatStep', 'autoLatSuggestion', 'autoLatLabel', 'calibTrim'];
 const P = new Function(consts + '\n' + fns.map(grab).join('\n') + '; return { ' + fns.join(', ') + ' };')();
 
 // drive the machine: returns the sends of a list of events
@@ -71,5 +71,12 @@ eq(P.autoLatLabel(fresh, 5, false, false), 'waiting: the XIAO\'s source is not U
 eq(P.autoLatLabel(fresh, null, true, false), 'waiting for a suggestion');
 eq(P.autoLatLabel({ ...fresh, sent: -26 }, -26, true, true), 'auto: -26 ms (sent)');
 eq(P.autoLatLabel({ ...fresh, on: false }, 5, true, false), 'off');
+eq(P.autoLatLabel({ ...fresh, sent: -65 }, -65, true, false, 3), 'auto -65 ms + trim 3 ms');   // M2h: the XIAO's two layers
+eq(P.autoLatLabel({ ...fresh, sent: -65 }, -65, true, true, 0), 'auto -65 ms + trim 0 ms (sent)');
+// Calibrate (M2h): the shift that makes auto + shift the suggestion; the layers unknown (an older firmware): null
+eq(P.calibTrim(-60, { auto: -65, trim: 0 }), 5);
+eq(P.calibTrim(-70.4, { auto: -65, trim: 3 }), -5);
+eq(P.calibTrim(-60, null), null);
+eq(P.calibTrim(null, { auto: -65, trim: 0 }), null);
 
 console.log(checks + ' checks passed');

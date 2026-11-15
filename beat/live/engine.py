@@ -218,10 +218,11 @@ class Engine:
             if on:
                 self._disarmed = False                     # a Stop ends a Start's disarm
 
-    def bar_nudge(self) -> BarView:
-        """The user nudged the beat: the downbeat estimator goes MANUAL. Its view before the nudge (the hand label)."""
+    def bar_view(self) -> BarView:
+        """The downbeat estimator's view now (a nudge's hand label). A nudge no longer makes it MANUAL (jank M2h: the PHASE
+        rides on AUTO BAR's bar, controller.nudge_phase)."""
         with self._lock:
-            return self.downbeat.nudge()
+            return self.downbeat.view()
 
     def set_autobar(self, value) -> str:
         """AUTO BAR: off / start / always (true = start, false = off). Returns the mode set."""

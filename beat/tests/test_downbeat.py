@@ -285,6 +285,31 @@ def test_an_auto_move_keeps_the_user_s_half_beat():
     assert link_shift(7, 0, link.beat_at(cm.to_link_us(50.0))) == 0
 
 
+def test_the_user_s_phase_rides_on_auto_bar():
+    """jank M2h, the user: "beat is more phase. So zero is auto (again two layers)". The user's PHASE (NUDGE BEAT's total)
+    is an offset on top of AUTO BAR's bar: AUTO BAR keeps placing the 1 (no MANUAL) with the offset kept, never undone;
+    back to 0 is AUTO BAR's bar alone."""
+    t = Clock()
+    link = SimLink(now=t, bpm=120.0)
+    cm = ClockMap()
+    cm.report(0.0, START_US)
+    ctl = LinkController(link, cm)
+    grid = (50.0, P)
+    at = cm.to_link_us(50.0)
+    ctl.tick(Snapshot("steady", 120.0, grid, bar_view(5, 7, 50.0, 2)))
+    assert link.beat_at(at) == pytest.approx(101.0)                    # AUTO BAR: bar position 1
+    ctl.nudge_phase(1.0)                                               # PHASE +1
+    assert ctl.phase == 1.0 and link.beat_at(at) == pytest.approx(102.0)
+    ctl.tick(Snapshot("steady", 120.0, grid, bar_view(6, 7, 50.0, 2)))   # the next decision, the same 1: no move back
+    assert link.beat_at(at) == pytest.approx(102.0) and ctl.bar_moves == 1
+    ctl.tick(Snapshot("steady", 120.0, grid, bar_view(7, 7, 50.0, 3)))   # the music's 1 moves: followed, the PHASE on top
+    assert ctl.bar_moves == 2 and link.beat_at(at) == pytest.approx(101.0)
+    ctl.nudge_phase(-1.0)                                              # back to 0: AUTO
+    assert ctl.phase == 0.0 and link.beat_at(at) == pytest.approx(100.0)
+    ctl.tick(Snapshot("steady", 120.0, grid, bar_view(8, 7, 50.0, 3)))
+    assert ctl.bar_moves == 2 and link.beat_at(at) == pytest.approx(100.0)   # (7 - 3) % 4 = 0: in place
+
+
 def test_the_device_screen_shows_the_bar():
     """player.html's OLED module: the marks under the beat boxes and the AUTO BAR menu item (tests/oled_bar.js, node)."""
     import shutil

@@ -192,8 +192,9 @@ class App:
             beats = float(body["beats"])
             if beats == 0 or abs(beats) > MAX_SHIFT_BEATS or (beats * 2) % 1:
                 raise ValueError(f"shift {beats} beats: halves, 0.5..{MAX_SHIFT_BEATS} either way")
-            self.controller.shift_beats(beats)
-            self._log_nudge(beats, self.engine.bar_nudge())
+            before = self.engine.bar_view()
+            self.controller.nudge_phase(beats)
+            self._log_nudge(beats, before)
         elif name == "autobar":                  # off / start / always (true = start, false = off: the old API)
             self.engine.set_autobar(body["mode"] if "mode" in body else body["on"])
         elif name == "hold":

@@ -18,14 +18,15 @@ eq(['0.5', '-0.5', '1', '-1.5', '3', '0'].map(Number).map(P.halvesText), ['+1/2'
 const answer = text => P.beatStats(text.split('\n'));
 const beat = answer('nudge_beats=0.5\nbar=locked\nbar_phi=2\nbar_count=37\nbar_scores=1.20,-0.30,0.10,0.00');
 eq(beat.nudge_beats, 0.5);
-eq(P.nudgeOverlay('no', beat), { title: 'NUDGE BEAT', value: '+1/2 BEAT' });
-eq(P.nudgeOverlay('no', answer('nudge_beats=-1.5')), { title: 'NUDGE BEAT', value: '-1 1/2 BEAT' });
-eq(P.nudgeOverlay('no', answer('nudge_beats=0')), { title: 'NUDGE BEAT', value: '0 BEAT' });
-eq(P.nudgeOverlay('yes', answer('beat_latency=3')), { title: 'NUDGE MS', value: 'AUDIO IN +3 MS' });
-eq(P.nudgeOverlay('yes', answer('beat_latency=-12')), { title: 'NUDGE MS', value: 'AUDIO IN -12 MS' });
-eq(P.nudgeOverlay('yes', answer('beat_latency=0')), { title: 'NUDGE MS', value: 'AUDIO IN 0 MS' });
-eq(P.nudgeErrOverlay('err nudge beat at its limit, -3 to 3 beats in all'), { title: 'NUDGE BEAT', value: 'MAX 3 BEATS' });
-eq(P.nudgeErrOverlay('err no beat yet'), { title: 'NUDGE BEAT', value: 'NO BEAT YET' });
+eq(P.nudgeOverlay('no', beat), { title: 'PHASE', value: '+1/2' });                 // M2h: two layers each, 0 = AUTO
+eq(P.nudgeOverlay('no', answer('nudge_beats=-1.5')), { title: 'PHASE', value: '-1 1/2' });
+eq(P.nudgeOverlay('no', answer('nudge_beats=0')), { title: 'PHASE', value: 'AUTO' });
+eq(P.nudgeOverlay('yes', answer('beat_latency=-62\nlat_auto=-65\nlat_trim=3')), { title: 'AUDIO SHIFT', value: '+3 MS' });
+eq(P.nudgeOverlay('yes', answer('beat_latency=-77\nlat_auto=-65\nlat_trim=-12')), { title: 'AUDIO SHIFT', value: '-12 MS' });
+eq(P.nudgeOverlay('yes', answer('beat_latency=-65\nlat_auto=-65\nlat_trim=0')), { title: 'AUDIO SHIFT', value: 'AUTO' });
+eq(P.nudgeOverlay('yes', answer('beat_latency=3')), { title: 'NUDGE MS', value: 'AUDIO IN +3 MS' });   // a firmware before M2h
+eq(P.nudgeErrOverlay('err nudge beat at its limit, -3 to 3 beats in all'), { title: 'PHASE', value: 'MAX 3 BEATS' });
+eq(P.nudgeErrOverlay('err no beat yet'), { title: 'PHASE', value: 'NO BEAT YET' });
 eq(P.nudgeErrOverlay('err link mode'), { title: 'LINK MODE', value: '' });
 eq(P.nudgeErrOverlay('err busy'), { title: 'NUDGE', value: 'BUSY' });
 eq(P.nudgeErrOverlay('err tempo is 20 to 999 BPM'), null);                      // not a nudge's
@@ -41,6 +42,7 @@ const combo = grab('comboStep');
 ok(/xiaoSend\(mod === 'no' \? 'nudge beat ' \+ \(d > 0 \? '\+0\.5' : '-0\.5'\) : 'nudge ms ' \+ \(d > 0 \? '\+1' : '-1'\)\)/.test(combo), 'NO: nudge beat +-0.5, YES: nudge ms +-1');
 ok(!/TRACKER LEADS/.test(combo), 'no "TRACKER LEADS" any more');
 ok(combo.indexOf('if (dev.link) return;') < combo.indexOf('xiaoSend'), 'LINK mode: nothing sent');
+ok(!/autoLatApply/.test(combo), 'M2h: the AUDIO SHIFT never turns Auto latency off');
 
 // ---- USB MIDI CLOCK in the menu ----
 ok(/usbmidi: \{ title: 'USB MIDI CLOCK', opts: \['ON', 'OFF'\]/.test(html), 'the menu edit, ON / OFF');
