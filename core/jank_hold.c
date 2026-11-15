@@ -3,7 +3,11 @@
 #include "jank_hold.h"
 #include <string.h>
 
-void jho_init(struct jho *h) { memset(h, 0, sizeof *h); }
+void jho_init(struct jho *h)
+{
+    memset(h, 0, sizeof *h);
+    h->hold = 1;                       /* power-on: the user's Stop (M2h), until the user's Start */
+}
 
 void jho_set(struct jho *h, int hold)
 {
@@ -43,8 +47,9 @@ int jho_outputs(struct jho *h, const struct jho_in *in)
 {
     if (!in->audio)                    /* LINK mode: the user's Stop holds here too; no gate */
         return h->hold ? 0 : in->base;
-    if (h->gate_off && in->conf_open)
-        h->gate_off = 0;               /* the confidence reached the threshold + 5 once: the gate is armed again */
+    if (h->gate_off && (in->conf_open || in->silent))
+        h->gate_off = 0;               /* the confidence reached the threshold + 5 once, or the silence (the automatic
+                                        * layer starts over, M2h): the gate is armed again */
     if (h->hold || gate_closed(h, in))
         return 0;                      /* (gated: an arming waits on: it ends with the lock once the gate lifts) */
     if (h->arming) {

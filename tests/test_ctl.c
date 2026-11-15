@@ -388,20 +388,23 @@ static void test_nudge(void)
     CHECK(run("nudger") == JK_CTL_NONE && strstr(out, "err unknown") == out);
     CHECK(!strcmp(jk_half_beats(1, b), "0.5") && !strcmp(jk_half_beats(-3, b), "-1.5") && !strcmp(jk_half_beats(4, b), "2"));
     CHECK(!strcmp(jk_half_beats(0, b), "0") && !strcmp(jk_half_beats(-1, b), "-0.5") && !strcmp(jk_half_beats(-6, b), "-3"));
-    /* NUDGE MS: LINK mode refused; AUDIO mode moves beat_latency by n, answers it */
+    /* NUDGE MS: LINK mode refused; AUDIO mode moves the AUDIO SHIFT (lat_trim) by n, answers the sum and both layers */
     CHECK(run("nudge ms 1") == JK_CTL_NONE && !strcmp(out, "err link mode\n") && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS);
     snap.beat.on = snap.beat.audio = snap.beat.audio_live = 1;
     CHECK(run("nudge ms +1") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS + 1);
-    CHECK(!strcmp(out, "beat_latency=26\nok\n"));
-    CHECK(run("nudge ms -1") == JK_CTL_CFG_CHANGED && !strcmp(out, "beat_latency=25\nok\n"));
+    CHECK(!strcmp(out, "beat_latency=26\nlat_auto=25\nlat_trim=1\nok\n"));
+    CHECK(run("nudge ms -1") == JK_CTL_CFG_CHANGED && !strcmp(out, "beat_latency=25\nlat_auto=25\nlat_trim=0\nok\n"));
     CHECK(run("nudge ms -10") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 15);
     CHECK(run("nudge ms 0") == JK_CTL_NONE && strstr(out, "err") && run("nudge ms 11") == JK_CTL_NONE && strstr(out, "err"));
     CHECK(run("nudge ms x") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == 15);
-    cfg.beat_latency_ms = JK_BEAT_LATENCY_MAX_MS;
-    CHECK(run("nudge ms 1") == JK_CTL_NONE && !strcmp(out, "beat_latency=300\nok\n"));   /* at the top: kept, said */
-    cfg.beat_latency_ms = 15;
+    CHECK(run("set beat_latency 300") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 290);   /* the auto base: the shift kept */
+    CHECK(run("set lat_trim 0") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == JK_BEAT_LATENCY_MAX_MS);
+    CHECK(run("nudge ms 1") == JK_CTL_NONE && !strcmp(out, "beat_latency=300\nlat_auto=300\nlat_trim=0\nok\n"));   /* at the top */
+    CHECK(run("set beat_latency 10") == JK_CTL_CFG_CHANGED && run("set lat_trim 5") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 15);
+    CHECK(run("set lat_trim 601") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == 15);
     snap.beat.nudge_halves = -3;
-    CHECK(run("status") == JK_CTL_NONE && strstr(out, "nudge_beats=-1.5\nbeat_latency=15\nbeat_latency_src=usb\nusbmidi=on\n"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "nudge_beats=-1.5\nbeat_latency=15\nlat_auto=10\nlat_trim=5\nbeat_latency_src=usb\nusbmidi=on\n"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "beat_latency=15\nlat_auto=10\nlat_trim=5\nbeat_latency_src=usb\n"));
 }
 
 /* settings saves: never a flash write while playing, unless a restart follows; what counts as a stored change */
@@ -570,8 +573,11 @@ static void test_status_size(void)
     snap.beat.fold_exp = -2;                                          /* "0.25" */
     snap.beat.fold_manual = 1;
     snap.beat.nudge_halves = -5;                                      /* "-2.5" */
-    cfg.beat_latency_ms = JK_BEAT_LATENCY_MIN_MS;
     cfg.lat_key = (struct jla_key){JLA_HOSTED, 0xFFFF, 0xFFFF};       /* "host:ffff:ffff" */
+    jla_set(&cfg.lat, &cfg.lat_key, JK_BEAT_LATENCY_MAX_MS);          /* (a shift of -600 needs a base of 300 first) */
+    jla_set_trim(&cfg.lat, &cfg.lat_key, -600);                       /* lat_trim=-600 */
+    jla_set(&cfg.lat, &cfg.lat_key, JK_BEAT_LATENCY_MIN_MS);          /* lat_auto=-300, beat_latency=-300 */
+    cfg.beat_latency_ms = JK_BEAT_LATENCY_MIN_MS;
     CHECK(jk_ctl_line("status", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest status: %zu bytes\n", strlen(big));
     CHECK(strstr(big, "bar=manual\n") && strstr(big, "ble_state=connected\n") && strstr(big, "usb_role=host\n"));

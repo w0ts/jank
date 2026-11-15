@@ -86,10 +86,10 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <button id="t-down" class="quiet hide" disabled>÷2</button>
     </div>
     <div class="row hide" id="nudges" style="flex-wrap:wrap;margin-bottom:12px">
-      <span class="note">Nudge beat</span>
+      <span class="note">Phase</span>
       <button id="n-beat-down" class="quiet" disabled title="Link's beats half a beat later">-½</button>
       <button id="n-beat-up" class="quiet" disabled title="Link's beats half a beat earlier (fixes an off-beat lock)">+½</button>
-      <span class="note">Audio in</span>
+      <span class="note">Audio shift</span>
       <button id="n-ms-down" class="quiet" disabled title="every output 1 ms earlier">-1 ms</button>
       <button id="n-ms-up" class="quiet" disabled title="every output 1 ms later">+1 ms</button>
     </div>
@@ -123,7 +123,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
       <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
       <label>Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
-      <label>Beat latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
+      <label>Auto latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
       <label>USB MIDI clock <select id="c-usbmidi"><option value="on">On: the clock also over USB</option><option value="off">Off: MIDI out (DIN / TRS) only</option></select></label>
       <label>Low confidence <select id="c-lowconf"><option value="stop">Stop / start: the outputs stop under the threshold</option><option value="run">Keep running</option></select></label>
       <label>Confidence threshold, % <input id="c-threshold" type="number" min="0" max="100" step="5" inputmode="numeric"></label>
@@ -586,14 +586,25 @@ function nudgeCommand(kind, dir) {
   return "nudge ms " + (dir > 0 ? "+1" : "-1");
 }
 
-/* what the page says after a nudge's answer (values: its key=value lines) */
+/* what the page says after a nudge's answer (values: its key=value lines). Two layers each (M2h): the PHASE (beats) on top
+   of AUTO BAR's bar, the AUDIO SHIFT (ms) on top of the auto latency; 0 is AUTO. (A firmware before M2h: no lat_trim) */
 function nudgeSaid(kind, dir, values) {
+  const sign = (x) => (x > 0 ? "+" : "") + x;
   if (kind === "beat") {
     const total = Number(values.nudge_beats);
-    const sign = (x) => (x > 0 ? "+" : "") + x;
-    return "Beat nudged " + (dir > 0 ? "half a beat earlier" : "half a beat later") + " (" + sign(total) + " beats in all). AUTO BAR is manual until picked again.";
+    return total ? "Phase " + sign(total) + " beats, on top of AUTO BAR's bar." : "Phase: AUTO (AUTO BAR's bar alone).";
   }
-  return "Audio in offset " + (Number(values.beat_latency) > 0 ? "+" : "") + values.beat_latency + " ms.";
+  if (values.lat_trim === undefined) return "Audio in offset " + sign(Number(values.beat_latency)) + " ms.";
+  const trim = Number(values.lat_trim);
+  return trim ? "Audio shift " + sign(trim) + " ms, on top of the auto " + values.lat_auto + " ms." : "Audio shift: AUTO (" + values.lat_auto + " ms).";
+}
+
+const LAT_SRC = { usb: "(the computer's)", line: "(the line in's)" };   /* beat_latency_src; a hosted device: host:VID:PID */
+/* the latency field is the auto base (`set beat_latency`); its note says the source and the AUDIO SHIFT on top */
+function latField(v) { return v.lat_auto !== undefined ? v.lat_auto : v.beat_latency; }
+function latNote(src, v) {
+  const trim = Number(v.lat_trim || 0);
+  return (LAT_SRC[src] || "(" + src + ")") + (trim ? " + audio shift " + (trim > 0 ? "+" : "") + trim + " ms" : "");
 }
 
 /* the error answers of the nudges, in words */
@@ -608,7 +619,6 @@ function nudgeError(message) {
 const $ = (id) => document.getElementById(id);
 const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency", "autobar", "usbmidi", "lowconf",
                   "threshold", "source", "ble"];
-const LAT_SRC = { usb: "(the computer's)", line: "(the line in's)" };   /* beat_latency_src; a hosted device: host:VID:PID */
 const BLE_SVC = "03b80e5a-ede8-4b33-a751-6ce34ec4c700", BLE_CHR = "7772e5db-3868-4112-a1a9-f2669d106bf3";
 const BLE_CAP = 20;                   /* write payload: the default ATT MTU's, which every link takes (Web Bluetooth does not say the MTU) */
 const HOME_EVERY_USB_MS = 300, STATUS_EVERY_MS = 1500, HOME_STALE_MS = 3000, BLE_WAIT_MS = 5000;
@@ -682,10 +692,10 @@ function showSettings({ values: v }) {
   if (document.activeElement !== $("net-ssid") && v.ssid !== undefined) $("net-ssid").value = v.ssid;
   for (const key of SETTINGS) {
     const el = $("c-" + key);
-    if (document.activeElement !== el && v[key] !== undefined) el.value = v[key];
+    if (document.activeElement !== el && v[key] !== undefined) el.value = key === "beat_latency" ? latField(v) : v[key];
   }
   $("net-state").textContent = networkLine(v);
-  if (v.beat_latency_src) $("c-beat_latency_src").textContent = LAT_SRC[v.beat_latency_src] || "(" + v.beat_latency_src + ")";
+  if (v.beat_latency_src) $("c-beat_latency_src").textContent = latNote(v.beat_latency_src, v);
   $("s-version").textContent = v.version ? "Version " + v.version + ", address " + v.mac : "-";
 }
 
@@ -940,7 +950,7 @@ async function nudge(kind, dir) {
   try {
     const { values } = await send(nudgeCommand(kind, dir));
     say(nudgeSaid(kind, dir, values));
-    if (kind === "ms" && document.activeElement !== $("c-beat_latency")) $("c-beat_latency").value = values.beat_latency;
+    if (kind === "ms" && document.activeElement !== $("c-beat_latency")) $("c-beat_latency").value = latField(values);
   } catch (e) {
     say(nudgeError(e.message), true);
   }

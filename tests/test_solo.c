@@ -328,7 +328,9 @@ static struct stick *stick_on(int i, int audio, int automatic)
     jp_init(&s->jp, usb, air, 0x1234u + 77u * (uint32_t)i, stick_out, s);
     jp_allow(&s->jp, 1, sim_now);
     jbl_init(&s->jbl);
-    jho_init(&s->hold);
+    jho_init(&s->hold);                /* power-on: the user's Stop (M2g/M2h) ... */
+    s->jbl.held = 1;                   /* ... as beat.c: no session stopped for it */
+    s->hold.hold = 0;                  /* these sticks: the user started them earlier (test_power_on: a real power-on) */
     jc_ticker_init(&s->tick, QUANTUM);
     s->start_tick = -1;
     s->audio = (uint8_t)audio;
@@ -620,6 +622,14 @@ static void test_start_wins_alone(void)
     a->silent = 1;
     run_for(100000);
     CHECK(a->stops == 2 && jho_icon(&a->hold, &a->hin) == JHO_STOPPED);
+    run_for(1000000);                                          /* M2h: the silence ended the override: the next track */
+    a->silent = 0;                                             /* (still conf under the threshold) waits for the gate */
+    run_for(3000000);
+    CHECK(a->starts == 2);
+    a->gated = 0;                                              /* the confidence up: it starts, no new Start needed */
+    a->conf_open = 1;
+    run_for(4000000);
+    CHECK(a->starts == 3 && on_the_bar(a));
     printf("solo: Start at low confidence: MIDI start %lld ms after it\n", (long long)(delay / 1000));
 }
 
@@ -679,6 +689,30 @@ static void test_user_stop_holds_alone(void)
     CHECK(a->starts == 3 && on_the_bar(a));
 }
 
+/* M2h, the user: "come up with manual state: stopped". A stick powered on (AUDIO mode, the music locked) stays stopped,
+ * the icon stopped; a computer's playing session it joins is left playing (no surprise stop, FOLLOW+LEAD); the user's
+ * Start: the MIDI clock on the session's next bar line */
+static void test_power_on(void)
+{
+    struct stick *a;
+    world();
+    pc_open(-1, 500000);
+    run_for(100000);
+    lk_set_playing(&pc, 1, lk_beat_at(&pc, sim_now), sim_now);
+    pc_at = 0;
+    a = stick_on(0, 1, 0);
+    a->hold.hold = 1;                                          /* a real power-on */
+    music(a, 122.9, 1);
+    run_for(8000000);
+    CHECK(jp_peers(&a->jp) == 1 && lk_playing(&pc) && jp_playing(&a->jp));
+    CHECK(a->starts == 0 && jho_icon(&a->hold, &a->hin) == JHO_STOPPED);
+    play(a, 1);
+    run_for(STEP_US);
+    CHECK(jho_icon(&a->hold, &a->hin) == JHO_ARMED);
+    run_for(4000000);
+    CHECK(a->starts == 1 && a->stops == 0 && on_the_bar(a) && jc_tick_ub(a->start_tick) % ((int64_t)QUANTUM * LK_UBEAT) == 0);
+}
+
 int main(void)
 {
     test_alone_starts_on_the_bar();
@@ -694,6 +728,7 @@ int main(void)
     test_two_solo_sticks_meet();
     test_start_wins_alone();
     test_user_stop_holds_alone();
+    test_power_on();
     printf("solo: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

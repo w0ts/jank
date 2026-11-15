@@ -291,6 +291,40 @@ static void test_bar_moves(void)
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10900000, &in, &bar) != 0);    /* the waiting decision, now */
 }
 
+static int bar_pos(int64_t beat_us) { return (int)((((lk_beat_at(&node, beat_us) + LK_UBEAT / 4) / LK_UBEAT) % 4 + 4) % 4); }
+
+/* M2h, the user: "beat is more phase. So zero is auto (again two layers)". PHASE (NUDGE BEAT's total) is an offset on top
+ * of AUTO BAR's bar: AUTO BAR keeps placing the music's 1 (no MANUAL), the offset rides on it, neither changes the other;
+ * back to 0, AUTO BAR's bar alone (no half-beat offset left, whatever folds the nudges were made at) */
+static void test_phase_over_autobar(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    struct jbl_bar bar = {.locked = 1, .seq = 5, .count = 7, .phi = 2};
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    bar.beat_us = 10000000 + 4 * 500000;
+    jbl_bar_step(&jbl, &node, &st, 1, 10200000, &in, &bar);
+    CHECK(bar_pos(bar.beat_us) == (7 - 2) % 4);                   /* AUTO BAR: the counted beat at its place */
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 2, 0, 10300000) == 0);   /* PHASE +1 beat */
+    CHECK(bar_pos(bar.beat_us) == (7 - 2 + 1) % 4);
+    bar.seq = 6;                                                  /* the next decision, the same 1: no move back */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10400000, &in, &bar) == 0 && bar_pos(bar.beat_us) == (7 - 2 + 1) % 4);
+    bar.seq = 7;
+    bar.phi = 3;                                                  /* the music's 1 moves: AUTO BAR follows, the phase on top */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10500000, &in, &bar) == -1 && bar_pos(bar.beat_us) == (7 - 3 + 1) % 4);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -1, 0, 10600000) == 0);  /* +1/2 */
+    bar.seq = 8;
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10700000, &in, &bar) == 0);
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, -2, 0, 10800000) == 0 && jbl.nudge == -1);   /* -1/2 */
+    bar.seq = 9;
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10900000, &in, &bar) == 0);
+    CHECK(bar_pos(bar.beat_us) == (7 - 3 + 3) % 4);               /* half a beat before the 1: counted as the beat before */
+    CHECK(jbl_nudge(&jbl, &node, &st, 1, &in, 1, 1, 11000000) == 0);   /* back to 0, the last half at fold x2 */
+    CHECK(jbl.nudge == 0 && jbl.nudge_8ths == 0 && jbl_nudge_us(&jbl, 500000, 0) == 0);   /* AUTO: no offset left */
+    bar.seq = 10;
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 11100000, &in, &bar) == 0 && bar_pos(bar.beat_us) == (7 - 3) % 4);
+}
+
 /* AUTO BAR AT START: the 1 is placed while the start is armed (it lands on it), never while the session plays; once at a
  * new start for the bar (bar_now); START WAIT holds the tracker's start; ALWAYS moves mid-play (test_bar_moves) */
 static void test_bar_at_start(void)
@@ -530,6 +564,7 @@ int main(void)
     test_session_offset();
     test_bar_shift();
     test_bar_moves();
+    test_phase_over_autobar();
     test_phase_forced_past_5ms();
     test_tempo_deadband();
     test_transport();
