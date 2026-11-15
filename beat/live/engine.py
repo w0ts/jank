@@ -6,7 +6,8 @@ Two gates on top of the estimator decide whether Link runs:
 - confidence (live.confidence) under `min_confidence` stops the transport; it runs again once confidence is back at
   `min_confidence + HYSTERESIS` (and the controller starts it on the next bar). The device's Start (resync) wins over
   it, as jank's firmware (M2g, core/jank_hold.h gate_off): the gate is disarmed until the confidence has reached
-  `min_confidence + HYSTERESIS` once; a Stop (hold) ends that. Silence is not disarmed.
+  `min_confidence + HYSTERESIS` once; a Stop (hold) or silence (M2h: the automatic layer starts over) ends that.
+  Silence is never disarmed.
 
 The downbeat estimator (live.downbeat) runs beside them on the same frames: the tracker's 81 bands (BandTap) and, after
 each tracked beat, ModeBpm's grid. Its reset events: silence, the estimator stopped (30 s without a steady beat), a
@@ -144,8 +145,8 @@ class Engine:
                 self._gated = conf < min(threshold + HYSTERESIS, 1.0)
             else:
                 self._gated = conf < threshold
-            if self._disarmed and (threshold <= 0 or conf >= min(threshold + HYSTERESIS, 1.0)):
-                self._disarmed = False                     # the confidence reached threshold + hysteresis: re-armed
+            if self._disarmed and (self.silent or threshold <= 0 or conf >= min(threshold + HYSTERESIS, 1.0)):
+                self._disarmed = False                     # threshold + hysteresis reached, or silence (M2h): re-armed
             gated = self._gated and not self._disarmed
             stop = self.silent or gated or self.hold
             bar = self.downbeat.view()
