@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "jank_core.h"
+#include "jank_hold.h"
 #include "jank_usbrole.h"
 
 static int fails, checks;
@@ -317,6 +318,18 @@ static void test_beat(void)
     CHECK(run("beat") == JK_CTL_NONE);
     CHECK(strstr(out, "mode=steady\n") && strstr(out, "bpm=123.45\n") && strstr(out, "heap_min=90000\n"));
     CHECK(strstr(out, "cpu_pct=25.3\n") && strstr(out, "packets=77\n") && strstr(out, "madmom BENCH ONLY") && ends(out, "ok\n"));
+    /* the source open and sounding (AUDIO mode), the meter, the confidence: in beat and status alike */
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .level_db = -21, .level_min_db = -30, .level_max_db = -14,
+                                 .peak_db = -6, .conf_pct = 73};
+    snap.hold = 1;
+    snap.outputs = JHO_STOPPED;
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=1\nrms_db=-21\nrms_min_db=-30\nrms_max_db=-14\npeak_db=-6\nconf=73\n"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=1\nhold=1\noutputs=stopped\nrms_db=-21\nrms_min_db=-30\n"));
+    CHECK(strstr(out, "rms_max_db=-14\npeak_db=-6\nconf=73\n") && ends(out, "ok\n"));
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .level_db = -99, .level_min_db = -99, .level_max_db = -99, .peak_db = -99};
+    snap.hold = 0;
+    snap.outputs = JHO_ARMED;                               /* a stream of zeros: open, no sound, LINK mode */
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=0\nhold=0\noutputs=armed\nrms_db=-99\n"));
 }
 
 /* AUTO BAR: the setting (on by default; `on` again counts as picked again) and the estimator in status and beat */
@@ -414,6 +427,12 @@ static void test_usb(void)
     CHECK(run("set source line") == JK_CTL_CFG_CHANGED && cfg.source == JUR_SRC_LINE);
     CHECK(run("set source usb") == JK_CTL_CFG_CHANGED && cfg.source == JUR_SRC_USB);
     CHECK(run("set source mic") == JK_CTL_NONE && cfg.source == JUR_SRC_USB);
+    {
+        struct jk_cfg before = cfg;                     /* LINK: a change, so stored by the deferred-save rule */
+        CHECK(run("set source link") == JK_CTL_CFG_CHANGED && cfg.source == JUR_SRC_LINK && jk_cfg_stored_differs(&before, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "source=link\n"));
+        CHECK(run("set source usb") == JK_CTL_CFG_CHANGED);
+    }
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "usb=device\n") && strstr(out, "source=usb\n"));
     /* the XIAO as a device: no CC chip */
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=device\nusb_cc=nochip\n") && !strstr(out, "usb_vbus_out"));
@@ -482,6 +501,10 @@ static void test_status_size(void)
     snap.ble_left_s = 4294967295u;
     snap.usb.audio_packets = snap.usb.audio_errors = snap.usb.midi_dropped = 4294967295u;
     snap.midi_ticks = snap.midi_resync = 4294967295u;
+    snap.beat.audio = snap.beat.audio_live = snap.hold = 1;           /* the audio lines at their longest */
+    snap.outputs = JHO_RUNNING;
+    snap.beat.level_db = snap.beat.level_min_db = snap.beat.level_max_db = snap.beat.peak_db = -99;
+    snap.beat.conf_pct = 100;
     CHECK(jk_ctl_line("status", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest status: %zu bytes\n", strlen(big));
     CHECK(strstr(big, "bar=manual\n") && strstr(big, "ble_state=connected\n") && strstr(big, "usb_role=host\n"));

@@ -227,7 +227,8 @@ function pushOf(data) {
   return { type: data[JX_PUSH.length], text };
 }
 
-/* the HOME line (core/jank_phone.h): "h bpm_x100 net transport bar quantum link_peers air_peers battery level conf" */
+/* the HOME line (core/jank_phone.h): "h bpm_x100 net transport bar quantum link_peers air_peers battery level conf min max"
+   (level: the input meter's RMS over 0.3 s; min / max: its extremes over 3 s, absent from older firmware) */
 function parseHome(text) {
   const f = String(text).trim().split(/\s+/);
   if (f.length < 11 || f[0] !== "h") return null;
@@ -237,7 +238,7 @@ function parseHome(text) {
   const quantum = num(f[5]);
   if (!net || !transport || !quantum) return null;
   return { bpm: (num(f[1]) || 0) / 100, net, transport, bar: num(f[4]), quantum, link: num(f[6]) || 0, air: num(f[7]) || 0,
-           battery: num(f[8]), level: num(f[9]), conf: num(f[10]) };
+           battery: num(f[8]), level: num(f[9]), conf: num(f[10]), levelMin: f.length > 11 ? num(f[11]) : null, levelMax: f.length > 12 ? num(f[12]) : null };
 }
 
 /* what HOME shows, ageMs after the line came: the beat goes on at the line's tempo between lines */
@@ -641,7 +642,7 @@ async function session(command, done) {
     say(done);
     if (!S.ble) takeHome((await send("home")).values.home);
   } catch (e) {
-    say(e.message === "err no session" ? "No Link session to change yet." : e.message === "err audio mode" ? "The beat tracker runs the session now (audio mode)." : e.message, true);
+    say(e.message === "err no session" ? "No Link session to change yet." : e.message, true);
   }
 }
 

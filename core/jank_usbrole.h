@@ -17,13 +17,15 @@
  * which the firmware does with the wanted stack kept in RTC memory across it.
  *
  * The audio source (AUDIO > SOURCE): AUTO = the line in when a plug is in, else USB audio when a stream is open; LINE, USB:
- * that one only. USB audio is the computer's stream (device stack) or the hosted device's (host stack). */
+ * that one only; LINK = USB audio ignored, the line in still when a plug is in (the plug is mechanical: it wins). USB audio
+ * is the computer's stream (device stack) or the hosted device's (host stack). AUDIO mode itself is "the source has
+ * sound" (jank_live.h). A unit with no screen toggles AUTO <-> LINK with a single NO (jur_src_toggle). */
 #ifndef JANK_USBROLE_H
 #define JANK_USBROLE_H
 #include <stdint.h>
 
 enum jur_usb { JUR_USB_DEVICE = 0, JUR_USB_HOST = 1 };                 /* the setting */
-enum jur_src { JUR_SRC_AUTO = 0, JUR_SRC_LINE = 1, JUR_SRC_USB = 2 };   /* the setting */
+enum jur_src { JUR_SRC_AUTO = 0, JUR_SRC_LINE = 1, JUR_SRC_USB = 2, JUR_SRC_LINK = 3 };   /* the setting */
 enum jur_audio { JUR_AUDIO_NONE = 0, JUR_AUDIO_LINE = 1, JUR_AUDIO_USB = 2 };   /* what the tracker hears now */
 enum jur_stack { JUR_STACK_DEVICE = 0, JUR_STACK_HOST = 1 };
 /* what the port chip says is on the cable */
@@ -96,9 +98,12 @@ int jur_line_step(struct jur_line *l, int raw, uint32_t now_ms);    /* -> the de
 
 /* what the tracker listens to (enum jur_audio) */
 uint8_t jur_source(uint8_t setting, int line_plugged, int usb_open);
+/* a screenless unit's single NO: USB AUDIO (AUTO) <-> LINK; from LINE or USB (set on the page): LINK. A plug in the line in:
+ * the setting unchanged (the line wins anyway), *changed 0. Returns the new setting */
+uint8_t jur_src_toggle(uint8_t setting, int line_plugged, int *changed);
 
 const char *jur_usb_name(uint8_t setting);      /* "device" "host" */
-const char *jur_src_name(uint8_t setting);      /* "auto" "line" "usb" */
+const char *jur_src_name(uint8_t setting);      /* "auto" "line" "usb" "link" */
 const char *jur_audio_name(uint8_t audio);      /* "none" "line" "usb" */
 const char *jur_cc_name(uint8_t cc);            /* "none" "device" "host" "accessory" */
 int jur_usb_parse(const char *s, uint8_t *out);  /* 0 ok, -1 not one */

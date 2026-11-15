@@ -131,16 +131,23 @@ uint8_t jur_source(uint8_t setting, int line_plugged, int usb_open)
         return JUR_AUDIO_USB;
     if (line_plugged)
         return JUR_AUDIO_LINE;
-    return usb_open ? JUR_AUDIO_USB : JUR_AUDIO_NONE;
+    return usb_open && setting != JUR_SRC_LINK ? JUR_AUDIO_USB : JUR_AUDIO_NONE;
+}
+
+uint8_t jur_src_toggle(uint8_t setting, int line_plugged, int *changed)
+{
+    uint8_t next = setting == JUR_SRC_LINK ? JUR_SRC_AUTO : JUR_SRC_LINK;
+    *changed = !line_plugged;
+    return line_plugged ? setting : next;
 }
 
 static const char *const USB_NAMES[] = {"device", "host"};
-static const char *const SRC_NAMES[] = {"auto", "line", "usb"};
+static const char *const SRC_NAMES[] = {"auto", "line", "usb", "link"};
 static const char *const AUDIO_NAMES[] = {"none", "line", "usb"};
 static const char *const CC_NAMES[] = {"none", "device", "host", "accessory"};
 
 const char *jur_usb_name(uint8_t setting) { return setting <= JUR_USB_HOST ? USB_NAMES[setting] : "?"; }
-const char *jur_src_name(uint8_t setting) { return setting <= JUR_SRC_USB ? SRC_NAMES[setting] : "?"; }
+const char *jur_src_name(uint8_t setting) { return setting <= JUR_SRC_LINK ? SRC_NAMES[setting] : "?"; }
 const char *jur_audio_name(uint8_t audio) { return audio <= JUR_AUDIO_USB ? AUDIO_NAMES[audio] : "?"; }
 const char *jur_cc_name(uint8_t cc) { return cc <= JUR_CC_ACCESSORY ? CC_NAMES[cc] : "?"; }
 
@@ -155,4 +162,4 @@ static int parse_name(const char *s, const char *const *names, uint8_t n, uint8_
 }
 
 int jur_usb_parse(const char *s, uint8_t *out) { return parse_name(s, USB_NAMES, 2, out); }
-int jur_src_parse(const char *s, uint8_t *out) { return parse_name(s, SRC_NAMES, 3, out); }
+int jur_src_parse(const char *s, uint8_t *out) { return parse_name(s, SRC_NAMES, 4, out); }

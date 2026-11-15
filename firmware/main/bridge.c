@@ -3,6 +3,7 @@
  * A full queue drops the frame: Link's next one is worth more than an old one. */
 #include <string.h>
 #include "app.h"
+#include "jank_hold.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -49,7 +50,11 @@ static struct js_scan s_scan;
 static uint8_t s_air[JK_AIR_MAX + 8];
 static uint32_t s_tx_fail, s_queue_full, s_scan_lost;
 static uint32_t s_lat_air, s_lat_air_max, s_lat_usb, s_lat_usb_max;
-static uint8_t s_want;
+static uint8_t s_want;                /* what the MIDI clock outputs were told (midi_want) */
+static uint8_t s_base;                /* what the transport setting wants of them, before AUDIO mode's hold */
+static struct jho s_hold;             /* AUDIO mode's Stop / Start (core/jank_hold.h) */
+static struct jho_in s_hin;           /* its inputs at the last step */
+static uint8_t s_lead = 1;            /* LINK TRANSPORT FOLLOW+LEAD (1) or FOLLOW (0), with the transport setting LINK */
 static uint8_t s_playing;             /* bridge_is_playing: written by the bridge task only (follow_transport) */
 static int64_t s_hop_until;
 static struct js_table s_table;
@@ -246,18 +251,27 @@ static void follow_mac(void)
         ESP_LOGE(TAG, "radio to the computer's MAC: %s", esp_err_to_name(e));
 }
 
-/* what the MIDI transport should be: the session's word while joined; held through a change of GROUP */
+static uint8_t lt_mode(void) { return s_cfg.transport == JK_TRANSPORT_AUTO ? JHO_IGNORE : s_lead ? JHO_LEAD : JHO_FOLLOW; }
+
+/* what the MIDI transport should be: the session's word while joined; held through a change of GROUP; then AUDIO mode's
+ * hold (jank_hold.h): Stop silences the outputs at once, Start lets them go once the tracker locks */
 static void follow_transport(int64_t now)
 {
-    int want = s_want;
+    int want, base = s_base;
     int automatic = s_cfg.transport == JK_TRANSPORT_AUTO;
+    uint8_t audio, locked;
     if (jp_joined(&s_peer)) {
         if (jp_settled(&s_peer, now))  /* (joined, not settled yet: the last wish held, nothing started on a guess) */
-            want = jc_should_play(automatic, jp_playing(&s_peer), jp_peers(&s_peer));
+            base = jc_should_play(automatic, jp_playing(&s_peer), jp_peers(&s_peer));
         s_hop_until = 0;
     } else if (automatic && !s_peer.on && now >= s_hop_until) {
-        want = 0;
+        base = 0;
     }
+    s_base = (uint8_t)base;
+    beat_state(&audio, &locked);
+    s_hin = (struct jho_in){.audio = audio, .lt = lt_mode(), .base = (uint8_t)base, .locked = locked,
+                            .clock_running = (uint8_t)(midi_is_playing() && !midi_start_pending())};
+    want = jho_outputs(&s_hold, &s_hin);
     if (want != s_want) {
         s_want = (uint8_t)want;
         midi_want(want);
@@ -387,6 +401,11 @@ void bridge_snapshot(struct jk_snapshot *s)
         s->settled = (uint8_t)jp_settled(&s_peer, now);
         s->armed = (uint8_t)pending_start(s->beat_ub, &s->start_ub);
     }
+    s->hold = s_hold.hold;
+    if (s_hin.audio)
+        s->outputs = jho_icon(&s_hold, &s_hin);
+    else                               /* LINK mode: the clocks as they are, a start waiting for its bar line armed */
+        s->outputs = s_hin.clock_running ? JHO_RUNNING : (s->armed || midi_start_pending()) ? JHO_ARMED : JHO_STOPPED;
     xSemaphoreGive(s_lock);
     midi_stats(&s->midi_ticks, &s->midi_resync);
     beat_stats(&s->beat);
@@ -443,16 +462,30 @@ int bridge_is_playing(void) { return __atomic_load_n(&s_playing, __ATOMIC_RELAXE
 
 int bridge_play(int play)
 {
-    int r;
-    struct jk_beat b;
-    beat_stats(&b);
-    if (b.on && b.audio)
-        return -2;                    /* AUDIO mode: the tracker starts and stops the session (jank_beatlink.h) */
+    int r = 0;
+    uint8_t audio, locked;
+    beat_state(&audio, &locked);
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    r = jp_set_playing(&s_peer, play, s_cfg.quantum, midi_now_us());
+    if (audio) {
+        jho_set(&s_hold, !play);      /* AUDIO mode: Stop / Start of the outputs; the tracker keeps the session (jank_hold.h) */
+        follow_transport(midi_now_us());   /* the clocks stop now, not at the bridge's next step */
+    } else {
+        r = jp_set_playing(&s_peer, play, s_cfg.quantum, midi_now_us());
+        if (play)
+            jho_link_play(&s_hold);
+    }
     xSemaphoreGive(s_lock);
     return r;
 }
+
+void bridge_set_lead(int lead)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_lead = (uint8_t)(lead != 0);
+    xSemaphoreGive(s_lock);
+}
+
+int bridge_session_held(void) { return jho_session_held(&s_hold, &s_hin); }
 
 void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), void *ctx)
 {

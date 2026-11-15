@@ -26,7 +26,8 @@ int jx_feed(struct jx_in *in, uint8_t byte);
  * <audio> [<beat_latency ms> -]" a second. lag: how long after the instant the stick takes the beat to be HEARD (its
  * sample's arrival + beat_latency) the report was made; a reader that time-stamps the report on arrival subtracts it.
  * link: where the Link session's nearest beat is from that instant (+ = later; what Live follows), "-" with no session
- * playing. The numbers are clamped to +-JX_FIELD_MAX. */
+ * playing. audio: 0 the tracker's source is not open, 1 open with no sound (LINK mode), 2 SOUND (AUDIO mode, jank_live.h).
+ * The numbers are clamped to +-JX_FIELD_MAX. */
 #define JX_PUSH_BEAT 0x10u
 /* the HOME line for a phone over BLE (jank_phone.h, jph_home_line): "h <bpm x100> <net> ...", a few times a second */
 #define JX_PUSH_HOME 0x11u
@@ -36,7 +37,8 @@ int jx_feed(struct jx_in *in, uint8_t byte);
 /* one report of n <= JX_PUSH_TEXT_MAX characters into out -> its length (0: a bad type or too long) */
 size_t jx_push_frame(uint8_t type, const char *text, size_t n, uint8_t *out);
 #define JX_NO_EXTRA INT32_MIN           /* no such field */
-/* the beat report's text: kind 'b' (a tracked beat) or 't' (the once-a-second state); mode 0..3 as jb_mode_kind; extra:
+/* the beat report's text: kind 'b' (a tracked beat) or 't' (the once-a-second state); mode 0..3 as jb_mode_kind; audio
+ * 0..2 as above (more: 2); extra:
  * the lag (b) or the latency (t), JX_NO_EXTRA for none (and then no extra2 either); extra2: the link offset (b),
  * JX_NO_EXTRA prints "-" -> length (0: does not fit) */
 size_t jx_beat_line(char *out, size_t cap, char kind, uint32_t n, int32_t bpm_x100, unsigned mode, unsigned audio, int32_t extra,

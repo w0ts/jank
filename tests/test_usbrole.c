@@ -239,6 +239,25 @@ static void test_source(void)
     CHECK(jur_source(JUR_SRC_AUTO, 0, 0) == JUR_AUDIO_NONE);
     CHECK(jur_source(JUR_SRC_LINE, 0, 1) == JUR_AUDIO_LINE);
     CHECK(jur_source(JUR_SRC_USB, 1, 0) == JUR_AUDIO_USB);
+    CHECK(jur_source(JUR_SRC_LINK, 0, 1) == JUR_AUDIO_NONE);    /* LINK: USB audio ignored ... */
+    CHECK(jur_source(JUR_SRC_LINK, 1, 1) == JUR_AUDIO_LINE);    /* ... the line in's plug still wins */
+    CHECK(jur_source(JUR_SRC_LINK, 1, 0) == JUR_AUDIO_LINE);
+}
+
+/* a screenless unit's single NO: USB AUDIO (AUTO) <-> LINK; a plug in the line in: nothing changes */
+static void test_source_toggle(void)
+{
+    int changed = 9;
+    uint8_t s = jur_src_toggle(JUR_SRC_AUTO, 0, &changed);
+    CHECK(s == JUR_SRC_LINK && changed == 1);
+    s = jur_src_toggle(s, 0, &changed);
+    CHECK(s == JUR_SRC_AUTO && changed == 1);
+    CHECK(jur_src_toggle(JUR_SRC_AUTO, 1, &changed) == JUR_SRC_AUTO && changed == 0);
+    CHECK(jur_src_toggle(JUR_SRC_LINK, 1, &changed) == JUR_SRC_LINK && changed == 0);
+    CHECK(jur_src_toggle(JUR_SRC_USB, 0, &changed) == JUR_SRC_LINK && changed == 1);   /* from the page's USB or LINE */
+    CHECK(jur_src_toggle(JUR_SRC_LINE, 0, &changed) == JUR_SRC_LINK);
+    /* unplugged again: the line was only ever an override, the selection is what NO left */
+    CHECK(jur_source(JUR_SRC_AUTO, 1, 1) == JUR_AUDIO_LINE && jur_source(JUR_SRC_AUTO, 0, 1) == JUR_AUDIO_USB);
 }
 
 static void test_names(void)
@@ -249,7 +268,8 @@ static void test_names(void)
     CHECK(jur_usb_parse("otg", &v) && v == JUR_USB_DEVICE);
     CHECK(!jur_src_parse("usb", &v) && v == JUR_SRC_USB);
     CHECK(!jur_src_parse("auto", &v) && v == JUR_SRC_AUTO);
-    CHECK(jur_src_parse("adc", &v));
+    CHECK(!jur_src_parse("link", &v) && v == JUR_SRC_LINK && !strcmp(jur_src_name(JUR_SRC_LINK), "link"));
+    CHECK(jur_src_parse("adc", &v) && !strcmp(jur_src_name(4), "?"));
     CHECK(!strcmp(jur_usb_name(JUR_USB_HOST), "host") && !strcmp(jur_src_name(JUR_SRC_LINE), "line"));
     CHECK(!strcmp(jur_audio_name(JUR_AUDIO_NONE), "none") && !strcmp(jur_cc_name(JUR_CC_HOST), "host"));
     CHECK(!strcmp(jur_cc_name(9), "?"));
@@ -323,6 +343,7 @@ int main(void)
     test_setting_to_device();
     test_line();
     test_source();
+    test_source_toggle();
     test_names();
     test_other_hal();
     test_vbus_holdoff();

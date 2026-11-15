@@ -44,7 +44,7 @@ size_t jx_beat_line(char *out, size_t cap, char kind, uint32_t n, int32_t bpm_x1
                     int32_t extra2)
 {
     int r = snprintf(out, cap, "%c %lu %ld %s %u", kind, (unsigned long)n, (long)(bpm_x100 > 0 ? bpm_x100 : 0),
-                     BEAT_MODES[mode & 3u], audio ? 1u : 0u);
+                     BEAT_MODES[mode & 3u], audio > 2u ? 2u : audio);
     size_t at = r < 0 ? cap : (size_t)r;
     if (at < cap && extra != JX_NO_EXTRA) {
         r = snprintf(out + at, cap - at, " %ld", clamp_field(extra));

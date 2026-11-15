@@ -307,6 +307,17 @@ static void test_led_events(void)
     CHECK(jl_pattern(JL_NO_GROUP, 1, 0, c) == 1 && c[0] && !c[1] && !c[2]);  /* red: not a JL_JOINED */
     CHECK(jl_pattern(JL_SCANNING, 1, 100000, c) == 1 && c[0] && !c[1] && c[2]);  /* steady, until the event changes */
     CHECK(jl_pattern(JL_NONE, 1, 0, c) == 0);
+    /* a screenless unit's NO: one 400 ms flash, cyan for USB AUDIO, purple for LINK; unlike the scan's magenta */
+    CHECK(jl_pattern(JL_SRC_AUDIO, 0, 0, c) == 1 && !c[0] && c[1] && c[2]);
+    CHECK(jl_pattern(JL_SRC_AUDIO, 0, JL_SRC_MS - 1u, c) == 1 && jl_pattern(JL_SRC_AUDIO, 0, JL_SRC_MS, c) == 0);
+    CHECK(jl_pattern(JL_SRC_LINK, 0, 0, c) == 1 && c[0] && !c[1] && c[2] > c[0]);
+    CHECK(jl_pattern(JL_SRC_LINK, 0, JL_SRC_MS, c) == 0);
+    {
+        uint8_t m[3];
+        jl_pattern(JL_SCANNING, 0, 0, m);
+        jl_pattern(JL_SRC_LINK, 0, 0, c);
+        CHECK(m[0] == m[2] && c[2] >= 2u * c[0]);   /* magenta is red = blue; purple is blue-heavy */
+    }
 }
 
 int main(void)

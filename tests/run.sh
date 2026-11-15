@@ -8,7 +8,7 @@ mkdir -p "$OUT"
 CC="${CC:-cc}"
 FLAGS="-std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -I$HERE/core"
 
-CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_phone.c $HERE/core/jank_usbrole.c"
+CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_phone.c $HERE/core/jank_usbrole.c $HERE/core/jank_hold.c"
 LINK="$HERE/third_party/link/link.c $HERE/core/jank_start.c"
 for t in core ctl ui; do
     "$CC" $FLAGS "$HERE/tests/test_$t.c" $CORE -o "$OUT/test_$t"
@@ -53,6 +53,10 @@ fi
 # The USB speaker's descriptor (firmware/main/usb_audio.h: macros only).
 "$CC" $FLAGS -I"$HERE/firmware/main" "$HERE/tests/test_uac_desc.c" -o "$OUT/test_uac_desc"
 "$OUT/test_uac_desc"
+
+# Sound on the source (AUDIO mode) and the input meter; AUDIO mode's Stop / Start of the outputs.
+"$CC" $FLAGS "$HERE/tests/test_live.c" "$HERE/core/jank_live.c" "$HERE/core/jank_hold.c" -lm -o "$OUT/test_live"
+"$OUT/test_live"
 
 # The beat tracker as the Link session's master.
 "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_beatlink.c" "$HERE/core/jank_beatlink.c" $LINK -lm -o "$OUT/test_beatlink"

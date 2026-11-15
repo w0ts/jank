@@ -27,6 +27,7 @@
 #include "jb_beat.h"
 #include "jb_down.h"
 #include "jb_mode.h"
+#include "jank_live.h"
 #include "usb_audio.h"
 
 #define BEAT_PRIO 3
@@ -34,6 +35,7 @@
 #define POLL_MS 5
 #define STEP_EVERY_US 250000           /* the Link session is looked after this often, and at each tracked beat */
 #define WINDOW_US 1000000              /* the CPU share is over this long */
+#define SILENT_GAP_US 200000         /* the source open and no samples this long: that time counts as silence (jank_live.h) */
 #define DOWN_JUMP_RESET 0              /* 1: a tempo jump (jb_mode's jumps) resets the bar; off: those are mostly short excursions
                                         * in breaks, and resetting cost 3 points and 2.4x the moves (beat-listener
                                         * studies/downbeat/results/v2_stream_check.md) */
@@ -58,8 +60,12 @@ static uint64_t s_busy_us, s_busy_cycles, s_frames_timed;
 static int64_t s_win_start, s_win_busy;
 static int32_t s_win_peak;             /* the input's largest |sample| in this window */
 static float s_win_act;                /* the network's largest activation in this window */
-static int16_t s_level_db = -99;       /* the last window's: dBFS, and the activation in percent */
+static int16_t s_peak_db = -99;        /* the last window's: dBFS, and the activation in percent */
 static uint8_t s_conf_pct;
+static struct jlv s_live;              /* sound on the source (AUDIO mode) and the input meter: the tracker's own samples */
+static int64_t s_fed_us;               /* when samples last came ... */
+static int64_t s_fed_samples;          /* ... s_samples then */
+static uint8_t s_audio_live;           /* the source open and sounding: AUDIO mode, as last decided by this task */
 
 struct step_ctx {
     struct jbl_in in;
@@ -108,7 +114,8 @@ static void report(char kind, double at_s)
         if (q.ok)
             link = q.us;
     }
-    size_t n = jx_beat_line(line, sizeof line, kind, s_beat_n, (int32_t)llround(bpm * 100.0), (unsigned)mode, u.open, extra, link);
+    size_t n = jx_beat_line(line, sizeof line, kind, s_beat_n, (int32_t)llround(bpm * 100.0), (unsigned)mode,
+                            u.open ? (s_audio_live ? 2u : 1u) : 0u, extra, link);
     if (n)
         usb_beat_line(line, n);        /* (not to a phone: it gets the HOME line, level and activation included) */
 }
@@ -197,8 +204,9 @@ static void make_bar(const struct jk_cfg *cfg, struct jbl_bar *bar)
 /* the bridge's task, holding its lock */
 static void step_link(struct jank_peer *p, int64_t now, void *arg)
 {
-    const struct step_ctx *c = arg;
+    struct step_ctx *c = arg;
     int settled = jp_settled(p, now);
+    c->in.held = (uint8_t)bridge_session_held();   /* AUDIO mode's Stop with FOLLOW+LEAD (jank_hold.h) */
     jbl_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, c->quantum);
     jbl_bar_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, &c->bar);
 }
@@ -213,8 +221,8 @@ static void make_input(const struct jk_cfg *cfg, struct jbl_in *in, enum jb_mode
     *mode = jb_mode_at(&s_mode, now_s);
     *bpm = 0.0;
     memset(in, 0, sizeof *in);
-    in->passive = (uint8_t)!u.open;            /* LINK mode: the tracker neither starts nor stops the session */
-    if (!u.open || *mode == JB_STOPPED || !jb_mode_bpm_at(&s_mode, now_s, bpm) || !jb_mode_grid(&s_mode, &tb, &period))
+    in->passive = (uint8_t)!s_audio_live;      /* LINK mode (no sound): the tracker neither starts nor stops the session */
+    if (!s_audio_live || *mode == JB_STOPPED || !jb_mode_bpm_at(&s_mode, now_s, bpm) || !jb_mode_grid(&s_mode, &tb, &period))
         return;
     if (!uac_sample_time((int64_t)llround(tb * (double)UAC_RATE), &us))
         return;
@@ -231,6 +239,7 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     memset(&b, 0, sizeof b);
     b.on = cfg->beat;
     b.audio = u.open;
+    b.audio_live = s_audio_live;
     b.mode = (uint8_t)mode;
     b.bpm_x100 = (int32_t)llround(bpm * 100.0);
     b.hops = s_hops;
@@ -259,7 +268,10 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     } else
         b.bar_phi = -1;
     b.bar_moves = s_jbl.bar_moves;
-    b.level_db = s_level_db;
+    b.level_db = s_live.rms_db;
+    b.level_min_db = s_live.min_db;
+    b.level_max_db = s_live.max_db;
+    b.peak_db = s_peak_db;
     b.conf_pct = s_conf_pct;
     portENTER_CRITICAL(&s_mux);
     s_pub = b;
@@ -277,6 +289,7 @@ static void work(const int16_t *x, size_t n)
         if (a > s_win_peak)
             s_win_peak = a;
     }
+    jlv_push(&s_live, x, n);
     jb_beat_push_s16(&s_b, x, n, on_frame, NULL);
     uint32_t cycles = esp_cpu_get_cycle_count() - c0;
     int64_t us = esp_timer_get_time() - t0;
@@ -293,6 +306,26 @@ static void work(const int16_t *x, size_t n)
     }
 }
 
+/* AUDIO mode: the source open and sounding (jank_live.h). Closed: the detector starts over (no sound at once); open with
+ * no samples for a while (a stalled stream): that time is silence */
+static void follow_sound(int64_t now)
+{
+    struct uac_stats u;
+    uac_stats(&u);
+    if (!u.open) {
+        if (s_live.blocks || s_live.acc_n)
+            jlv_init(&s_live);
+        s_fed_us = now;
+    } else if (s_samples != s_fed_samples) {
+        s_fed_samples = s_samples;
+        s_fed_us = now;
+    } else if (now - s_fed_us >= SILENT_GAP_US) {
+        jlv_push(&s_live, NULL, (size_t)((now - s_fed_us) * (int64_t)UAC_RATE / 1000000));
+        s_fed_us = now;
+    }
+    s_audio_live = (uint8_t)(u.open && jlv_live(&s_live));
+}
+
 static void beat_task(void *arg)
 {
     int16_t x[JB_HOP];
@@ -303,6 +336,7 @@ static void beat_task(void *arg)
     double bpm = 0.0;
     (void)arg;
     restart_tracker();
+    jlv_init(&s_live);
     s_win_start = esp_timer_get_time();
     for (;;) {
         size_t n;
@@ -315,6 +349,7 @@ static void beat_task(void *arg)
         }
         while ((n = uac_pull(x, JB_HOP)) != 0u)
             work(x, n);
+        follow_sound(esp_timer_get_time());
         if (s_down_seg && jd_counting(&s_down) && jb_mode_at(&s_mode, (double)s_samples / (double)UAC_RATE) == JB_STOPPED)
             jd_stop(&s_down);           /* 30 s without a steady beat: the bar starts over */
         now = esp_timer_get_time();
@@ -323,7 +358,7 @@ static void beat_task(void *arg)
             s_win_start = now;
             s_win_busy = 0;
             /* the second's input peak in dBFS (full scale 32768; silence and anything below -99 dB: -99) and activation */
-            s_level_db = s_win_peak > 0 ? (int16_t)fmax(-99.0, floor(20.0 * log10((double)s_win_peak / 32768.0) + 0.5)) : -99;
+            s_peak_db = s_win_peak > 0 ? (int16_t)fmax(-99.0, floor(20.0 * log10((double)s_win_peak / 32768.0) + 0.5)) : -99;
             s_conf_pct = (uint8_t)fmin(100.0, fmax(0.0, floor((double)s_win_act * 100.0 + 0.5)));
             s_win_peak = 0;
             s_win_act = 0.0f;
@@ -357,6 +392,14 @@ void beat_stats(struct jk_beat *out)
     out->heap_largest = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
     out->psram_free = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     out->psram_min = (uint32_t)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM);
+}
+
+void beat_state(uint8_t *audio, uint8_t *locked)
+{
+    portENTER_CRITICAL(&s_mux);
+    *audio = (uint8_t)(s_pub.on && s_pub.audio_live);
+    *locked = (uint8_t)(s_pub.mode != JB_STOPPED && s_pub.bpm_x100 > 0);
+    portEXIT_CRITICAL(&s_mux);
 }
 
 uint8_t beat_bar_state(void)

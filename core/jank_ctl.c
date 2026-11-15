@@ -2,6 +2,7 @@
 /* The control line protocol (jank_core.h): get, set, status. */
 #include "jank_core.h"
 #include "jank_phone.h"
+#include "jank_hold.h"
 #include "jank_usbrole.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -135,6 +136,14 @@ static void put_link(const struct jk_snapshot *s, struct writer *w)
     put(w, "midi_ticks=%lu\nmidi_resync=%lu\n", (unsigned long)s->midi_ticks, (unsigned long)s->midi_resync);
 }
 
+/* the tracker's source: open, sound (AUDIO mode), AUDIO mode's Stop, the outputs; the input meter and the confidence */
+static void put_audio(const struct jk_snapshot *s, struct writer *w)
+{
+    const struct jk_beat *t = &s->beat;
+    put(w, "audio=%u\naudio_live=%u\nhold=%u\noutputs=%s\n", t->audio, t->audio_live, s->hold, jho_icon_name(s->outputs));
+    put(w, "rms_db=%d\nrms_min_db=%d\nrms_max_db=%d\npeak_db=%d\nconf=%u\n", t->level_db, t->level_min_db, t->level_max_db, t->peak_db, t->conf_pct);
+}
+
 static const char *const BAR_NAME[] = {"off", "listening", "locked", "manual"};
 
 /* the downbeat estimator (AUTO BAR): its state, the 1's count position (-1 none) and its lead */
@@ -172,6 +181,7 @@ static void cmd_status(const struct jk_snapshot *s, uint32_t now_ms, struct writ
     put(w, "tx_fail=%lu\nqueue_full=%lu\nscan_lost=%lu\n", (unsigned long)s->tx_fail, (unsigned long)s->queue_full, (unsigned long)s->scan_lost);
     put(w, "lat_air_us=%lu\nlat_air_max_us=%lu\nlat_usb_us=%lu\nlat_usb_max_us=%lu\n", (unsigned long)s->lat_air_us, (unsigned long)s->lat_air_max_us, (unsigned long)s->lat_usb_us, (unsigned long)s->lat_usb_max_us);
     put_link(s, w);
+    put_audio(s, w);
     put_bar(&s->beat, w);
     if (s->ble_built) {
         static const char *const st[] = {"off", "window", "connected"};
@@ -340,7 +350,8 @@ static const char *const MODE_NAME[] = {"stopped", "steady", "speeding_up", "slo
 static void cmd_beat(const struct jk_beat *t, struct writer *w)
 {
     uint32_t bpm = t->bpm_x100 > 0 ? (uint32_t)t->bpm_x100 : 0u;
-    put(w, "beat=%s\nbeat_weights=madmom BENCH ONLY, CC BY-NC-SA 4.0, never ship\naudio=%u\n", on_off(t->on), t->audio);
+    put(w, "beat=%s\nbeat_weights=madmom BENCH ONLY, CC BY-NC-SA 4.0, never ship\naudio=%u\naudio_live=%u\n", on_off(t->on), t->audio, t->audio_live);
+    put(w, "rms_db=%d\nrms_min_db=%d\nrms_max_db=%d\npeak_db=%d\nconf=%u\n", t->level_db, t->level_min_db, t->level_max_db, t->peak_db, t->conf_pct);
     put(w, "mode=%s\nbpm=%lu.%02lu\n", MODE_NAME[t->mode & 3u], (unsigned long)(bpm / 100u), (unsigned long)(bpm % 100u));
     put(w, "heap_free=%lu\nheap_min=%lu\nheap_largest=%lu\nstack_free=%lu\n", (unsigned long)t->heap_free, (unsigned long)t->heap_min, (unsigned long)t->heap_largest, (unsigned long)t->stack_free);
     put(w, "psram_free=%lu\npsram_min=%lu\n", (unsigned long)t->psram_free, (unsigned long)t->psram_min);

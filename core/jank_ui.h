@@ -84,10 +84,14 @@ enum jl_event {
     JL_NONE = 0,
     JL_SCANNING,                       /* magenta, steady, for the whole scan */
     JL_JOINED,                         /* white, N flashes: the new GROUP */
-    JL_NO_GROUP                        /* red, 3 long pulses: none other found, stayed */
+    JL_NO_GROUP,                       /* red, 3 long pulses: none other found, stayed */
+    JL_SRC_AUDIO,                      /* cyan, one JL_SRC_MS flash: a screenless unit's NO chose USB AUDIO (jur_src_toggle) */
+    JL_SRC_LINK                        /* purple, one JL_SRC_MS flash: ... chose LINK. Neither is any other pattern's colour
+                                          (blue pair, red, green beat, amber 1, yellow armed, magenta scan, white joined) */
 };
 #define JL_FLASH_MS 240u               /* one JL_JOINED flash, on and off */
 #define JL_PULSE_MS 600u               /* one JL_NO_GROUP pulse, on and off */
+#define JL_SRC_MS 400u                 /* the source's flash on a screenless unit's NO */
 #define JL_PAIR_MS 250u                /* the pair window's blink, on and off: 4 a second, unlike any beat's flash */
 
 /* while a phone's pair window is open (no phone yet): 1 lit, rgb its colour (blue). t_ms: any running clock */

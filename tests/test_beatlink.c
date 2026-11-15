@@ -148,6 +148,39 @@ static void test_passive(void)
     CHECK(!st.armed && poll_start(30150000, 34000000, 1) == 0 && !lk_playing(&node));
 }
 
+/* AUDIO mode's Stop with FOLLOW+LEAD (jank_hold.h): the session stops at the press, whoever started it, and the tracker
+ * does not start it while held; Start: a start on the next bar line once the tracker runs */
+static void test_held(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000, .period_us = 500000};
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 10100000, &in, 4);
+    poll_start(10100000, 14000000, 1);
+    CHECK(lk_playing(&node) && jbl.playing && jbl.starts == 1);
+    in.held = 1;                                     /* Stop: at once */
+    jbl_step(&jbl, &node, &st, 1, 15000000, &in, 4);
+    CHECK(!lk_playing(&node) && !jbl.playing && jbl.stops == 1 && jbl.held);
+    jbl_step(&jbl, &node, &st, 1, 16000000, &in, 4);  /* still held, the tracker locked: no start */
+    CHECK(!st.armed && poll_start(16000000, 20000000, 1) == 0 && !lk_playing(&node) && jbl.starts == 1);
+    lk_set_playing(&node, 1, lk_beat_at(&node, 20000000), 20000000);   /* a peer starts the session while held: left alone */
+    jbl_step(&jbl, &node, &st, 1, 20100000, &in, 4);
+    CHECK(lk_playing(&node) && jbl.stops == 1);
+    lk_set_playing(&node, 0, lk_beat_at(&node, 20200000), 20200000);
+    in.passive = 1;                                  /* LINK mode (no sound) and back, still held: not stopped again */
+    jbl_step(&jbl, &node, &st, 1, 20300000, &in, 4);
+    in.passive = 0;
+    jbl_step(&jbl, &node, &st, 1, 20400000, &in, 4);
+    CHECK(jbl.stops == 1 && jbl.held);
+    in.held = 0;                                     /* Start, the tracker not locked: nothing yet */
+    in.running = 0;
+    jbl_step(&jbl, &node, &st, 1, 21000000, &in, 4);
+    CHECK(!st.armed && !jbl.held);
+    in.running = 1;                                  /* locked: a start on the next bar line */
+    jbl_step(&jbl, &node, &st, 1, 21500000, &in, 4);
+    CHECK(st.armed && st.ub % (4 * (int64_t)LK_UBEAT) == 0 && jbl.starts == 2);
+    CHECK(poll_start(21500000, 26000000, 1) != 0 && lk_playing(&node));
+}
+
 /* the start's own rules */
 static void test_start_rules(void)
 {
@@ -266,6 +299,7 @@ int main(void)
     test_tempo_deadband();
     test_transport();
     test_passive();
+    test_held();
     test_start_rules();
     test_not_joined();
     test_drifting_tracked_grid();
