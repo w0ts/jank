@@ -10,6 +10,15 @@ menu "jank"
             depends on IDF_TARGET_ESP32S3
     endchoice
 
+    config JANK_LINEIN_BENCH
+        bool "XIAO bench LINE IN on pad D3 (GPIO4, ADC1_CH3)"
+        depends on JANK_BOARD_XIAO
+        default n
+        help
+            The XIAO has no LINE IN. This samples pad D3 (GPIO4) with the LINE IN path (main/linein.c) so it can be tried
+            on the bench: a line signal through a bias network to D3 (docs/linein.md), then `set source line`. Off in the
+            normal XIAO build (USB audio only). firmware/sdkconfig.linein-bench turns it on.
+
     config JANK_BLE_MIDI
         bool "BLE MIDI peripheral for the control line"
         depends on BT_NIMBLE_ENABLED

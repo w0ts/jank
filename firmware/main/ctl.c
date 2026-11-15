@@ -170,6 +170,11 @@ static void run_line(const char *line)
         reply_out();
         return;
     }
+    if (!strcmp(line, "line")) {
+        linein_report(s_out, sizeof s_out);
+        reply_out();
+        return;
+    }
 #ifdef JANK_CLOCK_PROBE
     if (!strncmp(line, "probe", 5) && (!line[5] || !strcmp(line + 5, " reset"))) {
         ctl_reply(s_out, probe_report(s_out, sizeof s_out, line[5] != 0));

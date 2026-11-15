@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# The LINE IN's DMA interrupt runs with the cache off (CONFIG_ADC_CONTINUOUS_ISR_IRAM_SAFE): what it calls must be in IRAM
+# (ESP-IDF adc_continuous.rst "IRAM Safe"; api-guides/linker-script-generation.rst). core/jank_line.c's frame parser:
+[mapping:jank_line]
+archive: libmain.a
+entries:
+    jank_line:jl_parse (noflash)

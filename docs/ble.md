@@ -38,7 +38,7 @@ The setting `ble` (`set ble pair|auto|off`, saved):
 
   `net` is `j<group>` (MODE JANK) or `w1`/`w0` (on the Wi-Fi network / looking for it); `transport` 0 stopped, 1
   playing, 2 a start armed for a bar ahead; `bar` the session's place in the bar in hundredths of a beat (`-` with no
-  session); `battery` percent (`-`: no board has a gauge yet); `level` the beat tracker's input peak over the last second
+  session); `battery` percent (`-`: no gauge; jank mini 2.2 reads its cell, docs/linein.md); `level` the beat tracker's input peak over the last second
   in dBFS and `conf` its beat activation peak in percent (`-` with no audio stream). `home` on the control line answers
   the same line (the page polls it over USB).
 - **Nothing else**: no beat reports (they stay on USB), no MIDI clock (connection events 30..60 ms apart, some given up to
