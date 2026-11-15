@@ -122,6 +122,7 @@ class FollowBpm(ModeBpm):
     log: list = field(default_factory=list)      # (time, event): seed / jump / refused
     outcomes: deque = field(default_factory=lambda: deque(maxlen=TRUST_BEATS))   # the last beats: fitted or not
     pending: tuple | None = None                  # a proposed rate change (ratio, time, since) awaiting the next beat
+    last_ratio: float = 1.0                       # the last proposed ratio a beat backed (jank's status rate_ratio)
 
     def update(self, t: float) -> None:
         if self.kf is not None and self.mode_at(t) != "steady":
@@ -186,6 +187,8 @@ class FollowBpm(ModeBpm):
         if abs(e_new) >= abs(e_old):
             self.kf.x, self.kf.c = x_old, c_old                 # the beat does not back it: undone
             self.log[-1] = (t, "ratio refused")
+        else:
+            self.last_ratio = ratio
 
     def apply_ratio(self, ratio: float, t: float, since: float | None = None) -> bool:
         """A measured playback-rate change (the spectrum moved by `ratio`: a varispeed step, studies/advanced-follow

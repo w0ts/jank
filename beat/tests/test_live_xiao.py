@@ -211,7 +211,7 @@ def test_the_page_reads_the_xiao_reports():
     assert "checks passed" in r.stdout
 
 
-@pytest.mark.parametrize("script", ["xiao_m2b.js", "oled_buttons.js"])
+@pytest.mark.parametrize("script", ["xiao_m2b.js", "oled_buttons.js", "xiao_m2i.js"])
 def test_the_page_follows_the_xiao_m2b_and_the_one_button(script):
     """player.html with the XIAO firmware M2b (the sound flag, outputs, home's meter, Bluetooth) and NO's clicks / the
     screenless unit, run by node."""
