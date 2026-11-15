@@ -179,6 +179,63 @@ static void test_resync(void)
     CHECK(c.resyncs == 2);
 }
 
+/* Runs the clock over [t, t_end) at 120 BPM, moving the session's beat by move_ub at time t_move (an AUTO BAR move:
+ * jbl_shift_bar moves the bar by whole beats at the same time). Returns the clocks sent; *min_gap the closest two. */
+static uint32_t run_with_move(int64_t move_ub, int64_t t_move, int64_t t_end, int64_t *min_gap, uint32_t *resyncs)
+{
+    struct jc_map m;
+    struct jc_ticker c;
+    struct jc_fire f;
+    int64_t t, last = -1, gap = INT64_MAX;
+    uint32_t clocks = 0;
+    int moved = 0;
+    jc_map_make(&m, 0, 0, 500000, 0);
+    jc_ticker_init(&c, 4);
+    if (jc_begin(&c, &m, 0) != 0)
+        return 0;
+    t = c.t_due;
+    while (t < t_end) {
+        if (!moved && t >= t_move) {
+            jc_map_make(&m, t_move, t_move * 2 + move_ub, 500000, 0);     /* ub = t x 2 at 120 BPM, plus the move */
+            moved = 1;
+        }
+        jc_step(&c, &m, t, &f);
+        for (unsigned i = 0; i < f.n; i++)
+            if (f.bytes[i] == JC_CLOCK) {
+                clocks++;
+                if (last >= 0 && t - last < gap)
+                    gap = t - last;
+                last = t;
+            }
+        t = f.next;
+    }
+    *min_gap = gap;
+    *resyncs = c.resyncs;
+    return clocks;
+}
+
+/* AUTO BAR moves the session's bar by whole beats. The grid's times stay where they were, so the clock must go on with
+ * one F8 per grid time: no second F8 at the tick that was just sent (the timing audit's 193 -> 192 per bar move). */
+static void test_whole_beat_move(void)
+{
+    static const int64_t moves[] = {1000000, -1000000, 3000000, -2000000, 1000000 + 3000, 1000000 - 3000};
+    const int64_t tick = 500000 / 24, t_end = 4000000;             /* 2 bars of 4 at 120 BPM: 192 grid times */
+    for (unsigned i = 0; i < sizeof moves / sizeof moves[0]; i++) {
+        int64_t gap;
+        uint32_t resyncs, n = run_with_move(moves[i], 1000000 + 7 * tick + 1, t_end, &gap, &resyncs);
+        int whole = moves[i] % 1000000 == 0;
+        if (whole)
+            CHECK(n == 192);                                        /* exactly the grid's clocks */
+        else
+            CHECK(n >= 191 && n <= 193);                            /* 1.5 ms off the grid: the window holds one more or less */
+        CHECK(gap >= tick / 2);                                     /* never two clocks in a row */
+        CHECK(resyncs == 1);
+        if (whole)
+            CHECK(gap >= tick - 1);
+        printf("clock: bar move %+lld ub: %u clocks, min gap %lld us\n", (long long)moves[i], n, (long long)gap);
+    }
+}
+
 static uint32_t count(const struct jc_fire *f, uint8_t b)
 {
     uint32_t c = 0;
@@ -367,6 +424,7 @@ int main(void)
     test_tempo_change();
     test_slew();
     test_resync();
+    test_whole_beat_move();
     test_start_on_the_bar();
     test_click_resync();
     test_free_run_through_a_scan();
