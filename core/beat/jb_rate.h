@@ -9,7 +9,8 @@
  *   match     at every JR_EVERY-th block's end the mean of the last JR_CUR blocks against the mean of the JR_REF before
  *             them: the correlation of the mean-removed spectra at shifts within +-10 % (+-14 bins), the peak refined by
  *             a parabola, ratio = 2^(shift / 96)
- *   event     2 estimates in a row past 0.6 % that agree within 0.3 %: their mean is a rate step, handed to the follower
+ *   event     JR_CONFIRM estimates in a row past 0.6 %, each within 0.3 % of the one before: their median is a rate step
+ *             (3 since M2j, the median of three: fewer flips, a step taken ~0.5 beat later; M2i had 2), handed to the follower
  *             (jb_follow_propose, `since` JR_LAG_S before), which takes it only if the next tracked beat backs it;
  *             then no estimate for 4.5 s (until the reference holds only the new rate)
  * It runs only while the follower glides (jb_rate_set_active): its history starts over at each lock.
@@ -40,6 +41,8 @@
 #define JR_STEP 2                      /* the default: every second frame */
 #define JR_EVERY 2                     /* the default: an estimate at every second block (half the match's CPU; 1: every block) */
 #define JR_LAG_S 0.5                   /* an event comes this long after the step (the study's median) */
+#define JR_CONFIRM 3                   /* live/rate.py CONFIRM (M2j: studies/tempo-changes tuned-l16; M2i 2) */
+#define JR_CONFIRM_MAX 5
 #define JR_Q 8192.0f                   /* the ring's uint16: a block's mean log spectrum (0 .. 7) times this */
 
 struct jr_store {                      /* everything but a few counters: PSRAM on the device (internal RAM is short) */
@@ -53,12 +56,14 @@ struct jr_store {                      /* everything but a few counters: PSRAM o
     float pa[JR_BINS + 1], pb[JR_BINS + 1];   /* their prefix sums of squares (the norms at each shift) */
 };
 
-struct jb_rate {                       /* (about 90 bytes: internal RAM) */
+struct jb_rate {                       /* (about 130 bytes: internal RAM) */
     struct jr_store *st;               /* NULL: no rate */
     uint8_t acc_n, in_block, step, every, active;
     uint8_t count, head;               /* blocks in the ring, the oldest's row */
-    uint8_t run_n;                     /* estimates in a row past the threshold (0 .. 1) ... */
+    uint8_t run_n;                     /* estimates in a row past the threshold (0 .. confirm - 1) ... */
     double run_last;                   /* ... the last of them */
+    double run[JR_CONFIRM_MAX];        /* ... all of them */
+    uint8_t confirm;                   /* CONFIRM: JR_CONFIRM by jb_rate_init (2 .. JR_CONFIRM_MAX) */
     uint8_t has_last;                  /* an event was decided ... */
     double last_t;                     /* ... at this time */
     uint8_t has_event;                 /* jb_rate_take's: an event not taken yet */

@@ -166,6 +166,7 @@ static void test_mode_trace(const char *dir, const char *name)
     }
     struct jb_mode m;
     jb_mode_init(&m);
+    m.lock_beats = 8;                  /* the traces are ModeBpm with LOCK_BEATS 8 (the device has 16 since M2j) */
     int n = 0, bad_mode = 0;
     double worst = 0;
     (void)beats;

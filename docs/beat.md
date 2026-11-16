@@ -75,6 +75,10 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
 | `rate`, `rate_active` | the spectral rate: the setting (`set rate on\|off`; off also without PSRAM) and whether it runs now (only while gliding) |
 | `rate_events`, `rate_taken`, `rate_refused`, `rate_ignored` | rate steps proposed; taken, refused by the next beat, not judged (the glide not trusted yet) |
 | `rate_us`, `rate_max_us` | the rate's work over the last second in µs (1000 = 0.1 % of core 0) and its longest frame |
+| `weak` | the weak-signal hold (M2j): on with PSRAM for its 7.3 KB |
+| `weak_holds` | steps the weak confidence kept the outputs running while the strict one was under the threshold (beat-less or quiet passages) |
+| `coasts`, `weak_beats` | lines with no tracked beat the grid was corrected on from the activation; weak tracked beats taken gently |
+| `fast_jumps` | new grids the follower jumped to at once (16 beats on a grid more than 6 % away, not an octave) |
 
 ## How it works
 
@@ -116,3 +120,25 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   - Cost: the glide is a few hundred double operations a beat. The rate is ~0.7 % of core 0 (the S3 code's instruction
     count, CPI 1.45; PSRAM misses on top: read `rate_us`) and runs only while gliding. RAM: under 1 KB internal; the
     rate's 58 KB in PSRAM.
+- **THE TUNED FOLLOW** (M2j; beat-listener `studies/tempo-changes`, the proposal tuned-l16; golden vectors in
+  `tests/tempo_ref`). Hard to lock, sticky once locked, quick on clear evidence, held through beat-less passages:
+  - **LOCK_BEATS 16** (was 8): 16 consistent beats before the outputs run, and for a jump.
+  - **the rate's median of three** (`JR_CONFIRM` 3, was 2): fewer flips; a pitch step is taken ~0.5 beat later.
+  - **the fast jump** (`jb_follow_fast_jump`): 16 beats on one grid more than 6 % from the glide's tempo, not an octave:
+    jump now (a section change into a quiet part no longer waits for misses).
+  - **the lines cleared on any jump**: the new grid is not judged on the old grid's lines (the gate opens ~7 s sooner).
+  - **the weak-signal hold** (`core/beat/jb_weak.c`, `weak.py`): the network's activation is kept 2.56 s. A tracked
+    beat is strong when the activation around it reaches max(0.05, min(0.3, 0.4 × the 75th percentile of the last 64
+    beats')); weak beats are gentle corrections (12 ms, within ±0.12 period, no tempo move) or misses when off the grid;
+    a beat-less line takes a salient activation peak (≥ 0.03 and 2.5 × the median of ±1 period) as one. The strict line
+    confidence opens the gate; once open, the weak one holds it: lines with no evidence do not count against the grid,
+    only strong beats off the lines do (and with fewer than 4 observed lines in 8 s the last value holds).
+  - The device sees the activation only up to now: a beat goes to the follower 3 frames (30 ms) late, a beat-less line
+    once the frames a period after it are in. `weak.py causal` replays exactly that; the study's numbers were measured
+    with its look-ahead (not re-measured on the set: the cache is gone; equal on the synthetic cases).
+  - Measured offline (test half of the user's 829 tracks): BPM held like before (0.858), stopped 0.129 → 0.105, wrong
+    locks 0.31 → 0.20 a track, no range break; beat-less passages stopped 0.60 → 0.39; pitch moves in ~3 beats.
+    Known regression: a tracker that slides to the off-beat for long (Sympathy is a knife: stopped 0.13 → 0.36).
+  - `beat`: `weak`, `weak_holds`, `coasts`, `weak_beats`, `fast_jumps`. Cost (estimate): +0.16-0.24 % of core 0 (host
+    time scaled by ModeBpm's QEMU-measured soft-double cost; ~0.05 % if it ran like float code). RAM: ~0.3 KB internal,
+    7.3 KB PSRAM; without PSRAM, M2i's follow.

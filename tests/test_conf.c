@@ -118,6 +118,7 @@ static void test_run(const char *dir, const char *name)
         return;
     jcf_init(&c);
     jb_mode_init(&m);
+    m.lock_beats = 8;                  /* the vectors are ModeBpm with LOCK_BEATS 8 (the device has 16 since M2j) */
     while (fgets(line, sizeof line, f)) {
         if (line[0] == 'b') {
             double t = strtod(line + 1, NULL);

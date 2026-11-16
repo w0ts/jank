@@ -63,7 +63,11 @@ fi
 # Advanced beat follow (M2i): the tempo glide, the line confidence and the spectral rate against beat-listener's
 # eval/follow_bpm.py, live/follow.py and live/rate.py (golden vectors, tests/follow_ref).
 "$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_follow.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_follow.c" "$HERE/core/beat/jb_mode.c" "$HERE/core/beat/jb_rate.c" "$HERE/core/beat/jb_fe.c" "$HERE/core/beat/beat_model.c" -lm -o "$OUT/test_follow"
-"$OUT/test_follow" "$HERE/tests/follow_ref"
+"$OUT/test_follow" "$HERE/tests/follow_ref" "$HERE/tests/tempo_ref"
+# The tuned follow (M2j): the weak-signal hold, the fast jump, the weak confidence and gate against beat-listener's
+# studies/tempo-changes chain (tuned-l16; golden vectors, tests/tempo_ref, scripts/tempo_golden.py).
+"$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_tempo.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_follow.c" "$HERE/core/beat/jb_weak.c" "$HERE/core/beat/jb_mode.c" -lm -o "$OUT/test_tempo"
+"$OUT/test_tempo" "$HERE/tests/tempo_ref"
 "$OUT/test_fold"
 "$OUT/test_live"
 

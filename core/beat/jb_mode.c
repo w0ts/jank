@@ -24,7 +24,6 @@
 #define RAMP_EXIT 0.002
 #define EXIT_CHECKS 16
 #define HOLD_S 30.0
-#define LOCK_BEATS 8
 #define STUCK_BEATS 32
 #define RAMP_MARGIN 0.6
 #define NEVER 1000000000
@@ -345,6 +344,7 @@ void jb_mode_init(struct jb_mode *m)
     dq_init(&m->recent, SHORT_BEATS);
     dq_init(&m->history, CLASSIFY_BEATS);
     m->miss_limit = MISS_RESTART;          /* ModeBpm.__post_init__: hold on misses, the base restart never fires */
+    m->lock_beats = JB_LOCK_BEATS;
     m->mode = JB_STOPPED;
 }
 
@@ -358,21 +358,22 @@ enum jb_mode_kind jb_mode_at(struct jb_mode *m, double now)
 /* ModeBpm._recent_consistent */
 static int recent_consistent(const struct jb_mode *m)
 {
-    if (m->recent.n < LOCK_BEATS)
+    const int lb = m->lock_beats;
+    if (lb < 2 || lb > JB_DQ_MAX || m->recent.n < lb)
         return 0;
-    const double *b = m->recent.v + (m->recent.n - LOCK_BEATS);
-    double p = short_period(b, LOCK_BEATS);
+    const double *b = m->recent.v + (m->recent.n - lb);
+    double p = short_period(b, lb);
     if (p < 0)
         return 0;
-    double k[LOCK_BEATS], c[2], kmax = -1e30, kmin = 1e30;
-    for (int i = 0; i < LOCK_BEATS; ++i) {
-        k[i] = rint((b[i] - b[LOCK_BEATS - 1]) / p);
+    double k[JB_DQ_MAX], c[2], kmax = -1e30, kmin = 1e30;
+    for (int i = 0; i < lb; ++i) {
+        k[i] = rint((b[i] - b[lb - 1]) / p);
         kmax = k[i] > kmax ? k[i] : kmax;
         kmin = k[i] < kmin ? k[i] : kmin;
     }
-    if (unique_count(k, LOCK_BEATS) != LOCK_BEATS || kmax - kmin != LOCK_BEATS - 1 || polyfit(k, b, LOCK_BEATS, 1, c))
+    if (unique_count(k, lb) != lb || kmax - kmin != lb - 1 || polyfit(k, b, lb, 1, c))
         return 0;
-    for (int i = 0; i < LOCK_BEATS; ++i)
+    for (int i = 0; i < lb; ++i)
         if (fabs(b[i] - polyval(c, 1, k[i])) >= 0.08 * p)
             return 0;
     return 1;
@@ -514,13 +515,13 @@ void jb_mode_update(struct jb_mode *m, double t)
     if (m->misses >= m->miss_limit && recent_consistent(m)) {
         ++m->jumps;                        /* the beats moved to a new grid */
         restart(m);
-        m->in_a_row = LOCK_BEATS;
+        m->in_a_row = m->lock_beats;
         m->last_fit_time = t;
         m->has_last_fit = 1;
     }
     if (m->mode == JB_STOPPED) {
         m->stuck = restarted ? 0 : m->stuck + 1;
-        if (m->in_a_row >= LOCK_BEATS) {
+        if (m->in_a_row >= m->lock_beats) {
             set_mode(m, JB_STEADY);
         } else if (m->stuck >= STUCK_BEATS) {
             m->stuck = 0;

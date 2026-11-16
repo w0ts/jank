@@ -22,7 +22,14 @@
  * ModeBpm's lock, then a Kalman glide that takes a pitch move in a few beats with the phase kept), and while it glides
  * the spectral rate (core/beat/jb_rate.h, `set rate on|off`) reads the playback rate off the tracker's own |FFT| (the
  * front end's tap: no second FFT) and proposes it to the follower, which takes it if the next beat backs it. All of its
- * data (59 KB) is in PSRAM, a hundred bytes aside (internal RAM is short); without PSRAM the rate is off and the rest runs. */
+ * data (59 KB) is in PSRAM, a hundred bytes aside (internal RAM is short); without PSRAM the rate is off and the rest runs.
+ *
+ * THE TUNED FOLLOW (M2j, beat-listener studies/tempo-changes, the proposal tuned-l16): hard to lock (LOCK_BEATS 16), the
+ * rate's median of three, a fast jump to a new grid 16 beats agree on (jb_follow_fast_jump), the published lines cleared on
+ * any jump, and the weak-signal hold (core/beat/jb_weak.h): the network's activation kept for 2.56 s, each tracked beat
+ * judged strong or weak by it (fed to the follower 3 frames late, when its frames after are in), weak beats and salient
+ * activation peaks on beat-less lines as gentle corrections, and the gate held open by the weak confidence once the
+ * strict one opened it. Its 7.3 KB are PSRAM; without, M2i's follow. */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -44,6 +51,7 @@
 #include "jb_follow.h"
 #include "jb_mode.h"
 #include "jb_rate.h"
+#include "jb_weak.h"
 #include "jank_fold.h"
 #include "jank_live.h"
 #include "usb_audio.h"
@@ -54,6 +62,8 @@
 #define STEP_EVERY_US 250000           /* the Link session is looked after this often, and at each tracked beat */
 #define WINDOW_US 1000000              /* the CPU share is over this long */
 #define SILENT_GAP_US 200000         /* the source open and no samples this long: that time counts as silence (jank_live.h) */
+#define BEAT_DEFER JW_STRONG_HALF       /* frames a tracked beat waits for its strength (jb_weak.h) */
+#define RATE_QUEUE 4                   /* rate events waiting for the next tracked beat */
 #define DOWN_JUMP_RESET 0              /* 1: a tempo jump (jb_mode's jumps) resets the bar; off: those are mostly short excursions
                                         * in breaks, and resetting cost 3 points and 2.4x the moves (beat-listener
                                         * studies/downbeat/results/v2_stream_check.md) */
@@ -66,6 +76,18 @@ static struct jr_store *s_rate_store;  /* its tables, ring and work (59 KB, PSRA
 static uint8_t s_rate_cfg = 1;         /* the setting as last read (`set rate`) */
 static uint32_t s_rate_cycles, s_rate_max_cycles;   /* its work this second (the tap's calls) */
 static uint32_t s_rate_us, s_rate_max_us;           /* ... over the last second, published */
+static struct jb_weak s_weak;          /* the weak-signal hold (core/beat/jb_weak.h, M2j) */
+static struct jw_store *s_weak_store;  /* its activation ring and beat lists (7.3 KB, PSRAM); NULL: off, M2i's follow */
+static uint8_t s_pend;                 /* a tracked beat waiting BEAT_DEFER frames for its strength: */
+static int64_t s_pend_index;           /* ... its frame */
+static double s_pend_t;                /* ... its time */
+static struct {
+    double t, ratio;
+} s_rate_q[RATE_QUEUE];                /* rate events decided, proposed before the first tracked beat after them (chain.py) */
+static uint8_t s_rate_qn;
+static uint8_t s_conf_ran;             /* the automatic layer ran at the last step (a tempo, the gate open, no silence): the
+                                        * gate is then judged on the weak confidence */
+static uint32_t s_weak_holds;          /* steps the weak confidence held the gate open with the strict one under it */
 static struct jbl s_jbl;
 static TaskHandle_t s_task;
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -198,37 +220,76 @@ static void rate_tap(void *ctx, int64_t index, const float *mag)
         s_rate_max_cycles = c;
 }
 
-/* after a frame's beat (the follower has it): a rate step decided in this frame goes to the follower (held there until
- * the next beat, FollowBpm.propose_ratio), and the rate runs only while the follower glides, the setting on and sound */
+/* after a frame's beat: a rate step decided in this frame waits for the next tracked beat (then proposed to the follower,
+ * which that beat judges: FollowBpm.propose_ratio), and the rate runs only while the follower glides, the setting on and
+ * sound */
 static void rate_step(double now)
 {
     double t, ratio;
     if (!s_rate_store)
         return;
-    if (jb_rate_take(&s_rate, &t, &ratio))
-        jb_follow_propose(&s_follow, ratio, t, 1, t - JR_LAG_S);
+    if (jb_rate_take(&s_rate, &t, &ratio)) {
+        if (s_rate_qn == RATE_QUEUE) {          /* (never: 4.5 s apart) the oldest goes; the follower keeps the last anyway */
+            memmove(s_rate_q, s_rate_q + 1, sizeof s_rate_q[0] * (RATE_QUEUE - 1u));
+            s_rate_qn--;
+        }
+        s_rate_q[s_rate_qn].t = t;
+        s_rate_q[s_rate_qn++].ratio = ratio;
+    }
     jb_rate_set_active(&s_rate, s_rate_cfg && s_audio_live && jb_follow_state(&s_follow, now) == JF_GLIDE);
+}
+
+/* a tracked beat into the follower (chain.py's order): the rate events decided before it, the weak follower (strong:
+ * the follower's update; weak: a gentle observation), the fast jump, the lines cleared on any jump */
+static void feed_beat(double t)
+{
+    int jumps = s_follow.m.jumps;
+    uint8_t i = 0;
+    for (; i < s_rate_qn && s_rate_q[i].t <= t; i++)
+        jb_follow_propose(&s_follow, s_rate_q[i].ratio, s_rate_q[i].t, 1, s_rate_q[i].t - JR_LAG_S);
+    if (i) {
+        memmove(s_rate_q, s_rate_q + i, sizeof s_rate_q[0] * (size_t)(s_rate_qn - i));
+        s_rate_qn = (uint8_t)(s_rate_qn - i);
+    }
+    jw_update(&s_weak, &s_follow, t);
+    jb_follow_fast_jump(&s_follow, t, JF_FAST_JUMP_REL);
+    if (s_follow.m.jumps != jumps)
+        jcf_clear_lines(&s_conf);       /* a new grid: the old one's lines judge no beat */
+    if (s_down_seg)
+        down_tracked(t, jumps);
+    jcf_beat(&s_conf, t);              /* (not while silent: what comes after silence is new music) */
+    s_beat_seen = 1;
+    s_beat_n++;
+    report('b', t);
 }
 
 static void on_frame(void *ctx, const struct jb_frame *f)
 {
+    double now = (double)f->index / (double)JB_FPS;
     (void)ctx;
     s_hops++;
     if (s_down_seg && jd_frame(&s_down, f->index, f->bands))
         s_beat_seen = 1;                /* a decision: the session's bar is looked after now */
     if (f->act > s_win_act)
         s_win_act = f->act;
+    jw_act(&s_weak, f->index, f->act);
     if (f->beat) {
-        int jumps = s_follow.m.jumps;
-        jb_follow_update(&s_follow, f->time);
-        if (s_down_seg)
-            down_tracked(f->time, jumps);
-        jcf_beat(&s_conf, f->time);    /* (not while silent: what comes after silence is new music) */
-        s_beat_seen = 1;
-        s_beat_n++;
-        report('b', f->time);
+        if (s_pend)
+            feed_beat(s_pend_t);        /* (never: tracked beats are 0.33 s apart at least) */
+        s_pend = 0;
+        if (jw_on(&s_weak)) {
+            s_pend = 1;                 /* its strength needs the frames after it */
+            s_pend_index = f->index;
+            s_pend_t = f->time;
+        } else
+            feed_beat(f->time);
     }
-    rate_step((double)f->index / (double)JB_FPS);
+    if (s_pend && f->index >= s_pend_index + BEAT_DEFER) {
+        s_pend = 0;
+        feed_beat(s_pend_t);
+    }
+    jw_coast(&s_weak, &s_follow, now);  /* the beat-less lines whose evidence is in */
+    rate_step(now);
 }
 
 static void restart_down(void)
@@ -247,6 +308,10 @@ static void restart_tracker(void)
     s_bar_now = 1;
     jb_beat_reset(&s_b);
     jb_follow_init(&s_follow);
+    jw_init(&s_weak, s_weak_store, NULL, 0, 1);    /* the frame count starts over with the tracker */
+    s_pend = 0;
+    s_rate_qn = 0;
+    s_conf_ran = 0;
     jb_rate_set_active(&s_rate, 0);    /* (its history starts over at the next glide) */
     restart_down();
     jcf_init(&s_conf);                 /* a resync: no beats, no gate (engine.py resync) */
@@ -420,6 +485,11 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.rate_ignored = s_follow.ratios_ignored;
     b.rate_us = s_rate_us;
     b.rate_max_us = s_rate_max_us;
+    b.weak_on = (uint8_t)jw_on(&s_weak);
+    b.weak_holds = s_weak_holds;
+    b.coasts = s_weak.coasted;
+    b.weak_beats = s_weak.weak_beats;
+    b.fast_jumps = s_follow.fast_jumps;
     portENTER_CRITICAL(&s_mux);
     s_pub = b;
     portEXIT_CRITICAL(&s_mux);
@@ -427,17 +497,35 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
 
 /* LOW CONFIDENCE at a step: the confidence of the tracked beats against the lines the follower's grid published (0 in
  * LINK mode or silence; the grid records its lines while it gives a tempo: studies/advanced-follow replay.py) and the
- * gate's next state (core/jank_conf.h; engine.py status: conf under the threshold, back at threshold + 5) */
+ * gate's next state (core/jank_conf.h; engine.py status: conf under the threshold, back at threshold + 5). M2j
+ * (studies/tempo-changes chain.py conf "weak"): the strict line confidence opens the gate; once the outputs run, the weak
+ * one (jcf_weak_confidence: lines with no evidence do not count) holds it */
 static void follow_conf(const struct jk_cfg *cfg)
 {
-    double tb = 0.0, period = 0.0, conf = 0.0, bpm, now = (double)s_samples / (double)UAC_RATE;
-    if (s_audio_live) {
+    double tb = 0.0, period = 0.0, strict = 0.0, conf = 0.0, bpm, now = (double)s_samples / (double)UAC_RATE;
+    int has_bpm = 0;
+    uint8_t weak_picked = 0;
+    if (s_audio_live && !s_conf.silent) {
         int has = jb_follow_grid(&s_follow, &tb, &period);
-        conf = jcf_line_confidence(&s_conf, jb_follow_bpm_at(&s_follow, now, &bpm), has, tb, period, now);
+        has_bpm = jb_follow_bpm_at(&s_follow, now, &bpm);
+        jcf_line_tick(&s_conf, has_bpm ? has : 0, tb, period, now);
+        strict = jcf_lines_confidence(s_conf.t, s_conf.n, s_conf.line, s_conf.lines, has, period, now, JCF_WINDOW_S,
+                                      JCF_DELAY_S, JCF_TOL);
+        conf = strict;
+        if (jw_on(&s_weak)) {
+            double weak = jcf_weak_confidence(jw_strong(&s_weak), s_weak.n_strong, jw_seen(&s_weak), s_weak.n_seen,
+                                              jw_weak(&s_weak), s_weak.n_weak, s_conf.line, s_conf.lines, has, period, now,
+                                              JW_MIN_OBS, &s_weak.last_conf);
+            weak_picked = (uint8_t)(!s_gated && s_conf_ran);
+            conf = jcf_weak_pick(strict, weak, s_gated, s_conf_ran);
+        }
     }
     s_conf_pct = jcf_pct(conf);
     s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
     s_conf_open = (uint8_t)!jcf_gate(1, conf, JCF_STOP, cfg->threshold);   /* (a closed gate's test: open at threshold + 5) */
+    if (weak_picked && !s_gated && cfg->lowconf == JCF_STOP && strict < (double)cfg->threshold / 100.0)
+        s_weak_holds++;
+    s_conf_ran = (uint8_t)(s_audio_live && has_bpm && !s_gated && !s_conf.silent);
 }
 
 /* the tracker's work on one pass's samples; the time it took is the figure for the CPU */
@@ -732,6 +820,13 @@ esp_err_t beat_start(void)
                  (unsigned)sizeof *s_rate_store, (unsigned)JR_STEP, (unsigned)JR_EVERY);
     } else
         ESP_LOGW(TAG, "RATE: no PSRAM for its ring, off");
+    /* the weak-signal hold's ring and lists: PSRAM only; none: M2i's follow (every beat at once, the strict gate) */
+    s_weak_store = heap_caps_malloc(sizeof *s_weak_store, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    jw_init(&s_weak, s_weak_store, NULL, 0, 1);
+    if (s_weak_store)
+        ESP_LOGI(TAG, "WEAK: %u bytes + %u bytes in PSRAM", (unsigned)sizeof s_weak, (unsigned)sizeof *s_weak_store);
+    else
+        ESP_LOGW(TAG, "WEAK: no PSRAM for its ring, off");
     ESP_LOGW(TAG, "BEAT-FOLLOW BENCH BUILD: madmom's weights, CC BY-NC-SA 4.0, never ship");
     return xTaskCreatePinnedToCore(beat_task, "beat", BEAT_STACK, NULL, BEAT_PRIO, &s_task, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

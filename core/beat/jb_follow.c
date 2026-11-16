@@ -23,8 +23,8 @@
 /* from LockedBpm / ModeBpm (jb_mode.c) */
 #define OUTLIER 0.25
 #define CHANGE_BEATS 8
-#define LOCK_BEATS 8
 #define MIN_PERIOD 0.2
+#define OCTAVE_TOL 0.04264433740849372    /* log2(1.03): a fast jump's new tempo this near an octave is the fold's */
 #define SINCE_NONE 1000000
 
 enum { FIT, DOUBLE, MISS };
@@ -106,7 +106,7 @@ static int kf_step(struct jb_follow *f, double obs, double outlier)
     return FIT;
 }
 
-static void outcome(struct jb_follow *f, uint8_t fitted)
+void jb_follow_outcome(struct jb_follow *f, uint8_t fitted)
 {
     f->out[(f->out_head + f->out_n) % JF_TRUST_BEATS] = fitted;
     if (f->out_n < JF_TRUST_BEATS)
@@ -136,11 +136,11 @@ static void seed(struct jb_follow *f)
 }
 
 /* FollowBpm._jump (sticky off): a new segment from the recent beats, and the glide seeded on it */
-static void jump(struct jb_follow *f, double t)
+void jb_follow_jump(struct jb_follow *f, double t)
 {
     f->m.jumps++;
     jb_mode_restart(&f->m);
-    f->m.in_a_row = LOCK_BEATS;
+    f->m.in_a_row = f->m.lock_beats;
     f->m.last_fit_time = t;
     f->m.has_last_fit = 1;
     seed(f);
@@ -222,7 +222,7 @@ void jb_follow_update(struct jb_follow *f, double t)
     int res = kf_step(f, t, OUTLIER);
     if (res == DOUBLE)
         return;
-    outcome(f, (uint8_t)(res == FIT));
+    jb_follow_outcome(f, (uint8_t)(res == FIT));
     if (res == FIT) {
         m->misses = 0;
         m->last_fit_time = t;
@@ -233,7 +233,7 @@ void jb_follow_update(struct jb_follow *f, double t)
         m->misses++;
         m->in_a_row = 0;
         if (m->misses >= m->miss_limit && jb_mode_recent_consistent(m)) {
-            jump(f, t);
+            jb_follow_jump(f, t);
             return;
         }
     }
@@ -245,7 +245,7 @@ void jb_follow_update(struct jb_follow *f, double t)
     m->disagree = fabs(sp / f->x[1] - 1.0) > TEMPO_REL ? m->disagree + 1 : 0;
     if (m->disagree >= CHANGE_BEATS) {
         m->disagree = 0;
-        jump(f, t);
+        jb_follow_jump(f, t);
     }
 }
 
@@ -279,6 +279,60 @@ enum jb_follow_state jb_follow_state(struct jb_follow *f, double now)
     if (jb_mode_at(&f->m, now) == JB_STOPPED)
         return JF_STOPPED;
     return f->has_kf ? JF_GLIDE : JF_LOCK;
+}
+
+/* chain.fast_jump: the last LOCK_BEATS beats on one grid of their own, its tempo more than rel from the glide's and not an
+ * octave of it (the fold's business): jump to it now instead of waiting for misses or CHANGE_BEATS disagreeing beats */
+int jb_follow_fast_jump(struct jb_follow *f, double t, double rel)
+{
+    const struct jb_mode *m = &f->m;
+    if (!(rel > 0.0) || !f->has_kf || m->lock_beats < 2 || m->recent.n < m->lock_beats)
+        return 0;
+    /* the tempo test before the grid's (the Python's order the other way: both pure, the same answer; the fit is the
+     * dear one and the tempo is the glide's on nearly every beat) */
+    double sp = jb_short_period(m->recent.v + (m->recent.n - m->lock_beats), m->lock_beats);
+    if (sp < 0)
+        return 0;
+    double r = f->x[1] / sp, lr = log2(r), near = rint(lr);
+    if (fabs(r - 1.0) <= rel || (near != 0.0 && fabs(lr - near) <= OCTAVE_TOL) || !jb_mode_recent_consistent(m))
+        return 0;
+    jb_follow_jump(f, t);
+    f->fast_jumps++;
+    return 1;
+}
+
+/* weak.weak_step: the prediction as kf_step, the measurement noise r_s, no manoeuvre; taken within gate periods */
+int jb_follow_weak_obs(struct jb_follow *f, double obs, double r_s, double gate)
+{
+    if (!f->has_kf)
+        return 0;
+    double p = f->x[1], n = rint((obs - f->x[0]) / p);
+    if (n < 1.0)
+        return 0;
+    double F[3][3] = {{1.0, n, n * (n + 1.0) / 2.0}, {0.0, 1.0, n}, {0.0, 0.0, 1.0}};
+    double fc[3][3], c[3][3], xp[3];
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            fc[i][j] = F[i][0] * f->c[0][j] + F[i][1] * f->c[1][j] + F[i][2] * f->c[2][j];
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            c[i][j] = fc[i][0] * F[j][0] + fc[i][1] * F[j][1] + fc[i][2] * F[j][2];
+    c[0][0] += n * (Q_PHASE_S * Q_PHASE_S);
+    c[1][1] += n * ((Q_RATE * p) * (Q_RATE * p));
+    c[2][2] += n * ((Q_DRIFT * p) * (Q_DRIFT * p));
+    for (int i = 0; i < 3; ++i)
+        xp[i] = F[i][0] * f->x[0] + F[i][1] * f->x[1] + F[i][2] * f->x[2];
+    double e = obs - xp[0];
+    if (fabs(e) > gate * p)
+        return 0;
+    double s = c[0][0] + r_s * r_s;
+    double k[3] = {c[0][0] / s, c[1][0] / s, c[2][0] / s};
+    for (int i = 0; i < 3; ++i)
+        f->x[i] = xp[i] + k[i] * e;
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            f->c[i][j] = c[i][j] - k[i] * c[0][j];
+    return 1;
 }
 
 int32_t jb_follow_drift_ppm(const struct jb_follow *f)
