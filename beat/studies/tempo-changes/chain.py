@@ -32,6 +32,7 @@ from live.confidence import grid_confidence
 from live.engine import HYSTERESIS, SILENCE_RMS, SILENCE_S
 from live.fold import Fold
 from live.follow import LineLog, line_confidence
+from weak import STRONG_HALF, ready
 
 TICK_S = 0.05
 BLOCK_S = 0.1
@@ -234,6 +235,7 @@ def _replay(track: Track, cfg: Config) -> Run:
     fed: list[float] = []
     innov: list[float] = []
     r0 = FB.R_S
+    causal = bool(cfg.weak is not None and cfg.weak.get("causal"))
     for k, now in enumerate(ticks):
         while blk < track.rms.size and (blk + 1) * BLOCK_S <= now:
             was = silent_s >= SILENCE_S
@@ -246,7 +248,7 @@ def _replay(track: Track, cfg: Config) -> Run:
                 events.append((float(now), "silence"))
             blk += 1
         silent = silent_s >= SILENCE_S
-        while i < beats.size and beats[i] <= now:
+        while i < beats.size and (beats[i] <= now if not causal else ready(beats[i] + STRONG_HALF / FPS, now)):
             b = float(beats[i])
             i += 1
             if silent:

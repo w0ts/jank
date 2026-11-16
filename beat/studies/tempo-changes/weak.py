@@ -20,6 +20,14 @@ there's clear contrary evidence").
                 keeps the outputs running: they start on the strict line confidence (chain.py: hard to lock, sticky
                 once locked).
 
+CAUSAL (`causal`, the device, jank M2j): this prototype reads the cached activation of the whole track, so it looks a
+little ahead: a beat's strength takes the frames up to 3 after it, and a line's evidence the median of the period after
+it. The device has the activation only up to now. With `causal` the same decisions wait for their frames: chain.py feeds
+a beat to the estimator once STRONG_HALF frames past it are in (30 ms), and a line is coasted on once the frames up to a
+period after it are in (instead of WINDOW periods + LAG_S); a line is then skipped when any tracked beat fed so far lies
+within WINDOW periods of it (not only the last one, which may already be the next beat). The numbers are the same; only
+when they are taken moves.
+
 Device cost (estimate from the operations): per predicted line a max and a median over about 2 periods of the
 activation the device already computes (~100 values), and per tick the confidence as today: well under the Kalman's.
 """
@@ -38,12 +46,23 @@ DEFAULTS = {
     "source": "act",            # act / flux / both
     "window": 0.12, "salience": 2.5, "floor": 0.03, "flux_floor": 0.0,
     "r_weak": 0.012, "min_obs": 4, "hold_s": 30.0, "lag_s": 0.05, "filter": False,
+    "causal": False,            # the device's view: only the activation up to now (see CAUSAL)
 }
+STRONG_HALF = 3                 # peak_near's half window (frames)
 LEVEL_BEATS = 64
 FPS = 100
 
 
-def peak_near(x: np.ndarray, t: float, half: int = 3) -> float:
+def frame_of(t: float) -> int:
+    return int(round(t * FPS))
+
+
+def ready(t: float, now: float) -> bool:
+    """The activation's frame at t is in at now (frame k is the tracker's k / FPS s, in once that frame ran)."""
+    return frame_of(t) <= frame_of(now)
+
+
+def peak_near(x: np.ndarray, t: float, half: int = STRONG_HALF) -> float:
     f = int(round(t * FPS))
     lo, hi = max(f - half, 0), min(f + half + 1, x.size)
     return float(x[lo:hi].max()) if hi > lo else 0.0
@@ -164,10 +183,11 @@ class CoastBpm(FollowBpm):
         if self.next_line is None or self.next_line < self.kf.t + 0.5 * p:
             self.next_line = self.kf.t + p
         w = self.p["window"]
-        while self.next_line + w * p + self.p["lag_s"] <= now:
+        causal = self.p["causal"]
+        while self.next_line + w * p + self.p["lag_s"] <= now and (not causal or ready(self.next_line + p, now)):
             line = self.next_line
             self.next_line = line + p
-            if self.seen and abs(self.seen[-1] - line) <= w * p:
+            if self._tracked_near(line, w * p, causal):
                 continue                                # a tracked beat is there (the follower took it or missed it)
             obs = self._evidence(line, p)
             if obs is not None and weak_step(self.kf, obs, self.p["r_weak"], w):
@@ -176,6 +196,15 @@ class CoastBpm(FollowBpm):
                 self.outcomes.append(True)
                 self.coasted += 1
                 self.next_line = self.kf.t + self.kf.p
+
+    def _tracked_near(self, line: float, margin: float, causal: bool) -> bool:
+        if not self.seen:
+            return False
+        if not causal:
+            return abs(self.seen[-1] - line) <= margin
+        sb = list(self.seen)
+        i = bisect_left(sb, line)
+        return (i < len(sb) and abs(sb[i] - line) <= margin) or (i > 0 and abs(sb[i - 1] - line) <= margin)
 
     def _evidence(self, line: float, p: float) -> float | None:
         src, w, s = self.p["source"], self.p["window"], self.p["salience"]
