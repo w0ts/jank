@@ -115,7 +115,36 @@ eq(xiaoHearing({ audio: true, live: true, mode: 'stopped' }), { on: true, text: 
   dev.clocks = false;                                                         // stopped by YES
   eq(armedLocal(s()), false);
   dev.clocks = true;
-  dev.ltMode = 0;                                                             // IGNORE: the clocks run, never armed
-  eq(armedLocal(s()), false);
+  dev.ltMode = 0;                                                             // IGNORE with a peer: the clocks run, never armed
+  eq(armedLocal(s({ peers: 1 })), false);
+  eq(armedLocal(s()), true);                                                  // alone (jank M2l): its own session's next bar line
+  eq(armedLocal(s({ link_playing: true })), false);
+}
+
+// LINK mode alone (jank M2l, as a lone Ableton Live): Start starts the device's own session whatever the option, and the
+// outputs run with it; IGNORE with a peer runs them whatever the session; Stop stops
+{
+  const sent = [];
+  const dev = { link: true, hold: true, clocks: false, startAsked: false, ltMode: 0 };
+  const env = { dev, S: { peers: 0 }, hold: () => {}, api: (n, b) => sent.push([n, b]), xiaoSend: () => {}, XIAO: {}, askStatus: () => {},
+                performance: { now: () => 0 } };
+  const linkStartStop = new Function(...Object.keys(env), grab('linkStartStop') + '; return linkStartStop;')(...Object.values(env));
+  const outputsRun = new Function('dev', html.match(/const outputsRun = [^\n]*\n/)[0] + '; return outputsRun;')(dev);
+  for (const lt of [0, 1, 2]) {
+    dev.ltMode = lt;
+    sent.length = 0;
+    env.S.peers = 0;
+    linkStartStop(true);
+    eq(sent.some(([n, b]) => n === 'transport' && b.playing === true), true);           // alone: the session starts, any option
+    eq([outputsRun({ link_playing: false, peers: 0 }), outputsRun({ link_playing: true, peers: 0 })], [false, true]);
+    linkStartStop(false);
+    eq(sent.some(([n, b]) => n === 'transport' && b.playing === false), true);
+    eq(outputsRun({ link_playing: true, peers: 0 }), false);                            // held
+    env.S.peers = 1;
+    sent.length = 0;
+    linkStartStop(true);
+    eq(sent.some(([n]) => n === 'transport'), lt === 2);                                 // with a peer: FOLLOW+LEAD only
+    eq(outputsRun({ link_playing: false, peers: 1 }), lt === 0);                         // IGNORE: a peer is enough
+  }
 }
 console.log('xiao page helpers: ' + checks + ' checks passed');
