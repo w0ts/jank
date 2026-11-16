@@ -39,6 +39,23 @@ ok(!mRows(fb) && !underOne(fb) && tick(fb) === 0, 'off: nothing');
 fb = home(null);
 ok(tick(fb) === 0, 'no estimator: nothing');
 
+// the CF bar (y44): solid with its value; while the XIAO's confidence holds (jank M2k), hatched (a checkerboard) with HOLD
+{
+  const draw = extra => { const f = new Uint8Array(W * OLED.H); OLED.draw(f, OLED.create(), ctx(null, extra), 0); return f; };
+  const solid = draw({ conf: 0.9 }), held = draw({ conf: 0.9, confHold: true });
+  const at = (f, x, y) => f[y * W + x];
+  // far right inside the fill (x 104..111, rows 46..53), clear of the text and the threshold tick (x 100)
+  const cells = [];
+  for (let y = 46; y < 54; y++) for (let x = 104; x < 112; x++) cells.push([x, y]);
+  ok(cells.every(([x, y]) => at(solid, x, y) === 1), 'measured: the CF bar is filled');
+  ok(cells.every(([x, y]) => at(held, x, y) === ((x + y) % 2 === 0 ? 1 : 0)), 'HOLD: the CF bar is a checkerboard');
+  const textCols = f => { let n = 0; for (let x = 60; x < 96; x++) for (let y = 46; y < 53; y++) n += at(f, x, y) !== at(solid, x, y) ? 1 : 0; return n; };
+  ok(textCols(held) > 0, 'HOLD: the label differs (HOLD written after the value)');
+  ok([...Array(122).keys()].every(i => at(draw({ conf: 0.9, confHold: false }), 3 + i, 47) === at(solid, 3 + i, 47)), 'no hold: as before');
+  const empty = draw({ conf: 0, confHold: true });
+  ok(cells.every(([x, y]) => at(empty, x, y) === 0), 'HOLD at 0: no fill');
+}
+
 // the menu: AUTO BAR right after LINK TRANSPORT, YES on ON (unchanged) picks it again
 const ui = OLED.create();
 const c = ctx({ state: 'manual', conf: 0 });
