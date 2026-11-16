@@ -345,3 +345,66 @@ def test_weak_beats_on_a_consistent_new_grid_are_contrary_evidence():
     err = (tracked[-1] - t0) % period
     assert est.jumps >= 1
     assert min(err, period - err) < 0.03
+
+
+def test_causal_weak_follower_coasts_like_the_prototype():
+    """The device's view (weak `causal`: beats fed 3 frames late, a line coasted on once a period after it is in): the
+    breakdown above runs as with the look-ahead, and is back on the beat when the drums return."""
+    clean = beats_from([(128.0, 260)], jitter_s=0.0)
+    rng = np.random.default_rng(5)
+    gap = (clean >= 60.0) & (clean < 76.0)
+    tracked = clean + np.where(gap, rng.uniform(-0.12, 0.12, clean.size), rng.normal(0, 0.003, clean.size))
+    tr = synth_track(clean, float(clean[-1]) + 1, weak_from=60.0, weak_to=76.0, weak_peak=0.08)
+    tr = C.Track(np.sort(tracked), tr.rms, tr.rate, tr.act, tr.flux, tr.dur)
+    causal = CF.variant(CF.WEAK, "weak-causal", weak={"causal": True})
+    run, ref = C.replay(tr, causal), C.replay(tr, CF.WEAK)
+    sel = (run.t > 61) & (run.t < 76)
+    assert run.running[sel].mean() > 0.95
+    first = int(np.searchsorted(clean, 76.0))
+    k = int(np.searchsorted(run.t, clean[first])) - 1
+    err = (clean[first] - run.g0[k]) % run.gp[k]
+    assert min(err, run.gp[k] - err) < 0.03
+    assert abs(run.running.mean() - ref.running.mean()) < 0.02
+
+
+def test_causal_reads_no_activation_ahead():
+    """With `causal` no decision reads a frame past now: the activation after each tick is poisoned and nothing moves."""
+    beats = beats_from([(126.0, 200)], jitter_s=0.003)
+    tr = synth_track(beats, float(beats[-1]) + 1, weak_from=40.0, weak_to=60.0, weak_peak=0.06)
+    causal = CF.variant(CF.WEAK, "weak-causal", weak={"causal": True})
+    seen: list[int] = []
+    real_peak, real_weak = W.peak_near, W.weak_peak
+
+    def peak_near(x, t, half=W.STRONG_HALF):
+        seen.append(int(round(t * W.FPS)) + half)
+        return real_peak(x, t, half)
+
+    def weak_peak(x, line, period, *a):
+        seen.append(int(round((line + period) * W.FPS)))
+        return real_weak(x, line, period, *a)
+
+    W.peak_near, W.weak_peak = peak_near, weak_peak
+    try:
+        est = C.make_estimator(causal, tr)
+        last = []
+        orig_coast, orig_update = est.coast, est.update
+
+        def coast(now):
+            n = len(seen)
+            orig_coast(now)
+            last.extend(f - int(round(now * W.FPS)) for f in seen[n:])
+
+        def update(t, now_box=[0.0]):
+            n = len(seen)
+            orig_update(t)
+            last.extend(f - int(round(now_box[0] * W.FPS)) for f in seen[n:])
+
+        est.coast = coast
+        for now in np.arange(C.TICK_S, tr.dur, C.TICK_S):
+            for b in beats[(beats + W.STRONG_HALF / W.FPS <= now + 1e-9) & (beats + W.STRONG_HALF / W.FPS > now - C.TICK_S + 1e-9)]:
+                update.__defaults__[0][0] = now
+                update(float(b))
+            coast(float(now))
+    finally:
+        W.peak_near, W.weak_peak = real_peak, real_weak
+    assert last and max(last) <= 0
