@@ -24,6 +24,8 @@ struct jbl {
                                          * again (a session of its own joining an older, stopped one would wait forever) */
     uint32_t tempo_sets, phase_forces, starts, stops, releases;
     int32_t err_us;                     /* the last grid error seen against the tracked beat, before any correction */
+    uint8_t on_beat;                    /* the phase follower ran at this step and left the session on the tracked beat
+                                         * (within JBL_PHASE_US, or forced there): AUTO BAR can read its count */
     uint32_t bar_seq;                   /* the downbeat estimator's last decision acted on */
     uint8_t bar_seen;                   /* bar_seq holds one */
     uint32_t bar_moves;                 /* whole-beat moves of the session's bar */
@@ -53,6 +55,8 @@ struct jbl_in {
     uint8_t bar_now;                    /* AT START: a new start for the bar now (a resync, a fold change, a new lock): one
                                          * placement allowed at this step even though the session plays */
     uint8_t bar_wait;                   /* AT START: the estimator has not found the 1 yet: the tracker's start waits */
+    uint8_t clock_playing;              /* the stick's MIDI clock plays (its Start went out, none pending): AT START, the
+                                         * bar is not moved under it, bar_now or not (M2k) */
 };
 
 /* AUTO BAR (the setting): OFF no placement; AT START the bar's 1 is placed only while the session is stopped or its start
@@ -61,9 +65,18 @@ struct jbl_in {
  * estimator (bar_wait, which the caller holds for at most JBL_BAR_WAIT_BEATS tracked beats after the lock): found in time,
  * the start lands on the music's 1; not, it starts on the session's next bar line and the 1 waits for the next start. A
  * wait bounded so: "start on beat one" is honest when the estimator can say where it is, and a start is never held up
- * for long when it cannot (a break, music with no clear bar). */
+ * for long when it cannot (a break, music with no clear bar).
+ * M2k (the user, 2026-11-16: "the LED quite often starts on beat 3", "basically it starts off phase"; the rule: everything
+ * starts on the first beat). AT START never moves the bar while the stick's MIDI clock plays (jbl_in.clock_playing): the
+ * devices on it count from their Start, a move would make the beat they took as 1 read as 3. A Start's placement is made
+ * before the clock may start (bridge.c / beat.c: the outputs wait for the beat task's step, jho_in.bar_settling). And a
+ * step whose phase follower forced the session onto the beat places the bar at once (jbl.on_beat): the session held
+ * stopped since power-on is forced at the Start, and waiting a step for the error to settle lost the placement. */
 enum jbl_bar_mode { JBL_BAR_ALWAYS = 0, JBL_BAR_START = 1, JBL_BAR_OFF = 2 };   /* (0: the behaviour before the setting) */
-#define JBL_BAR_WAIT_BEATS 8u
+/* 12 since M2k (beat-listener studies/downbeat/results/v2_start_check.md, 80 of the user's tracks: the estimator's first
+ * lock a median 4.0 s after the tempo; 8 beats: 20 % of the starts went out before it, on an arbitrary beat of the music,
+ * median start 4.7 s; 12: 4 %, 4.0 s (the start no longer waits for a far bar line); 16 and 32 no better) */
+#define JBL_BAR_WAIT_BEATS 12u
 
 void jbl_init(struct jbl *c);
 /* settled: the node is in a session (with peers, or AUDIO mode's own alone) and has its state (jp_settled). start: the
@@ -82,8 +95,8 @@ int jbl_bar_shift(int64_t ub_at, int32_t count, int phi);
  * line of the moved grid (jank_start.h). Called under the Link node owner's lock. */
 void jbl_shift_bar(struct jbl *c, struct lk_node *k, struct jst *start, int n, int64_t t);
 /* after jbl_step, with the same lock: at each new LOCKED decision, the bar onto the 1 if it is not there. Only while
- * the tracker leads (settled, not passive, running) and the phase is within JBL_PHASE_US (then the session's beat at
- * the counted beat is unambiguous; otherwise the decision waits for the next step). The user's PHASE (the nudges' total)
+ * the tracker leads (settled, not passive, running) and this step's phase follower left the session on the beat (jbl.on_beat:
+ * then the session's beat at the counted beat is unambiguous; otherwise the decision waits for the next step). The user's PHASE (the nudges' total)
  * rides on top: the 1 is placed with the nudges' whole beats kept (M2h). Returns the move made, 0 none. */
 int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, int64_t now, const struct jbl_in *in,
                  const struct jbl_bar *bar);

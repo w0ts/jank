@@ -87,11 +87,19 @@ void jcf_clear_lines(struct jcf *c);
  * lines only. A line is hit by a tracked beat or a weak observation within JCF_TOL of a period; it is observed when hit
  * or when a strong beat lies within half a period. Recall = hits / observed lines; precision = strong beats in the window
  * on a line (any recorded line) / strong beats in the window (1 with none). With fewer than min_obs observed lines the
- * last value (*last) holds. Its lists are jb_weak.h's (strong beats, every beat fed, weak observations: as the Python's,
+ * last value (*last) holds (*held 1: a HOLD, the display's business, jcf_show_step; held may be NULL). Its lists are jb_weak.h's (strong beats, every beat fed, weak observations: as the Python's,
  * searched by bisection in the order kept). */
 double jcf_weak_confidence(const double *strong, size_t ns, const double *tracked, size_t nt, const double *weak, size_t nw,
                            const double *lines, size_t m, int has_period, double period, double now, int min_obs,
-                           double *last);
+                           double *last, uint8_t *held);
+/* THE HOLD ON SHOW (M2k, the user's choice: the gate rule unchanged). While the weak confidence holds its last value (no
+ * evidence: a break, a track change), the number shown is not frozen at it: it eases down toward the threshold, most of the
+ * way in JCF_HOLD_EASE_S (a time constant of a third of it), and snaps to the measured value once evidence returns
+ * (held 0). Shown values under the threshold are not raised. `conf_hold` says it is holding (status, beat, HOME). The
+ * gate keeps the real (held) value. dt_s: the time since the last step. */
+#define JCF_HOLD_EASE_S 8.0
+double jcf_show_step(double shown, double conf, int held, double threshold, double dt_s);
+
 /* the gate's input (chain.py conf "weak"): hard to open, sticky once open. The strict line confidence while the gate is
  * closed or the outputs were not running at the last step, else the weak one */
 static inline double jcf_weak_pick(double strict, double weak, uint8_t gated, uint8_t was_running)

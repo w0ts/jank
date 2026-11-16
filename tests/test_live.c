@@ -206,6 +206,25 @@ static void test_release_arms_until_locked(void)
     CHECK(!h.arming && h.releases == 1);
 }
 
+/* M2k: a Start's bar placement not made yet (the beat task's step): the clocks wait for it, so they start on the placed 1;
+ * clocks already running are not stopped for it */
+static void test_start_waits_for_the_bar(void)
+{
+    struct jho h;
+    struct jho_in in = hin(JHO_IGNORE, 1, 1);
+    started(&h);
+    jho_set(&h, 1);
+    jho_set(&h, 0);
+    in.locked = 1;
+    in.bar_settling = 1;
+    CHECK(jho_outputs(&h, &in) == 0 && jho_icon(&h, &in) == JHO_ARMED && h.arming);
+    in.bar_settling = 0;                                        /* placed: the clocks start (on the moved bar line) */
+    CHECK(jho_outputs(&h, &in) == 1 && !h.arming);
+    in.clock_running = 1;
+    in.bar_settling = 1;                                        /* a fold while playing: the clocks go on */
+    CHECK(jho_outputs(&h, &in) == 1);
+}
+
 /* FOLLOW+LEAD: the hold holds the Link session too; IGNORE and FOLLOW never touch it */
 static void test_session_by_option(void)
 {
@@ -429,6 +448,7 @@ int main(void)
     test_meter();
     test_hold_stops_all_outputs();
     test_release_arms_until_locked();
+    test_start_waits_for_the_bar();
     test_session_by_option();
     test_link_play_ends_hold();
     test_link_stop_holds();

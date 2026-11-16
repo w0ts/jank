@@ -192,8 +192,8 @@ static void put_link(const struct jk_snapshot *s, struct writer *w)
 /* LOW CONFIDENCE: the grid-fit confidence (conf), the network's activation (act), the gate and the silence, the settings */
 static void put_conf(const struct jk_cfg *c, const struct jk_beat *t, struct writer *w)
 {
-    put(w, "conf=%u\nact=%u\ngated=%u\nsilent=%u\nthreshold=%u\nlowconf=%s\n", t->conf_pct, t->act_pct, t->gated, t->silent, c->threshold,
-        lowconf_name(c->lowconf));
+    put(w, "conf=%u\nconf_hold=%u\nact=%u\ngated=%u\nsilent=%u\nthreshold=%u\nlowconf=%s\n", t->conf_pct, t->conf_hold, t->act_pct, t->gated,
+        t->silent, c->threshold, lowconf_name(c->lowconf));
 }
 
 static const char *const FOLLOW_NAME[] = {"stopped", "lock", "glide", "?"};

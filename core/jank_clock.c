@@ -89,7 +89,9 @@ static int JC_ISR on_bar(int64_t n, uint32_t bar)
     return d == 0;
 }
 
-static void JC_ISR collect(struct jc_ticker *c, struct jc_fire *o)
+/* may_start 0: this tick's schedule is from before a jump of the session (an AUTO BAR move the map just brought): a start
+ * waits for the moved grid's bar line (M2k: a start on the old bar line would read as the moved grid's 3) */
+static void JC_ISR collect(struct jc_ticker *c, struct jc_fire *o, int may_start)
 {
     int stop_now = c->resync || (c->want_stop && c->playing);
     o->n = 0;
@@ -103,7 +105,7 @@ static void JC_ISR collect(struct jc_ticker *c, struct jc_fire *o)
         c->want_start = 1;
     }
     /* never in the tick of its stop: the receiver gets a whole bar line after it */
-    if (c->want_start && !stop_now && on_bar(c->n, c->bar_ticks)) {
+    if (c->want_start && !stop_now && may_start && on_bar(c->n, c->bar_ticks)) {
         o->bytes[o->n++] = JC_START;
         c->playing = 1;
         c->want_start = 0;
@@ -115,8 +117,8 @@ static void JC_ISR collect(struct jc_ticker *c, struct jc_fire *o)
 void JC_ISR jc_step(struct jc_ticker *c, const struct jc_map *m, int64_t now, struct jc_fire *o)
 {
     int64_t tick = (int64_t)((m->q16 + 0x8000u) >> 16);
-    int64_t scheduled = c->t_due, want, gap, limit = tick * JC_RESYNC_TICKS;
-    collect(c, o);
+    int64_t scheduled = c->t_due, want, gap, limit = tick * JC_RESYNC_TICKS, here = jc_time(m, c->n);
+    collect(c, o, !(here - scheduled > limit || scheduled - here > limit));
     c->n++;
     want = jc_time(m, c->n);
     if (want - scheduled > limit || scheduled - want > limit || now - scheduled > limit) {

@@ -608,10 +608,13 @@ static void test_lowconf(void)
     run("set threshold 70");
     run("set lowconf run");
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .conf_pct = 62, .act_pct = 91, .gated = 1};
-    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nact=91\ngated=1\nsilent=0\nthreshold=70\nlowconf=run\n"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\nact=91\ngated=1\nsilent=0\nthreshold=70\nlowconf=run\n"));
+    snap.beat.conf_hold = 1;                                          /* M2k: the confidence holds (no evidence) */
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=1\n"));
+    snap.beat.conf_hold = 0;
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=run\nthreshold=70\n"));
     snap.beat.silent = 1;
-    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nconf=62\nact=91\ngated=1\nsilent=1\nthreshold=70\nlowconf=run\nmode="));
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\nact=91\ngated=1\nsilent=1\nthreshold=70\nlowconf=run\nmode="));
     CHECK(run("help") == JK_CTL_NONE && strstr(out, "|usbmidi|lowconf|threshold|"));
 }
 

@@ -153,7 +153,7 @@ static void tick(struct run *r, int silent)
         jcf_line_tick(&r->conf, r->has_bpm ? r->has_grid : 0, r->t0, r->p, now);
         r->loose = jcf_weak_confidence(jw_strong(&r->w), r->w.n_strong, jw_seen(&r->w), r->w.n_seen, jw_weak(&r->w),
                                        r->w.n_weak, r->conf.line, r->conf.lines, r->has_grid, r->p, now, JW_MIN_OBS,
-                                       &r->w.last_conf);
+                                       &r->w.last_conf, NULL);
         r->strict = jcf_lines_confidence(r->conf.t, r->conf.n, r->conf.line, r->conf.lines, r->has_grid, r->p, now,
                                          JCF_WINDOW_S, JCF_DELAY_S, JCF_TOL);
         r->c = jcf_weak_pick(r->strict, r->loose, r->gated, r->was_running);
@@ -317,6 +317,23 @@ static void test_numpy_pieces(void)
     CHECK(!jw_on(&w));
 }
 
+/* the HOLD on show (M2k): a held 100 % eases toward the threshold (most of the way in JCF_HOLD_EASE_S), never above what
+ * is held, never raised from under the threshold; evidence back: the measured value at once */
+static void test_hold_shown(void)
+{
+    double shown = 1.0, th = 0.8;
+    for (int k = 0; k < 4; k++)                                 /* 1 s of 0.25 s steps: down a little */
+        shown = jcf_show_step(shown, 1.0, 1, th, 0.25);
+    CHECK(shown < 0.96 && shown > 0.9);
+    for (int k = 0; k < 28; k++)                                /* 8 s in all: within 5 % of the way to the threshold */
+        shown = jcf_show_step(shown, 1.0, 1, th, 0.25);
+    CHECK(shown > th && shown - th < 0.05 * (1.0 - th) + 1e-12);
+    CHECK(jcf_show_step(shown, 0.02, 0, th, 0.25) == 0.02);    /* the first real recount: snapped to it */
+    CHECK(jcf_show_step(0.5, 0.5, 1, th, 1.0) == 0.5);          /* held under the threshold: kept */
+    CHECK(jcf_show_step(0.95, 0.9, 1, th, 0.0) == 0.9);         /* never above the held value */
+    CHECK(jcf_pct(jcf_show_step(1.0, 1.0, 1, th, 8.0)) == 81);  /* 8 s in one step: 95 % of the way: 81 % */
+}
+
 /* off (no store: no PSRAM on the device), the weak follower is the follower */
 static void test_off_is_m2i(void)
 {
@@ -365,15 +382,21 @@ static void test_weak_confidence(void)
         lines[i] = 1.0 + 0.5 * i;      /* the window at 10.5 s: 2.5 .. 10.4 */
     for (int i = 0; i < 8; i++)
         strong[i] = lines[4 + i];       /* beats on 3.0 .. 6.5, then nothing: the later lines are not observed */
-    double c = jcf_weak_confidence(strong, 8, strong, 8, NULL, 0, lines, 20, 1, 0.5, 10.5, JW_MIN_OBS, &last);
+    double c = jcf_weak_confidence(strong, 8, strong, 8, NULL, 0, lines, 20, 1, 0.5, 10.5, JW_MIN_OBS, &last, NULL);
     CHECK(fabs(c - 1.0) < 1e-12 && last == c);
     double off[9] = {3.0, 3.5, 4.0, 4.25, 4.5, 5.0, 5.5, 6.0, 6.5};    /* a strong beat off the lines */
-    c = jcf_weak_confidence(off, 9, off, 9, NULL, 0, lines, 20, 1, 0.5, 10.5, JW_MIN_OBS, &last);
+    c = jcf_weak_confidence(off, 9, off, 9, NULL, 0, lines, 20, 1, 0.5, 10.5, JW_MIN_OBS, &last, NULL);
     CHECK(fabs(c - 2.0 * (8.0 / 9.0) / (1.0 + 8.0 / 9.0)) < 1e-12);
     last = 0.42;
-    c = jcf_weak_confidence(strong, 2, strong, 2, NULL, 0, lines, 20, 1, 0.5, 10.5, JW_MIN_OBS, &last);
-    CHECK(c == 0.42);                                           /* 2 observed lines: the last value holds */
-    CHECK(jcf_weak_confidence(strong, 6, strong, 6, NULL, 0, lines, 20, 0, 0.0, 10.5, JW_MIN_OBS, &last) == 0.0
+    uint8_t held = 9;
+    c = jcf_weak_confidence(strong, 2, strong, 2, NULL, 0, lines, 20, 1, 0.5, 10.5, JW_MIN_OBS, &last, &held);
+    CHECK(c == 0.42 && held == 1);                              /* 2 observed lines: the last value holds: a HOLD */
+    c = jcf_weak_confidence(strong, 8, strong, 8, NULL, 0, lines, 20, 1, 0.5, 10.5, JW_MIN_OBS, &last, &held);
+    CHECK(fabs(c - 1.0) < 1e-12 && held == 0);                  /* evidence: measured, no hold */
+    held = 9;
+    CHECK(jcf_weak_confidence(strong, 8, strong, 8, NULL, 0, lines, 20, 0, 0.0, 10.5, JW_MIN_OBS, &last, &held) == 0.0
+          && held == 0);
+    CHECK(jcf_weak_confidence(strong, 6, strong, 6, NULL, 0, lines, 20, 0, 0.0, 10.5, JW_MIN_OBS, &last, NULL) == 0.0
           && last == 0.0);
     CHECK(jcf_weak_pick(0.3, 0.9, 1, 1) == 0.3 && jcf_weak_pick(0.3, 0.9, 0, 0) == 0.3 && jcf_weak_pick(0.3, 0.9, 0, 1) == 0.9);
 }
@@ -388,6 +411,7 @@ int main(int argc, char **argv)
     test_off_is_m2i();
     test_fast_jump();
     test_weak_confidence();
+    test_hold_shown();
     int n = test_runs(dir);
     printf("tempo: %d tracks x 2 views against studies/tempo-changes tuned-l16 (state %.0g s, confidences %.0g, gates "
            "exact)\n", n, STATE_S, CONF_NEAR);

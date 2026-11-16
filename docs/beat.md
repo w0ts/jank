@@ -70,6 +70,7 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
 | `offset_us`, `latency_us` | the sample-count-to-local-time offset (µs since the timer started) and the latency setting |
 | `bar`, `bar_phi`, `bar_lead`, `bar_moves` | AUTO BAR (also in `status`): off / listening / locked / manual, the 1's count position (-1 none), the best phase's lead (the first move at 2.00), the session's bar moves |
 | `conf` | LOW CONFIDENCE's confidence (also in `status`): since M2i against the grid lines the outputs published, not the grid extended back |
+| `conf_hold` | 1 while the confidence holds (no evidence: a break, a track change; M2k): `conf` is then the shown value easing toward the threshold, the gate keeps the held one |
 | `follow`, `drift_ppm`, `rate_ratio` | the follower (also in `status`): stopped / lock (ModeBpm's grid) / glide (the Kalman follower); the glide's period change a beat in ppm; the last rate ratio it took from the spectrum (1.0000: none yet) |
 | `manoeuvres` | tempo moves the glide took from the beats |
 | `rate`, `rate_active` | the spectral rate: the setting (`set rate on\|off`; off also without PSRAM) and whether it runs now (only while gliding) |
@@ -104,6 +105,22 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   moved grid's next bar line). A later move needs a lead of 3.0 held 8 beats. Reset (listening again, the bar left where
   it is): the tracker stopped, a new audio stream (a tempo jump is not one: `DOWN_JUMP_RESET` in beat.c). A beat nudge (`nudge beat`, the PHASE) no longer makes it
   MANUAL (M2h): AUTO BAR keeps placing the 1 and the PHASE rides on it (docs/firmware.md). The LED's bar flash turns amber while locked. RAM: 2.2 KB plus a 2.9 KB segment ring in PSRAM.
+  **M2k: every start on the first beat.** The user saw the first beat after a Start read 3, off the music's 1. Two
+  causes, reproduced in the host model (tests/test_solo.c, a Start pressed at 100 places in the bar, the estimator's 1
+  found after START WAIT ran out, 2 beats off): with LINK TRANSPORT IGNORE / FOLLOW the Start let the MIDI clock start on
+  the session's old bar line before the beat task's step placed the 1 (up to 250 ms later): 11 % of presses started, then
+  moved 2 beats under the playing clock; with FOLLOW+LEAD the session held since power-on was forced onto the beat at the
+  Start and the bar step refused on the error before that force, so the 1 was never placed: 13 % on the music's 3. Now:
+  a Start (or a fold) asks the beat task for its step at once and the clocks wait for it (`jho_in.bar_settling`); the
+  step that forces the phase places the bar too (`jbl.on_beat`); AT START never moves the bar under a playing MIDI clock
+  (`jbl_in.clock_playing`, a fold mid-play included); and the clock never starts on a tick scheduled from before a move
+  (`jc_step`). All 0 of 200 presses and 784 decision / fold timings now. START WAIT 8 → 12 tracked beats: the
+  estimator's first lock comes a median 4.0 s after the tempo; with 8, 20 % of the starts went out before it on an
+  arbitrary beat of the music, with 12 4 %, and the start comes no later (beat-listener
+  studies/downbeat/results/v2_start_check.md). The estimator's own 1-vs-3 confusion at its first lock: 9-10 % of the
+  starts it places (70 % right; 25 % if unplaced). **The CF bar's HOLD**: while the weak confidence holds its last value
+  (no evidence), `conf_hold=1` (status, beat; the HOME line's conf as `<pct>h`) and the shown confidence eases toward the
+  threshold (most of the way in 8 s) instead of a frozen 100 %, then snaps to the measured value; the gate is unchanged.
 - **ADVANCED FOLLOW** (M2i; beat-listener `studies/advanced-follow`, golden vectors in `tests/follow_ref`). Three parts,
   each a port checked against the Python:
   - the **glide** (`core/beat/jb_follow.c`, `eval/follow_bpm.py`): ModeBpm locks; then a 3-state Kalman filter (phase,

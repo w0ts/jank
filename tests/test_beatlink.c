@@ -284,9 +284,9 @@ static void test_bar_moves(void)
     in.passive = 1;                                               /* LINK mode: the session's bar is not ours */
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10600000, &in, &bar) == 0);
     in.passive = 0;
-    jbl.err_us = 9000;                                            /* the phase out of tolerance: wait */
+    jbl.on_beat = 0;                                              /* the phase follower did not run / left it off: wait */
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10700000, &in, &bar) == 0);
-    jbl.err_us = 0;
+    jbl.on_beat = 1;
     CHECK(jbl_bar_step(&jbl, &node, &st, 0, 10800000, &in, &bar) == 0);    /* not settled */
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 10900000, &in, &bar) != 0);    /* the waiting decision, now */
 }
@@ -349,7 +349,10 @@ static void test_bar_at_start(void)
     ub = lk_beat_at(&node, bar.beat_us);
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17000000, &in, &bar) == 0 && lk_beat_at(&node, bar.beat_us) == ub);
     bar.seq = 3;
-    in.bar_now = 1;                                              /* a new start for the bar (a fold change, a resync) */
+    in.bar_now = 1;                                              /* a new start for the bar (a fold change, a resync) ... */
+    in.clock_playing = 1;                                        /* ... but the MIDI clock plays: never under it (M2k) */
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17050000, &in, &bar) == 0 && lk_beat_at(&node, bar.beat_us) == ub);
+    in.clock_playing = 0;                                        /* the clock not started yet: placed, it starts on it */
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17100000, &in, &bar) == jbl_bar_shift(ub, 7, 3));
     in.bar_now = 0;
     in.bar_mode = JBL_BAR_OFF;                                   /* OFF: nothing */
@@ -361,6 +364,23 @@ static void test_bar_at_start(void)
     bar.seq = 5;
     ub = lk_beat_at(&node, bar.beat_us);
     CHECK(jbl_bar_step(&jbl, &node, &st, 1, 17400000, &in, &bar) == jbl_bar_shift(ub, 7, 1));
+}
+
+/* M2k: a step whose phase follower had to force the session onto the beat (the session held stopped since power-on, the
+ * user's Start) places the bar in that very step: the next step may come after the start's bar line, too late */
+static void test_bar_after_a_force(void)
+{
+    struct jbl_in in = {.running = 1, .beat_us = 10000000 + 234567, .period_us = 500000, .bar_mode = JBL_BAR_START,
+                        .bar_now = 1};
+    struct jbl_bar bar = {.locked = 1, .seq = 1, .count = 7, .phi = 2, .beat_us = 10000000 + 234567 + 4 * 500000};
+    start(10000000);
+    jbl_step(&jbl, &node, &st, 1, 12500000, &in, 4);
+    CHECK(jbl.phase_forces == 1 && jbl.err_us > JBL_PHASE_US && jbl.on_beat);   /* (err_us: the error before the force) */
+    int64_t ub = lk_beat_at(&node, bar.beat_us);
+    CHECK(jbl_bar_step(&jbl, &node, &st, 1, 12500000, &in, &bar) == jbl_bar_shift(ub, 7, 2));
+    CHECK(bar_pos(bar.beat_us) == (7 - 2) % 4);
+    jbl_step(&jbl, &node, &st, 0, 12600000, &in, 4);             /* not settled: the follower did not run */
+    CHECK(!jbl.on_beat);
 }
 
 /* the follower's input with the user's nudge kept, as beat.c's fold_step makes it (fold 1) */
@@ -564,6 +584,7 @@ int main(void)
     test_session_offset();
     test_bar_shift();
     test_bar_moves();
+    test_bar_after_a_force();
     test_phase_over_autobar();
     test_phase_forced_past_5ms();
     test_tempo_deadband();

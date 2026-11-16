@@ -66,6 +66,7 @@ static void follow_phase(struct jbl *c, struct lk_node *k, int64_t now, const st
     int64_t whole = floor_div(ub + LK_UBEAT / 2, LK_UBEAT) * LK_UBEAT;   /* the nearest session beat */
     double err = (double)(ub - whole) * (double)lk_mpb(k) / (double)LK_UBEAT;
     c->err_us = (int32_t)llround(err);
+    c->on_beat = 1;                     /* within the band, or forced onto the beat just below */
     if (fabs(err) <= (double)JBL_PHASE_US)
         return;
     lk_force_beat(k, lk_mpb(k), whole, t);
@@ -106,7 +107,9 @@ int jbl_bar_step(struct jbl *c, struct lk_node *k, struct jst *start, int settle
         return 0;
     if (in->bar_mode == JBL_BAR_START && !in->bar_now && lk_playing(k) && !start->armed && lk_play_beat(k) <= lk_beat_at(k, now))
         return 0;                       /* AT START: the session plays (its start reached): the 1 waits for the next start */
-    if (c->err_us > JBL_PHASE_US || c->err_us < -JBL_PHASE_US)
+    if (in->bar_mode == JBL_BAR_START && in->clock_playing)
+        return 0;                       /* AT START: never under the MIDI clock's devices (M2k) */
+    if (!c->on_beat)
         return 0;
     c->bar_seq = bar->seq;
     c->bar_seen = 1;
@@ -163,6 +166,7 @@ static void start_session(struct jbl *c, struct lk_node *k, struct jst *start, i
 
 void jbl_step(struct jbl *c, struct lk_node *k, struct jst *start, int settled, int64_t now, const struct jbl_in *in, uint32_t quantum)
 {
+    c->on_beat = 0;                     /* (follow_phase sets it when it runs) */
     if (!settled)
         return;
     if (memcmp(c->sess, k->sess, sizeof c->sess)) {
