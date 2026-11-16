@@ -1,0 +1,48 @@
+{
+  "tuned": {
+    "base": "weak+rate",
+    "consts": {
+      "rate.CONFIRM": 3
+    },
+    "fast_jump": 0.06,
+    "clear_lines": true
+  },
+  "tuned-hard": {
+    "base": "weak+rate",
+    "consts": {
+      "rate.CONFIRM": 3,
+      "mode_bpm.LOCK_BEATS": 16,
+      "follow_bpm.LOCK_BEATS": 16
+    },
+    "fast_jump": 0.06,
+    "clear_lines": true,
+    "adaptive_r": true
+  },
+  "tuned-hard-norate": {
+    "base": "weak+rate",
+    "rate": false,
+    "consts": {
+      "mode_bpm.LOCK_BEATS": 16,
+      "follow_bpm.LOCK_BEATS": 16
+    },
+    "fast_jump": 0.06,
+    "clear_lines": true,
+    "adaptive_r": true
+  },
+  "m2i+c3": {
+    "base": "m2i+rate",
+    "consts": {
+      "rate.CONFIRM": 3
+    }
+  },
+  "tuned-l16": {
+    "base": "weak+rate",
+    "consts": {
+      "rate.CONFIRM": 3,
+      "mode_bpm.LOCK_BEATS": 16,
+      "follow_bpm.LOCK_BEATS": 16
+    },
+    "fast_jump": 0.06,
+    "clear_lines": true
+  }
+}
