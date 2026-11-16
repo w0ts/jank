@@ -30,7 +30,7 @@ eq(P.xiaoOutputs(st({ outputs: 'running' }), 1000, 1500, { cmd: 'play', at: 1200
 
 // `home`
 const H = 'home=h 12400 0 1 2 4 1 0 87 -23 64 -30 -12';
-eq(P.parseHome(H), { bpm: 124, net: '0', transport: 1, bar: 2, quantum: 4, linkPeers: 1, airPeers: 0, batt: 87, level: -23, conf: 64, min: -30, max: -12, mode: null, fold: null });     // (an older firmware: no mode token)
+eq(P.parseHome(H), { bpm: 124, net: '0', transport: 1, bar: 2, quantum: 4, linkPeers: 1, airPeers: 0, batt: 87, level: -23, conf: 64, confHold: false, min: -30, max: -12, mode: null, fold: null });     // (an older firmware: no mode token)
 const none = P.parseHome('home=h 0 0 0 0 4 0 0 - - - - -');
 eq([none.batt, none.level, none.conf, none.min, none.max, none.bpm], [null, null, null, null, null, 0]);
 eq(P.parseHome('ok'), null);
@@ -39,18 +39,18 @@ eq(P.parseHome('bpm=120'), null);
 
 // the meter's numbers: home (fresh) > status's rms_db > nothing; the floor when the XIAO says nothing
 const home = P.parseHome(H);
-eq(P.xiaoMeters(home, 1000, null, 0, 1500), { level: -23, min: -30, max: -12, conf: 0.64 });
+eq(P.xiaoMeters(home, 1000, null, 0, 1500), { level: -23, min: -30, max: -12, conf: 0.64, hold: false });
 eq(P.xiaoMeters(home, 1000, null, 0, 1000 + 1501), null);                           // home too old, no status
 const stm = { rms_db: -40, rms_min_db: -50, rms_max_db: -35, conf: 25 };
-eq(P.xiaoMeters(home, 1000, stm, 2400, 2600), { level: -40, min: -50, max: -35, conf: 0.25 });   // home old: the status's numbers
+eq(P.xiaoMeters(home, 1000, stm, 2400, 2600), { level: -40, min: -50, max: -35, conf: 0.25, hold: false });   // home old: the status's numbers
 eq(P.xiaoMeters(null, 0, stm, 1000, 1500).level, -40);
 eq(P.xiaoMeters(null, 0, stm, 1000, 6500), null);
-eq(P.xiaoMeters(P.parseHome('home=h 0 0 0 0 4 0 0 - - - - -'), 1000, null, 0, 1200), { level: null, min: null, max: null, conf: 0 });
+eq(P.xiaoMeters(P.parseHome('home=h 0 0 0 0 4 0 0 - - - - -'), 1000, null, 0, 1200), { level: null, min: null, max: null, conf: 0, hold: false });
 const local = { bar: -20, lo: -25, hi: -15, conf: 0.9 };
 eq(P.meterNumbers(false, { level: -23, min: -30, max: -12, conf: 0.64 }, local), local);          // not --xiao: the page's own meter
-eq(P.meterNumbers(true, { level: -23, min: -30, max: -12, conf: 0.64 }, local), { bar: -23, lo: -30, hi: -12, conf: 0.64 });
-eq(P.meterNumbers(true, null, local), { bar: -99, lo: -99, hi: -99, conf: 0 });                    // nothing from the XIAO: no local numbers
-eq(P.meterNumbers(true, { level: null, min: null, max: null, conf: 0 }, local), { bar: -99, lo: -99, hi: -99, conf: 0 });
+eq(P.meterNumbers(true, { level: -23, min: -30, max: -12, conf: 0.64 }, local), { bar: -23, lo: -30, hi: -12, conf: 0.64, hold: false });
+eq(P.meterNumbers(true, null, local), { bar: -99, lo: -99, hi: -99, conf: 0, hold: false });                    // nothing from the XIAO: no local numbers
+eq(P.meterNumbers(true, { level: null, min: null, max: null, conf: 0 }, local), { bar: -99, lo: -99, hi: -99, conf: 0, hold: false });
 
 // the status's words: source, Bluetooth, outputs; hold / audio / the meter are numbers; mode stays out
 const b = P.beatStats(['audio=1', 'audio_live=0', 'hold=1', 'outputs=armed', 'audio_source=usb', 'ble_state=window', 'ble_left=97', 'rms_db=-41', 'conf=12', 'bar=locked', 'mode=steady', 'source=link', 'peers=2']);

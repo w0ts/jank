@@ -742,8 +742,11 @@ const OLED = (() => {
   };
 
   // a full-width 11 px bar with its value written inside, XOR-ed so it reads over the fill and over the empty part
-  function valueBar(fb, y, frac, tickFrac, label, right) {
-    rect(fb, 3, y + 1, Math.round(122 * clamp(frac, 0, 1)), 9, 1);           // no outline: the fill, its text and the tick only
+  function valueBar(fb, y, frac, tickFrac, label, right, hatch) {
+    const wFill = Math.round(122 * clamp(frac, 0, 1));
+    if (hatch) {                                                            // a HOLD: every other pixel, a checkerboard
+      for (let yy = y + 1; yy < y + 10; yy++) for (let xx = 3; xx < 3 + wFill; xx++) if ((xx + yy) % 2 === 0) px(fb, xx, yy, 1);
+    } else rect(fb, 3, y + 1, wFill, 9, 1);                                 // no outline: the fill, its text and the tick only
     xorCol(fb, 2 + Math.round(123 * tickFrac), y - 1, y + 11);
     const tmp = new Uint8Array(W * H); text(tmp, label, right ? 123 - textW(label, 1) : 5, y + 2, 1, 1);
     for (let i = 0; i < tmp.length; i++) fb[i] ^= tmp[i];
@@ -862,7 +865,7 @@ const OLED = (() => {
   //   AUDIO (any source: line in, USB audio, the XIAO's):
   //     y9   BPM x3 (left); four beat boxes (right), the current beat's box filled; under them the AUTO BAR marks
   //          (barMarks: the 1's box lit when LOCKED, an M when MANUAL; the confidence line under the boxes)
-  //     y31  IN bar (smoothed short-term RMS in dBFS, min / max lines over the last few seconds, tick = -60 silence)   y44  CF bar (tick = threshold); each value is written inside its bar
+  //     y31  IN bar (smoothed short-term RMS in dBFS, min / max lines over the last few seconds, tick = -60 silence)   y44  CF bar (tick = threshold; hatched with HOLD while the XIAO's confidence holds); each value is written inside its bar
   //     y57  status line, cycling every STATUS_CYCLE_MS: the Link peers (none: empty)
   //   LINK: BPM x4, four wide beat boxes across the width, the same status line at y57
   //   (the mode picks the layout, whatever the source: a line in, USB audio, the XIAO's)
@@ -892,7 +895,8 @@ const OLED = (() => {
     barMarks(fb, c.bar, 87, 9, 9, 9, 1);
     valueBar(fb, 31, (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, 'IN ' + Math.round(c.levelDb) + 'dB');
     for (const db of [c.levelMin, c.levelMax]) xorCol(fb, 3 + Math.round(121 * clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1)), 32, 41);   // min / max lines
-    valueBar(fb, 44, c.conf, c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%');
+    // CF: hatched, HOLD, while the confidence holds (jank M2k: no evidence; the value shown eases toward the threshold)
+    valueBar(fb, 44, c.conf, c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%' + (c.confHold ? ' HOLD' : ''), false, !!c.confHold);
     statusLine(fb, c, now, 57);
   }
   function drawMenu(fb, ui, c) {
@@ -1187,7 +1191,8 @@ function parseHome(line) {
   if (f[0] !== 'home=h' || f.length < 13) return null;
   const n = t => (t === '-' || !Number.isFinite(Number(t)) ? null : Number(t));
   return { bpm: n(f[1]) == null ? null : n(f[1]) / 100, net: f[2], transport: n(f[3]), bar: n(f[4]), quantum: n(f[5]), linkPeers: n(f[6]), airPeers: n(f[7]),
-           batt: n(f[8]), level: n(f[9]), conf: n(f[10]), min: n(f[11]), max: n(f[12]), ...homeMode(f[13]) };
+           batt: n(f[8]), level: n(f[9]), conf: /^\d+h$/.test(f[10]) ? Number(f[10].slice(0, -1)) : n(f[10]), confHold: /^\d+h$/.test(f[10]),
+           min: n(f[11]), max: n(f[12]), ...homeMode(f[13]) };
 }
 /* `home`'s mode token -> { mode, fold } */
 function homeMode(t) {
@@ -1239,18 +1244,21 @@ function xiaoGate(st, statusAt, now) {
    conf; null when neither is fresh. level / min / max dBFS or null (source not open), conf 0..1 (M2e: the grid-fit
    confidence, LOW CONFIDENCE's; M2d's was the network's activation, now act=) */
 function xiaoMeters(home, homeAt, st, statusAt, now) {
-  if (home && now - homeAt <= XIAO_HOME_FRESH_MS) return { level: home.level, min: home.min, max: home.max, conf: home.conf == null ? 0 : home.conf / 100 };
+  // (jank M2k: conf "<pct>h" in `home`, conf_hold=1 in `status`: the confidence holds, the value shown easing to the threshold)
+  if (home && now - homeAt <= XIAO_HOME_FRESH_MS)
+    return { level: home.level, min: home.min, max: home.max, conf: home.conf == null ? 0 : home.conf / 100, hold: !!home.confHold };
   if (st && now - statusAt <= XIAO_STATUS_FRESH_MS && 'rms_db' in st)
-    return { level: st.rms_db, min: st.rms_min_db === undefined ? null : st.rms_min_db, max: st.rms_max_db === undefined ? null : st.rms_max_db, conf: (st.conf || 0) / 100 };
+    return { level: st.rms_db, min: st.rms_min_db === undefined ? null : st.rms_min_db, max: st.rms_max_db === undefined ? null : st.rms_max_db,
+             conf: (st.conf || 0) / 100, hold: st.conf_hold === 1 };
   return null;
 }
 /* the numbers the IN and CF bars draw: with --xiao the XIAO's (the floor when it says nothing), else the page's own meter
    (local: { bar, lo, hi, conf }) */
 function meterNumbers(isXiao, xm, local) {
   if (!isXiao) return local;
-  if (!xm) return { bar: XIAO_FLOOR_DB, lo: XIAO_FLOOR_DB, hi: XIAO_FLOOR_DB, conf: 0 };
+  if (!xm) return { bar: XIAO_FLOOR_DB, lo: XIAO_FLOOR_DB, hi: XIAO_FLOOR_DB, conf: 0, hold: false };
   const db = v => (v == null ? XIAO_FLOOR_DB : v);
-  return { bar: db(xm.level), lo: db(xm.min), hi: db(xm.max), conf: xm.conf };
+  return { bar: db(xm.level), lo: db(xm.min), hi: db(xm.max), conf: xm.conf, hold: !!xm.hold };
 }
 /* the Bluetooth pair window and the phone, as HOME shows them: { left: seconds left | null (closed), phone: connected }.
    --xiao: status ble_state=off|window|connected, ble_left (extrapolated), and a `ble pair` the page sent that no status has
@@ -1833,7 +1841,7 @@ function buildCtx(now, beat) {
   const fold = dev.link ? { k: 1, auto: false } : foldNow(!!s.xiao, XIAO.status, XIAO.statusAt, XIAO.home, XIAO.homeAt, XIAO.foldSent, now, dev.foldK, s.fold_auto);
   return {
     link: dev.link, bpm, linkBpm: s.xiao && x && now > holdUntil.tempo ? x.bpm : dev.linkBpm, mode: s.xiao ? (xrep ? xrep.mode : 'stopped') : s.mode,
-    conf: mn.conf, th: dev.th, gain: dev.gain, confStop: dev.confStop, levelDb: mn.bar, levelMin: mn.lo, levelMax: mn.hi,
+    conf: mn.conf, confHold: !!mn.hold, th: dev.th, gain: dev.gain, confStop: dev.confStop, levelDb: mn.bar, levelMin: mn.lo, levelMax: mn.hi,
     // --xiao: the XIAO's own gate (status gated= / silent=, M2e); an older firmware's: the CF bar against the threshold
     silent: !audioIn || (!s.xiao && !!s.silent) || !!(xg && xg.silent),
     gated: s.xiao ? (xg ? xg.gated : !!xm && dev.confStop && mn.conf * 100 < dev.th) : !!s.gated, hold: dev.hold, playing: s.xiao ? !!(x && x.playing) : !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
