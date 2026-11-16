@@ -148,7 +148,7 @@ ok(shown > 0, 'rune states drawn');
   const wide = OLED.topBar(ctx({ ble: bles.solid }));
   ok(base.net.r === 86 && wide.net.r < base.net.r && wide.ble.l > wide.net.r, 'the network icon moves left for the rune');
   const g9 = OLED.topBar(ctx({ ble: bles.solid, net: nets[0] }));
-  eq(g9.name, 'JANK GRP 9');                                                        // the longest group name still fits in AUDIO
+  eq(g9.name, 'GRP 9');                                                             // the longest group name still fits in AUDIO
   const idle = OLED.topBar(ctx({ ble: bles.off, net: nets[0] }));
   ok(idle.nameBox.r === 86 - 10 - 3 && g9.nameBox.r === g9.net.l - 3, 'the name stays against the network icon');
 }
