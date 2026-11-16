@@ -29,41 +29,44 @@ OX, OY = 100.0, 100.0
 TEXT_H, STROKE, LINE_W = 0.8, 0.15, 0.15       # (JLCPCB: 0.8 mm text, 0.15 mm stroke minimum)
 CLEAR = 0.2                                     # silk to exposed copper / other silk
 EDGE = 0.3
-DATE = "2026-11-14"
+DATE = "2026-11-15"
 GROUP = "silk.py"
 TAGS = {   # short purposes, top (README "Twins", "Spare pads"): placed like a reference, beside it
-    "RT40": "LED R", "RT41": "LED G", "RT15": "SINK", "RT55": "SINK", "RT20": "SINK", "RT57": "SINK",
-    "RT30": "IN T", "RT31": "IN R", "RT32": "GAIN", "RT33": "BIAS", "RT34": "BIAS", "RT36": "PD", "RT37": "PD",
-    "RT38": "DET", "RT51": "ICHG", "RT10": "VBAT", "RT11": "VBAT", "RT60": "SCL", "RT61": "SDA", "RT39": "GND LIFT",
-    "RT73": "CLK PU", "RT75": "CLK R", "RT79": "RST PU", "RT81": "RST R", "CT9": "XTAL", "CT10": "XTAL", "CT8": "VBAT C", "CT3": "VIN",
-    "C72": "3V3 BULK", "C86": "3V3 BULK", "U11": "ESD", "U12": "ESD", "U15": "IDEAL D", "U13": "PUMP BUF", "C26": "PI", "C80": "DB", "C81": "DB", "C82": "DB", "C83": "DB", "C27": "VBUS", "C67": "GS",
+    "RT15": "SINK", "RT55": "SINK", "RT20": "SINK", "RT57": "SINK",
+    "RT33": "BIAS", "RT34": "BIAS", "RT36": "PD", "RT37": "PD",
+    "RT38": "DET", "RT51": "ICHG", "RT10": "VBAT", "RT11": "VBAT", "RT60": "SCL", "RT61": "SDA", "RT39": "GND LIFT", "RT120": "CLK GND", "RT121": "RST GND",
+    "RT73": "CLK PU", "RT75": "CLK R", "RT79": "RST PU", "RT81": "RST R", "CT8": "VBAT C", "CT3": "VIN",
+    "C72": "VSYS BULK", "C92": "VSYS BULK", "C27": "VBUS DAMP", "C91": "VBUS DAMP", "R88": "VBUS SENSE", "U11": "ESD", "U12": "ESD", "U15": "IDEAL D", "U18": "5V AUX", "U19": "5V CLAMP", "U2": "3V3 BB", "U2B": "LDO 3V3 ALT", "C26": "PI", "C80": "DB", "C81": "DB", "C82": "DB", "C83": "DB", "C27": "VBUS", "C67": "GS",
+    "U17": "CC", "Q9": "VBUS ISO", "RT93": "HOST R", "R98": "LED FILT",
 }
-NOTES = [("R62", "USB ONLY: BRIDGE"), ("R39", "GND LIFT"), ("R63", "FB"), ("J11", "<- ON/OFF"),
-         ("J10", "OLED 1.3 1.54"), ("J10B", "OLED 2.42 LEAD")]
+NOTES = [("R62", "USB ONLY: BRIDGE"), ("R39", "GND LIFT"), ("R63", "USB ONLY"), ("J11", "<- ON/OFF"),
+         ("J10", "OLED 1.54"), ("J10B", "OLED 2.42 LEAD")]
 BLOCKS = [   # title, net prefixes (a part with a pin on one of them belongs), extra parts
     ("MIDI OUT 2", ("MO2_", "MD2_", "MIDI_TX2"), ()),
     ("MIDI OUT 1", ("MO_", "MD_", "MIDI_TX"), ()),
-    ("LINE IN", ("LIN_", "LINE_IN", "AVDD"), ()),
+    ("LINE IN", ("LIN_", "LINE_IN", "LINE_SENSE"), ()),
     ("CLK / RST", ("CLK_", "RST_"), ()),
-    ("RF", ("LNA_IN", "RF", "UFL"), ("J4",)),
+    ("USB HOST", ("HOST", "V5H"), ("U17", "Q9")),
     ("CHARGE", ("BAT_", "XB_VDD", "Q2_G", "PROG", "CHRG"), ()),
     ("POWER", ("VBUS", "VUSB", "VSYS", "VREG"), ()),
-    ("MCU", ("XTAL_", "CHIP_PU", "VDD3P3", "VDD_SPI"), ("U1",)),
+    ("5V / 3V3", ("V5_", "V3_"), ("U18", "U2", "L4", "L5", "U19")),
+    ("MCU", ("CHIP_PU",), ("U1",)),
 ]
 CHEAT = [
     "TWINS: RTxx / CTxx sit across Rxx / Cxx: a part there",
     "  LOWERS the R (R // Rt) or ADDS to the C",
-    "SCREEN: 1.3 / 1.54 plug into J10, 2.42 on a lead to J10B;",
+    "SCREEN: a 1.54 plugs into J10, a 2.42 on a lead to J10B;",
     "  bridge JP1 / JP2 to the module's pin order (P1 G|V: pin 1 GND or VCC)",
     "J11 = the power toggle; R62 (fitted in the USB order) bridges it",
     "MIDI TRS type A: tip = sink (DIN 5), ring = source (DIN 4)",
-    "MIDI OUT 1 = GPIO21, MIDI OUT 2 = GPIO17",
-    "D-PAD: UP GPIO10, DOWN GPIO37, NO/BOOT GPIO0, YES GPIO36",
+    "MIDI OUT 1 = GPIO37, MIDI OUT 2 = GPIO42, VBUS sense GPIO14",
+    "D-PAD: UP GPIO18, DOWN GPIO4, NO/BOOT GPIO0, YES GPIO5",
     "RECOVERY J12: TX RX 3V3 GND EN BOOT (USB-UART 3.3 V):",
     "  hold BOOT to GND, pulse EN to GND: download mode",
-    "CLK OUT GPIO2, RST OUT GPIO1 (0 V..5-7 V, 1 k);",
-    "  the pump GPIO35 first: outputs 0 V till then",
-    "LINE IN GPIO9, plug detect GPIO16, cell GPIO4",
+    "CLK OUT GPIO36, RST OUT GPIO21 (0 / 5 V through 1 k)",
+    "LINE IN GPIO9 (tip) + GPIO8 (sleeve sense), detect GPIO48, cell GPIO10 (empty 3.3 V)",
+    "RGB LEDs GPIO38, 5 V rail GPIO41 (low = off); I2C SCL 39 SDA 35",
+    "USB HOST: enable GPIO47, CC INT GPIO13 (battery)",
 ]
 
 
@@ -202,7 +205,7 @@ def clear_old(board):
         board.Remove(g)
 
 
-PARKED = ("P1 G|V", "P2 V|G", "CELL 1", "CELL 2")
+PARKED = ("P1 G|V", "P2 V|G", "P1", "P2", "G", "V", "CELL 1", "CELL 2")   # (review S4: G / V at the jumpers' end pads)
 
 
 def fix_labels(board, s):
@@ -255,7 +258,7 @@ def refs(board, s):
             s.text(tag, around(box, reach=3.2), layer)
 
 
-POLAR = ("C72", "C86")
+POLAR = ()   # (the tantalums: none since experiment A, 2026-11-15)
 
 
 def notes(board, s):

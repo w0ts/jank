@@ -62,16 +62,17 @@ slot_w = nose_d + 1.0;    // the base's U-slot round the nose (0.5 each side), o
 /* [The power switch (stage 2): CAX-MTS102-YB-10.5JL (C55159907), panel mount in the lid's right wall (its drawing:
    M6 x 0.75 bushing 8.6 long, body 12.8 x 6.8 x 9.0 + 4.0 terminals, lever 10.5, panel hole 6.0)] */
 pwr = [60.6, 15.0];       // J11, its wire pads, board (x, y) (make_stl.sh sets it); the switch's axis 5 mm further down
-pwr_dy = 5.0;  pwr_z = bt + 7.0;   // the bushing's axis: board y = pwr.y + pwr_dy, height over the board's bottom
+pwr_dy = 14.0;  pwr_z = bt + 7.0;   // the bushing's axis: board y = pwr.y + pwr_dy, height over the board's bottom (mini 2.2 place2: 14, the user's choice 2026-11-16: 9 mm lower than 5, clear of the LED lid's pipe)
 pwr_body = [9.0 + 4.0, 12.8, 6.8];   // inside the wall: deep (body + terminals), along the wall, tall
 pwr_hole = 6.3;           // the wall's hole (the drawing's 6.0 + 0.3 for the print)
 pwr_nut = 9.0;  pwr_lever = 10.5;   // the nut across flats (ASSUMED: M6 thin nut, ~10 across corners), the lever
 din_h = 19.6;  din_gap = 0.35;
 /* [The cells: two 1S cells on edge under the board (the user measures them: set these)] */
-cell_len = 66;    // along x (GNB 550 mAh 65..66, BT2.0 450 mAh 62); the case's inside width is W + 2 clr
+cell_len = 62;    // along x (buffer try: the BT2.0 450 mAh 62 mm, shifted left: the sockets beside their right ends; GNB 550 mAh 65..66 does not fit); the case's inside width is W + 2 clr
 cell_h = 18;      // standing on edge: its width is its height (GNB 18, BT2.0 15.5)
 cell_t = 6.7;     // its thickness, along y (BT2.0 6.7, GNB 6..6.2)
 cell_y0 = H - 17.0;   // the band's top, board y (17 mm from the bottom edge: 41.0 on the 58 mm board, 47.0 on 64) (the DIN bodies end at 39.0, the ribs of their plates' slots at 40.85; the PH2.0 sockets' bodies are above it, at y 30..36)
+cell_x0 = 0.4;   // buffer try: the cells from the left wall, the leads at their right ends (x 62.4)
 rib_t = 2.0;      // the divider rib between the two cells' slots (it also carries the board under the buttons)
 cell_room = cell_h + 1.0;                     // the floor under the cells
 under = max(din ? din_h + din_gap : tail + 0.4, cells ? cell_room : 0);   // the floor's top under the board
@@ -93,7 +94,7 @@ btn = [[55.5, 41.7], [49, 48.2], [55.5, 54.7], [62, 48.2]];   // UP, NO / BOOT, 
 led = [5.5, 16.1];        // the middle of the red and the green LED (one window)
 hdr = [34, 14.8];         // J10: the screen's 1 x 4 header (the module's top edge 1.5 mm above its pin row)
 j4 = [42.2, 55.4];        // the u.FL
-ph = [[36.5, 33], [43, 33]];   // J8, J9: the PH2.0 sockets (bottom)
+ph = [[68.0, 57.6], [68.0, 68.25]];   // J8, J9: the PH2.0 sockets (bottom; buffer try: bottom right above SW3, vertical B2B)
 sw_top = bt + 1.5;        // the tactile switches' plunger top (TS-1187A-B-A-B: H 1.5, travel 0.2 +- 0.1 / 0.25: its drawing)
 led_top = bt + 0.8;       // (the mockup's block; the parts are 0.6 / 0.8)
 /* [The D-pad (stage 2; README "Buttons"; check_dpad.py checks the tilt)] */
@@ -130,10 +131,10 @@ bezel = [win[0] + 4.0, win[1] + 4.0, 0.6];               // the bezel pocket on 
 /* [The FPC antenna, upright on the inside of the bottom wall (Y = 0), its lead from J4] */
 ant_l = 42;  ant_w = 10.5;  ant_d = 0.4;   // the pocket: for a ~40 x 10 mm FPC antenna (ASSUMED size: C1693673's sheet
 ant_x0 = 3.0;                              //  could not be read; LCSC's FPCs with a 50 mm lead are about 40 x 10)
-base_pads = [[24.3, 27.6, H - 1.0, H + 0.2],   // the USB edge, between J7 and the USB-C's legs (mirrored: 38.4 .. 41.7)
+base_pads = [[29.9, 30.9, H - 1.0, H + 0.2],   // the USB edge, between the USB-C's legs and (mirrored: 41.1 .. 42.1) J13's body (mini 2.2 place2: J13 at x 48.3)
              [3, 9, -0.2, 1.0], [W - 9, W - 3, -0.2, 1.0],        // the bottom edge (not with the cells)
              [-0.2, 0.95, 6, 12]];    // the left edge (mirrored to the right; in the cells' band: off with the cells)
-lid_pads = [[2, 2], [2, 6.5], [W - 1.6, by(67.6)], [W - 5.0, by(71.0)]];   // (72 x 72: the right ones in the bottom right corner: the 2.42" covers y 1 .. 44, the 2 k stack and YES the right edge)   // the lid's feet on the board's top, clear of every part
+lid_pads = [[2, 2], [2, 6.5], [W - 1.4, by(66.2)], [W - 5.0, by(71.0)]];   // (mini 2.2: the third off J9's pin 1 joint, between SW5 and J9)   // (72 x 72: the right ones in the bottom right corner: the 2.42" covers y 1 .. 44, the 2 k stack and YES the right edge)   // the lid's feet on the board's top, clear of every part
 bumps = [[0, 26], [1, 26], [2, W / 2 - 11], [2, W / 2 + 11], [3, W / 2 - 11], [3, W / 2 + 11]];   // [side 0 left 1 right 2 top 3 bottom, along the wall]
 
 module rbox(x0, y0, x1, y1, z0, z1, r) {
@@ -186,12 +187,16 @@ module din_model() {   // one socket, J5 (left); face on the edge, body under th
 // the PH2.0 sockets under the board with a plug in (body 6.4 x 4.9, ~6 mm, + the plug: 10 mm down, either way round:
 // UNVERIFIED), the cells in their slots, the screen module on its header
 module ph_model() for (p = ph) translate([p[0] - 3.2, by(p[1]) - 3.0, -10]) cube([6.4, 6.0, 10 + 0.01]);
+// (mini 2.2) their solder joints on TOP: the pins at x +-1.0 (pitch 2.0), 1.6 mm pads; a joint as a cylinder r 0.8, 2.0 mm
+// up (pin through 1.6 mm board + fillet: ASSUMED, not from JST's drawing)
+ph_joint = [0.8, 2.0];
+module ph_joints() for (p = ph, dx = [-1.0, 1.0]) translate([p[0] + dx, by(p[1]), 0]) cylinder(r = ph_joint[0], h = ph_joint[1], $fn = 24);
 function slot_y(i) = i == 0 ? [cell_y0, rib_y - rib_t / 2] : [rib_y + rib_t / 2, H];   // the two slots, board y
 module cell_model(lift = 0.01) for (i = [0, 1]) let(s = slot_y(i), yc = (s[0] + s[1]) / 2)
-    translate([W / 2 - cell_len / 2, by(yc) - cell_t / 2, -under + lift]) cube([cell_len, cell_t, cell_h]);
+    translate([cell_x0, by(yc) - cell_t / 2, -under + lift]) cube([cell_len, cell_t, cell_h]);
 module module_model() translate([mod_xy[0], by(mod_xy[1] + mod_h), mod_z0]) cube([mod_w, mod_h, mod_z1 - mod_z0]);
 module board_all() {
-    mock(); jacks(); tails(); ph_model();
+    mock(); jacks(); tails(); ph_model(); ph_joints();
     if (din) both() din_model();
     if (cells) cell_model();
     if (lid_var == "screen") module_model();
@@ -417,6 +422,8 @@ module jack_noses_cut() {   // (the noses' room, removed from the bodies' check:
 // the D-pad at rest: its bosses 0.15 mm over the actuators (not touching at 0.1, within 0.2), its pivot on the board
 // (within 0.05), 0.25 mm or more from the lid (the hole's 0.3 sides; the flange 1.0 under the roof), the toggle's body
 // clear of the board's parts and of the D-pad
+ph_clr = 0.1;   // (part "check_ph_dpad": empty = the D-pad keeps ph_clr from J8 / J9's joints)
+if (part == "check_ph_dpad") intersection() { inflate(ph_clr) dpad_core(); ph_joints(); }
 if (part == "check_dpad") intersection() { inflate(0.1) dpad_core(false); board_all(); }
 if (part == "check_pivot_near") intersection() { inflate(0.05) translate([cross_c[0], by(cross_c[1]), bt]) cylinder(d = pivot_tip, h = 0.3, $fn = 16); mock(); }
 if (part == "check_dpad_near") intersection() { inflate(0.2) dpad_bosses(); board_all(); }

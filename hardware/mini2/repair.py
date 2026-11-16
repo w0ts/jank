@@ -90,8 +90,8 @@ def build(board, inflate=None):
 
 
 KINDS = {"plain": lambda n: False,                                   # (the router each kind of net is joined on)
-         "dig": lambda n: n in lin_keep.KEEP_NETS,                   # (a digital net: LIN_SUM / LIN_OUT kept clear)
-         "lin": lambda n: not lin_keep.quiet(n)}                     # (LIN_SUM / LIN_OUT: every digital net kept clear)
+         "dig": lambda n: n in lin_keep.KEEP_NETS,                   # (a digital net: LINE IN's nodes kept clear)
+         "lin": lambda n: not lin_keep.quiet(n)}                     # (LINE IN's nodes: every digital net kept clear)
 
 
 def kind(net):
@@ -174,7 +174,8 @@ def free_end(board, t):
     """True when one end of the track t touches no other copper of its net (a pad, a via, another track): a stub; a
     short piece between two others (a 45-degree corner) is not one"""
     for end in (t.GetStart(), t.GetEnd()):
-        hit = any(o is not t and o.GetNetCode() == t.GetNetCode() and o.HitTest(end) for o in board.GetTracks())
+        me = t.m_Uuid.AsString()
+        hit = any(o.GetNetCode() == t.GetNetCode() and o.m_Uuid.AsString() != me and o.HitTest(end) for o in board.GetTracks())
         hit = hit or any(p.GetNetCode() == t.GetNetCode() and p.HitTest(end) for f in board.GetFootprints() for p in f.Pads())
         if not hit:
             return True
@@ -248,13 +249,19 @@ def main():
     n1, n2, kept = tidy(board)
     text = open(os.path.join(HERE, "fab", "repair.rpt")).read()
     stubs = 0
+    nets = set()
     for block in text.split("[track_dangling]")[1:]:
         m = re.search(r"@\(([-\d.]+) mm, ([-\d.]+) mm\): Track \[([^\]]+)\]", block)
         if m:
-            at = pcbnew.VECTOR2I(MM(float(m.group(1))), MM(float(m.group(2))))
-            for t in [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() == m.group(3)
-                      and t.HitTest(at) and t.GetLength() < MM(5.0) and free_end(board, t)]:
-                stubs += try_remove(board, t)
+            nets.add(m.group(3))
+    for _ in range(40):                          # (review pass 2, L6: whole stubs, any length: each dangling piece
+        gone = 0                                 #  removed, then the piece it hung from, until none is left)
+        for t in [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK" and t.GetNetname() in nets]:
+            if free_end(board, t) and try_remove(board, t):
+                gone += 1
+        stubs += gone
+        if not gone:
+            break
     print(f"repair: {stubs} dangling stubs removed")
     dv = 0
     for block in text.split("[via_dangling]")[1:]:          # (a via a removed track left hanging)

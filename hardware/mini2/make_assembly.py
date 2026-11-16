@@ -28,6 +28,7 @@ import parts as P
 NAME = "mini2"
 FAB = os.path.join(HERE, "fab")
 JLC = os.path.join(HERE, "lib", "jlc.pretty")
+CHIP = os.path.join(HERE, "lib", "chip.pretty")
 
 
 def pads_of(fp):
@@ -37,7 +38,8 @@ def pads_of(fp):
 def fit_error(fp, x, y, rot, bottom):
     """JLC's footprint at (x, y) (KiCad page mm, y down), turned rot (counter-clockwise seen from the top), mirrored in y
     first for a bottom part: the largest distance from one of its pads to the board's pad of the same number"""
-    ref = pcbnew.FootprintLoad(JLC, fp.GetFPID().GetLibItemName().wx_str())
+    name = fp.GetFPID().GetLibItemName().wx_str()
+    ref = pcbnew.FootprintLoad(JLC, name) or pcbnew.FootprintLoad(CHIP, name)   # (the FH4R2's EP5.7: make_footprints.py's copy)
     c, s = math.cos(math.radians(rot)), math.sin(math.radians(rot))
     board = {}
     for n, px, py in pads_of(fp):

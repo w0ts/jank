@@ -1,5 +1,9 @@
 # jank mini 2.2: a bigger screen? (study, 2026-11-14; no board file changed)
 
+**Review pass 2 (2026-11-15), the user's: the 1.3" is dropped; the 1.54" goes on J10 and the 2.42" stays on J10B's
+lead** (it costs nothing: pads only; the firmware switches it on with Wi-Fi idle and stops at 3.7 V on the cell:
+README "Screens"). The 1.3" lines below are the record of the comparison only.
+
 The user loved the emulator's 2.5x screen, about 54 x 27 mm. **Only a 2.42" panel is that size (55.0 x 27.5 mm).** A
 1.3" is half of it in each direction.
 

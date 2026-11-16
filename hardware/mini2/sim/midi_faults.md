@@ -1,3 +1,5 @@
+> **Superseded 2026-11-15:** MIDI OUT is now a 5 V current loop with a 2N7002 per connector (sim/midi.py, midi.txt); this file is the 3.3 V GPIO-driven design's history.
+
 # jank mini 2.2: the MIDI outputs under single faults (midi_faults.py; the datasheet's figures and the models in its docstring)
 
 Limits asked: the GPIO within 40 mA (Table 5-4's IOH; no per-pin maximum is stated), each 0402 within 1/16 W in a sustained short, +3V3 up, and >= 5 mA into a standard receiver at 3.0 V and 3.3 V.

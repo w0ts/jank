@@ -1,21 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""jank mini 2.2's four MIDI outputs in ngspice (README "stage 2", "Simulations"): the current in each receiver, a mono
-plug in a jack, a shorted DIN pin 4, a shorted tip, and the GPIO's current. Writes sim/midi.txt.
+"""jank mini 2.2's four MIDI outputs as true 5 V current loops (2026-11-15, the user's; parts.py "MIDI OUT 1 and MIDI
+OUT 2"), in ngspice. Writes sim/midi.txt.
 
-The circuit (parts.py, stage 2's values): GPIO21 sinks MIDI OUT 1's jack (R15 68 ohm, source R14 // R26 // R48 = 33.3
-ohm) and DIN (R55 68 ohm, source R54 // R58 = 50 ohm); GPIO17 the same for MIDI OUT 2 (R20 / R21 // R27 // R49, R57 /
-R56 // R59). Each receiver: the MIDI 1.0 input
-(220 ohm, the optocoupler's LED, a reverse diode across it).
-Models (GENERIC, not the vendors'):
- - the receiver's LED: a diode fitted to 1.2 V at 5 mA (6N138 / H11L1 / PC900 class, "typical"), 1.5 V (the sim pass's
-   "standard receiver") and 1.7 V at 5 mA (an older or a slow opto); the reverse diode a 1N4148; "+ diode": a 1N4148
-   in series in the receiver (some have one).
- - the GPIO (review pass 1, the sim pass: the output resistance counts): low = 0 V through RON_L, high = +3V3 through
-   RON_H, from the ESP32-S3 datasheet v2.2, Table 5-4 (p. 65): IOL 28 mA typ at VOL 0.495 V and IOH 40 mA typ at VOH
-   >= 2.64 V, both at PAD_DRIVER = 3: 17.7 / 16.5 ohm; drive 2 ("20 mA"): 35 / 33 ohm (ESTIMATED by the sim pass: the
-   datasheet gives drive 3 only). Each pin sinks two loops. Typical figures, not limits.
- - +3V3: 3.3 V, and 3.47 V (the LDO's +5 % worst high).
-  python3 hardware/mini2/sim/midi.py        (ngspice 47; a second)
+The circuit: V5M (the 5 V aux rail through R122) -> the source (2 x 470 ohm 0805 in parallel, 235 ohm, the jacks and
+the DINs alike since the Standard study's experiment A, 2026-11-15; the jacks were 3 x 680) -> ring / DIN 4 -> the
+receiver (MIDI 1.0: 220 ohm, the optocoupler's LED, a reverse diode; some add a series diode) -> tip / DIN 5 -> the sink
+(2 x 470 ohm 0805 in parallel, 235 ohm; was one 220) -> a 2N7002 (gate on the inverted UART TX at 3.3 V) -> GND. Models (GENERIC, not the vendors'):
+ - the receiver's LED: a diode fitted to 1.2 V at 5 mA (6N138 / H11L1 / PC900 class), 1.5 V and 1.7 V (slow or old
+   optos); its 220 ohm +-5 %; "+ diode": a 1N4148 in series.
+ - the 2N7002: LTspice's standard.mos entry (Fairchild), copied by hand, at VGS 3.3 V (the GPIO high, 17 ohm).
+ - V5M: 4.72 / 4.85 / 4.97 V (the TPS61023's 4.85 V with R136 20 k, its VREF's +-2.5 %); the resistors +-1 %.
+  python3 hardware/mini2/sim/midi.py        (ngspice; seconds)
 """
 import os
 import re
@@ -23,17 +18,10 @@ import subprocess
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DRIVE = {"2": (35.0, 33.0), "3": (17.7, 16.5)}     # (RON_L, RON_H)
-RON_L, RON_H = DRIVE["3"]
 LEDS = {"1.2 V": "D(IS=3.1e-14 N=1.8 RS=2)", "1.5 V": "D(IS=1.3e-15 N=2.0 RS=2)", "1.7 V": "D(IS=2.6e-17 N=2.0 RS=2)"}
-SINK = 68.0
-# connector: (source ohms from +3V3, sink ohms to the GPIO, the GPIO)
-CONN = {"J2 jack OUT 1": (100 / 3, SINK, "g21"), "J5 DIN OUT 1": (50, SINK, "g21"),
-        "J3 jack OUT 2": (100 / 3, SINK, "g17"), "J6 DIN OUT 2": (50, SINK, "g17")}
-
-
-def conn(sink):
-    return {n: (src, sink, g) for n, (src, _s, g) in CONN.items()}
+QN = ".model QN VDMOS(Rg=3 Vto=1.6 Rd=0 Rs=.75 Rb=.14 Kp=.17 mtriode=1.25 Cgdmax=80p Cgdmin=12p Cgs=50p Cjo=50p Is=.04p)"
+SRC = {"jack": 470 / 2, "DIN": 470 / 2}
+SINK = 470 / 2
 
 
 def run(net):
@@ -41,88 +29,49 @@ def run(net):
         p = os.path.join(d, "x.cir")
         open(p, "w").write(net)
         out = subprocess.run(["nice", "-n", "19", "ngspice", "-b", p], capture_output=True, text=True, timeout=120).stdout
-    vals = {m[1]: float(m[2]) for m in re.finditer(r"^(\w+)\s*=\s*([-+\d.eE]+)", out, re.M)}
-    if not vals:
-        raise SystemExit(out[-2000:])
-    return vals
+    return {m[1]: float(m[2]) for m in re.finditer(r"^(\w+)\s*=\s*([-+\d.eE]+)", out, re.M)}
 
 
-def circuit(v33, led, gpio_level, fault=None, drive="3", sink=SINK, series=False):
-    """gpio_level 0 = both GPIOs low (every receiver on), 1 = high; fault: (connector, 'ring' | 'tip') shorted to ground,
-    the receiver of that connector unplugged"""
-    ron_l, ron_h = DRIVE[drive]
-    lines = [f"V33 v33 0 {v33}", f".model LED {LEDS[led]}", ".model D4148 D(IS=2.5n N=1.75 RS=0.6)"]
-    for g in ("g21", "g17"):
-        lines.append(f"Vg{g} {g}x 0 {v33 if gpio_level else 0}")
-        lines.append(f"Rg{g} {g}x {g} {ron_h if gpio_level else ron_l}")
-    for k, (name, (rsrc, rsnk, g)) in enumerate(conn(sink).items()):
-        lines += [f"Rsrc{k} v33 r{k} {rsrc}", f"Rsnk{k} t{k} {g} {rsnk}"]
-        if fault and fault[0] == name:
-            lines.append(f"Rf{k} {'r' if fault[1] == 'ring' else 't'}{k} 0 0.05")
-            continue
-        lines += [f"R220_{k} r{k} a{k}x 220", f"Vm{k} a{k}x a{k} 0",    # (Vm: the receiver's current)
-                  f"Dled{k} a{k} {'s' if series else 't'}{k} LED", f"Drev{k} t{k} a{k} D4148"]
-        if series:
-            lines.append(f"Dser{k} s{k} t{k} D4148")
-    lines.append(".op")
-    lines.append(".control\nop\n" + "".join(
-        f"let i{k} = i(Vm{k})\necho \"i{k} = $&i{k}\"\n" for k, n in enumerate(CONN) if not (fault and fault[0] == n)) +
-        "let ig21 = i(Vgg21)\necho \"ig21 = $&ig21\"\nlet ig17 = i(Vgg17)\necho \"ig17 = $&ig17\"\n" +
-        "".join(f"let p{k} = (v(v33) - v(r{k})) * (v(v33) - v(r{k})) / {CONN[n][0]}\necho \"p{k} = $&p{k}\"\n"
-                for k, n in enumerate(CONN)) + ".endc")
-    return run("* midi\n" + "\n".join(lines) + "\n.end\n")
-
-
-def tradeoff():
-    """review pass 1 / the sim pass: the receivers' current against the shorts, per sink value and drive strength"""
-    out = ["the trade-off (sink ohms per connector, drive 2 / 3): the receivers' current at 3.3 V (jack / DIN; a 1.5 V "
-           "opto, the same + a series diode) and 3.0 V (1.5 V opto); a tip shorted to GND with the pin high; tip to "
-           "ring with the pin low (into the pin); both tips of one output shorted (the pin, high)"]
-    for sink in (68.0, 56.0, 47.0, 39.0):
-        for d in ("2", "3"):
-            a = circuit(3.3, "1.5 V", 0, drive=d, sink=sink)
-            b = circuit(3.3, "1.5 V", 0, drive=d, sink=sink, series=True)
-            c = circuit(3.0, "1.5 V", 0, drive=d, sink=sink)
-            tip = circuit(3.3, "1.2 V", 1, ("J2 jack OUT 1", "tip"), drive=d, sink=sink)
-            ron_l, ron_h = DRIVE[d]
-            tr = 3.3 / (100 / 3 + sink + ron_l) * 1000
-            both = 3.3 / (sink / 2 + ron_h) * 1000
-            out.append(f"  {sink:.0f} ohm, drive {d}: 3.3 V {abs(a['i0']) * 1e3:.2f} / {abs(a['i1']) * 1e3:.2f} mA, + diode "
-                       f"{abs(b['i0']) * 1e3:.2f} / {abs(b['i1']) * 1e3:.2f}; 3.0 V {abs(c['i0']) * 1e3:.2f} / "
-                       f"{abs(c['i1']) * 1e3:.2f}; tip short {abs(tip['ig21']) * 1e3:.0f} mA ({(tip['ig21'] * 1) ** 2 * sink * 1e3:.0f} "
-                       f"mW in the sink); tip-ring {tr:.0f} mA; both tips {both:.0f} mA")
-    return out
+def loop(v5, rsrc, led, rrx=220.0, rsink=SINK, series=False, gate=3.3):
+    d = "Dser rx2 rx3 D1N\n" if series else "Rser rx2 rx3 0.001\n"
+    net = (f"* midi\n{QN}\n.model DL {LEDS[led]}\n.model D1N D(IS=2.5n N=1.75 RS=0.6)\n"
+           f"V5 v5 0 {v5}\nRs v5 ring {rsrc}\nRrx ring rx1 {rrx}\nDled rx1 rx2 DL\nDrev rx2 rx1 D1N\n{d}"
+           f"Vm rx3 tip 0\nRk tip k {rsink}\nM1 k g 0 0 QN\nVg gs 0 {gate}\nRg gs g 17\n"
+           ".control\nop\nlet i = i(Vm)\nlet vk = v(k)\necho \"i = $&i\"\necho \"vk = $&vk\"\n.endc\n.end\n")
+    return run(net)
 
 
 def main():
-    names = list(CONN)
-    out = ["jank mini 2.2, the four MIDI outputs: ngspice results (midi.py; generic models: its docstring); drive 3 "
-           "unless said", ""]
-    for v33 in (3.3, 3.0, 3.47):
+    out = ["jank mini 2.2, the four MIDI outputs as 5 V current loops: ngspice results (midi.py; generic models: its docstring)", ""]
+    lo, hi = 1e9, 0.0
+    out.append("the receiver's current with the FET on (a 0 bit), per connector:")
+    for v5, tol in ((4.72, -1), (4.85, 0), (4.97, 1)):
         for led in LEDS:
-            r = circuit(v33, led, 0)
-            cur = ", ".join(f"{names[k].split()[0]} {abs(r[f'i{k}']) * 1000:.2f}" for k in range(4))
-            out.append(f"+3V3 {v33} V, LED {led} at 5 mA, both GPIOs low: receivers {cur} mA; GPIO21 sinks "
-                       f"{abs(r['ig21']) * 1000:.1f} mA, GPIO17 {abs(r['ig17']) * 1000:.1f} mA")
-    r = circuit(3.3, "1.2 V", 1)
-    out.append(f"both GPIOs high (idle): receivers {max(abs(r[f'i{k}']) for k in range(4)) * 1e6:.2f} uA at most")
+            for series in (False, True):
+                row = []
+                for conn, rs in SRC.items():
+                    k = 1 + 0.01 * tol
+                    m = loop(v5, rs / k, led, rrx=220 * (1 - 0.05 * tol), rsink=SINK / k, series=series)
+                    i = abs(m["i"]) * 1000
+                    lo, hi = min(lo, i), max(hi, i)
+                    row.append(f"{conn} {i:.2f} mA")
+                out.append(f"  V5M {v5} V{' (resistors -1 %, receiver +5 %)' if tol < 0 else ' (resistors +1 %, receiver -5 %)' if tol > 0 else ''}, "
+                           f"LED {led}{' + a series diode' if series else ''}: " + ", ".join(row))
+    m = loop(4.97, SRC["jack"], "1.2 V", gate=0.0)
+    out.append(f"  the FET off (idle, a 1 bit): {abs(m['i']) * 1e6:.2f} uA")
     out.append("")
-    r = circuit(3.47, "1.2 V", 0, ("J2 jack OUT 1", "ring"))
-    out.append(f"a mono plug in J2 (its ring on the sleeve), +3V3 3.47 V: J2's source trio {r['p0'] * 1000:.0f} mW "
-               f"({r['p0'] / 3 * 1000:.0f} mW each, 250 mW parts); the other receivers "
-               + ", ".join(f"{names[k].split()[0]} {abs(r[f'i{k}']) * 1000:.2f}" for k in (1, 2, 3)) + " mA")
-    r = circuit(3.47, "1.2 V", 0, ("J5 DIN OUT 1", "ring"))
-    out.append(f"a broken DIN cable shorting J5's pin 4, 3.47 V: R54 // R58 {r['p1'] * 1000:.0f} mW ({r['p1'] / 2 * 1000:.0f} mW "
-               f"each, 250 mW parts); the others " + ", ".join(
-                   f"{names[k].split()[0]} {abs(r[f'i{k}']) * 1000:.2f}" for k in (0, 2, 3)) + " mA")
-    r = circuit(3.47, "1.2 V", 1, ("J2 jack OUT 1", "tip"))
-    out.append(f"J2's tip shorted to ground with GPIO21 high (a damaged cable): GPIO21 sources {abs(r['ig21']) * 1000:.0f} "
-               "mA through R15 68 ohm (the datasheet's IOH figure is 40 mA typ, Table 5-4; sim/midi_faults.md)")
+    out.append("faults (V5M 4.97 V, the resistors -1 %):")
+    for conn, rs in SRC.items():
+        i = 4.97 / (rs * 0.99)
+        out.append(f"  {conn}: ring / DIN 4 shorted to GND (a mono plug, a broken cable): {i * 1000:.1f} mA, "
+                   f"{i * i * rs * 0.99 / 2 * 1000:.0f} mW in each of its 2 0805s (125 mW parts)")
+    i = 4.97 / (SRC["jack"] * 0.99 + SINK * 0.99)
+    out.append(f"  jack: tip shorted to ring with the FET on: {i * 1000:.1f} mA ({i * i * SINK * 0.99 / 2 * 1000:.0f} mW in "
+               "each of the sink's 2 0805s)")
+    out.append("  tip shorted to GND: no current (the sink side is already at GND when the FET is on; off, nothing drives it)")
     out.append("")
-    out.append("GPIO17's default drive is 10 mA (the datasheet p. 18, note 5): the firmware sets GPIO17 and GPIO21 to "
-               "drive strength 3 (the receivers' current above; drive 2 loses ~10 %: the trade-off below)")
-    out.append("")
-    out += tradeoff()
+    out.append(f"SUMMARY: a receiver gets {lo:.2f} .. {hi:.2f} mA over the corners (MIDI 1.0's 5 V circuit aims at ~5 mA); "
+               "the GPIOs drive only the FETs' gates")
     open(os.path.join(HERE, "midi.txt"), "w").write("\n".join(out) + "\n")
     print("\n".join(out))
 

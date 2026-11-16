@@ -1,0 +1,19 @@
+jank mini 2.2, the USB host signal on VBUS from the 5 V aux rail (battery order): ngspice results (host.py; models in its docstring); R93 = 2200 ohm
+
+levels:
+  aux 4.845 V (typ), host ON, device detect: V5A 4.840 V, VBUS at the connector 4.52 V, the signal's current 0.05 mA (from the aux rail 0.34 mA); through Q9 into the board 0.00 uA (Q9's gate 4.84 V)
+  aux 4.845 V (typ), host ON, device 10k: V5A 4.840 V, VBUS at the connector 3.73 V, the signal's current 0.38 mA (from the aux rail 0.67 mA); through Q9 into the board 0.00 uA (Q9's gate 4.84 V)
+  aux 4.845 V (typ), host ON, device short: V5A 4.839 V, VBUS at the connector 0.00 V, the signal's current 2.04 mA (from the aux rail 2.33 mA); through Q9 into the board -23.71 uA (Q9's gate 4.84 V)
+  aux 4.724 V (low), host ON, device detect: V5A 4.719 V, VBUS at the connector 4.40 V, the signal's current 0.05 mA (from the aux rail 0.33 mA); through Q9 into the board 0.00 uA (Q9's gate 4.72 V)
+  aux 4.724 V (low), host ON, device 10k: V5A 4.719 V, VBUS at the connector 3.63 V, the signal's current 0.37 mA (from the aux rail 0.65 mA); through Q9 into the board 0.00 uA (Q9's gate 4.72 V)
+  aux 4.724 V (low), host ON, device short: V5A 4.718 V, VBUS at the connector 0.00 V, the signal's current 1.99 mA (from the aux rail 2.27 mA); through Q9 into the board -23.71 uA (Q9's gate 4.72 V)
+
+a charger plugged in host mode:
+  a 5.25 V charger plugged in host mode (aux 4.845 V): back into the signal path 19.01 uA at most (the 250 k leakage the model assumes), V5A never above 4.842 V; before the firmware drops HOST_EN: Q9's gate 4.84 V vs VBUS 5.25 V (0.00 mA through Q9); after: the board's VBUS 5.13 V (the charger runs)
+  a 5.5 V charger plugged in host mode (aux 4.724 V): back into the signal path 19.91 uA at most (the 250 k leakage the model assumes), V5A never above 4.721 V; before the firmware drops HOST_EN: Q9's gate 4.72 V vs VBUS 5.50 V (4.16 mA through Q9); after: the board's VBUS 5.37 V (the charger runs)
+
+device mode:
+  device mode, a host's 5.0 V on VBUS: V5A 4.721 V, VBUS at the connector 4.91 V, the signal's current -0.02 mA (from the aux rail 0.00 mA); through Q9 into the board 377866.00 uA (Q9's gate 0.36 V)
+  the aux rail dead (0 V: the boost off, dead or lifted), a charger's 5.0 V: V5A 0.362 V, VBUS at the connector 4.91 V, the signal's current -0.02 mA (from the aux rail -0.00 mA); through Q9 into the board 377866.00 uA (Q9's gate 0.36 V)
+
+SUMMARY (aux at its low 4.72 V): host VBUS 4.40 V into 100 k, 3.63 V into 10 k; a short takes 1.99 mA and leaves V5A at 4.718 V; back-feed with a charger 19.91 uA

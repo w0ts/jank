@@ -49,7 +49,7 @@ l1, l2 = lens("LED1"), lens("LED2")
 out = ["btn=" + vec([at(r) for r in ("SW3", "SW1", "SW4", "SW5")]),
        "led=[%g,%g]" % ((l1[0] + l2[0]) / 2, (l1[1] + l2[1]) / 2),
        "hdr=[%g,%g]" % at("J10"),
-       "j4=[%g,%g]" % at("J4"),
+       # (mini 2.2: no J4; the u.FL is the WROOM-1U's own, and mini_case.scad does not use j4)
        "ph=" + vec([at(r) for r in ("J8", "J9")]),
        "j2=[%g,%g]" % at("J2"), "j3=[%g,%g]" % at("J3"), "j7=[%g,%g]" % at("J7"),   # (stage 2: the jacks under the board)
        "pwr=[%g,%g]" % at("J11"),

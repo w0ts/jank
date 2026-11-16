@@ -1,191 +1,175 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""jank mini 2.2's LINE IN front end in ngspice (linein.lib): gain, band, bias, the swing at +4 dBu and at consumer
-level, clipping, a mono plug, the stage-2 pull-downs (the level with and without them, by source impedance), the plug
-detect (LIN_DET with and without a plug), the supply's ripple (U7 on VSYS, Wi-Fi bursts) at the ADC, USB plug-in with a
-signal present, and the ADC's sampling-capacitor kick. Writes sim/results.txt.
+"""jank mini 2.2's digital LINE IN (2026-11-15; parts.py "LINE IN, digital"): two matched passive networks into two ADC1
+pins, the firmware takes the difference. Writes sim/results.txt.
 
-  python3 hardware/mini2/sim/linein.py        (ngspice 47 on the PATH; a few seconds)
+The circuit: tip and ring each through 20 k and 1 uF into node A (LINE_IN, GPIO9); the sleeve through two identical
+branches (20 k + 1 uF each) into node B (LINE_SENSE, GPIO8); each node 12 k to the bias LIN_VB (R33 150 k from +3V3 /
+R34 120 k (100 k + R153 20 k since 2026-11-15) = 1.467 V, C33 10 uF) and 2.2 nF C0G to GND; R36 / R37 100 k from tip / ring to GND, R39 100 ohm from the
+sleeve to GND; the PESD15VL2BT (D7 on tip + ring, D14 on the sleeve; VRWM 15 V, VBR 17.1 .. 20.3 V, VCL 26 V at 8/20 us, 350 W). A - B = 0.273 x ((tip - sleeve) + (ring - sleeve)).
+Models / assumptions: the ADC range ATTEN3 0 .. 2.9 V (the datasheet's 12 dB range); the ADC pins as their ESD diodes to
++3V3 and GND (a 1N4148-class card: ASSUMED); the source 100 .. 600 ohm; the TVS as two 18.7 V zeners back to back per line (+ 0.7 V diodes);
+tolerances 1 % (resistors), 5 % (the 2.2 nF C0G), 10 % (the 1 uF X5R coupling caps: ASSUMED their grade).
+  python3 hardware/mini2/sim/linein.py        (ngspice; seconds)
 """
 import math
 import os
+import random
 import re
 import subprocess
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DBU0 = math.sqrt(0.6)                      # 0 dBu = 0.7746 V rms
-LSB = 2.9 / 4096                           # ATTEN3 (12 dB), the datasheet's 0..2900 mV, 12 bits
+VB = 3.3 * 120 / 270
+FS_LO, FS_HI = 0.0, 2.9
+R_IN, C_IN, R_B, C_N, R_PD = 20e3, 1e-6, 12e3, 2.2e-9, 100e3
 
 
-def peak(dbu):
-    return DBU0 * 10 ** (dbu / 20) * math.sqrt(2)
+def node(f, vins, rs, cs, rb=R_B, cn=C_N):
+    """a node's voltage (AC) from its branches (vin_i through rs_i + cs_i), rb to the bias (AC ground), cn to GND"""
+    w = 2j * math.pi * f
+    ys = [1 / (r + 1 / (w * c)) for r, c in zip(rs, cs)]
+    return sum(v * y for v, y in zip(vins, ys)) / (sum(ys) + 1 / rb + w * cn)
 
 
-def run(body, name):
-    """one netlist: body holds sources, analyses and a .control block that prints `name_key = value` lines"""
-    net = f"* {name}\n.include {os.path.join(HERE, 'linein.lib')}\n{body}\n.end\n"
+def jack(vsig_t, vsig_r, vcm, rsrc, rpd=R_PD):
+    """tip / ring at the jack: the source (its ground = the sleeve at vcm) through rsrc, loaded by the 100 k pull-downs
+    to the board's GND (the network's own ~20 k load ignored here: it is the same on every side to first order)"""
+    k = rpd / (rpd + rsrc)
+    return (vcm + vsig_t) * k, (vcm + vsig_r) * k
+
+
+def gains():
+    out = []
+    for f in (20, 50, 1000, 10000, 13300, 20800):
+        a = node(f, [1, 0], [R_IN, R_IN], [C_IN, C_IN])
+        both = node(f, [1, 1], [R_IN, R_IN], [C_IN, C_IN])
+        out.append(f"  {f:>5} Hz: one channel {20 * math.log10(abs(a)):.2f} dB ({abs(a):.3f}), the same on both "
+                   f"{20 * math.log10(abs(both)):.2f} dB ({abs(both):.3f})")
+    # the input impedance at the tip (1 kHz): R36 // (20 k + 1 uF + (the node's other paths to AC ground))
+    f, w = 1000, 2j * math.pi * 1000
+    zrest = 1 / (1 / (R_IN + 1 / (w * C_IN)) + 1 / R_B + w * C_N)
+    zin = 1 / (1 / R_PD + 1 / (R_IN + 1 / (w * C_IN) + zrest))
+    out.append(f"  the input impedance at the tip, 1 kHz: {abs(zin) / 1e3:.1f} k (100 k // ~27.5 k)")
+    return out
+
+
+def levels():
+    g1 = abs(node(1000, [1, 0], [R_IN, R_IN], [C_IN, C_IN]))
+    g2 = abs(node(1000, [1, 1], [R_IN, R_IN], [C_IN, C_IN]))
+    head = min(VB - FS_LO, FS_HI - VB)
+    out = [f"  node A's centre {VB:.3f} V, {head:.3f} V to the nearer end of ATTEN3's 0 .. 2.9 V"]
+    for what, g in (("the same signal on tip and ring", g2), ("one channel (a mono plug: the ring on the sleeve)", g1)):
+        pk = head / g
+        out.append(f"  {what}: the ADC clips at {pk:.2f} V peak = {20 * math.log10(pk / math.sqrt(2) / 0.7746):+.1f} dBu")
+    for vcm in (0.1, 1.0):
+        pk_cm = vcm * math.sqrt(2) * g2          # (an earth difference moves tip, ring and sleeve: both nodes by g2)
+        left = head - pk_cm
+        out.append(f"  with {vcm * 1000:.0f} mV rms of 50 Hz earth difference: both nodes swing +-{pk_cm:.3f} V; the "
+                   f"same-signal input then clips at {left / g2:.2f} V peak ({20 * math.log10(left / g2 / math.sqrt(2) / 0.7746):+.1f} dBu)")
+    return out
+
+
+def monte_carlo(n=5000, seed=1):
+    """the analog rejection of a 50 Hz / 1 kHz / 10 kHz earth difference: (A - B) from vcm, against the differential gain,
+    with the parts' tolerances (uniform: 1 % R, 5 % C0G, 10 % the 1 uF), a 600 ohm source"""
+    rng = random.Random(seed)
+    out = []
+    for f in (50, 1000, 10000):
+        w = 2j * math.pi * f
+        rej = []
+        for _ in range(n):
+            u = lambda t: 1 + rng.uniform(-t, t)
+            rs_a = [R_IN * u(0.01), R_IN * u(0.01)]
+            cs_a = [C_IN * u(0.10), C_IN * u(0.10)]
+            rs_b = [R_IN * u(0.01), R_IN * u(0.01)]
+            cs_b = [C_IN * u(0.10), C_IN * u(0.10)]
+            rba, rbb, cna, cnb = R_B * u(0.01), R_B * u(0.01), C_N * u(0.05), C_N * u(0.05)
+            vt, vr = jack(0, 0, 1.0, 600, R_PD * u(0.01))
+            a = node(f, [vt, vr], rs_a, cs_a, rba, cna)
+            b = node(f, [1.0, 1.0], rs_b, cs_b, rbb, cnb)
+            vt2, vr2 = jack(1.0, 1.0, 0.0, 600)
+            gd = node(f, [vt2, vr2], rs_a, cs_a, rba, cna)
+            rej.append(20 * math.log10(abs(gd) / max(abs(a - b), 1e-12)))
+        rej.sort()
+        nom_a = node(f, list(jack(0, 0, 1.0, 600)), [R_IN] * 2, [C_IN] * 2)
+        nom_b = node(f, [1.0, 1.0], [R_IN] * 2, [C_IN] * 2)
+        nom_g = node(f, list(jack(1, 1, 0, 600)), [R_IN] * 2, [C_IN] * 2)
+        out.append(f"  {f:>5} Hz: nominal {20 * math.log10(abs(nom_g) / abs(nom_a - nom_b)):.1f} dB (the 100 k pull-downs "
+                   f"against a 600 ohm source); over {n} boards: median {rej[n // 2]:.1f} dB, 1 % worst "
+                   f"{rej[n // 100]:.1f} dB, worst {rej[0]:.1f} dB")
+    return out
+
+
+def protection_case(amp, bv):
+    """a +-amp square wave (100 Hz) on the tip through 100 ohm; the PESD15VL2BT (D7, tip + ring to pin 3) as two zeners
+    back to back (VBR bv, RS 0.54 ohm: VCL 26 V at its 13.5 A, 8/20 us, from the 350 W) plus a 0.7 V forward diode in
+    each; node A through its coupling cap. ngspice transient: the tip's and node A's extremes, the pin diodes' current"""
+    net = f"""* prot
+.model DZ D(BV={bv} IBV=1m CJO=10p RS=0.54)
+.model DPIN D(IS=2.5n N=1.75 RS=0.6)
+Vs s 0 PULSE({-amp} {amp} 0 1u 1u 5m 10m)
+Rs s tip 100
+D1 tip m DZ
+D2 0 m DZ
+R36 tip 0 100k
+R30 tip a1 20k
+C30 a1 a 1u
+R31 r 0 1
+R32 a vb 12k
+C32 a 0 2.2n
+Vb vb 0 {VB:.4f}
+Rr r a1r 20k
+C31 a1r a 1u
+V33 v33 0 3.3
+Dhi a vh DPIN
+Vih vh v33 0
+Dlo vl a DPIN
+Vil 0 vl 0
+.control
+tran 2u 60m
+meas tran vmax max v(a) from=20m to=60m
+meas tran vmin min v(a) from=20m to=60m
+meas tran tmax max v(tip) from=20m to=60m
+meas tran ihi max i(Vih) from=20m to=60m
+meas tran ilo max i(Vil) from=20m to=60m
+meas tran itvs max i(Vs) from=20m to=60m
+.endc
+.end
+"""
     with tempfile.TemporaryDirectory(dir=os.environ.get("SIM_TMP")) as d:
         p = os.path.join(d, "x.cir")
         open(p, "w").write(net)
-        out = subprocess.run(["nice", "-n", "19", "ngspice", "-b", p], capture_output=True, text=True, timeout=600).stdout
-    vals = {}
-    for m in re.finditer(r"^(\w+)\s*=\s*([-+\d.eE]+)", out, re.M):
-        vals[m[1]] = float(m[2])
-    if not vals:
-        raise SystemExit(f"{name}: no results\n{out[-2000:]}")
-    return vals
+        o = subprocess.run(["nice", "-n", "19", "ngspice", "-b", p], capture_output=True, text=True, timeout=300).stdout
+    m = {k: float(v) for k, v in re.findall(r"^(\w+)\s*=\s*([-+\d.eE]+)", o, re.M)}
+    return (f"  +-{amp:g} V square, VBR {bv:g} V: the tip reaches +-{m['tmax']:.2f} V, {m['itvs'] * 1000:.1f} mA from the source; "
+            f"node A {m['vmin']:.2f} .. {m['vmax']:.2f} V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); "
+            f"pin-diode current: to +3V3 {max(m['ihi'], 0) * 1000:.3f} mA peak, to GND {max(m["ilo"], 0) * 1000:.3f} mA peak")
 
 
-def src(dbu, rs=600, ring=True, f=1000):
-    a = peak(dbu)
-    r = f"Vr sr 0 SIN(0 {a} {f})\nRsr sr ring {rs}" if ring else "Rring ring 0 0.01"
-    return f"Vt st 0 SIN(0 {a} {f})\nRst st tip {rs}\n{r}\n"
-
-
-AVDD = "Vavdd avdd 0 3.3\n"
-FE = "Vslv slv 0 0\nX1 tip ring ain avdd 0 slv FRONTEND\n"
-
-
-def fe(pd=1):
-    return f"Vslv slv 0 0\nX1 tip ring ain avdd 0 slv FRONTEND rpd={100e3 if pd else 1e12:g}\n"
-
-
-def ac():
-    body = ("Vt st 0 DC 0 AC 1\nRst st tip 100\nRsr st ring 100\n" + AVDD + FE +
-            ".control\nac dec 200 1 100k\nlet g = vdb(ain)\n"
-            "meas ac g1k find g at=1000\nmeas ac g22k find g at=22050\nmeas ac g40k find g at=40000\n"
-            "let ref = g1k - 3\nmeas ac fhi when g=ref fall=last\nmeas ac flo when g=ref rise=1\n"
-            "echo \"g1k = $&g1k\"\necho \"g22k = $&g22k\"\necho \"g40k = $&g40k\"\n"
-            "echo \"fhi = $&fhi\"\necho \"flo = $&flo\"\n.endc\n")
-    return run(body, "ac")
-
-
-def swing(dbu, ring=True, rs=600):
-    body = (src(dbu, rs, ring) + AVDD + FE + ".control\ntran 5u 60m 20m\n"
-            "meas tran vmax max v(ain)\nmeas tran vmin min v(ain)\nmeas tran vb avg v(x1.vb)\n"
-            "echo \"vmax = $&vmax\"\necho \"vmin = $&vmin\"\necho \"vb = $&vb\"\n.endc\n")
-    return run(body, f"swing {dbu}")
-
-
-def ground_loop(cb=0):
-    """stage 2: 100 mV (rms) between the source's ground (the plug's sleeve) and the board's GND, no signal: what reaches
-    the ADC pin with the ground-sensing input (gs=1: the sleeve through R39 22 ohm, sensed by R65 / R66) and with stage
-    1f's (gs=0: the sleeve on GND, the source's ground offset by the loop's voltage). AC analysis, both channels driven
-    from the source's ground through 600 ohm"""
-    out = {}
-    for gs in (1, 0):
-        slv = "sref" if gs else "0"
-        body = ("Vgl sref 0 DC 0 AC 0.1\nRst sref tip 600\nRsr sref ring 600\n" + AVDD +
-                f"X1 tip ring ain avdd 0 {slv} FRONTEND gs={gs} cb={cb if gs and cb else 1e-18:g}\n"
-                ".control\nac dec 50 10 100k\nlet g = mag(v(ain))\n"
-                "meas ac g50 find g at=50\nmeas ac g1k find g at=1000\nmeas ac g10k find g at=10000\n"
-                "echo \"g50 = $&g50\"\necho \"g1k = $&g1k\"\necho \"g10k = $&g10k\"\n.endc\n")
-        out[gs] = run(body, f"ground loop {gs}")
+def protection():
+    """+-10 V and +-12 V (modular outputs) on the tip; D7's PESD15VL2BT: VRWM 15 V, VBR 17.1 .. 20.3 V (nominal 18.7), so it
+    does not conduct below 15 V: the 20 k / 1 uF network and the pin's diodes carry the event. Also VBR min (17.1 V) and a
+    +-25 V case (the clamp working)"""
+    out = [protection_case(a, bv) for a, bv in ((10, 18.7), (12, 18.7), (12, 17.1), (12, 20.3), (25, 17.1))]
+    out.append("  the 100 k pull-down (R36) is all a +-12 V DC sees at the jack (VRWM 15 V: no clamp, ~nA leakage); node A"
+               " is AC coupled: it sits at the bias for DC")
     return out
-
-
-def level(rs, pd):
-    """the 1 kHz level at the pin (rms over 20 ms) from a 0 dBu source of rs ohms on both channels, pull-downs in or out"""
-    body = (src(0, rs) + AVDD + fe(pd) + ".control\ntran 5u 60m 20m\nlet ac = v(ain) - 1.4667\n"
-            "meas tran vr rms ac from=20m to=60m\necho \"vr = $&vr\"\n.endc\n")
-    return run(body, f"level {rs} {pd}")["vr"]
-
-
-def detect():
-    """LIN_DET (GPIO16, R38 1 M to +3V3): no plug = the ring switch closed onto the ring (R37 100 k to GND, D8); a plug
-    with a line source on the ring (the switch open); the GPIO's input leakage ASSUMED 50 nA (Espressif gives none)"""
-    out = {}
-    for name, closed in (("open", True), ("plugged", False)):
-        sw = "Rsw det ring 0.03\n" if closed else "Rsw det ring 1e12\nVr sr 0 SIN(0 1.55 1000)\nRsr sr ring 600\n"
-        body = ("V33 v33 0 3.3\nR38 v33 det 1Meg\nIleak det 0 50n\nVt tip 0 0\n" + sw + AVDD + fe(1) +
-                ".control\ntran 10u 40m 20m\nmeas tran dmax max v(det) from=20m\nmeas tran dmin min v(det) from=20m\n"
-                "echo \"dmax = $&dmax\"\necho \"dmin = $&dmin\"\n.endc\n")
-        out[name] = run(body, f"detect {name}")
-    return out
-
-
-def ripple(vsys, dip, period, width):
-    """U7 on VSYS: VSYS dips by `dip` volts (the Wi-Fi bursts through the USB cable and D3, or the cell's resistance)
-    for `width` every `period`; the input silent (tip and ring grounded through 600 ohm): the pin's ripple"""
-    body = (f"Vsys vsys 0 PULSE({vsys} {vsys - dip} 5m 20u 20u {width} {period})\nXU7 vsys avdd 0 LDO\n"
-            "Rst tip 0 600\nRsr ring 0 600\n" + fe(1) +
-            ".control\ntran 5u 200m 100m\nmeas tran amax max v(ain) from=100m\nmeas tran amin min v(ain) from=100m\n"
-            "meas tran vb avg v(avdd) from=100m\necho \"amax = $&amax\"\necho \"amin = $&amin\"\necho \"vb = $&vb\"\n.endc\n")
-    return run(body, f"ripple {vsys} {dip}")
-
-
-def plug_in():
-    """USB plugged at t = 0 with +4 dBu already on the jack: VSYS (VBUS through D3) up in 50 us, AVDD (U7) and +3V3 (the
-    3.3 V LDO, ~22 uF + the chip, ASSUMED 1 ms) follow; the pin must not sit above +3V3 by a diode drop"""
-    body = (src(4) + "Vsys vsys 0 PWL(0 0 50u 4.6)\nXU7 vsys avdd 0 LDO\n"
-            "B3v3 v3v3 0 V = min(3.3 * time / 1m, 3.3)\n" + FE +
-            ".control\ntran 10u 200m uic\nlet over = v(ain) - v(v3v3)\nmeas tran omax max over\n"
-            "echo \"omax = $&omax\"\n.endc\n")
-    return run(body, "plug-in")
-
-
-def kick():
-    """the ADC's sampling capacitor (ASSUMED 10 pF, reset to 0 V before each sample) switched onto the pin for 1 us every
-    44.1 kHz period, with a +4 dBu 5 kHz tone: the sampled value against the same front end with no ADC load"""
-    t = 1 / 44100
-    body = (src(4, f=5000) + AVDD + FE + "X2 tip ring ain2 avdd 0 slv FRONTEND\n"
-            f"Vclk clk 0 PULSE(0 1 0 1n 1n 1u {t})\nVrst rst 0 PULSE(0 1 1.5u 1n 1n {t - 2.2e-6} {t})\n"
-            "S1 ain cs clk 0 SW1\nS2 cs 0 rst 0 SW1\nCs cs 0 10p\n.model SW1 SW(VT=0.5 RON=200 ROFF=1G)\n"
-            f".control\ntran 20n 3m 2m\nlet e = v(cs) - v(ain2)\nlet ae = abs(e)\n"
-            "meas tran emax max ae when clk=0.5 fall=1\n"
-            + "".join(f"meas tran e{k} find e when clk=0.5 fall={k}\n" for k in range(1, 41)) +
-            "".join(f"echo \"e{k} = $&e{k}\"\n" for k in range(1, 41)) + ".endc\n")
-    v = run(body, "kick")
-    return max(abs(v[f"e{k}"]) for k in range(1, 41) if f"e{k}" in v)
 
 
 def main():
-    lines = ["jank mini 2.2, LINE IN front end: ngspice results (linein.py; generic models, linein.lib)", ""]
-    a = ac()
-    lines += [f"mono gain at 1 kHz (both channels the same signal, 100 ohm source): {a['g1k']:.2f} dB "
-              f"({10 ** (a['g1k'] / 20):.3f} x)",
-              f"band (-3 dB from 1 kHz): {a['flo']:.1f} Hz .. {a['fhi'] / 1000:.2f} kHz",
-              f"at 22.05 kHz (Nyquist of 44.1 kHz): {a['g22k'] - a['g1k']:.1f} dB; at 40 kHz: {a['g40k'] - a['g1k']:.1f} dB", ""]
-    for dbu, ring, rs in ((4, True, 600), (4, True, 100), (4, False, 600), (-10 + 2.2, True, 600), (10, True, 600),
-                          (20, True, 600)):
-        s = swing(dbu, ring, rs)
-        what = "mono plug (ring grounded)" if not ring else "stereo, same signal both channels"
-        lines.append(f"{dbu:+5.1f} dBu, {what}, {rs} ohm source: pin {s['vmin']:.3f} .. {s['vmax']:.3f} V "
-                     f"({s['vmax'] - s['vmin']:.3f} Vpp), bias {s['vb']:.3f} V")
-    lines.append("  (-7.8 dBu = -10 dBV, consumer line level)")
-    lines += ["", "the 100 k pull-downs (R36 / R37), 0 dBu 1 kHz on both channels: the level at the pin with them / without"]
-    for rs in (100, 600, 1000, 10000):
-        a, b = level(rs, 1), level(rs, 0)
-        lines.append(f"  {rs:>5} ohm source: {a * 1000:.1f} / {b * 1000:.1f} mV rms: {20 * math.log10(a / b):+.3f} dB")
-    gl = ground_loop()
-    lines += ["", "a ground loop: 100 mV rms between the plug's sleeve and the board's GND, no signal: at the ADC pin "
-              "(stage 2's ground-sensing input / stage 1f's, the sleeve on GND)"]
-    for f in ("50", "1k", "10k"):
-        a, b = gl[1]["g" + f], gl[0]["g" + f]
-        lines.append(f"  {f:>3} Hz: {a * 1000:.2f} / {b * 1000:.2f} mV rms: {20 * math.log10(b / a):.1f} dB rejected")
-    gl2 = ground_loop(2.2e-9)
-    lines.append("  with 2.2 nF on C67 (a DNP pad across R66, matching C32): " + ", ".join(
-        f"{f} Hz {20 * math.log10(gl2[0]['g' + f] / gl2[1]['g' + f]):.1f} dB" for f in ("50", "1k", "10k")))
-    d = detect()
-    lines += ["", f"plug detect (LIN_DET, R38 1 M, 50 nA leakage ASSUMED): no plug {d['open']['dmin']:.3f} .. "
-              f"{d['open']['dmax']:.3f} V (low: the S3's VIL is 0.25 x 3.3 = 0.825 V); a plug with +4 dBu on the ring "
-              f"{d['plugged']['dmin']:.3f} .. {d['plugged']['dmax']:.3f} V (high: VIH 0.75 x 3.3 = 2.475 V)"]
-    lines += ["", "the supply (U7, PSRR 50 dB ASSUMED) under Wi-Fi bursts, the input silent: the pin's ripple"]
-    for vsys, dip, per, wid, what in ((4.6, 0.15, 10e-3, 2e-3, "USB: VSYS 4.6 V, 150 mV dips 2 ms every 10 ms"),
-                                      (4.6, 0.15, 1e-3, 0.3e-3, "USB: 150 mV dips 0.3 ms every 1 ms"),
-                                      (3.7, 0.08, 10e-3, 2e-3, "cell: VSYS 3.7 V, 80 mV dips 2 ms every 10 ms"),
-                                      (3.4, 0.08, 10e-3, 2e-3, "cell low: VSYS 3.4 V (AVDD 3.2 V), 80 mV dips")):
-        r = ripple(vsys, dip, per, wid)
-        pp = r["amax"] - r["amin"]
-        lines.append(f"  {what}: {pp * 1e6:.1f} uV pp = {pp / LSB:.3f} LSB; AVDD {r['vb']:.3f} V")
-    p = plug_in()
-    lines += ["", f"USB plug-in with +4 dBu on the jack: the pin at most {p['omax']:.3f} V above +3V3 "
-              "(a diode drop, ~0.5 V, would inject current)"]
-    k = kick()
-    lines += [f"ADC sampling capacitor (10 pF ASSUMED, reset to 0 V each sample), +4 dBu 5 kHz: sampled value off by at "
-              f"most {k * 1000:.3f} mV = {k / LSB:.2f} LSB (ATTEN3, 0.71 mV)", ""]
-    open(os.path.join(HERE, "results.txt"), "w").write("\n".join(lines) + "\n")
-    print("\n".join(lines))
+    out = ["jank mini 2.2, the digital LINE IN (two passive networks, the difference in firmware): results (linein.py)", ""]
+    for name, lines in (("gain into a node (one branch of 20 k, the node's 12 k and 2.2 nF)", gains()),
+                        ("levels (ATTEN3 0 .. 2.9 V)", levels()),
+                        ("the analog rejection of an earth difference (A - B against the differential gain)", monte_carlo()),
+                        ("protection", protection())):
+        out.append(name + ":")
+        out += lines
+        out.append("")
+    out.append("the anti-alias pole: 20 k // 20 k // 12 k = 5.45 k with 2.2 nF: 13.3 kHz; -5.4 dB at 20.8 kHz (the tip's"
+               " Nyquist at 41.7 kHz per channel); a second matched RC was not added (the ADC's source impedance stays"
+               " 5.45 k, two more parts per node)")
+    open(os.path.join(HERE, "results.txt"), "w").write("\n".join(out) + "\n")
+    print("\n".join(out))
 
 
 if __name__ == "__main__":

@@ -1,37 +1,32 @@
-jank mini 2.2, LINE IN front end: ngspice results (linein.py; generic models, linein.lib)
+jank mini 2.2, the digital LINE IN (two passive networks, the difference in firmware): results (linein.py)
 
-mono gain at 1 kHz (both channels the same signal, 100 ohm source): -5.14 dB (0.553 x)
-band (-3 dB from 1 kHz): 7.8 Hz .. 8.48 kHz
-at 22.05 kHz (Nyquist of 44.1 kHz): -11.7 dB; at 40 kHz: -20.3 dB
+gain into a node (one branch of 20 k, the node's 12 k and 2.2 nF):
+     20 Hz: one channel -11.43 dB (0.268), the same on both -5.41 dB (0.537)
+     50 Hz: one channel -11.31 dB (0.272), the same on both -5.29 dB (0.544)
+   1000 Hz: one channel -11.31 dB (0.272), the same on both -5.29 dB (0.544)
+  10000 Hz: one channel -13.24 dB (0.218), the same on both -7.22 dB (0.435)
+  13300 Hz: one channel -14.31 dB (0.193), the same on both -8.29 dB (0.385)
+  20800 Hz: one channel -16.68 dB (0.147), the same on both -10.66 dB (0.293)
+  the input impedance at the tip, 1 kHz: 21.5 k (100 k // ~27.5 k)
 
- +4.0 dBu, stereo, same signal both channels, 600 ohm source: pin 0.558 .. 2.426 V (1.868 Vpp), bias 1.491 V
- +4.0 dBu, stereo, same signal both channels, 100 ohm source: pin 0.530 .. 2.454 V (1.924 Vpp), bias 1.491 V
- +4.0 dBu, mono plug (ring grounded), 600 ohm source: pin 1.024 .. 1.958 V (0.934 Vpp), bias 1.491 V
- -7.8 dBu, stereo, same signal both channels, 600 ohm source: pin 1.251 .. 1.731 V (0.480 Vpp), bias 1.491 V
-+10.0 dBu, stereo, same signal both channels, 600 ohm source: pin 0.065 .. 3.269 V (3.204 Vpp), bias 1.491 V
-+20.0 dBu, stereo, same signal both channels, 600 ohm source: pin 0.045 .. 3.293 V (3.248 Vpp), bias 1.491 V
-  (-7.8 dBu = -10 dBV, consumer line level)
+levels (ATTEN3 0 .. 2.9 V):
+  node A's centre 1.467 V, 1.433 V to the nearer end of ATTEN3's 0 .. 2.9 V
+  the same signal on tip and ring: the ADC clips at 2.64 V peak = +7.6 dBu
+  one channel (a mono plug: the ring on the sleeve): the ADC clips at 5.27 V peak = +13.6 dBu
+  with 100 mV rms of 50 Hz earth difference: both nodes swing +-0.077 V; the same-signal input then clips at 2.49 V peak (+7.1 dBu)
+  with 1000 mV rms of 50 Hz earth difference: both nodes swing +-0.769 V; the same-signal input then clips at 1.22 V peak (+0.9 dBu)
 
-the 100 k pull-downs (R36 / R37), 0 dBu 1 kHz on both channels: the level at the pin with them / without
-    100 ohm source: 429.4 / 429.8 mV rms: -0.009 dB
-    600 ohm source: 417.0 / 419.4 mV rms: -0.050 dB
-   1000 ohm source: 407.6 / 411.4 mV rms: -0.082 dB
-  10000 ohm source: 270.4 / 288.3 mV rms: -0.555 dB
+the analog rejection of an earth difference (A - B against the differential gain):
+     50 Hz: nominal 44.4 dB (the 100 k pull-downs against a 600 ohm source); over 5000 boards: median 42.5 dB, 1 % worst 35.3 dB, worst 33.5 dB
+   1000 Hz: nominal 44.4 dB (the 100 k pull-downs against a 600 ohm source); over 5000 boards: median 43.1 dB, 1 % worst 35.7 dB, worst 33.2 dB
+  10000 Hz: nominal 44.4 dB (the 100 k pull-downs against a 600 ohm source); over 5000 boards: median 34.5 dB, 1 % worst 24.8 dB, worst 23.1 dB
 
-a ground loop: 100 mV rms between the plug's sleeve and the board's GND, no signal: at the ADC pin (stage 2's ground-sensing input / stage 1f's, the sleeve on GND)
-   50 Hz: 0.56 / 53.42 mV rms: 39.6 dB rejected
-   1k Hz: 2.88 / 53.74 mV rms: 25.4 dB rejected
-  10k Hz: 18.37 / 34.08 mV rms: 5.4 dB rejected
-  with 2.2 nF on C67 (a DNP pad across R66, matching C32): 50 Hz 38.5 dB, 1k Hz 45.6 dB, 10k Hz 25.8 dB
+protection:
+  +-10 V square, VBR 18.7 V: the tip reaches +-9.95 V, 0.8 mA from the source; node A -0.49 .. 3.84 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 0.350 mA peak, to GND 0.121 mA peak
+  +-12 V square, VBR 18.7 V: the tip reaches +-11.94 V, 0.9 mA from the source; node A -0.52 .. 3.86 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 0.565 mA peak, to GND 0.225 mA peak
+  +-12 V square, VBR 17.1 V: the tip reaches +-11.94 V, 0.9 mA from the source; node A -0.52 .. 3.86 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 0.565 mA peak, to GND 0.225 mA peak
+  +-12 V square, VBR 20.3 V: the tip reaches +-11.94 V, 0.9 mA from the source; node A -0.52 .. 3.86 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 0.565 mA peak, to GND 0.225 mA peak
+  +-25 V square, VBR 17.1 V: the tip reaches +-18.05 V, 69.5 mA from the source; node A -0.57 .. 3.90 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 1.274 mA peak, to GND 0.720 mA peak
+  the 100 k pull-down (R36) is all a +-12 V DC sees at the jack (VRWM 15 V: no clamp, ~nA leakage); node A is AC coupled: it sits at the bias for DC
 
-plug detect (LIN_DET, R38 1 M, 50 nA leakage ASSUMED): no plug 0.295 .. 0.295 V (low: the S3's VIL is 0.25 x 3.3 = 0.825 V); a plug with +4 dBu on the ring 3.250 .. 3.250 V (high: VIH 0.75 x 3.3 = 2.475 V)
-
-the supply (U7, PSRR 50 dB ASSUMED) under Wi-Fi bursts, the input silent: the pin's ripple
-  USB: VSYS 4.6 V, 150 mV dips 2 ms every 10 ms: 50.0 uV pp = 0.071 LSB; AVDD 3.300 V
-  USB: 150 mV dips 0.3 ms every 1 ms: 20.0 uV pp = 0.028 LSB; AVDD 3.300 V
-  cell: VSYS 3.7 V, 80 mV dips 2 ms every 10 ms: 30.0 uV pp = 0.042 LSB; AVDD 3.300 V
-  cell low: VSYS 3.4 V (AVDD 3.2 V), 80 mV dips: 8520.0 uV pp = 12.034 LSB; AVDD 3.184 V
-
-USB plug-in with +4 dBu on the jack: the pin at most -0.001 V above +3V3 (a diode drop, ~0.5 V, would inject current)
-ADC sampling capacitor (10 pF ASSUMED, reset to 0 V each sample), +4 dBu 5 kHz: sampled value off by at most 0.254 mV = 0.36 LSB (ATTEN3, 0.71 mV)
-
+the anti-alias pole: 20 k // 20 k // 12 k = 5.45 k with 2.2 nF: 13.3 kHz; -5.4 dB at 20.8 kHz (the tip's Nyquist at 41.7 kHz per channel); a second matched RC was not added (the ADC's source impedance stays 5.45 k, two more parts per node)

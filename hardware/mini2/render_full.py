@@ -19,7 +19,7 @@ KC = "/opt/homebrew/bin/kicad-cli"
 USER = ("J2", "J3", "J5", "J6", "J7", "J8", "J9", "J10", "J13", "J14")
 BT = 1.6
 U = 2.54                                  # (KiCad's VRML unit: 0.1 inch)
-MODULE_W, MODULE_H, MODULE_Z = 35.4, 33.5, 2.5   # (72 x 72: the 1.3 in, the smallest screen kept)   # (make_board.MODULE: the module's outline, its underside over the board)
+MODULE_W, MODULE_H, MODULE_Z = 42.4, 38.0, 2.5   # (review pass 2: the 1.54 in (the 1.3 in dropped); its pin row 2.5 from its top)   # (make_board.MODULE: the module's outline, its underside over the board)
 
 
 def box(x0, y0, z0, x1, y1, z1, rgb):
@@ -38,10 +38,11 @@ def extras(board):
         p = fps[ref].GetPosition()
         return pcbnew.ToMM(p.x) - 100, pcbnew.ToMM(p.y) - 100
     hx, hy = at("J10")
-    jx, jy = at("J4")
+    jx, jy = at("U1")                            # (2026-11-15: the WROOM-1U's own u.FL, at its antenna end, turned 180:
+    jy += 8.0                                    #  toward the bottom edge; ~position, not read off its drawing)
     w = pcbnew.ToMM(board.GetBoardEdgesBoundingBox().GetWidth())
     h = pcbnew.ToMM(board.GetBoardEdgesBoundingBox().GetHeight())
-    x0, y0 = hx - MODULE_W / 2, hy - 2.0
+    x0, y0 = hx - MODULE_W / 2, hy - 2.5
     s = ["#VRML V2.0 utf8\n"]
     s.append(box(x0, y0, MODULE_Z, x0 + MODULE_W, y0 + MODULE_H, MODULE_Z + 1.2, "0.1 0.25 0.6"))           # the module
     s.append(box(x0 + 0.6, y0 + 5.0, MODULE_Z + 1.2, x0 + MODULE_W - 0.6, y0 + 21.0, MODULE_Z + 2.6, "0.05 0.05 0.05"))  # glass

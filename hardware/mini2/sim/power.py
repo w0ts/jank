@@ -38,14 +38,23 @@ MODELS = """
 .model PFET PMOS(LEVEL=1 VTO=-0.9 KP=5.95)
 .model DBODY D(IS=1e-9 N=1.4 RS=0.05)
 .model DSCH D(IS=3e-6 N=1.1 RS=0.1)
-.subckt LDO vin out gnd vdo0=0.02 rdo=0.68 ilim=0.6
+.model DSS34 D(IS=3e-5 N=1.15 RS=0.04)
+.subckt LDO vin out gnd vdo0=0.02 rdo=0.68 ilim=0.6 vo=3.3
 Bh h gnd V = V(vin) - {vdo0} - {rdo} * V(io)
-Btgt t gnd V = (3.3 + V(h) - sqrt((3.3 - V(h)) * (3.3 - V(h)) + 1e-4)) / 2
+Btgt t gnd V = ({vo} + V(h) - sqrt(({vo} - V(h)) * ({vo} - V(h)) + 1e-4)) / 2
 Rlag t t2 1
 Clag t2 gnd 10u
 Bio io gnd V = min({ilim}, max(0, (V(t2) - V(out)) / 0.1))
 Bo gnd out I = V(io)
 Bin vin gnd I = V(io)
+.ends
+.subckt BB vin out gnd vo=3.3 eta=0.9 vmin=1.8 ilim=2.5
+Bt t gnd V = {vo} * 0.5 * (1 + tanh((V(vin) - {vmin}) / 0.05))
+Rlag t t2 1
+Clag t2 gnd 2u
+Bio io gnd V = min({ilim}, max(0, (V(t2) - V(out)) / 0.05))
+Bo gnd out I = V(io)
+Bin vin gnd I = V(io) * V(out) / ({eta} * max(V(vin), 1))
 .ends
 """
 LOAD = "Iload v3v3 0 PULSE(0.06 0.34 {t0} 10u 10u 2m 10m)\nC5 v3v3 0 34u\n"
@@ -75,9 +84,18 @@ LM66100 = (   # (review pass 1 / the sim pass: U15, TI LM66100 (SLVSEZ8A), CE on
     "Dlmb bat_p vsys DBODY\n")
 
 
-def battery_net(vhost, vcell, usb_on, usb_off, r50="10k", c40="10u", reverse=False, rprog=5100, bypass=True, psw="PWL(0 1)",
-                bulk="0", ldo="vdo0=0 rdo=0.29 ilim=1.5", ideal=False, path="lm", lm="von=0.15 ron=0.091",
-                c41="10u", r86="1", lusb="0", pullup=False, tant="2"):
+BB = "BB vo=3.3 eta=0.9"                         # (2026-11-15: U2 = TPS63802, a behavioural buck-boost: +3V3 held while
+BB_WORST = "BB vo=3.267 eta=0.85"                #  VREG > 1.8 V (its start-up), the input current P / (eta V); VFB +-1 %)
+AUX = ("Baux vreg 0 I = {p} / (0.88 * max(V(vreg), 0.5)) * 0.5 * (1 + tanh((V(vreg) - 0.6) / 0.05))\n")   # (the 5 V aux
+#  rail's TPS61023 from VREG, eta 0.88 ASSUMED: p = its output power)
+TLV = "vo=3.3 vdo0=0 rdo=0.3 ilim=1.5"            # (review pass 2: U2 TLV75733P, typical: 300 mV at 1 A)
+TLV_WORST = "vo=3.2505 vdo0=0 rdo=0.475 ilim=1.2"  # (VO -1.5 %, 475 mV at 1 A max, ICL 1.2 A min: SBVS322A)
+LDL_WORST = "vdo0=0 rdo=0.5 ilim=1.5"              # (the LDL1117 of 3cec628 at its maximum dropout)
+
+
+def battery_net(vhost, vcell, usb_on, usb_off, r50="10k", c40="10u", reverse=False, rprog=12000, bypass=True, psw="PWL(0 1)",
+                bulk="80u", ldo=TLV, ideal=False, path="lm", lm="von=0.15 ron=0.091",
+                c41="10u", r86="1", lusb="0", pullup=False, tant="1", d9="DSS34"):
     """the battery order: USB from usb_on to usb_off (seconds; usb_off None = stays). path "lm": the board since review
     pass 1 (U15 LM66100 + D9; no Q1, no R50); "q1": Q1 (gate on VBUS, R50 to GND) + D9 (bypass)"""
     kv = dict(x.split("=") for x in lm.split())
@@ -91,7 +109,7 @@ def battery_net(vhost, vcell, usb_on, usb_off, r50="10k", c40="10u", reverse=Fal
     if ideal:                                    # (an ideal switch: the comparison line)
         cell += "Sid bat_p vsys bat_p vsys SWI\n.model SWI SW(VT=0.01 VH=0.005 RON=0.079 ROFF=1e9)\n"
     elif bypass:                                 # (the stage-2 change: a B5819W from BAT_P to VSYS, beside Q1 / U15)
-        cell += "D9 bat_p vsys DSCH\n"
+        cell += f"D9 bat_p vsys {d9}\n"
     if path == "lm":
         cell += LM66100.format(**kv)
     else:
@@ -110,7 +128,7 @@ def battery_net(vhost, vcell, usb_on, usb_off, r50="10k", c40="10u", reverse=Fal
             "Mq2 bat_c q2g bat_p bat_p PFET\nDq2 bat_c bat_p DBODY\nR53 q2g 0 100k\n"
             f"C41 c41n 0 {c41}\nR86 bat_p c41n {r86}\nR10 bat_p adc 100k\nR11 adc 0 100k\n"
             f"Bchg vbus bat_p I = 1000 / {rprog} * 0.25 * (1 + tanh((V(vbus) - 4.0) / 0.05)) * (1 + tanh((4.2 - V(bat_p)) / 0.02))\n"
-            f"XU2 vreg v3v3 0 LDO {ldo}\n")
+            + (f"XU2 vreg v3v3 0 {ldo}\n" if ldo.startswith("BB") else f"XU2 vreg v3v3 0 LDO {ldo}\n"))
 
 
 HT7833 = "vdo0=0.02 rdo=0.68 ilim=0.6"           # (the earlier battery order's LDO: the history lines)
@@ -120,10 +138,10 @@ LOAD_SIM = ("Iload v3v3 0 PULSE(0.102 0.362 {t0} 10u 10u 2m 10m)\nC5 v3v3 0 20u\
 #  a burst to 340 mA, the four MIDI loops 22 mA; +3V3's caps derated, C5 22 uF 0603 -> 8.8 uF at 3.3 V: ~20 uF in all)
 
 
-def unplug(vcell, r50="10k", c40="10u", bypass=True, bulk="0", ldo="vdo0=0 rdo=0.29 ilim=1.5", ideal=False, path="lm",
-           lm="von=0.15 ron=0.091", agent=False, pullup=False, tant="2", extra=""):
+def unplug(vcell, r50="10k", c40="10u", bypass=True, bulk="80u", ldo=TLV, ideal=False, path="lm",
+           lm="von=0.15 ron=0.091", agent=False, pullup=False, tant="1", extra="", d9="DSS34"):
     net = battery_net(5.0, vcell, 0, 0.05, r50, "4u" if agent else c40, bypass=bypass, bulk=bulk, ldo=ldo, ideal=ideal,
-                      path=path, lm=lm, lusb="1u" if agent else "0", pullup=pullup, tant=tant) + extra + (
+                      path=path, lm=lm, lusb="1u" if agent else "0", pullup=pullup, tant=tant, d9=d9) + extra + (
         LOAD_SIM if agent else LOAD).format(t0="0.049") + (
         ".control\ntran 10u 0.6 uic\n"
         "meas tran vsysmin min v(vsys) from=0.05 to=0.6\nmeas tran v3min min v(v3v3) from=0.05 to=0.6\n"
@@ -145,8 +163,8 @@ def plug(vcell):
     return run("* plug\n" + net)
 
 
-def battery_only(vcell, rdo=0.29):
-    net = battery_net(5.0, vcell, 1.0, None, ldo=f"vdo0=0 rdo={rdo} ilim=1.5") + LOAD.format(t0="0.02") + (
+def battery_only(vcell, ldo=TLV):
+    net = battery_net(5.0, vcell, 1.0, None, ldo=ldo) + LOAD.format(t0="0.02") + (
         ".control\ntran 10u 0.06 uic\nmeas tran v3min min v(v3v3) from=0.03 to=0.06\n"
         "meas tran vsysmin min v(vsys) from=0.03 to=0.06\necho \"v3min = $&v3min\"\necho \"vsysmin = $&vsysmin\"\n"
         ".endc\n.end\n")
@@ -187,9 +205,9 @@ def reversed_cell():
     return run("* reversed\n" + net)
 
 
-def usb_order(vhost, rdo=0.29):
-    net = (MODELS + f"Vhost host 0 {vhost}\nRcab host vbus 0.25\nD3 vbus vsys DSCH\nC72 vsys 0 40u\nRtr vsys vreg 0.2\n"
-           f"C3 vreg 0 10u\nC34 vreg 0 1u\nXU2 vreg v3v3 0 LDO vdo0=0 rdo={rdo} ilim=1.5\n" + LOAD.format(t0="0.02") +
+def usb_order(vhost, ldo=TLV):
+    net = (MODELS + f"Vhost host 0 {vhost}\nRcab host vbus 0.25\nD3 vbus vsys DSCH\nRtr vsys vreg 0.2\n"
+           f"C3 vreg 0 10u\nC34 vreg 0 1u\nXU2 vreg v3v3 0 LDO {ldo}\n" + LOAD.format(t0="0.02") +
            ".control\ntran 10u 0.06\nmeas tran v3min min v(v3v3) from=0.03 to=0.06\n"
            "meas tran vsysmin min v(vsys) from=0.03 to=0.06\necho \"v3min = $&v3min\"\necho \"vsysmin = $&vsysmin\"\n"
            ".endc\n.end\n")
@@ -200,43 +218,66 @@ def main():
     out = ["jank mini 2.2, the power path: ngspice results (power.py; generic models: its docstring)", ""]
     out.append("battery order, USB unplugged at 50 ms during a Wi-Fi burst; stage 1f's circuit (R50 100 k, no D9):")
     for vc in (4.2, 3.7, 3.4):
-        r = unplug(vc, r50="100k", bypass=False, bulk="0", ldo=HT7833, path="q1")
+        r = unplug(vc, r50="100k", bypass=False, bulk="0", ldo=HT7833, path="q1", tant="0", d9="DSCH")
         out.append(f"  cell {vc} V: VSYS min {r['vsysmin']:.2f} V, +3V3 min {r['v3min']:.2f} V (before: "
                    f"{r['v3pre']:.2f}); VSYS back on Q1's channel {r['tback'] - 0.05:.3f} s after the unplug"
                    if "tback" in r else f"  cell {vc} V: VSYS min {r['vsysmin']:.2f} V, +3V3 min {r['v3min']:.2f} V; "
                    "Q1 not on within 0.55 s")
     out.append("stage 2 (60c2f3a): R50 10 k and D9 (a second B5819W, BAT_P -> VSYS, beside Q1's body diode), the HT7833:")
     for vc in (4.2, 3.7, 3.4):
-        r = unplug(vc, r50="10k", bypass=True, bulk="0", ldo=HT7833, path="q1")
+        r = unplug(vc, r50="10k", bypass=True, bulk="0", ldo=HT7833, path="q1", tant="0", d9="DSCH")
         out.append(f"  cell {vc} V: VSYS min {r['vsysmin']:.2f} V, +3V3 min {r['v3min']:.2f} V; VSYS back "
                    f"{r['tback'] - 0.05:.3f} s after the unplug" if "tback" in r else f"  cell {vc} V: VSYS min "
                    f"{r['vsysmin']:.2f} V, +3V3 min {r['v3min']:.2f} V; Q1 not on within 0.55 s")
     out.append("review pass 1, tried: Q1 / R50 / D9 kept, the LDL1117 and a 100 uF on VSYS (40 uF at 4 V), cell 3.4 V:")
     for what, kw in (("as such", dict(bulk="40u")), ("R50 1 k and C40 1 uF too", dict(bulk="40u", r50="1k", c40="1u"))):
-        r = unplug(3.4, path="q1", **kw)
+        r = unplug(3.4, path="q1", ldo="vdo0=0 rdo=0.29 ilim=1.5", tant="0", d9="DSCH", **kw)
         out.append(f"  {what}: VSYS min {r['vsysmin']:.2f} V, +3V3 min {r['v3min']:.2f} V (the gap is Q1's: VBUS has to "
                    "fall below the cell before Q1 conducts; a bulk cap cannot bridge milliseconds at 340 mA)")
-    out.append("review pass 1: U15 LM66100 (an ideal diode, CE on VSYS) in Q1's place, R50 gone, D9 kept, the LDL1117; "
-               "+3V3's bulk for U15's 40 us turn-on (the sim pass's load: the S3 80 mA, bursts to 340 mA, the MIDI loops "
-               "22 mA; +3V3 ~20 uF derated, C40 4 uF, 1 uH in the cable), cell 3.4 V, typical / worst (the LDL1117's "
-               "maximum dropout, the LM66100's VON -250 mV and 125 mohm):")
-    for what, kw in (("no bulk", dict(tant="0")), ("one 100 uF tantalum (ESR 0.9)", dict(tant="1")),
-                     ("a 220 uF polymer (25 mohm), ASSUMED", dict(tant="0", extra="Cpo v3v3 cpo 220u\nRpo cpo 0 25m\n")),
-                     ("THE BOARD: two 100 uF tantalums, C72 + C86 (Basic)", dict(tant="2"))):
-        r = unplug(3.4, agent=True, **kw)
-        w = unplug(3.4, agent=True, ldo="vdo0=0 rdo=0.5 ilim=1.5", lm="von=0.25 ron=0.125", **kw)
-        out.append(f"  {what}: +3V3 min {r['v3min']:.3f} / {w['v3min']:.3f} V")
-    out.append("THE BOARD, the sim pass's load, typical / worst:")
-    for vc in (4.2, 3.7, 3.5, 3.4):
-        r = unplug(vc, agent=True)
-        w = unplug(vc, agent=True, ldo="vdo0=0 rdo=0.5 ilim=1.5", lm="von=0.25 ron=0.125")
+    out.append("review pass 1 (3cec628): U15 LM66100, the LDL1117, two 100 uF tantalums on +3V3, D9 a B5819W, the sim "
+               "pass's load (the S3 80 mA, bursts to 340 mA, the MIDI loops 22 mA; +3V3 ~20 uF derated, C40 4 uF, 1 uH in "
+               "the cable), cell 3.4 V, typical / worst (the LDL1117's maximum dropout, the LM66100's VON -250 mV and 125 "
+               "mohm):")
+    r = unplug(3.4, agent=True, ldo="vdo0=0 rdo=0.29 ilim=1.5", bulk="0", tant="2", d9="DSCH")
+    w = unplug(3.4, agent=True, ldo=LDL_WORST, lm="von=0.25 ron=0.125", bulk="0", tant="2", d9="DSCH")
+    out.append(f"  +3V3 min {r['v3min']:.3f} / {w['v3min']:.3f} V")
+    out.append("THE BOARD (review pass 2): U2 TLV75733P (COUT 1 .. 200 uF in its sheet), C86 one 100 uF tantalum on +3V3, "
+               "C72 + C92 2 x 100 uF X5R on VSYS (80 uF at ~4 V: ASSUMED), D9 an SS34 (fit ASSUMED), the sim pass's load + "
+               "a 1.54\" OLED 30 mA (ASSUMED), typical / worst (TLV757P VO -1.5 %, 475 mV at 1 A; LM66100 VON -250 mV, "
+               "125 mohm); the firmware's empty: 3.6 V:")
+    for vc in (4.2, 3.7, 3.6, 3.5):
+        r = unplug(vc, agent=True, extra="Ioled v3v3 0 30m\n")
+        w = unplug(vc, agent=True, ldo=TLV_WORST, lm="von=0.25 ron=0.125", extra="Ioled v3v3 0 30m\n")
         out.append(f"  cell {vc} V: +3V3 min {r['v3min']:.3f} / {w['v3min']:.3f} V; VSYS min {r['vsysmin']:.2f} / "
                    f"{w['vsysmin']:.2f} V")
+    out.append("THE BOARD (2026-11-15): Q1, an AO3401A load-sharing switch (Microchip AN1149: drain BAT_P, source VSYS, "
+               "gate VBUS, R50 100 k) with D9 (SS34) beside it, in the LM66100's place; U2 a TPS63802 buck-boost "
+               "(behavioural: +3V3 held while VREG > 1.8 V; typical eta 0.90 / worst VO -1 % and eta 0.85); the 5 V aux "
+               "rail's TPS61023 loading VREG with 50 mA at 4.91 V (eta 0.88); the board's VBUS with C27 / C91 (2 x 7 uF "
+               "ceramic, each through 1 ohm) and R88 + R89 (250 k); the sim pass's load + 30 mA OLED; the firmware's empty: 3.3 V:")
+    # (2026-11-15, the Standard study's experiment A: C27 / C91 are 10 uF 25 V 0805 ceramics, ~7 uF each at 5 V, each
+    #  through 1 ohm (R151 / R152: sim/vbus.py's hot-plug pick); R88 / R89 100 k / 150 k; C86 gone: +3V3 keeps C5 22 uF
+    #  + C17 22 uF + C16 / C6 (this model's U2 is behavioural, so +3V3's bulk does not show here: TI's minimum, 7 uF
+    #  effective at VOUT > 2.3 V, is met by C5 alone, ~11 uF at 3.3 V))
+    vbx = "C27x vbus c27x 7u\nRc27x c27x 0 1\nC91x vbus c91x 7u\nRc91x c91x 0 1\nRsense vbus 0 250k\n"
+    ex = "Ioled v3v3 0 30m\n" + AUX.format(p=4.91 * 0.05) + vbx
+    for vc in (4.2, 3.6, 3.4, 3.3, 3.2):
+        r = unplug(vc, agent=True, ldo=BB, path="q1", r50="100k", extra=ex)
+        w = unplug(vc, agent=True, ldo=BB_WORST, path="q1", r50="100k", extra=ex)
+        back = f"Q1 on {w['tback'] - 0.05:.2f} s after it" if "tback" in w else "D9 carries past 0.55 s"
+        out.append(f"  cell {vc} V, USB unplugged in a burst: +3V3 min {r['v3min']:.3f} / {w['v3min']:.3f} V; VSYS min "
+                   f"{r['vsysmin']:.2f} / {w['vsysmin']:.2f} V ({back})")
+    for vc in (3.6, 3.3):
+        net = battery_net(5.0, vc, 1.0, None, ldo=BB_WORST, path="q1", r50="100k") + ex + LOAD_SIM.format(t0="0.02") + (
+            ".control\ntran 10u 0.06 uic\nmeas tran v3min min v(v3v3) from=0.03 to=0.06\n"
+            "meas tran vsysmin min v(vsys) from=0.03 to=0.06\necho \"v3min = $&v3min\"\necho \"vsysmin = $&vsysmin\"\n.endc\n.end\n")
+        r = run("* batt\n" + net)
+        out.append(f"  cell {vc} V alone, Wi-Fi bursts, worst: +3V3 min {r['v3min']:.3f} V, VSYS min {r['vsysmin']:.2f} V")
     out.append("THE BOARD, this script's own load (60 mA + 280 mA bursts, +3V3 34 uF):")
-    for vc in (4.2, 3.7, 3.4):
+    for vc in (4.2, 3.7, 3.6):
         r = unplug(vc)
         out.append(f"  cell {vc} V: VSYS min {r['vsysmin']:.2f} V, +3V3 min {r['v3min']:.3f} V")
-    r, w = unplug(3.4, agent=True, pullup=True), unplug(3.4, agent=True, pullup=True, path="q1", bulk="0", tant="0")
+    r, w = unplug(3.6, agent=True, pullup=True), unplug(3.4, agent=True, pullup=True, path="q1", bulk="0", tant="0", ldo=LDL_WORST, d9="DSCH")
     out.append(f"the S3's D+ pull-up with no host (1.5 k into VUSB through the SRV05-4, the sim pass's finding), cell 3.4 V,"
                f" the sim pass's load: the board +3V3 min {r['v3min']:.3f} V (no Q1 gate to fool); 60c2f3a's Q1 / R50 "
                f"(and the LDL1117) {w['v3min']:.3f} V")
@@ -247,18 +288,18 @@ def main():
         out.append(f"  cell {vc} V: VSYS min {r['vsysmin']:.2f} V, +3V3 min {r['v3min']:.2f} V, then VSYS "
                    f"{r['vsysend']:.2f} V; the cell's current after it {r['icell'] * 1000:+.0f} mA (+ = charging: ngspice's current into the cell's + end)")
     out.append("")
-    out.append("battery order, the cell alone, 340 mA Wi-Fi peak (the LDL1117 typical / at its maximum dropout):")
-    for vc in (4.2, 3.7, 3.5, 3.4):
-        r, w = battery_only(vc), battery_only(vc, rdo=0.5)
+    out.append("battery order, the cell alone, 340 mA Wi-Fi peak (the TLV757P typical / worst: VO -1.5 %, 475 mV at 1 A):")
+    for vc in (4.2, 3.7, 3.6, 3.5):
+        r, w = battery_only(vc), battery_only(vc, ldo=TLV_WORST)
         out.append(f"  cell {vc} V: VSYS min {r['vsysmin']:.3f} V, +3V3 min {r['v3min']:.3f} V / {w['v3min']:.3f} V")
-    out.append("usb order (the LDL1117 too since review pass 1), 340 mA Wi-Fi peak (VSYS to VREG through R62 and the copper:"
+    out.append("usb order (U2, the TLV757P, in both orders since review pass 2), 340 mA Wi-Fi peak (VSYS to VREG through R62 and the copper:"
                " 0.2 ohm, an upper bound), typical / maximum dropout:")
     for vh in (5.0, 4.75, 4.5):
-        r, w = usb_order(vh), usb_order(vh, rdo=0.5)
+        r, w = usb_order(vh), usb_order(vh, ldo=TLV_WORST)
         out.append(f"  host {vh} V: VSYS min {r['vsysmin']:.3f} V, +3V3 min {r['v3min']:.3f} V / {w['v3min']:.3f} V")
     out.append("")
     out.append("the power toggle (J11, stage 2) closed with the cell alone (C3 10 uF + C34 1 uF on VREG, C5 + the chip's"
-               " 34 uF and C72 / C86's 2 x 100 uF tantalum on +3V3 after it):")
+               " 34 uF and C86, the 100 uF tantalum, on +3V3 after it; C72 / C92 on VSYS before it):")
     for vc in (4.2, 3.7):
         r = switch_on(vc)
         oc = f"above 2.1 A for {(r['toc'] - 0.01) * 1e6:.1f} us" if "toc" in r else "never above 2.1 A"
@@ -276,9 +317,9 @@ def main():
     out.append(f"a reversed cell (+ on BAT_N, - on BAT_C), no USB: the cell's current {abs(r['ic']) * 1e6:.2f} uA, "
                f"{abs(r['vq2']):.2f} V across Q2 (blocked; Q2's 30 V rating)")
     out.append("")
-    out.append("the charger (TP4054, I = 1000 V / RPROG, its datasheet's formula): R51 5.1 k -> 196 mA; with a twin on "
-               "RT51: 10 k -> 296 mA, 5.1 k -> 392 mA (TP4054's 500 mA maximum; its own thermal regulation cuts the "
-               "current when hot: at 5 V in and a 3.6 V cell, 196 mA = 0.27 W in the SOT-23-5)")
+    out.append("the charger (TP4054, I = 1000 V / RPROG below 150 mA, its datasheet's formula): review pass 2, R51 12 k -> 83 "
+               "mA (USB's 500 mA kept with a Wi-Fi burst: 83 x 1.1 + 340 + 28.5 + 30 = 490 mA worst); a part on RT51 (12 k "
+               "// 12 k) -> 167 mA; ~6.5 h for a 550 mAh cell at CC, ~3.5 h for 300 mAh, plus the CV tail (ASSUMED ~1 h)")
     open(os.path.join(HERE, "power.txt"), "w").write("\n".join(out) + "\n")
     print("\n".join(out))
 

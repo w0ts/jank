@@ -29,12 +29,16 @@ for k in sorted(set(sch) | set(want)):
 for name, (gpio, _pin) in P.GPIO.items():
     if gpio in P.STRAPPING and name != "BOOT":
         errors.append(f"{name} on strapping GPIO{gpio}")
-for name in ("VBANK_ADC", "VBUS_SENSE", "LINE_IN", "VBAT_ADC"):   # (stage 2: the cell's level too)
+for name in ("LINE_IN", "LINE_SENSE", "VBAT_ADC"):   # (2026-11-15: VBUS_SENSE is a digital input now)
     if name in P.GPIO and not 1 <= P.GPIO[name][0] <= 10:
         errors.append(f"{name} on GPIO{P.GPIO[name][0]}: not ADC1 (ADC2 is not usable with Wi-Fi on)")
-for name in ("MIDI_TX", "PWR_HOLD", "MIDI2_TX", "MIDI_TX2"):
-    if name in P.GPIO and P.GPIO[name][0] > 21:
-        errors.append(f"{name} on GPIO{P.GPIO[name][0]}: not an RTC GPIO (the ULP and deep-sleep hold need one)")
+# 2026-11-15 (the module, the GPIO re-map): the outputs that must stay idle through power-up and reset only on pins with
+# no power-up glitch (ESP32-S3 datasheet v2.2 Table 2-2: GPIO1 .. 20) and no reset pull (GPIO39, Table 2-1 note 7),
+# not a strapping, flash or USB pin. (Was: MIDI on an RTC GPIO for the ULP / deep-sleep hold: no ULP here, and each
+# MIDI gate has its 100 k pull-down, R124 / R125, that holds the loop off while the pin floats in sleep)
+for name in ("MIDI_TX", "MIDI_TX2", "CLK_IO", "RST_IO", "HOST_EN", "LED_DATA", "V5_EN_IO"):
+    if name in P.GPIO and P.GPIO[name][0] not in (21, 35, 36, 37, 38, 40, 41, 42, 47, 48):
+        errors.append(f"{name} on GPIO{P.GPIO[name][0]}: a power-up glitch or a reset pull (datasheet Tables 2-1 / 2-2)")
 # GPIO0's strap (the user's rule, 2026-11-14): on the BOOT net only the chip's pin, one pull-up and switches; nothing
 # that delays or weakens the level at reset (no capacitor, no other driver)
 boot = sorted({p.split(".")[0] for p in P.nets()["BOOT"]})

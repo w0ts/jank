@@ -104,9 +104,35 @@ SYMBOLS["sj3"] = ([("1", "A", PAS), ("3", "B", PAS)], [("2", "C", PAS)], "JP", 5
 # review pass 1: the MIDI lines' ESD (the SRV05-4's own pin names: four separate lines), the charge pump's buffer
 SYMBOLS["esd4"] = ([("1", "IO1", PAS), ("3", "IO2", PAS), ("4", "IO3", PAS), ("6", "IO4", PAS)],
                    [("5", "REF", PAS), ("2", "GND", PAS)], "U", 7.62)
+SYMBOLS["ldo6"] = ([("6", "IN", "power_in"), ("4", "EN", "input")], [("1", "OUT", "power_out"), ("3", "GND", "power_in"),
+                                                                  ("7", "PAD", PAS)], "U", 7.62)   # (review pass 2: the TLV757P, DRV)
 SYMBOLS["idiode"] = ([("1", "VIN", PAS), ("3", "~{CE}", "input")], [("6", "VOUT", PAS), ("5", "~{ST}", PAS),
                                                                    ("2", "GND", "power_in"), ("4", "NC", PAS)], "U", 7.62)
 # (the LM66100's VIN / VOUT passive: the cell's and VSYS's power flags drive them; ST tied to GND)
+SYMBOLS["bb10"] = ([("10", "VIN", "power_in"), ("1", "EN", "input"), ("2", "MODE", "input"), ("9", "L1", PAS)],
+                   [("6", "VOUT", "power_out"), ("4", "FB", "input"), ("5", "PG", "open_collector"), ("7", "L2", PAS),
+                    ("8", "GND", "power_in"), ("3", "AGND", "power_in")], "U", 7.62)   # (TPS63802)
+SYMBOLS["boost6"] = ([("3", "VIN", "power_in"), ("2", "EN", "input"), ("5", "SW", PAS)],
+                     [("6", "VOUT", "power_out"), ("1", "FB", "input"), ("4", "GND", "power_in")], "U", 7.62)   # (TPS61023)
+SYMBOLS["shunt"] = ([("1", "REF", "input")], [("2", "K", PAS), ("3", "A", PAS)], "U", 5.08)   # (CJ431)
+_wl = [("2", "3V3", "power_in"), ("3", "EN", "input"), ("1", "GND", "power_in"), ("40", "GND", "power_in"), ("41", "EPAD", "power_in")]
+_wr = [(n, nm, "bidirectional") for n, nm in (("4", "IO4"), ("5", "IO5"), ("6", "IO6"), ("7", "IO7"), ("8", "IO15"), ("9", "IO16"),
+       ("10", "IO17"), ("11", "IO18"), ("12", "IO8"), ("13", "IO19"), ("14", "IO20"), ("15", "IO3"), ("16", "IO46"), ("17", "IO9"),
+       ("18", "IO10"), ("19", "IO11"), ("20", "IO12"), ("21", "IO13"), ("22", "IO14"), ("23", "IO21"), ("24", "IO47"),
+       ("25", "IO48"), ("26", "IO45"), ("27", "IO0"), ("28", "IO35"), ("29", "IO36"), ("30", "IO37"), ("31", "IO38"),
+       ("32", "IO39"), ("33", "IO40"), ("34", "IO41"), ("35", "IO42"), ("36", "RXD0"), ("37", "TXD0"), ("38", "IO2"), ("39", "IO1"))]
+SYMBOLS["wroom"] = (_wl, _wr, "U", 12.7)   # (ESP32-S3-WROOM-1U: Table 3-1)
+SYMBOLS["rgb"] = ([("3", "DI", "input"), ("4", "VDD", "power_in")], [("1", "DO", "output"), ("2", "GND", "power_in")], "LED", 5.08)   # (WS2812B-2020)
+SYMBOLS["ldo89"] = ([("2", "VIN", PAS)], [("3", "VOUT", "power_out"), ("1", "GND", "power_in")], "U", 7.62)   # (HT7550-1)
+SYMBOLS["tusb"] = ([("1", "CC1", PAS), ("2", "CC2", PAS), ("4", "VBUS_DET", "input"), ("3", "PORT", "input"),
+                    ("5", "ADDR", "input"), ("11", "~{EN}", "input")],
+                   [("12", "VDD", "power_in"), ("8", "SCL", "bidirectional"), ("7", "SDA", "bidirectional"),
+                    ("6", "~{INT}", "open_collector"), ("9", "~{ID}", "open_collector"), ("10", "GND", "power_in")],
+                   "U", 10.16)   # (host mode: the TUSB320LI)
+SYMBOLS["inv6"] = ([("1", "1A", "input"), ("3", "2A", "input"), ("5", "3A", "input"), ("9", "4A", "input"), ("11", "5A", "input"), ("13", "6A", "input"), ("14", "VCC", "power_in")],
+                   [("2", "1Y", "output"), ("4", "2Y", "output"), ("6", "3Y", "output"), ("8", "4Y", "output"), ("10", "5Y", "output"), ("12", "6Y", "output"), ("7", "GND", "power_in")], "U", 7.62)   # (74AHCT04: TI SCLS228 pin table)
+SYMBOLS["sj2"] = ([("1", "A", PAS)], [("2", "B", PAS)], "JP", 2.54)   # (buffer try: a closed 2-pad solder jumper)
+SYMBOLS["tvs2l"] = ([("1", "1", PAS), ("2", "2", PAS)], [("3", "3", PAS)], "D", 5.08)   # (PESD15VL2BT: 1 / 2 the lines, 3 the common)
 SYMBOLS["buf"] = ([("2", "A", "input"), ("1", "~{OE}", "input")], [("4", "Y", "output"), ("5", "VCC", "power_in"),
                                                                    ("3", "GND", "power_in")], "U", 7.62)
 
@@ -143,7 +169,7 @@ def pin_xy(kind):
     return out
 
 
-FLAGS = ["GND", "VUSB", "VBUS", "VDD3P3", "VSYS", "XB_VDD", "VREG"]   # (power_in pins on these nets need a driver for the ERC; +3V3: U2's VOUT)
+FLAGS = ["GND", "VUSB", "VBUS", "VSYS", "XB_VDD", "VREG", "VLED", "VDDU", "V5C"]   # (power_in pins on these nets need a driver for the ERC; +3V3: U2's VOUT)
 
 
 def placed():
@@ -202,14 +228,14 @@ def schematic():
                 out.append(f'(no_connect (at {lx} {ly}) (uuid "{uid(ref, "nc", num)}"))')
     notes = [
         "jank mini 2.2 (hardware/mini2/README.md). Two orders, one board: usb (U2 AMS1117-3.3) / battery (U10 HT7833 and the CELL parts, parts.ONLY)."
-        " POWER: VBUS through D3 into VSYS; VSYS -> U2 or U10 -> +3V3 (C3 10u in, C5 22u + C6 100n out). No MIDI power input.",
-        "CELL (battery order): J8 / J9 PH2.0 in parallel (DNP; pin 1 = +, BAT_C), Q2 AO3401A reverse-polarity FET to BAT_P (R53 100k gate to GND);"
+        " POWER: VBUS through D3 into VSYS; VSYS -> U2 or U10 -> +3V3 (C3 10u in, C5 22u out). No MIDI power input.",
+        "CELL (battery order): J8 / J9 PH2.0 in parallel (DNP; pin 1 = +, BAT_C), Q2 AO3401A reverse-polarity FET to BAT_P (gate to GND);"
         " Q1 AO3401A BAT_P -> VSYS (gate on VBUS, R50 10k) and D9 B5819W beside it (stage 2: sim/power.py); U8 TP4054-42 (R51 5.1k: ~196 mA; C40 / C41 10u); U9 XB5353A in the minus lead"
         " (VDD via R52 100 ohm = XB_VDD, C42 100n to BAT_N; VM = GND); R10 1M (battery) / R11 1M + C8 100n: BAT_P / 2 on GPIO1 (0 V in the usb order).",
         "MIDI OUT 1, GPIO21 (MIDI_TX): jack J2 ring = +3V3 through R14 // R26 // R48 (3 x 100 ohm = 33.3 ohm), tip through R15 68 ohm;"
         " DIN J5 R54 // R58 (2 x 100 ohm) / R55 68 ohm. MIDI OUT 2, GPIO17 (MIDI_TX2, the same UART): jack J3 R21 // R27 // R49 + R20,"
         " DIN J6 R56 // R59 / R57. Jacks and DINs on the bottom (DNP, the user solders them). J11 (the power switch's wire pads, DNP) VSYS -> VREG, R62 0 ohm (usb order).",
-        "Pins: GPIO21 MIDI_TX, GPIO17 MIDI_TX2, GPIO16 LIN_DET (J7's ring switch, R38 1M up; R36 / R37 100k tip / ring down), GPIO0 BOOT (SW1 NO; R16 pull-up only; no RST button: CHIP_PU's RC only), GPIO38 LED_R (LED1 red, R40 1k), GPIO39 LED_G (LED2 green, R41 1k),"
+        "Pins: GPIO21 MIDI_TX, GPIO40 MIDI_TX2, GPIO42 HOST_EN, GPIO39 CC_INT, GPIO16 LIN_DET (J7's ring switch, R38 1M up; R36 / R37 100k tip / ring down), GPIO0 BOOT (SW1 NO; R16 pull-up only; no RST button: CHIP_PU's RC only), GPIO33 LED_DATA (LED1 / LED2 WS2812B-2020 RGB, chained, R40 33 ohm),"
         " GPIO9 LINE_IN, GPIO1 VBAT_ADC, GPIO19 / 20 USB D- / D+. GPIO3, 45, 46 (strapping) open: internal defaults (3.3 V flash, SPI boot).",
         "U1 ESP32-S3FN8: VDDA C11-C13; VDD3P3 through L2 2 nH (C14-C17 before, C18 after); VDD3P3_CPU C19, VDD3P3_RTC C20; VDD_SPI C21 + C22;"
         " CHIP_PU R8 10k / C7 1u; Y1 40 MHz, C9 / C10 10 pF, R17 0 ohm on XTAL_P (XIAO ESP32S3 v1.2 values).",

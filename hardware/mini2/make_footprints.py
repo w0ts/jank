@@ -17,6 +17,7 @@ import re
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "lib", "jlc.pretty")
 OUT = os.path.join(HERE, "lib", "chip.pretty")
+QFN, QFN_FH4R2 = "QFN-56_L7.0-W7.0-P0.40-TL-EP4.0", "QFN-56_L7.0-W7.0-P0.40-TL-EP5.7"
 MARGIN = 0.15
 TRS_PITCH, TRS_PAD_W, TRS_PAD_H = 2.54, 1.5, 2.0
 
@@ -112,14 +113,24 @@ def write():
         name, body = jlc(path)
         open(os.path.join(OUT, name + ".kicad_mod"), "w").write(body)
         names.append(name)
+    # (2026-11-15: the ESP32-S3FH4R2's land pattern: Espressif's datasheet v2.2, 7: "identical land pattern (Figure 7-1)
+    #  except ESP32-S3FH4R2 has a bigger EPAD": 5.7 x 5.7 (Figure 7-2; JLC's own FH4R2 footprint agrees). The EP4.0
+    #  copy with its pad 57 grown, the rest as JLC's)
+    qfn = open(os.path.join(OUT, QFN + ".kicad_mod")).read().replace(QFN, QFN_FH4R2)
+    assert "(pad 57 smd rect (at 0.00 -0.00 0.00) (size 4.000 4.000)" in qfn
+    qfn = qfn.replace("(pad 57 smd rect (at 0.00 -0.00 0.00) (size 4.000 4.000)", "(pad 57 smd rect (at 0.00 -0.00 0.00) (size 5.700 5.700)")
+    open(os.path.join(OUT, QFN_FH4R2 + ".kicad_mod"), "w").write(qfn)
+    names.append(QFN_FH4R2)
     open(os.path.join(OUT, "TRS_PADS_SMD.kicad_mod"), "w").write(trs_pads())
     open(os.path.join(OUT, "SJ3_SMD.kicad_mod"), "w").write(sj3())
+    open(os.path.join(OUT, "SJ2C_SMD.kicad_mod"), "w").write(sj_closed("SJ2C_SMD", False))
+    open(os.path.join(OUT, "SJ3C_SMD.kicad_mod"), "w").write(sj_closed("SJ3C_SMD", True))
     open(os.path.join(OUT, "R_TWIN_HAND.kicad_mod"), "w").write(twin())
     open(os.path.join(OUT, "PADS4_SMD.kicad_mod"), "w").write(pads4())
     open(os.path.join(OUT, "C_TWIN_HAND.kicad_mod"), "w").write(twin("C_TWIN_HAND", CTWIN_PAD, CTWIN_GAP))
     open(os.path.join(OUT, "PADS2_HAND.kicad_mod"), "w").write(pads2())
     open(os.path.join(OUT, "PADS6_SMD.kicad_mod"), "w").write(pads6())
-    return names + ["TRS_PADS_SMD", "SJ3_SMD", "R_TWIN_HAND", "C_TWIN_HAND", "PADS4_SMD", "PADS2_HAND", "PADS6_SMD"]
+    return names + ["TRS_PADS_SMD", "SJ3_SMD", "SJ2C_SMD", "SJ3C_SMD", "R_TWIN_HAND", "C_TWIN_HAND", "PADS4_SMD", "PADS2_HAND", "PADS6_SMD"]
 
 
 def pads6():
@@ -203,6 +214,30 @@ def sj3():
                       '  (property "Reference" "JP**" (at 0 -1.6 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
                       '  (property "Value" "SJ3" (at 0 1.6 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
                       *pads,
+                      f'  (fp_rect (start {-a:.2f} {-b:.2f}) (end {a:.2f} {b:.2f}) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
+                      ")", ""])
+
+
+SJC_PITCH, SJC_W, SJC_H = 1.0, 0.7, 1.0   # (buffer try: a closed jumper the size of an 0603: 0.3 mm gap, the bridge cut with a knife)
+
+
+def sj_closed(name, n3):
+    """buffer try: a CLOSED solder jumper: 2 pads (or 3 with pads 1-2 bridged) joined by a copper line, a net tie
+    (KiCad net_tie_pad_groups) so the two nets of the pads may touch inside the footprint; cut the bridge with a knife to open
+    it. Bare copper, no part."""
+    n = 3 if n3 else 2
+    pads = [f'  (pad "{i + 1}" smd rect (at {(i - (n - 1) / 2) * SJC_PITCH:.2f} 0) (size {SJC_W} {SJC_H}) (layers "F.Cu" "F.Mask"))'
+            for i in range(n)]
+    x0 = -(n - 1) / 2 * SJC_PITCH
+    a, b = (n - 1) / 2 * SJC_PITCH + SJC_W / 2 + 0.15, SJC_H / 2 + 0.15
+    return "\n".join([f'(footprint "{name}" (version 20240108) (generator "make_footprints.py") (layer "F.Cu")',
+                      f'  (descr "{n}-pad solder jumper, CLOSED (pads 1-2 bridged by copper): cut the bridge to open; not a part")',
+                      '  (attr smd exclude_from_bom exclude_from_pos_files)',
+                      '  (net_tie_pad_groups "1, 2")',
+                      '  (property "Reference" "JP**" (at 0 -1.6 0) (layer "F.SilkS") (hide yes) (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      f'  (property "Value" "{name}" (at 0 1.6 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))',
+                      *pads,
+                      f'  (fp_line (start {x0:.2f} 0) (end {x0 + SJC_PITCH:.2f} 0) (stroke (width 0.25) (type solid)) (layer "F.Cu"))',
                       f'  (fp_rect (start {-a:.2f} {-b:.2f}) (end {a:.2f} {b:.2f}) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))',
                       ")", ""])
 

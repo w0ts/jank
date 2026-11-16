@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""jank mini 2.2's MIDI outputs under single faults, in ngspice (README "stage 2", "MIDI shorts"). Writes
+"""(Superseded 2026-11-15: MIDI OUT is now a 5 V current loop, sim/midi.py; this script models the 3.3 V GPIO-driven
+design, kept as history.)
+jank mini 2.2's MIDI outputs under single faults, in ngspice (README "stage 2", "MIDI shorts"). Writes
 sim/midi_faults.txt: for a resistor set (source R_s from +3V3 to the ring / DIN 4, sink R_k from the GPIO to the tip /
 DIN 5), each fault's GPIO current and each resistor's dissipation, and the current into a standard receiver.
 

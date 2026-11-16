@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""An estimate of what 5 or 10 assembled jank chip ("jank mini") boards cost at JLCPCB, Economic assembly (one side), from the parts
+"""An estimate of what 5 or 10 assembled jank mini 2.2 boards cost at JLCPCB, STANDARD assembly (one side: every ESP32-S3
+module at JLC is "Standard only"), anchored on the first real JLCONE quote (2026-11-15), from the parts
 snapshot (fab/parts-snapshot.json, jlc_parts.py) and the assembly summary (fab/summary.json, make_assembly.py). Writes
 fab/cost.md. Nothing here is a quote: every fee says where it was seen. Shipping is left out: it is shared with other
 boards in one JLC order.
@@ -11,7 +12,19 @@ import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 USD_EUR = (0.86, "USD to EUR, an ASSUMED rate (not read on the day): check it")
-FEES = {   # USD; where each figure comes from
+QUOTE = (233.20, "JLCONE, 2026-11-15 17:58: the dummy board (placed, no tracks), 10 pcs, battery order, top side, "
+         "Standard; 57 part types: PCB 6.40, setup 25.75, stencil 8.27, parts 94.56, feeders loading 88.35, SMT 9.36, "
+         "packaging 0.51; shipping and the hand-soldered parts not included")
+STD = {   # USD, Standard PCBA, read off that quote
+    "setup": (25.75, "Standard setup, the JLCONE quote 2026-11-15"),
+    "stencil": (8.27, "Standard stencil, same quote"),
+    "feeder": (1.55, "feeder loading per part type, every type on Standard: 88.35 / 57 in that quote (JLC's price page: ~1.53)"),
+    "joint": (9.36 / 4440, "SMT per joint: 9.36 for 10 x 444 joints in that quote"),
+    "packaging": (0.51, "packaging, same quote"),
+    "pcb_10": (6.40, "bare 2-layer 72 x 72 mm board, 10 pcs: the JLCONE quote 2026-11-15 (place2 is 2 layers; "
+                      "4 layers were 19.30, JLCONE 2026-11-16)"),
+}
+FEES = {   # USD; where each figure comes from (Economic, the older tier: kept for the history notes)
     "econ_setup": (8.24, "Economic setup fee, JLCONE test quote with the bare ESP32-S3FN8 (2026-11-10)"),
     "econ_stencil": (1.55, "Economic stencil, same quote"),
     "nitrogen": (0.91, "nitrogen reflow, the jank-pcb-mod quote 2026-11-09 (JLC added it; may be optional)"),
@@ -33,18 +46,17 @@ FEES = {   # USD; where each figure comes from
 USER_PARTS = {
     "C16684": (3, "PJ-307C switched TRS jack (MIDI OUT 1, MIDI OUT 2, LINE IN)", "every board"),
     "C2939346": (2, "DIN-504B-M10 5-pin DIN socket", "the DIN option"),
-    "C131337": (2, "JST B2B-PH-K-S, PH2.0 socket (the cells)", "the battery order"),
+    "C131337": (2, "JST B2B-PH-K-S vertical PH2.0 socket (the cells, J8 / J9 on the bottom)", "the battery order"),
     "C2691448": (1, "1 x 4 2.54 mm header (the screen)", "the screen option"),
     "C1693673": (1, "HJ-2.4G-IPEX1-L=80mm FPC antenna, u.FL lead (its size ASSUMED ~40 x 10)", "every board"),
-    "C55159907": (1, "CAX-MTS102-YB-10.5JL MTS-102 panel toggle, M6 bushing (the power switch, in the case wall, two "
-                     "wires to J11)", "the battery order"),
+    "C2885782": (1, "RS601HL-1010011BB snap-in rocker, black, 3 A (the power switch, in the case wall, ~10.5 x 15 mm cut-out; "
+                    "two wires to J11; the user's choice 2026-11-15, was the MTS-102 toggle)", "the battery order"),
     "C18185602": (2, "PJ-320A 3.5 mm jack (CLOCK and RESET out)", "every board"),
 }
-SCREEN = (4.86, "the 1.3 inch module, HS13L03W2C01 (C7465997), LCSC's 1-piece price on the snapshot's day")
+SCREEN = (6.97, "the 1.54 inch module, HS154L03W2C01 (C7465999), LCSC's 1-piece price on the snapshot's day")
 # 72 x 72 (the user's "one board, different screens"; the 0.96 in is out: unreadable): the screen modules, one per board, the user's choice; bought with
 # the order, plugged into J10 (0.96 / 1.3 / 1.54) or on a lead to J10B (2.42); hardware/mini2/screen-study.md
 SCREEN_PARTS = {
-    "C7465997": ("1.3 in, SH1106, HS13L03W2C01 (J10)", "screen 1.3"),
     "C7465999": ("1.54 in, SSD1309, HS154L03W2C01 (J10)", "screen 1.54"),
     "C7466000": ("2.42 in, SSD1309, HS242L03B2C01 (J10B, a 4-wire lead; colour unclear: screen-study.md)", "screen 2.42"),
 }
@@ -66,13 +78,14 @@ def estimate(summary, snap, n):
         price = unit_price(s["prices"], qty)
         lines.append((code, s, per_board, qty, price, qty * price))
     ext = [c for c in summary["qty"] if snap["parts"][c]["type"] == "Extended" and not snap["parts"][c]["preferred"]]
+    types = len(summary["qty"])
     rows = {
-        f"PCB (bare, {n})": FEES["pcb_5" if n <= 5 else "pcb_10"][0],
-        "Economic setup": FEES["econ_setup"][0],
-        "Economic stencil": FEES["econ_stencil"][0],
-        "nitrogen reflow": FEES["nitrogen"][0],
-        f"Extended part types ({len(ext)} x {FEES['extended'][0]})": len(ext) * FEES["extended"][0],
-        f"solder joints ({summary['joints']} a board)": summary["joints"] * n * FEES["joint"][0],
+        f"PCB (bare, {n})": FEES["pcb_5"][0] if n <= 5 else STD["pcb_10"][0],
+        "Standard setup": STD["setup"][0],
+        "Standard stencil": STD["stencil"][0],
+        f"feeder loading ({types} part types x {STD['feeder'][0]})": types * STD["feeder"][0],
+        f"SMT ({summary['joints']} joints a board)": summary["joints"] * n * STD["joint"][0],
+        "packaging": STD["packaging"][0],
         "parts (with JLC's loss)": sum(x[5] for x in lines),
     }
     return rows, sum(rows.values()), lines, ext
@@ -123,12 +136,14 @@ def main():
     w, h = sums[VARIANTS[0]]["board_mm"]
     out = [f"# jank mini 2.2: cost estimate, both orders (generated by cost.py; parts snapshot {snap['date']}, newer parts"
            " read later: their 'read' field)", "",
-           f"{w:g} x {h:g} mm, 2 layers, top side only (JLC Economic). One board, two orders: **usb** (USB power only)"
-           " and **battery** (the cell circuit too; both orders the LDL1117). Shipping, taxes and the case are not included. Every fee is an"
+           f"{w:g} x {h:g} mm, 2 layers (1.6 mm), top side only, **JLC Standard** (every ESP32-S3 module at JLC is Standard only). "
+           f"**Anchor: {QUOTE[1]}: USD {QUOTE[0]:.2f}.** The table below re-prices today's BOM with that quote's fees; "
+           "re-quote before ordering. One board, two orders: **usb** (USB power only)"
+           " and **battery** (the cell circuit too; both orders the TPS63802 buck-boost and the TPS61023 5 V aux boost). Shipping: not included; JLC's checkout shows it. Taxes and the case are not included either. Every fee is an"
            " estimate (sources below).", "", "| | " + " | ".join(f"{v}: 5 boards | {v}: 10 boards" for v in VARIANTS) + " |",
            "|---|" + "---|" * (2 * len(VARIANTS))]
     for label, f in (("parts / lines / joints a board", lambda s, r: f"{s['parts']} / {s['lines']} / {s['joints']}"),
-                     ("Extended types (fee)", lambda s, r: str(len(r[3]))),
+                     ("part types (feeder fee each)", lambda s, r: str(len(s["qty"]))),
                      ("**total, USD**", lambda s, r: f"**{r[1]:.2f}**"),
                      ("per board, USD", lambda s, r: None)):
         cells = []
@@ -142,7 +157,8 @@ def main():
         out += [f"## The {v} order", ""] + detail(sums[v], snap, allruns[v], eur)
     out += user_parts(snap, allruns, eur)
     out += ["## Sources", ""]
-    out += [f"- {k}: USD {v:g}, {why}" for k, (v, why) in FEES.items()] + [f"- {USD_EUR[1]}: {eur}"]
+    out += [f"- {k}: USD {v:g}, {why}" for k, (v, why) in STD.items()]
+    out += [f"- (Economic, history) {k}: USD {v:g}, {why}" for k, (v, why) in FEES.items()] + [f"- {USD_EUR[1]}: {eur}"]
     open(os.path.join(HERE, "fab", "cost.md"), "w").write("\n".join(out) + "\n")
     print("\n".join(out[:9]))
 
@@ -162,23 +178,23 @@ def user_parts(snap, allruns, eur):
             row.append(f"{q}, {usd:.2f}")
         out.append(f"| {code} | {what} | {need} | {per} | " + " | ".join(row) + " |")
     out += ["", "### The screen modules (one per board, the user's choice; LCSC unit price at the quantity)", "",
-            "| LCSC | module | 5 boards: USD each | 10 boards: USD each | vs the 1.3 in, 10 |", "|---|---|---|---|---|"]
-    base10 = unit_price(snap["parts"]["C7465997"]["prices"], 10)
+            "| LCSC | module | 5 boards: USD each | 10 boards: USD each | vs the 1.54 in, 10 |", "|---|---|---|---|---|"]
+    base10 = unit_price(snap["parts"]["C7465999"]["prices"], 10)
     for code, (what, _k) in SCREEN_PARTS.items():
         pr = snap["parts"][code]["prices"]
         out.append(f"| {code} | {what} | {unit_price(pr, 5):.2f} | {unit_price(pr, 10):.2f} | {unit_price(pr, 10) - base10:+.2f} |")
-    out += ["", f"The full-options rows below take the 1.3 in ({SCREEN[1]}).", "",
+    out += ["", f"The full-options rows below take the 1.54 in ({SCREEN[1]}).", "",
             "### Full options, a board (USD): the JLC order + every part above + the screen module", "",
             "| | usb: 5 | usb: 10 | battery: 5 | battery: 10 |", "|---|---|---|---|---|"]
     def opt(v, n, codes, screen):
         return (allruns[v][n][1] + sum(tot[(c, n)] for c in codes) + (SCREEN[0] * n if screen else 0)) / n
     base_codes = ["C16684", "C18185602", "C1693673"]
     rows = (("JLC board only", lambda v, n: allruns[v][n][1] / n),
-            ("+ the five jacks (3 PJ-307C, 2 PJ-320A) and the FPC antenna (battery: + 2 PH2.0 and the toggle): the minimum to use it",
-             lambda v, n: opt(v, n, base_codes + (["C131337", "C55159907"] if v == "battery" else []), False)),
-            ("+ the DINs", lambda v, n: opt(v, n, base_codes + ["C2939346"] + (["C131337", "C55159907"] if v == "battery" else []), False)),
+            ("+ the five jacks (3 PJ-307C, 2 PJ-320A) and the FPC antenna (battery: + 2 PH2.0 and the rocker): the minimum to use it",
+             lambda v, n: opt(v, n, base_codes + (["C131337", "C2885782"] if v == "battery" else []), False)),
+            ("+ the DINs", lambda v, n: opt(v, n, base_codes + ["C2939346"] + (["C131337", "C2885782"] if v == "battery" else []), False)),
             ("+ the DINs + the screen (header, module)",
-             lambda v, n: opt(v, n, base_codes + ["C2939346", "C2691448"] + (["C131337", "C55159907"] if v == "battery" else []), True)))
+             lambda v, n: opt(v, n, base_codes + ["C2939346", "C2691448"] + (["C131337", "C2885782"] if v == "battery" else []), True)))
     for label, f in rows:
         out.append(f"| {label} | " + " | ".join(f"{f(v, n):.2f}" for v in ("usb", "battery") for n in (5, 10)) + " |")
     out += ["", "(The battery order's cells are not included: the user's own.)", ""]
@@ -189,7 +205,7 @@ def user_parts(snap, allruns, eur):
 def split_builds(snap, allruns):
     """the coordinator's question: 10 boards, 5 full (cells, toggle, CLK / RST) and 5 MIDI-only (USB power, no cells, no
     toggle: R62's pads bridged by hand, "USB ONLY: BRIDGE"; no CV jacks): one battery order of 10, or two orders of 5"""
-    full = {"C16684": 3, "C1693673": 1, "C18185602": 2, "C131337": 2, "C55159907": 1}
+    full = {"C16684": 3, "C1693673": 1, "C18185602": 2, "C131337": 2, "C2885782": 1}
     midi = {"C16684": 3, "C1693673": 1}
     qty = {c: 5 * full.get(c, 0) + 5 * midi.get(c, 0) for c in full}
     buy = sum(q * unit_price(snap["parts"][c]["prices"], q) for c, q in qty.items() if q)
@@ -202,10 +218,10 @@ def split_builds(snap, allruns):
            f"**{one + buy:.2f}** | {(one + buy) / 10:.2f} |",
            f"| **two orders**: usb x 5 (MIDI-only) + battery x 5 (full) | {two:.2f} | {buy:.2f} | **{two + buy:.2f}** | "
            f"{(two + buy) / 10:.2f} |", "",
-           f"One order saves {two - one:.2f} USD (one set of setup / stencil / Extended fees instead of two). The "
-           "MIDI-only boards from the battery order run from USB through the power path and the LDL1117 (no cell needed); "
+           f"One order saves {two - one:.2f} USD (one set of setup / stencil / feeder fees instead of two). The "
+           "MIDI-only boards from the battery order run from USB through the power path and the TPS63802 (no cell needed); "
            "R62 is a DNP 0402 land in that order: a blob or a 0 ohm 0402 bridges it. Shipping: one parcel either way "
-           "(not counted).", ""]
+           "(not included; JLC's checkout shows it).", ""]
     return out
 
 

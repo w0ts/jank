@@ -44,7 +44,7 @@ if grep -q "; error" fab/drc.rpt; then grep -B1 -A3 "; error" fab/drc.rpt | head
 "$KP" check_board.py mini2.kicad_pcb 2>&1 | Q    # (stage 2: courtyards both ways, the iron's rooms, vias, twins, ground islands, RF)
 "$KP" make_assembly.py 2>&1 | Q
 rm -rf fab/gerbers fab/mini2-gerbers.zip && mkdir -p fab/gerbers
-"$KC" pcb export gerbers --layers F.Cu,B.Cu,F.Mask,B.Mask,F.Paste,B.Paste,F.Silkscreen,B.Silkscreen,Edge.Cuts \
+"$KC" pcb export gerbers --layers F.Cu,In1.Cu,In2.Cu,B.Cu,F.Mask,B.Mask,F.Paste,B.Paste,F.Silkscreen,B.Silkscreen,Edge.Cuts \
     --no-protel-ext --use-drill-file-origin -o fab/gerbers/ mini2.kicad_pcb 2>&1 | Q >/dev/null
 "$KC" pcb export drill --format excellon --excellon-separate-th --drill-origin plot -o fab/gerbers/ mini2.kicad_pcb 2>&1 | Q >/dev/null
 (cd fab/gerbers && zip -q -r ../mini2-gerbers.zip .)

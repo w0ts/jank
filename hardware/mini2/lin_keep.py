@@ -10,8 +10,9 @@ import sys
 
 import pcbnew
 
-KEEP_NETS = ("LIN_SUM", "LIN_OUT")
-QUIET = ("GND", "AVDD", "LINE_IN")              # (and every LIN_*: the front end's own nets may run beside it)
+KEEP_NETS = ("LINE_IN", "LINE_SENSE", "LIN_A1", "LIN_A2", "LIN_B1", "LIN_B2", "LIN_VB")   # (2026-11-15: the digital LINE IN's two
+#  nodes, their coupling branches and the bias: the high-impedance ones)
+QUIET = ("GND", "LINE_IN", "LINE_SENSE")       # (and every LIN_*: the front end's own nets may run beside it)
 KEEP, RUN, STEP = 1.0, 2.0, 0.1
 MM, TO = pcbnew.FromMM, pcbnew.ToMM
 
@@ -21,7 +22,7 @@ def quiet(net):
 
 
 def keep_items(board):
-    """(layer, shape, bbox) of LIN_SUM / LIN_OUT's tracks and pads"""
+    """(layer, shape, bbox) of LINE IN's nodes's tracks and pads"""
     out = []
     for t in board.GetTracks():
         if t.GetNetname() in KEEP_NETS and t.GetClass() == "PCB_TRACK":
@@ -93,8 +94,8 @@ def main():
     path = sys.argv[1]
     board = pcbnew.LoadBoard(path)
     gone = rip(board)
-    print("lin_keep: " + (", ".join(f"{n} {r:.1f} mm" for n, r in sorted(gone.items())) + " ripped near LIN_SUM / LIN_OUT"
-                          if gone else "nothing within 1 mm of LIN_SUM / LIN_OUT for more than 2 mm"))
+    print("lin_keep: " + (", ".join(f"{n} {r:.1f} mm" for n, r in sorted(gone.items())) + " ripped near LINE IN's nodes"
+                          if gone else "nothing within 1 mm of LINE IN's nodes for more than 2 mm"))
     board.Save(path)
 
 

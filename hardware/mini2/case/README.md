@@ -28,7 +28,18 @@ board (72 x 72, outside 75.6 x 75.6): nothing in it is fixed to the old size.
   a press near the tip and near the middle both bottom the pressed switch (the middle one needs 2.2 x the force);
   pressed on the arm's centre line a neighbour drops 0.003 mm: **UP does not press NO or YES**. Off the centre line
   by 1.0 mm or more near the middle (1.5 at 3 mm, 2.0 at 5 mm) a neighbour can click too ("BOTH" in its table).
-- **The power toggle** (the user's: a panel MTS-102, CAX-MTS102-YB-10.5JL): through a **6.3 mm round hole** in the
+- **Review pass 2 (the user's, 2026-11-15), not yet in the STLs:** the switch becomes a black snap-in rocker,
+  RS601HL-1010011BB (C2885782, 3 A): a **rectangular ~10.5 x 15 mm cut-out** (its drawing's panel cut-out to check)
+  in the same wall instead of the 6.3 mm hole, wired to J11 as before; the **1.3" lid (`mini_lid_s130`) is dropped** with the 1.3"
+  screen (the 1.54" and the 2.42" lids stay); J2 / J3 / J7 sit 0.5 mm further in (J7 also 0.4 mm right): `place_args.py` reads them. The STLs
+  are rebuilt after review pass 3.
+- **2026-11-15, also not yet in the STLs:** the indicator is two RGB LEDs (WS2812B-2020, 2 x 2 mm; their height from their
+  sheet's side view to check against the light pipe) one over the other at LED1 / LED2's places (LED1 0.4 mm higher):
+  the window over the middle of both, as before (`place_args.py` reads them).
+- **2026-11-15: U1 is an ESP32-S3-WROOM-1U module** (18 x 19.2 mm, ~3.2 mm tall: its datasheet's drawing to check) in the
+  lower middle; its own u.FL (at its bottom end) takes the lid's FPC antenna lead: **the antenna is unchanged**.
+  `place_args.py` still reads J4 for the lead's way: point it at the module's u.FL when the STLs are rebuilt.
+- **The power toggle** (superseded by the rocker above; the user's earlier: a panel MTS-102, CAX-MTS102-YB-10.5JL): through a **6.3 mm round hole** in the
   lid's **left** wall (72 x 72: under the screen band, the right wall's design mirrored; `pwr_left`) (its drawing: a 6.0 mm panel hole, +0.3 for the print), its axis 5 mm below the board's J11 pads
   and 7 mm over the board's underside; a flat seat round it for the nut (M6 x 0.75, ~9 mm across flats ASSUMED); the
   lever outside. `check_pwr`: its body inside clears the board's parts and the D-pad by 0.3 mm; `check_pwr_lid`: it

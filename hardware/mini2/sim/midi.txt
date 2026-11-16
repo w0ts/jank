@@ -1,28 +1,30 @@
-jank mini 2.2, the four MIDI outputs: ngspice results (midi.py; generic models: its docstring); drive 3 unless said
+jank mini 2.2, the four MIDI outputs as 5 V current loops: ngspice results (midi.py; generic models: its docstring)
 
-+3V3 3.3 V, LED 1.2 V at 5 mA, both GPIOs low: receivers J2 5.84, J5 5.56, J3 5.84, J6 5.56 mA; GPIO21 sinks 11.4 mA, GPIO17 11.4 mA
-+3V3 3.3 V, LED 1.5 V at 5 mA, both GPIOs low: receivers J2 5.03, J5 4.79, J3 5.03, J6 4.79 mA; GPIO21 sinks 9.8 mA, GPIO17 9.8 mA
-+3V3 3.3 V, LED 1.7 V at 5 mA, both GPIOs low: receivers J2 4.48, J5 4.27, J3 4.48, J6 4.27 mA; GPIO21 sinks 8.8 mA, GPIO17 8.8 mA
-+3V3 3.0 V, LED 1.2 V at 5 mA, both GPIOs low: receivers J2 5.02, J5 4.79, J3 5.02, J6 4.79 mA; GPIO21 sinks 9.8 mA, GPIO17 9.8 mA
-+3V3 3.0 V, LED 1.5 V at 5 mA, both GPIOs low: receivers J2 4.22, J5 4.02, J3 4.22, J6 4.02 mA; GPIO21 sinks 8.2 mA, GPIO17 8.2 mA
-+3V3 3.0 V, LED 1.7 V at 5 mA, both GPIOs low: receivers J2 3.67, J5 3.50, J3 3.67, J6 3.50 mA; GPIO21 sinks 7.2 mA, GPIO17 7.2 mA
-+3V3 3.47 V, LED 1.2 V at 5 mA, both GPIOs low: receivers J2 6.31, J5 6.01, J3 6.31, J6 6.01 mA; GPIO21 sinks 12.3 mA, GPIO17 12.3 mA
-+3V3 3.47 V, LED 1.5 V at 5 mA, both GPIOs low: receivers J2 5.49, J5 5.23, J3 5.49, J6 5.23 mA; GPIO21 sinks 10.7 mA, GPIO17 10.7 mA
-+3V3 3.47 V, LED 1.7 V at 5 mA, both GPIOs low: receivers J2 4.94, J5 4.71, J3 4.94, J6 4.71 mA; GPIO21 sinks 9.7 mA, GPIO17 9.7 mA
-both GPIOs high (idle): receivers 0.00 uA at most
+the receiver's current with the FET on (a 0 bit), per connector:
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.2 V: jack 4.95 mA, DIN 4.95 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.2 V + a series diode: jack 4.05 mA, DIN 4.05 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.5 V: jack 4.54 mA, DIN 4.54 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.5 V + a series diode: jack 3.65 mA, DIN 3.65 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.7 V: jack 4.26 mA, DIN 4.26 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.7 V + a series diode: jack 3.37 mA, DIN 3.37 mA
+  V5M 4.85 V, LED 1.2 V: jack 5.24 mA, DIN 5.24 mA
+  V5M 4.85 V, LED 1.2 V + a series diode: jack 4.32 mA, DIN 4.32 mA
+  V5M 4.85 V, LED 1.5 V: jack 4.82 mA, DIN 4.82 mA
+  V5M 4.85 V, LED 1.5 V + a series diode: jack 3.90 mA, DIN 3.90 mA
+  V5M 4.85 V, LED 1.7 V: jack 4.53 mA, DIN 4.53 mA
+  V5M 4.85 V, LED 1.7 V + a series diode: jack 3.62 mA, DIN 3.62 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.2 V: jack 5.54 mA, DIN 5.54 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.2 V + a series diode: jack 4.58 mA, DIN 4.58 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.5 V: jack 5.10 mA, DIN 5.10 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.5 V + a series diode: jack 4.16 mA, DIN 4.16 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.7 V: jack 4.81 mA, DIN 4.81 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.7 V + a series diode: jack 3.87 mA, DIN 3.87 mA
+  the FET off (idle, a 1 bit): 0.00 uA
 
-a mono plug in J2 (its ring on the sleeve), +3V3 3.47 V: J2's source trio 360 mW (120 mW each, 250 mW parts); the other receivers J5 6.31, J3 6.31, J6 6.01 mA
-a broken DIN cable shorting J5's pin 4, 3.47 V: R54 // R58 240 mW (120 mW each, 250 mW parts); the others J2 6.61, J3 6.31, J6 6.01 mA
-J2's tip shorted to ground with GPIO21 high (a damaged cable): GPIO21 sources 41 mA through R15 68 ohm (the datasheet's IOH figure is 40 mA typ, Table 5-4; sim/midi_faults.md)
+faults (V5M 4.97 V, the resistors -1 %):
+  jack: ring / DIN 4 shorted to GND (a mono plug, a broken cable): 21.4 mA, 53 mW in each of its 2 0805s (125 mW parts)
+  DIN: ring / DIN 4 shorted to GND (a mono plug, a broken cable): 21.4 mA, 53 mW in each of its 2 0805s (125 mW parts)
+  jack: tip shorted to ring with the FET on: 10.7 mA (13 mW in each of the sink's 2 0805s)
+  tip shorted to GND: no current (the sink side is already at GND when the FET is on; off, nothing drives it)
 
-GPIO17's default drive is 10 mA (the datasheet p. 18, note 5): the firmware sets GPIO17 and GPIO21 to drive strength 3 (the receivers' current above; drive 2 loses ~10 %: the trade-off below)
-
-the trade-off (sink ohms per connector, drive 2 / 3): the receivers' current at 3.3 V (jack / DIN; a 1.5 V opto, the same + a series diode) and 3.0 V (1.5 V opto); a tip shorted to GND with the pin high; tip to ring with the pin low (into the pin); both tips of one output shorted (the pin, high)
-  68 ohm, drive 2: 3.3 V 4.61 / 4.39 mA, + diode 3.04 / 2.90; 3.0 V 3.87 / 3.68; tip short 33 mA (72 mW in the sink); tip-ring 24 mA; both tips 49 mA
-  68 ohm, drive 3: 3.3 V 5.03 / 4.79 mA, + diode 3.30 / 3.16; 3.0 V 4.22 / 4.02; tip short 39 mA (104 mW in the sink); tip-ring 28 mA; both tips 65 mA
-  56 ohm, drive 2: 3.3 V 4.75 / 4.52 mA, + diode 3.13 / 2.98; 3.0 V 3.98 / 3.79; tip short 37 mA (76 mW in the sink); tip-ring 27 mA; both tips 54 mA
-  56 ohm, drive 3: 3.3 V 5.20 / 4.94 mA, + diode 3.41 / 3.25; 3.0 V 4.36 / 4.15; tip short 45 mA (116 mW in the sink); tip-ring 31 mA; both tips 74 mA
-  47 ohm, drive 2: 3.3 V 4.86 / 4.62 mA, + diode 3.20 / 3.05; 3.0 V 4.08 / 3.87; tip short 41 mA (78 mW in the sink); tip-ring 29 mA; both tips 58 mA
-  47 ohm, drive 3: 3.3 V 5.34 / 5.07 mA, + diode 3.49 / 3.33; 3.0 V 4.47 / 4.25; tip short 52 mA (127 mW in the sink); tip-ring 34 mA; both tips 82 mA
-  39 ohm, drive 2: 3.3 V 4.97 / 4.71 mA, + diode 3.26 / 3.11; 3.0 V 4.17 / 3.95; tip short 45 mA (80 mW in the sink); tip-ring 31 mA; both tips 63 mA
-  39 ohm, drive 3: 3.3 V 5.46 / 5.18 mA, + diode 3.57 / 3.40; 3.0 V 4.58 / 4.34; tip short 59 mA (138 mW in the sink); tip-ring 37 mA; both tips 92 mA
+SUMMARY: a receiver gets 3.37 .. 5.54 mA over the corners (MIDI 1.0's 5 V circuit aims at ~5 mA); the GPIOs drive only the FETs' gates

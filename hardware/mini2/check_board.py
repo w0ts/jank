@@ -27,8 +27,11 @@ import parts as P
 MM = pcbnew.ToMM
 OX = OY = 100.0
 IRON = 0.8
-MODULE = (38.0 - 27.3 / 2, 15.9 - 1.5, 38.0 + 27.3 / 2, 15.9 - 1.5 + 27.8)   # (make_board.MODULE: HDR (38.0, 15.9) on 72 x 72)
-TALL = ("J1", "J4", "U2", "D7", "D8")
+# (2026-11-15, the fresh floorplan: the biggest screen on J10, the 1.54" (42.4 x 38.0, its header row 2.5 mm from its top
+#  edge: case/mini_case.scad SCREENS), 2.5 mm over the board on the header's plastic: nothing 2.0 mm or taller under it)
+MODULE = (38.0 - 42.4 / 2, 15.9 - 2.5, 38.0 + 42.4 / 2, 15.9 - 2.5 + 38.0)
+MODULE_242 = (0.0, 1.0, 72.0, 44.0)   # (the 2.42" module, hung from the lid's roof across the top: case/mini_case.scad "s242")
+TALL = ("J1", "U1", "D9")   # (buffer try: D7 / D14 are SOT-23 PESD15VL2BT now, 1.1 mm)
 
 
 def xy(v):
@@ -74,6 +77,9 @@ def courtyards(fps, problems):
     for r in refs:
         if not fps[r].IsFlipped() and (r.startswith(("SW", "LED")) or r in TALL) and hit(boxes[r], MODULE):
             problems.append(f"{r} under the screen module's outline")
+    for r in refs:                               # (2026-11-15: the beat LEDs on every board: clear of both screens + 1.5 mm)
+        if r.startswith("LED") and any(hit(boxes[r], (m[0] - 1.5, m[1] - 1.5, m[2] + 1.5, m[3] + 1.5)) for m in (MODULE, MODULE_242)):
+            problems.append(f"{r} under a screen's outline (+ 1.5 mm): not visible on the screen units")
     return boxes
 
 
@@ -121,7 +127,7 @@ def pivot(board, fps, boxes, problems):
 def vias(board, fps, problems):
     smd = [(r, p) for r, f in fps.items() for p in f.Pads() if p.GetAttribute() == pcbnew.PAD_ATTRIB_SMD]
     tht = [(r, p) for r, f in fps.items() for p in f.Pads() if p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH
-           and r in ("J2", "J3", "J5", "J6", "J7", "J10B", "J11", "J13", "J14")]
+           and r in ("J2", "J3", "J5", "J6", "J7", "J8", "J9", "J10B", "J11", "J13", "J14")]   # (review 2 A3: the cell sockets J8 / J9 are hand soldered too)
     n = 0
     for v in board.GetTracks():
         if v.GetClass() != "PCB_VIA":
@@ -235,6 +241,8 @@ def rf(board, fps, problems):
     rft = [t for t in tracks if t.GetNetname() in RF_NETS]
     pts = [xy(p.GetPosition()) for f in fps.values() if f.GetReference() != "U1" for p in f.Pads() if p.GetNetname() in RF_NETS]
     pts += [xy(t.GetStart()) for t in rft] + [xy(t.GetEnd()) for t in rft]
+    if not pts:                                  # (2026-11-15: the WROOM-1U module carries its own RF path and u.FL)
+        return None
     xs, ys = [q[0] for q in pts], [q[1] for q in pts]
     b = [min(xs) - 0.4, min(ys) - 0.4, max(xs) + 0.4, max(ys) + 0.4]
     pin1 = xy(next(p for p in fps["U1"].Pads() if p.GetNumber() == "1").GetPosition())
@@ -260,13 +268,13 @@ def rf(board, fps, problems):
     return b
 
 
-CV_NETS = ("CLK_", "RST_", "PUMP_")
-LIN_NETS = ("LIN_OUT", "LINE_IN")
+CV_NETS = ("CLK_", "RST_", "V5_SW", "V3_L")   # (2026-11-15: the pump is gone; the converters' switch nodes)
+LIN_NETS = ("LINE_IN", "LINE_SENSE")
 CV_MIN = 0.5                                       # mm: CLK / RST copper to LINE IN's ADC path (the coordinator's ask)
 
 
 def cv_vs_linein(board, problems):
-    """the CLOCK / RESET nets against LINE IN's ADC path (LIN_OUT, LINE_IN): the nearest approach of their copper on the
+    """the CLOCK / RESET nets against LINE IN's ADC path (LINE_IN, LINE_SENSE): the nearest approach of their copper on the
     same layer (sampled every 1/20 of a track), and how long a CLK / RST track runs within 1 mm of it; prints both"""
     tr = [t for t in board.GetTracks() if t.GetClass() == "PCB_TRACK"]
     cv = [t for t in tr if t.GetNetname().startswith(CV_NETS)]
@@ -292,8 +300,8 @@ def cv_vs_linein(board, problems):
         problems.append(f"{best[1]} within {best[0]:.2f} mm of {best[2]} (limit {CV_MIN})")
 
 
-AGGRESSORS = {"CLK / RST": ("CLK_", "RST_"), "the pump": ("PUMP_", "CV_RAIL"), "RF / u.FL": ("LNA_IN", "RF", "UFL")}
-VICTIMS = ("LIN_", "LINE_IN", "AVDD")
+AGGRESSORS = {"CLK / RST": ("CLK_", "RST_"), "the converters": ("V5_SW", "V3_L1", "V3_L2")}
+VICTIMS = ("LIN_", "LINE_IN", "LINE_SENSE")
 
 
 def _items(board, prefixes):
@@ -313,7 +321,7 @@ def _pad_d(p, x, y):
 
 def separation(board):
     """the timing study's self-lock check: each aggressor group's copper (tracks and pads, any layer) against LINE IN's
-    front end (LIN_*, LINE_IN, AVDD): the nearest approach, edge to edge (tracks sampled every 1/20)"""
+    front end (LIN_*, LINE_IN, LINE_SENSE): the nearest approach, edge to edge (tracks sampled every 1/20)"""
     vt, vp = _items(board, VICTIMS)
     for name, pre in AGGRESSORS.items():
         at, ap = _items(board, pre)
@@ -333,7 +341,7 @@ def separation(board):
                 if best is None or d < best[0]:
                     best = (d, p.GetNetname())
         if best:
-            print(f"{name} vs LINE IN's front end (LIN_*, LINE_IN, AVDD): nearest copper {max(best[0], 0):.2f} mm (to {best[1]}, any layer)")
+            print(f"{name} vs LINE IN's front end (LIN_*, LINE_IN, LINE_SENSE): nearest copper {max(best[0], 0):.2f} mm (to {best[1]}, any layer)")
 
 
 def lin_runs(board, problems):
@@ -341,11 +349,11 @@ def lin_runs(board, problems):
     LIN_OUT, in all per net: over lin_keep.RUN (2 mm) is a problem; the drawn USB pair (fixed) is reported, not fixed"""
     import lin_keep
     runs = lin_keep.close_runs(board)
-    print("within 1 mm of LIN_SUM / LIN_OUT (mm of track, per net): "
+    print("within 1 mm of LINE IN's nodes (mm of track, per net): "
           + (", ".join(f"{n} {r:.1f}" for n, (r, _t) in sorted(runs.items(), key=lambda x: -x[1][0])) or "none"))
     for n, (r, _t) in runs.items():
         if r > lin_keep.RUN and n not in lin_keep.FIXED:
-            problems.append(f"{n} runs {r:.1f} mm within 1 mm of LIN_SUM / LIN_OUT (2 mm allowed)")
+            problems.append(f"{n} runs {r:.1f} mm within 1 mm of LINE IN's nodes (2 mm allowed)")
 
 
 def main():
