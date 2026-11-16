@@ -463,7 +463,8 @@ static void test_transport(void)
     CHECK(jc_should_play(0, 1, 0) == 1);
     CHECK(jc_should_play(0, 0, 5) == 0);
     CHECK(jc_should_play(1, 0, 1) == 1);
-    CHECK(jc_should_play(1, 1, 0) == 0);
+    CHECK(jc_should_play(1, 1, 0) == 1);       /* M2l: AUTO alone: the stick's own session's start / stop (the user's) */
+    CHECK(jc_should_play(1, 0, 0) == 0);
 }
 
 /* the outputs' wish at a bridge step (bridge.c follow_transport) */

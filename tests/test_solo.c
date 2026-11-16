@@ -303,7 +303,7 @@ static void bridge_step(struct stick *s, int64_t now)
 {
     struct jc_tr t;
     int want, settled;
-    if (jp_solo(&s->jp, s->audio, now))
+    if (jp_solo(&s->jp, 1, now))       /* M2l: a session of its own while alone, either mode */
         s->base = 0;
     jp_poll(&s->jp, now);
     settled = jp_settled(&s->jp, now);
@@ -346,7 +346,7 @@ static void play(struct stick *s, int on)
         }
         return;
     }
-    if (!s->automatic)
+    if (!s->automatic || !jp_peers(&s->jp))      /* M2l: alone, the session is the stick's whatever LINK TRANSPORT */
         jp_set_playing(&s->jp, on, QUANTUM, sim_now);
     if (on)
         jho_link_play(&s->hold);
@@ -501,31 +501,86 @@ static void test_hold_alone(void)
 }
 
 /* the sound goes (LINK mode) while alone: nothing to follow any more: the session ends, the outputs stop */
+/* M2l: the sound goes while alone (AUDIO -> LINK): the session goes on, its tempo and transport kept, the clock too (no
+ * Stop at the switch) */
 static void test_sound_goes_alone(void)
 {
     struct stick *a = &st[0];
+    uint32_t starts = a->starts, stops = a->stops, clocks;
+    int32_t mpb = jp_mpb(&a->jp);
     a->audio = 0;
     run_for(500000);
-    CHECK(!a->jp.on && !jp_in_session(&a->jp));
-    CHECK(a->stops == 2 && a->starts == 2);
+    CHECK(a->jp.on && jp_in_session(&a->jp) && jp_settled(&a->jp, sim_now) && jp_playing(&a->jp));
+    CHECK(a->stops == stops && a->starts == starts && jp_mpb(&a->jp) == mpb);
+    clocks = a->clocks;
     run_for(10000000);
-    CHECK(a->starts == 2);
+    CHECK(a->starts == starts && a->stops == stops && a->clocks > clocks + 400);
+    a->audio = 1;                                              /* and the sound back: the tracker leads it again */
+    run_for(4000000);
+    CHECK(a->starts == starts && a->stops == stops && jp_playing(&a->jp));
 }
 
-/* LINK mode, alone: as before, nothing (no session, no frame, no clock); a play is refused */
+/* M2l (the user, 2026-11-16: "how am I supposed to start it here?"; the rule: as a lone Ableton Live). LINK mode alone:
+ * a session of the stick's own, always, at 120 BPM at first; power-on is the user's Stop, nothing starts it by itself;
+ * the user's Start starts the session on its next bar line and the MIDI clock with it; the tempo command works; Stop
+ * stops both. Every LINK TRANSPORT */
 static void test_link_mode_alone(void)
 {
     for (int automatic = 0; automatic <= 1; automatic++) {
         struct stick *a;
         world();
         a = stick_on(0, 0, automatic);
+        a->hold.hold = 1;                                      /* a real power-on */
         run_for(10000000);
-        CHECK(!a->jp.on && a->frames == 0 && !a->ticking && a->starts == 0);
-        CHECK(jp_set_playing(&a->jp, 1, QUANTUM, sim_now) == -1);
+        CHECK(a->jp.on && jp_in_session(&a->jp) && jp_settled(&a->jp, sim_now) && a->frames > 0);
+        CHECK(jp_mpb(&a->jp) == JP_DEFAULT_MPB && !jp_playing(&a->jp) && a->starts == 0);
         play(a, 1);
         run_for(5000000);
-        CHECK(!a->jp.on && !a->ticking && a->starts == 0);
+        CHECK(jp_playing(&a->jp) && a->starts == 1 && on_the_bar(a) && jc_tick_ub(a->start_tick) == lk_play_beat(&a->jp.k));
+        CHECK(a->start_at - (sim_now - 5000000) <= 2000000 + JST_LEAD_US + 10000);   /* on its next bar line */
+        CHECK(jp_set_tempo(&a->jp, 400000, sim_now) == 0);     /* UP / DOWN, the tempo command: 150 BPM */
+        run_for(2000000);
+        CHECK(jp_mpb(&a->jp) == 400000 && a->starts == 1 && a->stops == 0);
+        play(a, 0);
+        run_for(1000000);
+        CHECK(a->stops == 1 && !jp_playing(&a->jp));
+        uint32_t clocks = a->clocks;
+        run_for(3000000);
+        CHECK(a->starts == 1 && a->stops == 1 && a->clocks > clocks);   /* stopped: no Start again; the F8s run on */
+        printf("solo: LINK alone (%s): Start -> MIDI start on bar %lld at 120 BPM\n", automatic ? "IGNORE" : "FOLLOW+LEAD",
+               (long long)(a->start_tick / BAR_TICKS));
     }
+}
+
+/* M2l: LINK mode alone, playing: a computer opens Live (younger): it joins the stick's session, no Stop, no second Start;
+ * it leaves: the stick plays on. A group change with a peer there (jp_leave): the next session of its own starts at
+ * the last tempo, not 120 */
+static void test_link_alone_peer_comes_and_goes(void)
+{
+    struct stick *a;
+    uint8_t sess[8];
+    world();
+    a = stick_on(0, 0, 0);
+    run_for(2000000);
+    CHECK(jp_set_tempo(&a->jp, 480000, sim_now) == 0);         /* 125 BPM */
+    play(a, 1);
+    run_for(4000000);
+    CHECK(a->starts == 1 && jp_playing(&a->jp));
+    memcpy(sess, a->jp.k.sess, sizeof sess);
+    pc_open(0, 500000);
+    run_for(6000000);
+    CHECK(jp_peers(&a->jp) == 1 && !memcmp(pc.sess, sess, sizeof sess) && lk_mpb(&pc) == 480000 && lk_playing(&pc));
+    CHECK(a->starts == 1 && a->stops == 0);
+    pc_close();
+    run_for((int64_t)JP_ALONE_MS * 1000 + 2000000);
+    CHECK(a->jp.on && jp_playing(&a->jp) && a->starts == 1 && a->stops == 0 && jp_mpb(&a->jp) == 480000);
+    pc_open(0, 500000);
+    run_for(6000000);
+    CHECK(jp_peers(&a->jp) == 1);
+    jp_leave(&a->jp, sim_now);                                 /* another GROUP, a peer there: this session left */
+    pc_close();
+    run_for(1000000);
+    CHECK(a->jp.on && jp_in_session(&a->jp) && jp_mpb(&a->jp) == 480000);   /* its own again, at the last tempo */
 }
 
 /* a session older than the stick's turns up (a computer whose Link app was open before, out of reach). The stick joins
@@ -673,7 +728,7 @@ static void test_start_wins_alone(void)
 
 /* the two layers, alone (the user, 2026-11-15: "if I manually stopped, don't start again automatically"): after the
  * user's Stop nothing automatic starts the MIDI clock: the gate closing and opening, silence then sound, a re-lock, the
- * sound gone (LINK mode, the session of its own ended) and back (a new one), a computer joining and starting the session.
+ * sound gone (LINK mode: the session of its own kept, M2l) and back, a computer joining and starting the session.
  * The user's Start does, on the bar; then an automatic stop (the gate, once re-armed) restarts automatically */
 static void test_user_stop_holds_alone(void)
 {
@@ -702,7 +757,7 @@ static void test_user_stop_holds_alone(void)
     run_for(3000000);
     a->audio = 0;
     run_for(1000000);
-    CHECK(!a->jp.on);
+    CHECK(a->jp.on && !jp_playing(&a->jp) && a->starts == 1);  /* M2l: LINK mode keeps the session, still stopped */
     a->audio = 1;
     run_for(3000000);
     CHECK(a->jp.on && !jp_playing(&a->jp));
@@ -892,6 +947,7 @@ int main(void)
     test_hold_alone();
     test_sound_goes_alone();
     test_link_mode_alone();
+    test_link_alone_peer_comes_and_goes();
     test_older_session(1);
     test_older_session(0);
     test_two_sticks(0);

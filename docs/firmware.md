@@ -72,9 +72,10 @@ pair window (`err ble is off` with the setting off), `ble close` ends the window
 `ble_state=off|window|connected` and `ble_left=<s>`. Over Bluetooth, `ota`, `bootloader` and `set pass` are refused
 (`err ... over USB only`). `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
 nothing. `net jank` is the protocol's name for jank mode. `tempo`, `play` and `stop` change the whole Link session, as
-any Link app may; with no settled session they answer `err no session`: alone in LINK mode, the stick has no session of
-its own. Alone in AUDIO mode it has one (the tracker's, `core/jank_peer.h` jp_solo): the MIDI clock starts on its bar
-line once the tracker locks, as with peers.
+any Link app may; with no settled session (joining one) they answer `err no session`. Alone the stick runs a session of
+its own in either mode (`core/jank_peer.h` jp_solo; LINK mode since M2l, as a lone Ableton Live: the last tempo known or
+120 BPM, stopped until the user's Start, which starts it on its next bar line with the MIDI clock, whatever LINK TRANSPORT
+while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on its bar line once the tracker locks.
 
 - **`play` starts on the next bar line** (`quantum` beats). The start goes out 150 ms before that bar, as "playing from
   bar B" (Link's isPlaying, beats B, time stamp now), so every peer starts on B: Live and LinkHut read B, the FM-1 and the
