@@ -65,6 +65,7 @@ void jb_rate_init(struct jb_rate *r, struct jr_store *st, int step, int every)
     r->step = (uint8_t)(step == 1 || step == 2 || step == 5 ? step : JR_STEP);
     r->every = (uint8_t)(every == 1 || every == 2 ? every : JR_EVERY);
     r->est_ratio = 1.0;
+    r->confirm = JR_CONFIRM;
     if (st)
         tables(st);
 }
@@ -185,11 +186,22 @@ static void estimate(struct jb_rate *r, double t)
         r->run_n++;
     else
         r->run_n = fabs(ratio - 1.0) > EVENT_TH ? 1u : 0u;
-    double prev = r->run_last;
+    if (r->run_n)
+        r->run[r->run_n - 1u] = ratio;
     r->run_last = ratio;
-    if (r->run_n >= 2) {                 /* CONFIRM: the median of two is their mean */
+    int confirm = r->confirm >= 2 && r->confirm <= JR_CONFIRM_MAX ? r->confirm : JR_CONFIRM;
+    if (r->run_n >= confirm) {           /* CONFIRM: their median (np.median: the middle one, or the mean of two) */
+        double v[JR_CONFIRM_MAX];
+        int n = confirm;
+        memcpy(v, r->run, sizeof(double) * (size_t)n);
+        for (int i = 1; i < n; ++i)
+            for (int j = i; j > 0 && v[j] < v[j - 1]; --j) {
+                double tmp = v[j];
+                v[j] = v[j - 1];
+                v[j - 1] = tmp;
+            }
         r->ev_t = t;
-        r->ev_ratio = 0.5 * (prev + ratio);
+        r->ev_ratio = n % 2 ? v[n / 2] : (v[n / 2 - 1] + v[n / 2]) / 2.0;
         r->has_event = 1;
         r->events++;
         r->has_last = 1;

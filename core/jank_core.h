@@ -229,6 +229,13 @@ struct jk_beat {
                                                                        not judged (no trusted glide) */
     uint32_t rate_us;                 /* the rate's work over the last second, us (1000 = 0.1 % of core 0) */
     uint32_t rate_max_us;             /* its longest frame (a block's match) over the last second */
+    /* the tuned follow (M2j, core/beat/jb_weak.h, beat-listener studies/tempo-changes tuned-l16) */
+    uint8_t weak_on;                  /* the weak-signal hold runs (its RAM is PSRAM: without, M2i's follow) */
+    uint32_t weak_holds;              /* steps the weak confidence kept the outputs running with the strict one under the
+                                         threshold */
+    uint32_t coasts;                  /* lines with no tracked beat the grid was corrected on from the activation */
+    uint32_t weak_beats;              /* weak tracked beats taken as weak observations */
+    uint32_t fast_jumps;              /* new grids (a section change) the follower jumped to at once */
 };
 
 /* the USB port, for `status` (firmware/main/usbrole.c fills it) */

@@ -5,7 +5,9 @@
  *                  1e-9), and the line confidence (core/jank_conf.c) against live/follow.py: from the Python's grid the
  *                  same F-measure (1e-12) and the same lines; from the C follower's grid the same gates
  *   rate_NAME.txt  the spectral rate (core/beat/jb_rate.c on core/beat/jb_fe.c's frames) against live/rate.py on a
- *                  synthetic signal made here again from its description: each estimate and each event */
+ *                  synthetic signal made here again from its description: each estimate and each event
+ * These are M2i's vectors: the follower runs with M2i's LOCK_BEATS 8 and the rate with CONFIRM 2 (the device has 16 and 3
+ * since M2j). A second directory (tests/tempo_ref, scripts/tempo_golden.py) adds its rate runs with CONFIRM 3. */
 #include <dirent.h>
 #include <math.h>
 #include <stdio.h>
@@ -33,6 +35,10 @@ static double all_x, all_ratio, all_peak;      /* the worst over all the runs */
 #define BPM_NEAR 1e-6
 #define RATE_NEAR 1e-5                 /* a ratio: float spectra and the uint16 ring against numpy's doubles (measured 3e-7) */
 #define PEAK_NEAR 1e-4
+#define M2I_LOCK_BEATS 8
+#define M2I_CONFIRM 2
+
+static int rate_confirm = M2I_CONFIRM;
 
 /* the numbers after the line's tag */
 static int numbers(const char *line, double *v, int n)
@@ -112,6 +118,7 @@ static void test_follow_run(const char *dir, const char *name)
     if (!fp)
         return;
     jb_follow_init(&f);
+    f.m.lock_beats = M2I_LOCK_BEATS;
     jcf_init(&py);
     jcf_init(&mine);
     while (fgets(line, sizeof line, fp)) {
@@ -253,6 +260,7 @@ static void test_rate_run(const char *dir, const char *name)
     CHECK(read_rate(path, &c));
     memset(&x, 0, sizeof x);
     jb_rate_init(&x.r, &store, c.step, c.every);
+    x.r.confirm = (uint8_t)rate_confirm;
     jb_rate_set_active(&x.r, 1);
     jb_fe_init(&fe);
     fe.tap = rate_tap;
@@ -300,7 +308,7 @@ static void test_rate_run(const char *dir, const char *name)
         CHECK(fabs(x.ev[i][0] - c.ev[i][0]) < 1e-9 && fabs(x.ev[i][1] - c.ev[i][1]) <= RATE_NEAR);
 }
 
-static void test_runs(const char *dir)
+static void test_runs(const char *dir, int rate_only)
 {
     DIR *d = opendir(dir);
     struct dirent *e;
@@ -315,13 +323,13 @@ static void test_runs(const char *dir)
         if (!strncmp(e->d_name, "rate_", 5)) {
             test_rate_run(dir, e->d_name);
             nr++;
-        } else {
+        } else if (!rate_only) {
             test_follow_run(dir, e->d_name);
             nf++;
         }
     }
     closedir(d);
-    CHECK(nf >= 20 && nr >= 10);
+    CHECK((rate_only || nf >= 20) && nr >= 10);
 }
 
 /* ---- units ---- */
@@ -458,6 +466,7 @@ static void test_follow_units(void)
     static struct jb_follow f;
     double t = 0.0, bpm, t0, p;
     jb_follow_init(&f);
+    f.m.lock_beats = M2I_LOCK_BEATS;
     CHECK(jb_follow_state(&f, 0.0) == JF_STOPPED && !jb_follow_grid(&f, &t0, &p) && jb_follow_drift_ppm(&f) == 0);
     for (int k = 0; k < 160; k++)
         jb_follow_update(&f, t += 60.0 / 135.0);
@@ -469,6 +478,7 @@ static void test_follow_units(void)
         jb_follow_update(&f, t += 60.0 / (135.0 * 1.03));
     CHECK(jb_follow_bpm_at(&f, t, &bpm) && fabs(bpm - 135.0 * 1.03) < 0.05);
     jb_follow_init(&f);
+    f.m.lock_beats = M2I_LOCK_BEATS;
     for (int k = 0; k < 10; k++)
         jb_follow_update(&f, t += 0.5);
     jb_follow_propose(&f, 1.03, t + 0.1, 0, 0.0);
@@ -482,14 +492,21 @@ static void test_follow_units(void)
 int main(int argc, char **argv)
 {
     const char *dir = argc > 1 ? argv[1] : "tests/follow_ref";
-    verbose = argc > 2 && !strcmp(argv[2], "-v");
+    const char *m2j = argc > 2 && strcmp(argv[2], "-v") ? argv[2] : NULL;
+    verbose = !strcmp(argv[argc - 1], "-v");
     printf("sizeof struct jb_follow %zu, struct jb_rate %zu, struct jr_store %zu, struct jcf %zu\n", sizeof(struct jb_follow),
            sizeof(struct jb_rate), sizeof(struct jr_store), sizeof(struct jcf));
     test_lines_exact();
     test_line_log();
     test_rate_bins();
     test_follow_units();
-    test_runs(dir);
+    test_runs(dir, 0);
+    if (m2j) {
+        int before = n_rate;
+        rate_confirm = JR_CONFIRM;      /* the device's: the median of three */
+        test_runs(m2j, 1);
+        printf("follow: %d rate runs with CONFIRM %d (%s)\n", n_rate - before, JR_CONFIRM, m2j);
+    }
     printf("follow: %d runs against FollowBpm + line_confidence (glide worst %.2g s, the Python's lines and gates exact); "
            "%d rate runs against RateProbe (ratio worst %.2g, peak worst %.2g)\n", n_follow, all_x, n_rate, all_ratio,
            all_peak);

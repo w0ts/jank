@@ -200,7 +200,7 @@ static const char *const FOLLOW_NAME[] = {"stopped", "lock", "glide", "?"};
 
 /* the advanced beat follow (M2i): the follower's state (lock: ModeBpm's grid, glide: the Kalman follower), its drift and
  * the last rate ratio it took (status: these; its 1920 bytes are nearly full). full (beat): also the spectral rate's
- * setting, whether it runs, its steps and their fate, its CPU */
+ * setting, whether it runs, its steps and their fate, its CPU; the weak-signal hold and the fast jump (M2j) */
 static void put_follow(const struct jk_cfg *c, const struct jk_beat *t, struct writer *w, int full)
 {
     int32_t r = t->rate_x10000;
@@ -212,6 +212,8 @@ static void put_follow(const struct jk_cfg *c, const struct jk_beat *t, struct w
     put(w, "manoeuvres=%lu\nrate=%s\nrate_active=%u\n", (unsigned long)t->manoeuvres, on_off(c->rate && t->rate_on), t->rate_active);
     put(w, "rate_events=%lu\nrate_taken=%lu\nrate_refused=%lu\nrate_ignored=%lu\nrate_us=%lu\nrate_max_us=%lu\n", (unsigned long)t->rate_events,
         (unsigned long)t->rate_taken, (unsigned long)t->rate_refused, (unsigned long)t->rate_ignored, (unsigned long)t->rate_us, (unsigned long)t->rate_max_us);
+    put(w, "weak=%s\nweak_holds=%lu\ncoasts=%lu\nweak_beats=%lu\nfast_jumps=%lu\n", on_off(t->weak_on), (unsigned long)t->weak_holds,
+        (unsigned long)t->coasts, (unsigned long)t->weak_beats, (unsigned long)t->fast_jumps);
 }
 
 /* the tracker's source: open, sound (AUDIO mode), AUDIO mode's Stop, the outputs; the input meter and the confidence */

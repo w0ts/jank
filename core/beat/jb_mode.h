@@ -15,6 +15,11 @@
 #include <stdint.h>
 
 #define JB_DQ_MAX 32
+/* LOCK_BEATS: consistent beats in a new segment before the transport runs again, and the beats a jump or the follower's
+ * fast jump needs on one grid (ModeBpm._recent_consistent). 16 since M2j (beat-listener studies/tempo-changes tuned-l16:
+ * "hard to lock", wrong-tempo locks 0.33 -> 0.20 a track); M2i and the Python's default had 8. Per estimator (lock_beats)
+ * so the golden vectors of either can be replayed; at most the recent beats kept (16). */
+#define JB_LOCK_BEATS 16
 
 enum jb_mode_kind { JB_STOPPED, JB_STEADY, JB_SPEEDING_UP, JB_SLOWING_DOWN };
 
@@ -43,6 +48,7 @@ struct jb_mode {
     int last_jump_beat, last_jump_dir;
     uint8_t has_last_jump;
     int beats_seen;
+    int lock_beats;                     /* LOCK_BEATS (JB_LOCK_BEATS by jb_mode_init) */
 };
 
 void jb_mode_init(struct jb_mode *m);

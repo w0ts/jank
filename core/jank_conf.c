@@ -201,6 +201,85 @@ double jcf_line_confidence(struct jcf *c, int tick, int has_grid, double t0, dou
     return jcf_lines_confidence(c->t, c->n, c->line, c->lines, has_grid, period, now, JCF_WINDOW_S, JCF_DELAY_S, JCF_TOL);
 }
 
+void jcf_clear_lines(struct jcf *c) { c->lines = 0; }
+
+/* the distance from x to the nearest of v[a..b), by the neighbours of x when the slice is ascending (always, but for a
+ * weak observation taken out of order), else over them all: the minimum the Python takes either way */
+static double nearest(const double *v, size_t a, size_t b, int ascending, double x)
+{
+    double best = INFINITY;
+    if (b <= a)
+        return best;
+    if (ascending) {
+        size_t i = a + lower_bound(v + a, b - a, x);
+        if (i < b)
+            best = fabs(v[i] - x);
+        if (i > a && fabs(v[i - 1u] - x) < best)
+            best = fabs(v[i - 1u] - x);
+        return best;
+    }
+    for (size_t i = a; i < b; i++)
+        if (fabs(v[i] - x) < best)
+            best = fabs(v[i] - x);
+    return best;
+}
+
+static int ascending(const double *v, size_t a, size_t b)
+{
+    for (size_t i = a + 1u; i < b; i++)
+        if (v[i] < v[i - 1u])
+            return 0;
+    return 1;
+}
+
+double jcf_weak_confidence(const double *strong, size_t ns, const double *tracked, size_t nt, const double *weak, size_t nw,
+                           const double *lines, size_t m, int has_period, double period, double now, int min_obs,
+                           double *last)
+{
+    double lo = now - JCF_WINDOW_S, hi = now - JCF_DELAY_S, margin, recall, precision, f;
+    size_t la, lb, sa, sb, ta, tb, wa, wb, hits = 0, observed = 0, in_win = 0, on = 0;
+    int s_up, t_up, w_up;
+    if (!has_period || !(period > 0.0)) {
+        *last = 0.0;
+        return 0.0;
+    }
+    la = lower_bound(lines, m, lo);     /* the lines lo <= x <= hi */
+    for (lb = la; lb < m && lines[lb] <= hi; lb++)
+        ;
+    if (lb <= la) {
+        *last = 0.0;
+        return 0.0;
+    }
+    sa = lower_bound(strong, ns, lo - period);
+    sb = lower_bound(strong, ns, hi + period);
+    ta = lower_bound(tracked, nt, lo - period);
+    tb = lower_bound(tracked, nt, hi + period);
+    wa = lower_bound(weak, nw, lo - period);
+    wb = lower_bound(weak, nw, hi + period);
+    s_up = ascending(strong, sa, sb);
+    t_up = ascending(tracked, ta, tb);
+    w_up = ascending(weak, wa, wb);
+    margin = JCF_TOL * period;
+    for (size_t i = la; i < lb; i++) {
+        int hit = nearest(tracked, ta, tb, t_up, lines[i]) <= margin || nearest(weak, wa, wb, w_up, lines[i]) <= margin;
+        hits += (size_t)hit;
+        observed += (size_t)(hit || nearest(strong, sa, sb, s_up, lines[i]) <= 0.5 * period);
+    }
+    if (observed < (size_t)min_obs)
+        return *last;
+    for (size_t i = sa; i < sb; i++) {  /* a strong beat at the window's edge is judged against all the lines */
+        if (strong[i] < lo || strong[i] > hi)
+            continue;
+        in_win++;
+        on += (size_t)(nearest(lines, 0, m, 1, strong[i]) <= margin);
+    }
+    precision = in_win ? (double)on / (double)in_win : 1.0;
+    recall = (double)hits / (double)observed;
+    f = recall + precision == 0.0 ? 0.0 : 2.0 * recall * precision / (recall + precision);
+    *last = f;
+    return f;
+}
+
 uint8_t jcf_pct(double conf)
 {
     double p = floor(conf * 100.0 + 0.5);

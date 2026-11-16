@@ -79,6 +79,26 @@ double jcf_lines_confidence(const double *beats, size_t n, const double *lines, 
 /* the confidence now against the lines (the defaults; silent: 0, and no tick). The grid ticks the lines first while the
  * follower gives a tempo (tick 1; studies/advanced-follow/replay.py: not while stopped); its period sets the margin */
 double jcf_line_confidence(struct jcf *c, int tick, int has_grid, double t0, double period, double now);
+/* M2j: a jump of the estimator (a new grid) clears the published lines: the old grid's lines no longer judge the beats
+ * (studies/tempo-changes: on a section change the gate opened again ~7 s sooner) */
+void jcf_clear_lines(struct jcf *c);
+
+/* THE WEAK CONFIDENCE (M2j, studies/tempo-changes weak.py CoastBpm.confidence): the line confidence judged on observed
+ * lines only. A line is hit by a tracked beat or a weak observation within JCF_TOL of a period; it is observed when hit
+ * or when a strong beat lies within half a period. Recall = hits / observed lines; precision = strong beats in the window
+ * on a line (any recorded line) / strong beats in the window (1 with none). With fewer than min_obs observed lines the
+ * last value (*last) holds. Its lists are jb_weak.h's (strong beats, every beat fed, weak observations: as the Python's,
+ * searched by bisection in the order kept). */
+double jcf_weak_confidence(const double *strong, size_t ns, const double *tracked, size_t nt, const double *weak, size_t nw,
+                           const double *lines, size_t m, int has_period, double period, double now, int min_obs,
+                           double *last);
+/* the gate's input (chain.py conf "weak"): hard to open, sticky once open. The strict line confidence while the gate is
+ * closed or the outputs were not running at the last step, else the weak one */
+static inline double jcf_weak_pick(double strict, double weak, uint8_t gated, uint8_t was_running)
+{
+    return gated || !was_running ? strict : weak;
+}
+
 /* 0..1 as percent, rounded (the status, the HOME line) */
 uint8_t jcf_pct(double conf);
 

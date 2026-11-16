@@ -635,6 +635,11 @@ static void test_follow(void)
     CHECK(!strstr(out, "rate_events="));
     CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nfollow=glide\ndrift_ppm=-35\nrate_ratio=1.0203\nmanoeuvres=2\nrate=on\nrate_active=1\n"));
     CHECK(strstr(out, "\nrate_events=7\nrate_taken=3\nrate_refused=4\nrate_ignored=1\nrate_us=3120\nrate_max_us=95\n"));
+    CHECK(strstr(out, "\nrate_max_us=95\nweak=off\nweak_holds=0\ncoasts=0\nweak_beats=0\nfast_jumps=0\n"));
+    snap.beat.weak_on = 1, snap.beat.weak_holds = 41, snap.beat.coasts = 17, snap.beat.weak_beats = 230, snap.beat.fast_jumps = 2;
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nweak=on\nweak_holds=41\ncoasts=17\nweak_beats=230\nfast_jumps=2\n"));
+    CHECK(ends(out, "ok\n"));
+    CHECK(run("status") == JK_CTL_NONE && !strstr(out, "weak_holds="));     /* (status is nearly full: beat only) */
     snap.beat.rate_on = 0;                                            /* no PSRAM for its ring: off whatever the setting */
     CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nrate=off\n"));
     snap.beat.follow = 1;                                             /* lock */

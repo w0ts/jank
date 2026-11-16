@@ -45,6 +45,7 @@ struct jb_follow {
     /* totals since the start, for the stats */
     uint32_t seeds, manoeuvres_total, ratios_taken, ratios_refused, ratios_ignored;
     double last_ratio;                  /* the last ratio taken; 1 before any */
+    uint32_t fast_jumps;                /* jb_follow_fast_jump's (M2j) */
 };
 
 void jb_follow_init(struct jb_follow *f);
@@ -62,5 +63,16 @@ enum jb_follow_state jb_follow_state(struct jb_follow *f, double now);
 int32_t jb_follow_drift_ppm(const struct jb_follow *f);
 /* FollowBpm.trusted: the grid fitted most of the last beats */
 int jb_follow_trusted(const struct jb_follow *f);
+
+/* M2j (beat-listener studies/tempo-changes, tuned-l16). The fast jump (chain.fast_jump), called after each beat: when the
+ * last LOCK_BEATS beats sit on one consistent grid of their own whose tempo is more than rel (0.06) from the glide's and
+ * not within 3 % of an octave of it, jump to it at once (a section change, clear evidence). 1: it jumped. rel 0: off. */
+#define JF_FAST_JUMP_REL 0.06
+int jb_follow_fast_jump(struct jb_follow *f, double t, double rel);
+/* The pieces the weak-signal follower (jb_weak.h, CoastBpm) calls: a weak Kalman observation (weak.weak_step: noise r_s,
+ * taken within gate periods of the prediction, no manoeuvre; 1 taken), the outcome ring, the jump. */
+int jb_follow_weak_obs(struct jb_follow *f, double obs, double r_s, double gate);
+void jb_follow_outcome(struct jb_follow *f, uint8_t fitted);
+void jb_follow_jump(struct jb_follow *f, double t);
 
 #endif
