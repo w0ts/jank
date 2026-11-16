@@ -408,3 +408,18 @@ def test_causal_reads_no_activation_ahead():
     finally:
         W.peak_near, W.weak_peak = real_peak, real_weak
     assert last and max(last) <= 0
+
+
+def test_pertrack_episodes_and_categories():
+    P = _study("pertrack")
+    R = _study("pertrack_report")
+    mask = np.zeros(200, bool)
+    mask[10:50] = True          # 2.0 s at 20 Hz: counts
+    mask[60:79] = True          # 0.95 s: does not
+    assert P.episodes(mask, 0.05) == [(10, pytest.approx(2.0))]
+    base = {"locked": True, "wrongs_2s": 0, "stops_2s": 0, "longest_stop_s": 0.0}
+    assert R.category({"locked": False}) == "never locked"
+    assert R.category(base) == "held whole"
+    assert R.category({**base, "stops_2s": 1, "longest_stop_s": 5.0}) == "short stops"
+    assert R.category({**base, "stops_2s": 1, "longest_stop_s": 30.0}) == "long stops"
+    assert R.category({**base, "wrongs_2s": 1, "stops_2s": 1, "longest_stop_s": 30.0}) == "wrong tempo"
