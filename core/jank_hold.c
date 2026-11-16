@@ -52,6 +52,8 @@ int jho_outputs(struct jho *h, const struct jho_in *in)
                                         * layer starts over, M2h): the gate is armed again */
     if (h->hold || gate_closed(h, in))
         return 0;                      /* (gated: an arming waits on: it ends with the lock once the gate lifts) */
+    if (in->bar_settling && !in->clock_running)
+        return 0;                      /* the bar is being placed: start on it, not on the bar line before (M2k) */
     if (h->arming) {
         if (!in->locked)
             return 0;

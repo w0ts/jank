@@ -154,7 +154,7 @@ line once the tracker locks, as with peers.
 - **AUTO BAR** `set autobar off|start|always` (`on` = start), stored. AT START (the default): the bar's 1 is placed only
   while the session is stopped or its start is armed (the start re-targets onto the moved bar line), or once at a new
   start for the bar (Start after Stop, a fold change, a new lock) if the estimator knows the 1 then; never while it
-  plays. The tracker's start waits up to 8 tracked beats after its lock for the estimator: found, the start lands on the
+  plays. The tracker's start waits up to 12 tracked beats after its lock (8 before M2k) for the estimator: found, the start lands on the
   music's 1; not found by then, it starts on the session's next bar line and the 1 is placed at the next start (a bounded
   wait: beat one honest when the estimator can tell, no long silent wait when it cannot). ALWAYS: also mid-play, as
   before. No move while folded (the estimator counts tracked beats).

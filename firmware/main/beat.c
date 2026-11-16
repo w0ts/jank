@@ -88,6 +88,8 @@ static uint8_t s_rate_qn;
 static uint8_t s_conf_ran;             /* the automatic layer ran at the last step (a tempo, the gate open, no silence): the
                                         * gate is then judged on the weak confidence */
 static uint32_t s_weak_holds;          /* steps the weak confidence held the gate open with the strict one under it */
+static uint8_t s_conf_hold;            /* M2k: the weak confidence holds its last value (no evidence): shown eased */
+static double s_conf_shown, s_conf_at; /* the confidence shown (jcf_show_step) and the stream time of its step */
 static struct jbl s_jbl;
 static TaskHandle_t s_task;
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -141,6 +143,10 @@ static struct {
 enum { FOLD_REQ_NONE = 0, FOLD_REQ_UP, FOLD_REQ_DOWN, FOLD_REQ_ONE, FOLD_REQ_RESET };
 static struct jfo s_fold;
 static volatile uint8_t s_fold_req;
+/* M2k: a fold change or a Start asks for a new start for the bar (bar_now); the clocks wait until the beat task's step
+ * made that placement (beat_bar_settling, bridge.c's jho_in.bar_settling), so they start on the placed 1. Asked: s_bar_req
+ * counts up; done: the step that took it sets s_bar_done to it */
+static uint32_t s_bar_req, s_bar_done;
 
 struct session_q {
     int64_t at;                        /* host us */
@@ -312,6 +318,8 @@ static void restart_tracker(void)
     s_pend = 0;
     s_rate_qn = 0;
     s_conf_ran = 0;
+    s_conf_hold = 0;
+    s_conf_shown = s_conf_at = 0.0;
     jb_rate_set_active(&s_rate, 0);    /* (its history starts over at the next glide) */
     restart_down();
     jcf_init(&s_conf);                 /* a resync: no beats, no gate (engine.py resync) */
@@ -399,6 +407,7 @@ static void step_link(struct jank_peer *p, int64_t now, void *arg)
     if (c->nudge)                      /* first: the follower below then finds the session where the nudge put it */
         c->nudge_rc = (int8_t)(jbl_nudge(&s_jbl, &p->k, &p->start, settled, &c->in, c->nudge, s_fold.exp, now) ? BEAT_NUDGE_LIMIT : BEAT_NUDGE_OK);
     fold_step(p, now, settled, c);
+    c->in.clock_playing = (uint8_t)(midi_is_playing() && !midi_start_pending());   /* AT START: no move under it (M2k) */
     jbl_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, c->quantum);
     jbl_bar_step(&s_jbl, &p->k, &p->start, settled, now, &c->in, &c->bar);
     s_bar_now = 0;                     /* (one step: a decision not there yet waits for the next start) */
@@ -470,6 +479,7 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.peak_db = s_peak_db;
     b.act_pct = s_act_pct;
     b.conf_pct = s_conf_pct;
+    b.conf_hold = s_conf_hold;
     b.gated = s_gated;
     b.silent = s_conf.silent;
     b.conf_open = s_conf_open;
@@ -504,7 +514,7 @@ static void follow_conf(const struct jk_cfg *cfg)
 {
     double tb = 0.0, period = 0.0, strict = 0.0, conf = 0.0, bpm, now = (double)s_samples / (double)UAC_RATE;
     int has_bpm = 0;
-    uint8_t weak_picked = 0;
+    uint8_t weak_picked = 0, held = 0;
     if (s_audio_live && !s_conf.silent) {
         int has = jb_follow_grid(&s_follow, &tb, &period);
         has_bpm = jb_follow_bpm_at(&s_follow, now, &bpm);
@@ -515,12 +525,17 @@ static void follow_conf(const struct jk_cfg *cfg)
         if (jw_on(&s_weak)) {
             double weak = jcf_weak_confidence(jw_strong(&s_weak), s_weak.n_strong, jw_seen(&s_weak), s_weak.n_seen,
                                               jw_weak(&s_weak), s_weak.n_weak, s_conf.line, s_conf.lines, has, period, now,
-                                              JW_MIN_OBS, &s_weak.last_conf);
+                                              JW_MIN_OBS, &s_weak.last_conf, &held);
             weak_picked = (uint8_t)(!s_gated && s_conf_ran);
             conf = jcf_weak_pick(strict, weak, s_gated, s_conf_ran);
         }
     }
-    s_conf_pct = jcf_pct(conf);
+    /* shown: a hold eases toward the threshold instead of a frozen value (M2k); the gate below takes the real one */
+    s_conf_hold = (uint8_t)(weak_picked && held);
+    s_conf_shown = jcf_show_step(s_conf_shown, conf, s_conf_hold, (double)cfg->threshold / 100.0,
+                                 now > s_conf_at ? now - s_conf_at : 0.0);
+    s_conf_at = now;
+    s_conf_pct = jcf_pct(s_conf_shown);
     s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
     s_conf_open = (uint8_t)!jcf_gate(1, conf, JCF_STOP, cfg->threshold);   /* (a closed gate's test: open at threshold + 5) */
     if (weak_picked && !s_gated && cfg->lowconf == JCF_STOP && strict < (double)cfg->threshold / 100.0)
@@ -656,7 +671,10 @@ static void beat_task(void *arg)
         while ((n = uac_pull(x, JB_HOP)) != 0u)
             work(x, n);
         follow_sound(esp_timer_get_time());
+        uint32_t bar_req = __atomic_load_n(&s_bar_req, __ATOMIC_ACQUIRE);
         take_fold_req();
+        if (bar_req != s_bar_done)
+            s_beat_seen = 1;            /* a Start / a fold: the step now, the clocks wait for it (M2k) */
         nudge = take_nudge();
         if (jb_follow_at(&s_follow, (double)s_samples / (double)UAC_RATE) == JB_STOPPED) {
             if (s_down_seg && jd_counting(&s_down))
@@ -702,6 +720,7 @@ static void beat_task(void *arg)
                 finish_nudge(nudge, c.nudge_rc);
         }
         publish(mode, bpm * jfo_factor(&s_fold), &cfg, cpu_x10);
+        __atomic_store_n(&s_bar_done, bar_req, __ATOMIC_RELEASE);   /* the placement asked before this step is made */
     }
 }
 
@@ -727,10 +746,20 @@ int beat_fold(int dir)
     exp = dir > 0 ? exp + 1 : dir < 0 ? exp - 1 : 0;
     exp = exp < JFO_EXP_MIN ? JFO_EXP_MIN : exp > JFO_EXP_MAX ? JFO_EXP_MAX : exp;
     __atomic_store_n(&s_fold_req, (uint8_t)(dir > 0 ? FOLD_REQ_UP : dir < 0 ? FOLD_REQ_DOWN : FOLD_REQ_ONE), __ATOMIC_RELEASE);
+    __atomic_add_fetch(&s_bar_req, 1u, __ATOMIC_ACQ_REL);
     return exp;
 }
 
-void beat_fold_resync(void) { __atomic_store_n(&s_fold_req, (uint8_t)FOLD_REQ_RESET, __ATOMIC_RELEASE); }
+void beat_fold_resync(void)
+{
+    __atomic_store_n(&s_fold_req, (uint8_t)FOLD_REQ_RESET, __ATOMIC_RELEASE);
+    __atomic_add_fetch(&s_bar_req, 1u, __ATOMIC_ACQ_REL);   /* (after the request: a step that sees it takes the request) */
+}
+
+int beat_bar_settling(void)
+{
+    return __atomic_load_n(&s_bar_req, __ATOMIC_ACQUIRE) != __atomic_load_n(&s_bar_done, __ATOMIC_ACQUIRE);
+}
 
 #define NUDGE_WAIT_MS 200              /* the beat task takes it within a pass (5 ms) unless starved */
 

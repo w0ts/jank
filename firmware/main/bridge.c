@@ -273,7 +273,7 @@ static void follow_transport(int64_t now)
     s_base = (uint8_t)jc_base(s_base, &t);  /* (in a session not settled yet: the last wish held, nothing started on a guess) */
     s_hin = (struct jho_in){.audio = audio, .lt = lt_mode(), .base = s_base, .locked = locked,
                             .clock_running = (uint8_t)(midi_is_playing() && !midi_start_pending()), .gated = gated,
-                            .silent = silent, .conf_open = conf_open};
+                            .silent = silent, .conf_open = conf_open, .bar_settling = (uint8_t)beat_bar_settling()};
     want = jho_outputs(&s_hold, &s_hin);
     if (want != s_want) {
         s_want = (uint8_t)want;

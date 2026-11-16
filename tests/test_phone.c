@@ -154,6 +154,15 @@ static void test_home_line(void)
     s.beat.fold_exp = -1;
     CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && !strcmp(out + strlen(out) - 3, " /2"));
     s.beat.fold_exp = 0;
+    {
+        char conf[8];
+        snprintf(conf, sizeof conf, " %u ", (unsigned)s.beat.conf_pct);
+        CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && strstr(out, conf));
+        s.beat.conf_hold = 1;                                   /* M2k: the confidence holds: "<pct>h" */
+        snprintf(conf, sizeof conf, " %uh ", (unsigned)(s.beat.conf_pct > 99 ? 99 : s.beat.conf_pct));
+        CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && strstr(out, conf));
+        s.beat.conf_hold = 0;
+    }
     s.beat.audio_live = 0;
     s.beat_ub = -1;                                             /* just below zero: the bar's last hundredth */
     CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && !strncmp(out + 13, "299 ", 4));
@@ -173,7 +182,8 @@ static void test_home_line(void)
     s.beat.conf_pct = 100;
     s.beat.audio_live = 1;
     s.beat.fold_exp = -2;                                       /* the mode at its widest: two characters */
-    CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && strlen(out) <= JX_PUSH_TEXT_MAX);
+    s.beat.conf_hold = 1;                                       /* and the hold (M2k): "99h", no wider */
+    CHECK(jph_home_line(&c, &s, 0, out, sizeof out) > 0 && strlen(out) <= JX_PUSH_TEXT_MAX && strstr(out, " 99h "));
     printf("widest HOME line: %zu of %u\n", strlen(out), JX_PUSH_TEXT_MAX);
     CHECK(jph_home_line(&c, &s, 0, out, 10) == 0);              /* too small: nothing */
 }

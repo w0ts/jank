@@ -306,6 +306,44 @@ static void test_start_on_the_bar(void)
     }
 }
 
+/* M2k: AUTO BAR moves the session 2 beats just before the old bar line, a start waiting: the start must not go out on
+ * the tick scheduled from the old map (it would read as the moved grid's 3) but on the moved grid's bar line */
+static void test_start_after_a_move(void)
+{
+    for (int lead_ticks = 0; lead_ticks <= 3; lead_ticks++) {
+        struct jc_map m;
+        struct jc_ticker c;
+        struct jc_fire f;
+        const int64_t tick = 500000 / 24;
+        int64_t t, start_t = -1, start_n = -1, move_t;
+        jc_map_make(&m, 0, 3000000, 500000, 0);                  /* beat 3 at 0: the bar line (beat 4) 0.5 s ahead */
+        jc_ticker_init(&c, 4);
+        CHECK(jc_begin(&c, &m, -1) == 0);
+        t = c.t_due;
+        jc_want(&c, 1);
+        move_t = 500000 - lead_ticks * tick - tick / 2;           /* the move lands between two ticks before the bar */
+        for (int k = 0; k < 300; k++) {
+            int64_t n = c.n;
+            if (t >= move_t && move_t > 0) {
+                jc_map_make(&m, move_t, 3000000 + 2000000 + (move_t * 1000000) / 500000, 500000, 0);   /* +2 beats */
+                move_t = 0;
+            }
+            jc_step(&c, &m, t, &f);
+            if (count(&f, JC_START)) {
+                CHECK(start_n < 0);
+                start_n = n;
+                start_t = t;
+            }
+            t = f.next;
+        }
+        /* the moved grid's beat at the start's time: a bar line (the clock's 1 reads 1) */
+        int64_t ub = 5000000 + (start_t * 1000000) / 500000, pos = ((ub + 500000) / 1000000) % 4;
+        printf("clock: a 2-beat move %d ticks before the bar line, a start waiting: started at %lld us, the moved grid's "
+               "beat %lld\n", lead_ticks, (long long)start_t, (long long)pos + 1);
+        CHECK(start_n >= 0 && start_n % 96 == 0 && pos == 0);
+    }
+}
+
 /* one click: exactly what goes out, and when */
 static void test_click_resync(void)
 {
@@ -464,6 +502,7 @@ int main(void)
     test_whole_beat_move();
     test_half_beat_move();
     test_start_on_the_bar();
+    test_start_after_a_move();
     test_click_resync();
     test_free_run_through_a_scan();
     test_negative_beats_bar();

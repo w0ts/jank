@@ -51,6 +51,18 @@ struct stick {
     uint32_t starts, stops, clocks;    /* MIDI out */
     int64_t start_tick, start_at;      /* the last MIDI start's tick and time */
     uint32_t frames, unsettles;        /* frames the peer sent; steps in a session that lost its settled state */
+    /* AUTO BAR (beat.c make_bar / bar_rules / step_link): off in the tests above */
+    uint8_t bar_mode;
+    int64_t lock_at;                   /* the tracker's lock: START WAIT counts JBL_BAR_WAIT_BEATS beats from it */
+    int64_t dec_at;                    /* the downbeat estimator's first LOCKED decision appears (0: never) ... */
+    int dec_off;                       /* ... with the music's 1 this many beats past the session's bar line then */
+    uint8_t decided;
+    struct jbl_bar bar;
+    int64_t music_one;                 /* a time of the music's 1 (the decision's) */
+    int64_t bar_now_at;                /* a step with bar_now (a fold change, a new lock, a Start): 0 none */
+    uint8_t start_req;                 /* the user's Start after a Stop (bridge_play: beat_fold_resync): bar_now at the
+                                        * beat task's next step */
+    uint32_t moves, moves_playing;     /* AUTO BAR's moves; those while the MIDI clock plays */
 };
 
 static struct stick st[STICKS];
@@ -240,8 +252,29 @@ static void beat_step(struct stick *s, int64_t now)
         in.period_us = s->period_us;
     }
     in.held = (uint8_t)jho_session_held(&s->hold, &s->hin);
-    in.bar_mode = JBL_BAR_OFF;
+    in.bar_mode = s->bar_mode;
+    if (in.running && !s->lock_at)
+        s->lock_at = now;
+    if (!in.running)
+        s->lock_at = 0;
+    if (s->dec_at && !s->decided && now >= s->dec_at && in.running && jp_settled(&s->jp, now)) {
+        /* the estimator's 1: the tracked beat dec_off beats past a session bar line, as the session counts now */
+        int64_t n = (int64_t)floor((double)(now - s->beat0) / s->period_us), t = s->beat0 + llround((double)n * s->period_us);
+        int64_t pos = ((lk_beat_at(&s->jp.k, t) + LK_UBEAT / 2) / LK_UBEAT % 4 + 4) % 4;
+        s->music_one = t - llround((double)((pos - s->dec_off + 8) % 4) * s->period_us);
+        s->bar = (struct jbl_bar){.locked = 1, .seq = 1, .count = 0, .phi = 0, .beat_us = s->music_one};
+        s->decided = 1;
+    }
+    in.bar_wait = (uint8_t)(in.bar_mode == JBL_BAR_START && in.running && !s->decided
+                            && now - s->lock_at < (int64_t)(JBL_BAR_WAIT_BEATS * s->period_us));
+    in.bar_now = (uint8_t)((s->bar_now_at && now >= s->bar_now_at && now < s->bar_now_at + BEAT_STEP_US) || s->start_req);
+    in.clock_playing = (uint8_t)(s->tick.playing && !s->tick.want_start && !s->tick.resync);
+    s->start_req = 0;
     jbl_step(&s->jbl, &s->jp.k, &s->jp.start, jp_settled(&s->jp, now), now, &in, QUANTUM);
+    if (jbl_bar_step(&s->jbl, &s->jp.k, &s->jp.start, jp_settled(&s->jp, now), now, &in, &s->bar)) {
+        s->moves++;
+        s->moves_playing += s->tick.playing;
+    }
 }
 
 /* the timer interrupt's ticks due by now */
@@ -283,7 +316,7 @@ static void bridge_step(struct stick *s, int64_t now)
     s->base = (uint8_t)jc_base(s->base, &t);
     s->hin = (struct jho_in){.audio = s->audio, .lt = s->automatic ? JHO_IGNORE : JHO_LEAD, .base = s->base, .locked = s->locked,
                              .clock_running = (uint8_t)(s->tick.playing && !s->tick.want_start && !s->tick.resync),
-                             .gated = s->gated, .silent = s->silent, .conf_open = s->conf_open};
+                             .gated = s->gated, .silent = s->silent, .conf_open = s->conf_open, .bar_settling = s->start_req};
     want = jho_outputs(&s->hold, &s->hin);
     if (want != s->want) {
         s->want = (uint8_t)want;
@@ -307,6 +340,10 @@ static void play(struct stick *s, int on)
 {
     if (s->audio) {
         jho_set(&s->hold, !on);
+        if (on && s->hold.arming) {
+            s->start_req = 1;          /* beat_fold_resync: a new start for the bar, the outputs wait for it (M2k) ... */
+            s->next_beat = sim_now + 5000;      /* ... the beat task's next pass steps at once (POLL_MS) */
+        }
         return;
     }
     if (!s->automatic)
@@ -333,6 +370,7 @@ static struct stick *stick_on(int i, int audio, int automatic)
     s->hold.hold = 0;                  /* these sticks: the user started them earlier (test_power_on: a real power-on) */
     jc_ticker_init(&s->tick, QUANTUM);
     s->start_tick = -1;
+    s->bar_mode = JBL_BAR_OFF;
     s->audio = (uint8_t)audio;
     s->automatic = (uint8_t)automatic;
     s->next_beat = sim_now;
@@ -713,6 +751,139 @@ static void test_power_on(void)
     CHECK(a->starts == 1 && a->stops == 0 && on_the_bar(a) && jc_tick_ub(a->start_tick) % ((int64_t)QUANTUM * LK_UBEAT) == 0);
 }
 
+/* the session's beat at t, whole beats (rounded), mod the quantum: what the LEDs and the screen's boxes show then */
+static int box_at(const struct stick *s, int64_t t)
+{
+    int64_t ub = jp_beat_at(&s->jp, t);
+    int64_t b = (int64_t)floor((double)ub / LK_UBEAT + 0.5);
+    return (int)(((b % (int64_t)QUANTUM) + (int64_t)QUANTUM) % (int64_t)QUANTUM);
+}
+
+#define WAIT_MS ((int64_t)JBL_BAR_WAIT_BEATS * 500)   /* START WAIT at this model's 120 BPM */
+
+struct bar_case {
+    int starts, on_bar, box, music, moves, moves_playing;
+    int64_t start_ms;
+};
+
+/* AUDIO mode alone, AUTO BAR AT START: the tracker locks; the estimator's 1 (dec_off beats past the session's bar line)
+ * comes dec_ms after the lock (-1 never); a bar_now step at bar_now_ms (-1 none) */
+static struct bar_case bar_run(int dec_off, int64_t dec_ms, int64_t bar_now_ms, int64_t run_ms)
+{
+    struct stick *a;
+    struct bar_case r;
+    int64_t t_lock;
+    world();
+    a = stick_on(0, 1, 0);
+    a->bar_mode = JBL_BAR_START;
+    music(a, 120.0, 0);
+    run_for(1500000);
+    a->locked = 1;
+    t_lock = sim_now;
+    a->dec_off = dec_off;
+    a->dec_at = dec_ms >= 0 ? t_lock + dec_ms * 1000 : 0;
+    a->bar_now_at = bar_now_ms >= 0 ? t_lock + bar_now_ms * 1000 : 0;
+    run_for(run_ms * 1000);
+    r.starts = (int)a->starts;
+    r.on_bar = on_the_bar(a);
+    r.box = a->starts ? box_at(a, a->start_at) : -1;
+    r.music = a->decided && a->starts
+                  ? (int)(((llround((double)(a->start_at - a->music_one) / a->period_us) % 4) + 4) % 4)
+                  : -1;
+    r.moves = (int)a->moves;
+    r.moves_playing = (int)a->moves_playing;
+    r.start_ms = a->starts ? (a->start_at - t_lock) / 1000 : -1;
+    return r;
+}
+
+/* the user (2026-11-16): "when it starts counting/playing, the LED quite often starts on beat 3", "basically it starts
+ * off phase". The rule: everything starts on the first beat; a bar move never makes the beat just started read as 3 */
+static void test_autobar_start(void)
+{
+    int bad_box = 0, bad_music = 0, bad_playing = 0, n = 0;
+    for (int off = 1; off < 4; off++)
+        for (int64_t ms = 0; ms <= WAIT_MS + 5000; ms += 50) {
+            struct bar_case r = bar_run(off, ms, -1, WAIT_MS + 10000);
+            n++;
+            CHECK(r.starts == 1 && r.on_bar);
+            if (r.box != 0) {
+                if (bad_box++ < 6)
+                    printf("autobar: the 1 %d beats off at %lld ms: MIDI start %lld ms, its beat now reads %d, moves %d "
+                           "(%d while playing)\n", off, (long long)ms, (long long)r.start_ms, r.box + 1, r.moves,
+                           r.moves_playing);
+            }
+            bad_music += r.music > 0 && ms < WAIT_MS - 500;  /* found well inside START WAIT: on the music's 1 */
+            bad_playing += r.moves_playing;
+        }
+    printf("autobar: %d cases: first beat not 1 %d, off the music's 1 though found in time %d, moves while playing %d\n",
+           n, bad_box, bad_music, bad_playing);
+    CHECK(bad_box == 0);
+    CHECK(bad_music == 0);
+    CHECK(bad_playing == 0);
+    /* a bar_now step (a fold change, a new lock) near and after the start, the estimator's 1 found late */
+    bad_box = bad_playing = n = 0;
+    for (int64_t now_ms = WAIT_MS - 1000; now_ms <= WAIT_MS + 5000; now_ms += 50) {
+        struct bar_case r = bar_run(2, WAIT_MS + 2000, now_ms, WAIT_MS + 10000);
+        n++;
+        bad_box += r.box != 0;
+        bad_playing += r.moves_playing;
+        if (r.box != 0 && bad_box <= 3)
+            printf("autobar: bar_now at %lld ms, the 1 found 2 s after START WAIT: MIDI start %lld ms, its beat now reads %d, "
+                   "moves %d (%d while playing)\n", (long long)now_ms, (long long)r.start_ms, r.box + 1, r.moves,
+                   r.moves_playing);
+    }
+    printf("autobar: bar_now sweep %d cases: first beat not 1 %d, moves while playing %d\n", n, bad_box, bad_playing);
+    CHECK(bad_box == 0);
+    CHECK(bad_playing == 0);
+}
+
+/* the user's Start (after the power-on Stop) with the estimator's 1 found after the session started on its own bar line
+ * (START WAIT ran out first): the Start places the 1, and the MIDI start must land on it, whenever in the bar it comes */
+static void test_start_places_the_bar(int automatic)
+{
+    int bad_box = 0, bad_music = 0, bad_playing = 0, n = 0;
+    for (int64_t press = 0; press < 2000; press += 20) {
+        struct stick *a;
+        world();
+        a = stick_on(0, 1, automatic);
+        a->bar_mode = JBL_BAR_START;
+        a->hold.hold = 1;                                      /* power-on: the user's Stop */
+        music(a, 120.0, 0);
+        run_for(1500000);
+        a->locked = 1;
+        a->dec_off = 2;                                        /* the 1 vs 3 */
+        a->dec_at = sim_now + (WAIT_MS + 2000) * 1000;         /* after START WAIT */
+        run_for((WAIT_MS + 4000 + press) * 1000);
+        CHECK(a->decided && a->starts == 0);
+        play(a, 1);
+        run_for(6000000);
+        n++;
+        CHECK(a->starts == 1 && on_the_bar(a));
+        int box = a->starts ? box_at(a, a->start_at) : -1;
+        int music = a->starts ? (int)(((llround((double)(a->start_at - a->music_one) / a->period_us) % 4) + 4) % 4) : -1;
+        if ((box != 0 || music != 0) && bad_box + bad_music < 3)
+            printf("start: pressed %lld ms into the bar: the MIDI start reads beat %d, the music's beat %d, moves %u (%u while "
+                   "playing)\n", (long long)press, box + 1, music + 1, a->moves, a->moves_playing);
+        bad_box += box != 0;
+        bad_music += music != 0;
+        bad_playing += (int)a->moves_playing;
+    }
+    printf("start (%s): %d presses: the first beat not 1 %d, not the music's 1 %d, moves while playing %d\n",
+           automatic ? "IGNORE" : "FOLLOW+LEAD", n, bad_box, bad_music, bad_playing);
+    CHECK(bad_box == 0 && bad_music == 0 && bad_playing == 0);
+}
+
+/* START WAIT long enough for the estimator (M2k; beat-listener studies/downbeat/results/v2_start_check.md: its first lock
+ * comes a median 4.0 s after the tempo; with 8 beats 20 % of the starts went out before it, on an arbitrary beat of the
+ * music; 12: 4 %, and a start no later). Found 5.9 s after the lock at 120 BPM: the start lands on it */
+static void test_start_wait_lets_the_estimator_place(void)
+{
+    struct bar_case r = bar_run(2, 5900, -1, 20000);         /* after 8 beats (4 s) and the bar armed then (5.7 s) */
+    printf("start wait: %u beats; the 1 found 5.9 s after the lock: MIDI start %lld ms after it, on the music's beat %d\n",
+           JBL_BAR_WAIT_BEATS, (long long)r.start_ms, r.music + 1);
+    CHECK(r.starts == 1 && r.box == 0 && r.music == 0);
+}
+
 int main(void)
 {
     test_alone_starts_on_the_bar();
@@ -729,6 +900,10 @@ int main(void)
     test_start_wins_alone();
     test_user_stop_holds_alone();
     test_power_on();
+    test_autobar_start();
+    test_start_wait_lets_the_estimator_place();
+    test_start_places_the_bar(1);
+    test_start_places_the_bar(0);
     printf("solo: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

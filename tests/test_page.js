@@ -57,13 +57,13 @@ eq(box.pushOf([0xf0, 0x7d, 0x4a, 0x42, 0xf7]), null);
 
 // --- the HOME line, as tests/test_phone.c makes it ---
 eq(box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87"),                       // older firmware: no min / max
-   { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87,
+   { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87, confHold: false,
      levelMin: null, levelMax: null, audio: false, fold: "" });
 eq(box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18"),
-   { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87,
+   { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87, confHold: false,
      levelMin: -31, levelMax: -18, audio: false, fold: "" });
 eq(box.parseHome("h 0 j3 0 - 4 0 0 - - - - -"),
-   { bpm: 0, net: { kind: "jank", group: 3 }, transport: "stopped", bar: null, quantum: 4, link: 0, air: 0, battery: null, level: null, conf: null,
+   { bpm: 0, net: { kind: "jank", group: 3 }, transport: "stopped", bar: null, quantum: 4, link: 0, air: 0, battery: null, level: null, conf: null, confHold: false,
      levelMin: null, levelMax: null, audio: false, fold: "" });
 eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false });
 // M2b/M2c: the mode (0 LINK, 1 AUDIO, x2 x4 /2 /4 AUDIO folded), the hold as the transport in AUDIO mode
@@ -80,6 +80,13 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   eq([folded.audio, folded.fold, box.homeView(folded, 0).mode], [true, "x2", "AUDIO x2"]);
   eq(box.homeView(box.parseHome("h 6400 j3 1 0 4 2 0 - -12 90 -15 -9 /2"), 0).mode, "AUDIO ÷2");
   eq(box.parseHome("h 12000 j3 1 0 4 2 0 - -12 90 -15 -9 x3").fold, "");
+  // M2k: the confidence holds: "<pct>h" -> the shown value, HOLD by the number, the bar hatched
+  const hold = box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93h -15 -9 1");
+  eq([hold.conf, hold.confHold], [93, true]);
+  const hv = box.homeView(hold, 0);
+  eq([hv.conf, hv.confPct, hv.confHold], ["93 % HOLD", 93, true]);
+  eq([box.homeView(box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93 -15 -9 1"), 0).conf, box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93 -15 -9 1").confHold],
+     ["93 %", false]);
   const idle = box.homeView(box.parseHome("h 0 j3 0 - 4 0 0 - - - - - 0"), 0);
   eq([idle.canPlay, idle.levelRange], [false, "input level"]);
   // Bluetooth from `status`: the window's countdown, a phone, off; over Bluetooth this phone

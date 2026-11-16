@@ -69,6 +69,8 @@ struct jho_in {
     uint8_t gated;                      /* LOW CONFIDENCE's gate (jank_conf.h jcf_gate): the confidence under the threshold */
     uint8_t silent;                     /* the silence (0.5 s under -60 dBFS): stops the outputs whatever the Start */
     uint8_t conf_open;                  /* the confidence at the threshold + JCF_HYST_PCT: a Start's disarm ends */
+    uint8_t bar_settling;               /* M2k: a Start's (or a fold's) bar placement is not made yet (the beat task's next
+                                         * step): the clocks do not start before it, so they start on the placed 1 */
 };
 
 /* power-on: the user's layer stopped (M2h, the user: "come up with manual state: stopped"; a constant, nothing stored) */

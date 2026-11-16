@@ -44,6 +44,8 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .meter { position: relative; }
 .meter b.tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
 .meter.gated i { background: var(--warn); }
+/* M2k: the confidence holds (no evidence): the bar hatched and dimmed, "HOLD" by the number */
+.meter.hold i { opacity: 0.55; background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--off) 3px 6px); }
 #msg { color: var(--dim); min-height: 1.4em; margin: 0 0 12px; }
 #msg.bad { color: var(--warn); }
 .hide { display: none !important; }
@@ -252,17 +254,18 @@ function pushOf(data) {
 
 /* the HOME line (core/jank_phone.h): "h bpm_x100 net transport bar quantum link_peers air_peers battery level conf min max mode"
    (level: the input meter's RMS over 0.3 s; min / max: its extremes over 3 s; mode 0 LINK, 1 AUDIO, x2 x4 /2 /4 AUDIO
-   folded; the last three absent from older firmware) */
+   folded; the last three absent from older firmware). conf "<pct>h": the confidence holds (M2k), pct the value shown */
 function parseHome(text) {
   const f = String(text).trim().split(/\s+/);
   if (f.length < 11 || f[0] !== "h") return null;
   const num = (s) => (s === "-" || !/^-?\d+$/.test(s) ? null : Number(s));
+  const hold = /^\d+h$/.test(f[10]);
   const net = /^j(\d)$/.exec(f[2]) ? { kind: "jank", group: Number(f[2].slice(1)) } : /^w[01]$/.test(f[2]) ? { kind: "wifi", up: f[2] === "w1" } : null;
   const transport = ["stopped", "playing", "armed"][Number(f[3])];
   const quantum = num(f[5]);
   if (!net || !transport || !quantum) return null;
   return { bpm: (num(f[1]) || 0) / 100, net, transport, bar: num(f[4]), quantum, link: num(f[6]) || 0, air: num(f[7]) || 0,
-           battery: num(f[8]), level: num(f[9]), conf: num(f[10]), levelMin: f.length > 11 ? num(f[11]) : null, levelMax: f.length > 12 ? num(f[12]) : null,
+           battery: num(f[8]), level: num(f[9]), conf: hold ? Number(f[10].slice(0, -1)) : num(f[10]), confHold: hold, levelMin: f.length > 11 ? num(f[11]) : null, levelMax: f.length > 12 ? num(f[12]) : null,
            audio: f.length > 13 && f[13] !== "0", fold: f.length > 13 && /^[x/][24]$/.test(f[13]) ? f[13] : "" };
 }
 
@@ -290,7 +293,8 @@ function homeView(h, ageMs) {
   v.level = h.level === null ? "-" : h.level + " dB";
   v.levelRange = h.levelMin === null || h.levelMax === null ? "input level" : "input level, " + h.levelMin + " to " + h.levelMax + " dB in 3 s";
   v.levelPct = h.level === null ? 0 : Math.max(0, Math.min(100, (h.level + 60) / 60 * 100));
-  v.conf = h.conf === null ? "-" : h.conf + " %";
+  v.conf = h.conf === null ? "-" : h.conf + " %" + (h.confHold ? " HOLD" : "");
+  v.confHold = !!h.confHold;
   v.confPct = h.conf === null ? 0 : Math.max(0, Math.min(100, h.conf));
   return v;
 }
@@ -667,6 +671,8 @@ function showHome() {
   $("h-conf-tick").classList.toggle("hide", c.tick === null);
   if (c.tick !== null) $("h-conf-tick").style.left = c.tick + "%";
   $("h-conf-meter").classList.toggle("gated", c.gated);
+  $("h-conf-meter").classList.toggle("hold", !!(v && v.confHold));
+  if (v && v.confHold) $("h-conf-note").textContent = "confidence: holding, no beats to judge (the outputs keep running)";
   const on = !!(S.line && S.lastHome && S.lastHome.bpm > 0);
   $("t-set").disabled = !on;
   $("t-play").disabled = !(S.line && v && v.canPlay);

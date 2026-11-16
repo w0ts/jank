@@ -60,6 +60,7 @@ void beat_gate(uint8_t *gated, uint8_t *silent, uint8_t *conf_open);
  * new exp (fold 2^exp), -99 in LINK mode */
 int beat_fold(int dir);
 void beat_fold_resync(void);                                /* Start after Stop: fold 1, as a resync */
+int beat_bar_settling(void);                                /* a Start's / a fold's bar placement not made yet (M2k) */
 /* NUDGE BEAT (core/jank_beatlink.h jbl_nudge; the control line's `nudge beat`, the device's NO + UP/DOWN): half beats,
  * +: Link's beats come earlier. The beat task applies it at its next pass and this waits for that (up to ~200 ms; call it
  * from a task that may block, never from the beat or bridge task). *total: the user's nudges after it, half beats; view

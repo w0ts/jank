@@ -206,6 +206,8 @@ struct jk_beat {
     uint8_t conf_pct;                 /* the confidence: how well the last 8 s of tracked beats fit the published grid, percent
                                          (core/jank_conf.h, the player's live/confidence.py); 0 in silence */
     uint8_t act_pct;                  /* the network's beat activation peak over the last second, percent (M2d's conf=) */
+    uint8_t conf_hold;                /* M2k: the confidence holds (no evidence): conf_pct is the shown value, easing toward
+                                         the threshold (jank_conf.h jcf_show_step); the gate keeps the held one */
     uint8_t gated;                    /* LOW CONFIDENCE's gate: the confidence under the threshold (STOP / START) */
     uint8_t silent;                   /* 0.5 s under -60 dBFS: the outputs stopped too (jank_conf.h SILENCE) */
     uint8_t conf_open;                /* the confidence at the threshold + 5 (where the gate opens): a Start's disarm ends */

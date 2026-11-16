@@ -234,11 +234,13 @@ static int ascending(const double *v, size_t a, size_t b)
 
 double jcf_weak_confidence(const double *strong, size_t ns, const double *tracked, size_t nt, const double *weak, size_t nw,
                            const double *lines, size_t m, int has_period, double period, double now, int min_obs,
-                           double *last)
+                           double *last, uint8_t *held)
 {
     double lo = now - JCF_WINDOW_S, hi = now - JCF_DELAY_S, margin, recall, precision, f;
     size_t la, lb, sa, sb, ta, tb, wa, wb, hits = 0, observed = 0, in_win = 0, on = 0;
     int s_up, t_up, w_up;
+    if (held)
+        *held = 0;
     if (!has_period || !(period > 0.0)) {
         *last = 0.0;
         return 0.0;
@@ -265,8 +267,11 @@ double jcf_weak_confidence(const double *strong, size_t ns, const double *tracke
         hits += (size_t)hit;
         observed += (size_t)(hit || nearest(strong, sa, sb, s_up, lines[i]) <= 0.5 * period);
     }
-    if (observed < (size_t)min_obs)
+    if (observed < (size_t)min_obs) {
+        if (held)
+            *held = 1;
         return *last;
+    }
     for (size_t i = sa; i < sb; i++) {  /* a strong beat at the window's edge is judged against all the lines */
         if (strong[i] < lo || strong[i] > hi)
             continue;
@@ -278,6 +283,17 @@ double jcf_weak_confidence(const double *strong, size_t ns, const double *tracke
     f = recall + precision == 0.0 ? 0.0 : 2.0 * recall * precision / (recall + precision);
     *last = f;
     return f;
+}
+
+double jcf_show_step(double shown, double conf, int held, double threshold, double dt_s)
+{
+    if (!held)
+        return conf;
+    if (shown > conf)
+        shown = conf;                   /* (never above what is held) */
+    if (shown <= threshold || !(dt_s > 0.0))
+        return shown;
+    return threshold + (shown - threshold) * exp(-dt_s * 3.0 / JCF_HOLD_EASE_S);
 }
 
 uint8_t jcf_pct(double conf)
