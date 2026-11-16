@@ -1731,6 +1731,8 @@ function netCtx(now) {
 // (Stop used to leave the clocks on in IGNORE and FOLLOW, so YES could not stop them and FOLLOW blinked "armed" until another
 // peer started the session: forever with none. Now Stop is Stop in every option.)
 // --xiao: the XIAO's session instead: `play` (it starts on its next bar line) or `stop`, the XIAO's own commands
+// Alone (no Link peer: jank M2l, as a lone Ableton Live), the session is the device's whatever the option: Start starts it
+// on its next bar line and the clocks with it, Stop stops both
 function linkStartStop(on) {
   if (S && S.xiao) {
     const cmd = on ? 'play' : 'stop';
@@ -1742,20 +1744,22 @@ function linkStartStop(on) {
   dev.clocks = on;
   dev.startAsked = on;                           // armed until the session plays (FOLLOW+LEAD: on its next bar)
   dev.hold = !on; hold('hold'); api('hold', { hold: !on });   // the user's layer (jank M2g): this Stop holds in both modes
-  if (dev.ltMode === 2) api('transport', { playing: on });
+  if (dev.ltMode === 2 || !(S && S.peers)) api('transport', { playing: on });
 }
 // the outputs (MIDI clock, modular clock) run: AUDIO = not held and Link playing (the device leads);
-// LINK = started on the device and, when following the session's start/stop, the session playing. The user's Stop
-// (dev.hold, either mode) holds in both: nothing automatic starts them again, only the user's Start (jank M2g's two layers)
-const outputsRun = s => (dev.link ? !dev.hold && dev.clocks && (dev.ltMode === 0 || !!s.link_playing) : !dev.hold && !!s.link_playing);
+// LINK = started on the device and the session playing; IGNORE: a peer there is enough (jank jc_should_play), alone the
+// device's own session's start / stop (M2l). The user's Stop (dev.hold, either mode) holds in both: nothing automatic
+// starts them again, only the user's Start (jank M2g's two layers)
+const outputsRun = s => (dev.link ? !dev.hold && dev.clocks && ((dev.ltMode === 0 && !!s.peers) || !!s.link_playing) : !dev.hold && !!s.link_playing);
 /* the transport icon's "armed" (blinking): a start asked for and not reached yet, one that resolves by itself or by YES.
    AUDIO: not held, the tracker hears music with a tempo (not silent, not gated) and Link has not started yet: it locks
    and starts on the next bar, or the music stops and it is stopped again. LINK: Start was pressed (dev.startAsked) and the
    session does not play yet (FOLLOW+LEAD: its next bar; FOLLOW: another peer's start; YES stops it). A session that is
-   merely stopped (page start-up, a mode switch) is not armed: the square. IGNORE runs the clocks: never armed */
+   merely stopped (page start-up, a mode switch) is not armed: the square. IGNORE with a peer runs the clocks: never armed;
+   alone (jank M2l) every option waits for the device's own session's next bar line */
 function armedLocal(s) {
   if (!dev.link) return !dev.hold && !s.link_playing && !s.silent && !s.gated && !!s.bpm;
-  return !dev.hold && dev.clocks && dev.startAsked && dev.ltMode !== 0 && !s.link_playing;
+  return !dev.hold && dev.clocks && dev.startAsked && (dev.ltMode !== 0 || !s.peers) && !s.link_playing;
 }
 async function setHold(on) {                  // Stop = hold; Start = resync, then release the hold
   dev.hold = on; hold('hold');

@@ -215,7 +215,7 @@ class App:
             if mode not in ("audio", "link"):
                 raise ValueError(f"mode {mode!r} is not 'audio' or 'link'")
             self.controller.passive = mode == "link"
-        elif name == "transport":                # LINK mode, FOLLOW + LEAD: the device starts / stops the session
+        elif name == "transport":                # LINK mode, FOLLOW + LEAD or alone (jank M2l): the device starts / stops it
             playing = body["playing"]
             if not isinstance(playing, bool):
                 raise ValueError(f"playing must be true or false, not {playing!r}")
