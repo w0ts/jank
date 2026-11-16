@@ -151,7 +151,7 @@ static void start(struct jank_peer *p, int64_t now)
     c.port = LK_MCAST_PORT;
     c.send = link_send;
     c.ctx = p;
-    lk_init(&p->k, &c, next_rand(p), JP_DEFAULT_MPB);
+    lk_init(&p->k, &c, next_rand(p), p->last_mpb > 0 ? p->last_mpb : JP_DEFAULT_MPB);   /* the last tempo (M2l) */
     lk_enable(&p->k, 1, now);
     lk_set_addr(&p->k, p->ip, LK_MCAST_PORT);
     p->on = 1;
@@ -346,6 +346,7 @@ void jp_poll(struct jank_peer *p, int64_t now_us)
     if (!p->on)
         return;
     lk_poll(&p->k, now_us);
+    p->last_mpb = lk_mpb(&p->k);
     if (lk_peers(&p->k) || p->solo)
         p->t_company = now_us;
     else if (now_us - p->t_company > (int64_t)JP_ALONE_MS * 1000)

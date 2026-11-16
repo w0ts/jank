@@ -58,7 +58,8 @@ void jc_want(struct jc_ticker *c, int play);
 /* the button's click: MIDI stop (0xFC) before the next clock, always, then start (0xFA) just before the clock of the
  * first bar line after that tick, whatever the session's transport; clocks go on all the way */
 void jc_resync(struct jc_ticker *c);
-/* Link's Start Stop Sync, or with auto transport whether a session is joined */
+/* Link's Start Stop Sync, or with auto transport whether a session is joined; alone (M2l: the stick's own session in
+ * LINK mode too), auto follows that session's start / stop, which only the user's Start / Stop set */
 int jc_should_play(int auto_transport, int link_playing, uint32_t link_peers);
 
 /* What the transport setting wants of the clock outputs at a bridge step (jank_hold.h jho_in.base, before AUDIO mode's

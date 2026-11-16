@@ -154,7 +154,7 @@ void jc_resync(struct jc_ticker *c) { c->resync = 1; }
 
 int jc_should_play(int auto_transport, int link_playing, uint32_t link_peers)
 {
-    return auto_transport ? link_peers > 0u : link_playing != 0;
+    return auto_transport ? link_peers > 0u || link_playing : link_playing != 0;
 }
 
 int jc_base(int last, const struct jc_tr *t)

@@ -322,8 +322,10 @@ static void bridge_task(void *arg)
         if (got)
             handle(&s_slot[i], i);
         beat_state(&audio, &locked);
-        if (jp_solo(&s_peer, audio, now))  /* AUDIO mode: a session of its own while alone (jank_peer.h) */
-            s_base = 0;                    /* ... ended with the sound, alone: nothing to follow, the outputs stop */
+        /* M2l: a session of its own while alone, in either mode (jank_peer.h), as a lone Link app: it never ends with the
+         * sound (the user, 2026-11-16: "how am I supposed to start it here?") */
+        if (jp_solo(&s_peer, 1, now))
+            s_base = 0;
         jp_poll(&s_peer, now);
         follow_transport(now);
         publish(now);
@@ -485,7 +487,7 @@ int bridge_play(int play)
     } else {
         /* LINK mode: the stick's own clocks (a Stop holds until its Start, jank_hold.h jho_link_stop); with transport LINK
          * (FOLLOW+LEAD) the session too. AUTO (IGNORE): the session is not the stick's to start or stop */
-        if (s_cfg.transport != JK_TRANSPORT_AUTO)
+        if (s_cfg.transport != JK_TRANSPORT_AUTO || !jp_peers(&s_peer))   /* M2l: alone, the session is the stick's */
             r = jp_set_playing(&s_peer, play, s_cfg.quantum, midi_now_us());
         if (play)
             jho_link_play(&s_hold);

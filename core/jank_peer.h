@@ -16,8 +16,10 @@
  * Link's (silent with the setting off or no address). A peer coming later joins it, as Link's rule says: the older
  * session wins, so the stick's tempo, phase and transport carry on and the newcomer takes them. A session older than the
  * stick's (an app that was there first, out of reach) is joined as before: the stick takes its timeline and start / stop
- * state, then the tracker leads it. The last peer leaving changes nothing in AUDIO mode. The sound gone (LINK mode) while
- * alone: the session ends at once (nothing to follow, as before). */
+ * state, then the tracker leads it. The last peer leaving changes nothing in AUDIO mode.
+ * M2l (the user, 2026-11-16; the rule: as a lone Ableton Live): LINK mode too. Alone the stick runs a session of its own,
+ * always, at the last tempo known (the last session's or the tracker's; 120 BPM before any), stopped until the user's
+ * Start; the sound coming or going keeps the session, its tempo and its transport. The bridge passes 1 always. */
 #ifndef JANK_PEER_H
 #define JANK_PEER_H
 #include <stddef.h>
@@ -62,7 +64,8 @@ struct jank_peer {
     uint8_t sess_seen[8];              /* the session the settle hold counts for */
     int64_t t_settle;                  /* host us the hold started: joined, or the session changed */
     uint8_t was_settled;               /* settled once in this session */
-    uint8_t solo;                      /* AUDIO mode: a session of its own while alone (jp_solo) */
+    uint8_t solo;                      /* a session of its own while alone (jp_solo; M2l: either mode) */
+    int32_t last_mpb;                  /* the last session's tempo: a new session of its own starts at it (M2l) */
 };
 
 void jp_init(struct jank_peer *p, const uint8_t usb_mac[6], const uint8_t air_mac[6], uint32_t seed, jp_out_fn out, void *ctx);
@@ -81,7 +84,7 @@ int jp_joined(const struct jank_peer *p);
 /* AUDIO mode (1) or not, every bridge step: 1 runs a session of its own while alone (started at the next jp_poll). Set
  * back to 0 while alone: that session ends (a bye-bye), and 1 is returned (the outputs have nothing to follow) */
 int jp_solo(struct jank_peer *p, int solo, int64_t now_us);
-/* the session; meaningful while jp_in_session: joined, or alone in a session of its own (AUDIO mode) */
+/* the session; meaningful while jp_in_session: joined, or alone in a session of its own (either mode since M2l) */
 int jp_in_session(const struct jank_peer *p);
 /* joined for JP_SETTLE_US in the same session, no other session waiting to be measured before that: the session's tempo,
  * beat and start / stop are the peers'. Until then the stick starts nothing, sends no clock and sets no tempo. Alone in a
@@ -91,8 +94,8 @@ int32_t jp_mpb(const struct jank_peer *p);
 int64_t jp_beat_at(const struct jank_peer *p, int64_t now_us);
 int jp_playing(const struct jank_peer *p);
 uint32_t jp_peers(const struct jank_peer *p);
-/* the stick changes the session, as any Link app may: 0 done, -1 not in a settled session (alone in LINK mode it has none
- * to change) */
+/* the stick changes the session, as any Link app may: 0 done, -1 not in a settled session (joining one; alone, the
+ * stick's own is settled) */
 int jp_set_tempo(struct jank_peer *p, int32_t mpb, int64_t now_us);
 /* play: a start on the next bar line (quantum beats), sent JST_LEAD_US before it by jp_poll (jank_start.h); nothing when
  * the session plays already. Stop: at once */
