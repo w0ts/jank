@@ -86,7 +86,9 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 #player input[type="checkbox"] { width: auto; min-height: 0; }
 #player select { width: auto; max-width: 100%; }
 #player label { flex-direction: row; align-items: center; gap: 4px; font-size: 12px; }
-#player .then { margin-left: auto; flex: none; }
+#player .then { flex: none; }
+#player .then:first-of-type { margin-left: auto; }
+#player .pl-out button.link { margin-left: 6px; }
 #player .pl-name-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 #player .pl-name-row #pl-name { flex: 1 1 auto; min-width: 0; margin-top: 0; }
 #player #pl-volval { white-space: nowrap; min-width: 3em; text-align: right; }
@@ -204,6 +206,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <label id="pl-dirpick" class="hide quiet-file">Choose music folder <input id="pl-dir" type="file" webkitdirectory multiple></label>
         <button id="pl-reopen" class="quiet small hide" type="button"></button>
         <div class="pl-name-row"><span id="pl-name" class="note">No track: choose a music folder</span>
+          <label class="then"><input id="pl-scope" type="checkbox" checked title="next, random and the end of a track use every audio file under the folder you picked"> all folders</label>
           <label class="then">then <select id="pl-then"><option value="next">next</option><option value="random">random</option><option value="stop">stop</option></select></label>
         </div>
         <input id="pl-seek" class="thin" type="range" min="0" max="1000" value="0" step="1" disabled aria-label="Position">
@@ -214,12 +217,14 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <div class="pl-row"><strong>Volume</strong><input id="pl-vol" class="thin grow" type="range" min="0" max="100" step="1" value="80" aria-label="Volume"><span id="pl-volval" class="num">80 %</span>
           <label class="monitor"><input id="pl-monitor" type="checkbox" checked> monitor</label></div>
         <p id="pl-status" class="note">no file</p>
-        <p class="note pl-out">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button">change</button></p>
+        <p class="note pl-out">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button">change</button>
+          <button id="pl-test" class="link" type="button" title="a 1 kHz tone for 1 s, through the stick's path only">Test stick output</button></p>
         <select id="pl-out" class="hide" aria-label="Stick output"><option value="">None (monitor only)</option></select>
         <button id="pl-pick" class="quiet small hide" type="button"></button>
         <p id="pl-pick-help" class="note hide"></p>
         <p id="pl-note" class="note" aria-live="polite"></p>
-        <details class="pl-details"><summary>details</summary><p id="pl-details" class="note"></p></details>
+        <details class="pl-details"><summary>details</summary><p id="pl-details" class="note"></p><p id="pl-output-report" class="note"></p></details>
+        <p id="pl-scope-row" class="note hide"><span id="pl-scope-line"></span> <button id="pl-rescan" class="link" type="button">rescan</button></p>
         <div id="pl-browser" class="hide">
           <div id="pl-crumbs" class="pl-crumbs"></div>
           <div id="pl-list"></div>
@@ -2028,13 +2033,62 @@ const Player = (() => {
 
   const outputs = devices => (devices || []).filter(d => d.kind === 'audiooutput');
   // the first audio output whose label holds `needle` (the stick's USB audio is named "jank"), or null
+  // ("Default - jank (303a:4a4b)" is the system default entry when jank is the default output: a named device is preferred)
+  const ALIAS_IDS = ['default', 'communications'];
   function pickOutput(devices, needle) {
     const n = String(needle || 'jank').toLowerCase();
-    const d = outputs(devices).find(x => String(x.label || '').toLowerCase().includes(n));
+    const hits = outputs(devices).filter(x => String(x.label || '').toLowerCase().includes(n));
+    const d = hits.find(x => !ALIAS_IDS.includes(x.deviceId)) || hits[0];
     return d ? d.deviceId : null;
   }
   // [{ id, label }] for the Output select; a device without a label (no media permission yet) is numbered
   const outputChoices = devices => outputs(devices).map((d, i) => ({ id: d.deviceId, label: d.label || 'Output ' + (i + 1) }));
+  // Is the saved output still there? 'unknown' when the list shows no ids (no permission yet): then it is only tried, never dropped.
+  function savedStatus(devices, saved) {
+    if (!saved || !saved.id) return 'none';
+    const list = outputs(devices);
+    if (!list.some(d => d.deviceId)) return 'unknown';
+    return matchSavedIn(list, saved) ? 'found' : 'stale';
+  }
+  const matchSavedIn = (list, saved) => list.find(d => d.deviceId === saved.id) || (saved.label ? list.find(d => d.label === saved.label) : null) || null;
+  // AudioContext.sinkId reads back as an id string, or an object ({ type: 'none' }) for no output
+  const sinkMatches = (current, id) => typeof current === 'string' && current === id;
+  // the 'details' text of the stick output: everything needed to see why a sound does not reach it
+  function outputReport(s) {
+    const id8 = id => (id ? String(id).slice(0, 8) : '-');
+    const named = x => (x && x.id ? id8(x.id) + (x.label ? ' "' + x.label + '"' : '') : 'none');
+    const outs = outputs(s.devices).map(d => (d.label || 'no label') + ' (' + id8(d.deviceId) + ')').join(', ') || 'none listed';
+    const ctx = s.ctxState ? s.ctxState + ', sinkId ' + (typeof s.ctxSinkId === 'string' ? (id8(s.ctxSinkId) === '-' ? 'default' : id8(s.ctxSinkId)) : JSON.stringify(s.ctxSinkId)) : 'none yet';
+    return ['permission: ' + (s.permission || 'unknown'), 'outputs: ' + outs, 'saved: ' + named(s.saved), 'chosen: ' + named(s.chosen), 'stick context: ' + ctx, 'last sink error: ' + (s.lastError || 'none')].join(' · ');
+  }
+
+  // ---- the play scope: every audio file under the picked folder, in depth-first natural order ----
+  const SCOPE_CAP = 100000;
+  const JUNK_FOLDERS = ['$recycle.bin', '__macosx', 'system volume information', 'lost+found'];
+  const isJunkName = name => String(name).startsWith('.') || JUNK_FOLDERS.includes(String(name).toLowerCase());
+  const pathKey = path => path.join('/');
+  // Walks a directory tree with injected pieces: list(dir, path) -> entries { name, kind, ... }; shouldStop() cancels; yieldFn() gives the
+  // page a turn between directories; onProgress(count). Collects audio files only (name + the entry as the source gave it), folders first
+  // in each directory, natural order: the order a Next button follows. Stops at `cap` files (capped: true).
+  async function scanTree({ root, list, shouldStop, yieldFn, onProgress, cap }) {
+    const files = [], max = cap || SCOPE_CAP;
+    let capped = false;
+    async function walk(dir, path) {
+      if (shouldStop() || capped) return;
+      const entries = sortEntries((await list(dir, path)).filter(e => !isJunkName(e.name)));
+      await yieldFn();
+      for (const e of entries) {
+        if (shouldStop() || capped) return;
+        if (e.kind === 'directory') await walk(e, [...path, e.name]);
+        else if (files.length >= max) { capped = true; return; } else files.push({ ...e, path: [...path, e.name] });
+      }
+      onProgress(files.length);
+    }
+    await walk(root, []);
+    return { files, capped, cancelled: shouldStop() };
+  }
+  const scopeLine = s => (s.scanning ? 'scanning: ' + s.count.toLocaleString('en-US') + ' files' : s.capped ? s.count.toLocaleString('en-US') + ' files (capped)' : s.count.toLocaleString('en-US') + ' files in scope');
+
   // the output the user chose last time, found again in a device list (ids first; a label when the list has labels and the id changed)
   function matchSaved(devices, saved) {
     if (!saved || !saved.id) return null;
@@ -2309,7 +2363,7 @@ const Player = (() => {
   const expectedBpm = (tag, rate) => tag * rate;
 
   return { MAX_TAG_BYTES, parseBpmText, id3TotalSize, parseId3, mp4Atom, parseMp4Tmpo, parseFlac, parseOgg, sniff, tagBpm, expectedBpm, PITCH_RANGE_PCT, DEFAULT_VOLUME_PCT, MAX_ROWS, AUDIO_EXT, LEVEL_FLOOR_DB, rmsOf, rmsToDb, smoothDb, meterFraction, statusText, pitchToRate, formatPitch, volumeFromPct, parseVolumePct, formatTime,
-           matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, afterTrack, skipTrack, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
+           savedStatus, sinkMatches, outputReport, SCOPE_CAP, isJunkName, pathKey, scanTree, scopeLine, matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, afterTrack, skipTrack, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
 })();
 </script>
 <script id="face-ui">
@@ -2440,14 +2494,14 @@ const Player = (() => {
   }
   // `diag`: boots and the reset reason first, so a restart of the stick shows at once
   function paintDiag(v) {
-    const boots = Number(v.boots), restarted = lastBoots !== null && boots !== lastBoots;
+    const boots = Number(v.boots), restarted = Number.isFinite(boots) && lastBoots !== null && boots !== lastBoots;
     el("adv-boots").textContent = "boots " + dash(v.boots) + " · reset: " + dash(v.reset);
     if (restarted) {
       el("adv-restart").textContent = "The stick restarted: boots " + lastBoots + " → " + boots + ", reset: " + dash(v.reset) + ", at " + new Date().toTimeString().slice(0, 8) + ".";
       el("adv-restart").classList.remove("hide");
       el("adv-boots").classList.add("restarted");
     }
-    lastBoots = boots;
+    if (Number.isFinite(boots)) lastBoots = boots;
     el("adv-settled").textContent = v.link_settled === "1" ? "yes" : v.link_settled === "0" ? "no" : "-";
     el("adv-drift").textContent = dash(v.link_drift_ppb);
     el("adv-rtt").textContent = dash(v.link_partner_rtt_us);
@@ -2483,7 +2537,7 @@ const Player = (() => {
 (() => {
   const el = (id) => document.getElementById(id);
   const card = el("player"), audio = el("pl-audio");
-  const KEY = { output: "jank.player.output", volume: "jank.player.volume", then: "jank.player.then" };
+  const KEY = { output: "jank.player.output", volume: "jank.player.volume", then: "jank.player.then", scope: "jank.player.scope" };
   const DB = { name: "jank-player", store: "handles", key: "music" };
   let url = null, hovered = false, seeking = false, error = "", level = Player.LEVEL_FLOOR_DB, lastFrame = 0, frame = 0;
   const tap = { context: null, source: null, analyser: null, samples: null, url: null, routed: false, sinkId: "", missing: false };
@@ -2498,7 +2552,10 @@ const Player = (() => {
   const plan = Player.playbackPlan(env);
   const jank = { id: "", label: "", error: "" };
   let tagBpm;                                   // undefined: not read yet, null: the file has no BPM tag
-  const queue = { entries: [], index: -1 };
+  const queue = { entries: [], index: -1, current: "" };
+  const scope = { on: true, files: [], count: 0, scanning: false, capped: false, token: null };
+  const state = { devices: [], permission: "unknown" };
+  const stick = { test: null };
   const browser = { rootName: "", names: [], handles: [], tree: null, entries: [], shown: Player.MAX_ROWS };
 
   const note = (text, bad) => { el("pl-note").textContent = text; el("pl-note").style.color = bad ? "var(--warn)" : ""; };
@@ -2607,10 +2664,27 @@ const Player = (() => {
   // whose sink is the stick's device. Path "webaudio" (no captureStream here): the element goes through Web Audio, a gain for the volume
   // knob and one for the monitor box on the monitor branch only, and a stream destination feeds the stick through a hidden element
   // (or a second context) with its sink set. The meter's analyser listens before any gain in both. Created inside the Play gesture.
+  // a context for the stick: its sink is set at creation (new AudioContext({ sinkId }), Chrome 110+) when the device is known, and always
+  // read back and set with `await setSinkId(id)` when it differs: both ways are used, errors are shown. 44.1 kHz is the stick's rate.
+  function makeContext(sinkId) {
+    let ctx;
+    try { ctx = new AudioContext({ latencyHint: "interactive", sampleRate: 44100, ...(sinkId ? { sinkId } : {}) }); } catch (err) { ctx = new AudioContext({ latencyHint: "interactive" }); }
+    return ctx;
+  }
+  async function aimContext(ctx, sinkId) {
+    if (Player.sinkMatches(ctx.sinkId, sinkId)) return;
+    if (typeof ctx.setSinkId !== "function") throw new Error("this browser cannot choose the stick's output (AudioContext.setSinkId)");
+    await ctx.setSinkId(sinkId);
+  }
   function wakeContext() {
     if (plan.path === "none") return;
     if (!tap.context) {
-      tap.context = new AudioContext({ latencyHint: "interactive" });
+      tap.context = makeContext(jank.id);
+      tap.mono = tap.context.createGain();                      // the stick is 1 channel: a stereo file is mixed down here, whatever the device
+      tap.mono.channelCount = 1;
+      tap.mono.channelCountMode = "explicit";
+      tap.mono.channelInterpretation = "speakers";
+      tap.mono.connect(tap.context.destination);
       if (plan.path === "webaudio") buildWebAudio();
     }
     tap.context.resume().catch((err) => note("Cannot start the audio path to the stick: " + errorText(err), true));
@@ -2646,10 +2720,10 @@ const Player = (() => {
       await web.stickEl.play();
     } else if (plan.stick === "context") {
       if (!web.stickCtx) {
-        web.stickCtx = new AudioContext({ latencyHint: "interactive" });
+        web.stickCtx = makeContext(jank.id);
         web.stickCtx.createMediaStreamSource(web.dest.stream).connect(web.stickCtx.destination);
       }
-      await web.stickCtx.setSinkId(jank.id);
+      await aimContext(web.stickCtx, jank.id);
       await web.stickCtx.resume();
     } else {
       throw new Error("this browser cannot choose the stick's output (no setSinkId)");
@@ -2658,10 +2732,13 @@ const Player = (() => {
   async function routeCapture() {
     if (!tap.source) return;
     if (jank.id) {
-      if (tap.sinkId !== jank.id) { await tap.context.setSinkId(jank.id); tap.sinkId = jank.id; }
-      if (!tap.routed) { tap.source.connect(tap.context.destination); tap.routed = true; }
+      await aimContext(tap.context, jank.id);
+      tap.sinkId = jank.id;
+      if (!tap.routed) { tap.source.connect(tap.mono); tap.routed = true; }
+      if (tap.context.state !== "running") await tap.context.resume();
+      if (tap.context.state !== "running") throw new Error("the audio context is " + tap.context.state + ": press Play again");
     } else if (tap.routed) {
-      tap.source.disconnect(tap.context.destination);
+      tap.source.disconnect(tap.mono);
       tap.routed = false;
     }
   }
@@ -2675,6 +2752,7 @@ const Player = (() => {
     }
     paintStatus();
     paintOutputUi();
+    paintDetails();
   }
   function startTap() {
     if (tap.missing || tap.url === url || plan.path === "none" || !tap.context) return;
@@ -2727,6 +2805,9 @@ const Player = (() => {
   }
   // leaving Advanced (or the USB connection) takes the player away: playback stops and the file is released
   function releasePlayer() {
+    cancelScan();
+    Object.assign(scope, { files: [], count: 0, capped: false });
+    paintScope();
     if (url === null) return;
     audio.pause();
     URL.revokeObjectURL(url);
@@ -2740,6 +2821,7 @@ const Player = (() => {
     paintBpm();
     el("pl-name").textContent = "No track: choose a music folder";
     tap.url = null;
+    queue.current = "";
     if (tap.context) tap.context.suspend().catch((err) => note("Cannot suspend the audio path: " + errorText(err), true));
     el("pl-play").disabled = true;
     el("pl-seek").disabled = true;
@@ -2756,6 +2838,7 @@ const Player = (() => {
   async function playQueued(index) {
     if (index < 0) return;
     queue.index = index;
+    queue.current = Player.pathKey(queue.entries[index].path);
     paintSteps();
     paintList();
     try { load(await entryFile(queue.entries[index])); } catch (err) { setError("cannot open that file: " + errorText(err)); return; }
@@ -2765,9 +2848,12 @@ const Player = (() => {
   const afterEnd = () => playQueued(Player.afterTrack(thenMode(), queue.entries.length, queue.index));
 
   // ---- output: the stick's USB audio ("jank"), chosen once in the browser's own output chooser (selectAudioOutput: no microphone) ----
-  // The chosen device is remembered and tried silently next time. enumerateDevices() needs no permission for the ids. The microphone
-  // is asked for only by the explicit "Allow device names" button, and only where the browser has no output chooser.
+  // The chosen device is remembered (id and label) and tried silently at every load and Play. The microphone is asked for only by the
+  // explicit "Allow device names" button, where the browser has no output chooser, and only while no saved output works.
   const canSelect = () => !!navigator.mediaDevices && typeof navigator.mediaDevices.selectAudioOutput === "function";
+  const savedOutput = () => {
+    try { const o = JSON.parse(store.get(KEY.output)); return o && o.id ? o : null; } catch (err) { return null; }
+  };
   function paintOutputUi() {
     const kind = Player.outputButton({ working: jank.id !== "" && jank.error === "", hasSelectAudioOutput: canSelect() });
     el("pl-pick").classList.toggle("hide", kind === "none");
@@ -2775,13 +2861,20 @@ const Player = (() => {
     el("pl-pick").dataset.kind = kind;
     el("pl-pick-help").classList.toggle("hide", kind === "none");
     el("pl-pick-help").textContent = Player.OUTPUT_HELP[kind];
+    el("pl-test").disabled = jank.id === "";
+  }
+  function paintDetails() {
+    const ctx = plan.path === "webaudio" ? web.stickCtx : tap.context;
+    el("pl-output-report").textContent = Player.outputReport({
+      permission: state.permission, devices: state.devices, saved: savedOutput(), chosen: jank, ctxState: ctx ? ctx.state : "", ctxSinkId: ctx ? ctx.sinkId : "", lastError: jank.error,
+    });
   }
   function fillOutputs(devices) {
     const select = el("pl-out");
     select.replaceChildren(new Option("None (monitor only)", ""), ...Player.outputChoices(devices).map((c) => new Option(c.label, c.id)));
     select.value = jank.id;
   }
-  // the stick's output: the monitor is always the default output; this picks the second path's device
+  // the stick's output: the monitor is always the default output; this picks the second path's device (a running context is re-aimed live)
   async function useOutput(choice) {
     Object.assign(jank, { id: choice.id || "", label: choice.id ? choice.label : "none" });
     el("pl-outlabel").textContent = jank.label;
@@ -2790,10 +2883,8 @@ const Player = (() => {
     await routeJank();
     paintStatus();
     paintOutputUi();
+    paintDetails();
   }
-  const savedOutput = () => {
-    try { const o = JSON.parse(store.get(KEY.output)); return o && o.id ? o : null; } catch (err) { return null; }
-  };
   async function pickOutput() {
     try {
       if (el("pl-pick").dataset.kind === "choose") {
@@ -2811,21 +2902,31 @@ const Player = (() => {
   async function allowNames() {
     const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
     for (const track of probe.getTracks()) track.stop();
+    state.permission = "granted";
     const devices = await navigator.mediaDevices.enumerateDevices();
+    state.devices = devices;
     fillOutputs(devices);
     const saved = savedOutput(), choice = Player.resolveOutput(devices, saved && saved.id);
     await useOutput(choice);
-    note(choice.why === "default" ? 'The stick\'s USB audio ("jank") is not listed: plug it in and run the firmware with the audio build. Only the monitor plays.'
-      : choice.why === "jank" ? "The stick's USB audio is the second output." : "The second output is " + choice.label + ".");
+    note(choice.why === "default" ? "Output names unlocked. The stick's USB audio (\"jank\") is not listed: plug it in and run the firmware with the audio build. Only the monitor plays."
+      : "Output names unlocked. " + (choice.why === "jank" ? "The stick's USB audio is the second output." : "The second output is " + choice.label + "."));
   }
-  // no permission: the ids are listed, the labels maybe not; the chosen device is found again by its id (or its label) and tried
+  async function readPermission() {
+    try { state.permission = (await navigator.permissions.query({ name: "microphone" })).state; } catch (err) { state.permission = "unknown"; }
+  }
+  // no permission needed: the ids may be listed, the labels maybe not. The chosen device is found again by its id (or its label); a saved
+  // device that is not in a list that shows ids is dropped (the button comes back); with no ids shown it is only tried at Play
   async function readDevices() {
     if (!navigator.mediaDevices) return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
+      state.devices = devices;
+      await readPermission();
       fillOutputs(devices);
-      const saved = savedOutput(), found = Player.matchSaved(devices, saved);
+      const saved = savedOutput(), found = Player.matchSaved(devices, saved), status = Player.savedStatus(devices, saved);
       if (found) await useOutput({ id: found.id, label: saved.label || found.label });
+      else if (status === "stale") await useOutput({ id: "", label: "" });
+      paintDetails();
     } catch (err) {
       note("Cannot list the audio outputs (" + errorText(err) + ").", true);
     }
@@ -2834,6 +2935,28 @@ const Player = (() => {
     const saved = savedOutput();
     if (saved) await useOutput(saved);
     else paintOutputUi();
+  }
+  // a tone through the stick's path only: its own context with the chosen sink, 1 kHz for 1 s, and what happened
+  async function testStick() {
+    if (jank.id === "") { note("No stick output chosen: nothing to test.", true); return; }
+    let ctx = null;
+    try {
+      ctx = makeContext(jank.id);
+      await aimContext(ctx, jank.id);
+      await ctx.resume();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.frequency.value = 1000;
+      gain.gain.value = 0.2;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.onended = () => ctx.close();
+      osc.start();
+      osc.stop(ctx.currentTime + 1);
+      note("tone sent to " + jank.label);
+    } catch (err) {
+      note("Test tone failed: " + errorText(err), true);
+      if (ctx) ctx.close();
+    }
   }
 
   // ---- the music folder ----
@@ -2887,18 +3010,80 @@ const Player = (() => {
     el("pl-browser").classList.toggle("hide", browser.rootName === "");
     const crumbs = Player.breadcrumbs([browser.rootName, ...browser.names]).slice(1);
     el("pl-crumbs").replaceChildren(el("pl-folder").firstElementChild.cloneNode(true), ...crumbs.map((c) => rowButton(c.label, "quiet", () => goTo(c.depth - 1))));
-    const files = browser.entries.filter((e) => e.kind === "file");
-    const playing = queue.entries.length ? queue.entries[queue.index] : null;
     const rows = [];
     if (browser.names.length) rows.push(rowButton("..", "dir", () => goTo(browser.names.length - 1)));
     for (const entry of browser.entries.slice(0, Player.rowsToShow(browser.entries.length, browser.shown))) {
       if (entry.kind === "directory") rows.push(rowButton("▸ " + entry.name, "dir", () => enter(entry)));
-      else rows.push(rowButton(entry.name, entry === playing ? "playing" : "", () => { queue.entries = files; playQueued(files.indexOf(entry)); }));
+      else rows.push(rowButton(entry.name, Player.pathKey([...browser.names, entry.name]) === queue.current ? "playing" : "", () => startFrom(entry)));
     }
     if (browser.entries.length > browser.shown) {
       rows.push(rowButton("show more (" + (browser.entries.length - browser.shown) + ")", "dir", () => { browser.shown += Player.MAX_ROWS; paintList(); }));
     }
     el("pl-list").replaceChildren(...rows);
+  }
+  // a click on a file: the queue is the whole scope (every audio file under the picked folder) when it is on and scanned, else this folder
+  function startFrom(entry) {
+    const path = [...browser.names, entry.name], key = Player.pathKey(path);
+    const inScope = scope.on ? scope.files.findIndex((f) => Player.pathKey(f.path) === key) : -1;
+    if (inScope >= 0) {
+      queue.entries = scope.files;
+      playQueued(inScope);
+      return;
+    }
+    queue.entries = browser.entries.filter((e) => e.kind === "file").map((e) => ({ ...e, path: [...browser.names, e.name] }));
+    playQueued(queue.entries.findIndex((e) => e.name === entry.name));
+  }
+  // the scope's scan finished (or the box changed): the playing track continues in the right list
+  function reanchor() {
+    if (queue.current === "") return;
+    const list = scope.on ? scope.files : scope.files.filter((f) => Player.pathKey(f.path.slice(0, -1)) === Player.pathKey(queue.current.split("/").slice(0, -1)));
+    const at = list.findIndex((f) => Player.pathKey(f.path) === queue.current);
+    if (at < 0) return;
+    queue.entries = list;
+    queue.index = at;
+    paintSteps();
+  }
+  // ---- the play scope: every audio file under the picked folder, walked once per source (names only, no file is read) ----
+  const paintScope = () => {
+    const visible = scope.on && browser.rootName !== "";
+    el("pl-scope-row").classList.toggle("hide", !visible);
+    el("pl-scope-line").textContent = visible ? Player.scopeLine(scope) : "";
+  };
+  function cancelScan() {
+    if (scope.token) scope.token.cancelled = true;
+    Object.assign(scope, { token: null, scanning: false });
+  }
+  async function listHandle(dir) {
+    const out = [];
+    for await (const [name, handle] of dir.entries()) out.push({ name, kind: handle.kind, handle });
+    return out;
+  }
+  async function scanScope() {
+    cancelScan();
+    Object.assign(scope, { files: [], count: 0, capped: false });
+    if (!scope.on || browser.rootName === "") { paintScope(); return; }
+    const token = { cancelled: false }, channel = new MessageChannel();
+    scope.token = token;
+    scope.scanning = true;
+    paintScope();
+    const yieldFn = () => new Promise((resolve) => { channel.port1.onmessage = () => resolve(); channel.port2.postMessage(0); });
+    const tree = browser.tree, root = tree ? {} : { handle: browser.handles[0] };
+    let result = null;
+    try {
+      result = await Player.scanTree({
+        root, list: tree ? async (dir, path) => Player.listTree(tree, path) : (dir) => listHandle(dir.handle), shouldStop: () => token.cancelled, yieldFn,
+        onProgress: (n) => { if (!token.cancelled) { scope.count = n; paintScope(); } }, cap: Player.SCOPE_CAP,
+      });
+    } catch (err) {
+      if (!token.cancelled) note("Cannot scan the folders: " + errorText(err), true);
+    } finally {
+      channel.port1.close();
+      channel.port2.close();
+    }
+    if (token.cancelled) return;
+    Object.assign(scope, { files: result ? result.files : [], count: result ? result.files.length : 0, capped: !!(result && result.capped), scanning: false, token: null });
+    reanchor();
+    paintScope();
   }
   async function openHandle(handle, mayAsk) {
     const options = { mode: "read" };
@@ -2906,6 +3091,7 @@ const Player = (() => {
     if (state !== "granted" && mayAsk) state = await handle.requestPermission(options);
     if (state !== "granted") return false;
     Object.assign(browser, { rootName: handle.name, names: [], handles: [handle], tree: null });
+    scanScope();
     await showFolder();
     el("pl-reopen").classList.add("hide");
     return true;
@@ -2933,6 +3119,7 @@ const Player = (() => {
   function chooseTree(fileList) {
     const items = [...fileList].filter((f) => Player.isAudioFile(f.name)).map((f) => ({ path: f.webkitRelativePath || "Files/" + f.name, file: f }));
     Object.assign(browser, { rootName: Player.buildTree(items).name, names: [], handles: [], tree: Player.buildTree(items) });
+    scanScope();
     showFolder();
   }
 
@@ -2945,6 +3132,12 @@ const Player = (() => {
     if (el("pl-pitch-num").value !== "" && Number.isFinite(v)) { el("pl-pitch").value = Math.max(-Player.PITCH_RANGE_PCT, Math.min(Player.PITCH_RANGE_PCT, v)); applyPitch(); }
   });
   el("pl-then").addEventListener("change", () => { store.set(KEY.then, thenMode()); paintSteps(); });
+  el("pl-scope").addEventListener("change", () => {
+    scope.on = el("pl-scope").checked;
+    store.set(KEY.scope, scope.on ? "1" : "0");
+    if (scope.on) scanScope(); else { cancelScan(); reanchor(); paintScope(); }
+  });
+  el("pl-rescan").addEventListener("click", scanScope);
   el("pl-help").addEventListener("click", () => {
     const open = el("pl-help-text").classList.toggle("hide") === false;
     el("pl-help").setAttribute("aria-expanded", String(open));
@@ -2968,9 +3161,10 @@ const Player = (() => {
   audio.addEventListener("error", () => setError("cannot decode this file as audio"));
   audio.addEventListener("playing", () => { error = ""; startTap(); startLevel(); });
   for (const type of ["pause", "ended", "emptied"]) audio.addEventListener(type, stopLevel);
-  document.addEventListener("jank-advanced", (e) => { if (!e.detail.visible) releasePlayer(); });
+  document.addEventListener("jank-advanced", (e) => { if (!e.detail.visible) releasePlayer(); else if (scope.on && browser.rootName !== "") scanScope(); });
   if (navigator.mediaDevices) navigator.mediaDevices.addEventListener("devicechange", readDevices);
   el("pl-pick").addEventListener("click", pickOutput);
+  el("pl-test").addEventListener("click", testStick);
 
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });
@@ -2989,6 +3183,8 @@ const Player = (() => {
   el("pl-dir").addEventListener("change", (e) => chooseTree(e.target.files));
 
   el("pl-then").value = Player.parseAfterMode(store.get(KEY.then));
+  scope.on = store.get(KEY.scope) !== "0";
+  el("pl-scope").checked = scope.on;
   el("pl-details").textContent = Player.planDetails(plan, env, Player.browserBrand(navigator.userAgentData, navigator.userAgent));
   if (Player.planNote(plan)) note(Player.planNote(plan), true);
   el("pl-vol").value = Player.parseVolumePct(store.get(KEY.volume));

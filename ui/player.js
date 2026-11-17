@@ -82,13 +82,62 @@ const Player = (() => {
 
   const outputs = devices => (devices || []).filter(d => d.kind === 'audiooutput');
   // the first audio output whose label holds `needle` (the stick's USB audio is named "jank"), or null
+  // ("Default - jank (303a:4a4b)" is the system default entry when jank is the default output: a named device is preferred)
+  const ALIAS_IDS = ['default', 'communications'];
   function pickOutput(devices, needle) {
     const n = String(needle || 'jank').toLowerCase();
-    const d = outputs(devices).find(x => String(x.label || '').toLowerCase().includes(n));
+    const hits = outputs(devices).filter(x => String(x.label || '').toLowerCase().includes(n));
+    const d = hits.find(x => !ALIAS_IDS.includes(x.deviceId)) || hits[0];
     return d ? d.deviceId : null;
   }
   // [{ id, label }] for the Output select; a device without a label (no media permission yet) is numbered
   const outputChoices = devices => outputs(devices).map((d, i) => ({ id: d.deviceId, label: d.label || 'Output ' + (i + 1) }));
+  // Is the saved output still there? 'unknown' when the list shows no ids (no permission yet): then it is only tried, never dropped.
+  function savedStatus(devices, saved) {
+    if (!saved || !saved.id) return 'none';
+    const list = outputs(devices);
+    if (!list.some(d => d.deviceId)) return 'unknown';
+    return matchSavedIn(list, saved) ? 'found' : 'stale';
+  }
+  const matchSavedIn = (list, saved) => list.find(d => d.deviceId === saved.id) || (saved.label ? list.find(d => d.label === saved.label) : null) || null;
+  // AudioContext.sinkId reads back as an id string, or an object ({ type: 'none' }) for no output
+  const sinkMatches = (current, id) => typeof current === 'string' && current === id;
+  // the 'details' text of the stick output: everything needed to see why a sound does not reach it
+  function outputReport(s) {
+    const id8 = id => (id ? String(id).slice(0, 8) : '-');
+    const named = x => (x && x.id ? id8(x.id) + (x.label ? ' "' + x.label + '"' : '') : 'none');
+    const outs = outputs(s.devices).map(d => (d.label || 'no label') + ' (' + id8(d.deviceId) + ')').join(', ') || 'none listed';
+    const ctx = s.ctxState ? s.ctxState + ', sinkId ' + (typeof s.ctxSinkId === 'string' ? (id8(s.ctxSinkId) === '-' ? 'default' : id8(s.ctxSinkId)) : JSON.stringify(s.ctxSinkId)) : 'none yet';
+    return ['permission: ' + (s.permission || 'unknown'), 'outputs: ' + outs, 'saved: ' + named(s.saved), 'chosen: ' + named(s.chosen), 'stick context: ' + ctx, 'last sink error: ' + (s.lastError || 'none')].join(' · ');
+  }
+
+  // ---- the play scope: every audio file under the picked folder, in depth-first natural order ----
+  const SCOPE_CAP = 100000;
+  const JUNK_FOLDERS = ['$recycle.bin', '__macosx', 'system volume information', 'lost+found'];
+  const isJunkName = name => String(name).startsWith('.') || JUNK_FOLDERS.includes(String(name).toLowerCase());
+  const pathKey = path => path.join('/');
+  // Walks a directory tree with injected pieces: list(dir, path) -> entries { name, kind, ... }; shouldStop() cancels; yieldFn() gives the
+  // page a turn between directories; onProgress(count). Collects audio files only (name + the entry as the source gave it), folders first
+  // in each directory, natural order: the order a Next button follows. Stops at `cap` files (capped: true).
+  async function scanTree({ root, list, shouldStop, yieldFn, onProgress, cap }) {
+    const files = [], max = cap || SCOPE_CAP;
+    let capped = false;
+    async function walk(dir, path) {
+      if (shouldStop() || capped) return;
+      const entries = sortEntries((await list(dir, path)).filter(e => !isJunkName(e.name)));
+      await yieldFn();
+      for (const e of entries) {
+        if (shouldStop() || capped) return;
+        if (e.kind === 'directory') await walk(e, [...path, e.name]);
+        else if (files.length >= max) { capped = true; return; } else files.push({ ...e, path: [...path, e.name] });
+      }
+      onProgress(files.length);
+    }
+    await walk(root, []);
+    return { files, capped, cancelled: shouldStop() };
+  }
+  const scopeLine = s => (s.scanning ? 'scanning: ' + s.count.toLocaleString('en-US') + ' files' : s.capped ? s.count.toLocaleString('en-US') + ' files (capped)' : s.count.toLocaleString('en-US') + ' files in scope');
+
   // the output the user chose last time, found again in a device list (ids first; a label when the list has labels and the id changed)
   function matchSaved(devices, saved) {
     if (!saved || !saved.id) return null;
@@ -363,5 +412,5 @@ const Player = (() => {
   const expectedBpm = (tag, rate) => tag * rate;
 
   return { MAX_TAG_BYTES, parseBpmText, id3TotalSize, parseId3, mp4Atom, parseMp4Tmpo, parseFlac, parseOgg, sniff, tagBpm, expectedBpm, PITCH_RANGE_PCT, DEFAULT_VOLUME_PCT, MAX_ROWS, AUDIO_EXT, LEVEL_FLOOR_DB, rmsOf, rmsToDb, smoothDb, meterFraction, statusText, pitchToRate, formatPitch, volumeFromPct, parseVolumePct, formatTime,
-           matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, afterTrack, skipTrack, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
+           savedStatus, sinkMatches, outputReport, SCOPE_CAP, isJunkName, pathKey, scanTree, scopeLine, matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, afterTrack, skipTrack, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
 })();
