@@ -116,6 +116,10 @@ OPT="$FM1BASE/wifi"
 
 if command -v node >/dev/null; then
     BLEMIDI_VECTORS="$OUT/blemidi_vectors.json" node "$HERE/tests/test_page.js"
+    node "$HERE/tests/test_sim.js"
+    node "$HERE/tests/test_player.js"
+    node "$HERE/tests/test_tags.js"
+    node "$HERE/tests/test_connect.js"
 else
     echo "page: node not found, control page logic NOT tested"
     exit 1

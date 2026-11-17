@@ -2,7 +2,7 @@
 // firmware's formats (jank core/jank_sysex.h)
 const fs = require('fs');
 const assert = require('assert');
-const html = fs.readFileSync(process.argv[2], 'utf8');
+const html = require('../../tests/load_html.js')(process.argv[2]);
 const grab = name => html.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n'))[0];
 const src = ['const JX_TEXT_MAX = 30;', grab('xiaoReport'), grab('xiaoBeatEpochMs'), grab('jxText'), grab('jxFrames'), grab('beatStats')].join('\n');
 const { xiaoReport, xiaoBeatEpochMs, jxText, jxFrames, beatStats } =

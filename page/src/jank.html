@@ -1,0 +1,1626 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jank</title>
+<style>
+:root { --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --dim: #6b6a64; --line: #dddbd3; --accent: #0b6e4f; --warn: #a33b20; --beat: #0b6e4f; --off: #e6e4dc; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; --beat: #4cc497; --off: #2c2c2a; } }
+:root[data-theme="dark"] { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; --beat: #4cc497; --off: #2c2c2a; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+main { max-width: 680px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 14px; }
+.stat b { display: block; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--dim); font-size: 12px; }
+label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--dim); }
+select, input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; width: 100%; min-height: 40px; }
+button { font: inherit; color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 9px 14px; cursor: pointer; min-height: 40px; }
+button.quiet { color: var(--ink); background: transparent; border: 1px solid var(--line); }
+button:disabled { opacity: .45; cursor: default; }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.note { font-size: 13px; color: var(--dim); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+th, td { text-align: left; padding: 3px 8px 3px 0; }
+th { color: var(--dim); font-weight: 500; font-size: 12px; }
+table.groups tbody tr.on td { color: var(--accent); font-weight: 600; }
+td button { padding: 4px 12px; min-height: 32px; }
+details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 2px; }
+.home-top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 12px; }
+.big { font-size: 44px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
+.boxes { display: flex; gap: 6px; flex-wrap: wrap; }
+.boxes span { width: 22px; height: 22px; border-radius: 4px; background: var(--off); }
+.boxes span.on { background: var(--beat); }
+.row { display: flex; gap: 8px; align-items: end; }
+.row input { width: 7em; }
+.meter { height: 8px; border-radius: 4px; background: var(--off); overflow: hidden; margin-top: 6px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--accent); }
+.meter { position: relative; }
+.meter b.tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
+.meter.gated i { background: var(--warn); }
+/* M2k: the confidence holds (no evidence): the bar hatched and dimmed, "HOLD" by the number */
+.meter.hold i { opacity: 0.55; background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--off) 3px 6px); }
+/* the robust follower's COAST: the outputs run under the threshold, the value is measured: the bar hatched the other way, "COAST" by the number */
+.meter.coast i { opacity: 0.75; background-image: repeating-linear-gradient(45deg, transparent 0 3px, var(--off) 3px 6px); }
+#msg { color: var(--dim); min-height: 1.4em; margin: 0 0 12px; }
+#msg.bad { color: var(--warn); }
+#msg:empty { display: none; }
+.hide { display: none !important; }
+[hidden] { display: none !important; }
+<!--@include ui/box.css-->
+#face .hint { margin: 10px 0 0; text-align: center; }
+#player.drop { outline: 2px dashed var(--accent); outline-offset: -6px; }
+#player .row { align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+#player .row > * { width: auto; }
+#player #pl-name { flex: 1 1 10em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+#player input[type="range"] { width: 100%; padding: 0; min-height: 28px; }
+#player input[type="file"] { padding: 6px; }
+#player .num { font-variant-numeric: tabular-nums; color: var(--dim); }
+#player #pl-pitchval { font-size: 18px; font-weight: 600; min-width: 5.5em; color: var(--ink); }
+#player button.link { min-height: 0; padding: 0 2px; background: none; border: 0; color: var(--accent); text-decoration: underline; }
+#player label.monitor { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; margin-left: 10px; font-size: 13px; }
+#player label.monitor input { width: auto; min-height: 0; }
+#player .quiet-file { flex-direction: row; align-items: center; gap: 6px; }
+#pl-crumbs { gap: 4px; margin: 12px 0 6px; }
+#pl-crumbs button { min-height: 28px; padding: 2px 8px; }
+#pl-list { max-height: 360px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+#pl-list button { display: block; width: 100%; text-align: left; min-height: 34px; padding: 6px 10px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); background: transparent; }
+#pl-list button.dir { font-weight: 600; }
+#pl-list button.playing { color: var(--accent); }
+#player select { width: auto; max-width: 100%; }
+#c-advanced-box { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
+#c-advanced-box input { width: auto; min-height: 0; }
+#connect .buttons button { color: var(--ink); background: transparent; border: 1px solid var(--line); }
+#connect .buttons button[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+#face-box svg { width: 100%; max-width: 560px; height: auto; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>jank</h1>
+  </header>
+  <p id="msg"></p>
+
+  <section id="connect">
+    <div class="buttons">
+      <button id="c-sim" type="button" aria-pressed="true" title="the offline demo: a local model, no stick needed">Demo</button>
+      <button id="c-midi" aria-pressed="false">MIDI port (USB, iPhone app)</button>
+      <button id="c-bluetooth" aria-pressed="false">Bluetooth</button>
+      <label id="c-advanced-box" class="hide"><input id="c-advanced" type="checkbox"> Advanced</label>
+    </div>
+    <label id="c-ports-box" class="hide" style="margin-top:10px">MIDI port <select id="c-ports"></select></label>
+  </section>
+
+  <section id="face" class="device">
+    <div id="face-box">
+      <!--@include ui/box.svg.html-->
+    </div>
+    <p id="face-hint" class="note hint"></p>
+  </section>
+
+  <div id="advanced-extra" class="hide"></div>
+
+  <section id="player" class="hide" tabindex="-1">
+    <h2>Player</h2>
+    <audio id="pl-audio" preload="auto"></audio>
+    <div class="row">
+      <input id="pl-file" type="file" accept="audio/*" aria-label="Open audio file">
+      <button id="pl-folder" class="quiet" type="button">Music folder</button>
+      <label id="pl-dirpick" class="hide quiet-file">Choose music folder <input id="pl-dir" type="file" webkitdirectory multiple></label>
+      <button id="pl-reopen" class="quiet hide" type="button"></button>
+    </div>
+    <div class="row"><span id="pl-name" class="note">No file: choose one, or drop it here</span></div>
+    <div class="row">
+      <button id="pl-prev" class="quiet" type="button" disabled>Previous</button>
+      <button id="pl-play" type="button" disabled>Play</button>
+      <button id="pl-next" class="quiet" type="button" disabled>Next</button>
+      <span class="num"><span id="pl-pos">0:00</span> / <span id="pl-len">0:00</span></span>
+    </div>
+    <div class="meter" aria-hidden="true" title="the file's level, as measured in this page"><i id="pl-meter"></i></div>
+    <p id="pl-status" class="note" style="margin:6px 0 8px">no file</p>
+    <input id="pl-seek" type="range" min="0" max="1000" value="0" step="1" disabled aria-label="Position">
+    <div class="row" style="margin-top:10px">
+      <strong>Pitch</strong><span id="pl-pitchval" class="num">+0.00 %</span>
+      <button id="pl-reset" class="quiet" type="button">0</button>
+    </div>
+    <input id="pl-pitch" type="range" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, varispeed">
+    <p id="pl-bpm" class="note hide" style="margin:4px 0 0"></p>
+    <div class="row" style="margin-top:10px"><strong>Volume</strong><span id="pl-volval" class="num">80 %</span></div>
+    <input id="pl-vol" type="range" min="0" max="100" step="1" value="80" aria-label="Volume">
+    <p class="note" style="margin:10px 0 0">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button">change</button>
+      <label class="monitor"><input id="pl-monitor" type="checkbox" checked> monitor</label></p>
+    <select id="pl-out" class="hide" aria-label="Stick output"><option value="">None (monitor only)</option></select>
+    <p id="pl-note" class="note" aria-live="polite">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first button pressed here asks once for permission to list the audio outputs (the browser needs it to show their names). The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card.</p>
+    <div id="pl-browser" class="hide">
+      <div id="pl-crumbs" class="row"></div>
+      <div id="pl-list"></div>
+    </div>
+  </section>
+
+  <section id="home">
+    <h2>Home</h2>
+    <div class="home-top">
+      <div><div class="big" id="h-bpm">-</div><span class="note">BPM</span></div>
+      <div><div class="boxes" id="h-boxes"></div><span class="note" id="h-transport">-</span></div>
+      <div><div class="big" id="h-mode">-</div><span class="note" id="h-mode-note">mode</span></div>
+    </div>
+    <div class="row" style="flex-wrap:wrap;margin-bottom:12px">
+      <label>New tempo <input id="t-tempo" inputmode="decimal" placeholder="120"></label>
+      <button id="t-set" disabled>Set</button>
+      <button id="t-play" disabled>Play</button>
+      <button id="t-up" class="quiet hide" disabled>x2</button>
+      <button id="t-down" class="quiet hide" disabled>÷2</button>
+    </div>
+    <div class="row hide" id="nudges" style="flex-wrap:wrap;margin-bottom:12px">
+      <span class="note">Phase</span>
+      <button id="n-beat-down" class="quiet" disabled title="Link's beats half a beat later">-½</button>
+      <button id="n-beat-up" class="quiet" disabled title="Link's beats half a beat earlier (fixes an off-beat lock)">+½</button>
+      <span class="note">Audio shift</span>
+      <button id="n-ms-down" class="quiet" disabled title="every output 1 ms earlier">-1 ms</button>
+      <button id="n-ms-up" class="quiet" disabled title="every output 1 ms later">+1 ms</button>
+    </div>
+    <div class="grid">
+      <div class="stat"><b id="h-net">-</b><span>network</span></div>
+      <div class="stat"><b id="h-link">-</b><span>Link peers</span></div>
+      <div class="stat"><b id="h-air">-</b><span>units on the air</span></div>
+      <div class="stat"><b id="h-batt">-</b><span>battery</span></div>
+      <div class="stat"><b id="h-level">-</b><span id="h-level-range">input level</span><div class="meter"><i id="h-level-bar"></i></div></div>
+      <div class="stat"><b id="h-conf">-</b><span id="h-conf-note">confidence</span><div class="meter" id="h-conf-meter"><i id="h-conf-bar"></i><b class="tick hide" id="h-conf-tick" title="the threshold"></b></div></div>
+      <div class="stat"><b id="h-ble">-</b><span>Bluetooth</span></div>
+    </div>
+  </section>
+
+  <section id="menu">
+    <h2>Settings</h2>
+    <div class="grid">
+      <label>Group <select id="c-group"></select></label>
+      <div class="row"><button id="scan" class="quiet" disabled>Scan</button></div>
+    </div>
+    <table class="groups" style="margin-top:8px">
+      <thead><tr><th>Group</th><th>Ch.</th><th>Peers</th><th>dBm</th><th></th></tr></thead>
+      <tbody id="groups"></tbody>
+    </table>
+    <p id="scan-result" class="note"></p>
+    <div class="grid">
+      <label>MIDI start / stop <select id="c-transport"><option value="link">Link play / stop</option><option value="auto">Always in a session</option></select></label>
+      <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16" inputmode="numeric"></label>
+      <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01" inputmode="decimal"></label>
+      <label>Name <input id="c-name" maxlength="23"></label>
+      <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
+      <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
+      <label>Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
+      <label>Auto latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
+      <label>USB MIDI clock <select id="c-usbmidi"><option value="on">On: the clock also over USB</option><option value="off">Off: MIDI out (DIN / TRS) only</option></select></label>
+      <label>Low confidence <select id="c-lowconf"><option value="stop">Stop / start: the outputs stop under the threshold</option><option value="run">Keep running</option></select></label>
+      <label>Confidence threshold, % <input id="c-threshold" type="number" min="0" max="100" step="5" inputmode="numeric"></label>
+      <label>Auto bar <select id="c-autobar"><option value="start">At start: the 1 placed when playing starts</option><option value="always">Always: also while playing</option><option value="off">Off</option></select></label>
+      <label>Audio source <select id="c-source"><option value="auto">Auto: the line in when plugged, else USB</option><option value="usb">USB audio</option><option value="line">Line in</option><option value="link">None: Link only (a plugged line still wins)</option></select></label>
+      <label>Bluetooth <select id="c-ble"><option value="pair">Pair now: three clicks or the button</option><option value="auto">On start: also at every start</option><option value="off">Off</option></select></label>
+    </div>
+    <div class="buttons" style="margin-top:10px">
+      <button id="ble-pair" class="quiet" disabled>Pair now (two minutes)</button>
+      <button id="ble-close" class="quiet hide" disabled>Done: Bluetooth off</button>
+    </div>
+    <p class="note">Bluetooth shares the radio with Wi-Fi and MODE JANK, so it is on only for two minutes after three clicks (or
+    after a start, set to "also at every start") and while a phone stays connected.</p>
+
+    <h2 style="margin-top:14px">Network</h2>
+    <p id="net-state" class="note">-</p>
+    <div class="grid">
+      <label>Join <select id="net-mode"><option value="jank">MODE JANK</option><option value="wifi">A Wi-Fi network</option></select></label>
+      <label>Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
+      <label>Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
+    </div>
+    <p class="note" id="net-note">2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.</p>
+    <button id="net-apply" disabled>Save and restart</button>
+  </section>
+
+  <details class="more" id="more">
+    <summary>Details</summary>
+    <section>
+      <h2>Air and Link</h2>
+      <div class="grid">
+        <div class="stat"><b id="s-rssi">-</b><span>best signal, dBm</span></div>
+        <div class="stat"><b id="s-channel">-</b><span>channel</span></div>
+        <div class="stat"><b id="s-link_ip">-</b><span>Link address</span></div>
+        <div class="stat"><b id="s-midi_ticks">-</b><span>MIDI clocks sent</span></div>
+        <div class="stat"><b id="s-midi_resync">-</b><span>clock jumps</span></div>
+        <div class="stat"><b id="s-ble_state">-</b><span>Bluetooth</span></div>
+        <div class="stat"><b id="s-audio">-</b><span>audio heard</span></div>
+        <div class="stat"><b id="s-outputs">-</b><span>clock outputs</span></div>
+        <div class="stat"><b id="s-peak_db">-</b><span>peak, dB</span></div>
+        <div class="stat"><b id="s-air_in">-</b><span>frames from the air</span></div>
+        <div class="stat"><b id="s-air_out">-</b><span>frames to the air</span></div>
+        <div class="stat"><b id="s-drops">-</b><span>dropped by faults</span></div>
+      </div>
+    </section>
+    <section>
+      <h2>Peers heard</h2>
+      <table>
+        <thead><tr><th>Address</th><th>dBm</th><th>ms ago</th><th>Frames</th></tr></thead>
+        <tbody id="units"></tbody>
+      </table>
+    </section>
+    <section>
+      <h2>Firmware</h2>
+      <p id="s-version" class="note">-</p>
+      <p class="note">Update: copy jank.bin onto the JANK drive; it installs as it lands and the jank restarts. Download mode restarts
+      the jank so esptool can reach it.</p>
+      <button id="bootloader" class="quiet" disabled>Download mode</button>
+    </section>
+  </details>
+</main>
+
+<script id="logic">
+/* no DOM in here: tests/test_page.js runs this part on its own */
+function splitLines(buffer, chunk) {
+  const parts = (buffer + chunk).split("\n");
+  const rest = parts.pop();
+  return { lines: parts.map((l) => l.replace(/\r$/, "")), rest };
+}
+
+/* the commands for the Network form; null: not valid. An empty password leaves the stored one. Over Bluetooth the
+   password is never sent (the jank refuses it: the link is not encrypted) */
+function networkCommands(mode, ssid, pass, passStored, overBle) {
+  const printable = (s) => /^[\x20-\x7e]*$/.test(s);
+  if (mode === "jank") return ["set net jank", "reboot"];
+  if (!ssid || ssid.length > 32 || !printable(ssid) || ssid !== ssid.trim()) return null;
+  if (overBle && pass) return null;
+  if (!printable(pass) || pass !== pass.trim() || (pass && (pass.length < 8 || pass.length > 63))) return null;
+  const commands = ["set ssid " + ssid];
+  if (pass) commands.push("set pass " + pass);
+  else if (!passStored && !overBle) commands.push("set pass");
+  commands.push("set net wifi", "reboot");
+  return commands;
+}
+
+/* the line under Network, from get (and status over USB) */
+function networkLine(v) {
+  if (v.net !== "wifi") return "MODE JANK, group " + v.group;
+  if (v.wifi === undefined) return "Wi-Fi network " + v.ssid;
+  if (v.wifi !== "1") return "Looking for " + v.ssid;
+  if (v.wifi_ip === "0.0.0.0") return "On " + v.ssid + ", waiting for an address";
+  return "On " + v.ssid + ", " + v.wifi_ip + ", " + v.wifi_rssi + " dBm, channel " + v.wifi_channel;
+}
+
+/* the control line in SysEx, as core/jank_sysex.c: F0 7D 'J' 'K' <7-bit text> F7, 30 characters a frame; text runs across frames */
+const JX_HEAD = [0xf0, 0x7d, 0x4a, 0x4b], JX_PUSH = [0xf0, 0x7d, 0x4a, 0x42], JX_TEXT_MAX = 30;
+const JX_PUSH_BEAT = 0x10, JX_PUSH_HOME = 0x11;
+function textToSysex(text) {
+  const frames = [];
+  for (let at = 0; at < text.length; at += JX_TEXT_MAX) {
+    const part = [];
+    for (const c of text.slice(at, at + JX_TEXT_MAX)) part.push(c.charCodeAt(0) < 0x80 ? c.charCodeAt(0) : 0x3f);
+    frames.push([...JX_HEAD, ...part, 0xf7]);
+  }
+  return frames;
+}
+function startsWith(data, head) {
+  for (let i = 0; i < head.length; i++) if (data[i] !== head[i]) return false;
+  return true;
+}
+function sysexToText(data) {
+  const n = data.length;
+  if (n < JX_HEAD.length + 1 || data[n - 1] !== 0xf7 || !startsWith(data, JX_HEAD)) return null;
+  let s = "";
+  for (let i = JX_HEAD.length; i < n - 1; i++) s += String.fromCharCode(data[i]);
+  return s;
+}
+
+/* a report the jank sends on its own: F0 7D 'J' 'B' <type> <text> F7 -> { type, text } or null */
+function pushOf(data) {
+  const n = data.length;
+  if (n < JX_PUSH.length + 2 || data[n - 1] !== 0xf7 || !startsWith(data, JX_PUSH)) return null;
+  let text = "";
+  for (let i = JX_PUSH.length + 1; i < n - 1; i++) text += String.fromCharCode(data[i]);
+  return { type: data[JX_PUSH.length], text };
+}
+
+/* the HOME line (core/jank_phone.h): "h bpm_x100 net transport bar quantum link_peers air_peers battery level conf min max mode"
+   (level: the input meter's RMS over 0.3 s; min / max: its extremes over 3 s; mode 0 LINK, 1 AUDIO, x2 x4 /2 /4 AUDIO
+   folded; the last three absent from older firmware). conf "<pct>h": the confidence holds (M2k), pct the value shown;
+   "<pct>c": the outputs COAST (the robust follower runs them under the threshold), pct a measured value */
+function parseHome(text) {
+  const f = String(text).trim().split(/\s+/);
+  if (f.length < 11 || f[0] !== "h") return null;
+  const num = (s) => (s === "-" || !/^-?\d+$/.test(s) ? null : Number(s));
+  const hold = /^\d+h$/.test(f[10]);
+  const coast = /^\d+c$/.test(f[10]);
+  const net = /^j(\d)$/.exec(f[2]) ? { kind: "jank", group: Number(f[2].slice(1)) } : /^w[01]$/.test(f[2]) ? { kind: "wifi", up: f[2] === "w1" } : null;
+  const transport = ["stopped", "playing", "armed"][Number(f[3])];
+  const quantum = num(f[5]);
+  if (!net || !transport || !quantum) return null;
+  return { bpm: (num(f[1]) || 0) / 100, net, transport, bar: num(f[4]), quantum, link: num(f[6]) || 0, air: num(f[7]) || 0,
+           battery: num(f[8]), level: num(f[9]), conf: hold || coast ? Number(f[10].slice(0, -1)) : num(f[10]), confHold: hold, confCoast: coast, levelMin: f.length > 11 ? num(f[11]) : null, levelMax: f.length > 12 ? num(f[12]) : null,
+           audio: f.length > 13 && f[13] !== "0", fold: f.length > 13 && /^[x/][24]$/.test(f[13]) ? f[13] : "" };
+}
+
+/* what HOME shows, ageMs after the line came: the beat goes on at the line's tempo between lines */
+function homeView(h, ageMs) {
+  if (!h) return null;
+  const v = { bpm: h.bpm > 0 ? (Number.isInteger(h.bpm) ? String(h.bpm) : h.bpm.toFixed(2)) : "-", beat: null, quantum: h.quantum };
+  if (h.bpm > 0 && h.bar !== null) {
+    const pos = h.bar / 100 + (h.transport === "stopped" ? 0 : Math.max(0, ageMs) / 60000 * h.bpm);
+    v.beat = Math.floor(((pos % h.quantum) + h.quantum) % h.quantum);
+  }
+  /* AUDIO mode: the transport is the clock outputs' (core/jank_hold.h): stopped only while held by Stop */
+  v.audio = h.audio;
+  v.mode = h.audio ? "AUDIO" + (h.fold ? " " + h.fold.replace("/", "÷") : "") : "LINK";
+  v.modeNote = h.audio ? "the beat tracker leads" : "Link's session";
+  if (h.audio) v.transport = { stopped: "Held: outputs stopped", playing: "Playing", armed: "Starts once the beat locks, on a bar" }[h.transport];
+  else v.transport = h.bpm > 0 ? { stopped: "Stopped", playing: "Playing", armed: "Starts on the next bar" }[h.transport] : "No Link session yet";
+  v.play = h.transport === "stopped" ? "play" : "stop";
+  v.playText = h.audio ? (v.play === "play" ? "Start outputs" : "Stop outputs") : v.play === "play" ? "Play" : "Stop";
+  v.canPlay = h.audio || h.bpm > 0;
+  v.net = h.net.kind === "jank" ? "MODE JANK " + h.net.group : h.net.up ? "Wi-Fi" : "Wi-Fi (looking)";
+  v.link = String(h.link);
+  v.air = h.net.kind === "jank" ? String(h.air) : "-";
+  v.battery = h.battery === null ? "-" : h.battery + " %";
+  v.level = h.level === null ? "-" : h.level + " dB";
+  v.levelRange = h.levelMin === null || h.levelMax === null ? "input level" : "input level, " + h.levelMin + " to " + h.levelMax + " dB in 3 s";
+  v.levelPct = h.level === null ? 0 : Math.max(0, Math.min(100, (h.level + 60) / 60 * 100));
+  v.conf = h.conf === null ? "-" : h.conf + " %" + (h.confHold ? " HOLD" : h.confCoast ? " COAST" : "");
+  v.confHold = !!h.confHold;
+  v.confCoast = !!h.confCoast;
+  v.confPct = h.conf === null ? 0 : Math.max(0, Math.min(100, h.conf));
+  return v;
+}
+
+/* MIDI bytes in any chunks (the iPhone apps' polyfills hand SysEx over as it comes) -> whole F0 .. F7 messages */
+class SysexIn {
+  constructor() { this.buf = null; }
+  feed(bytes, onMessage) {
+    for (let i = 0; i < bytes.length; i++) {
+      const b = bytes[i];
+      if (b >= 0xf8) continue;                         /* real time: anywhere, the clock included */
+      if (b === 0xf0) { this.buf = [b]; continue; }
+      if (this.buf === null) continue;
+      if (b >= 0x80) {
+        if (b === 0xf7) { this.buf.push(b); onMessage(this.buf); }
+        this.buf = null;
+        continue;
+      }
+      this.buf.push(b);
+      if (this.buf.length > 4096) this.buf = null;
+    }
+  }
+}
+
+/* BLE-MIDI packets, ported from core/jank_blemidi.c (tests/test_page.js checks them against its vectors byte for byte) */
+const BLE_PAYLOAD_MIN = 3;
+function isSysex(m) {
+  if (m.length < 2 || m[0] !== 0xf0 || m[m.length - 1] !== 0xf7) return false;
+  for (let i = 1; i + 1 < m.length; i++) if (m[i] >= 0x80) return false;
+  return true;
+}
+/* the next packet of a whole SysEx m from st.at at payload cap (jbm_sysex_packet), or null */
+function bleSysexPacket(m, st, ms, cap) {
+  if (cap < BLE_PAYLOAD_MIN || st.at >= m.length || !isSysex(m)) return null;
+  const ts = 0x80 | (ms & 0x7f), out = [0x80 | ((ms >> 7) & 0x3f)];
+  let pos = st.at;
+  if (pos === 0) { out.push(ts, 0xf0); pos = 1; }
+  while (pos < m.length) {
+    if (pos === m.length - 1) {
+      if (out.length + 2 > cap) break;
+      out.push(ts, 0xf7);
+    } else {
+      if (out.length + 1 > cap) break;
+      out.push(m[pos]);
+    }
+    pos++;
+  }
+  st.at = pos;
+  return out;
+}
+/* a whole SysEx appended to pkt (jbm_pack): true, or false when it does not fit (pkt unchanged) */
+function blePack(m, ms, pkt, cap) {
+  const ts = 0x80 | (ms & 0x7f);
+  if (!isSysex(m) || (pkt.length ? 0 : 1) + pkt.length + m.length + 2 > cap) return false;
+  if (!pkt.length) pkt.push(0x80 | ((ms >> 7) & 0x3f));
+  pkt.push(ts);
+  for (let i = 0; i + 1 < m.length; i++) pkt.push(m[i]);
+  pkt.push(ts, 0xf7);
+  return true;
+}
+/* the sender's rule (ble_midi.c tx_msg): whole messages packed while they fit, one too big for an empty packet split */
+function bleSend(messages, cap, ms) {
+  const out = [];
+  let pkt = [];
+  for (const m of messages) {
+    if (blePack(m, ms, pkt, cap)) continue;
+    if (pkt.length) { out.push(pkt); pkt = []; }
+    if (blePack(m, ms, pkt, cap)) continue;
+    const st = { at: 0 };
+    let p;
+    while ((p = bleSysexPacket(m, st, ms, cap))) out.push(p);
+  }
+  if (pkt.length) out.push(pkt);
+  return out;
+}
+/* one packet -> the plain MIDI byte stream (jbm_decode): 0, or -1 for a malformed packet */
+function bleDataLen(s) {
+  if (s < 0xf0) return (s & 0xe0) === 0xc0 ? 1 : 2;
+  if (s === 0xf1 || s === 0xf3) return 1;
+  return s === 0xf2 ? 2 : 0;
+}
+class BleMidiIn {
+  constructor() { this.inSysex = false; this.running = 0; }
+  decode(p, emit) {
+    const BAD = -1, n = p.length;
+    const sysexData = (i) => { while (i < n && p[i] < 0x80) emit(p[i++]); return i; };
+    const dataBytes = (i, count) => {
+      for (let j = 0; j < count; j++, i++) {
+        if (i >= n || p[i] >= 0x80) return BAD;
+        emit(p[i]);
+      }
+      return i;
+    };
+    const running = (i) => {
+      if (!this.running) return BAD;
+      emit(this.running);
+      return dataBytes(i, bleDataLen(this.running));
+    };
+    const status = (i) => {
+      const s = p[i++];
+      if (s >= 0xf8) { emit(s); return this.inSysex ? sysexData(i) : i; }
+      if (this.inSysex) {
+        this.inSysex = false;
+        if (s === 0xf7) { emit(s); return i; }
+      }
+      if (s === 0xf7) return i;
+      emit(s);
+      if (s === 0xf0) { this.running = 0; this.inSysex = true; return sysexData(i); }
+      this.running = s < 0xf0 ? s : 0;
+      return dataBytes(i, bleDataLen(s));
+    };
+    let i = 1;
+    if (n < 1 || (p[0] & 0xc0) !== 0x80) { this.inSysex = false; return -1; }
+    if (this.inSysex) i = sysexData(i);
+    while (i !== BAD && i < n) {
+      if (p[i] < 0x80) { i = running(i); continue; }
+      if (++i >= n) { i = BAD; break; }
+      i = p[i] < 0x80 ? running(i) : status(i);
+    }
+    if (i === BAD) { this.inSysex = false; this.running = 0; return -1; }
+    return 0;
+  }
+}
+
+/* one answer: lines up to "ok" or "err ..." */
+function parseAnswer(lines) {
+  const values = {};
+  const units = [];
+  const scans = [];
+  for (const line of lines) {
+    const at = line.indexOf("=");
+    if (at < 0) continue;
+    const key = line.slice(0, at);
+    const value = line.slice(at + 1);
+    if (key === "scan") {
+      if (value !== "none") {
+        const [group, channel, frames, count, janks, rssi] = value.split(",").map(Number);
+        scans.push({ group, channel, frames, units: count, janks, rssi });
+      }
+    } else if (key === "peer" && value.includes(",")) {      /* a unit in `status`; plain peer= is the setting in `get` */
+      const [mac, rssi, age, frames] = value.split(",");
+      units.push({ mac, rssi: Number(rssi), age: Number(age), frames: Number(frames) });
+    } else {
+      values[key] = value;
+    }
+  }
+  return { values, units, scans };
+}
+
+function isEnd(line) {
+  return line === "ok" || line.startsWith("err ");
+}
+
+/* The control line over any transport: write(text) puts text on it (as frames), receive(message) takes each whole SysEx that
+   comes back. One command at a time; its answer is the lines up to ok or err. Reports ('J' 'B') go to onPush. */
+class LineClient {
+  constructor(write, timers) {
+    this.write = write;
+    this.timers = timers || { set: (f, ms) => setTimeout(f, ms), clear: (t) => clearTimeout(t) };
+    this.rest = "";
+    this.pending = null;
+    this.queue = Promise.resolve();
+    this.onPush = null;
+  }
+  receive(message) {
+    const push = pushOf(message);
+    if (push) { if (this.onPush) this.onPush(push); return; }
+    const text = sysexToText(message);
+    if (text === null) return;
+    const r = splitLines(this.rest, text);
+    this.rest = r.rest;
+    for (const line of r.lines) {
+      const p = this.pending;
+      if (!p) continue;
+      if (isEnd(line)) p.end(line); else p.lines.push(line);
+    }
+  }
+  send(command, waitMs) {
+    const run = () => new Promise((resolve, reject) => {
+      const p = { lines: [] };
+      const timer = this.timers.set(() => { if (this.pending === p) this.pending = null; reject(new Error("no answer to " + command)); }, waitMs || 2000);
+      p.end = (end) => {
+        this.timers.clear(timer);
+        this.pending = null;
+        if (end === "ok") resolve(parseAnswer(p.lines)); else reject(new Error(end));
+      };
+      p.fail = (e) => { this.timers.clear(timer); this.pending = null; reject(e); };
+      this.pending = p;
+      Promise.resolve().then(() => this.write(command + "\n")).catch(p.fail);
+    });
+    this.queue = this.queue.then(run, run);
+    return this.queue;
+  }
+  close(reason) {
+    if (this.pending) this.pending.fail(new Error(reason || "disconnected"));
+    this.queue = Promise.resolve();
+    this.rest = "";
+  }
+}
+
+/* Web MIDI ports, as the iPhone apps' polyfills give them too (plain objects with forEach; no for..of, no Array.from) */
+function portList(map) {
+  const out = [];
+  if (map && typeof map.forEach === "function") map.forEach((port) => { if (port && port.state !== "disconnected") out.push(port); });
+  return out;
+}
+/* the jank among the ports: "jank" exactly is the USB port; "jank XXXX" a jank over Bluetooth (its BLE name). -> the
+   inputs to choose from, best first, and whether the first is a Bluetooth one */
+function jankPorts(inputs) {
+  const named = inputs.filter((p) => /jank/i.test(p.name || ""));
+  named.sort((a, b) => (b.name === "jank") - (a.name === "jank"));
+  return named;
+}
+function overBluetooth(name) {
+  return /jank/i.test(name || "") && name !== "jank";
+}
+function outputFor(input, outputs) {
+  return outputs.find((o) => o.name === input.name) || outputs.find((o) => /jank/i.test(o.name || "")) || null;
+}
+
+/* the FM-1s and janks heard in a group: a jank shows only by its MAC prefix */
+function peerText(row) {
+  return row.janks ? row.units + ", of which " + row.janks + " jank" : String(row.units);
+}
+
+/* the tempo box's command, or null: Link's 20..999 BPM, two decimals at most; a comma as the decimal point too */
+function tempoCommand(raw) {
+  const value = String(raw).trim().replace(",", ".");
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(value)) return null;
+  const bpm = Number(value);
+  return bpm >= 20 && bpm <= 999 ? "tempo " + value : null;
+}
+
+function faultDrops(v) {
+  return ["drop_big", "drop_bad", "tx_fail", "queue_full", "drop_foreign"].reduce((sum, k) => sum + Number(v[k] || 0), 0);
+}
+
+/* Bluetooth from `status` (ble_state, ble_left) ageMs after it came; over Bluetooth this phone is the one connected */
+function bleView(v, ageMs, overBle) {
+  if (overBle) return "this phone";
+  if (!v || !v.ble_state) return "-";
+  if (v.ble_state === "connected") return "phone connected";
+  if (v.ble_state !== "window") return "off";
+  const left = Math.max(0, Number(v.ble_left || 0) - Math.floor(Math.max(0, ageMs) / 1000));
+  return left > 0 ? "pairing " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") : "off";
+}
+
+/* the audio lines of `status` for the details */
+function audioView(v) {
+  const heard = v.audio === undefined ? "-" : v.audio_live === "1" ? "sound (AUDIO)" : v.audio === "1" ? "silent (LINK)" : "none (LINK)";
+  return { audio: v.audio_source && v.audio_source !== "none" ? heard + ", " + v.audio_source : heard, outputs: v.outputs || "-",
+           peak_db: v.peak_db ?? "-" };
+}
+
+/* LOW CONFIDENCE on the confidence meter, from `status` (fresh: the age is the caller's) or `get`: the threshold's tick
+   (percent, null: none, KEEP RUNNING or 0) and the note under the number; gated: the outputs are stopped by it (AUDIO mode) */
+function confView(v) {
+  if (!v || v.lowconf === undefined) return { tick: null, note: "confidence", gated: false };
+  const th = Number(v.threshold);
+  const on = v.lowconf === "stop" && th > 0;
+  const gated = on && v.gated === "1" && v.audio_live === "1";
+  const silent = v.silent === "1" && v.audio_live === "1";
+  const note = silent ? "confidence: silence, outputs stopped" : gated ? "confidence: under " + th + " %, outputs stopped"
+             : on ? "confidence (stops under " + th + " %)" : "confidence (keeps running)";
+  return { tick: on ? Math.max(0, Math.min(100, th)) : null, note, gated: gated || silent };
+}
+
+/* a setting's command, or null when the value is not one the jank takes */
+function setCommand(key, raw) {
+  const value = String(raw).trim();
+  if (key === "offset") {        /* ms, 10 us steps */
+    if (!/^-?\d{1,3}(\.\d{1,2})?$/.test(value) || Math.abs(Number(value)) > 100) return null;
+    return "set offset " + value;
+  }
+  const range = { group: [1, 9], quantum: [1, 16], beat_latency: [-300, 300], threshold: [0, 100] }[key];
+  if (range) {
+    const n = Number(value);
+    if (value === "" || !Number.isInteger(n) || n < range[0] || n > range[1]) return null;
+    return "set " + key + " " + n;
+  }
+  const choices = { filter: ["link", "all"], peer: ["on", "off"], transport: ["link", "auto"], beat: ["on", "off"], ble: ["pair", "off", "auto"],
+                    source: ["auto", "line", "usb", "link"], autobar: ["off", "start", "always"], usbmidi: ["on", "off"],
+                    lowconf: ["run", "stop"] }[key];
+  if (choices) return choices.includes(value) ? "set " + key + " " + value : null;
+  if (key === "name" && /^[\x20-\x7e]{1,23}$/.test(value)) return "set name " + value;
+  return null;
+}
+
+/* AUDIO mode's nudges (the device's NO / YES held + UP / DOWN): kind "beat" moves Link's beats half a beat (+: earlier),
+   "ms" the AUDIO IN offset 1 ms (+: every output later) */
+function nudgeCommand(kind, dir) {
+  if (kind === "beat") return "nudge beat " + (dir > 0 ? "+0.5" : "-0.5");
+  return "nudge ms " + (dir > 0 ? "+1" : "-1");
+}
+
+/* what the page says after a nudge's answer (values: its key=value lines). Two layers each (M2h): the PHASE (beats) on top
+   of AUTO BAR's bar, the AUDIO SHIFT (ms) on top of the auto latency; 0 is AUTO. (A firmware before M2h: no lat_trim) */
+function nudgeSaid(kind, dir, values) {
+  const sign = (x) => (x > 0 ? "+" : "") + x;
+  if (kind === "beat") {
+    const total = Number(values.nudge_beats);
+    return total ? "Phase " + sign(total) + " beats, on top of AUTO BAR's bar." : "Phase: AUTO (AUTO BAR's bar alone).";
+  }
+  if (values.lat_trim === undefined) return "Audio in offset " + sign(Number(values.beat_latency)) + " ms.";
+  const trim = Number(values.lat_trim);
+  return trim ? "Audio shift " + sign(trim) + " ms, on top of the auto " + values.lat_auto + " ms." : "Audio shift: AUTO (" + values.lat_auto + " ms).";
+}
+
+const LAT_SRC = { usb: "(the computer's)", line: "(the line in's)" };   /* beat_latency_src; a hosted device: host:VID:PID */
+/* the latency field is the auto base (`set beat_latency`); its note says the source and the AUDIO SHIFT on top */
+function latField(v) { return v.lat_auto !== undefined ? v.lat_auto : v.beat_latency; }
+function latNote(src, v) {
+  const trim = Number(v.lat_trim || 0);
+  return (LAT_SRC[src] || "(" + src + ")") + (trim ? " + audio shift " + (trim > 0 ? "+" : "") + trim + " ms" : "");
+}
+
+/* the error answers of the nudges, in words */
+function nudgeError(message) {
+  return { "err link mode": "The nudges are for AUDIO mode (music heard).", "err no beat yet": "No beat to nudge yet: the tracker has not locked.",
+           "err busy": "The jank is busy: try again." }[message]
+    || (/^err nudge beat at its limit/.test(message) ? "The beat is nudged 3 beats already: that is the limit." : message);
+}
+</script>
+
+<script id="ui">
+const $ = (id) => document.getElementById(id);
+const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency", "autobar", "usbmidi", "lowconf",
+                  "threshold", "source", "ble"];
+const BLE_SVC = "03b80e5a-ede8-4b33-a751-6ce34ec4c700", BLE_CHR = "7772e5db-3868-4112-a1a9-f2669d106bf3";
+const BLE_CAP = 20;                   /* write payload: the default ATT MTU's, which every link takes (Web Bluetooth does not say the MTU) */
+const HOME_EVERY_USB_MS = 300, STATUS_EVERY_MS = 1500, HOME_STALE_MS = 3000, BLE_WAIT_MS = 5000;
+const PAIR_WATCH_MS = 125000;         /* after Pair now, `status` is polled for the window's countdown this long */
+const S = { line: null, kind: null, ble: false, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastScans: [], timers: [],
+            lastStatus: null, statusAt: 0, pairAt: -Infinity };
+
+function say(text, bad) {
+  $("msg").textContent = text;
+  $("msg").classList.toggle("bad", !!bad);
+}
+
+function cells(row, values) {
+  for (const value of values) {
+    const td = document.createElement("td");
+    if (value instanceof Node) td.append(value); else td.textContent = value;
+    row.append(td);
+  }
+  return row;
+}
+
+function send(command, waitMs) {
+  if (!S.line) return Promise.reject(new Error("not connected"));
+  return S.line.send(command, waitMs || (S.ble ? BLE_WAIT_MS : 2000));
+}
+
+function showHome() {
+  const v = homeView(S.lastHome, performance.now() - S.homeAt);
+  const boxes = $("h-boxes");
+  const q = v ? v.quantum : 0;
+  if (boxes.children.length !== q) boxes.replaceChildren(...Array.from({ length: q }, () => document.createElement("span")));
+  for (let i = 0; i < q; i++) boxes.children[i].classList.toggle("on", v.beat === i);
+  $("h-bpm").textContent = v ? v.bpm : "-";
+  $("h-transport").textContent = v ? v.transport : "-";
+  $("h-mode").textContent = v ? v.mode : "-";
+  $("h-mode-note").textContent = v ? v.modeNote : "mode";
+  $("h-level-range").textContent = v ? v.levelRange : "input level";
+  $("h-ble").textContent = bleView(S.lastStatus, performance.now() - S.statusAt, S.ble);
+  for (const k of ["net", "link", "air", "level", "conf"]) $("h-" + k).textContent = v ? v[k] : "-";
+  $("h-batt").textContent = v ? v.battery : "-";
+  $("h-level-bar").style.width = (v ? v.levelPct : 0) + "%";
+  $("h-conf-bar").style.width = (v ? v.confPct : 0) + "%";
+  const fresh = S.lastStatus && performance.now() - S.statusAt < HOME_STALE_MS;
+  const c = confView(fresh ? S.lastStatus : S.lastGet);     /* (a `get` has the settings, no gate) */
+  $("h-conf-note").textContent = c.note;
+  $("h-conf-tick").classList.toggle("hide", c.tick === null);
+  if (c.tick !== null) $("h-conf-tick").style.left = c.tick + "%";
+  $("h-conf-meter").classList.toggle("gated", c.gated);
+  $("h-conf-meter").classList.toggle("hold", !!(v && v.confHold));
+  if (v && v.confHold) $("h-conf-note").textContent = "confidence: holding, no beats to judge (the outputs keep running)";
+  $("h-conf-meter").classList.toggle("coast", !!(v && v.confCoast));
+  if (v && v.confCoast) $("h-conf-note").textContent = "confidence: coasting under the threshold (the outputs keep running on the follower's tempo and phase)";
+  const on = !!(S.line && S.lastHome && S.lastHome.bpm > 0);
+  $("t-set").disabled = !on;
+  $("t-play").disabled = !(S.line && v && v.canPlay);
+  $("t-play").textContent = v ? v.playText : "Play";
+  for (const id of ["t-up", "t-down"]) {         /* AUDIO mode: the fold, x2 / ÷2 of the tracked tempo (`fold`) */
+    $(id).classList.toggle("hide", !(v && v.audio));
+    $(id).disabled = !(S.line && v && v.audio);
+  }
+  $("nudges").classList.toggle("hide", !(v && v.audio));   /* AUDIO mode: the nudges (`nudge beat`, `nudge ms`) */
+  for (const id of ["n-beat-down", "n-beat-up", "n-ms-down", "n-ms-up"]) $(id).disabled = !(S.line && v && v.audio);
+}
+
+function takeHome(text) {
+  const h = parseHome(text);
+  if (!h) return;
+  S.lastHome = h;
+  S.homeAt = performance.now();
+}
+
+function showSettings({ values: v }) {
+  S.lastGet = v;
+  if (document.activeElement !== $("net-mode") && v.net) $("net-mode").value = v.net;
+  if (document.activeElement !== $("net-ssid") && v.ssid !== undefined) $("net-ssid").value = v.ssid;
+  for (const key of SETTINGS) {
+    const el = $("c-" + key);
+    if (document.activeElement !== el && v[key] !== undefined) el.value = key === "beat_latency" ? latField(v) : v[key];
+  }
+  $("net-state").textContent = networkLine(v);
+  if (v.beat_latency_src) $("c-beat_latency_src").textContent = latNote(v.beat_latency_src, v);
+  $("s-version").textContent = v.version ? "Version " + v.version + ", address " + v.mac : "-";
+}
+
+function showStatus({ values: v, units }) {
+  S.lastStatus = v;
+  S.statusAt = performance.now();
+  const a = audioView(v);
+  for (const key of ["audio", "outputs", "peak_db"]) $("s-" + key).textContent = a[key];
+  for (const key of ["rssi", "channel", "link_ip", "midi_ticks", "midi_resync", "air_in", "air_out"]) $("s-" + key).textContent = v[key] ?? "-";
+  $("s-ble_state").textContent = v.ble_state ? v.ble_state + (v.ble_state === "window" ? ", " + v.ble_left + " s" : "") : "not in this build";
+  $("s-drops").textContent = faultDrops(v);
+  $("units").replaceChildren(...units.map((u) => cells(document.createElement("tr"), [u.mac, u.rssi, u.age, u.frames])));
+  $("net-state").textContent = networkLine({ ...S.lastGet, ...v });
+}
+
+function showGroups(scans) {
+  S.lastScans = scans;
+  const home = $("c-group").value;
+  $("groups").replaceChildren(...scans.map((g) => {
+    const on = String(g.group) === home;
+    const row = document.createElement("tr");
+    row.classList.toggle("on", on);
+    let action = "Joined";
+    if (!on) {
+      action = document.createElement("button");
+      action.textContent = "Join";
+      action.disabled = !S.line;
+      action.addEventListener("click", () => {
+        $("c-group").value = String(g.group);
+        change("group");
+        showGroups(S.lastScans);
+      });
+    }
+    return cells(row, [g.group, g.channel, peerText(g), g.rssi, action]);
+  }));
+  $("scan-result").textContent = scans.length ? "" : "No group heard.";
+}
+
+async function scan() {
+  $("scan").disabled = true;
+  $("scan-result").textContent = "Scanning...";
+  try {
+    showGroups((await send("scan", S.ble ? 8000 : 4000)).scans);
+  } catch (e) {
+    $("scan-result").textContent = "";
+    say(e.message, true);
+  }
+  $("scan").disabled = !S.line;
+}
+
+async function change(key) {
+  const command = setCommand(key, $("c-" + key).value);
+  if (!command) {
+    say("That value is not allowed for " + key + ".", true);
+    return;
+  }
+  try {
+    await send(command);
+    showSettings(await send("get"));
+    say("Saved on the jank.");
+  } catch (e) {
+    say(e.message, true);
+  }
+}
+
+async function session(command, done) {
+  try {
+    await send(command);
+    say(done);
+    if (!S.ble) takeHome((await send("home")).values.home);
+  } catch (e) {
+    say(e.message === "err no session" ? "No Link session to change yet." : e.message === "err link mode" ? "x2 and ÷2 are for AUDIO mode (music heard)." : e.message, true);
+  }
+}
+
+/* USB: HOME and the details by polling; Bluetooth: HOME comes by itself (a push), polled only when it stops coming */
+async function pollHome() {
+  if (!S.line) return;
+  if (S.ble && performance.now() - S.homeAt < HOME_STALE_MS) return;
+  try {
+    takeHome((await send("home")).values.home);
+  } catch (e) {
+    say(e.message, true);
+  }
+}
+async function pollStatus() {
+  if (!S.line || S.ble || (!$("more").open && performance.now() - S.pairAt > PAIR_WATCH_MS)) return;
+  try {
+    showStatus(await send("status"));
+  } catch (e) {
+    say(e.message, true);
+  }
+}
+
+/* Advanced: a check box shown only over USB MIDI; it shows the Player card (and the room for the extra info of the next stage) */
+function paintAdvanced() {
+  const visible = S.kind === "midi" && $("c-advanced").checked;
+  $("c-advanced-box").classList.toggle("hide", S.kind !== "midi");
+  $("player").classList.toggle("hide", !visible);
+  $("advanced-extra").classList.toggle("hide", !visible);
+  document.dispatchEvent(new CustomEvent("jank-advanced", { detail: { visible } }));
+}
+const ADVANCED_KEY = "jank.advanced";
+function storedAdvanced() {
+  try { return localStorage.getItem(ADVANCED_KEY) === "1"; } catch (e) { return false; }     /* storage blocked: not remembered */
+}
+function rememberAdvanced(on) {
+  try { localStorage.setItem(ADVANCED_KEY, on ? "1" : "0"); } catch (e) { /* not remembered */ }
+}
+
+function setConnected(kind, ble) {
+  S.kind = kind;
+  S.ble = ble;
+  $("c-sim").setAttribute("aria-pressed", String(!kind));
+  $("c-midi").setAttribute("aria-pressed", String(kind === "midi"));
+  $("c-bluetooth").setAttribute("aria-pressed", String(kind === "ble"));
+  paintAdvanced();
+  $("more").classList.toggle("hide", ble);
+  $("ble-close").classList.toggle("hide", !ble);
+  $("ble-pair").classList.toggle("hide", ble);
+  $("net-pass").disabled = ble;
+  $("net-note").textContent = ble ? "The Wi-Fi password goes over USB only: the Bluetooth link is not encrypted. A saved password stays." : "2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.";
+  for (const id of ["scan", "net-apply", "bootloader", "ble-pair", "ble-close"]) $(id).disabled = !kind;
+}
+
+function disconnected(text) {
+  for (const t of S.timers) clearInterval(t);
+  S.timers = [];
+  if (S.line) S.line.close(text);
+  if (S.drop) S.drop();
+  S.line = null;
+  S.drop = null;
+  S.lastHome = null;
+  setConnected(null, false);
+  showHome();
+  showGroups(S.lastScans);
+  if (text) say(text, true);
+}
+
+async function started(line, kind, ble, drop) {
+  S.line = line;
+  S.drop = drop;
+  line.onPush = (p) => { if (p.type === JX_PUSH_HOME) takeHome(p.text); };
+  setConnected(kind, ble);
+  try {
+    let got;
+    try { got = await send("get"); } catch (e) { got = await send("get"); }   /* the first answer, tried twice */
+    showSettings(got);
+    say("");
+    await pollHome();
+  } catch (e) {
+    disconnected(e.message + (ble ? "" : ". If the app asks for SysEx, turn it on."));
+    return;
+  }
+  S.timers.push(setInterval(showHome, 50));
+  S.timers.push(setInterval(pollHome, S.ble ? 1000 : HOME_EVERY_USB_MS));
+  S.timers.push(setInterval(pollStatus, STATUS_EVERY_MS));
+}
+
+/* Web MIDI: the USB port, or a jank the iPhone app connected over Bluetooth. Calls kept to what the apps' polyfills take:
+   one .then(ok, fail) on requestMIDIAccess, forEach over the ports, onmidimessage, send in a try */
+function midiAccess() {
+  return new Promise((resolve, reject) => {
+    try { navigator.requestMIDIAccess({ sysex: true }).then(resolve, reject); } catch (e) { reject(e); }
+  });
+}
+
+function attachMidi(access, input) {
+  const output = outputFor(input, portList(access.outputs));
+  if (!output) throw new Error("No output port next to " + input.name);
+  const sysex = new SysexIn();
+  const ble = overBluetooth(input.name);
+  const line = new LineClient(async (text) => {
+    for (const frame of textToSysex(text)) {
+      try { output.send(frame); } catch (e) { throw new Error("The MIDI port refused SysEx: turn SysEx on in the app's settings"); }
+    }
+  });
+  input.onmidimessage = (ev) => {
+    const d = ev.data, bytes = new Uint8Array(d.length);
+    for (let i = 0; i < d.length; i++) bytes[i] = d[i];
+    sysex.feed(bytes, (m) => line.receive(m));
+  };
+  access.onstatechange = () => {
+    if (!portList(access.inputs).some((p) => p.id === input.id)) disconnected("The jank's MIDI port went away.");
+  };
+  started(line, "midi", ble, () => { input.onmidimessage = null; access.onstatechange = null; });
+}
+
+async function connectMidi() {
+  if (!navigator.requestMIDIAccess) {
+    say("No Web MIDI here: use Chrome or Edge on a computer, or an iPhone MIDI browser app.", true);
+    return;
+  }
+  disconnected();
+  try {
+    const access = await midiAccess();
+    const inputs = portList(access.inputs);
+    const jank = jankPorts(inputs);
+    const choices = jank.length ? jank : inputs;
+    if (!choices.length) throw new Error("No MIDI port at all. Is the jank plugged in, or connected in the app's Bluetooth MIDI settings?");
+    if (choices.length > 1 || !jank.length) {
+      $("c-ports").replaceChildren(...choices.map((p, i) => new Option(p.name || "port " + (i + 1), String(i))));
+      $("c-ports-box").classList.remove("hide");
+      $("c-ports").onchange = () => { disconnected(); attachMidi(access, choices[Number($("c-ports").value)]); };
+    } else {
+      $("c-ports-box").classList.add("hide");
+    }
+    attachMidi(access, choices[0]);
+  } catch (e) {
+    disconnected(e && e.message ? e.message : "No MIDI access (code " + (e && e.code) + ").");
+  }
+}
+
+/* Web Bluetooth: Chrome on a computer or Android, straight to the BLE-MIDI service, packets made here */
+async function connectBle() {
+  if (!navigator.bluetooth) {
+    say("No Web Bluetooth here (Chrome on a computer or Android has it). On an iPhone, use a MIDI browser app and MIDI port.", true);
+    return;
+  }
+  disconnected();
+  try {
+    const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE_SVC] }, { namePrefix: "jank" }], optionalServices: [BLE_SVC] });
+    const server = await device.gatt.connect();
+    const chr = await (await server.getPrimaryService(BLE_SVC)).getCharacteristic(BLE_CHR);
+    const decoder = new BleMidiIn(), sysex = new SysexIn();
+    let writing = Promise.resolve();
+    const line = new LineClient((text) => {
+      const ms = Math.floor(performance.now()) & 0x1fff;
+      for (const pkt of bleSend(textToSysex(text), BLE_CAP, ms)) {
+        const v = new Uint8Array(pkt);
+        /* one write at a time; a failed one fails its command, not the ones after it */
+        writing = writing.catch(() => undefined).then(() => (chr.writeValueWithoutResponse ? chr.writeValueWithoutResponse(v) : chr.writeValue(v)));
+      }
+      return writing;
+    });
+    const onValue = (ev) => {
+      const dv = ev.target.value, pkt = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+      const bytes = [];
+      decoder.decode(pkt, (b) => bytes.push(b));
+      sysex.feed(bytes, (m) => line.receive(m));
+    };
+    const onGone = () => disconnected("The Bluetooth link ended.");
+    chr.addEventListener("characteristicvaluechanged", onValue);
+    device.addEventListener("gattserverdisconnected", onGone);
+    await chr.startNotifications();
+    started(line, "ble", true, () => {
+      chr.removeEventListener("characteristicvaluechanged", onValue);
+      device.removeEventListener("gattserverdisconnected", onGone);
+      if (device.gatt.connected) device.gatt.disconnect();
+    });
+  } catch (e) {
+    disconnected(e.message);
+  }
+}
+
+for (let g = 1; g <= 9; g++) $("c-group").add(new Option("Group " + g + " (channel " + [1, 6, 11][(g - 1) % 3] + ")", String(g)));
+for (const key of SETTINGS) $("c-" + key).addEventListener("change", () => change(key));
+/* Demo is the base: pressing the active connection again, or Demo, leaves it; every way out ends in disconnected() */
+$("c-midi").addEventListener("click", () => (S.kind === "midi" ? disconnected() : connectMidi()));
+$("c-bluetooth").addEventListener("click", () => (S.kind === "ble" ? disconnected() : connectBle()));
+$("c-sim").addEventListener("click", () => { if (S.kind) disconnected(); });
+$("c-advanced").checked = storedAdvanced();
+$("c-advanced").addEventListener("change", () => { rememberAdvanced($("c-advanced").checked); paintAdvanced(); });
+$("scan").addEventListener("click", scan);
+$("t-set").addEventListener("click", () => {
+  const command = tempoCommand($("t-tempo").value);
+  if (!command) { say("A tempo is 20 to 999 BPM.", true); return; }
+  session(command, "Tempo sent to the session.").then(() => { $("t-tempo").value = ""; });
+});
+$("t-up").addEventListener("click", () => session("fold x2", "Tempo doubled (x2)."));
+$("t-down").addEventListener("click", () => session("fold /2", "Tempo halved (÷2)."));
+async function nudge(kind, dir) {
+  try {
+    const { values } = await send(nudgeCommand(kind, dir));
+    say(nudgeSaid(kind, dir, values));
+    if (kind === "ms" && document.activeElement !== $("c-beat_latency")) $("c-beat_latency").value = latField(values);
+  } catch (e) {
+    say(nudgeError(e.message), true);
+  }
+}
+$("n-beat-down").addEventListener("click", () => nudge("beat", -1));
+$("n-beat-up").addEventListener("click", () => nudge("beat", 1));
+$("n-ms-down").addEventListener("click", () => nudge("ms", -1));
+$("n-ms-up").addEventListener("click", () => nudge("ms", 1));
+$("t-play").addEventListener("click", () => {
+  const v = homeView(S.lastHome, 0);
+  const play = !v || v.play === "play";
+  const done = v && v.audio ? (play ? "Outputs start once the beat locks, on the next bar." : "Outputs stopped.")
+    : play ? "The session starts on the next bar." : "Session stopped.";
+  session(play ? "play" : "stop", done);
+});
+$("ble-pair").addEventListener("click", async () => {
+  try { await send("ble pair"); S.pairAt = performance.now(); say("Bluetooth is open for two minutes: connect the phone now."); pollStatus(); } catch (e) { say(e.message === "err ble is off" ? "Bluetooth is set to off: change the setting first." : e.message, true); }
+});
+$("ble-close").addEventListener("click", async () => {
+  try { await send("ble close"); } catch (e) { /* the link may end before the answer: that is the point */ }
+  disconnected("Bluetooth is off on the jank. Three clicks open it again.");
+});
+$("net-apply").addEventListener("click", async () => {
+  const commands = networkCommands($("net-mode").value, $("net-ssid").value, $("net-pass").value, S.lastGet.pass === "set", S.ble);
+  if (!commands) {
+    say(S.ble ? "Check the Wi-Fi name. The password can only be set over USB." : "Check the Wi-Fi name, and that the password is 8 to 63 characters.", true);
+    return;
+  }
+  try {
+    for (const command of commands) await send(command);
+    $("net-pass").value = "";
+    say("The jank is restarting. Give it a few seconds.");
+  } catch (e) {
+    say(e.message, true);
+  }
+});
+$("bootloader").addEventListener("click", async () => {
+  try { await send("bootloader"); } catch (e) { say(e.message, true); }
+  disconnected("The jank restarted for flashing. Unplug it and plug it back in to run again.");
+});
+$("c-bluetooth").classList.toggle("hide", !navigator.bluetooth);
+setConnected(null, false);
+showHome();
+</script>
+<!--@include ui/oled.js-->
+<!--@include ui/face.js-->
+<!--@include ui/sim.js-->
+<!--@include ui/player.js-->
+<script id="face-ui">
+(() => {
+  const el = (id) => document.getElementById(id);
+  const ARMS = ["up", "down", "no", "yes"];
+  const IDLE_REDRAW_MS = 100, SCREEN = "2.42";
+  const svg = el("dev"), card = el("face");
+  const sim = Sim.create();
+  let hovered = false, pending = 0, wake = 0;
+
+  const paintCanvas = (canvas, fb) => {
+    const ctx2d = canvas.getContext("2d");
+    Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), fb, sim.dev.bright);
+  };
+  const paintArms = () => {
+    for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", sim.held[b]);
+  };
+  const paintLeds = (now) => Sim.ledCss(sim, now).forEach((css, i) => Face.paintLed(svg, i, css));
+
+  function draw() {
+    pending = 0;
+    const now = performance.now();
+    Sim.tick(sim, now);
+    paintCanvas(el("oled"), Sim.framebuffer(sim, now));
+    paintLeds(now);
+    paintArms();
+    clearTimeout(wake);
+    if (Sim.busy(sim, now)) schedule();
+    else wake = setTimeout(schedule, Math.min(Sim.nextBeatInMs(sim, now), IDLE_REDRAW_MS * 5));
+  }
+  function schedule() { if (!pending) pending = requestAnimationFrame(draw); }
+
+  const pressDown = (b) => { Sim.down(sim, b, performance.now()); schedule(); };
+  const pressUp = (b) => { Sim.up(sim, b, performance.now()); schedule(); };
+
+  const padButton = new Map();
+  el("dpad").addEventListener("pointerdown", (e) => {
+    const target = e.target.closest("[data-b]");
+    if (!target) return;
+    e.preventDefault();
+    padButton.set(e.pointerId, target.dataset.b);
+    pressDown(target.dataset.b);
+  });
+  const onPointerEnd = (e) => {
+    const b = padButton.get(e.pointerId);
+    if (!b) return;
+    padButton.delete(e.pointerId);
+    pressUp(b);
+  };
+  window.addEventListener("pointerup", onPointerEnd);
+  window.addEventListener("pointercancel", onPointerEnd);
+
+  const typing = (t) => ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(t.tagName);
+  const faceActive = () => hovered || card.contains(document.activeElement);
+  const keyButton = (e) => (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey ? null : Sim.KEY_BTN[e.key] || null);
+  window.addEventListener("keydown", (e) => {
+    const b = keyButton(e);
+    if (!b) return;
+    if (faceActive()) e.preventDefault();
+    if (!e.repeat) pressDown(b);
+  });
+  window.addEventListener("keyup", (e) => {
+    const b = keyButton(e);
+    if (!b) return;
+    if (faceActive()) e.preventDefault();
+    pressUp(b);
+  });
+  window.addEventListener("blur", () => { Sim.releaseAll(sim, performance.now()); schedule(); });
+  card.addEventListener("pointerenter", () => { hovered = true; });
+  card.addEventListener("pointerleave", () => { hovered = false; });
+
+  // ?sim=NO,DOWN presses those buttons once, in order, at load: a preview / test hook (no keyboard needed)
+  const replay = (list) => list.split(",").filter(Boolean).forEach((name) => {
+    const b = name.toLowerCase(), at = performance.now();
+    if (!ARMS.includes(b)) throw new Error("?sim: unknown button " + name);
+    Sim.down(sim, b, at); Sim.up(sim, b, at + 1);
+  });
+
+  const params = new URLSearchParams(location.search);
+  Face.placeScreen(svg, SCREEN);
+  Face.makeLeds(svg);
+  el("face-hint").textContent = Sim.KEY_HINT;
+  if (params.has("sim")) replay(params.get("sim"));
+  schedule();
+})();
+</script>
+<script id="player-ui">
+(() => {
+  const el = (id) => document.getElementById(id);
+  const card = el("player"), audio = el("pl-audio");
+  const KEY = { output: "jank.player.output", volume: "jank.player.volume" };
+  const DB = { name: "jank-player", store: "handles", key: "music" };
+  let url = null, hovered = false, seeking = false, outputAsked = false, error = "", level = Player.LEVEL_FLOOR_DB, lastFrame = 0, frame = 0;
+  const tap = { context: null, source: null, analyser: null, samples: null, url: null, routed: false, sinkId: "", missing: false };
+  const jank = { id: "", label: "", error: "" };
+  let tagBpm;                                   // undefined: not read yet, null: the file has no BPM tag
+  const queue = { entries: [], index: -1 };
+  const browser = { rootName: "", names: [], handles: [], tree: null, entries: [], shown: Player.MAX_ROWS };
+
+  const note = (text, bad) => { el("pl-note").textContent = text; el("pl-note").style.color = bad ? "var(--warn)" : ""; };
+  const errorText = (err) => (err && err.message ? err.message : String(err));
+  // storage can be blocked (private windows, some file:// setups): then nothing is remembered, the player still works
+  const store = {
+    get(key) { try { return localStorage.getItem(key); } catch (err) { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); } catch (err) { /* not remembered */ } },
+  };
+
+  // ---- playback: pitch (varispeed), volume, position ----
+  function applyPitch() {
+    const pct = Number(el("pl-pitch").value), rate = Player.pitchToRate(pct);
+    audio.preservesPitch = false;
+    audio.defaultPlaybackRate = rate;
+    audio.playbackRate = rate;
+    el("pl-pitchval").textContent = Player.formatPitch(pct);
+    paintBpm();
+  }
+  // the BPM written into the playing file's tags times the playback rate (the plain product: the stick folds half / double, this does not)
+  function paintBpm() {
+    const line = el("pl-bpm");
+    line.classList.toggle("hide", tagBpm === undefined);
+    if (tagBpm === undefined) return;
+    line.textContent = tagBpm === null ? "no BPM tag" : "tag BPM " + tagBpm.toFixed(2) + " \u00d7 pitch \u2192 " + Player.expectedBpm(tagBpm, audio.playbackRate).toFixed(2);
+  }
+  async function readHead(file, length) {
+    return new Uint8Array(await file.slice(0, length).arrayBuffer());
+  }
+  // only the playing file's tags, and only the part that holds them: an ID3 tag by its size, an MP4's moov atom found by walking the
+  // atom headers (it can sit after the audio), the first 2 MB of a FLAC / Ogg file. A tag beyond those limits is not found.
+  async function readTagBpm(file) {
+    const head = await readHead(file, 16);
+    switch (Player.sniff(head)) {
+      case "id3": return Player.parseId3(await readHead(file, Math.min(Player.id3TotalSize(head), Player.MAX_TAG_BYTES)));
+      case "flac": return Player.parseFlac(await readHead(file, Player.MAX_TAG_BYTES));
+      case "ogg": return Player.parseOgg(await readHead(file, Player.MAX_TAG_BYTES));
+      case "mp4": return readMp4Bpm(file);
+      default: return null;
+    }
+  }
+  async function readMp4Bpm(file) {
+    let at = 0;
+    for (let atoms = 0; atoms < 64 && at < file.size; atoms++) {
+      const header = new Uint8Array(await file.slice(at, at + 16).arrayBuffer()), atom = Player.mp4Atom(header);
+      if (!atom || atom.size < atom.headerLen) return null;
+      if (atom.type === "moov") return Player.parseMp4Tmpo(new Uint8Array(await file.slice(at, at + Math.min(atom.size, Player.MAX_TAG_BYTES)).arrayBuffer()));
+      at += atom.size;
+    }
+    return null;
+  }
+  async function showTagBpm(file) {
+    tagBpm = undefined;
+    paintBpm();
+    const mine = url;
+    let found;
+    try { found = await readTagBpm(file); } catch (err) { if (url === mine) { el("pl-bpm").classList.remove("hide"); el("pl-bpm").textContent = "BPM tag unreadable: " + errorText(err); } return; }
+    if (url !== mine) return;
+    tagBpm = found;
+    paintBpm();
+  }
+  function applyVolume() {
+    const pct = Number(el("pl-vol").value);
+    audio.volume = Player.volumeFromPct(pct);
+    el("pl-volval").textContent = pct + " %";
+  }
+  function paintTime() {
+    paintStatus();
+    el("pl-pos").textContent = Player.formatTime(audio.currentTime);
+    el("pl-len").textContent = Player.formatTime(audio.duration);
+    if (!seeking && Number.isFinite(audio.duration) && audio.duration > 0) el("pl-seek").value = Math.round(1000 * audio.currentTime / audio.duration);
+  }
+  function paintStatus() {
+    el("pl-status").textContent = Player.statusText({
+      hasFile: url !== null, paused: audio.paused, position: audio.ended ? 0 : audio.currentTime, length: audio.duration,
+      monitor: el("pl-monitor").checked, jank: jank.id ? jank.label : "", jankError: jank.error, volumePct: Number(el("pl-vol").value), error,
+    });
+    el("pl-status").style.color = error ? "var(--warn)" : "";
+  }
+  const setError = (text) => { error = text; paintStatus(); };
+  const paintPlay = () => { el("pl-play").textContent = audio.paused ? "Play" : "Pause"; paintStatus(); };
+  const paintSteps = () => {
+    el("pl-prev").disabled = Player.stepIndex(queue.entries.length, queue.index, -1) < 0;
+    el("pl-next").disabled = Player.stepIndex(queue.entries.length, queue.index, 1) < 0;
+  };
+
+  function load(file) {
+    if (!file) return;
+    if (url) URL.revokeObjectURL(url);
+    url = URL.createObjectURL(file);
+    audio.src = url;
+    el("pl-name").textContent = file.name;
+    error = "";
+    showTagBpm(file);
+    el("pl-play").disabled = false;
+    el("pl-seek").disabled = false;
+    applyPitch();
+    paintTime();
+    paintPlay();
+  }
+  async function play() {
+    try { await audio.play(); } catch (err) { setError("cannot play: " + errorText(err)); }
+  }
+  // One source, two paths: the element plays on the default output (the monitor; its volume is the knob) and its captureStream
+  // feeds an AudioContext whose sink is the stick's output (the file at its true level, not scaled by the knob). The same
+  // stream feeds the analyser of the meter (not connected to any output). The context is created and resumed inside the Play gesture.
+  function wakeContext() {
+    if (!tap.context && typeof AudioContext === "function") tap.context = new AudioContext({ latencyHint: "interactive" });
+    if (tap.context) tap.context.resume().catch((err) => note("Cannot start the audio path to the stick: " + errorText(err), true));
+  }
+  async function routeJank() {
+    if (!tap.context || !tap.source) return;
+    try {
+      if (jank.id) {
+        if (typeof tap.context.setSinkId !== "function") throw new Error("this browser cannot choose the stick's output (AudioContext.setSinkId)");
+        if (tap.sinkId !== jank.id) { await tap.context.setSinkId(jank.id); tap.sinkId = jank.id; }
+        if (!tap.routed) { tap.source.connect(tap.context.destination); tap.routed = true; }
+      } else if (tap.routed) {
+        tap.source.disconnect(tap.context.destination);
+        tap.routed = false;
+      }
+      jank.error = "";
+    } catch (err) {
+      jank.error = errorText(err);
+    }
+    paintStatus();
+  }
+  function startTap() {
+    if (tap.missing || tap.url === url) return;
+    if (typeof audio.captureStream !== "function" || !tap.context) {
+      tap.missing = true;
+      note("This browser cannot take the player's sound for the stick and the meter (no captureStream): only the monitor plays.", true);
+      return;
+    }
+    try {
+      if (tap.source) tap.source.disconnect();
+      const source = tap.context.createMediaStreamSource(audio.captureStream());
+      const analyser = tap.context.createAnalyser();
+      analyser.fftSize = 16384;
+      source.connect(analyser);
+      Object.assign(tap, { source, analyser, samples: new Float32Array(analyser.fftSize), url, routed: false });
+    } catch (err) {
+      tap.missing = true;
+      note("Cannot take the player's sound for the stick and the meter: " + errorText(err), true);
+      return;
+    }
+    routeJank();
+  }
+  const applyMonitor = () => { audio.muted = !el("pl-monitor").checked; paintStatus(); };
+  function levelFrame(now) {
+    frame = 0;
+    if (audio.paused) return;
+    if (tap.analyser && tap.url === url) {
+      tap.analyser.getFloatTimeDomainData(tap.samples);
+      level = Player.smoothDb(level, Player.rmsToDb(Player.rmsOf(tap.samples)), now - lastFrame);
+    }
+    lastFrame = now;
+    el("pl-meter").style.width = Math.round(100 * Player.meterFraction(level)) + "%";
+    frame = requestAnimationFrame(levelFrame);
+  }
+  function startLevel() {
+    if (frame) return;
+    lastFrame = performance.now();
+    frame = requestAnimationFrame(levelFrame);
+  }
+  function stopLevel() {
+    cancelAnimationFrame(frame);
+    frame = 0;
+    level = Player.LEVEL_FLOOR_DB;
+    el("pl-meter").style.width = "0%";
+    paintStatus();
+  }
+  // leaving Advanced (or the USB connection) takes the player away: playback stops and the file is released
+  function releasePlayer() {
+    if (url === null) return;
+    audio.pause();
+    URL.revokeObjectURL(url);
+    url = null;
+    audio.removeAttribute("src");
+    audio.load();
+    queue.entries = [];
+    queue.index = -1;
+    error = "";
+    tagBpm = undefined;
+    paintBpm();
+    el("pl-name").textContent = "No file: choose one, or drop it here";
+    el("pl-play").disabled = true;
+    el("pl-seek").disabled = true;
+    paintSteps();
+    paintTime();
+    paintPlay();
+  }
+  async function togglePlay() {
+    if (url === null) return;
+    if (!audio.paused) { audio.pause(); return; }
+    wakeContext();
+    await play();
+  }
+  const entryFile = (entry) => (entry.file ? Promise.resolve(entry.file) : entry.handle.getFile());
+  async function playQueued(index) {
+    if (index < 0) return;
+    queue.index = index;
+    paintSteps();
+    paintList();
+    try { load(await entryFile(queue.entries[index])); } catch (err) { setError("cannot open that file: " + errorText(err)); return; }
+    await play();
+  }
+  const step = (delta) => playQueued(Player.stepIndex(queue.entries.length, queue.index, delta));
+
+  // ---- output: the stick's USB audio ("jank") when it is listed ----
+  async function listOutputs() {
+    if (!navigator.mediaDevices) throw new Error("device names need a secure page (https, localhost or a file)");
+    try {
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+      for (const track of probe.getTracks()) track.stop();
+    } catch (err) {
+      if (typeof navigator.mediaDevices.selectAudioOutput !== "function") throw err;
+      return [await navigator.mediaDevices.selectAudioOutput()];
+    }
+    return navigator.mediaDevices.enumerateDevices();
+  }
+  function fillOutputs(devices) {
+    const select = el("pl-out");
+    select.replaceChildren(new Option("None (monitor only)", ""), ...Player.outputChoices(devices).map((c) => new Option(c.label, c.id)));
+  }
+  // the stick's output: the monitor is always the default output; this picks the second path's device
+  async function useOutput(choice) {
+    Object.assign(jank, { id: choice.id || "", label: choice.id ? choice.label : "none" });
+    el("pl-outlabel").textContent = jank.label;
+    el("pl-out").value = jank.id;
+    if (choice.id) store.set(KEY.output, JSON.stringify({ id: choice.id, label: choice.label }));
+    await routeJank();
+    paintStatus();
+  }
+  const savedOutput = () => {
+    try { const o = JSON.parse(store.get(KEY.output)); return o && o.id ? o : null; } catch (err) { return null; }
+  };
+  async function chooseOutput(devices) {
+    fillOutputs(devices);
+    const saved = savedOutput(), choice = Player.resolveOutput(devices, saved && saved.id);
+    await useOutput(choice);
+    if (choice.why === "default") note('The stick\'s USB audio ("jank") is not listed: plug it in and run the firmware with the audio build. Only the monitor plays.');
+    else note(choice.why === "jank" ? "The stick's USB audio is the second output." : "The second output is " + choice.label + ".");
+  }
+  // the permission is asked once, on the first button press in the card: a page cannot read device names without it
+  async function settleOutput() {
+    outputAsked = true;
+    try { await chooseOutput(await listOutputs()); } catch (err) { note("Cannot list the audio outputs (" + errorText(err) + "): only the monitor plays.", true); }
+  }
+  const firstGesture = () => { if (!outputAsked) settleOutput(); };
+  async function recheckOutputs() {
+    if (!outputAsked || !navigator.mediaDevices) return;
+    try { await chooseOutput(await navigator.mediaDevices.enumerateDevices()); } catch (err) { note("Cannot list the audio outputs (" + errorText(err) + ").", true); }
+  }
+  async function reuseSavedOutput() {
+    const saved = savedOutput();
+    if (saved) await useOutput(saved);
+  }
+
+  // ---- the music folder ----
+  const idbOpen = () => new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB.name, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(DB.store);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  const idbRun = async (mode, action) => {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const req = action(db.transaction(DB.store, mode).objectStore(DB.store));
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  };
+  const savedHandle = () => idbRun("readonly", (s) => s.get(DB.key));
+  const rememberHandle = (handle) => idbRun("readwrite", (s) => s.put(handle, DB.key));
+
+  async function listEntries() {
+    if (browser.tree) return Player.listTree(browser.tree, browser.names);
+    const out = [], dir = browser.handles[browser.handles.length - 1];
+    for await (const [name, handle] of dir.entries()) out.push({ name, kind: handle.kind, handle });
+    return out;
+  }
+  async function showFolder() {
+    try { browser.entries = Player.sortEntries(await listEntries()); } catch (err) { note("Cannot read that folder: " + errorText(err), true); return; }
+    browser.shown = Player.MAX_ROWS;
+    paintList();
+  }
+  const rowButton = (text, className, onClick) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = className;
+    b.textContent = text;
+    b.addEventListener("click", onClick);
+    return b;
+  };
+  function goTo(depth) {
+    browser.names = browser.names.slice(0, depth);
+    if (!browser.tree) browser.handles = browser.handles.slice(0, depth + 1);
+    showFolder();
+  }
+  function enter(entry) {
+    browser.names = [...browser.names, entry.name];
+    if (!browser.tree) browser.handles = [...browser.handles, entry.handle];
+    showFolder();
+  }
+  function paintList() {
+    el("pl-browser").classList.toggle("hide", browser.rootName === "");
+    const crumbs = Player.breadcrumbs([browser.rootName, ...browser.names]).slice(1);
+    el("pl-crumbs").replaceChildren(...crumbs.map((c) => rowButton(c.label, "quiet", () => goTo(c.depth - 1))));
+    const files = browser.entries.filter((e) => e.kind === "file");
+    const playing = queue.entries.length ? queue.entries[queue.index] : null;
+    const rows = [];
+    if (browser.names.length) rows.push(rowButton("..", "dir", () => goTo(browser.names.length - 1)));
+    for (const entry of browser.entries.slice(0, Player.rowsToShow(browser.entries.length, browser.shown))) {
+      if (entry.kind === "directory") rows.push(rowButton("▸ " + entry.name, "dir", () => enter(entry)));
+      else rows.push(rowButton(entry.name, entry === playing ? "playing" : "", () => { queue.entries = files; playQueued(files.indexOf(entry)); }));
+    }
+    if (browser.entries.length > browser.shown) {
+      rows.push(rowButton("show more (" + (browser.entries.length - browser.shown) + ")", "dir", () => { browser.shown += Player.MAX_ROWS; paintList(); }));
+    }
+    el("pl-list").replaceChildren(...rows);
+  }
+  async function openHandle(handle, mayAsk) {
+    const options = { mode: "read" };
+    let state = await handle.queryPermission(options);
+    if (state !== "granted" && mayAsk) state = await handle.requestPermission(options);
+    if (state !== "granted") return false;
+    Object.assign(browser, { rootName: handle.name, names: [], handles: [handle], tree: null });
+    await showFolder();
+    el("pl-reopen").classList.add("hide");
+    return true;
+  }
+  async function pickFolder() {
+    let handle;
+    try { handle = await window.showDirectoryPicker({ startIn: "music", mode: "read" }); } catch (err) {
+      if (err.name !== "AbortError") note("Cannot open the folder picker: " + errorText(err), true);
+      return;
+    }
+    try { await rememberHandle(handle); } catch (err) { note("The folder is open but cannot be remembered: " + errorText(err), true); }
+    await openHandle(handle, true);
+  }
+  async function restoreFolder() {
+    let handle;
+    try { handle = await savedHandle(); } catch (err) { note("Cannot read the remembered folder: " + errorText(err), true); return; }
+    if (!handle) return;
+    try {
+      if (await openHandle(handle, false)) return;
+    } catch (err) { note("The remembered folder is not available: " + errorText(err), true); return; }
+    el("pl-reopen").textContent = "Open " + handle.name;
+    el("pl-reopen").classList.remove("hide");
+    el("pl-reopen").onclick = () => openHandle(handle, true).catch((err) => note("Cannot open the folder: " + errorText(err), true));
+  }
+  function chooseTree(fileList) {
+    const items = [...fileList].filter((f) => Player.isAudioFile(f.name)).map((f) => ({ path: f.webkitRelativePath || f.name, file: f }));
+    Object.assign(browser, { rootName: Player.buildTree(items).name, names: [], handles: [], tree: Player.buildTree(items) });
+    showFolder();
+  }
+
+  // ---- wiring ----
+  el("pl-file").addEventListener("change", (e) => { queue.entries = []; queue.index = -1; paintSteps(); load(e.target.files[0]); });
+  el("pl-play").addEventListener("click", togglePlay);
+  el("pl-prev").addEventListener("click", () => step(-1));
+  el("pl-next").addEventListener("click", () => step(1));
+  el("pl-pitch").addEventListener("input", applyPitch);
+  el("pl-reset").addEventListener("click", () => { el("pl-pitch").value = 0; applyPitch(); });
+  el("pl-vol").addEventListener("input", () => { applyVolume(); store.set(KEY.volume, el("pl-vol").value); paintStatus(); });
+  el("pl-seek").addEventListener("input", () => { seeking = true; });
+  el("pl-seek").addEventListener("change", () => {
+    if (Number.isFinite(audio.duration)) audio.currentTime = audio.duration * el("pl-seek").value / 1000;
+    seeking = false;
+  });
+  el("pl-monitor").addEventListener("change", applyMonitor);
+  el("pl-change").addEventListener("click", () => el("pl-out").classList.toggle("hide"));
+  el("pl-out").addEventListener("change", (e) => {
+    const choice = { id: e.target.value, label: e.target.selectedOptions[0].text };
+    useOutput(choice);
+  });
+  for (const type of ["timeupdate", "loadedmetadata", "durationchange"]) audio.addEventListener(type, paintTime);
+  audio.addEventListener("loadedmetadata", applyPitch);
+  for (const type of ["play", "pause", "ended"]) audio.addEventListener(type, paintPlay);
+  audio.addEventListener("ended", () => step(1));
+  audio.addEventListener("error", () => setError("cannot decode this file as audio"));
+  audio.addEventListener("playing", () => { error = ""; startTap(); startLevel(); });
+  for (const type of ["pause", "ended", "emptied"]) audio.addEventListener(type, stopLevel);
+  card.addEventListener("click", firstGesture, true);
+  document.addEventListener("jank-advanced", (e) => { if (!e.detail.visible) releasePlayer(); });
+  if (navigator.mediaDevices) navigator.mediaDevices.addEventListener("devicechange", recheckOutputs);
+
+  card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("drop"); });
+  card.addEventListener("dragleave", () => card.classList.remove("drop"));
+  card.addEventListener("drop", (e) => {
+    e.preventDefault();
+    card.classList.remove("drop");
+    queue.entries = []; queue.index = -1; paintSteps();
+    load([...e.dataTransfer.files].find((f) => f.type.startsWith("audio/")));
+  });
+
+  card.addEventListener("pointerenter", () => { hovered = true; });
+  card.addEventListener("pointerleave", () => { hovered = false; });
+  const spaceTarget = (t) => !["BUTTON", "SELECT", "TEXTAREA"].includes(t.tagName) && !(t.tagName === "INPUT" && t.type !== "range");
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== " " || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!(hovered || card.contains(document.activeElement)) || !spaceTarget(e.target)) return;
+    e.preventDefault();
+    firstGesture();
+    togglePlay();
+  });
+
+  const hasPicker = typeof window.showDirectoryPicker === "function";
+  el("pl-folder").classList.toggle("hide", !hasPicker);
+  el("pl-dirpick").classList.toggle("hide", hasPicker);
+  el("pl-folder").addEventListener("click", pickFolder);
+  el("pl-dir").addEventListener("change", (e) => chooseTree(e.target.files));
+
+  el("pl-vol").value = Player.parseVolumePct(store.get(KEY.volume));
+  applyVolume();
+  applyPitch();
+  applyMonitor();
+  paintSteps();
+  reuseSavedOutput();
+  if (hasPicker) restoreFolder();
+})();
+</script>
+</body>
+</html>

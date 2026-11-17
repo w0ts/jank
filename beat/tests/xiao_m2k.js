@@ -2,7 +2,7 @@
 // (conf "<pct>h") and `status` says it (conf_hold=1): the CF bar's numbers carry it, the value is the one shown
 const fs = require('fs');
 const assert = require('assert');
-const html = fs.readFileSync(process.argv[2], 'utf8');
+const html = require('../../tests/load_html.js')(process.argv[2]);
 const grab = name => html.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n'))[0];
 let checks = 0;
 const eq = (a, b) => { assert.deepStrictEqual(a, b); checks++; };

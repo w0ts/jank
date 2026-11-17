@@ -1,0 +1,22 @@
+.device svg { display:block; flex:none; margin:0 auto; outline:none; touch-action:none; user-select:none; -webkit-user-select:none; }
+.device .lid { fill:#8d9094; stroke:#5d6064; stroke-width:.5; }
+.device .lidshade { fill:none; stroke:#a9acb0; stroke-width:.4; }
+.device .port { fill:#16171a; stroke:#4a4d50; stroke-width:.35; }
+.device .pending { fill:none; stroke:#7a7d80; stroke-width:.35; stroke-dasharray:.9 .7; }
+.device .plug { fill:#d8b14a; stroke:#8a6d1c; stroke-width:.25; }
+.device .lbl { fill:#4a4d50; font-size:2.3px; text-anchor:middle; font-family:-apple-system, system-ui, sans-serif; }
+.device .lbl.l { text-anchor:start; } .device .lbl.r { text-anchor:end; }
+.device .lbl.pend { fill:#7a7d80; font-style:italic; font-size:1.4px; }
+.device .brand { fill:#4a4d50; font-size:3px; text-anchor:middle; font-family:-apple-system, system-ui, sans-serif; letter-spacing:.1px; }
+.device .win { fill:#202225; stroke:#5d6064; stroke-width:.4; }
+.device .frost { fill:#34373b; opacity:.9; }
+.device .led { mix-blend-mode:screen; }
+.device .bezel { fill:#0b0c0d; stroke:#5d6064; stroke-width:.4; }
+.device .btnarm { fill:#2c2e31; stroke:#16171a; stroke-width:.3; cursor:pointer; }
+.device .btnarm.on { fill:#4b4f54; }
+.device .glyph { fill:#c9ccd0; font-size:3.2px; text-anchor:middle; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
+.device .glyph.s { font-size:2.5px; }
+.device .toggle { cursor:pointer; }
+.device .slot { fill:#16171a; stroke:#4a4d50; stroke-width:.3; }
+.device .lever { fill:#d6d8db; stroke:#6d7074; stroke-width:.3; }
+.device canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#04060a; }

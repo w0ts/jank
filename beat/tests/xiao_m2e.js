@@ -3,7 +3,7 @@
 // bar is the XIAO's conf (the grid-fit confidence) and the gate (stopped icon, LED) its gated= / silent=
 const fs = require('fs');
 const assert = require('assert');
-const html = fs.readFileSync(process.argv[2], 'utf8');
+const html = require('../../tests/load_html.js')(process.argv[2]);
 const grab = name => html.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n'))[0];
 let checks = 0;
 const ok = (c, msg) => { assert.ok(c, msg); checks++; };
