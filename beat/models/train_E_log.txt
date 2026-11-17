@@ -1,0 +1,142 @@
+train 2590 tracks, val 85; resume at step 0
+step 20 loss 0.5071 lr 0.00300 2.71 s/step
+step 40 loss 0.4077 lr 0.00300 2.72 s/step
+step 60 loss 0.3812 lr 0.00300 2.54 s/step
+step 80 loss 0.3027 lr 0.00299 2.56 s/step
+step 100 loss 0.2517 lr 0.00299 2.56 s/step
+step 120 loss 0.2384 lr 0.00298 2.67 s/step
+step 140 loss 0.2313 lr 0.00298 2.58 s/step
+step 160 loss 0.2304 lr 0.00297 2.61 s/step
+step 180 loss 0.2191 lr 0.00296 2.59 s/step
+step 200 loss 0.2107 lr 0.00295 2.60 s/step
+step 220 loss 0.2146 lr 0.00295 2.55 s/step
+step 240 loss 0.2111 lr 0.00293 2.55 s/step
+step 260 loss 0.2108 lr 0.00292 2.51 s/step
+step 280 loss 0.2072 lr 0.00291 2.51 s/step
+step 300 loss 0.2077 lr 0.00290 2.49 s/step
+step 320 loss 0.2054 lr 0.00288 2.45 s/step
+step 340 loss 0.2078 lr 0.00287 2.48 s/step
+step 360 loss 0.2066 lr 0.00285 2.43 s/step
+step 380 loss 0.2044 lr 0.00284 2.43 s/step
+step 400 loss 0.2068 lr 0.00282 2.41 s/step
+exit at step 410
+train 2590 tracks, val 85; resume at step 410
+step 420 loss 0.2010 lr 0.00280 2.47 s/step
+step 440 loss 0.2058 lr 0.00278 2.42 s/step
+step 460 loss 0.2025 lr 0.00276 2.39 s/step
+step 480 loss 0.2014 lr 0.00274 2.38 s/step
+step 500 loss 0.2044 lr 0.00272 2.39 s/step
+step 500 VAL loss 0.2364
+step 520 loss 0.2007 lr 0.00270 2.52 s/step
+step 540 loss 0.2009 lr 0.00268 2.34 s/step
+step 560 loss 0.1966 lr 0.00266 2.39 s/step
+step 580 loss 0.2019 lr 0.00263 2.35 s/step
+step 600 loss 0.2005 lr 0.00261 2.35 s/step
+step 620 loss 0.1987 lr 0.00258 2.36 s/step
+step 640 loss 0.2007 lr 0.00256 2.34 s/step
+step 660 loss 0.1981 lr 0.00253 2.31 s/step
+step 680 loss 0.1899 lr 0.00250 2.34 s/step
+step 700 loss 0.1928 lr 0.00247 2.33 s/step
+step 720 loss 0.1877 lr 0.00245 2.34 s/step
+step 740 loss 0.1976 lr 0.00242 2.32 s/step
+step 760 loss 0.1913 lr 0.00239 2.31 s/step
+step 780 loss 0.1940 lr 0.00236 2.29 s/step
+step 800 loss 0.1915 lr 0.00233 2.31 s/step
+step 820 loss 0.1932 lr 0.00230 2.27 s/step
+step 840 loss 0.1898 lr 0.00226 2.30 s/step
+exit at step 855
+train 2590 tracks, val 85; resume at step 855
+step 860 loss 0.1891 lr 0.00223 2.36 s/step
+step 880 loss 0.1851 lr 0.00220 2.29 s/step
+step 900 loss 0.1918 lr 0.00217 2.28 s/step
+step 920 loss 0.1854 lr 0.00213 2.28 s/step
+step 940 loss 0.1838 lr 0.00210 2.27 s/step
+step 960 loss 0.1876 lr 0.00207 2.27 s/step
+step 980 loss 0.1809 lr 0.00203 2.24 s/step
+step 1000 loss 0.1894 lr 0.00200 2.29 s/step
+step 1000 VAL loss 0.2263
+step 1020 loss 0.1867 lr 0.00196 2.39 s/step
+step 1040 loss 0.1842 lr 0.00193 2.26 s/step
+step 1060 loss 0.1859 lr 0.00189 2.28 s/step
+step 1080 loss 0.1855 lr 0.00186 2.28 s/step
+step 1100 loss 0.1804 lr 0.00182 2.29 s/step
+step 1120 loss 0.1818 lr 0.00178 2.28 s/step
+step 1140 loss 0.1814 lr 0.00175 2.27 s/step
+step 1160 loss 0.1805 lr 0.00171 2.27 s/step
+step 1180 loss 0.1757 lr 0.00167 2.27 s/step
+step 1200 loss 0.1759 lr 0.00164 2.28 s/step
+step 1220 loss 0.1780 lr 0.00160 2.26 s/step
+step 1240 loss 0.1816 lr 0.00157 2.27 s/step
+step 1260 loss 0.1756 lr 0.00153 2.30 s/step
+step 1280 loss 0.1807 lr 0.00149 2.26 s/step
+step 1300 loss 0.1793 lr 0.00146 2.26 s/step
+exit at step 1314
+train 2590 tracks, val 85; resume at step 1314
+step 1320 loss 0.1811 lr 0.00142 2.37 s/step
+step 1340 loss 0.1782 lr 0.00138 2.31 s/step
+step 1360 loss 0.1796 lr 0.00135 2.28 s/step
+step 1380 loss 0.1763 lr 0.00131 2.27 s/step
+step 1400 loss 0.1772 lr 0.00127 2.29 s/step
+step 1420 loss 0.1736 lr 0.00124 2.30 s/step
+step 1440 loss 0.1725 lr 0.00120 2.30 s/step
+step 1460 loss 0.1796 lr 0.00117 2.27 s/step
+step 1480 loss 0.1765 lr 0.00113 2.28 s/step
+step 1500 loss 0.1688 lr 0.00110 2.29 s/step
+step 1500 VAL loss 0.2147
+step 1520 loss 0.1769 lr 0.00106 2.40 s/step
+step 1540 loss 0.1761 lr 0.00103 2.32 s/step
+step 1560 loss 0.1802 lr 0.00099 2.30 s/step
+step 1580 loss 0.1734 lr 0.00096 2.27 s/step
+step 1600 loss 0.1716 lr 0.00093 2.35 s/step
+step 1620 loss 0.1731 lr 0.00089 2.36 s/step
+step 1640 loss 0.1708 lr 0.00086 2.29 s/step
+step 1660 loss 0.1707 lr 0.00083 2.25 s/step
+step 1680 loss 0.1730 lr 0.00080 2.31 s/step
+step 1700 loss 0.1722 lr 0.00077 2.27 s/step
+step 1720 loss 0.1680 lr 0.00074 2.30 s/step
+step 1740 loss 0.1698 lr 0.00071 2.29 s/step
+step 1760 loss 0.1704 lr 0.00068 2.27 s/step
+exit at step 1770
+train 2590 tracks, val 85; resume at step 1770
+step 1780 loss 0.1753 lr 0.00065 2.30 s/step
+step 1800 loss 0.1756 lr 0.00062 2.25 s/step
+step 1820 loss 0.1742 lr 0.00059 2.28 s/step
+step 1840 loss 0.1666 lr 0.00056 2.31 s/step
+step 1860 loss 0.1704 lr 0.00054 2.28 s/step
+step 1880 loss 0.1683 lr 0.00051 2.24 s/step
+step 1900 loss 0.1721 lr 0.00049 2.28 s/step
+step 1920 loss 0.1727 lr 0.00046 2.34 s/step
+step 1940 loss 0.1713 lr 0.00044 2.27 s/step
+step 1960 loss 0.1692 lr 0.00041 2.27 s/step
+step 1980 loss 0.1682 lr 0.00039 2.27 s/step
+step 2000 loss 0.1662 lr 0.00037 2.27 s/step
+step 2000 VAL loss 0.2148
+step 2020 loss 0.1694 lr 0.00035 2.33 s/step
+step 2040 loss 0.1693 lr 0.00033 2.27 s/step
+step 2060 loss 0.1707 lr 0.00031 2.28 s/step
+step 2080 loss 0.1656 lr 0.00029 2.28 s/step
+step 2100 loss 0.1698 lr 0.00027 2.29 s/step
+step 2120 loss 0.1676 lr 0.00025 2.31 s/step
+step 2140 loss 0.1670 lr 0.00024 2.31 s/step
+step 2160 loss 0.1704 lr 0.00022 2.26 s/step
+step 2180 loss 0.1683 lr 0.00021 2.28 s/step
+step 2200 loss 0.1699 lr 0.00019 2.31 s/step
+step 2220 loss 0.1677 lr 0.00018 2.27 s/step
+exit at step 2229
+train 2590 tracks, val 85; resume at step 2229
+step 2240 loss 0.1682 lr 0.00017 2.23 s/step
+step 2260 loss 0.1683 lr 0.00016 2.25 s/step
+step 2280 loss 0.1629 lr 0.00015 2.28 s/step
+step 2300 loss 0.1698 lr 0.00014 2.28 s/step
+step 2320 loss 0.1683 lr 0.00013 2.27 s/step
+step 2340 loss 0.1688 lr 0.00012 2.27 s/step
+step 2360 loss 0.1674 lr 0.00011 2.26 s/step
+step 2380 loss 0.1687 lr 0.00011 2.27 s/step
+step 2400 loss 0.1637 lr 0.00010 2.24 s/step
+step 2420 loss 0.1658 lr 0.00010 2.25 s/step
+step 2440 loss 0.1677 lr 0.00009 2.31 s/step
+step 2460 loss 0.1664 lr 0.00009 2.24 s/step
+step 2480 loss 0.1729 lr 0.00009 2.23 s/step
+step 2500 loss 0.1703 lr 0.00009 2.25 s/step
+step 2500 VAL loss 0.2122
+exit at step 2500

@@ -1,0 +1,6 @@
+tracker                    causal  n    F     dbF  | tight loose octave trip  offbt  off   med ms | rtf
+madmom_online              yes   807 0.828   -  | 0.80  0.82  0.05   0.03  0.05  0.04    4.3  | 0.046
+beatnet_online_pf          yes   807 0.449 0.16 | 0.34  0.39  0.20   0.12  0.07  0.21    9.8  | 0.164
+beat_this_small0_stream_L0 yes   103 0.755   -  | 0.55  0.74  0.05   0.09  0.02  0.07   12.8  | nan
+beat_this_small0_stream_L5 yes   103 0.804   -  | 0.67  0.79  0.05   0.06  0.02  0.06    9.7  | nan
+beat_this_small0_stream_L12 yes   103 0.814   -  | 0.64  0.78  0.05   0.05  0.02  0.08   10.3  | nan

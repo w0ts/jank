@@ -1,0 +1,11 @@
+{
+  "all-d-f60": {"coast": {"hold_s": 30.0, "on_jump": "gate", "floor": 0.6}, "memory": {"mode": "hold", "width": 0.04, "floor": 0.1, "related_beats": 48}, "ratio": {"margin": 0.05, "span_s": 10.0}, "agree": {"threshold": 0.8, "parts": ["lines", "tempo", "phase", "dbn"]}},
+  "all-d-f50": {"base": "all-d-f60", "coast": {"floor": 0.5}},
+  "all-d-f70": {"base": "all-d-f60", "coast": {"floor": 0.7}},
+  "all-d75-f60": {"base": "all-d-f60", "agree": {"threshold": 0.75}},
+  "all-d85-f60": {"base": "all-d-f60", "agree": {"threshold": 0.85}},
+  "all-d-f60-noratio": {"base": "all-d-f60", "ratio": null},
+  "all-d-f60-nomem": {"base": "all-d-f60", "memory": null},
+  "all-d-f60-nocoast": {"base": "all-d-f60", "coast": null},
+  "all-d-f60-follow": {"base": "all-d-f60", "coast": {"on_jump": "follow"}}
+}

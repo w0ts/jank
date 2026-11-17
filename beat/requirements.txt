@@ -1,0 +1,19 @@
+numpy
+scipy
+mir_eval
+librosa
+soundfile
+soxr
+numba
+matplotlib
+pytest
+cython<3
+madmom @ git+https://github.com/CPJKU/madmom
+beat_this @ git+https://github.com/CPJKU/beat_this
+# torch/torchaudio: CPU wheels on the farm (--extra-index-url https://download.pytorch.org/whl/cpu)
+torch
+torchaudio
+# BeatNet is installed with --no-deps: it pins madmom from PyPI (Python < 3.10 only) and needs pyaudio only for live input
+sounddevice
+LinkPython-extern
+pyobjc-framework-MediaPlayer; sys_platform == "darwin"   # live.player media keys (macOS only; pulls pyobjc-core, Cocoa, AVFoundation)
