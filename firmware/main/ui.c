@@ -154,8 +154,10 @@ static void auto_scan(uint32_t now)
         return;
     if (xSemaphoreTake(s_scanning, 0) != pdTRUE)
         return;
-    led_event(JL_SCANNING, cfg.group);
+#if BOARD_LED_RGB_GPIO >= 0
+    led_event(JL_SCANNING, cfg.group);   /* (a mono LED cannot show magenta: it would light for the whole sweep, a long flash every 6 s) */
     led_step(bridge_ms() + LED_EVERY_MS);
+#endif
     sweep(cfg.group);
     bridge_note_scan_groups(&seen);
     next = js_pick(&seen, cfg.group, bridge_ms());
