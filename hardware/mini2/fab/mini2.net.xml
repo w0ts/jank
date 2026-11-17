@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>/Users/mots/GitHub/jank/hardware/mini2/mini2.kicad_sch</source>
-    <date>2026-11-17T16:17:59</date>
+    <date>2026-11-17T18:11:52</date>
     <tool>Eeschema 10.0.8</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -25,16 +25,16 @@
   </design>
   <components>
     <comp ref="C3">
-      <value>10u</value>
-      <footprint>chip:C0603</footprint>
+      <value>22u</value>
+      <footprint>chip:C0805</footprint>
       <fields>
-        <field name="LCSC">C19702</field>
-        <field name="Footprint">chip:C0603</field>
+        <field name="LCSC">C45783</field>
+        <field name="Footprint">chip:C0805</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="C" description="jank chip: C"/>
-      <property name="LCSC" value="C19702"/>
+      <property name="LCSC" value="C45783"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2116,16 +2116,16 @@
       </units>
     </comp>
     <comp ref="Q10">
-      <value>2N7002</value>
+      <value>AO3400A</value>
       <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
       <fields>
-        <field name="LCSC">C8545</field>
+        <field name="LCSC">C20917</field>
         <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="nfet" description="jank chip: nfet"/>
-      <property name="LCSC" value="C8545"/>
+      <property name="LCSC" value="C20917"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2141,16 +2141,16 @@
       </units>
     </comp>
     <comp ref="Q11">
-      <value>2N7002</value>
+      <value>AO3400A</value>
       <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
       <fields>
-        <field name="LCSC">C8545</field>
+        <field name="LCSC">C20917</field>
         <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="nfet" description="jank chip: nfet"/>
-      <property name="LCSC" value="C8545"/>
+      <property name="LCSC" value="C20917"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2166,16 +2166,16 @@
       </units>
     </comp>
     <comp ref="Q12">
-      <value>2N7002</value>
+      <value>AO3400A</value>
       <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
       <fields>
-        <field name="LCSC">C8545</field>
+        <field name="LCSC">C20917</field>
         <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="nfet" description="jank chip: nfet"/>
-      <property name="LCSC" value="C8545"/>
+      <property name="LCSC" value="C20917"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2191,16 +2191,16 @@
       </units>
     </comp>
     <comp ref="Q13">
-      <value>2N7002</value>
+      <value>AO3400A</value>
       <footprint>chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</footprint>
       <fields>
-        <field name="LCSC">C8545</field>
+        <field name="LCSC">C20917</field>
         <field name="Footprint">chip:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="nfet" description="jank chip: nfet"/>
-      <property name="LCSC" value="C8545"/>
+      <property name="LCSC" value="C20917"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2288,16 +2288,16 @@
       </units>
     </comp>
     <comp ref="R10">
-      <value>100k</value>
+      <value>1M</value>
       <footprint>chip:R0402</footprint>
       <fields>
-        <field name="LCSC">C25741</field>
+        <field name="LCSC">C26083</field>
         <field name="Footprint">chip:R0402</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C25741"/>
+      <property name="LCSC" value="C26083"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -2312,16 +2312,16 @@
       </units>
     </comp>
     <comp ref="R11">
-      <value>100k</value>
+      <value>1M</value>
       <footprint>chip:R0402</footprint>
       <fields>
-        <field name="LCSC">C25741</field>
+        <field name="LCSC">C26083</field>
         <field name="Footprint">chip:R0402</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C25741"/>
+      <property name="LCSC" value="C26083"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -3666,16 +3666,16 @@
       </units>
     </comp>
     <comp ref="R136">
-      <value>20k</value>
+      <value>22k</value>
       <footprint>chip:R0402</footprint>
       <fields>
-        <field name="LCSC">C25765</field>
+        <field name="LCSC">C25768</field>
         <field name="Footprint">chip:R0402</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="R" description="jank chip: R"/>
-      <property name="LCSC" value="C25765"/>
+      <property name="LCSC" value="C25768"/>
       <property name="Sheetname" value="mini2"/>
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -3994,6 +3994,30 @@
       <property name="Sheetfile" value="mini2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>3b955f0f-88f4-503a-a2dd-186b65205c42</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R156">
+      <value>1</value>
+      <footprint>chip:R0805</footprint>
+      <fields>
+        <field name="LCSC">C25271</field>
+        <field name="Footprint">chip:R0805</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="chip" part="R" description="jank chip: R"/>
+      <property name="LCSC" value="C25271"/>
+      <property name="Sheetname" value="mini2"/>
+      <property name="Sheetfile" value="mini2.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>6c9b58ab-f23a-5bef-b359-0a69909b9101</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -6245,6 +6269,7 @@
       <node ref="JP12" pin="1" pinfunction="A_1" pintype="passive"/>
       <node ref="L5" pin="1" pintype="passive"/>
       <node ref="R155" pin="1" pintype="passive"/>
+      <node ref="R156" pin="1" pintype="passive"/>
       <node ref="R62" pin="2" pintype="passive"/>
       <node ref="U18" pin="3" pinfunction="VIN_3" pintype="power_in"/>
       <node ref="U2" pin="10" pinfunction="VIN_10" pintype="power_in"/>
@@ -6255,6 +6280,7 @@
       <node ref="C72" pin="1" pintype="passive"/>
       <node ref="C92" pin="1" pintype="passive"/>
       <node ref="R155" pin="2" pintype="passive"/>
+      <node ref="R156" pin="2" pintype="passive"/>
     </net>
     <net code="103" name="/VSYS" class="Default">
       <node ref="D3" pin="1" pinfunction="K_1" pintype="passive"/>
