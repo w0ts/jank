@@ -114,6 +114,7 @@ void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), v
 uint32_t bridge_ms(void);
 
 /* ui.c: button, LED, group scan */
+esp_err_t ui_screen_early(void);                             /* app_main, before the radio: the screen found and switched on */
 esp_err_t ui_start(void);
 esp_err_t ui_scan_table(struct js_table *out);               /* blocks about 1.05 s; joins nothing */
 
