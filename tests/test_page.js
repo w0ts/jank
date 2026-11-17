@@ -14,6 +14,7 @@ const ui = html.match(/<script id="ui">([\s\S]*?)<\/script>/)[1];
 const box = {};
 vm.createContext(box);
 vm.runInContext(logic, box);
+vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "ui", "ports.js"), "utf8") + "\nthis.jankPortName = jankPortName; this.jankPorts = jankPorts; this.overBluetooth = overBluetooth; this.outputFor = outputFor; this.portNames = portNames;", box);
 // classes and consts are the script's lexical names, not properties of its global: hand them out
 vm.runInContext("this.SysexIn = SysexIn; this.BleMidiIn = BleMidiIn; this.LineClient = LineClient; this.JX_PUSH_HOME = JX_PUSH_HOME;", box);
 new vm.Script(ui);                       // the DOM part at least parses
@@ -273,6 +274,10 @@ async function lineTests() {
   eq(box.portList(new Map([["a", usb], ["b", gone]])).map((p) => p.id), ["1"]);
   eq(box.portList(undefined), []);
   eq(box.jankPorts(box.portList(polyfill)).map((p) => p.name), ["jank", "jank 1A2B"]);   // USB first
+  eq(["jank", "jank 1A2B", "jank (USB)", "jank1A2B", "My jank", "JANK"].map(box.jankPortName), [true, true, true, true, true, true]);
+  eq(["Digitone Audio+MIDI Elektron Digitone II", "FM1-E040", "Jankowski", "jankins", "Bluetooth", "", undefined].map(box.jankPortName), [false, false, false, false, false, false, false]);
+  eq(box.jankPorts([other, { name: "Digitone" }]), []);
+  eq(box.portNames([other, usb]) + "|" + box.portNames([]), "FM1-E040, jank|none");
   eq(box.overBluetooth("jank 1A2B"), true);
   eq(box.overBluetooth("jank"), false);
   eq(box.overBluetooth("FM1-E040"), false);
