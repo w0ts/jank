@@ -1,0 +1,5 @@
+CLK / RST vs LINE IN's ADC path: nearest copper 5.96 mm (RST_IO to LINE_IN, same layer); CLK / RST track within 1 mm of it: 0.0 mm
+CLK / RST vs LINE IN's front end (LIN_*, LINE_IN, LINE_SENSE): nearest copper 0.00 mm (to LIN_R, any layer)
+the converters vs LINE IN's front end (LIN_*, LINE_IN, LINE_SENSE): nearest copper 9.57 mm (to LIN_DET, any layer)
+within 1 mm of LINE IN's nodes (mm of track, per net): USB_DN 1.6, VBAT_ADC 1.2, +3V3 1.2, UDP 0.8, HOST_EN 0.5, UDN 0.3
+check_board: 190 parts, 336 vias, 78 GND pour pieces, 19 twins: 0 problems

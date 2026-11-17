@@ -1,0 +1,12 @@
+jank mini 2.2, VBUS when a cable is plugged in hot (vbus.py: the circuit and the assumptions in its docstring)
+
+5.25 V supply, the tantalums (2 x 10 uF, ESR 2 ohm): VBUS peak 6.08 V (settles 5.19 V)
+5.25 V supply, 2 x 10 uF 25 V 0805 ceramic, each through 0.005 ohm: VBUS peak 6.61 V (settles 5.24 V)
+5.25 V supply, 2 x 10 uF 25 V 0805 ceramic, each through 1 ohm: VBUS peak 5.48 V (settles 5.25 V)
+5.25 V supply, 2 x 10 uF 25 V 0805 ceramic, each through 4.7 ohm: VBUS peak 6.99 V (settles 5.19 V)
+
+5.5 V supply, the tantalums (2 x 10 uF, ESR 2 ohm): VBUS peak 6.37 V (settles 5.44 V)
+5.5 V supply, 2 x 10 uF 25 V 0805 ceramic, each through 0.005 ohm: VBUS peak 6.92 V (settles 5.49 V)
+5.5 V supply, 2 x 10 uF 25 V 0805 ceramic, each through 1 ohm: VBUS peak 5.74 V (settles 5.50 V)
+5.5 V supply, 2 x 10 uF 25 V 0805 ceramic, each through 4.7 ohm: VBUS peak 7.32 V (settles 5.44 V)
+

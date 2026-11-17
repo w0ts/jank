@@ -1,0 +1,42 @@
+** Drc report for tiny.kicad_pcb **
+** Created on 2026-11-10T20:48:53 **
+** Report includes: Errors, Warnings, Exclusions **
+
+** Found 6 DRC violations **
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(123.9770 mm, 120.1016 mm): Polygon of D1 on F.Silkscreen
+    @(123.8000 mm, 121.0000 mm): PCB text 'PWR' on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(101.3000 mm, 104.3000 mm): PCB text 'OUT' on F.Silkscreen
+    @(101.5000 mm, 104.9000 mm): NPTH pad of J2
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(102.5000 mm, 107.2000 mm): Footprint text of P2 (T)
+    @(103.2000 mm, 106.9000 mm): Pad 1 [+3V3] of C5 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(102.5000 mm, 109.7400 mm): Footprint text of P2 (R)
+    @(102.7600 mm, 109.9000 mm): Pad 3 [VSYS] of U3 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(123.8000 mm, 121.0000 mm): PCB text 'PWR' on F.Silkscreen
+    @(123.0000 mm, 122.0000 mm): Pad 2 [PT] of D2 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(123.8000 mm, 121.0000 mm): PCB text 'PWR' on F.Silkscreen
+    @(123.0000 mm, 120.3000 mm): Pad 1 [VSYS] of D1 on F.Cu
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

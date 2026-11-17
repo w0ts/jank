@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "chip")(type "KiCad")(uri "${KIPRJMOD}/lib/chip.pretty")(options "")(descr "JLC footprints (fetch_jlc.sh) and the TRS pads"))
+)
