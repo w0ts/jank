@@ -20,7 +20,15 @@ if [ -d "$DRIVE" ]; then
     cp "$IMAGE" "$DRIVE/jank.bin"
     sync
     echo "waiting for the stick to restart (it restarts after 1.5 s of quiet)..."
-    for _ in $(seq 1 60); do [ -d "$DRIVE" ] || break; sleep 0.5; done
+    gone=0
+    for _ in $(seq 1 60); do
+        if [ ! -d "$DRIVE" ]; then gone=1; break; fi
+        sleep 0.5
+    done
+    if [ "$gone" = 0 ]; then       # no restart: the stick did not take the copy; the update over MIDI says why, or does it
+        echo "the stick did not restart after the copy: updating over MIDI instead (close the Chrome control page and players that talk to the stick)"
+        exec "$PY" "$FW_DIR/scripts/ota.py" "$IMAGE"
+    fi
     for _ in $(seq 1 60); do [ -f "$DRIVE/UPDATE.TXT" ] && break; sleep 0.5; done
     if [ -f "$DRIVE/UPDATE.TXT" ]; then
         cat "$DRIVE/UPDATE.TXT"
