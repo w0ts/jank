@@ -8,7 +8,10 @@ baud, with multiply and shift only. Small session moves slew by up to half a tic
 (`JC_RESYNC_TICKS`). A board may list more pads for the same TX signal (`BOARD_MIDI_TX_MORE_GPIOS`, routed through the
 GPIO matrix); no board uses it yet.
 
-`transport link` follows Link's Start Stop Sync; `transport auto` runs whenever a session is joined. `offset` moves the
+`transport link` follows Link's Start Stop Sync; `transport auto` runs whenever a session is joined. In AUDIO mode the
+outputs follow the session's start / stop with either setting (the tracker starts it on a bar line once it locks, alone
+or with peers). In LINK mode `stop` stops the stick's own clocks until its `play`, whoever starts the session again or
+whatever peer comes (with `transport auto` the session itself is left alone). `offset` moves the
 clock against the session by -100..100 ms, for gear that lags. `quantum` (1..16, default 4) is the bar for start.
 
 ## Resync (a click)
@@ -35,6 +38,13 @@ stopped gear too, which stays started until the session's next stop.
 What it took: the alarm goes 2 us early (`CLK_LEAD_US`: interrupt entry ~2.0 us, the UART 0.3 us, which starts the byte at
 once, not on a bit boundary), and core 1 runs the clock interrupt alone: with TinyUSB's task on core 1 the worst tick was
 37 us (a critical section there masks the level-3 interrupt).
+
+**Bench outputs on the XIAO** (every XIAO build, `BOARD_BENCH_CLK_GPIO` in `main/board.h`): pad **D1 (GPIO2) = CLK**
+changes level on every MIDI clock, so each tick is an edge (rising and falling in turn); pad **D0 (GPIO1) = RST** goes high
+with each MIDI start and low at the next clock. Both are written in the clock's interrupt right after the UART starts the
+tick's first byte, so an edge sits with that byte's start bit (a start tick's first byte is the FA). Into an audio
+interface as above: each pad through 1 kohm into a line input's tip (Fireface: one input each, 96 kHz if it can), the
+XIAO's GND to the sleeves. 3.3 V logic: no 5 V, no current to speak of.
 
 **Over USB-MIDI** (the Mac's Link library against arrival times, `aalink`): sd 110 to 240 us, p99 about 1 ms, a mean of
 0.4 to 0.6 ms late. USB full speed polls every 1 ms, so this path is bounded by USB; a computer is better served by Link

@@ -1,0 +1,74 @@
+--- a/tinyusb_msc.c
++++ b/tinyusb_msc.c
+@@ -1672,7 +1672,7 @@
+ #define SCSI_CODE_ASCQ                                  0x00
+ 
+ // Invoked when received GET_MAX_LUN request, required for multiple LUNs implementation
+-uint8_t tud_msc_get_maxlun_cb(void)
++TU_ATTR_WEAK uint8_t tud_msc_get_maxlun_cb(void)
+ {
+     uint8_t msc_lun = 1; // Default 1 LUN, even when the storage is not initialized, report 1 LUN, but without a media
+ 
+@@ -1687,7 +1687,7 @@
+ 
+ // Invoked when received SCSI_CMD_INQUIRY
+ // Application fill vendor id, product id and revision with string up to 8, 16, 4 characters respectively
+-void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16], uint8_t product_rev[4])
++TU_ATTR_WEAK void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16], uint8_t product_rev[4])
+ {
+     (void) lun;
+     const char vid[] = "TinyUSB";
+@@ -1701,7 +1701,7 @@
+ 
+ // Invoked when received Test Unit Ready command.
+ // return true allowing host to read/write this LUN e.g SD card inserted
+-bool tud_msc_test_unit_ready_cb(uint8_t lun)
++TU_ATTR_WEAK bool tud_msc_test_unit_ready_cb(uint8_t lun)
+ {
+     msc_storage_obj_t *storage = NULL;
+     bool host_io_blocked = false;
+@@ -1730,7 +1730,7 @@
+ 
+ // Invoked when received SCSI_CMD_READ_CAPACITY_10 and SCSI_CMD_READ_FORMAT_CAPACITY to determine the disk size
+ // Application update block count and block size
+-void tud_msc_capacity_cb(uint8_t lun, uint32_t *block_count, uint16_t *block_size)
++TU_ATTR_WEAK void tud_msc_capacity_cb(uint8_t lun, uint32_t *block_count, uint16_t *block_size)
+ {
+     msc_storage_obj_t *storage = NULL;
+ 
+@@ -1754,7 +1754,7 @@
+ // Invoked when received Start Stop Unit command
+ // - Start = 0 : stopped power mode, if load_eject = 1 : unload disk storage
+ // - Start = 1 : active mode, if load_eject = 1 : load disk storage
+-bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, bool load_eject)
++TU_ATTR_WEAK bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, bool load_eject)
+ {
+     (void) lun;
+     (void) power_condition;
+@@ -1769,7 +1769,7 @@
+ // Invoked when received SCSI READ10 command
+ // - Address = lba * BLOCK_SIZE + offset
+ // - Application fill the buffer (up to bufsize) with address contents and return number of read byte.
+-int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize)
++TU_ATTR_WEAK int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize)
+ {
+ #if (CONFIG_TINYUSB_MSC_ASYNC_IO)
+     return msc_async_io_submit(lun, false, lba, offset, buffer, bufsize);
+@@ -1787,7 +1787,7 @@
+ // Invoked when received SCSI WRITE10 command
+ // - Address = lba * BLOCK_SIZE + offset
+ // - Application write data from buffer to address contents (up to bufsize) and return number of written byte.
+-int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
++TU_ATTR_WEAK int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
+ {
+ #if (CONFIG_TINYUSB_MSC_ASYNC_IO)
+     return msc_async_io_submit(lun, true, lba, offset, buffer, bufsize);
+@@ -1827,7 +1827,7 @@
+  * \retval      negative    Indicate error e.g unsupported command, tinyusb will \b STALL the corresponding
+  *                          endpoint and return failed status in command status wrapper phase.
+  */
+-int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, uint16_t bufsize)
++TU_ATTR_WEAK int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, uint16_t bufsize)
+ {
+     int32_t ret;
+ 
