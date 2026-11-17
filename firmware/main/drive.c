@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The JANK drive: a made-up FAT16 volume (core/jank_vdrive.h) served straight from TinyUSB's mass storage callbacks. It
- * holds jank.html (the control page, from the image) and UPDATE.TXT (the last update's note); nothing of it is stored.
+ * holds jank.html (the control page, from the image), README.txt (docs/drive-readme.txt, from the image) and UPDATE.TXT (the
+ * last update's note); nothing of it is stored.
  *
  * Updating: the user copies a jank.bin (the app image, no conversion) onto the drive. Its first sector gives it away (an
  * ESP32-S3 image header); from there each sector the computer writes goes straight into the spare app slot (a 4 KB page
@@ -42,6 +43,7 @@ _Static_assert(CONFIG_TINYUSB_MSC_BUFSIZE % JV_SECTOR == 0, "TinyUSB hands over 
 
 extern const uint8_t page_start[] asm("_binary_jank_html_start");
 extern const uint8_t page_end[] asm("_binary_jank_html_end");
+extern const char readme_start[] asm("_binary_drive_readme_txt_start");   /* docs/drive-readme.txt: README.txt, NUL-ended (TEXT blob) */
 
 static const char *TAG = "drive";
 static struct jv s_d;
@@ -410,7 +412,7 @@ esp_err_t drive_start(void)
     s_slot = esp_ota_get_next_update_partition(NULL);
     esp_efuse_mac_get_default(mac);
     /* page_end - 1: a text blob ends in a NUL (target_add_binary_data TEXT) */
-    jv_init(&s_d, page_start, (uint32_t)(page_end - page_start - 1), s_note, (uint32_t)mac[2] << 24 | (uint32_t)mac[3] << 16 | (uint32_t)mac[4] << 8 | mac[5],
+    jv_init(&s_d, page_start, (uint32_t)(page_end - page_start - 1), s_note, readme_start, (uint32_t)mac[2] << 24 | (uint32_t)mac[3] << 16 | (uint32_t)mac[4] << 8 | mac[5],
             s_slot ? (uint32_t)s_slot->size : 0u, alloc_sector, NULL);
     /* the image check (esp_image_verify, SHA-256) and the NVS note run on this stack, as ota.c's do_end did on the control task's */
     if (xTaskCreatePinnedToCore(drive_task, "drive", 4096, NULL, 3, &s_task, 0) != pdPASS)
