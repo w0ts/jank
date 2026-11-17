@@ -41,6 +41,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_freertos_hooks.h"
 #include "sdkconfig.h"
 #include "jank_beatlink.h"
 #include "jank_conf.h"
@@ -49,6 +50,9 @@
 #include "jb_beat.h"
 #include "jb_down.h"
 #include "jb_follow.h"
+#include "jb_graded.h"
+#include "jb_robust.h"
+#include "jb_skip.h"
 #include "jb_mode.h"
 #include "jb_rate.h"
 #include "jb_weak.h"
@@ -78,6 +82,18 @@ static uint32_t s_rate_cycles, s_rate_max_cycles;   /* its work this second (the
 static uint32_t s_rate_us, s_rate_max_us;           /* ... over the last second, published */
 static struct jb_weak s_weak;          /* the weak-signal hold (core/beat/jb_weak.h, M2j) */
 static struct jw_store *s_weak_store;  /* its activation ring and beat lists (7.3 KB, PSRAM); NULL: off, M2i's follow */
+static struct jb_robust s_robust;      /* the robust follower, all-d-f60 (core/beat/jb_robust.h, M2m): the A/B against the tuned one */
+static struct jrb_store *s_robust_store;   /* its activation ring (8 KB, PSRAM); NULL: no robust follower, `set follower robust` stays tuned */
+static uint8_t s_follower;             /* the one running: 0 tuned (M2j, today's code path), 1 robust */
+static struct jb_skip s_skip;          /* SKIP (core/beat/jb_skip.h): off with the tuned follower; ACT / PAT on the robust one */
+static uint8_t s_skip_mode;            /* enum jsk_mode running */
+static uint8_t s_graded, s_coast;      /* the shown confidence is the graded one (display only); the outputs run under the threshold */
+static int s_last_jumps;               /* the follower's jumps at the last confidence step (a jump since is `jumped`) */
+static uint32_t s_conf_cycles;         /* follow_conf's work this second ... */
+static uint32_t s_conf_us;             /* ... over the last second, published */
+static struct {
+    uint32_t refresh_us, refresh_max_us, gate_us, gate_max_us, tick_us;
+} s_rb_pub;                            /* the robust counters over the last second */
 static uint8_t s_pend;                 /* a tracked beat waiting BEAT_DEFER frames for its strength: */
 static int64_t s_pend_index;           /* ... its frame */
 static double s_pend_t;                /* ... its time */
@@ -213,6 +229,30 @@ static void down_tracked(double t, int jumps_before)
 }
 
 /* the front end's tap: each frame's |FFT| to the spectral rate (it returns at once while inactive), its cycles counted */
+static uint32_t cycles_now(void) { return esp_cpu_get_cycle_count(); }
+
+/* the profile (M2m): the tracker task's cycles per stage this second, and core 0's idle share */
+enum { P_PULL, P_METER, P_FE, P_RATE, P_NET, P_DBN, P_DOWN, P_ACT, P_FEED, P_COAST, P_RSTEP, P_CONF, P_STEP, P_BURN, P_N };
+static uint32_t s_prof[P_N], s_prof_pub[P_N], s_pmax[P_N], s_pmax_pub[P_N];
+static uint32_t s_hop_win_max_us, s_hop_over10, s_hop_win_max_pub, s_hop_over10_pub;
+static uint32_t s_idle_cyc, s_idle_last, s_idle_pub;     /* core 0's idle task: cycles spent spinning in it */
+static uint16_t s_burn_us;                               /* BENCH: extra work a frame (set burn) */
+static int64_t s_burn_until_us;                          /* ... only until then (60 s after it was set): a forgotten burn must not stay */
+#define BURN_MAX_S 60
+#define PROF_BEGIN uint32_t prof_c0 = esp_cpu_get_cycle_count()
+#define PROF_END(k) do { uint32_t c_ = esp_cpu_get_cycle_count() - prof_c0; s_prof[k] += c_; if (c_ > s_pmax[k]) s_pmax[k] = c_; } while (0)
+
+/* core 0's idle task (it spins here instead of waiting for an interrupt, so that its time can be counted: a gap between two
+ * calls longer than a spin is time some other task or interrupt had) */
+static bool idle_hook(void)
+{
+    uint32_t n = esp_cpu_get_cycle_count(), d = n - s_idle_last;
+    s_idle_last = n;
+    if (d < 2000u)
+        s_idle_cyc += d;
+    return false;
+}
+
 static void rate_tap(void *ctx, int64_t index, const float *mag)
 {
     (void)ctx;
@@ -247,7 +287,7 @@ static void rate_step(double now)
 
 /* a tracked beat into the follower (chain.py's order): the rate events decided before it, the weak follower (strong:
  * the follower's update; weak: a gentle observation), the fast jump, the lines cleared on any jump */
-static void feed_beat(double t)
+static void feed_beat_inner(double t)
 {
     int jumps = s_follow.m.jumps;
     uint8_t i = 0;
@@ -257,10 +297,11 @@ static void feed_beat(double t)
         memmove(s_rate_q, s_rate_q + i, sizeof s_rate_q[0] * (size_t)(s_rate_qn - i));
         s_rate_qn = (uint8_t)(s_rate_qn - i);
     }
-    jw_update(&s_weak, &s_follow, t);
+    const uint32_t resyncs = s_skip.resyncs;
+    jsk_update(&s_skip, &s_weak, &s_follow, t);    /* (SKIP off: jw_update) */
     jb_follow_fast_jump(&s_follow, t, JF_FAST_JUMP_REL);
-    if (s_follow.m.jumps != jumps)
-        jcf_clear_lines(&s_conf);       /* a new grid: the old one's lines judge no beat */
+    if (s_follow.m.jumps != jumps || s_skip.resyncs != resyncs)
+        jcf_clear_lines(&s_conf);       /* a new grid (a jump, or SKIP's phase re-sync): the old one's lines judge no beat */
     if (s_down_seg)
         down_tracked(t, jumps);
     jcf_beat(&s_conf, t);              /* (not while silent: what comes after silence is new music) */
@@ -269,16 +310,33 @@ static void feed_beat(double t)
     report('b', t);
 }
 
+static void feed_beat(double t)
+{
+    PROF_BEGIN;
+    feed_beat_inner(t);
+    PROF_END(P_FEED);
+}
+
 static void on_frame(void *ctx, const struct jb_frame *f)
 {
     double now = (double)f->index / (double)JB_FPS;
     (void)ctx;
     s_hops++;
-    if (s_down_seg && jd_frame(&s_down, f->index, f->bands))
-        s_beat_seen = 1;                /* a decision: the session's bar is looked after now */
+    {
+        PROF_BEGIN;
+        if (s_down_seg && jd_frame(&s_down, f->index, f->bands))
+            s_beat_seen = 1;            /* a decision: the session's bar is looked after now */
+        PROF_END(P_DOWN);
+    }
     if (f->act > s_win_act)
         s_win_act = f->act;
-    jw_act(&s_weak, f->index, f->act);
+    {
+        PROF_BEGIN;
+        jw_act(&s_weak, f->index, f->act);
+        if (s_follower)
+            jrb_act(&s_robust, f->index, f->act);
+        PROF_END(P_ACT);
+    }
     if (f->beat) {
         if (s_pend)
             feed_beat(s_pend_t);        /* (never: tracked beats are 0.33 s apart at least) */
@@ -294,8 +352,23 @@ static void on_frame(void *ctx, const struct jb_frame *f)
         s_pend = 0;
         feed_beat(s_pend_t);
     }
-    jw_coast(&s_weak, &s_follow, now);  /* the beat-less lines whose evidence is in */
-    rate_step(now);
+    {
+        PROF_BEGIN;
+        jsk_coast(&s_skip, &s_weak, &s_follow, now);  /* the beat-less lines whose evidence is in; SKIP's activation path (off: jw_coast) */
+        PROF_END(P_COAST);
+    }
+    {
+        PROF_BEGIN;
+        rate_step(now);
+        PROF_END(P_RSTEP);
+    }
+    if (s_burn_us && esp_timer_get_time() < s_burn_until_us) {   /* BENCH: busy for s_burn_us more, to find where the core overloads */
+        PROF_BEGIN;
+        const uint32_t span = (uint32_t)s_burn_us * (uint32_t)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+        while (esp_cpu_get_cycle_count() - prof_c0 < span)
+            ;
+        PROF_END(P_BURN);
+    }
 }
 
 static void restart_down(void)
@@ -315,10 +388,20 @@ static void restart_tracker(void)
     jb_beat_reset(&s_b);
     jb_follow_init(&s_follow);
     jw_init(&s_weak, s_weak_store, NULL, 0, 1);    /* the frame count starts over with the tracker */
+    jrb_init(&s_robust, s_robust_store);           /* ... and the robust follower's: no memory, no ring */
+    s_robust.clock = cycles_now;
+    jsk_init(&s_skip, &s_robust);                  /* SKIP starts over with the estimator */
+    jsk_set_mode(&s_skip, s_follower ? (enum jsk_mode)s_skip_mode : JSK_OFF);
+    s_robust.sk = jsk_on(&s_skip) ? &s_skip : NULL;
+    jb_dbn_set_prior(&s_b.dbn, NULL);
+    if (s_follower)
+        jrb_attach(&s_robust, &s_follow, &s_weak);  /* the lock and jump gate (tuned: none, today's follower bit for bit) */
+    s_last_jumps = 0;
     s_pend = 0;
     s_rate_qn = 0;
     s_conf_ran = 0;
     s_conf_hold = 0;
+    s_coast = 0;
     s_conf_shown = s_conf_at = 0.0;
     jb_rate_set_active(&s_rate, 0);    /* (its history starts over at the next glide) */
     restart_down();
@@ -500,6 +583,33 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.coasts = s_weak.coasted;
     b.weak_beats = s_weak.weak_beats;
     b.fast_jumps = s_follow.fast_jumps;
+    b.follower = s_follower;
+    b.skip = s_skip_mode;
+    b.graded = s_graded;
+    b.coast = s_coast;
+    b.skip_resyncs = (uint16_t)(s_skip.resyncs_total > 65535u ? 65535u : s_skip.resyncs_total);
+    b.skip_act_resyncs = (uint16_t)(s_skip.act_resyncs_total > 65535u ? 65535u : s_skip.act_resyncs_total);
+    b.skip_gated = (uint16_t)(s_skip.gated_ticks > 65535u ? 65535u : s_skip.gated_ticks);
+    memcpy(b.prof_us, s_prof_pub, sizeof b.prof_us);
+    memcpy(b.prof_max_us, s_pmax_pub, sizeof b.prof_max_us);
+    b.hop_win_max_us = s_hop_win_max_pub;
+    b.hop_over10 = s_hop_over10_pub;
+    b.uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
+    memcpy(b.gap_at_ms, u.gap_at_ms, sizeof b.gap_at_ms);
+    memcpy(b.gap_len_ms, u.gap_len_ms, sizeof b.gap_len_ms);
+    b.core0_idle_x10 = s_idle_pub;
+    b.burn_us = s_burn_us;
+    b.conf_us = s_conf_us;
+    b.robust_refresh_us = s_rb_pub.refresh_us;
+    b.robust_refresh_max_us = s_rb_pub.refresh_max_us;
+    b.robust_gate_us = s_rb_pub.gate_us;
+    b.robust_gate_max_us = s_rb_pub.gate_max_us;
+    b.robust_tick_us = s_rb_pub.tick_us;
+    b.robust_asked = s_robust.asked;
+    b.robust_refused_memory = s_robust.refused_memory;
+    b.robust_refused_ratio = s_robust.refused_ratio;
+    b.robust_coast_ticks = s_robust.coasting_ticks;
+    b.robust_prior_ticks = s_robust.prior_ticks;
     portENTER_CRITICAL(&s_mux);
     s_pub = b;
     portEXIT_CRITICAL(&s_mux);
@@ -513,10 +623,11 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
 static void follow_conf(const struct jk_cfg *cfg)
 {
     double tb = 0.0, period = 0.0, strict = 0.0, conf = 0.0, bpm, now = (double)s_samples / (double)UAC_RATE;
-    int has_bpm = 0;
+    double conf_shown = 0.0;
+    int has_bpm = 0, has = 0, use_graded = 0;
     uint8_t weak_picked = 0, held = 0;
     if (s_audio_live && !s_conf.silent) {
-        int has = jb_follow_grid(&s_follow, &tb, &period);
+        has = jb_follow_grid(&s_follow, &tb, &period);
         has_bpm = jb_follow_bpm_at(&s_follow, now, &bpm);
         jcf_line_tick(&s_conf, has_bpm ? has : 0, tb, period, now);
         strict = jcf_lines_confidence(s_conf.t, s_conf.n, s_conf.line, s_conf.lines, has, period, now, JCF_WINDOW_S,
@@ -532,11 +643,42 @@ static void follow_conf(const struct jk_cfg *cfg)
     }
     /* shown: a hold eases toward the threshold instead of a frozen value (M2k); the gate below takes the real one */
     s_conf_hold = (uint8_t)(weak_picked && held);
-    s_conf_shown = jcf_show_step(s_conf_shown, conf, s_conf_hold, (double)cfg->threshold / 100.0,
-                                 now > s_conf_at ? now - s_conf_at : 0.0);
+    if (s_follower) {
+        /* M2m, the robust follower: the gate judges the agreement of the lines, the comb's tempo, the phase and the DBN's
+         * mass (jrb_tick: also the coast, the tempo memory and the DBN's prior); that is the confidence shown */
+        struct jrb_in in = {.now = now, .silent = !(s_audio_live && !s_conf.silent), .has_bpm = has_bpm, .bpm = has_bpm ? bpm : 0.0,
+                            .has_grid = has, .period = period,
+                            .conf = conf, .strict = strict, .has_kf = s_follow.has_kf,
+                            .jumped = s_follow.m.jumps != s_last_jumps, .was_running = s_conf_ran, .lines = s_conf.line,
+                            .n_lines = s_conf.lines, .threshold_pct = cfg->threshold, .keep_running = cfg->lowconf != JCF_STOP};
+        struct jrb_out o;
+        if (in.silent)
+            in.conf = in.strict = 0.0;
+        jrb_tick(&s_robust, &s_b.dbn, &in, &s_gated, &o);
+        s_last_jumps = s_follow.m.jumps;
+        conf = o.gconf;
+        s_coast = o.coasting;
+        if (s_graded && !in.silent) {
+            /* the graded confidence (jb_graded.h) is shown instead; the gate above keeps judging the agreement */
+            conf_shown = jg_graded(has ? jg_soft_f(jw_seen(&s_weak), s_weak.n_seen, s_conf.line, s_conf.lines, period, now) : 0.0,
+                                   jg_jitter(jw_seen(&s_weak), s_weak.n_seen), s_robust.v_tempo, s_robust.v_dbn);
+            use_graded = 1;
+        }
+    } else {
+        s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
+        s_coast = 0;
+    }
+    if (use_graded) {
+        s_conf_shown = conf_shown;      /* a measurement: no HOLD easing */
+        s_conf_hold = 0;
+    } else {
+        s_conf_shown = jcf_show_step(s_conf_shown, conf, s_conf_hold, (double)cfg->threshold / 100.0,
+                                     now > s_conf_at ? now - s_conf_at : 0.0);
+        if (s_conf_hold)
+            s_coast = 0;                /* (a HOLD is not a COAST) */
+    }
     s_conf_at = now;
     s_conf_pct = jcf_pct(s_conf_shown);
-    s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
     s_conf_open = (uint8_t)!jcf_gate(1, conf, JCF_STOP, cfg->threshold);   /* (a closed gate's test: open at threshold + 5) */
     if (weak_picked && !s_gated && cfg->lowconf == JCF_STOP && strict < (double)cfg->threshold / 100.0)
         s_weak_holds++;
@@ -550,18 +692,24 @@ static void work(const int16_t *x, size_t n)
     int64_t t0 = esp_timer_get_time();
     uint32_t c0 = esp_cpu_get_cycle_count();
     uint64_t sumsq = 0;
+    uint32_t m0 = esp_cpu_get_cycle_count();
     for (size_t i = 0; i < n; i++) {
         int32_t a = x[i] < 0 ? -(int32_t)x[i] : x[i];
         if (a > s_win_peak)
             s_win_peak = a;
-        sumsq += (uint64_t)((int64_t)a * a);
+        sumsq += (uint32_t)a * (uint32_t)a;     /* (a <= 32768: fits 32 bits; the 64-bit multiply was a library call) */
     }
     jlv_push(&s_live, x, n);
     jcf_samples(&s_conf, sumsq, n);    /* the silence first: a block that begins it keeps none of its beats (engine.py) */
+    s_prof[P_METER] += esp_cpu_get_cycle_count() - m0;
     jb_beat_push_s16(&s_b, x, n, on_frame, NULL);
     uint32_t cycles = esp_cpu_get_cycle_count() - c0;
     int64_t us = esp_timer_get_time() - t0;
     uint32_t frames = s_hops - h0;
+    if ((uint32_t)us > s_hop_win_max_us)
+        s_hop_win_max_us = (uint32_t)us;
+    if (us > 10000)
+        s_hop_over10++;
     s_samples += (int64_t)n;
     s_busy_us += (uint64_t)us;
     s_busy_cycles += cycles;
@@ -668,8 +816,17 @@ static void beat_task(void *arg)
             epoch = uac_epoch();
             restart_tracker();
         }
-        while ((n = uac_pull(x, JB_HOP)) != 0u)
+        const int64_t pass_start = esp_timer_get_time();
+        for (;;) {
+            uint32_t p0 = esp_cpu_get_cycle_count();
+            n = uac_pull(x, JB_HOP);
+            s_prof[P_PULL] += esp_cpu_get_cycle_count() - p0;
+            if (n == 0u)
+                break;
             work(x, n);
+            if (esp_timer_get_time() - pass_start > 12000)
+                break;                  /* behind the audio: the step (settings, publish) still runs, the ring may overflow */
+        }
         follow_sound(esp_timer_get_time());
         uint32_t bar_req = __atomic_load_n(&s_bar_req, __ATOMIC_ACQUIRE);
         take_fold_req();
@@ -685,7 +842,39 @@ static void beat_task(void *arg)
             cpu_x10 = (uint32_t)(s_win_busy * 1000 / (now - s_win_start));
             s_rate_us = s_rate_cycles / (uint32_t)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;      /* (cycles at the CPU's MHz: us) */
             s_rate_max_us = s_rate_max_cycles / (uint32_t)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
-            s_rate_cycles = s_rate_max_cycles = 0;
+            {
+                const uint32_t mhz = (uint32_t)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+                s_prof[P_FE] = s_b.cyc_fe > s_rate_cycles ? s_b.cyc_fe - s_rate_cycles : 0u;   /* (the rate's tap is inside the front end) */
+                s_prof[P_RATE] = s_rate_cycles;
+                s_pmax[P_FE] = s_b.max_fe;
+                s_pmax[P_NET] = s_b.max_net;
+                s_pmax[P_DBN] = s_b.max_dbn;
+                s_b.max_fe = s_b.max_net = s_b.max_dbn = 0;
+                s_prof[P_NET] = s_b.cyc_net;
+                s_prof[P_DBN] = s_b.cyc_dbn;
+                s_b.cyc_fe = s_b.cyc_net = s_b.cyc_dbn = 0;
+                s_prof[P_CONF] = s_conf_cycles;
+                for (int k = 0; k < P_N; k++) {
+                    s_prof_pub[k] = s_prof[k] / mhz;
+                    s_pmax_pub[k] = s_pmax[k] / mhz;
+                    s_prof[k] = 0;
+                    s_pmax[k] = 0;
+                }
+                s_hop_win_max_pub = s_hop_win_max_us;
+                s_hop_over10_pub = s_hop_over10;
+                s_hop_win_max_us = s_hop_over10 = 0;
+                s_idle_pub = (uint32_t)((uint64_t)s_idle_cyc * 1000u / ((uint64_t)mhz * (uint64_t)(now - s_win_start)));
+                s_idle_cyc = 0;
+                s_rate_cycles = s_rate_max_cycles = 0;
+                struct jrb_cycles c = jrb_take_cycles(&s_robust);
+                s_conf_us = s_conf_cycles / mhz;
+                s_conf_cycles = 0;
+                s_rb_pub.refresh_us = c.refresh / mhz;
+                s_rb_pub.refresh_max_us = c.refresh_max / mhz;
+                s_rb_pub.gate_us = c.gate / mhz;
+                s_rb_pub.gate_max_us = c.gate_max / mhz;
+                s_rb_pub.tick_us = c.tick / mhz;
+            }
             s_win_start = now;
             s_win_busy = 0;
             /* the second's input peak in dBFS (full scale 32768; silence and anything below -99 dB: -99) and activation */
@@ -702,7 +891,26 @@ static void beat_task(void *arg)
         app_cfg_get(&cfg);
         apply_autobar(&cfg);
         s_rate_cfg = cfg.rate;
-        follow_conf(&cfg);
+        {
+            uint8_t want = (uint8_t)(cfg.follower && s_robust_store && s_weak_store);
+            uint8_t want_skip = want && cfg.skip <= JSK_PAT ? cfg.skip : 0;
+            if (want != s_follower || want_skip != s_skip_mode) {   /* M2m A/B: a new follower or SKIP setting starts on a clean tracker */
+                s_follower = want;
+                s_skip_mode = want_skip;
+                restart_tracker();
+            }
+            s_graded = (uint8_t)(want && cfg.graded);
+        }
+        {
+            uint32_t c0 = esp_cpu_get_cycle_count();
+            follow_conf(&cfg);
+            s_conf_cycles += esp_cpu_get_cycle_count() - c0;
+        }
+        if (cfg.burn_us != s_burn_us) {
+            s_burn_us = cfg.burn_us;
+            s_burn_until_us = esp_timer_get_time() + (int64_t)BURN_MAX_S * 1000000;
+        }
+        uint32_t step0 = esp_cpu_get_cycle_count();
         {
             struct step_ctx c;
             make_input(&cfg, &c.in, &mode, &bpm);
@@ -720,6 +928,7 @@ static void beat_task(void *arg)
                 finish_nudge(nudge, c.nudge_rc);
         }
         publish(mode, bpm * jfo_factor(&s_fold), &cfg, cpu_x10);
+        s_prof[P_STEP] += esp_cpu_get_cycle_count() - step0;
         __atomic_store_n(&s_bar_done, bar_req, __ATOMIC_RELEASE);   /* the placement asked before this step is made */
     }
 }
@@ -824,6 +1033,8 @@ uint8_t beat_bar_state(void)
 esp_err_t beat_start(void)
 {
     jbl_init(&s_jbl);
+    esp_register_freertos_idle_hook_for_cpu(idle_hook, 0);
+    s_b.clock = cycles_now;
     s_jbl.held = 1;                    /* power-on is the user's Stop (core/jank_hold.h jho_init): a session already playing
                                         * (Live, another stick) is not stopped for it, nor started by the tracker */
     if (jb_beat_init_q16(&s_b) != 0) {         /* the network's weights in RAM as int16: from flash they cost > a core */
@@ -856,6 +1067,14 @@ esp_err_t beat_start(void)
         ESP_LOGI(TAG, "WEAK: %u bytes + %u bytes in PSRAM", (unsigned)sizeof s_weak, (unsigned)sizeof *s_weak_store);
     else
         ESP_LOGW(TAG, "WEAK: no PSRAM for its ring, off");
+    /* the robust follower's activation ring: PSRAM only; none: `set follower robust` keeps the tuned one */
+    s_robust_store = heap_caps_malloc(sizeof *s_robust_store, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    jrb_init(&s_robust, s_robust_store);
+    jsk_init(&s_skip, &s_robust);
+    if (s_robust_store)
+        ESP_LOGI(TAG, "ROBUST: %u bytes + %u bytes in PSRAM", (unsigned)sizeof s_robust, (unsigned)sizeof *s_robust_store);
+    else
+        ESP_LOGW(TAG, "ROBUST: no PSRAM for its ring, off");
     ESP_LOGW(TAG, "BEAT-FOLLOW BENCH BUILD: madmom's weights, CC BY-NC-SA 4.0, never ship");
     return xTaskCreatePinnedToCore(beat_task, "beat", BEAT_STACK, NULL, BEAT_PRIO, &s_task, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

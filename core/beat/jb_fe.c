@@ -49,11 +49,19 @@ static void fft(float *z)
             z[2 * j + 1] = ti;
         }
     }
-    for (int len = 2; len <= N2; len <<= 1) {
+    for (int i = 0; i < N2; i += 2) {                         /* the first stage: its twiddle is 1 (no multiplies, the same values) */
+        float *a = z + 2 * i, *b = a + 2;
+        float br = b[0], bi = b[1];
+        b[0] = a[0] - br;
+        b[1] = a[1] - bi;
+        a[0] += br;
+        a[1] += bi;
+    }
+    for (int len = 4; len <= N2; len <<= 1) {
         int half = len >> 1, step = N2 / len;                 /* twiddle exp(-2 pi i m / N2) = table[2 m] */
-        for (int i = 0; i < N2; i += len) {
-            for (int m = 0; m < half; ++m) {
-                float wr = s_cos[2 * m * step], wi = s_sin[2 * m * step];
+        for (int m = 0; m < half; ++m) {                      /* the twiddle once for the blocks (the same butterflies) */
+            const float wr = s_cos[2 * m * step], wi = s_sin[2 * m * step];
+            for (int i = 0; i < N2; i += len) {
                 float *a = z + 2 * (i + m), *b = z + 2 * (i + m + half);
                 float xr = b[0] * wr - b[1] * wi, xi = b[0] * wi + b[1] * wr;
                 b[0] = a[0] - xr;
@@ -84,10 +92,12 @@ static void frame_features(struct jb_fe *fe, float *feat)
 {
     float mag[BEAT_BINS];
     int64_t start = fe->frame * JB_HOP - JB_FRAME / 2;
-    for (int i = 0; i < JB_FRAME; i += 2) {                   /* even samples to re, odd to im, windowed */
-        float w0 = s_win[i < N2 ? i : JB_FRAME - 1 - i], w1 = s_win[i + 1 < N2 ? i + 1 : JB_FRAME - 2 - i];
-        fe->buf[i] = fe->ring[(start + i) & (JB_FRAME - 1)] * w0;
-        fe->buf[i + 1] = fe->ring[(start + i + 1) & (JB_FRAME - 1)] * w1;
+    const uint32_t base = (uint32_t)start & (JB_FRAME - 1);    /* (32-bit index arithmetic: the 64-bit adds were library calls) */
+    for (int i = 0; i < JB_FRAME; i += 2) {                   /* even samples to re, odd to im, windowed (the symmetric window's halves) */
+        float w0 = i < N2 ? s_win[i] : s_win[JB_FRAME - 1 - i];
+        float w1 = i + 1 < N2 ? s_win[i + 1] : s_win[JB_FRAME - 2 - i];
+        fe->buf[i] = fe->ring[(base + i) & (JB_FRAME - 1)] * w0;
+        fe->buf[i + 1] = fe->ring[(base + i + 1) & (JB_FRAME - 1)] * w1;
     }
     magnitudes(fe->buf, mag);
     if (fe->tap)

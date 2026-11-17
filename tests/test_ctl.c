@@ -22,7 +22,7 @@ static int fails, checks;
 static const uint8_t HOST[6] = {0x02, 0x11, 0x22, 0x33, 0x44, 0x55};
 static struct jk_cfg cfg;
 static struct jk_snapshot snap;
-static char out[1024];
+static char out[JK_CTL_OUT_MAX];
 
 static void setup(void)
 {
@@ -585,6 +585,12 @@ static void test_status_size(void)
     printf("longest status: %zu bytes\n", strlen(big));
     CHECK(strstr(big, "bar=manual\n") && strstr(big, "ble_state=connected\n") && strstr(big, "usb_role=host\n"));
     CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
+    /* `beat` with every counter at its largest (M2m added the robust follower's: it must still fit the answer buffer) */
+    memset(&snap.beat, 0xFF, sizeof snap.beat);
+    snap.beat.mode = snap.beat.follow = 0;
+    CHECK(jk_ctl_line("beat", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
+    printf("longest beat: %zu bytes\n", strlen(big));
+    CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
 }
 
 /* LOW CONFIDENCE: STOP / START at 80 % by default; set lowconf run|stop, set threshold 0..100; get and status say them,
@@ -608,13 +614,16 @@ static void test_lowconf(void)
     run("set threshold 70");
     run("set lowconf run");
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .conf_pct = 62, .act_pct = 91, .gated = 1};
-    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\nact=91\ngated=1\nsilent=0\nthreshold=70\nlowconf=run\n"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\ncoast=0\nact=91\ngated=1\nsilent=0\nthreshold=70\nlowconf=run\n"));
     snap.beat.conf_hold = 1;                                          /* M2k: the confidence holds (no evidence) */
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=1\n"));
+    snap.beat.coast = 1;                                              /* the robust follower's coast */
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=1\ncoast=1\nact=91\n"));
+    snap.beat.coast = 0;
     snap.beat.conf_hold = 0;
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=run\nthreshold=70\n"));
     snap.beat.silent = 1;
-    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\nact=91\ngated=1\nsilent=1\nthreshold=70\nlowconf=run\nmode="));
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\ncoast=0\nact=91\ngated=1\nsilent=1\nthreshold=70\nlowconf=run\nmode="));
     CHECK(run("help") == JK_CTL_NONE && strstr(out, "|usbmidi|lowconf|threshold|"));
 }
 
@@ -629,6 +638,30 @@ static void test_follow(void)
     before = cfg;
     CHECK(run("set rate off") == JK_CTL_CFG_CHANGED && cfg.rate == 0 && jk_cfg_stored_differs(&before, &cfg));
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nrate=off\n"));
+    /* M2m A/B: set follower tuned|robust, not stored (back to tuned at every start) */
+    CHECK(cfg.follower == 0 && run("get") == JK_CTL_NONE && strstr(out, "\nfollower=tuned\n"));
+    {
+        struct jk_cfg was = cfg;
+        CHECK(run("set follower robust") == JK_CTL_CFG_CHANGED && cfg.follower == 1 && !jk_cfg_stored_differs(&was, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nfollower=robust\n"));
+        CHECK(run("set follower fast") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.follower == 1);
+        CHECK(run("set follower tuned") == JK_CTL_CFG_CHANGED && cfg.follower == 0);
+    }
+    /* SKIP and the graded confidence, on the robust follower: set skip off|act|pat, set graded on|off; not stored */
+    CHECK(cfg.skip == 0 && cfg.graded == 0 && run("get") == JK_CTL_NONE && strstr(out, "\nskip=off\ngraded=off\n"));
+    {
+        struct jk_cfg was = cfg;
+        CHECK(run("set skip pat") == JK_CTL_CFG_CHANGED && cfg.skip == 2 && !jk_cfg_stored_differs(&was, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nskip=pat\n"));
+        CHECK(run("set skip act") == JK_CTL_CFG_CHANGED && cfg.skip == 1);
+        CHECK(run("set skip fast") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.skip == 1);
+        CHECK(run("set skip off") == JK_CTL_CFG_CHANGED && cfg.skip == 0);
+        CHECK(run("set graded on") == JK_CTL_CFG_CHANGED && cfg.graded == 1 && !jk_cfg_stored_differs(&was, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\ngraded=on\n"));
+        CHECK(run("set graded maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.graded == 1);
+        CHECK(run("set graded off") == JK_CTL_CFG_CHANGED && cfg.graded == 0);
+    }
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|follower|skip|graded|burn|"));
     CHECK(run("set rate maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.rate == 0);
     CHECK(run("set rate on") == JK_CTL_CFG_CHANGED && cfg.rate == 1);
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .conf_pct = 97, .follow = 2 /* glide */, .drift_ppm = -35,
@@ -648,7 +681,7 @@ static void test_follow(void)
     snap.beat.follow = 1;                                             /* lock */
     snap.beat.rate_x10000 = 9700;
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nfollow=lock\n") && strstr(out, "\nrate_ratio=0.9700\n"));
-    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|ble|"));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|follower|skip|graded|burn|ble|"));
 }
 
 int main(void)

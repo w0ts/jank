@@ -522,7 +522,9 @@ void jb_mode_update(struct jb_mode *m, double t)
     if (m->mode == JB_STOPPED) {
         m->stuck = restarted ? 0 : m->stuck + 1;
         if (m->in_a_row >= m->lock_beats) {
-            set_mode(m, JB_STEADY);
+            double lt0, lp;
+            if (!m->gate || !jb_mode_line(m, &lt0, &lp) || !(lp > 0.0) || m->gate(m->gate_ctx, JB_GATE_LOCK, t, lp))
+                set_mode(m, JB_STEADY);          /* (RobustBpm._set_mode: a refused lock stays stopped) */
         } else if (m->stuck >= STUCK_BEATS) {
             m->stuck = 0;
             restart(m);                    /* no lock after STUCK_BEATS beats: the grid is wrong, reseed */

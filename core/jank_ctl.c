@@ -125,6 +125,7 @@ static void put_lat(const struct jk_cfg *c, struct writer *w)
 }
 
 static const char *const BLE_NAMES[] = {"pair", "off", "auto"};   /* by enum jk_ble */
+static const char *const SKIP_NAME[] = {"off", "act", "pat"};      /* by enum jsk_mode (core/beat/jb_skip.h) */
 
 static const char *const AUTOBAR_NAMES[] = {"off", "start", "always"};   /* by enum jk_autobar */
 static const char *autobar_name(uint32_t v) { return v <= JK_AUTOBAR_ALWAYS ? AUTOBAR_NAMES[v] : AUTOBAR_NAMES[JK_AUTOBAR_START]; }
@@ -154,7 +155,8 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put_lat(c, w);
     put(w, "beat_latency_src=%s\nautobar=%s\n", jla_name(&c->lat_key, src), autobar_name(c->autobar));
     put(w, "usbmidi=%s\n", on_off(c->usbmidi));
-    put(w, "lowconf=%s\nthreshold=%u\nrate=%s\n", lowconf_name(c->lowconf), c->threshold, on_off(c->rate));
+    put(w, "lowconf=%s\nthreshold=%u\nrate=%s\nfollower=%s\nskip=%s\ngraded=%s\n", lowconf_name(c->lowconf), c->threshold, on_off(c->rate),
+        c->follower ? "robust" : "tuned", SKIP_NAME[c->skip < 3u ? c->skip : 0u], on_off(c->graded));
     put(w, "ble=%s\n", ble_name(c->ble));
     put(w, "usb=%s\nsource=%s\n", jur_usb_name(c->usb), jur_src_name(c->source));
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
@@ -192,8 +194,8 @@ static void put_link(const struct jk_snapshot *s, struct writer *w)
 /* LOW CONFIDENCE: the grid-fit confidence (conf), the network's activation (act), the gate and the silence, the settings */
 static void put_conf(const struct jk_cfg *c, const struct jk_beat *t, struct writer *w)
 {
-    put(w, "conf=%u\nconf_hold=%u\nact=%u\ngated=%u\nsilent=%u\nthreshold=%u\nlowconf=%s\n", t->conf_pct, t->conf_hold, t->act_pct, t->gated,
-        t->silent, c->threshold, lowconf_name(c->lowconf));
+    put(w, "conf=%u\nconf_hold=%u\ncoast=%u\nact=%u\ngated=%u\nsilent=%u\nthreshold=%u\nlowconf=%s\n", t->conf_pct, t->conf_hold, t->coast, t->act_pct,
+        t->gated, t->silent, c->threshold, lowconf_name(c->lowconf));
 }
 
 static const char *const FOLLOW_NAME[] = {"stopped", "lock", "glide", "?"};
@@ -214,6 +216,26 @@ static void put_follow(const struct jk_cfg *c, const struct jk_beat *t, struct w
         (unsigned long)t->rate_taken, (unsigned long)t->rate_refused, (unsigned long)t->rate_ignored, (unsigned long)t->rate_us, (unsigned long)t->rate_max_us);
     put(w, "weak=%s\nweak_holds=%lu\ncoasts=%lu\nweak_beats=%lu\nfast_jumps=%lu\n", on_off(t->weak_on), (unsigned long)t->weak_holds,
         (unsigned long)t->coasts, (unsigned long)t->weak_beats, (unsigned long)t->fast_jumps);
+    put(w, "prof_us=");
+    for (unsigned i = 0; i < 14u; i++)
+        put(w, i ? ",%lu" : "%lu", (unsigned long)t->prof_us[i]);
+    put(w, "\nprof_max_us=");
+    for (unsigned i = 0; i < 14u; i++)
+        put(w, i ? ",%lu" : "%lu", (unsigned long)t->prof_max_us[i]);
+    put(w, "\nhop_win_max_us=%lu\nhop_over10=%lu\nuptime_s=%lu\ngap_log=", (unsigned long)t->hop_win_max_us, (unsigned long)t->hop_over10, (unsigned long)t->uptime_s);
+    for (unsigned i = 0; i < 6u; i++)
+        if (t->gap_len_ms[i])
+            put(w, "%lu:%lu ", (unsigned long)t->gap_at_ms[i], (unsigned long)t->gap_len_ms[i]);
+    put(w, "\ncore0_idle=%lu.%lu\nburn_us=%u\n", (unsigned long)(t->core0_idle_x10 / 10u), (unsigned long)(t->core0_idle_x10 % 10u), t->burn_us);
+    put(w, "follower=%s\nrobust=%s\nconf_us=%lu\n", c->follower ? "robust" : "tuned", t->follower ? "on" : "off", (unsigned long)t->conf_us);
+    put(w, "skip=%s\ngraded=%s\nsk_syncs=%u\nsk_act=%u\nsk_gated=%u\n", SKIP_NAME[t->skip < 3u ? t->skip : 0u], on_off(t->graded),
+        t->skip_resyncs, t->skip_act_resyncs, t->skip_gated);
+    put(w, "robust_refresh_us=%lu\nrobust_refresh_max_us=%lu\nrobust_gate_us=%lu\nrobust_gate_max_us=%lu\nrobust_tick_us=%lu\n",
+        (unsigned long)t->robust_refresh_us, (unsigned long)t->robust_refresh_max_us, (unsigned long)t->robust_gate_us,
+        (unsigned long)t->robust_gate_max_us, (unsigned long)t->robust_tick_us);
+    put(w, "robust_asked=%lu\nrobust_refused_memory=%lu\nrobust_refused_ratio=%lu\nrobust_coast_ticks=%lu\nrobust_prior_ticks=%lu\n",
+        (unsigned long)t->robust_asked, (unsigned long)t->robust_refused_memory, (unsigned long)t->robust_refused_ratio,
+        (unsigned long)t->robust_coast_ticks, (unsigned long)t->robust_prior_ticks);
 }
 
 /* the tracker's source: open, sound (AUDIO mode), AUDIO mode's Stop, the outputs; the input meter and the confidence */
@@ -360,6 +382,8 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
     long v;
     if (!strcmp(key, "group") && !parse_int(val, JK_GROUP_MIN, JK_GROUP_MAX, &v))
         c->group = (uint8_t)v;
+    else if (!strcmp(key, "burn") && !parse_int(val, 0, 9000, &v))
+        c->burn_us = (uint16_t)v;          /* BENCH: extra tracker work a frame, us */
     else if (!strcmp(key, "quantum") && !parse_int(val, 1, JK_QUANTUM_MAX, &v))
         c->quantum = (uint8_t)v;
     else if (!strcmp(key, "offset") && !parse_hundredths(val, &v) && v >= -JK_OFFSET_MAX_10US && v <= JK_OFFSET_MAX_10US)
@@ -417,6 +441,18 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
         return parse_on_off(val, &c->beat);
     if (!strcmp(key, "usbmidi"))
         return parse_on_off(val, &c->usbmidi);
+    if (!strcmp(key, "follower"))          /* M2m A/B: tuned (M2j) or robust (all-d-f60); not stored */
+        return parse_pair(val, "tuned", "robust", &c->follower);
+    if (!strcmp(key, "skip")) {            /* SKIP on the robust follower: off, ACT or PAT (core/beat/jb_skip.h); not stored */
+        for (uint8_t i = 0; i < 3u; i++)
+            if (!strcmp(val, SKIP_NAME[i])) {
+                c->skip = i;
+                return 0;
+            }
+        return -1;
+    }
+    if (!strcmp(key, "graded"))            /* the shown confidence graded (core/beat/jb_graded.h): display only; not stored */
+        return parse_on_off(val, &c->graded);
     if (!strcmp(key, "rate"))              /* the advanced beat follow's spectral rate (core/beat/jb_rate.h) */
         return parse_on_off(val, &c->rate);
     if (!strcmp(key, "lowconf"))           /* LOW CONFIDENCE: KEEP RUNNING or STOP / START (jank_conf.h) */
@@ -641,7 +677,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     } else if (!strcmp(s, "ble pair") || !strcmp(s, "ble close"))
         return s[4] == 'p' ? JK_CTL_BLE_PAIR : JK_CTL_BLE_CLOSE;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nble pair|close\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nble pair|close\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

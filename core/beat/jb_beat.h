@@ -21,6 +21,11 @@ struct jb_beat {
     int q16;                           /* 1: the network runs on the int16 weights in RAM (jb_beat_init_q16) */
     jb_fe_tap tap;                     /* the front end's tap (jb_beat_set_tap), kept across resets */
     void *tap_ctx;
+    /* the stage cost counters (the device sets `clock`: a cycle counter; NULL: none): cycles in the front end (its tap
+     * included), the network and the DBN, since the caller last cleared them */
+    uint32_t (*clock)(void);
+    uint32_t cyc_fe, cyc_net, cyc_dbn;
+    uint32_t max_fe, max_net, max_dbn;  /* the longest single frame of each, since the caller last cleared them */
 };
 
 struct jb_frame {
