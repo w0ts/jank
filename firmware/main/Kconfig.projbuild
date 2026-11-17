@@ -5,5 +5,17 @@ menu "jank"
         config JANK_BOARD_XIAO
             bool "Seeed XIAO ESP32S3"
             depends on IDF_TARGET_ESP32S3
+        config JANK_BOARD_MINI22
+            bool "jank mini 2.2 (ESP32-S3FH4R2): USB host mode's parts; a build check until the board exists"
+            depends on IDF_TARGET_ESP32S3
     endchoice
+
+    config JANK_BLE_MIDI
+        bool "BLE MIDI peripheral for the control line"
+        depends on BT_NIMBLE_ENABLED
+        default n
+        help
+            The standard BLE MIDI service (main/ble_midi.c) for a phone: the control line's SysEx both ways and the
+            HOME line. Bluetooth is on only for a pair window opened on the device, or while a phone stays connected
+            (the setting ble, docs/ble.md). Needs Bluetooth with NimBLE (firmware/sdkconfig.ble).
 endmenu

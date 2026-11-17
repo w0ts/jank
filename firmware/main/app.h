@@ -35,12 +35,42 @@ typedef void (*usb_free_fn)(void *token);
 typedef void (*usb_line_fn)(const uint8_t *data, size_t n);
 esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, usb_line_fn serial_rx);
 int usb_up(void);
+int usb_host_spoke(void);                                            /* a control line came from the computer since the start */
+void usb_beat_line(const char *text, size_t n);                      /* a beat report: SysEx F0 7D 'J' 'B' 0x10 <text> F7, dropped when full */
 esp_err_t usb_send(const uint8_t *eth, size_t len, void *token);   /* tx_done(token) follows when ESP_OK */
 /* usb_midi_host.c: the clock to USB-MIDI devices, when the port started as host */
 esp_err_t usb_midi_host_start(void);
 void usb_midi_host_send(const uint8_t *packets, size_t n);
 bool usb_midi_isr(const uint8_t *bytes, size_t n);                  /* from the timer interrupt -> a task was woken */
+void usb_midi_clock(int on);                                        /* USB MIDI CLOCK (setting usbmidi): off, none of it to USB */
 void usb_serial_write(const char *text, size_t n);                 /* the control line, as SysEx on the MIDI port */
+
+/* usb_audio.c, beat.c: the beat-follow bench build (README): the computer's audio into the beat tracker, into the Link session */
+struct jank_peer;
+esp_err_t beat_start(void);
+void beat_stats(struct jk_beat *out);
+uint8_t beat_bar_state(void);
+/* AUDIO mode (the tracker on and its source sounding, core/jank_live.h) and the tracker locked on a steady beat; cheap
+ * (the bridge's task asks it at every step) */
+void beat_state(uint8_t *audio, uint8_t *locked);
+/* LOW CONFIDENCE (core/jank_conf.h), in AUDIO mode: the gate closed (STOP / START under the threshold), 0.5 s of silence,
+ * and the confidence at the threshold + 5 (core/jank_hold.h jho_in gated, silent, conf_open); cheap, for the bridge's step */
+void beat_gate(uint8_t *gated, uint8_t *silent, uint8_t *conf_open);
+/* AUDIO mode's fold (core/jank_fold.h): dir +1 x2, -1 /2, 0 back to 1; taken by the beat task within 5 ms. Returns the
+ * new exp (fold 2^exp), -99 in LINK mode */
+int beat_fold(int dir);
+void beat_fold_resync(void);                                /* Start after Stop: fold 1, as a resync */
+int beat_bar_settling(void);                                /* a Start's / a fold's bar placement not made yet (M2k) */
+/* NUDGE BEAT (core/jank_beatlink.h jbl_nudge; the control line's `nudge beat`, the device's NO + UP/DOWN): half beats,
+ * +: Link's beats come earlier. The beat task applies it at its next pass and this waits for that (up to ~200 ms; call it
+ * from a task that may block, never from the beat or bridge task). *total: the user's nudges after it, half beats; view
+ * (may be NULL, cap bytes): the downbeat estimator before it, "bar=..\nbar_phi=..\nbar_count=..\nbar_scores=a,b,c,d\n". A
+ * nudge sets AUTO BAR to MANUAL until its reset or AUTO BAR picked again; the nudges clear when the tracker starts over or
+ * stops (AUTO BAR's reset events) */
+enum beat_nudge_rc { BEAT_NUDGE_OK = 0, BEAT_NUDGE_LINK = -1, BEAT_NUDGE_NO_BEAT = -2, BEAT_NUDGE_LIMIT = -3, BEAT_NUDGE_BUSY = -4 };
+int beat_nudge(int halves, int8_t *total, char *view, size_t cap);
+/* NUDGE MS for the device's YES + UP/DOWN is core/jank_core.h jk_nudge_ms on the settings (app_cfg_get, jk_nudge_ms,
+ * app_cfg_set), as the control line's `nudge ms` does */                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
 
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);
@@ -48,8 +78,10 @@ int64_t midi_now_us(void);
 void midi_set_quantum(uint32_t quantum);
 void midi_publish(const struct jc_map *m);
 void midi_want(int play);
+int midi_start_pending(void);                        /* a MIDI start waits for its bar line */
 void midi_resync(void);
 void midi_stats(uint32_t *ticks, uint32_t *resyncs);
+int midi_is_playing(void);                           /* a MIDI start went out (or waits for its bar line), no stop since */
 
 /* bridge.c */
 esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uint8_t peer_mac[6]);
@@ -60,11 +92,25 @@ void bridge_note_scan_groups(struct js_scan *out);
 void bridge_table_start(void);                               /* frames of every group go in a table from here .. */
 void bridge_table_stop(struct js_table *out);                /* .. to here */
 uint32_t bridge_peers_heard(void);
-int bridge_beat(int64_t *beat_ub, int32_t *mpb);
-int bridge_tempo(int32_t mpb);
-void bridge_diag(char *out, size_t cap);                     /* the Link clock filter, for `diag` */
-void app_diag(char *out, size_t cap);                        /* restarts and the last reset's reason, for `diag` */                       /* 0 set; -1 no session to set it in */
-int bridge_play(int play);                           /* 0 started / stopped; -1 no session */    /* 1 in a session, with its beat now */
+int bridge_beat(int64_t *beat_ub, int32_t *mpb);    /* 1 in a session, with its beat now */
+int bridge_tempo(int32_t mpb);                       /* 0 set; -1 no session to set it in */
+/* YES / `play` / `stop`. AUDIO mode: Start / Stop of the outputs (the hold, core/jank_hold.h), always 0. LINK mode: the
+ * session: 0 a start armed for the next bar / stopped; -1 no settled session; `play` also ends a hold */
+int bridge_play(int play);
+/* LINK TRANSPORT FOLLOW (0) or FOLLOW+LEAD (1, the default) while the transport setting is LINK (AUTO = IGNORE): the
+ * device UI's choice (branch fw/ui keeps it in its prefs: it calls this when it loads or changes it) */
+void bridge_set_lead(int lead);
+/* AUDIO mode's Stop holds the Link session (FOLLOW+LEAD): for the beat tracker's step, the bridge's lock held */
+int bridge_session_held(void);
+/* the user's layer is stopped (power-on, or the user's Stop: core/jank_hold.h) */
+int bridge_user_stopped(void);
+/* the session plays (joined, or AUDIO mode's own), or (transport LINK) the MIDI clock has a start out: no flash writes
+ * now (updates excepted; settings saved later; the timing audit). Lock-free (bridge.c) */
+int bridge_is_playing(void);
+void bridge_diag(char *out, size_t cap);             /* the Link clock filter, for `diag` */
+void app_diag(char *out, size_t cap);                /* restarts and the last reset's reason, for `diag` */
+/* fn on the Link peer, with the bridge's lock held and the host time now (the beat tracker steers the session through it) */
+void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), void *ctx);
 uint32_t bridge_ms(void);
 
 /* ui.c: button, LED, group scan */
@@ -72,9 +118,25 @@ esp_err_t ui_start(void);
 esp_err_t ui_scan_table(struct js_table *out);               /* blocks about 1.05 s; joins nothing */
 
 /* ctl.c: the control protocol on the serial */
+enum ctl_src { CTL_SRC_USB, CTL_SRC_BLE, CTL_SRC_COUNT };
 esp_err_t ctl_start(void);
-void ctl_serial_rx(const uint8_t *data, size_t n);
+void ctl_serial_rx(const uint8_t *data, size_t n);           /* = ctl_line_rx(CTL_SRC_USB, ..) */
+void ctl_line_rx(enum ctl_src src, const uint8_t *data, size_t n);   /* text of the control line, from src */
+void ctl_reply(const char *text, size_t n);                  /* the answer to the line being run, to where it came from */
 uint32_t ctl_beats(void);                                    /* counts up while the task runs */
+
+#if CONFIG_JANK_BLE_MIDI
+/* ble_midi.c: a BLE MIDI peripheral for a phone: the control line's SysEx and the HOME line. Bluetooth is on only for a
+ * pair window or a connected phone (core/jank_phone.h) */
+esp_err_t ble_midi_start(const uint8_t mac[6], uint32_t mode);   /* mode: the `ble` setting, enum jk_ble */
+void ble_midi_write(const char *text, size_t n);             /* control line text, as SysEx frames; waits for buffers */
+int ble_midi_pair(void);                                     /* open a pair window: 0, or -1 with the setting off */
+void ble_midi_close(void);                                   /* the window and the phone's link off now */
+void ble_midi_setting(uint32_t mode);                        /* the `ble` setting changed */
+void ble_midi_state(uint8_t *state, uint32_t *left_s);       /* enum jph_state, the window's seconds left */
+int ble_midi_advertising(void);                              /* a pair window is open, no phone yet (the LED blinks) */
+void ble_midi_diag(char *out, size_t cap);
+#endif
 
 /* ota.c: firmware updates over the control line, and the rollback's confirmation */
 bool ota_busy(void);                                         /* a transfer over MIDI is running */
@@ -83,8 +145,13 @@ void ota_idle(void);                                         /* called about onc
 void ota_validate_start(void);                               /* a new image confirms itself once USB and the control task work */
 void ota_mark_valid(void);
 
-/* drive.c: the JANK drive: wiped at every start, jank.html on it, a jank.bin copied onto it and ejected is installed */
+/* drive.c: the JANK drive, made up (core/jank_vdrive.h): jank.html on it, a jank.bin copied onto it streams into the spare
+ * app slot and is installed */
 esp_err_t drive_start(void);
+/* the spare app slot's one writer at a time: the drive's stream or an update over MIDI (taken under a lock) */
+enum slot_user { SLOT_FREE = 0, SLOT_DRIVE, SLOT_MIDI };
+bool slot_take(enum slot_user who);                          /* true: who has it now (or had it already) */
+void slot_give(enum slot_user who);
 #ifdef JANK_CLOCK_PROBE
 esp_err_t probe_start(void);                                 /* clkprobe.c: a test build's pin probe */
 void probe_mark(int64_t due, int64_t isr_now);
@@ -92,12 +159,13 @@ size_t probe_report(char *out, size_t cap, int reset);
 #endif
 void drive_note(const char *slot, const char *text);         /* UPDATE.TXT at the next start, if slot runs (else: rolled back) */
 void drive_note_forget(void);
-void drive_state(char *out, size_t cap);                     /* `drive`: ok, or the start step that failed */                                /* the image is confirmed: the note is said */
+void drive_state(char *out, size_t cap);                     /* `drive`: ok, or the start step that failed; the stream's state */
 
 /* download.c: the ROM's download mode, with USB */
 void usb_to_rom_download(void);                              /* does not return */
 
 /* main.c: the settings' one owner */
 void app_cfg_get(struct jk_cfg *c);
-void app_cfg_set(const struct jk_cfg *c);
+void app_cfg_set(const struct jk_cfg *c);                     /* saved first (or once stopped, while playing), then published */
+void app_cfg_flush(int force);                               /* a deferred save, once stopped (force: a restart follows) */
 #endif

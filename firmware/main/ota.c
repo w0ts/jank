@@ -14,6 +14,7 @@
 
 #define VALID_POLL_MS 200
 #define VALID_MIN_UP_US 20000000LL     /* and 20 s alive: a crash once the clock or the radio gets going is rolled back too */
+#define VALID_DEADLINE_US 120000000LL  /* not confirmed by then: restart, and the bootloader puts the old image back */
 #define RESTART_DELAY_MS 100
 
 static const char *TAG = "ota";
@@ -39,6 +40,7 @@ static void drop_flash(void)
     s_handle = 0;
     s_slot = NULL;
     jo_abort(&s_jo);
+    slot_give(SLOT_MIDI);
 }
 
 static void do_begin(const struct jo_cmd *c)
@@ -51,8 +53,16 @@ static void do_begin(const struct jo_cmd *c)
         say(JO_E_STATE, 0);
         return;
     }
+    /* no "stop first" (the user, 2026-11-15: "drop the guard. just let me flash"): an update while playing is allowed;
+     * its flash erases stall USB, Wi-Fi and the tracker for a moment, so the clock may hiccup during the transfer */
+    if (!slot_take(SLOT_MIDI)) {           /* a jank.bin from the drive has the slot (streaming, or installed) */
+        say(JO_E_BUSY, 0);
+        return;
+    }
     e = jo_begin(&s_jo, c->size, c->crc, slot->size, now_ms());
     if (e != JO_OK) {
+        if (!s_jo.active)                  /* (JO_E_BUSY: the transfer running keeps the slot) */
+            slot_give(SLOT_MIDI);
         say(e, s_jo.offset);
         return;
     }
@@ -161,25 +171,35 @@ void ota_mark_valid(void)
 }
 
 /* A new image starts "pending verify": the next reset of any kind, a crash included, puts the old image back. It is
- * confirmed once it has shown that the computer sees it (USB configured by the host) and the control task has gone round
- * once after that, which is the path the next update needs, and it has run 20 s (measured 2026-11-09: a probe build that
- * crashed when its MIDI clock started, a few seconds in, had confirmed at USB-up and looped instead of rolling back). A start as USB host (no computer) confirms in usb.c before
- * its restart. */
+ * confirmed only once the computer has configured the USB device AND has spoken to it on the MIDI control line (a SysEx
+ * line from scripts/ota.py's `get` after the update, or from a page), the control task has gone round once after that,
+ * which is the path the next update needs, and it has run 20 s (measured 2026-11-09: a probe build that crashed when its
+ * MIDI clock started, a few seconds in, had confirmed at USB-up and looped instead of rolling back). Not confirmed within
+ * VALID_DEADLINE_US: it restarts, and the bootloader starts the old image. A start as USB host (no computer) does not
+ * confirm a pending image either (usb.c): its restart rolls it back. */
 static void valid_task(void *arg)
 {
     uint32_t beats = 0;
-    int seen = 0;
+    int seen = 0, ready = 0;
     (void)arg;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(VALID_POLL_MS));
-        if (!usb_up())
+        if (ready) {                   /* the confirm (an otadata write) is made at once, playing or not */
+            ota_mark_valid();
+            vTaskDelete(NULL);
+        }
+        if (esp_timer_get_time() >= VALID_DEADLINE_US) {
+            ESP_LOGE(TAG, "no computer spoke on the MIDI control line within %d s: restarting into the old image", (int)(VALID_DEADLINE_US / 1000000));
+            vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));
+            esp_restart();
+        }
+        if (!usb_up() || !usb_host_spoke())
             continue;
         if (!seen) {
             seen = 1;
             beats = ctl_beats();
         } else if (ctl_beats() != beats && esp_timer_get_time() >= VALID_MIN_UP_US) {
-            ota_mark_valid();
-            vTaskDelete(NULL);
+            ready = 1;
         }
     }
 }
@@ -191,6 +211,6 @@ void ota_validate_start(void)
     if (!run || esp_ota_get_state_partition(run, &st) != ESP_OK || st != ESP_OTA_IMG_PENDING_VERIFY)
         return;
     ESP_LOGW(TAG, "new image, not confirmed yet");
-    if (xTaskCreatePinnedToCore(valid_task, "ota_valid", 2048, NULL, 1, NULL, 0) != pdPASS)
+    if (xTaskCreatePinnedToCore(valid_task, "ota_valid", 4096, NULL, 1, NULL, 0) != pdPASS)
         ESP_LOGE(TAG, "no task to confirm the image: the next reset rolls it back");
 }

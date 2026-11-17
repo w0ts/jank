@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# BEAT-FOLLOW BENCH BUILD: the tracker needs the cycles (the release runs the S3 at 160 MHz)
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y

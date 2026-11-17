@@ -58,6 +58,27 @@ void jc_want(struct jc_ticker *c, int play);
 /* the button's click: MIDI stop (0xFC) before the next clock, always, then start (0xFA) just before the clock of the
  * first bar line after that tick, whatever the session's transport; clocks go on all the way */
 void jc_resync(struct jc_ticker *c);
-/* Link's Start Stop Sync, or with auto transport whether a session is joined */
+/* Link's Start Stop Sync, or with auto transport whether a session is joined; alone (M2l: the stick's own session in
+ * LINK mode too), auto follows that session's start / stop, which only the user's Start / Stop set */
 int jc_should_play(int auto_transport, int link_playing, uint32_t link_peers);
+
+/* What the transport setting wants of the clock outputs at a bridge step (jank_hold.h jho_in.base, before AUDIO mode's
+ * hold and LINK mode's own Stop):
+ *   AUDIO mode   the session's start / stop, whatever the transport setting: the tracker starts it on a bar line once it
+ *                locks (jank_beatlink.h), alone (a session of its own) or with peers. (Transport AUTO used to run them
+ *                whenever a peer was there, locked or not, the session stopped or not.)
+ *   LINK mode    jc_should_play: transport LINK the session's start / stop, AUTO whenever a peer is there.
+ * In a session not settled yet, or with none (transport LINK): last, the wish of the step before, held (nothing started
+ * or stopped on a guess). gone (no session and none to wait for: AUTO with the peer off, or a session of its own that
+ * ended): 0. */
+struct jc_tr {
+    uint8_t audio;                     /* AUDIO mode */
+    uint8_t automatic;                 /* transport AUTO (LINK TRANSPORT IGNORE) */
+    uint8_t session;                   /* jank_peer.h jp_in_session */
+    uint8_t settled;                   /* jp_settled */
+    uint8_t playing;                   /* jp_playing */
+    uint8_t gone;
+    uint32_t peers;                    /* jp_peers */
+};
+int jc_base(int last, const struct jc_tr *t);
 #endif

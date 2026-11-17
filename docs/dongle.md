@@ -1,0 +1,109 @@
+# A MIDI-powered jank (study, 2026-11-10)
+
+The idea: a small board anyone orders assembled from JLCPCB, in a printed case. Two 3.5 mm jacks, plugged with TRS-to-DIN
+adaptors: one into the gear's MIDI IN (jank's clock goes in), one into its MIDI OUT or THRU (power taken from it). One
+button, USB-C to configure and update and as the power of last resort. With a computer on USB it is the stick (network
+adapter, USB-MIDI, the drive). Nothing here is built or measured yet: figures marked *estimate* or *from the datasheet*.
+
+## Power from a MIDI OUT
+
+MIDI's spec gives a 5 mA current loop and no available current (CA-033, 2014). From its resistor values, with the
+dongle drawing from pin 4 (and pin 5, high between notes) to pin 2, at a load of V:
+
+| output | per pin | notes |
+|---|---|---|
+| 5 V, 220 ohm | (5 - V) / 220: 7.7 mA at 3.3 V, 4.5 mA at 4.0 V; 5.4 mA at 3.3 V at the low tolerance (4.5 V) | both pins: about twice |
+| 3.3 V, 33 + 10 ohm | (3.3 - V) / 33 | nothing left above 3.3 V: such gear cannot run a 3.3 V chip; USB power |
+
+Real gear varies: some outputs are weaker (MIDI Solutions needs 4 V, or 3 V for its newer boxes; a Digitakt rebooted a
+MIDI-powered box). Budget: **under 5 mA average**. Measure the user's gear first (below).
+
+## The radio only listens
+
+jank keeps the Wi-Fi receiver on (60-90 mA): 10 to 20 times the budget. The dongle instead listens a few ms around a
+**sync frame** and free-runs on its crystal in between, with the drift learned (`third_party/link`'s filter):
+
+- A new frame on the air, beside today's (older units ignore it): session id, sequence number, tempo, and the session's
+  beat when the frame really left. The sender learns that moment only after the channel was free (TX done), so it puts
+  it in its next frame for the previous sequence number (two steps, as PTP). The receiver takes its own hardware receive
+  timestamp (`rx_ctrl.timestamp`, us). One-way over air: microseconds of delay, known from the frame length.
+- Sent on every beat by any jank in a session (FM-1s once Optimist adds it): the dongle needs one sender in the group.
+- The dongle transmits rarely (2026-11-11, the user: "it would be nice if it could be counted as a peer"): one short
+  "here" frame about once a second (its node id, the session id; a tap tempo from the button rides on it), ~1 ms at
+  ~300 mA from the capacitor bank (a ~0.15 V dip on 2 mF), **~0.3 mA on average** (*estimate*). Any jank or FM-1 on
+  USB (a bridge, running Link) hears it and sends Link's ALIVE for the dongle under its node id. Link keeps a peer for
+  the ttl in its ALIVE (5 s, discovery/PeerGateway.hpp; third_party/link LK_TTL), so a frame a second keeps the dongle
+  in Live's peer count. A Link peer that wants to measure the dongle's session reaches the bridge's endpoint (same
+  session clock). Without a bridge the dongles count each other through the jank frames only. It can also lead: a sync
+  frame on every beat (2 a second at 120 BPM), ~0.5-1 mA (*estimate*). Not a Link peer itself on MIDI power: Link keeps
+  the receiver on and answers at any time (70+ mA).
+- Otherwise the radio only listens: it wakes for about 10 ms a second (*estimate*: Wi-Fi wake from light sleep is not
+  documented anywhere; measure it).
+- The first lock after power-on: the beat's place is unknown, so it listens in chunks (8 ms, then ~120 ms recharging),
+  a few seconds once.
+
+## Chips (datasheet figures at 3.3 V; prices are LCSC/JLC snapshots, not live; all Extended parts at JLC)
+
+| | RX peak | light sleep | USB device (network adapter, USB-MIDI) | cores for the clock | module, 1 pc | average, listening design (*estimate*) |
+|---|---|---|---|---|---|---|
+| ESP32-C2 (ESP8684) | 65 mA | 140 uA | no USB | 1 | ESP8684-MINI-1 C3013916 ~$2.0-2.4 | ~1.8 mA |
+| ESP32-C3 | 84 mA | 130 uA | Serial/JTAG only | 1 | C3-MINI-1-N4 C2838502 $1.3-3.1 (NRND?) | ~1.9 mA |
+| ESP32-C6 | 78 mA | 180 uA | Serial/JTAG only | 1 + LP core with an LP UART | C6-MINI-1-N4 C5736265 $3.2-4.9 | ~1.3 mA |
+| ESP32-S2 | 63 mA | 750 uA | OTG | 1 (+ ULP, bit-banged UART) | S2-MINI-2-N4 C3013906 ~$1.9 | ~2.1 mA |
+| **ESP32-S3** | 88 mA | 240 uA | OTG (NCM + MIDI + MSC proven on the stick) | 2 (the clock alone on core 1) | S3-MINI-1-N8 C2913206 $3.9-4.7 | ~2.1-2.5 mA |
+
+Sources: Espressif datasheets (C2 v2.3 T20/22, C3 v2.4 T5-7..9, C6 v1.5 T5-7..11, S2 v1.9 T5-7..9, S3 v2.2 T5-7..10),
+ESP-IDF v5.5.5 low-power Wi-Fi guides, the USB Serial/JTAG console guide (fixed function: no custom USB classes).
+
+**Choice: the ESP32-S3.** One board is both the stick (computer on USB) and the dongle (MIDI power, alone); the same code;
+two cores keep the clock where it measured 0.3 us at the pin. The MIDI ticks in the dongle: the CPU wakes from light
+sleep ~1.5 ms early (the RTC timer's wake has jitter) and waits for the exact microsecond. Fallback: the S2 (cheaper, one
+core: the clock shares it, as on the stick before core 1 was given to it; 3x the light-sleep current).
+
+## Power path
+
+- Pins 4 and 5 of the power jack through Schottky diodes and a current limit (the source's drivers are not to be
+  stressed) into a plain capacitor bank: ~1000 uF for the listening windows (0.6-0.8 mC each, *estimate*), a few mF for
+  a slow start (the CPU at a low clock, the RF calibration kept in flash, not redone).
+- A 60 nA buck (TPS62840, C2071859, Extended, works from 1.8 V) rather than an LDO: the bank may sag from ~4.7 V to
+  ~3.5 V, and the input current is below the output's.
+- USB-C wins when present (power and data). The firmware reads the bank's voltage and waits when it is low.
+- No supercap: no SMD one found at JLC (the small ones are through-hole), and not needed for listening only.
+
+## Measured on the XIAO ESP32-S3 (2026-11-10, `tools/powerprobe`, 40 s a phase, timings by the chip)
+
+| | result |
+|---|---|
+| Wi-Fi left started across `esp_light_sleep_start` | survives: promiscuous again **3.0 ms** after waking (max 3.5 ms), frames heard in 40 of 40 windows |
+| Wi-Fi stopped and started around each sleep | 8.1 ms (max 56 ms): keep it started |
+| MIDI ticks with the CPU woken from light sleep 1.5 ms early, then waiting | late by 2 us on average, 12 us at worst (`esp_timer`, not the pin) |
+| listening all the time | ~99 frames a second on a channel with 5 access points |
+
+Currents, 2026-11-10, an in-line USB meter at 5 V read by a webcam every 3 s (1 mA steps; the whole XIAO board):
+
+| phase | meter |
+|---|---|
+| listening all the time | 71-72 mA |
+| Wi-Fi stopped and started around each 1 s sleep | mostly 2 mA, spikes 6-23: ~4 mA |
+| Wi-Fi kept, ~22 ms awake a second | mostly 2 mA, spikes: ~4 mA |
+| light sleep only | 2 mA (the board's floor: its charger and regulator, the chip's 0.24) |
+| 48 wakes a second for the ticks (1.5 ms early, then waiting) | 4-5 mA: the ticks cost ~2.2 mA |
+
+On this board the dongle would draw about 2 + 2.2 + 0.8 (8 ms of radio a second at a known sync time) = **~5 mA at
+5 V**: at the edge. Lower: a board of our own (no charger, a buck from the MIDI side: about a fifth less input
+current), waking ~0.3 ms before a tick instead of 1.5 ms (the wake lands within 12 us), or the ULP sending the ticks:
+**~3 mA** is the target.
+
+Driving the gear's MIDI IN (arithmetic): current flows only for 0 bits; F8 has 4 of its 10 (start + three low bits,
+sent first): 128 us a byte, 48 a second at 120 BPM, 0.6 % of the time at ~5-8 mA (the receiver's 220 ohm, its
+opto's ~1.2 V): **~0.04 mA** on average (~0.1 mA at 300 BPM), its 128 us peaks from the capacitor bank. The clock's
+real cost is the CPU's wakes (above).
+
+The earlier budget (datasheet currents, before the meter): radio ~8 ms a second at 88 mA, ~0.7 mA; the ticks 48 wakes
+of ~1.8 ms at 13-22 mA, ~1.1-1.9 mA; light sleep ~0.2 mA: **about 2-3 mA**. Still to measure: the currents themselves
+(an in-line USB meter on a charger: the probe's five phases, the LED blinking 1..5 times at each start; a Mac only shows
+the 500 mA allotted), and the user's gear: each MIDI OUT's current into ~330 ohm (or a 3.3 V load) between pin 4 and
+pin 2, and pin 5 to pin 2, on 2-3 devices.
+
+Then: the sync frame in jank and Optimist, the board (S3-MINI-1, two PJ-320 jacks, one button, USB-C, the buck, the
+cap bank), the case.

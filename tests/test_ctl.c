@@ -1,9 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Host tests of the control line protocol, the settings, the LED and the button.
  * Exit status: the number of failed checks. */
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include "jank_core.h"
+#include "jank_conf.h"
+#include "jank_hold.h"
+#include "jank_usbrole.h"
 
 static int fails, checks;
 #define CHECK(c)                                                  \
@@ -18,7 +22,7 @@ static int fails, checks;
 static const uint8_t HOST[6] = {0x02, 0x11, 0x22, 0x33, 0x44, 0x55};
 static struct jk_cfg cfg;
 static struct jk_snapshot snap;
-static char out[1024];
+static char out[JK_CTL_OUT_MAX];
 
 static void setup(void)
 {
@@ -102,7 +106,7 @@ static void test_set_music(void)
     CHECK(run("set offset 0") == JK_CTL_CFG_CHANGED && run("get") == JK_CTL_NONE && strstr(out, "offset=0.00\n"));
     CHECK(run("set offset -101") == JK_CTL_NONE);
     CHECK(run("get") == JK_CTL_NONE);
-    CHECK(strstr(out, "peer=on\n") && !strstr(out, "midi=") && strstr(out, "transport=auto\n"));
+    CHECK(strstr(out, "peer=on\n") && !strstr(out, "\nmidi=") && strstr(out, "transport=auto\n"));   /* (usbmidi= is M2d's) */
     CHECK(strstr(out, "quantum=8\n") && strstr(out, "offset=0.00\n"));
 }
 
@@ -160,6 +164,13 @@ static void test_status_link(void)
     CHECK(strstr(out, "link=1\n") && strstr(out, "link_ip=169.254.1.2\n") && strstr(out, "link_peers=2\n"));
     CHECK(strstr(out, "bpm=120.00\n") && strstr(out, "beat=12.500\n") && strstr(out, "playing=1\n"));
     CHECK(strstr(out, "midi_ticks=300\n"));
+    CHECK(strstr(out, "settled=0\narmed=0\n") && !strstr(out, "start="));
+    snap.settled = 1;
+    snap.armed = 1;
+    snap.start_ub = 16000000;
+    CHECK(run("status") == JK_CTL_NONE);
+    CHECK(strstr(out, "settled=1\narmed=1\nstart=16.000\n"));       /* the bar line the transport starts on */
+    snap.armed = 0;
     snap.beat_ub = -1500000;
     snap.mpb = 400000;
     CHECK(run("status") == JK_CTL_NONE);
@@ -222,6 +233,15 @@ static void test_session_commands(void)
     CHECK(run("tempo") == JK_CTL_NONE && strstr(out, "err ") == out);
     CHECK(jk_ctl_tempo("tempo -5", &mpb) == -1);
     CHECK(run("play") == JK_CTL_PLAY && out[0] == 0);
+    {
+        int dir = 9;                                    /* AUDIO mode's fold: the caller answers fold=<f> ok, or err link mode */
+        CHECK(run("fold x2") == JK_CTL_FOLD && out[0] == 0);
+        CHECK(!jk_ctl_fold("fold x2", &dir) && dir == 1 && !jk_ctl_fold(" fold /2 ", &dir) && dir == -1);
+        CHECK(!jk_ctl_fold("fold 1", &dir) && dir == 0);
+        CHECK(jk_ctl_fold("fold x3", &dir) == -1 && jk_ctl_fold("fold", &dir) == -1 && jk_ctl_fold("folder x2", &dir) == -1);
+        CHECK(run("fold x3") == JK_CTL_NONE && strstr(out, "err fold"));
+        CHECK(run("fold") == JK_CTL_NONE && strstr(out, "err fold"));
+    }
     CHECK(run("stop") == JK_CTL_STOP && out[0] == 0);
     CHECK(run("play now") == JK_CTL_NONE && strstr(out, "err ") == out);
 }
@@ -262,6 +282,8 @@ static void test_led(void)
     CHECK(jk_led_lit(JK_NET_JANK, 1, BEAT + flash, mpb, 4) == 0);
     CHECK(jk_led_lit(JK_NET_JANK, 1, 7 * (int64_t)BEAT + 10, mpb, 4) == 1);
     CHECK(jk_led_lit(JK_NET_JANK, 1, -BEAT + 10, mpb, 4) == 1);           /* before the session's beat 0 too */
+    CHECK(jk_led_bar_one(0, 4) && jk_led_bar_one(4 * (int64_t)BEAT + 10, 4) && !jk_led_bar_one(BEAT + 10, 4));
+    CHECK(jk_led_bar_one(-4 * (int64_t)BEAT + 10, 4) && !jk_led_bar_one(-BEAT + 10, 4) && jk_led_bar_one(-3 * (int64_t)BEAT, 3));
     CHECK(jk_led_lit(JK_NET_JANK, 1, -10, mpb, 4) == 0);
     /* station: the other way round, lit and off on each beat */
     CHECK(jk_led_lit(JK_NET_WIFI, 1, 0, mpb, 4) == 0);
@@ -291,9 +313,385 @@ static void test_button(void)
     CHECK(jk_next_group(0) == 1 && jk_next_group(200) == 1);
 }
 
+static void test_beat(void)
+{
+    setup();
+    CHECK(cfg.beat == 1 && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS);
+    CHECK(run("set beat_latency 40") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 40);
+    CHECK(run("set beat_latency 301") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == 40);
+    CHECK(run("set beat_latency -1") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == -1);      /* the stick may hear it after the speakers */
+    CHECK(run("set beat_latency -301") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == -1);
+    CHECK(run("set beat_latency 40") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 40);
+    CHECK(run("set beat off") == JK_CTL_CFG_CHANGED && cfg.beat == 0);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "beat=off\nbeat_latency=40\n"));
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .mode = 1, .bpm_x100 = 12345, .heap_min = 90000, .cpu_pct_x10 = 253, .packets = 77};
+    CHECK(run("beat") == JK_CTL_NONE);
+    CHECK(strstr(out, "mode=steady\n") && strstr(out, "bpm=123.45\n") && strstr(out, "heap_min=90000\n"));
+    CHECK(strstr(out, "cpu_pct=25.3\n") && strstr(out, "packets=77\n") && strstr(out, "madmom BENCH ONLY") && ends(out, "ok\n"));
+    /* the source open and sounding (AUDIO mode), the meter, the confidence: in beat and status alike */
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .level_db = -21, .level_min_db = -30, .level_max_db = -14,
+                                 .peak_db = -6, .conf_pct = 73};
+    snap.hold = 1;
+    snap.outputs = JHO_STOPPED;
+    snap.beat.fold_exp = -1;
+    snap.beat.fold_manual = 1;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "outputs=stopped\nfold=0.5\nfold_manual=1\n"));
+    snap.beat.fold_exp = 0;
+    snap.beat.fold_manual = 0;
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=1\nrms_db=-21\nrms_min_db=-30\nrms_max_db=-14\npeak_db=-6\nconf=73\n"));
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=1\nhold=1\noutputs=stopped\nfold=1\nfold_manual=0\nrms_db=-21\nrms_min_db=-30\n"));
+    CHECK(strstr(out, "rms_max_db=-14\npeak_db=-6\nconf=73\n") && ends(out, "ok\n"));
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .level_db = -99, .level_min_db = -99, .level_max_db = -99, .peak_db = -99};
+    snap.hold = 0;
+    snap.outputs = JHO_ARMED;                               /* a stream of zeros: open, no sound, LINK mode */
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "audio=1\naudio_live=0\nhold=0\noutputs=armed\nfold=1\n"));
+}
+
+/* AUTO BAR: the setting (on by default; `on` again counts as picked again) and the estimator in status and beat */
+static void test_autobar(void)
+{
+    setup();
+    CHECK(cfg.autobar == JK_AUTOBAR_START && cfg.autobar_picks == 0);              /* AT START by default */
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=start\n"));
+    CHECK(run("set autobar off") == JK_CTL_CFG_CHANGED && cfg.autobar == JK_AUTOBAR_OFF && cfg.autobar_picks == 0);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=off\n"));
+    CHECK(run("set autobar on") == JK_CTL_CFG_CHANGED && cfg.autobar == JK_AUTOBAR_START && cfg.autobar_picks == 1);   /* on = start */
+    CHECK(run("set autobar start") == JK_CTL_CFG_CHANGED && cfg.autobar_picks == 2);   /* picked again */
+    CHECK(run("set autobar always") == JK_CTL_CFG_CHANGED && cfg.autobar == JK_AUTOBAR_ALWAYS && cfg.autobar_picks == 3);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "autobar=always\n"));
+    CHECK(run("set autobar yes") == JK_CTL_NONE && strstr(out, "err") && cfg.autobar == JK_AUTOBAR_ALWAYS);
+    snap.beat = (struct jk_beat){.bar = 2, .bar_phi = 3, .bar_lead_x100 = 241, .bar_moves = 4};
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "bar=locked\nbar_phi=3\nbar_lead=2.41\n") && ends(out, "ok\n"));
+    snap.beat = (struct jk_beat){.bar = 1, .bar_phi = -1, .bar_lead_x100 = -5};
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "bar=listening\nbar_phi=-1\nbar_lead=-0.05\n"));
+    snap.beat.bar = 3;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "bar=manual\n"));
+    snap.beat = (struct jk_beat){.bar = 0, .bar_phi = -1, .bar_moves = 7};
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "bar=off\n") && strstr(out, "bar_moves=7\n") && ends(out, "ok\n"));
+}
+
+/* NUDGE BEAT (the caller applies it) and NUDGE MS (beat_latency, AUDIO mode only); status says both */
+static void test_nudge(void)
+{
+    int h = 0;
+    char b[8];
+    setup();
+    CHECK(run("nudge beat +0.5") == JK_CTL_NUDGE && out[0] == 0);
+    CHECK(!jk_ctl_nudge("nudge beat +0.5", &h) && h == 1 && !jk_ctl_nudge(" nudge beat -0.5 ", &h) && h == -1);
+    CHECK(!jk_ctl_nudge("nudge beat 1", &h) && h == 2 && !jk_ctl_nudge("nudge beat -1.5", &h) && h == -3);
+    CHECK(!jk_ctl_nudge("nudge beat 3", &h) && h == 6 && !jk_ctl_nudge("nudge beat -3.0", &h) && h == -6);
+    CHECK(jk_ctl_nudge("nudge beat 0", &h) == -1 && jk_ctl_nudge("nudge beat 0.25", &h) == -1);
+    CHECK(jk_ctl_nudge("nudge beat 3.5", &h) == -1 && jk_ctl_nudge("nudge beat +-1", &h) == -1 && jk_ctl_nudge("nudge beat", &h) == -1);
+    CHECK(jk_ctl_nudge("nudge beatx 1", &h) == -1 && jk_ctl_nudge("nudge beat up", &h) == -1);
+    CHECK(run("nudge beat 4") == JK_CTL_NONE && strstr(out, "err nudge") == out);
+    CHECK(run("nudge") == JK_CTL_NONE && strstr(out, "err nudge") == out);
+    CHECK(run("nudger") == JK_CTL_NONE && strstr(out, "err unknown") == out);
+    CHECK(!strcmp(jk_half_beats(1, b), "0.5") && !strcmp(jk_half_beats(-3, b), "-1.5") && !strcmp(jk_half_beats(4, b), "2"));
+    CHECK(!strcmp(jk_half_beats(0, b), "0") && !strcmp(jk_half_beats(-1, b), "-0.5") && !strcmp(jk_half_beats(-6, b), "-3"));
+    /* NUDGE MS: LINK mode refused; AUDIO mode moves the AUDIO SHIFT (lat_trim) by n, answers the sum and both layers */
+    CHECK(run("nudge ms 1") == JK_CTL_NONE && !strcmp(out, "err link mode\n") && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS);
+    snap.beat.on = snap.beat.audio = snap.beat.audio_live = 1;
+    CHECK(run("nudge ms +1") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == JK_BEAT_LATENCY_DEFAULT_MS + 1);
+    CHECK(!strcmp(out, "beat_latency=26\nlat_auto=25\nlat_trim=1\nok\n"));
+    CHECK(run("nudge ms -1") == JK_CTL_CFG_CHANGED && !strcmp(out, "beat_latency=25\nlat_auto=25\nlat_trim=0\nok\n"));
+    CHECK(run("nudge ms -10") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 15);
+    CHECK(run("nudge ms 0") == JK_CTL_NONE && strstr(out, "err") && run("nudge ms 11") == JK_CTL_NONE && strstr(out, "err"));
+    CHECK(run("nudge ms x") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == 15);
+    CHECK(run("set beat_latency 300") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 290);   /* the auto base: the shift kept */
+    CHECK(run("set lat_trim 0") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == JK_BEAT_LATENCY_MAX_MS);
+    CHECK(run("nudge ms 1") == JK_CTL_NONE && !strcmp(out, "beat_latency=300\nlat_auto=300\nlat_trim=0\nok\n"));   /* at the top */
+    CHECK(run("set beat_latency 10") == JK_CTL_CFG_CHANGED && run("set lat_trim 5") == JK_CTL_CFG_CHANGED && cfg.beat_latency_ms == 15);
+    CHECK(run("set lat_trim 601") == JK_CTL_NONE && strstr(out, "err") && cfg.beat_latency_ms == 15);
+    snap.beat.nudge_halves = -3;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "nudge_beats=-1.5\nbeat_latency=15\nlat_auto=10\nlat_trim=5\nbeat_latency_src=usb\nusbmidi=on\n"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "beat_latency=15\nlat_auto=10\nlat_trim=5\nbeat_latency_src=usb\n"));
+}
+
+/* settings saves: never a flash write while playing, unless a restart follows; what counts as a stored change */
+static void test_save(void)
+{
+    struct jk_cfg a, b;
+    uint8_t pending = 0;
+    jk_cfg_defaults(&a);
+    b = a;
+    CHECK(!jk_cfg_stored_differs(&a, &b));
+    b.beat_latency_ms = 10;                             /* a bench setting: not stored */
+    CHECK(!jk_cfg_stored_differs(&a, &b));
+    b.autobar = JK_AUTOBAR_ALWAYS;                      /* stored apart ("usb1"), as SOURCE */
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.ble = JK_BLE_AUTO;                                /* the release blob's pad byte: stored */
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.source = JUR_SRC_USB;                             /* stored apart ("usb1") */
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.group = 3;
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.lowconf = JCF_RUN;                                /* LOW CONFIDENCE and THRESHOLD: stored apart ("usb1") */
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    b = a;
+    b.threshold = 50;
+    CHECK(jk_cfg_stored_differs(&a, &b));
+    /* stopped: at once */
+    CHECK(jk_save_on_change(&pending, 1, 0, 0) == JK_SAVE_NOW && !pending);
+    CHECK(jk_save_on_change(&pending, 0, 0, 0) == JK_SAVE_NONE && !pending);
+    /* playing: later, and not due until stopped */
+    CHECK(jk_save_on_change(&pending, 1, 1, 0) == JK_SAVE_LATER && pending);
+    CHECK(!jk_save_due(&pending, 1) && pending);
+    CHECK(jk_save_on_change(&pending, 0, 1, 0) == JK_SAVE_LATER && pending);    /* an unstored change: still pending */
+    CHECK(jk_save_due(&pending, 0) && !pending);
+    CHECK(!jk_save_due(&pending, 0));                                           /* once */
+    /* playing, but a restart follows (USB DEVICE / HOST): now, before the restart */
+    CHECK(jk_save_on_change(&pending, 1, 1, 1) == JK_SAVE_NOW && !pending);
+    /* a pending save and a change while stopped: one save covers both */
+    CHECK(jk_save_on_change(&pending, 1, 1, 0) == JK_SAVE_LATER);
+    CHECK(jk_save_on_change(&pending, 0, 0, 0) == JK_SAVE_NOW && !pending);
+}
+
+/* `diag intr`: esp_intr_dump's text (intr_alloc.c's format) cut to what is in use */
+static void test_intr_summary(void)
+{
+    static const char dump[] = "CPU 0 interrupt status:\n"
+                               " Int  Level  Type   Status\n"
+                               "  0     1    Level  Reserved\n"
+                               "  2     1    Level  Used: USB\n"
+                               "  3     1    Level  Shared: SYSTIMER_TARGET0 TG1_T0_LEVEL \n"
+                               "  4     1    Level  Free\n"
+                               "  6     1    Level  CPU-internal\n"
+                               " 17     1    Level  Reserved (run-time)\n"
+                               "CPU 1 interrupt status:\n"
+                               " Int  Level  Type   Status\n"
+                               "  0     1    Level  Reserved\n"
+                               " 27     3    Level  Used: TG0_T0_LEVEL\n"
+                               " 31     5    Level  Free (not general-use)\n"
+                               "Interrupts available for general use: 15\n"
+                               "Shared interrupts: 1";
+    char out[256];
+    size_t n = jk_intr_summary(dump, out, sizeof out);
+    CHECK(n == strlen(out));
+    CHECK(!strcmp(out, "c0 2 L1 Used: USB\nc0 3 L1 Shared: SYSTIMER_TARGET0 TG1_T0_LEVEL\nc0 17 L1 Reserved (run-time)\n"
+                       "c1 27 L3 Used: TG0_T0_LEVEL\nok\n"));
+    CHECK(jk_intr_summary(dump, out, 40) == 0);                 /* does not fit: no half answer passed as whole */
+    CHECK(jk_intr_summary("", out, sizeof out) == 3 && !strcmp(out, "ok\n"));
+}
+
+/* USB DEVICE / HOST and AUDIO > SOURCE; the port's lines in status */
+static void test_usb(void)
+{
+    setup();
+    CHECK(cfg.usb == JUR_USB_DEVICE && cfg.source == JUR_SRC_AUTO);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "usb=device\n") && strstr(out, "source=auto\n"));
+    CHECK(run("set usb host") == JK_CTL_CFG_CHANGED && cfg.usb == JUR_USB_HOST && ends(out, "ok\n"));
+    CHECK(run("set usb otg") == JK_CTL_NONE && cfg.usb == JUR_USB_HOST && strstr(out, "err ") == out);
+    CHECK(run("set usb device") == JK_CTL_CFG_CHANGED && cfg.usb == JUR_USB_DEVICE);
+    CHECK(run("set source line") == JK_CTL_CFG_CHANGED && cfg.source == JUR_SRC_LINE);
+    CHECK(run("set source usb") == JK_CTL_CFG_CHANGED && cfg.source == JUR_SRC_USB);
+    CHECK(run("set source mic") == JK_CTL_NONE && cfg.source == JUR_SRC_USB);
+    {
+        struct jk_cfg before = cfg;                     /* LINK: a change, so stored by the deferred-save rule */
+        CHECK(run("set source link") == JK_CTL_CFG_CHANGED && cfg.source == JUR_SRC_LINK && jk_cfg_stored_differs(&before, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "source=link\n"));
+        CHECK(run("set source usb") == JK_CTL_CFG_CHANGED);
+    }
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "usb=device\n") && strstr(out, "source=usb\n"));
+    /* the XIAO as a device: no CC chip */
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=device\nusb_cc=nochip\n") && !strstr(out, "usb_vbus_out"));
+    CHECK(strstr(out, "audio_source=none\n") && !strstr(out, "usb_dev=") && !strstr(out, "usb_audio=") && ends(out, "ok\n"));
+    /* the board as a host with a synth on a hub: its MIDI and its audio */
+    snap.usb.stack = JUR_STACK_HOST;
+    snap.usb.has_port = 1;
+    snap.usb.cc = JUR_CC_DEVICE;
+    snap.usb.cc_dir = 2;
+    snap.usb.vbus_on = 1;
+    snap.usb.audio = JUR_AUDIO_USB;
+    snap.usb.ndev = 2;
+    strcpy(snap.usb.dev[0].name, "OP-Z");
+    snap.usb.dev[0].midi = 1;
+    snap.usb.dev[0].audio = 1;
+    snap.usb.dev[1].midi = 1;
+    snap.usb.audio_rate = 48000;
+    snap.usb.audio_channels = 2;
+    snap.usb.audio_bits = 24;
+    snap.usb.midi_dropped = 3;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "usb_role=host\nusb_cc=device\nusb_cc_dir=2\nusb_vbus_out=1\nusb_vbus=0\n"));
+    CHECK(strstr(out, "audio_source=usb\n") && strstr(out, "usb_dev=OP-Z,midi+audio\n") && strstr(out, "usb_dev=?,midi\n"));
+    CHECK(strstr(out, "usb_audio=48000/2/24\n") && strstr(out, "usb_midi_dropped=3\n") && ends(out, "ok\n"));
+}
+
+/* the longest status (a host with four devices, eight peers, every number at its longest) fits the firmware's answer
+ * buffer (JK_CTL_OUT_MAX, ctl.c) with its closing ok */
+static void test_status_size(void)
+{
+    static char big[4096];
+    setup();
+    memset(&snap.b.st, 0xFF, sizeof snap.b.st);
+    snap.usb_up = 1;
+    snap.uptime_s = snap.tx_fail = snap.queue_full = snap.scan_lost = 4294967295u;
+    snap.lat_air_us = snap.lat_air_max_us = snap.lat_usb_us = snap.lat_usb_max_us = 4294967295u;
+    snap.wifi_up = 1;
+    snap.wifi_ip = snap.link_ip = 0xFFFFFFFFu;
+    snap.wifi_rssi = -128;
+    snap.wifi_channel = 255;
+    snap.link_peers = 4294967295u;
+    snap.mpb = 1;
+    snap.beat_ub = snap.start_ub = INT64_MIN + 1;
+    snap.playing = snap.settled = 1;
+    snap.link_on = 1;
+    snap.armed = 1;
+    snap.usb.stack = JUR_STACK_HOST;
+    snap.usb.has_port = 1;
+    snap.usb.ndev = JK_USB_DEVS;
+    snap.usb.audio_rate = 48000;
+    for (uint32_t i = 0; i < JK_USB_DEVS; i++) {
+        memset(snap.usb.dev[i].name, 'n', JK_USB_NAME_MAX);
+        snap.usb.dev[i].midi = snap.usb.dev[i].audio = 1;
+    }
+    for (uint32_t i = 0; i < JK_PEERS; i++) {
+        snap.b.peer[i].used = 1;
+        snap.b.peer[i].rssi = -100;
+        snap.b.peer[i].t_heard = 999;
+        snap.b.peer[i].frames = 4000000000u;
+    }
+    /* the merged build's other status lines at their longest: AUTO BAR and Bluetooth */
+    snap.beat.bar = 3;
+    snap.beat.bar_phi = -128;
+    snap.beat.bar_lead_x100 = -2147483647;
+    snap.ble_built = 1;
+    snap.ble_state = 2;
+    snap.ble_left_s = 4294967295u;
+    snap.usb.audio_packets = snap.usb.audio_errors = snap.usb.midi_dropped = 4294967295u;
+    snap.midi_ticks = snap.midi_resync = 4294967295u;
+    snap.beat.audio = snap.beat.audio_live = snap.hold = 1;           /* the audio lines at their longest */
+    snap.outputs = JHO_RUNNING;
+    snap.beat.level_db = snap.beat.level_min_db = snap.beat.level_max_db = snap.beat.peak_db = -99;
+    snap.beat.conf_pct = snap.beat.act_pct = 100;
+    snap.beat.gated = snap.beat.silent = 1;
+    cfg.threshold = 100;
+    cfg.lowconf = JCF_STOP;                                           /* "stop" */
+    snap.beat.fold_exp = -2;                                          /* "0.25" */
+    snap.beat.fold_manual = 1;
+    snap.beat.nudge_halves = -5;                                      /* "-2.5" */
+    snap.beat.follow = 0;                                             /* "stopped" (jb_follow.h JF_STOPPED) */
+    snap.beat.drift_ppm = -2147483647 - 1;                            /* the follow lines at their longest */
+    snap.beat.rate_x10000 = -2147483647 - 1;
+    cfg.lat_key = (struct jla_key){JLA_HOSTED, 0xFFFF, 0xFFFF};       /* "host:ffff:ffff" */
+    jla_set(&cfg.lat, &cfg.lat_key, JK_BEAT_LATENCY_MAX_MS);          /* (a shift of -600 needs a base of 300 first) */
+    jla_set_trim(&cfg.lat, &cfg.lat_key, -600);                       /* lat_trim=-600 */
+    jla_set(&cfg.lat, &cfg.lat_key, JK_BEAT_LATENCY_MIN_MS);          /* lat_auto=-300, beat_latency=-300 */
+    cfg.beat_latency_ms = JK_BEAT_LATENCY_MIN_MS;
+    CHECK(jk_ctl_line("status", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
+    printf("longest status: %zu bytes\n", strlen(big));
+    CHECK(strstr(big, "bar=manual\n") && strstr(big, "ble_state=connected\n") && strstr(big, "usb_role=host\n"));
+    CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
+    /* `beat` with every counter at its largest (M2m added the robust follower's: it must still fit the answer buffer) */
+    memset(&snap.beat, 0xFF, sizeof snap.beat);
+    snap.beat.mode = snap.beat.follow = 0;
+    CHECK(jk_ctl_line("beat", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
+    printf("longest beat: %zu bytes\n", strlen(big));
+    CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
+}
+
+/* LOW CONFIDENCE: STOP / START at 80 % by default; set lowconf run|stop, set threshold 0..100; get and status say them,
+ * status and beat the grid-fit confidence (conf=), the network's activation (act=), the gate and the silence */
+static void test_lowconf(void)
+{
+    struct jk_cfg before;
+    setup();
+    CHECK(cfg.lowconf == JCF_STOP && cfg.threshold == 80);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=stop\nthreshold=80\n"));
+    before = cfg;
+    CHECK(run("set lowconf run") == JK_CTL_CFG_CHANGED && cfg.lowconf == JCF_RUN && jk_cfg_stored_differs(&before, &cfg));
+    CHECK(run("set lowconf stop") == JK_CTL_CFG_CHANGED && cfg.lowconf == JCF_STOP);
+    CHECK(run("set lowconf keep") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.lowconf == JCF_STOP);
+    CHECK(run("set threshold 65") == JK_CTL_CFG_CHANGED && cfg.threshold == 65);
+    CHECK(run("set threshold 0") == JK_CTL_CFG_CHANGED && cfg.threshold == 0);
+    CHECK(run("set threshold 100") == JK_CTL_CFG_CHANGED && cfg.threshold == 100);
+    CHECK(run("set threshold 101") == JK_CTL_NONE && cfg.threshold == 100);
+    CHECK(run("set threshold -5") == JK_CTL_NONE && run("set threshold 7.5") == JK_CTL_NONE && run("set threshold") == JK_CTL_NONE);
+    CHECK(cfg.threshold == 100);
+    run("set threshold 70");
+    run("set lowconf run");
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .conf_pct = 62, .act_pct = 91, .gated = 1};
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\ncoast=0\nact=91\ngated=1\nsilent=0\nthreshold=70\nlowconf=run\n"));
+    snap.beat.conf_hold = 1;                                          /* M2k: the confidence holds (no evidence) */
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=1\n"));
+    snap.beat.coast = 1;                                              /* the robust follower's coast */
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=1\ncoast=1\nact=91\n"));
+    snap.beat.coast = 0;
+    snap.beat.conf_hold = 0;
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=run\nthreshold=70\n"));
+    snap.beat.silent = 1;
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\ncoast=0\nact=91\ngated=1\nsilent=1\nthreshold=70\nlowconf=run\nmode="));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|usbmidi|lowconf|threshold|"));
+}
+
+/* ADVANCED FOLLOW (M2i): set rate on|off (on by default, stored); get says it; status the follower's state, drift and the
+ * last ratio taken; beat all of the rate's numbers */
+static void test_follow(void)
+{
+    struct jk_cfg before;
+    setup();
+    CHECK(cfg.rate == 1);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nthreshold=80\nrate=on\n"));
+    before = cfg;
+    CHECK(run("set rate off") == JK_CTL_CFG_CHANGED && cfg.rate == 0 && jk_cfg_stored_differs(&before, &cfg));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nrate=off\n"));
+    /* M2m A/B: set follower tuned|robust, not stored (back to tuned at every start) */
+    CHECK(cfg.follower == 0 && run("get") == JK_CTL_NONE && strstr(out, "\nfollower=tuned\n"));
+    {
+        struct jk_cfg was = cfg;
+        CHECK(run("set follower robust") == JK_CTL_CFG_CHANGED && cfg.follower == 1 && !jk_cfg_stored_differs(&was, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nfollower=robust\n"));
+        CHECK(run("set follower fast") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.follower == 1);
+        CHECK(run("set follower tuned") == JK_CTL_CFG_CHANGED && cfg.follower == 0);
+    }
+    /* SKIP and the graded confidence, on the robust follower: set skip off|act|pat, set graded on|off; not stored */
+    CHECK(cfg.skip == 0 && cfg.graded == 0 && run("get") == JK_CTL_NONE && strstr(out, "\nskip=off\ngraded=off\n"));
+    {
+        struct jk_cfg was = cfg;
+        CHECK(run("set skip pat") == JK_CTL_CFG_CHANGED && cfg.skip == 2 && !jk_cfg_stored_differs(&was, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nskip=pat\n"));
+        CHECK(run("set skip act") == JK_CTL_CFG_CHANGED && cfg.skip == 1);
+        CHECK(run("set skip fast") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.skip == 1);
+        CHECK(run("set skip off") == JK_CTL_CFG_CHANGED && cfg.skip == 0);
+        CHECK(run("set graded on") == JK_CTL_CFG_CHANGED && cfg.graded == 1 && !jk_cfg_stored_differs(&was, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\ngraded=on\n"));
+        CHECK(run("set graded maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.graded == 1);
+        CHECK(run("set graded off") == JK_CTL_CFG_CHANGED && cfg.graded == 0);
+    }
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|follower|skip|graded|burn|"));
+    CHECK(run("set rate maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.rate == 0);
+    CHECK(run("set rate on") == JK_CTL_CFG_CHANGED && cfg.rate == 1);
+    snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .conf_pct = 97, .follow = 2 /* glide */, .drift_ppm = -35,
+                                 .rate_x10000 = 10203, .manoeuvres = 2, .rate_on = 1, .rate_active = 1, .rate_events = 7,
+                                 .rate_taken = 3, .rate_refused = 4, .rate_ignored = 1, .rate_us = 3120, .rate_max_us = 95};
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nfollow=glide\ndrift_ppm=-35\nrate_ratio=1.0203\n"));
+    CHECK(!strstr(out, "rate_events="));
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nfollow=glide\ndrift_ppm=-35\nrate_ratio=1.0203\nmanoeuvres=2\nrate=on\nrate_active=1\n"));
+    CHECK(strstr(out, "\nrate_events=7\nrate_taken=3\nrate_refused=4\nrate_ignored=1\nrate_us=3120\nrate_max_us=95\n"));
+    CHECK(strstr(out, "\nrate_max_us=95\nweak=off\nweak_holds=0\ncoasts=0\nweak_beats=0\nfast_jumps=0\n"));
+    snap.beat.weak_on = 1, snap.beat.weak_holds = 41, snap.beat.coasts = 17, snap.beat.weak_beats = 230, snap.beat.fast_jumps = 2;
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nweak=on\nweak_holds=41\ncoasts=17\nweak_beats=230\nfast_jumps=2\n"));
+    CHECK(ends(out, "ok\n"));
+    CHECK(run("status") == JK_CTL_NONE && !strstr(out, "weak_holds="));     /* (status is nearly full: beat only) */
+    snap.beat.rate_on = 0;                                            /* no PSRAM for its ring: off whatever the setting */
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nrate=off\n"));
+    snap.beat.follow = 1;                                             /* lock */
+    snap.beat.rate_x10000 = 9700;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nfollow=lock\n") && strstr(out, "\nrate_ratio=0.9700\n"));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|follower|skip|graded|burn|ble|"));
+}
+
 int main(void)
 {
     test_defaults();
+    test_lowconf();
+    test_follow();
+    test_beat();
+    test_autobar();
+    test_nudge();
     test_get();
     test_set();
     test_set_music();
@@ -308,6 +706,10 @@ int main(void)
     test_cfg_name();
     test_led();
     test_button();
+    test_usb();
+    test_status_size();
+    test_save();
+    test_intr_summary();
     printf("ctl: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

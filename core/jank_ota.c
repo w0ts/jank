@@ -244,7 +244,7 @@ enum jo_err jo_idle(struct jo *j, uint32_t now_ms)
     return JO_E_IDLE;
 }
 
-static const char *const NAMES[] = {"ok", "ok", "busy", "size", "arg", "state", "gap", "crc", "header", "short", "idle"};
+static const char *const NAMES[] = {"ok", "ok", "busy", "size", "arg", "state", "gap", "crc", "header", "short", "idle", "playing"};
 
 size_t jo_reply(enum jo_err e, uint32_t offset, char *out, size_t cap)
 {

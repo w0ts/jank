@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "jank_sysex.h"
+#include <stdio.h>
 
 static const uint8_t HEAD[] = {0xF0, 0x7D, 0x4A, 0x4B};
 #define HEAD_LEN (sizeof HEAD)
@@ -15,6 +16,45 @@ size_t jx_frame(const char *text, size_t n, uint8_t *out)
     }
     out[at++] = 0xF7;
     return at;
+}
+
+size_t jx_push_frame(uint8_t type, const char *text, size_t n, uint8_t *out)
+{
+    size_t at = 0;
+    if (type >= 0x80u || n > JX_PUSH_TEXT_MAX)
+        return 0;
+    out[at++] = 0xF0;
+    out[at++] = 0x7D;
+    out[at++] = 0x4A;                  /* 'J' */
+    out[at++] = 0x42;                  /* 'B' */
+    out[at++] = type;
+    for (size_t i = 0; i < n; ++i) {
+        uint8_t c = (uint8_t)text[i];
+        out[at++] = c < 0x80u ? c : (uint8_t)'?';
+    }
+    out[at++] = 0xF7;
+    return at;
+}
+
+static const char *const BEAT_MODES[] = {"stopped", "steady", "faster", "slower"};
+
+static long clamp_field(int32_t v) { return v > JX_FIELD_MAX ? JX_FIELD_MAX : v < -JX_FIELD_MAX ? -JX_FIELD_MAX : (long)v; }
+
+size_t jx_beat_line(char *out, size_t cap, char kind, uint32_t n, int32_t bpm_x100, unsigned mode, unsigned audio, int32_t extra,
+                    int32_t extra2)
+{
+    int r = snprintf(out, cap, "%c %lu %ld %s %u", kind, (unsigned long)n, (long)(bpm_x100 > 0 ? bpm_x100 : 0),
+                     BEAT_MODES[mode & 3u], audio > 2u ? 2u : audio);
+    size_t at = r < 0 ? cap : (size_t)r;
+    if (at < cap && extra != JX_NO_EXTRA) {
+        r = snprintf(out + at, cap - at, " %ld", clamp_field(extra));
+        at = r < 0 ? cap : at + (size_t)r;
+    }
+    if (at < cap && extra != JX_NO_EXTRA) {
+        r = extra2 == JX_NO_EXTRA ? snprintf(out + at, cap - at, " -") : snprintf(out + at, cap - at, " %ld", clamp_field(extra2));
+        at = r < 0 ? cap : at + (size_t)r;
+    }
+    return at >= cap ? 0u : at;
 }
 
 size_t jx_realtime_packets(const uint8_t *bytes, size_t n, uint8_t *out, size_t cap)

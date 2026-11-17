@@ -3,6 +3,7 @@
  * A full queue drops the frame: Link's next one is worth more than an old one. */
 #include <string.h>
 #include "app.h"
+#include "jank_hold.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -31,7 +32,9 @@ struct slot {
 };
 
 static const char *TAG = "bridge";
-static struct slot s_slot[SLOTS];
+/* PSRAM when CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY (sdkconfig.ble-tuned): tasks only touch them, and NCM and Wi-Fi copy
+ * a frame out before sending it; internal otherwise */
+static EXT_RAM_BSS_ATTR struct slot s_slot[SLOTS];
 static QueueHandle_t s_free, s_work;
 static SemaphoreHandle_t s_lock;
 static struct jk_bridge s_b;
@@ -47,7 +50,12 @@ static struct js_scan s_scan;
 static uint8_t s_air[JK_AIR_MAX + 8];
 static uint32_t s_tx_fail, s_queue_full, s_scan_lost;
 static uint32_t s_lat_air, s_lat_air_max, s_lat_usb, s_lat_usb_max;
-static uint8_t s_want;
+static uint8_t s_want;                /* what the MIDI clock outputs were told (midi_want) */
+static uint8_t s_base;                /* what the transport setting wants of them, before AUDIO mode's hold */
+static struct jho s_hold;             /* AUDIO mode's Stop / Start (core/jank_hold.h) */
+static struct jho_in s_hin;           /* its inputs at the last step */
+static uint8_t s_lead = 1;            /* LINK TRANSPORT FOLLOW+LEAD (1) or FOLLOW (0), with the transport setting LINK */
+static uint8_t s_playing;             /* bridge_is_playing: written by the bridge task only (follow_transport) */
 static int64_t s_hop_until;
 static struct js_table s_table;
 static volatile uint8_t s_table_on;
@@ -243,29 +251,47 @@ static void follow_mac(void)
         ESP_LOGE(TAG, "radio to the computer's MAC: %s", esp_err_to_name(e));
 }
 
-/* what the MIDI transport should be: the session's word while joined; held through a change of GROUP */
+static uint8_t lt_mode(void) { return s_cfg.transport == JK_TRANSPORT_AUTO ? JHO_IGNORE : s_lead ? JHO_LEAD : JHO_FOLLOW; }
+
+/* what the MIDI transport should be (jank_clock.h jc_base): the session's word while in one (joined, or AUDIO mode's
+ * session of its own); held through a change of GROUP; then AUDIO mode's hold (jank_hold.h): Stop silences the outputs at
+ * once, Start lets them go once the tracker locks; LOW CONFIDENCE's gate (jank_conf.h): closed, the outputs stop; open
+ * again, they start on the next bar line; and LINK mode's own Stop, which holds until its Start */
 static void follow_transport(int64_t now)
 {
-    int want = s_want;
-    int automatic = s_cfg.transport == JK_TRANSPORT_AUTO;
-    if (jp_joined(&s_peer)) {
-        want = jc_should_play(automatic, jp_playing(&s_peer), jp_peers(&s_peer));
+    int want, automatic = s_cfg.transport == JK_TRANSPORT_AUTO;
+    int session = jp_in_session(&s_peer);
+    uint8_t audio, locked, gated, silent, conf_open;
+    struct jc_tr t;
+    beat_state(&audio, &locked);
+    beat_gate(&gated, &silent, &conf_open);
+    t = (struct jc_tr){.audio = audio, .automatic = (uint8_t)automatic, .session = (uint8_t)session,
+                       .settled = (uint8_t)jp_settled(&s_peer, now), .playing = (uint8_t)jp_playing(&s_peer),
+                       .gone = (uint8_t)(automatic && !s_peer.on && now >= s_hop_until), .peers = jp_peers(&s_peer)};
+    if (session)
         s_hop_until = 0;
-    } else if (automatic && !s_peer.on && now >= s_hop_until) {
-        want = 0;
-    }
+    s_base = (uint8_t)jc_base(s_base, &t);  /* (in a session not settled yet: the last wish held, nothing started on a guess) */
+    s_hin = (struct jho_in){.audio = audio, .lt = lt_mode(), .base = s_base, .locked = locked,
+                            .clock_running = (uint8_t)(midi_is_playing() && !midi_start_pending()), .gated = gated,
+                            .silent = silent, .conf_open = conf_open, .bar_settling = (uint8_t)beat_bar_settling()};
+    want = jho_outputs(&s_hold, &s_hin);
     if (want != s_want) {
         s_want = (uint8_t)want;
         midi_want(want);
     }
+    /* playing, for the flash rules (bridge_is_playing): the session plays (joined, or AUDIO mode's own), or (transport
+     * LINK) the MIDI clock has a start out or armed. Not the MIDI clock under transport AUTO, where it plays whenever a
+     * peer is there (Live open, stopped): no stop would ever allow an update or a save. Not a session gone: nothing could
+     * stop it. */
+    __atomic_store_n(&s_playing, (uint8_t)(session && (jp_playing(&s_peer) || (!automatic && midi_is_playing()))), __ATOMIC_RELAXED);
 }
 
 static void publish(int64_t now)
 {
     static int64_t next;
     struct jc_map m;
-    if (now < next || !jp_joined(&s_peer) || s_away)
-        return;                       /* no session: the timer keeps the last tempo and phase */
+    if (now < next || !jp_settled(&s_peer, now) || s_away)
+        return;                       /* no settled session: the timer keeps the last tempo and phase (none: no clock) */
     next = now + PUBLISH_US;
     jc_map_make(&m, now, jp_beat_at(&s_peer, now), jp_mpb(&s_peer), (int32_t)s_cfg.offset_10us * 10);
     midi_publish(&m);
@@ -289,12 +315,17 @@ static void bridge_task(void *arg)
 {
     (void)arg;
     for (;;) {
-        uint8_t i;
+        uint8_t i, audio, locked;
         int got = xQueueReceive(s_work, &i, pdMS_TO_TICKS(IDLE_WAIT_MS)) == pdTRUE;
         int64_t now = midi_now_us();
         xSemaphoreTake(s_lock, portMAX_DELAY);
         if (got)
             handle(&s_slot[i], i);
+        beat_state(&audio, &locked);
+        /* M2l: a session of its own while alone, in either mode (jank_peer.h), as a lone Link app: it never ends with the
+         * sound (the user, 2026-11-16: "how am I supposed to start it here?") */
+        if (jp_solo(&s_peer, 1, now))
+            s_base = 0;
         jp_poll(&s_peer, now);
         follow_transport(now);
         publish(now);
@@ -326,9 +357,34 @@ void bridge_apply(const struct jk_cfg *cfg)
     xSemaphoreGive(s_lock);
 }
 
+/* a start not reached yet, and its bar line: one waiting to be sent (play, the tracker), one sent for a bar still ahead,
+ * or the session playing while the MIDI start waits for the next bar line (a peer's start "from now", as Live and the
+ * FM-1 send them). The lock held */
+static int pending_start(int64_t beat_ub, int64_t *bar_ub)
+{
+    if (jp_start_armed(&s_peer, bar_ub))
+        return 1;
+    if (!jp_playing(&s_peer))
+        return 0;
+    if (lk_play_beat(&s_peer.k) > beat_ub) {
+        *bar_ub = lk_play_beat(&s_peer.k);
+        return 1;
+    }
+    if (s_cfg.transport != JK_TRANSPORT_AUTO && midi_start_pending()) {
+        *bar_ub = jst_bar_at_or_after(beat_ub, s_cfg.quantum);
+        return 1;
+    }
+    return 0;
+}
+
 void bridge_snapshot(struct jk_snapshot *s)
 {
+    int8_t rssi;
+    uint8_t channel, gate_off;
     memset(s, 0, sizeof *s);
+    /* the Wi-Fi driver's own call outside the bridge's lock: the HOME push and the control line take this snapshot, and
+     * the bridge's task (frames, Link) must never wait behind a Wi-Fi API call (the timing audit's fix 3) */
+    radio_network_info(&rssi, &channel);
     xSemaphoreTake(s_lock, portMAX_DELAY);
     int64_t now = midi_now_us();
     s->b = s_b;
@@ -342,18 +398,36 @@ void bridge_snapshot(struct jk_snapshot *s)
     s->lat_usb_max_us = s_lat_usb_max;
     s->wifi_up = (uint8_t)radio_network_up();
     s->wifi_ip = jn_ip(&s_net);
-    radio_network_info(&s->wifi_rssi, &s->wifi_channel);
+    s->wifi_rssi = rssi;
+    s->wifi_channel = channel;
     s->link_on = s_peer.on;
     s->link_ip = s_peer.ip;
     s->link_peers = jp_peers(&s_peer);
-    if (jp_joined(&s_peer)) {
+    if (jp_in_session(&s_peer)) {
         s->mpb = jp_mpb(&s_peer);
         s->beat_ub = jp_beat_at(&s_peer, now);
         s->playing = (uint8_t)jp_playing(&s_peer);
+        s->settled = (uint8_t)jp_settled(&s_peer, now);
+        s->armed = (uint8_t)pending_start(s->beat_ub, &s->start_ub);
     }
+    s->hold = s_hold.hold;
+    gate_off = s_hold.gate_off;
+    if (s_hin.audio)
+        s->outputs = jho_icon(&s_hold, &s_hin);
+    else                               /* LINK mode: the clocks as they are, a start waiting for its bar line armed (not
+                                        * after the stick's own Stop: its clocks wait for its Start, not for a bar line) */
+        s->outputs = s_hin.clock_running ? JHO_RUNNING : !s_hold.hold && (s->armed || midi_start_pending()) ? JHO_ARMED : JHO_STOPPED;
     xSemaphoreGive(s_lock);
     midi_stats(&s->midi_ticks, &s->midi_resync);
+    beat_stats(&s->beat);
+    if (gate_off)
+        s->beat.gated = 0;             /* gated= as it acts: a Start disarmed it (core/jank_hold.h gate_off, M2g) */
     s->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
+    s->batt_pct = -1;                  /* no board has a battery gauge yet */
+#if CONFIG_JANK_BLE_MIDI
+    s->ble_built = 1;
+    ble_midi_state(&s->ble_state, &s->ble_left_s);
+#endif
 }
 
 
@@ -377,7 +451,7 @@ int bridge_beat(int64_t *beat_ub, int32_t *mpb)
 {
     int joined;
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    joined = jp_joined(&s_peer);
+    joined = jp_in_session(&s_peer);   /* (AUDIO mode's session of its own too: the LED shows the tracker's beat) */
     if (joined) {
         *mpb = jp_mpb(&s_peer);
         *beat_ub = jp_beat_at(&s_peer, midi_now_us());
@@ -395,13 +469,59 @@ int bridge_tempo(int32_t mpb)
     return r;
 }
 
+/* Read without the bridge's lock: TinyUSB's task asks this for every sector of a drive copy, and the bridge task can sit
+ * on its lock waiting for TinyUSB's queue (to_computer), which only TinyUSB's task empties. */
+int bridge_is_playing(void) { return __atomic_load_n(&s_playing, __ATOMIC_RELAXED); }
+
 int bridge_play(int play)
 {
-    int r;
+    int r = 0;
+    uint8_t audio, locked;
+    beat_state(&audio, &locked);
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    r = jp_set_playing(&s_peer, play, midi_now_us());
+    if (audio) {
+        jho_set(&s_hold, !play);      /* AUDIO mode: Stop / Start of the outputs; the tracker keeps the session (jank_hold.h) */
+        if (play && s_hold.arming)
+            beat_fold_resync();       /* Start: a resync, the fold back to 1 (the emulator's setHold) */
+        follow_transport(midi_now_us());   /* the clocks stop now, not at the bridge's next step */
+    } else {
+        /* LINK mode: the stick's own clocks (a Stop holds until its Start, jank_hold.h jho_link_stop); with transport LINK
+         * (FOLLOW+LEAD) the session too. AUTO (IGNORE): the session is not the stick's to start or stop */
+        if (s_cfg.transport != JK_TRANSPORT_AUTO || !jp_peers(&s_peer))   /* M2l: alone, the session is the stick's */
+            r = jp_set_playing(&s_peer, play, s_cfg.quantum, midi_now_us());
+        if (play)
+            jho_link_play(&s_hold);
+        else
+            jho_link_stop(&s_hold);
+        follow_transport(midi_now_us());
+    }
     xSemaphoreGive(s_lock);
     return r;
+}
+
+void bridge_set_lead(int lead)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_lead = (uint8_t)(lead != 0);
+    xSemaphoreGive(s_lock);
+}
+
+int bridge_session_held(void) { return jho_session_held(&s_hold, &s_hin); }
+
+int bridge_user_stopped(void)
+{
+    int held;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    held = s_hold.hold;
+    xSemaphoreGive(s_lock);
+    return held;
+}
+
+void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), void *ctx)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    fn(&s_peer, midi_now_us(), ctx);
+    xSemaphoreGive(s_lock);
 }
 
 /* the Link clock filter's state, for `diag` */
@@ -436,6 +556,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     memcpy(s_bssid, s_b.bssid, 6);
     memcpy(s_own, mac, 6);
     js_clear(&s_scan);
+    jho_init(&s_hold);                 /* power-on: the user's layer stopped until the user's Start (M2h) */
     jp_init(&s_peer, peer_mac, mac, esp_random(), peer_out, NULL);
     s_on_network = cfg->net == JK_NET_WIFI;
     jn_init(&s_net, mac, esp_random(), cfg->name, LK_MCAST_IP, net_out, NULL);
@@ -452,5 +573,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     e = s_on_network ? radio_start_network(mac, cfg->ssid, cfg->pass, on_network) : radio_start(mac, s_b.channel, on_air);
     if (e != ESP_OK)
         return e;
-    return xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    if (xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) != pdPASS)
+        return ESP_ERR_NO_MEM;
+    return beat_start();
 }

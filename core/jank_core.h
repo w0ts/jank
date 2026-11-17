@@ -8,6 +8,7 @@
 #define JANK_CORE_H
 #include <stddef.h>
 #include <stdint.h>
+#include "jank_lat.h"
 
 #define JK_VERSION "0.1.0"
 
@@ -93,9 +94,17 @@ uint32_t jk_peers_heard(const struct jk_bridge *b, uint32_t now_ms);
 int8_t jk_best_rssi(const struct jk_bridge *b, uint32_t now_ms);     /* 0: none heard */
 
 /* settings */
+/* AUTO BAR (core/jank_beatlink.h jbl_bar_mode): OFF; AT START (the default) the 1 is placed only at a (re)start, never
+ * while playing; ALWAYS also mid-play. `set autobar on` is AT START, as before */
+enum jk_autobar { JK_AUTOBAR_OFF = 0, JK_AUTOBAR_START = 1, JK_AUTOBAR_ALWAYS = 2 };
 enum jk_transport {
     JK_TRANSPORT_LINK = 0,            /* MIDI start/stop follows Link's Start Stop Sync */
     JK_TRANSPORT_AUTO = 1             /* start at the next bar once a session is joined, stop when it is gone */
+};
+enum jk_ble {                         /* Bluetooth for a phone (jank_phone.h, docs/ble.md) */
+    JK_BLE_PAIR = 0,                  /* on only for a pair window asked for on the device, and while the phone stays */
+    JK_BLE_OFF = 1,                   /* never */
+    JK_BLE_AUTO = 2                   /* as pair, plus a window at every start */
 };
 enum jk_net {
     JK_NET_JANK = 0,                   /* MODE JANK's air, in GROUP */
@@ -106,6 +115,9 @@ enum jk_net {
 #define JK_PASS_MAX 63u
 #define JK_QUANTUM_MAX 16u
 #define JK_OFFSET_MAX_10US 10000       /* +-100 ms */
+#define JK_BEAT_LATENCY_MIN_MS (-300)   /* negative: the stick hears the audio after the speakers do (player --xiao) */
+#define JK_BEAT_LATENCY_MAX_MS 300
+#define JK_BEAT_LATENCY_DEFAULT_MS 25
 struct jk_cfg {
     uint8_t group, filter;
     uint8_t peer;                     /* 1: jank is a Link peer itself */
@@ -116,11 +128,167 @@ struct jk_cfg {
     char name[JK_NAME_MAX + 1];
     char ssid[JK_SSID_MAX + 1];
     char pass[JK_PASS_MAX + 1];       /* never sent back: get says only whether there is one */
+    uint8_t ble;                      /* enum jk_ble. In the byte the compiler padded the release's struct with (its size stays
+                                         130): the release stored 0 there, which is the default, JK_BLE_PAIR */
+    /* The beat-follow bench build's settings come after everything that is stored (store.c keeps only what is above
+     * this line), so they are back at their defaults at every start. */
+    uint8_t beat;                     /* 1: the beat tracker steers the Link session */
+    int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX):
+                                         the current source's value from `lat` below (stored there, since M2d) */
+    uint16_t burn_us;                 /* BENCH: extra work the tracker does per frame, us (0..9000), to find where the core overloads.
+                                         Not stored: 0 at every start */
+    uint8_t autobar_picks;            /* counts `set autobar start|always|on`: picked again, it leaves MANUAL even when on */
+    uint8_t follower;                 /* M2m A/B: 0 (default) the tuned follower (tuned-l16, M2j), 1 the robust one (all-d-f60,
+                                         core/beat/jb_robust.h). Not stored: 0 again at every start */
+    uint8_t skip;                     /* SKIP (core/beat/jb_skip.h, on the robust follower): 0 off, 1 ACT, 2 PAT. Not stored */
+    uint8_t graded;                   /* the shown confidence is the graded one (core/beat/jb_graded.h): display only; 0 off, 1 on.
+                                         Not stored. Both need follower robust */
+    /* Stored apart from the blob above (store.c, key "usb1"), so the blob stays 130: USB host mode (core/jank_usbrole.h)
+     * and AUTO BAR */
+    uint8_t autobar;                  /* enum jk_autobar: the downbeat estimator puts the session's bar on the music's 1 */
+    uint8_t usb;                      /* enum jur_usb: USB DEVICE / HOST */
+    uint8_t source;                   /* enum jur_src: AUDIO > SOURCE AUTO / LINE / USB */
+    /* Stored in the same small blob since M2d: */
+    uint8_t usbmidi;                  /* 1: the MIDI clock also goes out over USB-MIDI (to the computer, or to hosted gear) */
+    /* ... and since M2e: LOW CONFIDENCE (core/jank_conf.h) */
+    uint8_t lowconf;                  /* enum jcf_lowconf: KEEP RUNNING (0) or STOP / START (1, the default, as the emulator) */
+    uint8_t threshold;                /* percent 0..100: STOP / START gates the outputs under it (0: never) */
+    /* ... and since M2i: the advanced beat follow's spectral rate (core/beat/jb_rate.h) */
+    uint8_t rate;                     /* 1 (default): a pitch move read from the spectrum steers the follower; 0: the beats alone
+                                         (CPU: the rate costs ~0.4 % of core 0 while it runs) */
+    /* Stored in their own blob (store.c, key "lat1") since M2d: beat_latency per audio source (core/jank_lat.h) */
+    struct jla lat;
+    struct jla_key lat_key;           /* the source beat_latency_ms belongs to now (not stored: usbrole.c follows it) */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
+/* what store.c keeps: the release's blob (everything up to the bench settings) and, apart, usb and source */
+#define JK_CFG_STORED offsetof(struct jk_cfg, beat)
+/* the audio source the tracker hears now (usbrole.c): beat_latency_ms becomes that source's value (jank_lat.h). 1 changed */
+int jk_lat_select(struct jk_cfg *c, const struct jla_key *k);
+/* the current source's auto base (`set beat_latency`, the player's Auto latency), stored; its AUDIO SHIFT kept on top */
+void jk_lat_set(struct jk_cfg *c, int ms);
+/* the current source's AUDIO SHIFT (`set lat_trim`, Calibrate's, NUDGE MS; 0: the auto base alone), stored */
+void jk_lat_trim(struct jk_cfg *c, int ms);
+int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b);   /* 1: a save would write something */
 
+/* Saving settings writes flash, and a flash write stops everything but the clock's interrupt for the erase (tens of ms,
+ * worst ~400 ms: the timing audit). So a change while the session plays (or the MIDI clock plays) is saved once stopped,
+ * unless a restart follows the change (a restart stops the clock anyway, and the setting must be there after it). */
+enum jk_save { JK_SAVE_NONE, JK_SAVE_NOW, JK_SAVE_LATER };
+/* a change of the settings: *pending is the unsaved flag. JK_SAVE_NOW: save before the change is published */
+enum jk_save jk_save_on_change(uint8_t *pending, int changed, int playing, int restart_follows);
+/* called often (and before a restart with playing 0): 1 when the deferred save is due now (*pending cleared) */
+int jk_save_due(uint8_t *pending, int playing);
+/* `diag intr`: ESP-IDF's esp_intr_dump text cut to the interrupts in use, one short line each ("c1 27 L3 Used: TG0_T0"),
+ * then ok; the free and reserved lines left out so it fits an answer. Returns the bytes written (0: out too small) */
+size_t jk_intr_summary(const char *dump, char *out, size_t cap);
+
+/* drive and MIDI updates: refused while playing ("stop first"): flash erases would stall USB, Wi-Fi and the tracker */
+#define JK_STOP_FIRST "the session or the MIDI clock is playing: stop first"
+
+#define JK_CTL_OUT_MAX 2040u         /* the firmware's answer buffer (ctl.c): the longest status (1871) and `beat` with every counter at its largest (1963, M2m's profile) fit with the ok, tests/test_ctl.c; under usb.c's 2048 */
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
+/* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
+struct jk_beat {
+    uint8_t on;                       /* the setting */
+    uint8_t audio;                    /* the tracker's source is open (the computer's stream, a hosted device's) */
+    uint8_t audio_live;               /* ... and it has sound: AUDIO mode (core/jank_live.h); 0: LINK mode */
+    int8_t fold_exp;                  /* AUDIO mode's fold, 2^fold_exp (core/jank_fold.h) */
+    uint8_t fold_manual;              /* the user chose it, not AUTO RANGE */
+    uint8_t mode;                     /* 0 stopped, 1 steady, 2 speeding up, 3 slowing down */
+    int32_t bpm_x100;                 /* the tracker's published tempo, 0: none */
+    uint32_t hops;                    /* 10 ms frames computed */
+    uint32_t hop_avg_us, hop_max_us;  /* wall time of the tracker's work for one frame, preemption included */
+    uint32_t hop_avg_cycles;          /* the same in CPU cycles (240 MHz in this build) */
+    uint32_t cpu_pct_x10;             /* the tracker task's share of core 0 over the last second, preemption included */
+    uint32_t packets, gaps, overflows, resets;   /* USB audio packets taken, 1 ms gaps between them, ring overflows, restarts */
+    uint32_t heap_free, heap_min, heap_largest;  /* internal heap: now, lowest ever, largest free block */
+    uint32_t psram_free, psram_min;   /* the PSRAM heap (XIAO): now, lowest ever; 0 0 when there is none */
+    uint32_t stack_free;              /* bytes never used of the tracker task's stack */
+    int16_t level_db;                 /* the input meter: RMS over 0.3 s, a value every 250 ms, dBFS -99 .. 0 (the line in's
+                                         rms_db; the emulator's level_fast_db) */
+    int16_t level_min_db, level_max_db;   /* the lowest and highest of those values over the last 3 s */
+    int16_t peak_db;                  /* the input's peak over the last second, dBFS, -99 .. 0 (silence: -99) */
+    uint8_t conf_pct;                 /* the confidence: how well the last 8 s of tracked beats fit the published grid, percent
+                                         (core/jank_conf.h, the player's live/confidence.py); 0 in silence */
+    uint8_t act_pct;                  /* the network's beat activation peak over the last second, percent (M2d's conf=) */
+    uint8_t conf_hold;                /* M2k: the confidence holds (no evidence): conf_pct is the shown value, easing toward
+                                         the threshold (jank_conf.h jcf_show_step); the gate keeps the held one */
+    uint8_t gated;                    /* LOW CONFIDENCE's gate: the confidence under the threshold (STOP / START) */
+    uint8_t silent;                   /* 0.5 s under -60 dBFS: the outputs stopped too (jank_conf.h SILENCE) */
+    uint8_t conf_open;                /* the confidence at the threshold + 5 (where the gate opens): a Start's disarm ends */
+    uint32_t tempo_sets, phase_forces, starts, stops;   /* what the tracker did to the Link session */
+    int32_t err_us;                   /* the session's beat grid against the tracked beat at the last step, before a correction */
+    int32_t offset_us;                /* the clock the audio's samples are mapped to local time with: the offset's value */
+    int32_t latency_us;               /* the setting, in us */
+    uint8_t bar;                      /* the downbeat estimator: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
+    int8_t bar_phi;                   /* locked: the count position of the 1; else -1 */
+    int32_t bar_lead_x100;            /* its lead, score units x 100 */
+    uint32_t bar_moves;               /* whole-beat moves of the session's bar */
+    int8_t nudge_halves;              /* NUDGE BEAT: the user's nudges since the last reset, half beats (core/jank_beatlink.h) */
+    /* the advanced beat follow (M2i, core/beat/jb_follow.h, jb_rate.h); conf_pct above is against the published lines */
+    uint8_t follow;                   /* enum jb_follow_state: 0 stopped, 1 lock (ModeBpm's grid), 2 glide (the Kalman follower) */
+    int32_t drift_ppm;                /* the glide's period change a beat, parts per million (+: slowing down) */
+    uint32_t manoeuvres;              /* the glide's tempo moves taken from the beats */
+    uint8_t rate_on;                  /* the spectral rate: the setting, and its RAM there (PSRAM) */
+    uint8_t rate_active;              /* ... running (only while the glide runs) */
+    int32_t rate_x10000;              /* the last ratio the follower took, x 10000 (10000: none yet) */
+    uint32_t rate_events, rate_taken, rate_refused, rate_ignored;   /* steps proposed; taken, refused by the next beat,
+                                                                       not judged (no trusted glide) */
+    uint32_t rate_us;                 /* the rate's work over the last second, us (1000 = 0.1 % of core 0) */
+    uint32_t rate_max_us;             /* its longest frame (a block's match) over the last second */
+    /* the tuned follow (M2j, core/beat/jb_weak.h, beat-listener studies/tempo-changes tuned-l16) */
+    uint8_t weak_on;                  /* the weak-signal hold runs (its RAM is PSRAM: without, M2i's follow) */
+    uint32_t weak_holds;              /* steps the weak confidence kept the outputs running with the strict one under the
+                                         threshold */
+    uint32_t coasts;                  /* lines with no tracked beat the grid was corrected on from the activation */
+    uint32_t weak_beats;              /* weak tracked beats taken as weak observations */
+    uint32_t fast_jumps;              /* new grids (a section change) the follower jumped to at once */
+    /* the robust follower (M2m, core/beat/jb_robust.h) and the cost counters for the A/B */
+    uint8_t follower;                 /* the one running: 0 tuned, 1 robust (the setting, and its PSRAM there) */
+    uint8_t skip, graded;             /* the ones running (follower robust only): SKIP 0 off, 1 ACT, 2 PAT; the graded confidence shown */
+    uint8_t coast;                    /* the outputs run under the threshold (not a HOLD): the confidence is the robust follower's coast */
+    uint16_t skip_resyncs, skip_act_resyncs, skip_gated;   /* since the tracker started (saturating): phase re-syncs, those from the activation, confidence steps with SKIP on and the gate closed */
+    uint32_t conf_us;                 /* the confidence step's work (follow_conf) over the last second, us (10000 = 1 % of core 0);
+                                         it is not in cpu_pct, which is the tracker's work (frames, beats, the gate's questions) */
+    uint32_t robust_refresh_us, robust_refresh_max_us;    /* the agreement refresh (every 0.5 s): its total over the second, its longest */
+    uint32_t robust_gate_us, robust_gate_max_us;          /* the lock/jump gate's questions (ratio check): total, longest */
+    uint32_t robust_tick_us;          /* the robust tick without its refresh */
+    /* the profile (M2m): the tracker task's cycles per stage over the last second, us; order: pull, meter, fe (without the
+     * rate's tap), rate (the tap), net, dbn, down, act, feed, coast, rstep, conf, step, burn. idle: core 0's idle task's share
+     * over the second, x10 percent (Wi-Fi, Link, USB and the tracker are the rest) */
+    uint32_t prof_us[14];
+    uint32_t prof_max_us[14];         /* the longest single call of each stage in the last second (fe, net, dbn: one frame), us */
+    uint32_t hop_win_max_us, hop_over10;   /* the longest tracker pass (wall time, preemption included) in the last second, and how many
+                                              passes took over 10 ms (a frame's worth of audio) */
+    uint32_t uptime_s;
+    uint32_t gap_at_ms[6], gap_len_ms[6];  /* the last audio gaps: when (ms since boot) and how long (ms) */
+    uint32_t core0_idle_x10;
+    uint16_t burn_us;
+    uint32_t robust_asked, robust_refused_memory, robust_refused_ratio, robust_coast_ticks, robust_prior_ticks;
+};
+
+/* the USB port, for `status` (firmware/main/usbrole.c fills it) */
+#define JK_USB_DEVS 4u
+#define JK_USB_NAME_MAX 23u
+struct jk_usb_dev {
+    char name[JK_USB_NAME_MAX + 1];   /* the product string, printable ASCII */
+    uint8_t midi, audio;              /* its MIDI OUT gets the clock; its audio is what the tracker hears */
+};
+struct jk_usb {
+    uint8_t stack;                    /* enum jur_stack: what runs (0 device, 1 host) */
+    uint8_t has_port;                   /* a port chip is there and answered */
+    uint8_t cc, cc_dir;               /* enum jur_cc; 1 CC1, 2 CC2, 0 unknown */
+    uint8_t vbus_on, vbus, line;      /* jank's 5 V on VBUS, VBUS from outside, a plug in the line in */
+    uint8_t audio;                    /* enum jur_audio: what the tracker listens to now */
+    uint8_t ndev;
+    struct jk_usb_dev dev[JK_USB_DEVS];
+    uint32_t audio_rate;              /* the hosted stream's format; 0: none */
+    uint8_t audio_channels, audio_bits;
+    uint32_t audio_packets, audio_errors, midi_dropped;
+};
+
 struct jk_snapshot {
     uint8_t usb_up;
     uint32_t uptime_s;
@@ -131,6 +299,11 @@ struct jk_snapshot {
     uint32_t lat_usb_us, lat_usb_max_us;   /* USB -> radio handed over, in the stick: last, highest */
     uint8_t link_on;                  /* the Link peer is in the session's traffic */
     uint8_t playing;                  /* the session plays (Start Stop Sync) */
+    uint8_t settled;                  /* joined long enough to have the session's state (jank_peer.h jp_settled) */
+    uint8_t armed;                    /* a start not reached yet: its bar line is start_ub */
+    int64_t start_ub;
+    uint8_t hold;                     /* AUDIO mode's Stop (core/jank_hold.h) */
+    uint8_t outputs;                  /* enum jho_outputs: the clock outputs as the transport icon shows them */
     uint32_t link_ip;                 /* the peer's own address, host order; 0: none yet */
     uint32_t link_peers;              /* Link peers in the session, the stick not counted */
     int32_t mpb;                      /* us a beat; 0: no session */
@@ -141,6 +314,12 @@ struct jk_snapshot {
     uint8_t wifi_channel;
     uint32_t midi_ticks;              /* MIDI clocks sent */
     uint32_t midi_resync;             /* the clock had to jump to the session */
+    struct jk_beat beat;
+    int8_t batt_pct;                  /* -1: no battery gauge */
+    uint8_t ble_built;                /* the build has Bluetooth for a phone */
+    uint8_t ble_state;                /* enum jph_state (jank_phone.h): off, window, connected */
+    uint32_t ble_left_s;              /* the pair window's seconds left */
+    struct jk_usb usb;
     struct jk_bridge b;
 };
 
@@ -152,13 +331,31 @@ enum jk_ctl_action {
     JK_CTL_SCAN,                      /* out is empty: the caller scans and answers with js_table_report */
     JK_CTL_TEMPO,                     /* out is empty: the caller sets the session's tempo (jk_ctl_tempo), answers ok or err */
     JK_CTL_PLAY,                      /* out is empty: the caller starts the session, answers ok or err */
-    JK_CTL_STOP                       /* out is empty: the caller stops the session, answers ok or err */
+    JK_CTL_STOP,                      /* out is empty: the caller stops the session, answers ok or err */
+    JK_CTL_BLE_PAIR,                  /* out is empty: the caller opens a pair window (jph_pair), answers ok or err */
+    JK_CTL_BLE_CLOSE,                 /* out is empty: the caller ends the window and the phone's link, answers ok */
+    JK_CTL_FOLD,                      /* out is empty: the caller folds (jk_ctl_fold), answers fold=<f> ok or err link mode */
+    JK_CTL_NUDGE                      /* out is empty: the caller nudges the beat (jk_ctl_nudge), answers nudge_beats=<b> ok or err */
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
 #define JK_BPM_MIN_X100 2000u          /* the BPM the tempo command takes, hundredths: Link's own clamp, 20..999 */
 #define JK_BPM_MAX_X100 99900u
 /* "tempo <bpm>", BPM 20..999 with up to two decimals -> 0 and us a beat; -1 not one */
 int jk_ctl_tempo(const char *line, int32_t *mpb);
+/* "fold x2" / "fold /2" / "fold 1" (AUDIO mode's x2 / /2, core/jank_fold.h) -> 0 and dir +1 / -1 / 0; -1 not one */
+int jk_ctl_fold(const char *line, int *dir);
+/* NUDGE BEAT and NUDGE MS (AUDIO mode: the device's NO / YES held + UP/DOWN). "nudge beat <b>", b in half beats, signed,
+ * 0.5 to 3 (+0.5, -0.5, 1, -1.5) -> 0 and the half beats (+-1..+-6); -1 not one. The caller nudges (core/jank_beatlink.h
+ * jbl_nudge) and answers `nudge_beats=<total>`, the estimator's view before it, ok; or err link mode, no beat, at the limit */
+int jk_ctl_nudge(const char *line, int *halves);
+/* "nudge ms <n>": the AUDIO SHIFT (M2h), the current audio source's shift += n (1..JK_NUDGE_MS_STEP_MAX either way) on top
+ * of its auto base, which it never changes; the sum kept within JK_BEAT_LATENCY_MIN_MS..MAX (jank_lat.h; stored, saved once
+ * stopped). jk_ctl_line answers beat_latency=<sum> lat_auto=<base> lat_trim=<shift> ok (a change: JK_CTL_CFG_CHANGED), or
+ * err link mode. jk_nudge_ms is the same for the device's YES + UP/DOWN: 1 when it moved */
+#define JK_NUDGE_MS_STEP_MAX 10
+int jk_nudge_ms(struct jk_cfg *c, int ms);
+/* half beats as beats: 1 -> "0.5", -3 -> "-1.5", 4 -> "2", 0 -> "0" (out holds 8) */
+const char *jk_half_beats(int halves, char *out);
 
 /* on the session's beat: MODE JANK rests off and flashes on, the Wi-Fi network the other way round. No session: the rest.
  * beat_ub in micro-beats, mpb us a beat. -> 1: lit */
@@ -166,6 +363,9 @@ int jk_ctl_tempo(const char *line, int32_t *mpb);
 #define JK_BAR_FLASH_MS 150u           /* the bar's first beat, by quantum, on Link's beat count as MIDI start uses */
 #define JK_FLASH_CAP_DIV 3             /* no flash is longer than a third of a beat: they stay apart at fast tempos */
 int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum);
+/* the session's beat at beat_ub is its bar's first (by quantum): with AUTO BAR locked, that flash shows the music's 1 */
+int jk_led_bar_one(int64_t beat_ub, uint32_t quantum);
+#define JK_LED_ONE_RGB 40, 18, 0       /* the locked 1's flash: amber (the other flashes keep the network's colour) */
 
 /* the GROUP after this one, 9 wraps to 1 */
 uint32_t jk_next_group(uint32_t group);

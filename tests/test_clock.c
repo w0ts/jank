@@ -179,6 +179,76 @@ static void test_resync(void)
     CHECK(c.resyncs == 2);
 }
 
+/* Runs the clock over [t, t_end) at 120 BPM, moving the session's beat by move_ub at time t_move (an AUTO BAR move:
+ * jbl_shift_bar moves the bar by whole beats at the same time). Returns the clocks sent; *min_gap the closest two. */
+static uint32_t run_with_move(int64_t move_ub, int64_t t_move, int64_t t_end, int64_t *min_gap, uint32_t *resyncs)
+{
+    struct jc_map m;
+    struct jc_ticker c;
+    struct jc_fire f;
+    int64_t t, last = -1, gap = INT64_MAX;
+    uint32_t clocks = 0;
+    int moved = 0;
+    jc_map_make(&m, 0, 0, 500000, 0);
+    jc_ticker_init(&c, 4);
+    if (jc_begin(&c, &m, 0) != 0)
+        return 0;
+    t = c.t_due;
+    while (t < t_end) {
+        if (!moved && t >= t_move) {
+            jc_map_make(&m, t_move, t_move * 2 + move_ub, 500000, 0);     /* ub = t x 2 at 120 BPM, plus the move */
+            moved = 1;
+        }
+        jc_step(&c, &m, t, &f);
+        for (unsigned i = 0; i < f.n; i++)
+            if (f.bytes[i] == JC_CLOCK) {
+                clocks++;
+                if (last >= 0 && t - last < gap)
+                    gap = t - last;
+                last = t;
+            }
+        t = f.next;
+    }
+    *min_gap = gap;
+    *resyncs = c.resyncs;
+    return clocks;
+}
+
+/* AUTO BAR moves the session's bar by whole beats. The grid's times stay where they were, so the clock must go on with
+ * one F8 per grid time: no second F8 at the tick that was just sent (the timing audit's 193 -> 192 per bar move). */
+static void test_whole_beat_move(void)
+{
+    static const int64_t moves[] = {1000000, -1000000, 3000000, -2000000, 1000000 + 3000, 1000000 - 3000};
+    const int64_t tick = 500000 / 24, t_end = 4000000;             /* 2 bars of 4 at 120 BPM: 192 grid times */
+    for (unsigned i = 0; i < sizeof moves / sizeof moves[0]; i++) {
+        int64_t gap;
+        uint32_t resyncs, n = run_with_move(moves[i], 1000000 + 7 * tick + 1, t_end, &gap, &resyncs);
+        int whole = moves[i] % 1000000 == 0;
+        if (whole)
+            CHECK(n == 192);                                        /* exactly the grid's clocks */
+        else
+            CHECK(n >= 191 && n <= 193);                            /* 1.5 ms off the grid: the window holds one more or less */
+        CHECK(gap >= tick / 2);                                     /* never two clocks in a row */
+        CHECK(resyncs == 1);
+        if (whole)
+            CHECK(gap >= tick - 1);
+        printf("clock: bar move %+lld ub: %u clocks, min gap %lld us\n", (long long)moves[i], n, (long long)gap);
+    }
+}
+
+/* NUDGE BEAT moves the session's beats by half beats (12 ticks): the grid's times stay too, one F8 per grid time */
+static void test_half_beat_move(void)
+{
+    static const int64_t moves[] = {500000, -500000, 1500000, -2500000};
+    const int64_t tick = 500000 / 24, t_end = 4000000;
+    for (unsigned i = 0; i < sizeof moves / sizeof moves[0]; i++) {
+        int64_t gap;
+        uint32_t resyncs, n = run_with_move(moves[i], 1000000 + 7 * tick + 1, t_end, &gap, &resyncs);
+        CHECK(n == 192 && gap >= tick - 1 && resyncs == 1);
+        printf("clock: half-beat move %+lld ub: %u clocks, min gap %lld us\n", (long long)moves[i], n, (long long)gap);
+    }
+}
+
 static uint32_t count(const struct jc_fire *f, uint8_t b)
 {
     uint32_t c = 0;
@@ -233,6 +303,44 @@ static void test_start_on_the_bar(void)
         jc_step(&c, &m, t, &f);
         CHECK(f.n == 1);
         t = f.next;
+    }
+}
+
+/* M2k: AUTO BAR moves the session 2 beats just before the old bar line, a start waiting: the start must not go out on
+ * the tick scheduled from the old map (it would read as the moved grid's 3) but on the moved grid's bar line */
+static void test_start_after_a_move(void)
+{
+    for (int lead_ticks = 0; lead_ticks <= 3; lead_ticks++) {
+        struct jc_map m;
+        struct jc_ticker c;
+        struct jc_fire f;
+        const int64_t tick = 500000 / 24;
+        int64_t t, start_t = -1, start_n = -1, move_t;
+        jc_map_make(&m, 0, 3000000, 500000, 0);                  /* beat 3 at 0: the bar line (beat 4) 0.5 s ahead */
+        jc_ticker_init(&c, 4);
+        CHECK(jc_begin(&c, &m, -1) == 0);
+        t = c.t_due;
+        jc_want(&c, 1);
+        move_t = 500000 - lead_ticks * tick - tick / 2;           /* the move lands between two ticks before the bar */
+        for (int k = 0; k < 300; k++) {
+            int64_t n = c.n;
+            if (t >= move_t && move_t > 0) {
+                jc_map_make(&m, move_t, 3000000 + 2000000 + (move_t * 1000000) / 500000, 500000, 0);   /* +2 beats */
+                move_t = 0;
+            }
+            jc_step(&c, &m, t, &f);
+            if (count(&f, JC_START)) {
+                CHECK(start_n < 0);
+                start_n = n;
+                start_t = t;
+            }
+            t = f.next;
+        }
+        /* the moved grid's beat at the start's time: a bar line (the clock's 1 reads 1) */
+        int64_t ub = 5000000 + (start_t * 1000000) / 500000, pos = ((ub + 500000) / 1000000) % 4;
+        printf("clock: a 2-beat move %d ticks before the bar line, a start waiting: started at %lld us, the moved grid's "
+               "beat %lld\n", lead_ticks, (long long)start_t, (long long)pos + 1);
+        CHECK(start_n >= 0 && start_n % 96 == 0 && pos == 0);
     }
 }
 
@@ -355,7 +463,32 @@ static void test_transport(void)
     CHECK(jc_should_play(0, 1, 0) == 1);
     CHECK(jc_should_play(0, 0, 5) == 0);
     CHECK(jc_should_play(1, 0, 1) == 1);
-    CHECK(jc_should_play(1, 1, 0) == 0);
+    CHECK(jc_should_play(1, 1, 0) == 1);       /* M2l: AUTO alone: the stick's own session's start / stop (the user's) */
+    CHECK(jc_should_play(1, 0, 0) == 0);
+}
+
+/* the outputs' wish at a bridge step (bridge.c follow_transport) */
+static void test_base(void)
+{
+    struct jc_tr t = {.audio = 1, .session = 1, .settled = 1, .playing = 0, .peers = 0};
+    CHECK(jc_base(1, &t) == 0);                 /* AUDIO, alone in its own session: the session's start / stop */
+    t.playing = 1;
+    CHECK(jc_base(0, &t) == 1);
+    t.automatic = 1;
+    t.playing = 0;
+    t.peers = 2;
+    CHECK(jc_base(1, &t) == 0);                 /* AUDIO with AUTO: still the session's (no clock on a peer alone) */
+    t.audio = 0;
+    CHECK(jc_base(0, &t) == 1);                 /* LINK mode, AUTO: a peer is there */
+    t.automatic = 0;
+    CHECK(jc_base(1, &t) == 0);                 /* LINK mode, LINK: the session's */
+    t.settled = 0;
+    t.playing = 1;
+    CHECK(jc_base(0, &t) == 0 && jc_base(1, &t) == 1);   /* not settled: the wish before, held */
+    t = (struct jc_tr){.session = 0};
+    CHECK(jc_base(1, &t) == 1);                 /* no session, transport LINK: held */
+    t.gone = 1;
+    CHECK(jc_base(1, &t) == 0);
 }
 
 int main(void)
@@ -367,12 +500,16 @@ int main(void)
     test_tempo_change();
     test_slew();
     test_resync();
+    test_whole_beat_move();
+    test_half_beat_move();
     test_start_on_the_bar();
+    test_start_after_a_move();
     test_click_resync();
     test_free_run_through_a_scan();
     test_negative_beats_bar();
     test_begin_needs_map();
     test_transport();
+    test_base();
     printf("clock: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

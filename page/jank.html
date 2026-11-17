@@ -6,159 +6,184 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>jank</title>
 <style>
-:root { --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --dim: #6b6a64; --line: #dddbd3; --accent: #0b6e4f; --warn: #a33b20; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; } }
-:root[data-theme="dark"] { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; }
+:root { --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --dim: #6b6a64; --line: #dddbd3; --accent: #0b6e4f; --warn: #a33b20; --beat: #0b6e4f; --off: #e6e4dc; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; --beat: #4cc497; --off: #2c2c2a; } }
+:root[data-theme="dark"] { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; --beat: #4cc497; --off: #2c2c2a; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
 main { max-width: 680px; margin: 0 auto; }
 h1 { font-size: 22px; margin: 0; }
 h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 14px; }
 .stat b { display: block; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .stat span { color: var(--dim); font-size: 12px; }
 label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--dim); }
-select, input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px; width: 100%; }
-button { font: inherit; color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+select, input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; width: 100%; min-height: 40px; }
+button { font: inherit; color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 9px 14px; cursor: pointer; min-height: 40px; }
 button.quiet { color: var(--ink); background: transparent; border: 1px solid var(--line); }
-table.groups tbody tr { cursor: pointer; }
-table.groups tbody tr:hover { background: var(--line); }
-table.groups tbody tr.on td { color: var(--accent); font-weight: 600; }
-.note { font-size: 13px; color: var(--dim); }
 button:disabled { opacity: .45; cursor: default; }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.note { font-size: 13px; color: var(--dim); }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
 th, td { text-align: left; padding: 3px 8px 3px 0; }
 th { color: var(--dim); font-weight: 500; font-size: 12px; }
-details.more { margin-bottom: 12px; }
+table.groups tbody tr.on td { color: var(--accent); font-weight: 600; }
+td button { padding: 4px 12px; min-height: 32px; }
 details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 2px; }
-details.more[open] > summary { margin-bottom: 8px; }
-.tempo { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 18px; margin-bottom: 12px; }
-.big { font-size: 40px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
-.tempo input { width: 7.5em; font-size: 20px; }
+.home-top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 12px; }
+.big { font-size: 44px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
+.boxes { display: flex; gap: 6px; flex-wrap: wrap; }
+.boxes span { width: 22px; height: 22px; border-radius: 4px; background: var(--off); }
+.boxes span.on { background: var(--beat); }
 .row { display: flex; gap: 8px; align-items: end; }
-td button { padding: 4px 12px; }
-.tempo label button { font-size: 15px; padding: 9px 14px; }
+.row input { width: 7em; }
+.meter { height: 8px; border-radius: 4px; background: var(--off); overflow: hidden; margin-top: 6px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--accent); }
+.meter { position: relative; }
+.meter b.tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
+.meter.gated i { background: var(--warn); }
+/* M2k: the confidence holds (no evidence): the bar hatched and dimmed, "HOLD" by the number */
+.meter.hold i { opacity: 0.55; background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--off) 3px 6px); }
+/* the robust follower's COAST: the outputs run under the threshold, the value is measured: the bar hatched the other way, "COAST" by the number */
+.meter.coast i { opacity: 0.75; background-image: repeating-linear-gradient(45deg, transparent 0 3px, var(--off) 3px 6px); }
 #msg { color: var(--dim); min-height: 1.4em; margin: 0 0 12px; }
 #msg.bad { color: var(--warn); }
+.hide { display: none !important; }
+#link-state { font-size: 13px; color: var(--dim); text-align: right; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>jank</h1>
-    <button id="connect">Connect</button>
+    <div id="link-state">not connected</div>
   </header>
-  <p id="msg">Chrome or Edge on a computer: plug the stick in, then Connect.</p>
+  <p id="msg">Connect to a jank: by USB (Chrome or Edge on a computer), from an iPhone MIDI browser app, or by Bluetooth (Chrome).</p>
 
-  <section>
-    <h2>Two devices</h2>
-    <p class="note"><b>The stick:</b> a bare ESP32-S3 (Seeed XIAO, about US$7.50) in any USB host that speaks MIDI clock or Link (network driver). <b>The jank box:</b> the same firmware plus MIDI and clock outs for hardware. No router for either.</p>
-    <p class="note">Name: <b>jank</b> = jam + Link, and ironic: it should be rock solid.</p>
+  <section id="connect">
+    <h2>Connect</h2>
+    <div class="buttons">
+      <button id="c-midi">MIDI port (USB, iPhone app)</button>
+      <button id="c-bluetooth">Bluetooth</button>
+      <button id="c-off" class="quiet hide">Disconnect</button>
+    </div>
+    <label id="c-ports-box" class="hide" style="margin-top:10px">MIDI port <select id="c-ports"></select></label>
+    <p class="note">Bluetooth: press the jank's button three times (its LED blinks blue for two minutes), then connect. On an iPhone, open
+    this page in the MIDIWeb Browser or Web MIDI Browser app, connect the jank in the app's Bluetooth MIDI settings, turn SysEx on
+    there, then press MIDI port.</p>
   </section>
 
-  <section>
-    <h2>Group</h2>
-    <table class="groups">
-      <thead><tr><th>Group</th><th>Channel</th><th>Peers</th><th>Signal, dBm</th><th></th></tr></thead>
-      <tbody id="groups"></tbody>
-    </table>
-    <p id="scan-result"></p>
+  <section id="home">
+    <h2>Home</h2>
+    <div class="home-top">
+      <div><div class="big" id="h-bpm">-</div><span class="note">BPM</span></div>
+      <div><div class="boxes" id="h-boxes"></div><span class="note" id="h-transport">-</span></div>
+      <div><div class="big" id="h-mode">-</div><span class="note" id="h-mode-note">mode</span></div>
+    </div>
+    <div class="row" style="flex-wrap:wrap;margin-bottom:12px">
+      <label>New tempo <input id="t-tempo" inputmode="decimal" placeholder="120"></label>
+      <button id="t-set" disabled>Set</button>
+      <button id="t-play" disabled>Play</button>
+      <button id="t-up" class="quiet hide" disabled>x2</button>
+      <button id="t-down" class="quiet hide" disabled>÷2</button>
+    </div>
+    <div class="row hide" id="nudges" style="flex-wrap:wrap;margin-bottom:12px">
+      <span class="note">Phase</span>
+      <button id="n-beat-down" class="quiet" disabled title="Link's beats half a beat later">-½</button>
+      <button id="n-beat-up" class="quiet" disabled title="Link's beats half a beat earlier (fixes an off-beat lock)">+½</button>
+      <span class="note">Audio shift</span>
+      <button id="n-ms-down" class="quiet" disabled title="every output 1 ms earlier">-1 ms</button>
+      <button id="n-ms-up" class="quiet" disabled title="every output 1 ms later">+1 ms</button>
+    </div>
+    <div class="grid">
+      <div class="stat"><b id="h-net">-</b><span>network</span></div>
+      <div class="stat"><b id="h-link">-</b><span>Link peers</span></div>
+      <div class="stat"><b id="h-air">-</b><span>units on the air</span></div>
+      <div class="stat"><b id="h-batt">-</b><span>battery</span></div>
+      <div class="stat"><b id="h-level">-</b><span id="h-level-range">input level</span><div class="meter"><i id="h-level-bar"></i></div></div>
+      <div class="stat"><b id="h-conf">-</b><span id="h-conf-note">confidence</span><div class="meter" id="h-conf-meter"><i id="h-conf-bar"></i><b class="tick hide" id="h-conf-tick" title="the threshold"></b></div></div>
+      <div class="stat"><b id="h-ble">-</b><span>Bluetooth</span></div>
+    </div>
+  </section>
+
+  <section id="menu">
+    <h2>Settings</h2>
     <div class="grid">
       <label>Group <select id="c-group"></select></label>
       <div class="row"><button id="scan" class="quiet" disabled>Scan</button></div>
     </div>
-    <p class="note">Join a group heard nearby, or pick one. While no peer is heard the stick scans by itself every 5 s.</p>
-  </section>
-
-  <section>
-    <h2>Tempo and transport</h2>
-    <div class="tempo">
-      <div><div class="big" id="t-bpm">-</div><span class="note">BPM</span></div>
-      <div><div class="big" id="t-beat">-</div><span class="note">beat</span></div>
-      <label>New tempo <span class="row"><input id="t-tempo" inputmode="decimal" placeholder="120"><button id="t-set" disabled>Set</button></span></label>
-      <div class="row"><button id="t-play" disabled>Play</button></div>
-    </div>
-    <p class="note" id="t-state">-</p>
+    <table class="groups" style="margin-top:8px">
+      <thead><tr><th>Group</th><th>Ch.</th><th>Peers</th><th>dBm</th><th></th></tr></thead>
+      <tbody id="groups"></tbody>
+    </table>
+    <p id="scan-result" class="note"></p>
     <div class="grid">
       <label>MIDI start / stop <select id="c-transport"><option value="link">Link play / stop</option><option value="auto">Always in a session</option></select></label>
-      <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16"></label>
-      <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01"></label>
+      <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16" inputmode="numeric"></label>
+      <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01" inputmode="decimal"></label>
+      <label>Name <input id="c-name" maxlength="23"></label>
+      <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
+      <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
+      <label>Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
+      <label>Auto latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
+      <label>USB MIDI clock <select id="c-usbmidi"><option value="on">On: the clock also over USB</option><option value="off">Off: MIDI out (DIN / TRS) only</option></select></label>
+      <label>Low confidence <select id="c-lowconf"><option value="stop">Stop / start: the outputs stop under the threshold</option><option value="run">Keep running</option></select></label>
+      <label>Confidence threshold, % <input id="c-threshold" type="number" min="0" max="100" step="5" inputmode="numeric"></label>
+      <label>Auto bar <select id="c-autobar"><option value="start">At start: the 1 placed when playing starts</option><option value="always">Always: also while playing</option><option value="off">Off</option></select></label>
+      <label>Audio source <select id="c-source"><option value="auto">Auto: the line in when plugged, else USB</option><option value="usb">USB audio</option><option value="line">Line in</option><option value="link">None: Link only (a plugged line still wins)</option></select></label>
+      <label>Bluetooth <select id="c-ble"><option value="pair">Pair now: three clicks or the button</option><option value="auto">On start: also at every start</option><option value="off">Off</option></select></label>
     </div>
-  </section>
+    <div class="buttons" style="margin-top:10px">
+      <button id="ble-pair" class="quiet" disabled>Pair now (two minutes)</button>
+      <button id="ble-close" class="quiet hide" disabled>Done: Bluetooth off</button>
+    </div>
+    <p class="note">Bluetooth shares the radio with Wi-Fi and MODE JANK, so it is on only for two minutes after three clicks (or
+    after a start, set to "also at every start") and while a phone stays connected.</p>
 
-  <section>
-    <h2>Network</h2>
-    <p id="net-state">-</p>
+    <h2 style="margin-top:14px">Network</h2>
+    <p id="net-state" class="note">-</p>
     <div class="grid">
       <label>Join <select id="net-mode"><option value="jank">MODE JANK</option><option value="wifi">A Wi-Fi network</option></select></label>
       <label>Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
       <label>Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
     </div>
-    <p class="note">2.4 GHz only. The stick keeps the password in its flash, unencrypted, and never sends it back.</p>
+    <p class="note" id="net-note">2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.</p>
     <button id="net-apply" disabled>Save and restart</button>
   </section>
 
-  <details class="more">
-    <summary>Details</summary>
-
+  <details class="more" id="more">
+    <summary>Details (USB)</summary>
     <section>
-      <h2>Air</h2>
+      <h2>Air and Link</h2>
       <div class="grid">
-        <div class="stat"><b id="s-peers">-</b><span>peers heard</span></div>
         <div class="stat"><b id="s-rssi">-</b><span>best signal, dBm</span></div>
         <div class="stat"><b id="s-channel">-</b><span>channel</span></div>
-        <div class="stat"><b id="s-usb">-</b><span>computer</span></div>
-      </div>
-    </section>
-
-    <section>
-      <h2>Link and MIDI</h2>
-      <div class="grid">
-        <div class="stat"><b id="s-link_peers">-</b><span>Link peers</span></div>
-        <div class="stat"><b id="s-link_ip">-</b><span>the stick's Link address</span></div>
+        <div class="stat"><b id="s-link_ip">-</b><span>Link address</span></div>
         <div class="stat"><b id="s-midi_ticks">-</b><span>MIDI clocks sent</span></div>
-        <div class="stat"><b id="s-midi_resync">-</b><span>clock jumps to the session</span></div>
-      </div>
-    </section>
-
-    <section>
-      <h2>Frames</h2>
-      <div class="grid">
-        <div class="stat"><b id="s-air_in">-</b><span>from the air</span></div>
-        <div class="stat"><b id="s-usb_out">-</b><span>to the computer</span></div>
-        <div class="stat"><b id="s-usb_in">-</b><span>from the computer</span></div>
-        <div class="stat"><b id="s-air_out">-</b><span>to the air</span></div>
+        <div class="stat"><b id="s-midi_resync">-</b><span>clock jumps</span></div>
+        <div class="stat"><b id="s-ble_state">-</b><span>Bluetooth</span></div>
+        <div class="stat"><b id="s-audio">-</b><span>audio heard</span></div>
+        <div class="stat"><b id="s-outputs">-</b><span>clock outputs</span></div>
+        <div class="stat"><b id="s-peak_db">-</b><span>peak, dB</span></div>
+        <div class="stat"><b id="s-air_in">-</b><span>frames from the air</span></div>
+        <div class="stat"><b id="s-air_out">-</b><span>frames to the air</span></div>
         <div class="stat"><b id="s-drops">-</b><span>dropped by faults</span></div>
-        <div class="stat"><b id="s-drop_filter">-</b><span>chatter kept off the air</span></div>
-        <div class="stat"><b id="s-lat_air_us">-</b><span>air to USB, us</span></div>
-        <div class="stat"><b id="s-lat_usb_us">-</b><span>USB to air, us</span></div>
       </div>
     </section>
-
     <section>
       <h2>Peers heard</h2>
       <table>
-        <thead><tr><th>Address</th><th>dBm</th><th>Last heard, ms</th><th>Frames</th></tr></thead>
+        <thead><tr><th>Address</th><th>dBm</th><th>ms ago</th><th>Frames</th></tr></thead>
         <tbody id="units"></tbody>
       </table>
-      <p class="note">FM-1s and jank sticks send the same frames: a jank shows only by its address, unless a computer changed it. A scan takes about 1 s, with the stick off its own channel for about 0.7 s; the MIDI clock runs on.</p>
     </section>
-
-    <section>
-      <h2>More settings</h2>
-      <div class="grid">
-        <label>Name <input id="c-name" maxlength="23"></label>
-        <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
-        <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
-      </div>
-    </section>
-
     <section>
       <h2>Firmware</h2>
       <p id="s-version" class="note">-</p>
-      <p>This page does not flash. Download mode restarts the stick so esptool can reach it; the README has the command.</p>
+      <p class="note">Update: copy jank.bin onto the JANK drive; it installs as it lands and the jank restarts. Download mode restarts
+      the jank so esptool can reach it.</p>
       <button id="bootloader" class="quiet" disabled>Download mode</button>
     </section>
   </details>
@@ -172,44 +197,231 @@ function splitLines(buffer, chunk) {
   return { lines: parts.map((l) => l.replace(/\r$/, "")), rest };
 }
 
-/* the commands for the Network form; null: not valid. An empty password leaves the stored one */
-function networkCommands(mode, ssid, pass, passStored) {
+/* the commands for the Network form; null: not valid. An empty password leaves the stored one. Over Bluetooth the
+   password is never sent (the jank refuses it: the link is not encrypted) */
+function networkCommands(mode, ssid, pass, passStored, overBle) {
   const printable = (s) => /^[\x20-\x7e]*$/.test(s);
   if (mode === "jank") return ["set net jank", "reboot"];
   if (!ssid || ssid.length > 32 || !printable(ssid) || ssid !== ssid.trim()) return null;
+  if (overBle && pass) return null;
   if (!printable(pass) || pass !== pass.trim() || (pass && (pass.length < 8 || pass.length > 63))) return null;
   const commands = ["set ssid " + ssid];
   if (pass) commands.push("set pass " + pass);
-  else if (!passStored) commands.push("set pass");
+  else if (!passStored && !overBle) commands.push("set pass");
   commands.push("set net wifi", "reboot");
   return commands;
 }
 
-/* the line under Network, from status and get */
+/* the line under Network, from get (and status over USB) */
 function networkLine(v) {
   if (v.net !== "wifi") return "MODE JANK, group " + v.group;
+  if (v.wifi === undefined) return "Wi-Fi network " + v.ssid;
   if (v.wifi !== "1") return "Looking for " + v.ssid;
   if (v.wifi_ip === "0.0.0.0") return "On " + v.ssid + ", waiting for an address";
   return "On " + v.ssid + ", " + v.wifi_ip + ", " + v.wifi_rssi + " dBm, channel " + v.wifi_channel;
 }
 
-/* the control line in SysEx on an S3's USB MIDI port, as core/jank_sysex.c: text runs across frames */
-const JX_HEAD = [0xf0, 0x7d, 0x4a, 0x4b], JX_TEXT_MAX = 30;
+/* the control line in SysEx, as core/jank_sysex.c: F0 7D 'J' 'K' <7-bit text> F7, 30 characters a frame; text runs across frames */
+const JX_HEAD = [0xf0, 0x7d, 0x4a, 0x4b], JX_PUSH = [0xf0, 0x7d, 0x4a, 0x42], JX_TEXT_MAX = 30;
+const JX_PUSH_BEAT = 0x10, JX_PUSH_HOME = 0x11;
 function textToSysex(text) {
   const frames = [];
   for (let at = 0; at < text.length; at += JX_TEXT_MAX) {
-    const part = Array.from(text.slice(at, at + JX_TEXT_MAX), (c) => (c.charCodeAt(0) < 0x80 ? c.charCodeAt(0) : 0x3f));
+    const part = [];
+    for (const c of text.slice(at, at + JX_TEXT_MAX)) part.push(c.charCodeAt(0) < 0x80 ? c.charCodeAt(0) : 0x3f);
     frames.push([...JX_HEAD, ...part, 0xf7]);
   }
   return frames;
 }
+function startsWith(data, head) {
+  for (let i = 0; i < head.length; i++) if (data[i] !== head[i]) return false;
+  return true;
+}
 function sysexToText(data) {
   const n = data.length;
-  if (n < JX_HEAD.length + 1 || data[n - 1] !== 0xf7 || JX_HEAD.some((b, i) => data[i] !== b)) return null;
-  return String.fromCharCode(...Array.from(data).slice(JX_HEAD.length, n - 1));
+  if (n < JX_HEAD.length + 1 || data[n - 1] !== 0xf7 || !startsWith(data, JX_HEAD)) return null;
+  let s = "";
+  for (let i = JX_HEAD.length; i < n - 1; i++) s += String.fromCharCode(data[i]);
+  return s;
 }
-function isJankPort(p) {
-  return /jank/i.test(p.name || "") && p.state !== "disconnected";
+
+/* a report the jank sends on its own: F0 7D 'J' 'B' <type> <text> F7 -> { type, text } or null */
+function pushOf(data) {
+  const n = data.length;
+  if (n < JX_PUSH.length + 2 || data[n - 1] !== 0xf7 || !startsWith(data, JX_PUSH)) return null;
+  let text = "";
+  for (let i = JX_PUSH.length + 1; i < n - 1; i++) text += String.fromCharCode(data[i]);
+  return { type: data[JX_PUSH.length], text };
+}
+
+/* the HOME line (core/jank_phone.h): "h bpm_x100 net transport bar quantum link_peers air_peers battery level conf min max mode"
+   (level: the input meter's RMS over 0.3 s; min / max: its extremes over 3 s; mode 0 LINK, 1 AUDIO, x2 x4 /2 /4 AUDIO
+   folded; the last three absent from older firmware). conf "<pct>h": the confidence holds (M2k), pct the value shown;
+   "<pct>c": the outputs COAST (the robust follower runs them under the threshold), pct a measured value */
+function parseHome(text) {
+  const f = String(text).trim().split(/\s+/);
+  if (f.length < 11 || f[0] !== "h") return null;
+  const num = (s) => (s === "-" || !/^-?\d+$/.test(s) ? null : Number(s));
+  const hold = /^\d+h$/.test(f[10]);
+  const coast = /^\d+c$/.test(f[10]);
+  const net = /^j(\d)$/.exec(f[2]) ? { kind: "jank", group: Number(f[2].slice(1)) } : /^w[01]$/.test(f[2]) ? { kind: "wifi", up: f[2] === "w1" } : null;
+  const transport = ["stopped", "playing", "armed"][Number(f[3])];
+  const quantum = num(f[5]);
+  if (!net || !transport || !quantum) return null;
+  return { bpm: (num(f[1]) || 0) / 100, net, transport, bar: num(f[4]), quantum, link: num(f[6]) || 0, air: num(f[7]) || 0,
+           battery: num(f[8]), level: num(f[9]), conf: hold || coast ? Number(f[10].slice(0, -1)) : num(f[10]), confHold: hold, confCoast: coast, levelMin: f.length > 11 ? num(f[11]) : null, levelMax: f.length > 12 ? num(f[12]) : null,
+           audio: f.length > 13 && f[13] !== "0", fold: f.length > 13 && /^[x/][24]$/.test(f[13]) ? f[13] : "" };
+}
+
+/* what HOME shows, ageMs after the line came: the beat goes on at the line's tempo between lines */
+function homeView(h, ageMs) {
+  if (!h) return null;
+  const v = { bpm: h.bpm > 0 ? (Number.isInteger(h.bpm) ? String(h.bpm) : h.bpm.toFixed(2)) : "-", beat: null, quantum: h.quantum };
+  if (h.bpm > 0 && h.bar !== null) {
+    const pos = h.bar / 100 + (h.transport === "stopped" ? 0 : Math.max(0, ageMs) / 60000 * h.bpm);
+    v.beat = Math.floor(((pos % h.quantum) + h.quantum) % h.quantum);
+  }
+  /* AUDIO mode: the transport is the clock outputs' (core/jank_hold.h): stopped only while held by Stop */
+  v.audio = h.audio;
+  v.mode = h.audio ? "AUDIO" + (h.fold ? " " + h.fold.replace("/", "÷") : "") : "LINK";
+  v.modeNote = h.audio ? "the beat tracker leads" : "Link's session";
+  if (h.audio) v.transport = { stopped: "Held: outputs stopped", playing: "Playing", armed: "Starts once the beat locks, on a bar" }[h.transport];
+  else v.transport = h.bpm > 0 ? { stopped: "Stopped", playing: "Playing", armed: "Starts on the next bar" }[h.transport] : "No Link session yet";
+  v.play = h.transport === "stopped" ? "play" : "stop";
+  v.playText = h.audio ? (v.play === "play" ? "Start outputs" : "Stop outputs") : v.play === "play" ? "Play" : "Stop";
+  v.canPlay = h.audio || h.bpm > 0;
+  v.net = h.net.kind === "jank" ? "MODE JANK " + h.net.group : h.net.up ? "Wi-Fi" : "Wi-Fi (looking)";
+  v.link = String(h.link);
+  v.air = h.net.kind === "jank" ? String(h.air) : "-";
+  v.battery = h.battery === null ? "-" : h.battery + " %";
+  v.level = h.level === null ? "-" : h.level + " dB";
+  v.levelRange = h.levelMin === null || h.levelMax === null ? "input level" : "input level, " + h.levelMin + " to " + h.levelMax + " dB in 3 s";
+  v.levelPct = h.level === null ? 0 : Math.max(0, Math.min(100, (h.level + 60) / 60 * 100));
+  v.conf = h.conf === null ? "-" : h.conf + " %" + (h.confHold ? " HOLD" : h.confCoast ? " COAST" : "");
+  v.confHold = !!h.confHold;
+  v.confCoast = !!h.confCoast;
+  v.confPct = h.conf === null ? 0 : Math.max(0, Math.min(100, h.conf));
+  return v;
+}
+
+/* MIDI bytes in any chunks (the iPhone apps' polyfills hand SysEx over as it comes) -> whole F0 .. F7 messages */
+class SysexIn {
+  constructor() { this.buf = null; }
+  feed(bytes, onMessage) {
+    for (let i = 0; i < bytes.length; i++) {
+      const b = bytes[i];
+      if (b >= 0xf8) continue;                         /* real time: anywhere, the clock included */
+      if (b === 0xf0) { this.buf = [b]; continue; }
+      if (this.buf === null) continue;
+      if (b >= 0x80) {
+        if (b === 0xf7) { this.buf.push(b); onMessage(this.buf); }
+        this.buf = null;
+        continue;
+      }
+      this.buf.push(b);
+      if (this.buf.length > 4096) this.buf = null;
+    }
+  }
+}
+
+/* BLE-MIDI packets, ported from core/jank_blemidi.c (tests/test_page.js checks them against its vectors byte for byte) */
+const BLE_PAYLOAD_MIN = 3;
+function isSysex(m) {
+  if (m.length < 2 || m[0] !== 0xf0 || m[m.length - 1] !== 0xf7) return false;
+  for (let i = 1; i + 1 < m.length; i++) if (m[i] >= 0x80) return false;
+  return true;
+}
+/* the next packet of a whole SysEx m from st.at at payload cap (jbm_sysex_packet), or null */
+function bleSysexPacket(m, st, ms, cap) {
+  if (cap < BLE_PAYLOAD_MIN || st.at >= m.length || !isSysex(m)) return null;
+  const ts = 0x80 | (ms & 0x7f), out = [0x80 | ((ms >> 7) & 0x3f)];
+  let pos = st.at;
+  if (pos === 0) { out.push(ts, 0xf0); pos = 1; }
+  while (pos < m.length) {
+    if (pos === m.length - 1) {
+      if (out.length + 2 > cap) break;
+      out.push(ts, 0xf7);
+    } else {
+      if (out.length + 1 > cap) break;
+      out.push(m[pos]);
+    }
+    pos++;
+  }
+  st.at = pos;
+  return out;
+}
+/* a whole SysEx appended to pkt (jbm_pack): true, or false when it does not fit (pkt unchanged) */
+function blePack(m, ms, pkt, cap) {
+  const ts = 0x80 | (ms & 0x7f);
+  if (!isSysex(m) || (pkt.length ? 0 : 1) + pkt.length + m.length + 2 > cap) return false;
+  if (!pkt.length) pkt.push(0x80 | ((ms >> 7) & 0x3f));
+  pkt.push(ts);
+  for (let i = 0; i + 1 < m.length; i++) pkt.push(m[i]);
+  pkt.push(ts, 0xf7);
+  return true;
+}
+/* the sender's rule (ble_midi.c tx_msg): whole messages packed while they fit, one too big for an empty packet split */
+function bleSend(messages, cap, ms) {
+  const out = [];
+  let pkt = [];
+  for (const m of messages) {
+    if (blePack(m, ms, pkt, cap)) continue;
+    if (pkt.length) { out.push(pkt); pkt = []; }
+    if (blePack(m, ms, pkt, cap)) continue;
+    const st = { at: 0 };
+    let p;
+    while ((p = bleSysexPacket(m, st, ms, cap))) out.push(p);
+  }
+  if (pkt.length) out.push(pkt);
+  return out;
+}
+/* one packet -> the plain MIDI byte stream (jbm_decode): 0, or -1 for a malformed packet */
+function bleDataLen(s) {
+  if (s < 0xf0) return (s & 0xe0) === 0xc0 ? 1 : 2;
+  if (s === 0xf1 || s === 0xf3) return 1;
+  return s === 0xf2 ? 2 : 0;
+}
+class BleMidiIn {
+  constructor() { this.inSysex = false; this.running = 0; }
+  decode(p, emit) {
+    const BAD = -1, n = p.length;
+    const sysexData = (i) => { while (i < n && p[i] < 0x80) emit(p[i++]); return i; };
+    const dataBytes = (i, count) => {
+      for (let j = 0; j < count; j++, i++) {
+        if (i >= n || p[i] >= 0x80) return BAD;
+        emit(p[i]);
+      }
+      return i;
+    };
+    const running = (i) => {
+      if (!this.running) return BAD;
+      emit(this.running);
+      return dataBytes(i, bleDataLen(this.running));
+    };
+    const status = (i) => {
+      const s = p[i++];
+      if (s >= 0xf8) { emit(s); return this.inSysex ? sysexData(i) : i; }
+      if (this.inSysex) {
+        this.inSysex = false;
+        if (s === 0xf7) { emit(s); return i; }
+      }
+      if (s === 0xf7) return i;
+      emit(s);
+      if (s === 0xf0) { this.running = 0; this.inSysex = true; return sysexData(i); }
+      this.running = s < 0xf0 ? s : 0;
+      return dataBytes(i, bleDataLen(s));
+    };
+    let i = 1;
+    if (n < 1 || (p[0] & 0xc0) !== 0x80) { this.inSysex = false; return -1; }
+    if (this.inSysex) i = sysexData(i);
+    while (i !== BAD && i < n) {
+      if (p[i] < 0x80) { i = running(i); continue; }
+      if (++i >= n) { i = BAD; break; }
+      i = p[i] < 0x80 ? running(i) : status(i);
+    }
+    if (i === BAD) { this.inSysex = false; this.running = 0; return -1; }
+    return 0;
+  }
 }
 
 /* one answer: lines up to "ok" or "err ..." */
@@ -237,7 +449,78 @@ function parseAnswer(lines) {
   return { values, units, scans };
 }
 
-/* FM-1s and janks send the same frames: a jank shows only by its MAC prefix */
+function isEnd(line) {
+  return line === "ok" || line.startsWith("err ");
+}
+
+/* The control line over any transport: write(text) puts text on it (as frames), receive(message) takes each whole SysEx that
+   comes back. One command at a time; its answer is the lines up to ok or err. Reports ('J' 'B') go to onPush. */
+class LineClient {
+  constructor(write, timers) {
+    this.write = write;
+    this.timers = timers || { set: (f, ms) => setTimeout(f, ms), clear: (t) => clearTimeout(t) };
+    this.rest = "";
+    this.pending = null;
+    this.queue = Promise.resolve();
+    this.onPush = null;
+  }
+  receive(message) {
+    const push = pushOf(message);
+    if (push) { if (this.onPush) this.onPush(push); return; }
+    const text = sysexToText(message);
+    if (text === null) return;
+    const r = splitLines(this.rest, text);
+    this.rest = r.rest;
+    for (const line of r.lines) {
+      const p = this.pending;
+      if (!p) continue;
+      if (isEnd(line)) p.end(line); else p.lines.push(line);
+    }
+  }
+  send(command, waitMs) {
+    const run = () => new Promise((resolve, reject) => {
+      const p = { lines: [] };
+      const timer = this.timers.set(() => { if (this.pending === p) this.pending = null; reject(new Error("no answer to " + command)); }, waitMs || 2000);
+      p.end = (end) => {
+        this.timers.clear(timer);
+        this.pending = null;
+        if (end === "ok") resolve(parseAnswer(p.lines)); else reject(new Error(end));
+      };
+      p.fail = (e) => { this.timers.clear(timer); this.pending = null; reject(e); };
+      this.pending = p;
+      Promise.resolve().then(() => this.write(command + "\n")).catch(p.fail);
+    });
+    this.queue = this.queue.then(run, run);
+    return this.queue;
+  }
+  close(reason) {
+    if (this.pending) this.pending.fail(new Error(reason || "disconnected"));
+    this.queue = Promise.resolve();
+    this.rest = "";
+  }
+}
+
+/* Web MIDI ports, as the iPhone apps' polyfills give them too (plain objects with forEach; no for..of, no Array.from) */
+function portList(map) {
+  const out = [];
+  if (map && typeof map.forEach === "function") map.forEach((port) => { if (port && port.state !== "disconnected") out.push(port); });
+  return out;
+}
+/* the jank among the ports: "jank" exactly is the USB port; "jank XXXX" a jank over Bluetooth (its BLE name). -> the
+   inputs to choose from, best first, and whether the first is a Bluetooth one */
+function jankPorts(inputs) {
+  const named = inputs.filter((p) => /jank/i.test(p.name || ""));
+  named.sort((a, b) => (b.name === "jank") - (a.name === "jank"));
+  return named;
+}
+function overBluetooth(name) {
+  return /jank/i.test(name || "") && name !== "jank";
+}
+function outputFor(input, outputs) {
+  return outputs.find((o) => o.name === input.name) || outputs.find((o) => /jank/i.test(o.name || "")) || null;
+}
+
+/* the FM-1s and janks heard in a group: a jank shows only by its MAC prefix */
 function peerText(row) {
   return row.janks ? row.units + ", of which " + row.janks + " jank" : String(row.units);
 }
@@ -250,73 +533,111 @@ function tempoCommand(raw) {
   return bpm >= 20 && bpm <= 999 ? "tempo " + value : null;
 }
 
-/* "3 / 4": the beat in the bar, Link's beat count as MIDI start uses it */
-function beatInBar(beat, quantum) {
-  const q = Number(quantum) || 4;
-  if (beat === undefined || !Number.isFinite(Number(beat))) return "-";
-  const b = Math.floor(Number(beat));
-  return (((b % q) + q) % q + 1) + " / " + q;
-}
-
-/* status's bpm is 0 with no session */
-function inSession(v) {
-  return Number(v.bpm || 0) > 0;
-}
-
-function isEnd(line) {
-  return line === "ok" || line.startsWith("err ");
-}
-
 function faultDrops(v) {
   return ["drop_big", "drop_bad", "tx_fail", "queue_full", "drop_foreign"].reduce((sum, k) => sum + Number(v[k] || 0), 0);
 }
 
-/* a setting's command, or null when the value is not one the stick takes */
+/* Bluetooth from `status` (ble_state, ble_left) ageMs after it came; over Bluetooth this phone is the one connected */
+function bleView(v, ageMs, overBle) {
+  if (overBle) return "this phone";
+  if (!v || !v.ble_state) return "-";
+  if (v.ble_state === "connected") return "phone connected";
+  if (v.ble_state !== "window") return "off";
+  const left = Math.max(0, Number(v.ble_left || 0) - Math.floor(Math.max(0, ageMs) / 1000));
+  return left > 0 ? "pairing " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") : "off";
+}
+
+/* the audio lines of `status` for the details */
+function audioView(v) {
+  const heard = v.audio === undefined ? "-" : v.audio_live === "1" ? "sound (AUDIO)" : v.audio === "1" ? "silent (LINK)" : "none (LINK)";
+  return { audio: v.audio_source && v.audio_source !== "none" ? heard + ", " + v.audio_source : heard, outputs: v.outputs || "-",
+           peak_db: v.peak_db ?? "-" };
+}
+
+/* LOW CONFIDENCE on the confidence meter, from `status` (fresh: the age is the caller's) or `get`: the threshold's tick
+   (percent, null: none, KEEP RUNNING or 0) and the note under the number; gated: the outputs are stopped by it (AUDIO mode) */
+function confView(v) {
+  if (!v || v.lowconf === undefined) return { tick: null, note: "confidence", gated: false };
+  const th = Number(v.threshold);
+  const on = v.lowconf === "stop" && th > 0;
+  const gated = on && v.gated === "1" && v.audio_live === "1";
+  const silent = v.silent === "1" && v.audio_live === "1";
+  const note = silent ? "confidence: silence, outputs stopped" : gated ? "confidence: under " + th + " %, outputs stopped"
+             : on ? "confidence (stops under " + th + " %)" : "confidence (keeps running)";
+  return { tick: on ? Math.max(0, Math.min(100, th)) : null, note, gated: gated || silent };
+}
+
+/* a setting's command, or null when the value is not one the jank takes */
 function setCommand(key, raw) {
   const value = String(raw).trim();
   if (key === "offset") {        /* ms, 10 us steps */
     if (!/^-?\d{1,3}(\.\d{1,2})?$/.test(value) || Math.abs(Number(value)) > 100) return null;
     return "set offset " + value;
   }
-  const range = { group: [1, 9], quantum: [1, 16] }[key];
+  const range = { group: [1, 9], quantum: [1, 16], beat_latency: [-300, 300], threshold: [0, 100] }[key];
   if (range) {
     const n = Number(value);
     if (value === "" || !Number.isInteger(n) || n < range[0] || n > range[1]) return null;
     return "set " + key + " " + n;
   }
-  if (key === "name" && !/^[\x20-\x7e]{1,23}$/.test(value)) return null;
-  if (/[\r\n]/.test(value)) return null;
-  return "set " + key + " " + value;
+  const choices = { filter: ["link", "all"], peer: ["on", "off"], transport: ["link", "auto"], beat: ["on", "off"], ble: ["pair", "off", "auto"],
+                    source: ["auto", "line", "usb", "link"], autobar: ["off", "start", "always"], usbmidi: ["on", "off"],
+                    lowconf: ["run", "stop"] }[key];
+  if (choices) return choices.includes(value) ? "set " + key + " " + value : null;
+  if (key === "name" && /^[\x20-\x7e]{1,23}$/.test(value)) return "set name " + value;
+  return null;
+}
+
+/* AUDIO mode's nudges (the device's NO / YES held + UP / DOWN): kind "beat" moves Link's beats half a beat (+: earlier),
+   "ms" the AUDIO IN offset 1 ms (+: every output later) */
+function nudgeCommand(kind, dir) {
+  if (kind === "beat") return "nudge beat " + (dir > 0 ? "+0.5" : "-0.5");
+  return "nudge ms " + (dir > 0 ? "+1" : "-1");
+}
+
+/* what the page says after a nudge's answer (values: its key=value lines). Two layers each (M2h): the PHASE (beats) on top
+   of AUTO BAR's bar, the AUDIO SHIFT (ms) on top of the auto latency; 0 is AUTO. (A firmware before M2h: no lat_trim) */
+function nudgeSaid(kind, dir, values) {
+  const sign = (x) => (x > 0 ? "+" : "") + x;
+  if (kind === "beat") {
+    const total = Number(values.nudge_beats);
+    return total ? "Phase " + sign(total) + " beats, on top of AUTO BAR's bar." : "Phase: AUTO (AUTO BAR's bar alone).";
+  }
+  if (values.lat_trim === undefined) return "Audio in offset " + sign(Number(values.beat_latency)) + " ms.";
+  const trim = Number(values.lat_trim);
+  return trim ? "Audio shift " + sign(trim) + " ms, on top of the auto " + values.lat_auto + " ms." : "Audio shift: AUTO (" + values.lat_auto + " ms).";
+}
+
+const LAT_SRC = { usb: "(the computer's)", line: "(the line in's)" };   /* beat_latency_src; a hosted device: host:VID:PID */
+/* the latency field is the auto base (`set beat_latency`); its note says the source and the AUDIO SHIFT on top */
+function latField(v) { return v.lat_auto !== undefined ? v.lat_auto : v.beat_latency; }
+function latNote(src, v) {
+  const trim = Number(v.lat_trim || 0);
+  return (LAT_SRC[src] || "(" + src + ")") + (trim ? " + audio shift " + (trim > 0 ? "+" : "") + trim + " ms" : "");
+}
+
+/* the error answers of the nudges, in words */
+function nudgeError(message) {
+  return { "err link mode": "The nudges are for AUDIO mode (music heard).", "err no beat yet": "No beat to nudge yet: the tracker has not locked.",
+           "err busy": "The jank is busy: try again." }[message]
+    || (/^err nudge beat at its limit/.test(message) ? "The beat is nudged 3 beats already: that is the limit." : message);
 }
 </script>
 
 <script id="ui">
 const $ = (id) => document.getElementById(id);
-const SCAN_WAIT_MS = 4000;
-const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset"];
-const STATS = ["peers", "rssi", "channel", "link_peers", "link_ip", "midi_ticks", "midi_resync", "air_in", "usb_out", "usb_in", "air_out", "drop_filter", "lat_air_us", "lat_usb_us"];
-let port = null, writer = null, poll = null, pendingEnd = null, pendingLines = [], queue = Promise.resolve();
-let lastGet = {}, lastStatus = {}, lastScans = [];
+const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency", "autobar", "usbmidi", "lowconf",
+                  "threshold", "source", "ble"];
+const BLE_SVC = "03b80e5a-ede8-4b33-a751-6ce34ec4c700", BLE_CHR = "7772e5db-3868-4112-a1a9-f2669d106bf3";
+const BLE_CAP = 20;                   /* write payload: the default ATT MTU's, which every link takes (Web Bluetooth does not say the MTU) */
+const HOME_EVERY_USB_MS = 300, STATUS_EVERY_MS = 1500, HOME_STALE_MS = 3000, BLE_WAIT_MS = 5000;
+const PAIR_WATCH_MS = 125000;         /* after Pair now, `status` is polled for the window's countdown this long */
+const S = { line: null, kind: null, ble: false, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastScans: [], timers: [],
+            lastStatus: null, statusAt: 0, pairAt: -Infinity };
 
 function say(text, bad) {
   $("msg").textContent = text;
   $("msg").classList.toggle("bad", !!bad);
-}
-
-function send(command, waitMs = 2000) {
-  const run = () => new Promise((resolve, reject) => {
-    pendingLines = [];
-    const timer = setTimeout(() => { pendingEnd = null; reject(new Error("no answer to " + command)); }, waitMs);
-    pendingEnd = (end) => { clearTimeout(timer); pendingEnd = null; end === "ok" ? resolve(parseAnswer(pendingLines)) : reject(new Error(end)); };
-    writer.write(new TextEncoder().encode(command + "\n")).catch(reject);
-  });
-  queue = queue.then(run, run);
-  return queue;
-}
-
-function onLine(line) {
-  if (!pendingEnd) return;
-  if (isEnd(line)) pendingEnd(line); else pendingLines.push(line);
 }
 
 function cells(row, values) {
@@ -328,29 +649,83 @@ function cells(row, values) {
   return row;
 }
 
-function showTransport(v) {
-  const on = inSession(v);
-  $("t-bpm").textContent = on ? Number(v.bpm).toFixed(Number.isInteger(Number(v.bpm)) ? 0 : 2) : "-";
-  $("t-beat").textContent = on ? beatInBar(v.beat, lastGet.quantum) : "-";
-  $("t-set").disabled = !port || !on;
-  $("t-play").disabled = !port || !on;
-  $("t-play").textContent = v.playing === "1" ? "Stop" : "Play";
-  $("t-state").textContent = !port ? "-"
-    : on ? (v.playing === "1" ? "Playing" : "Stopped") + " with " + v.link_peers + " Link peer" + (v.link_peers === "1" ? "" : "s") + ". Tempo and play / stop change the whole session."
-    : "No Link session yet: the tempo and play / stop come from the group once a peer is heard.";
+function send(command, waitMs) {
+  if (!S.line) return Promise.reject(new Error("not connected"));
+  return S.line.send(command, waitMs || (S.ble ? BLE_WAIT_MS : 2000));
+}
+
+function showHome() {
+  const v = homeView(S.lastHome, performance.now() - S.homeAt);
+  const boxes = $("h-boxes");
+  const q = v ? v.quantum : 0;
+  if (boxes.children.length !== q) boxes.replaceChildren(...Array.from({ length: q }, () => document.createElement("span")));
+  for (let i = 0; i < q; i++) boxes.children[i].classList.toggle("on", v.beat === i);
+  $("h-bpm").textContent = v ? v.bpm : "-";
+  $("h-transport").textContent = v ? v.transport : "-";
+  $("h-mode").textContent = v ? v.mode : "-";
+  $("h-mode-note").textContent = v ? v.modeNote : "mode";
+  $("h-level-range").textContent = v ? v.levelRange : "input level";
+  $("h-ble").textContent = bleView(S.lastStatus, performance.now() - S.statusAt, S.ble);
+  for (const k of ["net", "link", "air", "level", "conf"]) $("h-" + k).textContent = v ? v[k] : "-";
+  $("h-batt").textContent = v ? v.battery : "-";
+  $("h-level-bar").style.width = (v ? v.levelPct : 0) + "%";
+  $("h-conf-bar").style.width = (v ? v.confPct : 0) + "%";
+  const fresh = S.lastStatus && performance.now() - S.statusAt < HOME_STALE_MS;
+  const c = confView(fresh ? S.lastStatus : S.lastGet);     /* (a `get` has the settings, no gate) */
+  $("h-conf-note").textContent = c.note;
+  $("h-conf-tick").classList.toggle("hide", c.tick === null);
+  if (c.tick !== null) $("h-conf-tick").style.left = c.tick + "%";
+  $("h-conf-meter").classList.toggle("gated", c.gated);
+  $("h-conf-meter").classList.toggle("hold", !!(v && v.confHold));
+  if (v && v.confHold) $("h-conf-note").textContent = "confidence: holding, no beats to judge (the outputs keep running)";
+  $("h-conf-meter").classList.toggle("coast", !!(v && v.confCoast));
+  if (v && v.confCoast) $("h-conf-note").textContent = "confidence: coasting under the threshold (the outputs keep running on the follower's tempo and phase)";
+  const on = !!(S.line && S.lastHome && S.lastHome.bpm > 0);
+  $("t-set").disabled = !on;
+  $("t-play").disabled = !(S.line && v && v.canPlay);
+  $("t-play").textContent = v ? v.playText : "Play";
+  for (const id of ["t-up", "t-down"]) {         /* AUDIO mode: the fold, x2 / ÷2 of the tracked tempo (`fold`) */
+    $(id).classList.toggle("hide", !(v && v.audio));
+    $(id).disabled = !(S.line && v && v.audio);
+  }
+  $("nudges").classList.toggle("hide", !(v && v.audio));   /* AUDIO mode: the nudges (`nudge beat`, `nudge ms`) */
+  for (const id of ["n-beat-down", "n-beat-up", "n-ms-down", "n-ms-up"]) $(id).disabled = !(S.line && v && v.audio);
+}
+
+function takeHome(text) {
+  const h = parseHome(text);
+  if (!h) return;
+  S.lastHome = h;
+  S.homeAt = performance.now();
+}
+
+function showSettings({ values: v }) {
+  S.lastGet = v;
+  if (document.activeElement !== $("net-mode") && v.net) $("net-mode").value = v.net;
+  if (document.activeElement !== $("net-ssid") && v.ssid !== undefined) $("net-ssid").value = v.ssid;
+  for (const key of SETTINGS) {
+    const el = $("c-" + key);
+    if (document.activeElement !== el && v[key] !== undefined) el.value = key === "beat_latency" ? latField(v) : v[key];
+  }
+  $("net-state").textContent = networkLine(v);
+  if (v.beat_latency_src) $("c-beat_latency_src").textContent = latNote(v.beat_latency_src, v);
+  $("s-version").textContent = v.version ? "Version " + v.version + ", address " + v.mac : "-";
 }
 
 function showStatus({ values: v, units }) {
-  lastStatus = v;
-  for (const key of STATS) $("s-" + key).textContent = v[key] ?? "-";
-  $("s-usb").textContent = v.usb === "1" ? "connected" : "none";
+  S.lastStatus = v;
+  S.statusAt = performance.now();
+  const a = audioView(v);
+  for (const key of ["audio", "outputs", "peak_db"]) $("s-" + key).textContent = a[key];
+  for (const key of ["rssi", "channel", "link_ip", "midi_ticks", "midi_resync", "air_in", "air_out"]) $("s-" + key).textContent = v[key] ?? "-";
+  $("s-ble_state").textContent = v.ble_state ? v.ble_state + (v.ble_state === "window" ? ", " + v.ble_left + " s" : "") : "not in this build";
   $("s-drops").textContent = faultDrops(v);
   $("units").replaceChildren(...units.map((u) => cells(document.createElement("tr"), [u.mac, u.rssi, u.age, u.frames])));
-  showTransport(v);
+  $("net-state").textContent = networkLine({ ...S.lastGet, ...v });
 }
 
 function showGroups(scans) {
-  lastScans = scans;
+  S.lastScans = scans;
   const home = $("c-group").value;
   $("groups").replaceChildren(...scans.map((g) => {
     const on = String(g.group) === home;
@@ -360,11 +735,11 @@ function showGroups(scans) {
     if (!on) {
       action = document.createElement("button");
       action.textContent = "Join";
-      action.disabled = !port;
+      action.disabled = !S.line;
       action.addEventListener("click", () => {
         $("c-group").value = String(g.group);
         change("group");
-        showGroups(lastScans);
+        showGroups(S.lastScans);
       });
     }
     return cells(row, [g.group, g.channel, peerText(g), g.rssi, action]);
@@ -376,34 +751,12 @@ async function scan() {
   $("scan").disabled = true;
   $("scan-result").textContent = "Scanning...";
   try {
-    showGroups((await send("scan", SCAN_WAIT_MS)).scans);
+    showGroups((await send("scan", S.ble ? 8000 : 4000)).scans);
   } catch (e) {
     $("scan-result").textContent = "";
     say(e.message, true);
   }
-  $("scan").disabled = !port;
-}
-
-function showSettings({ values: v }) {
-  lastGet = v;
-  const form = { "net-mode": v.net, "net-ssid": v.ssid };
-  for (const [id, value] of Object.entries(form))
-    if (document.activeElement !== $(id) && value !== undefined) $(id).value = value;
-  for (const key of SETTINGS) {
-    const el = $("c-" + key);
-    if (document.activeElement !== el && v[key] !== undefined) el.value = v[key];
-  }
-  $("s-version").textContent = v.version ? "Version " + v.version + ", address " + v.mac : "-";
-}
-
-async function pollOnce() {
-  try {
-    const status = await send("status");
-    showStatus(status);
-    $("net-state").textContent = networkLine({ ...lastGet, ...status.values });
-  } catch (e) {
-    say(e.message, true);
-  }
+  $("scan").disabled = !S.line;
 }
 
 async function change(key) {
@@ -415,7 +768,7 @@ async function change(key) {
   try {
     await send(command);
     showSettings(await send("get"));
-    say("Saved on the stick.");
+    say("Saved on the jank.");
   } catch (e) {
     say(e.message, true);
   }
@@ -425,83 +778,169 @@ async function session(command, done) {
   try {
     await send(command);
     say(done);
-    pollOnce();
+    if (!S.ble) takeHome((await send("home")).values.home);
   } catch (e) {
-    say(e.message === "err no session" ? "No Link session to change yet." : e.message, true);
+    say(e.message === "err no session" ? "No Link session to change yet." : e.message === "err link mode" ? "x2 and ÷2 are for AUDIO mode (music heard)." : e.message, true);
   }
 }
 
-function setTempo() {
-  const command = tempoCommand($("t-tempo").value);
-  if (!command) {
-    say("A tempo is 20 to 999 BPM.", true);
-    return;
+/* USB: HOME and the details by polling; Bluetooth: HOME comes by itself (a push), polled only when it stops coming */
+async function pollHome() {
+  if (!S.line) return;
+  if (S.ble && performance.now() - S.homeAt < HOME_STALE_MS) return;
+  try {
+    takeHome((await send("home")).values.home);
+  } catch (e) {
+    say(e.message, true);
   }
-  session(command, "Tempo sent to the session.").then(() => { $("t-tempo").value = ""; });
+}
+async function pollStatus() {
+  if (!S.line || S.ble || (!$("more").open && performance.now() - S.pairAt > PAIR_WATCH_MS)) return;
+  try {
+    showStatus(await send("status"));
+  } catch (e) {
+    say(e.message, true);
+  }
+}
+
+function setConnected(kind, ble) {
+  S.kind = kind;
+  S.ble = ble;
+  $("link-state").textContent = kind ? (ble ? "Bluetooth" : "USB") + (kind === "ble" ? " (Web Bluetooth)" : "") : "not connected";
+  $("c-off").classList.toggle("hide", !kind);
+  $("more").classList.toggle("hide", ble);
+  $("ble-close").classList.toggle("hide", !ble);
+  $("ble-pair").classList.toggle("hide", ble);
+  $("net-pass").disabled = ble;
+  $("net-note").textContent = ble ? "The Wi-Fi password goes over USB only: the Bluetooth link is not encrypted. A saved password stays." : "2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.";
+  for (const id of ["scan", "net-apply", "bootloader", "ble-pair", "ble-close"]) $(id).disabled = !kind;
 }
 
 function disconnected(text) {
-  clearInterval(poll);
-  poll = null;
-  if (port && "onmidimessage" in port) port.onmidimessage = null;
-  port = writer = null;
-  pendingEnd = null;
-  queue = Promise.resolve();
-  $("connect").textContent = "Connect";
-  for (const id of ["bootloader", "scan", "net-apply"]) $(id).disabled = true;
-  showTransport({});
-  showGroups(lastScans);
-  say(text, true);
+  for (const t of S.timers) clearInterval(t);
+  S.timers = [];
+  if (S.line) S.line.close(text);
+  if (S.drop) S.drop();
+  S.line = null;
+  S.drop = null;
+  S.lastHome = null;
+  setConnected(null, false);
+  showHome();
+  showGroups(S.lastScans);
+  if (text) say(text, true);
 }
 
-/* the first answer after connecting, tried twice */
-async function firstAnswer() {
+async function started(line, kind, ble, drop) {
+  S.line = line;
+  S.drop = drop;
+  line.onPush = (p) => { if (p.type === JX_PUSH_HOME) takeHome(p.text); };
+  setConnected(kind, ble);
   try {
-    return await send("get");
+    let got;
+    try { got = await send("get"); } catch (e) { got = await send("get"); }   /* the first answer, tried twice */
+    showSettings(got);
+    say(ble ? "Connected over Bluetooth: home and settings." : "Connected.");
+    await pollHome();
   } catch (e) {
-    return send("get");
-  }
-}
-
-/* an S3: its USB MIDI port. true when one is there */
-async function openMidi() {
-  if (!navigator.requestMIDIAccess) return false;
-  const access = await navigator.requestMIDIAccess({ sysex: true });
-  const input = [...access.inputs.values()].find(isJankPort);
-  const output = [...access.outputs.values()].find(isJankPort);
-  if (!input || !output) return false;
-  let rest = "";
-  input.onmidimessage = (ev) => {
-    const text = sysexToText(ev.data);
-    if (text === null) return;
-    const r = splitLines(rest, text);
-    rest = r.rest;
-    r.lines.forEach(onLine);
-  };
-  access.onstatechange = (ev) => {
-    if (ev.port.id === input.id && ev.port.state === "disconnected" && port === input) disconnected("The stick went away.");
-  };
-  port = input;
-  writer = {
-    write: async (bytes) => textToSysex(new TextDecoder().decode(bytes)).forEach((frame) => output.send(frame)),
-  };
-  return true;
-}
-
-async function connect() {
-  if (!navigator.requestMIDIAccess) {
-    say("This browser has no Web MIDI: use Chrome or Edge on a computer.", true);
+    disconnected(e.message + (ble ? "" : ". If the app asks for SysEx, turn it on."));
     return;
   }
+  S.timers.push(setInterval(showHome, 50));
+  S.timers.push(setInterval(pollHome, S.ble ? 1000 : HOME_EVERY_USB_MS));
+  S.timers.push(setInterval(pollStatus, STATUS_EVERY_MS));
+}
+
+/* Web MIDI: the USB port, or a jank the iPhone app connected over Bluetooth. Calls kept to what the apps' polyfills take:
+   one .then(ok, fail) on requestMIDIAccess, forEach over the ports, onmidimessage, send in a try */
+function midiAccess() {
+  return new Promise((resolve, reject) => {
+    try { navigator.requestMIDIAccess({ sysex: true }).then(resolve, reject); } catch (e) { reject(e); }
+  });
+}
+
+function attachMidi(access, input) {
+  const output = outputFor(input, portList(access.outputs));
+  if (!output) throw new Error("No output port next to " + input.name);
+  const sysex = new SysexIn();
+  const ble = overBluetooth(input.name);
+  const line = new LineClient(async (text) => {
+    for (const frame of textToSysex(text)) {
+      try { output.send(frame); } catch (e) { throw new Error("The MIDI port refused SysEx: turn SysEx on in the app's settings"); }
+    }
+  });
+  input.onmidimessage = (ev) => {
+    const d = ev.data, bytes = new Uint8Array(d.length);
+    for (let i = 0; i < d.length; i++) bytes[i] = d[i];
+    sysex.feed(bytes, (m) => line.receive(m));
+  };
+  access.onstatechange = () => {
+    if (!portList(access.inputs).some((p) => p.id === input.id)) disconnected("The jank's MIDI port went away.");
+  };
+  started(line, "midi", ble, () => { input.onmidimessage = null; access.onstatechange = null; });
+}
+
+async function connectMidi() {
+  if (!navigator.requestMIDIAccess) {
+    say("No Web MIDI here: use Chrome or Edge on a computer, or an iPhone MIDI browser app.", true);
+    return;
+  }
+  disconnected();
   try {
-    if (!(await openMidi())) throw new Error("No jank USB MIDI port found. Is the stick plugged in?");
-    showSettings(await firstAnswer());
-    $("connect").textContent = "Connected";
-    for (const id of ["bootloader", "scan", "net-apply"]) $(id).disabled = false;
-    say("Connected.");
-    poll = setInterval(pollOnce, 1000);
-    pollOnce();
-    scan();
+    const access = await midiAccess();
+    const inputs = portList(access.inputs);
+    const jank = jankPorts(inputs);
+    const choices = jank.length ? jank : inputs;
+    if (!choices.length) throw new Error("No MIDI port at all. Is the jank plugged in, or connected in the app's Bluetooth MIDI settings?");
+    if (choices.length > 1 || !jank.length) {
+      $("c-ports").replaceChildren(...choices.map((p, i) => new Option(p.name || "port " + (i + 1), String(i))));
+      $("c-ports-box").classList.remove("hide");
+      $("c-ports").onchange = () => { disconnected(); attachMidi(access, choices[Number($("c-ports").value)]); };
+    } else {
+      $("c-ports-box").classList.add("hide");
+    }
+    attachMidi(access, choices[0]);
+  } catch (e) {
+    disconnected(e && e.message ? e.message : "No MIDI access (code " + (e && e.code) + ").");
+  }
+}
+
+/* Web Bluetooth: Chrome on a computer or Android, straight to the BLE-MIDI service, packets made here */
+async function connectBle() {
+  if (!navigator.bluetooth) {
+    say("No Web Bluetooth here (Chrome on a computer or Android has it). On an iPhone, use a MIDI browser app and MIDI port.", true);
+    return;
+  }
+  disconnected();
+  try {
+    const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE_SVC] }, { namePrefix: "jank" }], optionalServices: [BLE_SVC] });
+    const server = await device.gatt.connect();
+    const chr = await (await server.getPrimaryService(BLE_SVC)).getCharacteristic(BLE_CHR);
+    const decoder = new BleMidiIn(), sysex = new SysexIn();
+    let writing = Promise.resolve();
+    const line = new LineClient((text) => {
+      const ms = Math.floor(performance.now()) & 0x1fff;
+      for (const pkt of bleSend(textToSysex(text), BLE_CAP, ms)) {
+        const v = new Uint8Array(pkt);
+        /* one write at a time; a failed one fails its command, not the ones after it */
+        writing = writing.catch(() => undefined).then(() => (chr.writeValueWithoutResponse ? chr.writeValueWithoutResponse(v) : chr.writeValue(v)));
+      }
+      return writing;
+    });
+    const onValue = (ev) => {
+      const dv = ev.target.value, pkt = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+      const bytes = [];
+      decoder.decode(pkt, (b) => bytes.push(b));
+      sysex.feed(bytes, (m) => line.receive(m));
+    };
+    const onGone = () => disconnected("The Bluetooth link ended.");
+    chr.addEventListener("characteristicvaluechanged", onValue);
+    device.addEventListener("gattserverdisconnected", onGone);
+    await chr.startNotifications();
+    started(line, "ble", true, () => {
+      chr.removeEventListener("characteristicvaluechanged", onValue);
+      device.removeEventListener("gattserverdisconnected", onGone);
+      if (device.gatt.connected) device.gatt.disconnect();
+    });
   } catch (e) {
     disconnected(e.message);
   }
@@ -509,36 +948,65 @@ async function connect() {
 
 for (let g = 1; g <= 9; g++) $("c-group").add(new Option("Group " + g + " (channel " + [1, 6, 11][(g - 1) % 3] + ")", String(g)));
 for (const key of SETTINGS) $("c-" + key).addEventListener("change", () => change(key));
-$("connect").addEventListener("click", connect);
+$("c-midi").addEventListener("click", connectMidi);
+$("c-bluetooth").addEventListener("click", connectBle);
+$("c-off").addEventListener("click", () => disconnected("Disconnected."));
+$("scan").addEventListener("click", scan);
+$("t-set").addEventListener("click", () => {
+  const command = tempoCommand($("t-tempo").value);
+  if (!command) { say("A tempo is 20 to 999 BPM.", true); return; }
+  session(command, "Tempo sent to the session.").then(() => { $("t-tempo").value = ""; });
+});
+$("t-up").addEventListener("click", () => session("fold x2", "Tempo doubled (x2)."));
+$("t-down").addEventListener("click", () => session("fold /2", "Tempo halved (÷2)."));
+async function nudge(kind, dir) {
+  try {
+    const { values } = await send(nudgeCommand(kind, dir));
+    say(nudgeSaid(kind, dir, values));
+    if (kind === "ms" && document.activeElement !== $("c-beat_latency")) $("c-beat_latency").value = latField(values);
+  } catch (e) {
+    say(nudgeError(e.message), true);
+  }
+}
+$("n-beat-down").addEventListener("click", () => nudge("beat", -1));
+$("n-beat-up").addEventListener("click", () => nudge("beat", 1));
+$("n-ms-down").addEventListener("click", () => nudge("ms", -1));
+$("n-ms-up").addEventListener("click", () => nudge("ms", 1));
+$("t-play").addEventListener("click", () => {
+  const v = homeView(S.lastHome, 0);
+  const play = !v || v.play === "play";
+  const done = v && v.audio ? (play ? "Outputs start once the beat locks, on the next bar." : "Outputs stopped.")
+    : play ? "The session starts on the next bar." : "Session stopped.";
+  session(play ? "play" : "stop", done);
+});
+$("ble-pair").addEventListener("click", async () => {
+  try { await send("ble pair"); S.pairAt = performance.now(); say("Bluetooth is open for two minutes: connect the phone now."); pollStatus(); } catch (e) { say(e.message === "err ble is off" ? "Bluetooth is set to off: change the setting first." : e.message, true); }
+});
+$("ble-close").addEventListener("click", async () => {
+  try { await send("ble close"); } catch (e) { /* the link may end before the answer: that is the point */ }
+  disconnected("Bluetooth is off on the jank. Three clicks open it again.");
+});
 $("net-apply").addEventListener("click", async () => {
-  const commands = networkCommands($("net-mode").value, $("net-ssid").value, $("net-pass").value, lastGet.pass === "set");
+  const commands = networkCommands($("net-mode").value, $("net-ssid").value, $("net-pass").value, S.lastGet.pass === "set", S.ble);
   if (!commands) {
-    say("Check the Wi-Fi name, and that the password is 8 to 63 characters.", true);
+    say(S.ble ? "Check the Wi-Fi name. The password can only be set over USB." : "Check the Wi-Fi name, and that the password is 8 to 63 characters.", true);
     return;
   }
   try {
     for (const command of commands) await send(command);
     $("net-pass").value = "";
-    say("The stick is restarting. Give it a few seconds.");
+    say("The jank is restarting. Give it a few seconds.");
   } catch (e) {
     say(e.message, true);
   }
-});
-$("scan").addEventListener("click", scan);
-$("t-set").addEventListener("click", setTempo);
-$("t-tempo").addEventListener("keydown", (e) => { if (e.key === "Enter") setTempo(); });
-$("t-play").addEventListener("click", () => {
-  const play = lastStatus.playing !== "1";
-  session(play ? "play" : "stop", play ? "Session started." : "Session stopped.");
 });
 $("bootloader").addEventListener("click", async () => {
-  try {
-    await send("bootloader");
-  } catch (e) {
-    say(e.message, true);
-  }
-  disconnected("The stick restarted for flashing. Unplug it and plug it back in to run again.");
+  try { await send("bootloader"); } catch (e) { say(e.message, true); }
+  disconnected("The jank restarted for flashing. Unplug it and plug it back in to run again.");
 });
+$("c-bluetooth").classList.toggle("hide", !navigator.bluetooth);
+setConnected(null, false);
+showHome();
 </script>
 </body>
 </html>

@@ -11,6 +11,7 @@ against the firmware's own C logic (tests/test_ota.py).
 """
 import argparse
 import os
+import re
 import struct
 import sys
 import time
@@ -23,10 +24,17 @@ CHIP_ESP32S3 = 9
 REPLY_TIMEOUT = 2.0         # seconds for one answer
 TRIES = 6                   # sends of one chunk before giving up
 BACK_TIMEOUT = 60.0         # seconds for the stick to come back after the restart
+STOP_FIRST = ("the stick is playing (the Link session or its MIDI clock): updates write flash, which stalls USB and "
+              "Wi-Fi, so they wait. Stop the session (Live's transport, or jank's stop), then run this again")
 
 
 class OtaError(Exception):
     pass
+
+
+# What the stick answers to an `ota` line (core/jank_ota.c): "ok <offset>" ("ok <offset> <chunk>" to begin) or "err <name> <offset>".
+# Anything else on the port is another client's: the bare "ok" that ends every other answer (get, beat, status), their errors.
+OTA_ANSWER = re.compile(r"^(ok( \d+){1,2}|err (busy|size|arg|state|gap|crc|header|short|idle|playing)( \d+)?)$")
 
 
 def frame(text):
@@ -87,7 +95,7 @@ class Uploader:
             end = time.monotonic() + REPLY_TIMEOUT
             while time.monotonic() < end:
                 line = self.recv(max(0.0, end - time.monotonic()))
-                if line is not None and (line.startswith("ok") or line.startswith("err")):
+                if line is not None and OTA_ANSWER.match(line):      # (others on the port, e.g. a bare "ok", are skipped)
                     return line
         raise OtaError("no answer to %r" % text.split(" ")[0:2])
 
@@ -98,6 +106,8 @@ class Uploader:
             self.ask("ota abort")
             answer = self.ask(line)
         parts = answer.split()
+        if answer.startswith("err playing"):
+            raise OtaError(STOP_FIRST)
         if parts[0] != "ok" or len(parts) < 3:
             raise OtaError("the stick refused: %s" % answer)
         return min(CHUNK, int(parts[2]))
@@ -112,11 +122,15 @@ class Uploader:
                 if parts[0] == "ok":
                     pos, bad = int(parts[1]), 0
                     self.progress(pos, len(image))
+                elif answer.startswith("err playing"):
+                    raise OtaError(STOP_FIRST)
                 elif parts[1] in ("gap", "crc") and bad < TRIES:
                     pos, bad = int(parts[2]), bad + 1     # go on from where the stick is
                 else:
                     raise OtaError("the stick stopped the transfer: %s" % answer)
             answer = self.ask("ota end")
+            if answer.startswith("err playing"):
+                raise OtaError(STOP_FIRST)
             if not answer.startswith("ok"):
                 raise OtaError("the image was not accepted: %s" % answer)
         except (OtaError, KeyboardInterrupt):
