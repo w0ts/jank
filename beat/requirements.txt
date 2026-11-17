@@ -16,3 +16,4 @@ torchaudio
 # BeatNet is installed with --no-deps: it pins madmom from PyPI (Python < 3.10 only) and needs pyaudio only for live input
 sounddevice
 LinkPython-extern
+pyobjc-framework-MediaPlayer; sys_platform == "darwin"   # live.player media keys (macOS only; pulls pyobjc-core, Cocoa, AVFoundation)

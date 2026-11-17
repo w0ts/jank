@@ -56,6 +56,31 @@ ok(tick(fb) === 0, 'no estimator: nothing');
   ok(cells.every(([x, y]) => at(empty, x, y) === 0), 'HOLD at 0: no fill');
 }
 
+// COAST: the outputs run while the confidence is under the threshold (the robust follower coasts): the CF bar is hatched and says COAST
+{
+  const draw = extra => { const f = new Uint8Array(W * OLED.H); OLED.draw(f, OLED.create(), ctx(null, extra), 0); return f; };
+  const at = (f, x, y) => f[y * W + x];
+  const coast = draw({ conf: 0.9, th: 99, running: true }), stopped = draw({ conf: 0.9, th: 99, running: false });
+  const above = draw({ conf: 0.9, th: 80, running: true }), held = draw({ conf: 0.9, th: 99, running: true, confHold: true });
+  const cells = [];
+  for (let y = 46; y < 54; y++) for (let x = 104; x < 112; x++) cells.push([x, y]);     // inside the 90 % fill, clear of the text and the tick
+  ok(cells.every(([x, y]) => at(stopped, x, y) === 1), 'stopped under the threshold: the solid fill, as before');
+  ok(cells.every(([x, y]) => at(coast, x, y) === ((x + y) % 2 === 0 ? 1 : 0)), 'COAST: the CF bar is a checkerboard');
+  const bar = f => f.slice(44 * W, 56 * W);               // the CF bar's rows (the transport icon above differs with running)
+  ok(bar(above).every((v, i) => v === bar(draw({ conf: 0.9, th: 80, running: false }))[i]), 'running above the threshold: as before');
+  const textDiff = (a, b) => { let n = 0; for (let x = 30; x < 100; x++) for (let y = 46; y < 53; y++) n += at(a, x, y) !== at(b, x, y) ? 1 : 0; return n; };
+  ok(textDiff(coast, held) > 0, 'COAST and HOLD are written differently');
+  // the label stays readable on the hatched bar (a checkerboard under XOR-ed text was garbage): a cleared box, so far fewer lit pixels than a checkerboard's half
+  const litShare = f => { let n = 0, t = 0; for (let y = 46; y < 53; y++) for (let x = 5; x < 60; x++) { t++; n += at(f, x, y) ? 1 : 0; } return n / t; };
+  ok(litShare(coast) < 0.4 && litShare(coast) > 0.1, 'COAST: the label sits on a cleared box');
+  ok(litShare(held) < 0.4 && litShare(held) > 0.1, 'HOLD: the same');
+  // the IN bar's min / max lines do not run through its label
+  const withLines = draw({ conf: 0.9, th: 80, running: false, levelDb: -8, levelMin: -50, levelMax: -3 });
+  const noLines = draw({ conf: 0.9, th: 80, running: false, levelDb: -8, levelMin: -90, levelMax: -90 });
+  const labelBox = f => { let n = 0; for (let y = 34; y < 40; y++) for (let x = 5; x < 45; x++) n += at(f, x, y); return n; };
+  ok(labelBox(withLines) === labelBox(noLines), 'IN: a min line in the label leaves the letters alone');
+}
+
 // the menu: AUTO BAR right after LINK TRANSPORT, YES on ON (unchanged) picks it again
 const ui = OLED.create();
 const c = ctx({ state: 'manual', conf: 0 });

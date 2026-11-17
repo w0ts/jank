@@ -7,6 +7,7 @@ The page is served on 127.0.0.1 only."""
 from __future__ import annotations
 
 import argparse
+import random
 import json
 import sys
 import threading
@@ -37,6 +38,8 @@ TRACKS_DIR = Path.home() / "Music" / "Tracks"
 ACCURACY_DIR = ROOT / "runs" / "accuracy"      # player --xiao: one CSV a day of the accuracy windows
 NUDGE_DIR = ROOT / "runs" / "downbeat"         # one JSON line per NUDGE BEAT: hand labels for the downbeat refit
 DEFAULT_PORT = 8791
+DEFAULT_LATENCY_S = 0.1       # the speakers' and the jank output's stream latency: measured to ride out the Mac's late callbacks
+PREVIOUS_RESTART_S = 3.0      # the previous key restarts a track played longer than this, else goes back one
 TAB_MAX_S = 2.0            # one tab_audio post carries at most this much audio (the page sends ~0.1 s)
 MAX_OFFSET_MS = 200.0
 FOLDS = (0.25, 0.5, 1.0, 2.0, 4.0)   # x2 / /2 steps, two either way
@@ -76,6 +79,10 @@ class App:
         self.speaker_name = ""   # the speakers' device (--xiao): a wireless one makes the suggested beat_latency unsure
         self.xiao = None     # live.xiao.XiaoOutput with --xiao: the track's mid also goes to the jank XIAO
         self.bench = None    # live.bench.XiaoBench with --xiao: the accuracy of the XIAO, this tracker and Link
+        self.queue_paths: list[str] = []     # the page's list (what "next" follows there) and its "then" choice (next / random / stop)
+        self.queue_mode = "next"
+        self.rng = random.Random()
+        self.stall = None    # live.audiostats.StallWatch: how late a sleeping thread wakes (the GIL), gc pauses
         self.nudge_dir: Path | None = None   # the nudge log's folder (main: NUDGE_DIR); None: no log
 
     def status(self) -> dict:
@@ -97,6 +104,8 @@ class App:
             "bar": bar_status(es.bar, self.controller.bar_moves),
             "follow": self.engine.follow_status() if hasattr(self.engine, "follow_status") else None,
             "tab": self.source.tab_active(),
+            "stall": self.stall.snapshot() if self.stall is not None else None,
+            "speaker_cb": getattr(getattr(self.source, "cb_stats", None), "snapshot", lambda: None)(),
             **self._latency_status(),
             "bench": self.bench.status() if self.bench is not None else None,
         }
@@ -154,8 +163,50 @@ class App:
         with (self.nudge_dir / f"nudges-{time.strftime('%Y%m%d')}.jsonl").open("a") as f:
             f.write(json.dumps(row) + "\n")
 
+    def media_command(self, name: str) -> bool:
+        """A media key (live/mediakeys.py): play / pause / toggle / next / previous. False: nothing to do (no track, no list)."""
+        st = self.source.state()
+        if name in ("play", "pause", "toggle"):
+            if not st.path:
+                return False
+            self.source.set_playing({"play": True, "pause": False, "toggle": not st.playing}[name])
+            return True
+        if name == "previous" and st.path and st.position_s > PREVIOUS_RESTART_S:
+            self.source.seek(0.0)
+            return True
+        if name not in ("next", "previous"):
+            raise KeyError(name)
+        paths = self.queue_paths or [r["path"] for r in self.library]
+        if not paths:
+            return False
+        if name == "next" and self.queue_mode == "random":
+            others = [p for p in paths if p != st.path]
+            target = self.rng.choice(others or paths)
+        else:
+            step = 1 if name == "next" else -1
+            target = paths[(paths.index(st.path) + step) % len(paths)] if st.path in paths else paths[0]
+        self.source.load(target)
+        self.source.set_playing(True)
+        return True
+
+    def now_playing(self) -> dict | None:
+        """The track now, for Control Center (live/mediakeys.py)."""
+        st = self.source.state()
+        if not st.path:
+            return None
+        bpm = self.engine.status().bpm or self.bpm_by_path.get(st.path)
+        return {"path": st.path, "bpm": bpm, "position_s": st.position_s, "duration_s": st.duration_s,
+                "playing": st.playing, "rate": st.rate}
+
     def command(self, name: str, body: dict) -> None:
-        if name in ("xiao_beat", "xiao_stats"):
+        if name == "queue":              # the page's list and "then" choice, kept for the media keys' next / previous
+            paths, mode = body.get("paths"), body.get("mode")
+            if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
+                raise ValueError("queue: paths must be a list of file paths")
+            if mode not in ("next", "random", "stop"):
+                raise ValueError(f"queue: mode {mode!r} is not next, random or stop")
+            self.queue_paths, self.queue_mode = paths, mode
+        elif name in ("xiao_beat", "xiao_stats"):
             if self.bench is None:
                 raise ValueError(f"{name}: the player runs without --xiao")
             self.bench.command(name, body)
@@ -283,11 +334,25 @@ def make_handler(app: App):
     return Handler
 
 
-def serve(port: int, app: App) -> ThreadingHTTPServer:
+class QosHTTPServer(ThreadingHTTPServer):
+    """Each request's thread asks for the user-interactive class first (live/qos.py): a request holding the interpreter
+    lock must not be run late by a busy Mac while the audio callbacks wait for it."""
+    qos = True
+
+    def process_request_thread(self, request, client_address) -> None:
+        if self.qos:
+            from live import qos
+            qos.interactive()
+        super().process_request_thread(request, client_address)
+
+
+def serve(port: int, app: App, qos: bool = True) -> ThreadingHTTPServer:
     try:
-        return ThreadingHTTPServer(("127.0.0.1", port), make_handler(app))
+        server = QosHTTPServer(("127.0.0.1", port), make_handler(app))
     except OSError:
-        return ThreadingHTTPServer(("127.0.0.1", 0), make_handler(app))     # taken: let the OS pick one
+        server = QosHTTPServer(("127.0.0.1", 0), make_handler(app))     # taken: let the OS pick one
+    server.qos = qos
+    return server
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -306,14 +371,29 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--advanced-follow", action=argparse.BooleanOptionalAction, default=None,
                    help="the advanced follow (jank M2i: the Kalman glide, the line confidence, the spectral rate); "
                         "default: on with --xiao (the firmware runs it), off without")
+    p.add_argument("--speaker-latency", type=float, default=DEFAULT_LATENCY_S, metavar="S",
+                   help="the speakers' stream latency in seconds (default 0.1; 0 = the device's low latency, ~0.018 s). A bigger "
+                        "buffer rides out a busy Mac's late callbacks (they were audio holes: a crackle) at the cost of that delay")
+    p.add_argument("--jank-latency", type=float, default=DEFAULT_LATENCY_S, metavar="S",
+                   help="the same for the jank USB output (default 0.1; 0 = the device's low latency)")
+    p.add_argument("--jank-resample", action=argparse.BooleanOptionalAction, default=True,
+                   help="the jank FIFO follows the clocks' drift by resampling (ratio near 1; the default) instead of one-sample slips "
+                        "(--no-jank-resample: they saturate at 0.23%% drift, buzz at 100 Hz and run dry)")
+    p.add_argument("--no-media-keys", action="store_true",
+                   help="no media keys (play/pause, next, previous from the keyboard, headphones or Control Center; macOS, needs "
+                        "pyobjc-framework-MediaPlayer); with them the player runs its loop on a worker thread and Cocoa's on the main one")
+    p.add_argument("--no-qos", action="store_true", help="do not ask macOS for the user-interactive class for the threads")
     p.add_argument("--no-rate", action="store_true", help="with the advanced follow: no spectral rate (jank's set rate off)")
     args = p.parse_args(argv)
 
     # --xiao: only the XIAO is on Link (it leads, Live follows): this program never joins, its own model runs on a local
     # SimLink, and the Link session's beat comes from the XIAO's own reports (live.bench)
     link = SimLink() if args.dry_run or args.xiao else RealLink()
-    xiao = make_xiao() if args.xiao else None
-    source = VarispeedSource(link.now_us)
+    xiao = make_xiao(args.jank_latency or None, args.jank_resample) if args.xiao else None
+    if not args.no_qos:
+        from live import qos
+        qos.interactive()
+    source = VarispeedSource(link.now_us, latency=args.speaker_latency or None)
     clock = ClockMap(args.offset_ms)
     controller = LinkController(link, clock)
     advanced = args.xiao if args.advanced_follow is None else args.advanced_follow
@@ -339,9 +419,16 @@ def main(argv: list[str] | None = None) -> int:
                               ACCURACY_DIR / f"accuracy-{time.strftime('%Y%m%d')}.csv", tuple(args.range))
         app.bench.start()
         xiao.start()
-    server = serve(args.port, app)
+    from live.audiostats import StallWatch
+    app.stall = StallWatch()
+    app.stall.start()
+    server = serve(args.port, app, qos=not args.no_qos)
     url = f"http://127.0.0.1:{server.server_address[1]}/"
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    if args.no_qos:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    else:
+        from live import qos
+        qos.thread(server.serve_forever, name="http").start()
     mode = f'XIAO on "{xiao.device_name}", local Link model' if xiao else "dry run" if args.dry_run else "Link master"
     if advanced:
         mode += "; advanced follow" + (" without the rate" if args.no_rate else "")
@@ -349,8 +436,18 @@ def main(argv: list[str] | None = None) -> int:
           f"output latency {source.latency_ms:.1f} ms; Ctrl-C quits)", flush=True)
     if not args.no_browser:
         webbrowser.open(url)
+    media = None if args.no_media_keys else start_media_keys(app)
     try:
-        run(source, engine, clock, link, controller, out=None)     # the page shows the state: no line a second here
+        def loop() -> None:
+            run(source, engine, clock, link, controller, out=None)     # the page shows the state: no line a second here
+
+        if media is None:
+            loop()
+        else:
+            from live.mediakeys import run_event_loop
+            exc = run_event_loop(loop, media)
+            if exc is not None and not isinstance(exc, KeyboardInterrupt):
+                raise exc
     except KeyboardInterrupt:
         pass
     finally:
@@ -362,17 +459,37 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def start_media_keys(app: App):
+    """The media keys on (live/mediakeys.py), or None with the reason printed: not a Mac, or pyobjc is not installed."""
+    import importlib.util
+    if importlib.util.find_spec("AppKit") is None or importlib.util.find_spec("MediaPlayer") is None:
+        print("media keys: off (pip install pyobjc-framework-MediaPlayer, macOS only)", flush=True)
+        return None
+    try:
+        from live.mediakeys import MediaKeys
+    except ImportError:
+        print("media keys: off (pip install pyobjc-framework-MediaPlayer, macOS only)", flush=True)
+        return None
+    keys = MediaKeys({k: (lambda k=k: app.media_command(k)) for k in ("play", "pause", "toggle", "next", "previous")},
+                     app.now_playing)
+    if not keys.start():
+        print("media keys: off (MediaPlayer is not available)", flush=True)
+        return None
+    print("media keys: on (play/pause, next, previous)", flush=True)
+    return keys
+
+
 def speaker_device_name(source) -> str:
     """The name of the output device the player's own stream plays on."""
     import sounddevice as sd
     return str(sd.query_devices(source._stream.device)["name"])
 
 
-def make_xiao():
+def make_xiao(latency: float | None = None, resample: bool = False):
     """The second output on the jank XIAO; exits with the reason when there is none."""
     from live.xiao import XiaoOutput
     try:
-        return XiaoOutput()
+        return XiaoOutput(latency=latency, resample=resample)
     except RuntimeError as exc:
         raise SystemExit(f"--xiao: {exc}") from exc
 

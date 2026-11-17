@@ -31,6 +31,8 @@ class _ControlThread(threading.Thread):
         self.error: BaseException | None = None
 
     def run(self) -> None:
+        from live import qos
+        qos.interactive()
         try:
             while not self.stop_event.wait(TICK_S):
                 self.controller.tick(self.engine.snapshot())

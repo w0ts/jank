@@ -142,7 +142,8 @@ def test_bench_helpers():
     assert predicted_xiao_offset_ms(None, 30.0, 20.0, 15.0, 25.0) is None
 
 
-def test_xiao_mode_never_constructs_real_link(monkeypatch):
+@pytest.mark.parametrize("with_media", [False, True])
+def test_xiao_mode_never_constructs_real_link(monkeypatch, with_media):
     """player --xiao: only the XIAO is on Link. main() with every device stood in: RealLink must never be built."""
     import live.player as player
 
@@ -187,10 +188,31 @@ def test_xiao_mode_never_constructs_real_link(monkeypatch):
 
     monkeypatch.setattr(player, "RealLink", no_link)
     monkeypatch.setattr(player, "VarispeedSource", FakeSource)
-    monkeypatch.setattr(player, "make_xiao", lambda: FakeXiao())
+    monkeypatch.setattr(player, "make_xiao", lambda latency=None, resample=False: FakeXiao())
     monkeypatch.setattr(player, "speaker_device_name", lambda source: "Fake Speakers")
-    monkeypatch.setattr(player, "serve", lambda port, app: FakeServer())          # port 8791 is never touched
+    monkeypatch.setattr(player, "serve", lambda port, app, qos=True: FakeServer())          # port 8791 is never touched
     monkeypatch.setattr(player, "run", lambda *a, **k: None)
     monkeypatch.setattr(player, "Engine", lambda *a, **k: SimpleNamespace(beats=[], status=lambda: SimpleNamespace(bpm=None)))
     monkeypatch.setattr(player, "ACCURACY_DIR", __import__("pathlib").Path("/nonexistent-never-written"))
-    assert player.main(["--xiao", "--no-browser"]) == 0
+    ran = []
+    if with_media:                                 # the media keys' path: the loop runs through live.mediakeys.run_event_loop
+        import live.mediakeys as mediakeys
+
+        monkeypatch.setattr(player, "start_media_keys", lambda app: SimpleNamespace(update=lambda: None))
+        monkeypatch.setattr(player, "run", lambda *a, **k: ran.append("loop"))
+        monkeypatch.setattr(mediakeys, "run_event_loop", lambda work, keys, tick_s=1.0: work())
+        assert player.main(["--xiao", "--no-browser"]) == 0
+        assert ran == ["loop"]
+        return
+    assert player.main(["--xiao", "--no-browser", "--no-media-keys"]) == 0
+
+
+def test_help_prints_with_every_option_documented(capsys):
+    """argparse help is %-formatted: a bare % in a help string crashes --help (it did, for --jank-resample)."""
+    import live.player as player
+
+    with pytest.raises(SystemExit) as exit_:
+        player.main(["--help"])
+    assert exit_.value.code == 0
+    out = capsys.readouterr().out
+    assert "--speaker-latency" in out and "default 0.1" in out and "--no-jank-resample" in out

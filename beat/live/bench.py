@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable
 
 from live.accuracy import Accuracy, Block
+from live import qos
 
 TICK_S = 0.02
 MIN_LATENCY_MS, MAX_LATENCY_MS = -300, 300      # the XIAO's beat_latency range (jank core/jank_core.h)
@@ -53,7 +54,7 @@ class XiaoBench:
         source.on_block = lambda path, pos, rate, frames, heard: self.acc.add_block(Block(path, pos, rate, frames, heard))
 
     def start(self) -> None:
-        threading.Thread(target=self._loop, daemon=True, name="xiao-bench").start()
+        qos.thread(self._loop, name="xiao-bench").start()
 
     def close(self) -> None:
         self._stop.set()
