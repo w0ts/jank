@@ -13,7 +13,7 @@ const assert = require('assert');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'page', 'jank.html'), 'utf8');
-const lib = ['ui/oled.js', 'ui/face.js', 'ui/lcd2.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Stick = Stick; this.Player = Player;';
+const lib = ['ui/oled.js', 'ui/face.js', 'ui/lcd2.js', 'ui/ports.js', 'ui/autolat.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Stick = Stick; this.Player = Player;';
 const script = id => html.match(new RegExp('<script id="' + id + '">([\\s\\S]*?)</script>'))[1];
 const transcript = {};
 for (const block of fs.readFileSync(path.join(root, 'tests', 'stick_ref', 'transcript.txt'), 'utf8').split('### ').slice(1)) {
@@ -28,11 +28,11 @@ function makeElement() {
     classList: { add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c), toggle: (c, on) => { (on === undefined ? !classes.has(c) : on) ? classes.add(c) : classes.delete(c); return classes.has(c); } },
     setAttribute: (k, v) => { attrs[k] = String(v); }, getAttribute: k => (k in attrs ? attrs[k] : null),
     addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
-    click: () => (listeners.click || []).forEach(fn => fn({ target: el })),
+    click: () => { (listeners.click || []).forEach(fn => fn({ target: el })); if (el.onclick) el.onclick({ target: el }); },
     fire: (type, ev) => (listeners[type] || []).forEach(fn => fn(ev)), contains: () => false,
     append: () => {}, add: () => {}, focus: () => {}, remove: () => {}, removeAttribute: k => { delete attrs[k]; }, replaceChildren: (...kids) => { el.children = kids; },
     closest: () => null, cloneNode: () => makeElement(), setPointerCapture: () => {}, selectedOptions: [{ text: '' }],
-    getContext: () => ({ createImageData: () => ({ data: new Uint8ClampedArray(128 * 64 * 4) }), putImageData(img) { el.lastImage = img; } }),
+    getContext: () => ({ createImageData: (w = 128, h = 64) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }), putImageData(img) { el.lastImage = img; } }),
   });
   const kids = new Map();
   el.querySelector = sel => { if (!kids.has(sel)) kids.set(sel, makeElement()); return kids.get(sel); };
@@ -61,15 +61,16 @@ function makePage(opts = {}) {
   const setTimer = () => { const id = nextTimer++; timers.add(id); return id; };
   const box = {
     document, console, performance: { now: () => clock.t }, Option: class { constructor(text, value) { this.text = text; this.value = value; } },
-    setInterval: (fn, ms) => { const id = setTimer(); box.__intervals = box.__intervals || new Map(); box.__intervals.set(id, fn); return id; }, setTimeout: setTimer,
-    clearInterval: id => timers.delete(id), clearTimeout: id => timers.delete(id),
+    setInterval: (fn, ms) => { const id = setTimer(); box.__intervals = box.__intervals || new Map(); box.__intervals.set(id, fn); return id; }, setTimeout: fn => { const id = setTimer(); box.__timeouts = box.__timeouts || new Map(); box.__timeouts.set(id, fn); return id; },
+    clearInterval: id => timers.delete(id), clearTimeout: id => { timers.delete(id); if (box.__timeouts) box.__timeouts.delete(id); },
     requestAnimationFrame: fn => { const id = nextFrame++; frames.add({ id, fn }); return id; },
     cancelAnimationFrame: id => { for (const f of frames) if (f.id === id) frames.delete(f); },
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } }, navigator: { mediaDevices: opts.mediaDevices },
-    localStorage: opts.storage || { getItem: () => null, setItem: () => {} },
+    localStorage: opts.storage || { getItem: () => null, setItem: () => {}, removeItem: () => {} },
     URL: { createObjectURL: f => 'blob:' + f.name, revokeObjectURL: u => media.revoked.push(u) },
-    window: { addEventListener: (type, fn) => { (winBus[type] = winBus[type] || []).push(fn); } }, location: { search: '' }, URLSearchParams, TextDecoder, Uint8Array, Float32Array, MessageChannel,
+    window: { addEventListener: (type, fn) => { (winBus[type] = winBus[type] || []).push(fn); } }, location: { search: opts.search || '' }, URLSearchParams, TextDecoder, Uint8Array, Float32Array, MessageChannel: opts.MessageChannel || MessageChannel,
   };
+  if (opts.indexedDB) { box.indexedDB = opts.indexedDB; box.window.showDirectoryPicker = opts.showDirectoryPicker; }
   if (opts.audioApi) { box.AudioContext = opts.audioApi.Context; box.window.AudioContext = opts.audioApi.Context; }
   vm.createContext(box);
   vm.runInContext(script('logic'), box);
@@ -81,7 +82,7 @@ function makePage(opts = {}) {
   vm.runInContext('this.S = S; this.disconnected = disconnected;', box);
   const key = (type, k) => (winBus[type] || []).forEach(fn => fn({ key: k, target: { tagName: 'BODY' }, repeat: false, preventDefault() {} }));
   const runFrame = () => { const [f] = [...frames]; if (f) { frames.delete(f); f.fn(clock.t); } };
-  return { box, el: id => document.getElementById(id), timers, frames, media, clock, key, runFrame, intervals: () => [...(box.__intervals || [])] };
+  return { box, el: id => document.getElementById(id), timers, frames, media, clock, key, runFrame, intervals: () => [...(box.__intervals || [])], timeouts: () => [...(box.__timeouts || [])] };
 }
 
 
@@ -89,14 +90,13 @@ function makePage(opts = {}) {
 function fakeAudioApi(options = {}) {
   const log = [], contexts = [], gains = [];
   class Context {
-    constructor(o) { this.opts = o || {}; this.state = 'suspended'; this.sinkId = options.ignoreCtorSink ? '' : (this.opts.sinkId || ''); this.destination = { kind: 'destination' }; this.currentTime = 0; contexts.push(this); log.push(['new', this.opts.sinkId || null, this.opts.sampleRate || null]); }
+    constructor(o) { this.opts = o || {}; this.state = 'suspended'; this.sinkId = options.ignoreCtorSink ? '' : (this.opts.sinkId || ''); this.destination = { kind: 'destination' }; this.currentTime = 0; this.baseLatency = 0.010; this.outputLatency = this.opts.sinkId ? 0.040 : 0.020; contexts.push(this); log.push(['new', this.opts.sinkId || null, this.opts.sampleRate || null]); }
     async resume() { log.push(['resume']); this.state = 'running'; }
     async suspend() { log.push(['suspend']); this.state = 'suspended'; }
     async close() { log.push(['close']); this.state = 'closed'; }
     createAnalyser() { return { kind: 'analyser', fftSize: 0, getFloatTimeDomainData: a => a.fill(0.1) }; }
     createGain() { const g = { kind: 'gain', gain: { value: 1 }, channelCount: 2, connect: n => { log.push(['gain->', n.kind]); }, disconnect() {} }; gains.push(g); return g; }
     createMediaStreamSource() { const src = { kind: 'source', connect: n => { log.push(['source->', n.kind]); }, disconnect: () => log.push(['source disconnect']) }; return src; }
-    createOscillator() { const osc = { kind: 'osc', frequency: { value: 0 }, connect: n => log.push(['osc->', n.kind]), start: () => log.push(['osc start', osc.frequency.value]), stop: () => { log.push(['osc stop']); queueMicrotask(() => osc.onended && osc.onended()); } }; return osc; }
   }
   if (!options.noSinkId) Context.prototype.setSinkId = async function (id) { log.push(['setSinkId', id]); if (options.rejectSink) throw new Error(options.rejectSink); this.sinkId = id; };
   return { Context, log, contexts, gains, capture: options.capture };
@@ -179,6 +179,16 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   p.runFrame();
   const lit = [...p.el('oled').lastImage.data].filter((v, i) => i % 4 === 0 && v > 100).length;
   ok(lit > 100, 'the screen shows the stick\'s HOME (' + lit + ' lit pixels)');
+  eq([p.el('oled').width, p.el('oled').height, p.el('oled').lastImage.width], [320, 240, 320], 'the default screen is the colour lcd2 landscape (320 x 240), for every board');
+  p.box.disconnected();
+  {
+    const q = await connected(undefined, { search: '?screen=oled' });
+    q.page.runFrame();
+    eq([q.page.el('oled').width, q.page.el('oled').height, q.page.el('oled').lastImage.width], [128, 64, 128], '?screen=oled: the black and white 128 x 64 OLED');
+    q.page.box.disconnected();
+  }
+  ({ page: p, midi } = await connected());
+  p.runFrame();
   for (const [, tick] of p.intervals()) tick();
   await settle();
   ok(midi.sent.includes('status'), 'status is polled (every 1.5 s) for the gate, the bar and the Bluetooth window, with no details open');
@@ -341,7 +351,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
       addEventListener: (type, fn) => { handlers[type] = fn; },
     };
     if (withChooser) mediaDevices.selectAudioOutput = async () => { calls.selectAudioOutput++; return { deviceId: 'jk', label: extra.chosenLabel || 'JANK USB Audio' }; };
-    return { calls, store, handlers, extra, opts: { mediaDevices, storage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v) } } };
+    return { calls, store, handlers, extra, opts: { mediaDevices, storage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v), removeItem: k => store.delete(k) } } };
   };
   let dev = fakeDevices(true);
   ({ page: p, midi } = await connected(undefined, dev.opts));
@@ -372,6 +382,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   p.el('c-advanced').checked = true;
   p.el('c-advanced').fire('change', {});
   await settle();
+  eq(shown(p, 'pl-out-row'), true, 'permission still needed: the line is shown');
   eq([p.el('pl-pick').textContent, p.el('pl-pick-help').textContent, dev.calls.getUserMedia], ['Allow device names (asks for the microphone)', 'Chrome will ask for the microphone only to read the device names; nothing is recorded.', 0], 'no output chooser: the explicit button and its sentence; the microphone is not asked at load');
   p.el('pl-pick').click();
   await settle();
@@ -398,7 +409,8 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // saved id valid, labels absent: the context is created with the sink, read back, no extra setSinkId, source -> mono gain -> destination
   let r = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
   await play(r);
-  eq(r.api.log.filter(e => e[0] === 'new'), [['new', 'jk', 44100]], 'saved id: the stick context is created with sinkId and 44.1 kHz');
+  eq(r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), [['new', 'jk', 44100]], 'saved id: the stick context is created with sinkId and 44.1 kHz');
+  eq(shown(r.page, 'pl-out-row'), false, 'resolved automatically and routed without an error: the whole "stick output" line is hidden');
   eq(r.api.log.filter(e => e[0] === 'setSinkId'), [], 'its sinkId reads back as the saved id: no second setSinkId needed');
   eq(r.api.log.filter(e => /->/.test(e[0])).map(e => e.join('')), ['gain->destination', 'source->analyser', 'source->gain'], 'captureStream -> MediaStreamSource -> mono gain -> that context\'s destination');
   eq([r.api.gains[0].channelCount, r.api.gains[0].channelCountMode, r.api.gains[0].channelInterpretation], [1, 'explicit', 'speakers'], 'the stick path is mixed down to one channel explicitly');
@@ -408,7 +420,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // muting the monitor leaves the captured stream alone
   r.page.el('pl-monitor').checked = false;
   r.page.el('pl-monitor').fire('change', {});
-  eq([r.page.el('pl-audio').muted, r.api.contexts.length, r.api.log.filter(e => e[0] === 'source disconnect').length], [true, 1, 0], 'monitor off mutes the element only: the stick path is untouched');
+  eq([r.page.el('pl-audio').muted, r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'source disconnect').length], [true, 1, 0], 'monitor off mutes the element only: the stick path is untouched');
   r.page.box.disconnected();
 
   // the constructor does not take the sink (older browser): setSinkId is awaited and called with the saved id
@@ -421,6 +433,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   r = await startPlayback({ ignoreCtorSink: true, rejectSink: 'NotFoundError: no such device' }, {}, { id: 'jk', label: 'jank' });
   await play(r);
   assert.match(r.page.el('pl-status').textContent, /jank output failed: NotFoundError: no such device, monitor only/); checks++;
+  eq(shown(r.page, 'pl-out-row'), true, 'a routing error: the line is shown again');
   eq([shown(r.page, 'pl-pick'), r.page.el('pl-audio').paused], [true, false], 'the button to choose again is shown and the monitor keeps playing');
   assert.match(r.page.el('pl-output-report').textContent, /last sink error: NotFoundError: no such device/); checks++;
   r.page.box.disconnected();
@@ -428,19 +441,21 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // the context exists before the device is known; choosing it later re-aims it live, with no restart of the track
   r = await startPlayback({}, {}, null);
   await play(r);
-  eq([r.api.contexts.length, r.api.log.filter(e => e[0] === 'new'), r.api.log.filter(e => e.join('') === 'source->gain').length], [1, [['new', null, 44100]], 0], 'no output chosen: a context for the meter, nothing sent to the stick');
+  eq(shown(r.page, 'pl-out-row'), true, 'no stick output found: the line (and its change link) is shown');
+  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), r.api.log.filter(e => e.join('') === 'source->gain').length], [1, [['new', null, 44100]], 0], 'no output chosen: a context for the meter, nothing sent to the stick');
   const pausedBefore = r.page.media.paused;
   r.page.el('pl-pick').click();
   await settle();
   eq(r.api.log.filter(e => e[0] === 'setSinkId'), [['setSinkId', 'jk']], 'the choice re-aims the running context: setSinkId(jk)');
-  eq([r.api.contexts.length, r.page.media.paused - pausedBefore, r.page.el('pl-audio').paused, r.api.log.filter(e => e[0] === 'source->').map(e => e[1])], [1, 0, false, ['analyser', 'gain']], 'live: same context, the track was not stopped, the source now feeds the stick path');
+  eq(shown(r.page, 'pl-out-row'), false, 'after the choice routes without an error: the line is hidden again');
+  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.page.media.paused - pausedBefore, r.page.el('pl-audio').paused, r.api.log.filter(e => e[0] === 'source->').map(e => e[1])], [1, 0, false, ['analyser', 'gain']], 'live: same context, the track was not stopped, the source now feeds the stick path');
   r.page.box.disconnected();
 
   // a saved device that is not listed (ids shown, no match) is dropped; when it appears (devicechange) it is used, live
   const listed2 = [{ kind: 'audiooutput', label: 'MacBook Speakers', deviceId: 'spk' }];
   r = await startPlayback({}, { current: listed2 }, { id: 'jk', label: 'jank (303a:4a4b)' }, listed2);
   await settle();
-  eq([r.page.el('pl-outlabel').textContent, shown(r.page, 'pl-pick')], ['none', true], 'a saved output that is not in a list that shows ids: dropped, the button is back');
+  eq([r.page.el('pl-outlabel').textContent, shown(r.page, 'pl-pick'), shown(r.page, 'pl-out-row')], ['none', true, true], 'a saved output that is not in a list that shows ids: dropped, the button and the line are back');
   await play(r);
   eq(r.api.log.filter(e => e[0] === 'setSinkId'), [], 'nothing is sent to a device that is not there');
   r.d.extra.current = [{ kind: 'audiooutput', label: 'MacBook Speakers', deviceId: 'spk' }, { kind: 'audiooutput', label: 'jank (303a:4a4b)', deviceId: 'jk' }];
@@ -464,19 +479,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   assert.match(p.el('pl-note').textContent, /^Output names unlocked\./); checks++;
   eq(JSON.parse(dn.store.get('jank.player.output')), { id: 'jk', label: 'JANK (303a:4a4b)' }, 'the id and the label are saved');
   p.box.disconnected();
-
-  // the test tone: the stick path only, its own context with the sink
-  r = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
-  r.page.el('pl-test').click();
-  await settle();
-  eq(r.api.log.filter(e => e[0] === 'new' || e[0] === 'osc start' || e[0] === 'osc stop' || e[0] === 'close' || e[0] === 'setSinkId'), [['new', 'jk', 44100], ['osc start', 1000], ['osc stop'], ['close']], 'the test tone: a context with the chosen sink, 1 kHz, 1 s, then closed');
-  eq(r.page.el('pl-note').textContent, 'tone sent to jank (303a:4a4b)', 'and the result line');
-  r.page.box.disconnected();
-  r = await startPlayback({ ignoreCtorSink: true, rejectSink: 'NotAllowedError: blocked' }, {}, { id: 'jk', label: 'jank' });
-  r.page.el('pl-test').click();
-  await settle();
-  eq([r.page.el('pl-note').textContent, r.api.log.filter(e => e[0] === 'osc start').length], ['Test tone failed: NotAllowedError: blocked', 0], 'a failing test tone shows the exact error and plays nothing');
-  r.page.box.disconnected();
 
   // ---- the play scope: every audio file under the picked folder ----
   const rel = (path) => ({ name: path.split('/').pop(), webkitRelativePath: path, slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) }) });
@@ -525,6 +527,334 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   p.el('c-advanced').fire('change', {});
   eq(p.el('pl-scope-line').textContent, '0 files in scope', 'leaving Advanced cancels the scan and clears the list');
   p.box.disconnected();
+
+
+  // ---- Play with nothing clicked: it starts from the files found so far, and the queue becomes the whole scope ----
+  {
+    const pending = [];
+    class StepChannel { constructor() { this.port1 = { onmessage: null, close() {} }; this.port2 = { postMessage: () => pending.push(this.port1), close() {} }; } }
+    const flush = async () => { const q = pending.splice(0); q.forEach(port => port.onmessage && port.onmessage()); await settle(4); };
+    ({ page: p, midi } = await connected(undefined, { MessageChannel: StepChannel }));
+    p.el('c-advanced').checked = true;
+    p.el('c-advanced').fire('change', {});
+    await settle();
+    eq(p.el('pl-play').disabled, true, 'no source yet: Play is disabled');
+    const names = ['A/a1.mp3', 'A/a2.mp3', 'B/b1.mp3', 'B/b2.mp3', 'C/c1.mp3'];
+    p.el('pl-dir').fire('change', { target: { files: names.map(n => rel('Music/' + n)) } });
+    await settle();
+    eq([p.el('pl-play').disabled, p.el('pl-scope-line').textContent], [true, 'scanning: 0 files'], 'a source is picked and the scan has found nothing yet: Play stays disabled');
+    await flush();
+    await flush();
+    eq([p.el('pl-play').disabled, p.el('pl-scope-line').textContent], [false, 'scanning: 2 files'], 'the first folder is in: Play is enabled while the scan goes on, nothing clicked');
+    vm.runInContext('Math.random = () => 0.99', p.box);
+    p.el('pl-then').value = 'random';
+    p.el('pl-then').fire('change', {});
+    p.el('pl-play').click();
+    await settle();
+    eq(['a1.mp3', 'a2.mp3'].includes(p.el('pl-name').textContent), true, 'Play with "random" starts a random one of the files found so far (' + p.el('pl-name').textContent + ')');
+    await flush();
+    await flush();
+    await flush();
+    eq(p.el('pl-scope-line').textContent, '5 files in scope', 'the scan finishes: the whole scope');
+    // the queue is the whole scope now: random from a file in A can land in B or C
+    const reached = new Set();
+    for (let k = 0; k < 20; k++) {
+      vm.runInContext('Math.random = () => ' + (k / 20), p.box);
+      p.el('pl-audio').fire('ended', {});
+      await settle();
+      reached.add(p.el('pl-name').textContent[0]);
+    }
+    eq([...reached].sort(), ['a', 'b', 'c'], 'random now draws from the files of all three folders, not only the open one');
+    // Play with "next" and the scope on: the first file of the scope; "all folders" off: the first of the folder shown
+    p.box.disconnected();
+  }
+  {
+    ({ page: p, midi } = await connected());
+    p.el('c-advanced').checked = true;
+    p.el('c-advanced').fire('change', {});
+    await settle();
+    p.el('pl-dir').fire('change', { target: { files: ['Music/Sub/s1.mp3', 'Music/Sub/s2.mp3', 'Music/r1.mp3'].map(rel) } });
+    await settle();
+    eq(p.el('pl-play').disabled, false, 'the scan is done: Play is enabled with nothing clicked');
+    p.el('pl-then').value = 'next';
+    p.el('pl-then').fire('change', {});
+    p.el('pl-play').click();
+    await settle();
+    eq(p.el('pl-name').textContent, 's1.mp3', 'Play with "next": the first file of the whole scope (in a sub folder that was never opened)');
+    p.el('pl-scope').checked = false;
+    p.el('pl-scope').fire('change', {});
+    await settle();
+    p.box.disconnected();
+  }
+  {
+    ({ page: p, midi } = await connected());
+    p.el('c-advanced').checked = true;
+    p.el('c-advanced').fire('change', {});
+    await settle();
+    p.el('pl-scope').checked = false;
+    p.el('pl-scope').fire('change', {});
+    p.el('pl-dir').fire('change', { target: { files: ['Music/Sub/s1.mp3', 'Music/r1.mp3', 'Music/r2.mp3'].map(rel) } });
+    await settle();
+    p.el('pl-then').value = 'stop';
+    p.el('pl-then').fire('change', {});
+    p.el('pl-play').click();
+    await settle();
+    eq(p.el('pl-name').textContent, 'r1.mp3', '"all folders" off: Play starts inside the folder shown (the root has r1 and r2), not from the sub folder');
+    p.box.disconnected();
+  }
+  {
+    ({ page: p, midi } = await connected());
+    p.el('c-advanced').checked = true;
+    p.el('c-advanced').fire('change', {});
+    await settle();
+    p.el('pl-dir').fire('change', { target: { files: ['Music/cover.jpg', 'Music/Sub/notes.txt'].map(rel) } });
+    await settle();
+    eq([p.el('pl-play').disabled, p.el('pl-scope-line').textContent], [true, 'no audio files under Music'], 'no audio file under the source: it says so and Play stays disabled');
+    p.box.disconnected();
+  }
+
+  // ---- only a port named jank is ever attached to; no jank port: nothing is sent anywhere, and the page waits 15 s for one ----
+  {
+    const decoy = (id, name) => {
+      const out = { id: 'o' + id, name, state: 'connected', frames: 0, send() { this.frames++; } };
+      return { input: { id: 'i' + id, name, state: 'connected', onmidimessage: null }, output: out };
+    };
+    const open = async (names, withJank, extraJank = []) => {
+      const page = makePage(), midi = fakeMidi();
+      midi.attach(page);
+      const decoys = names.map((n, i) => decoy(i, n));
+      const ins = new Map(), outs = new Map();
+      for (const d of decoys) { ins.set(d.input.id, d.input); outs.set(d.output.id, d.output); }
+      const extras = extraJank.map((n, i) => decoy('b' + i, n));
+      if (withJank) { ins.set('in', midi.input); outs.set('out', midi.output); }
+      for (const d of extras) { ins.set(d.input.id, d.input); outs.set(d.output.id, d.output); }
+      const access = { inputs: ins, outputs: outs, onstatechange: null };
+      page.box.navigator.requestMIDIAccess = () => Promise.resolve(access);
+      page.el('c-midi').click();
+      await settle();
+      return { page, midi, access, decoys, extras, frames: () => decoys.reduce((n, d) => n + d.output.frames, 0) };
+    };
+    const addJank = (c) => { c.access.outputs.set('out', c.midi.output); c.access.inputs.set('in', c.midi.input); };
+    const gets = c => c.midi.sent.filter(s => s === 'get').length;
+
+    // (a) Digitone + FM1 only: nothing attached, nothing sent, the error names the ports, the buttons stay usable
+    let c = await open(['Digitone Audio+MIDI Elektron Digitone II', 'FM1-E040'], false);
+    eq([c.frames(), c.midi.sent.length, c.page.box.S.line], [0, 0, null], '(a) no jank port: no byte sent to any port, nothing attached');
+    eq(c.page.el('msg').textContent, "No MIDI port named jank. Plug it in (USB), or connect it in the app's Bluetooth MIDI settings. MIDI ports I see: Digitone Audio+MIDI Elektron Digitone II, FM1-E040", '(a) the line names what the browser sees');
+    eq([c.page.el('msg').classList.contains('bad'), shown(c.page, 'c-ports-box'), shown(c.page, 'live'), pressed(c.page), c.page.el('c-midi').disabled, c.page.el('c-bluetooth').disabled], [true, false, false, ['false', 'false'], false, false], '(a) an error, no chooser, no face, both connection buttons usable');
+    eq(c.page.timeouts().length, 1, '(a) one wait timer (the 15 s) is running');
+    c.page.box.disconnected();
+    eq([c.page.timers.size, c.access.onstatechange], [0, null], '(a) a disconnect releases the wait: no timer, no listener');
+
+    // (b) Digitone + jank: jank only
+    c = await open(['Digitone Audio+MIDI Elektron Digitone II'], true);
+    eq([c.frames(), gets(c) > 0, c.page.box.S.line !== null, shown(c.page, 'c-ports-box')], [0, true, true, false], '(b) jank attached and spoken to, the Digitone never');
+    c.page.box.disconnected();
+
+    // (c) jank appears later: connects once; the input alone (output not yet there) is not enough
+    c = await open(['Digitone Audio+MIDI Elektron Digitone II'], false);
+    c.access.inputs.set('in', c.midi.input);
+    c.access.onstatechange();
+    await settle();
+    eq([c.midi.sent.length, c.page.box.S.line], [0, null], '(c) a jank input without its output yet: still waiting');
+    c.access.outputs.set('out', c.midi.output);
+    c.access.onstatechange();
+    await settle();
+    const first = gets(c);
+    eq([first, c.page.timeouts().length, c.frames()], [1, 0, 0], '(c) jank appeared: connected, one get, the wait timer cleared, the Digitone untouched');
+    c.access.onstatechange();
+    c.access.onstatechange();
+    await settle();
+    eq(gets(c), 1, '(c) more state changes attach nothing again');
+    c.page.box.disconnected();
+
+    // (d) 15 s without a jank: stop listening, say so, no late auto-connect
+    c = await open(['FM1-E040'], false);
+    for (const [, fn] of c.page.timeouts()) fn();
+    eq(c.page.el('msg').textContent.startsWith('Stopped waiting for a jank port after 15 s. Press MIDI port to try again. MIDI ports I see: FM1-E040'), true, '(d) after 15 s it says it stopped');
+    eq([c.access.onstatechange, c.page.timers.size], [null, 0], '(d) no listener, no timer left');
+    addJank(c);
+    await settle();
+    eq([c.midi.sent.length, c.frames()], [0, 0], '(d) a jank plugged in after that connects nothing by itself');
+    c.page.box.disconnected();
+
+    // (e) USB + Bluetooth jank: the chooser lists those two, never the Digitone
+    c = await open(['Digitone Audio+MIDI Elektron Digitone II'], true, ['jank 1A2B']);
+    eq(c.page.el('c-ports').children.map(o => o.text), ['jank', 'jank 1A2B'], '(e) the chooser: USB first, then Bluetooth, no other device');
+    eq([shown(c.page, 'c-ports-box'), c.frames()], [true, 0], '(e) shown, and the Digitone untouched');
+    c.page.box.disconnected();
+
+    // the error names the port that did not answer
+    const wrong = fakeMidi({ get: '' });
+    wrong.output.send = () => {};
+    const wp = makePage();
+    wrong.attach(wp);
+    wp.box.navigator.requestMIDIAccess = () => Promise.resolve(wrong.access);
+    wp.el('c-midi').click();
+    await settle();
+    for (let k = 0; k < 2; k++) { for (const [id, fn] of wp.timeouts()) { wp.box.clearTimeout(id); fn(); } await settle(); }
+    eq(wp.el('msg').textContent.startsWith('no answer to get from jank. If the app asks for SysEx, turn it on.'), true, 'no answer to get: names the port, keeps the SysEx hint');
+  }
+
+  // ---- Auto latency: set beat_latency from the two paths, only under its guards ----
+  {
+    const statusUsb = (source) => transcript.status.replace(/\nok\s*$/, '') + '\naudio_source=' + source + '\nok';
+    const sets = c => c.midi.sent.filter(s => s.startsWith('set beat_latency'));
+    const tickAll = async c => { for (const [, tick] of c.page.intervals()) tick(); c.page.el('pl-audio').fire('timeupdate', {}); await settle(); };
+    const setup = async (source) => {
+      const c = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
+      c.midi.text.status = statusUsb(source);
+      return c;
+    };
+    let a = await setup('usb');
+    await tickAll(a);
+    eq(sets(a), [], 'not at load: nothing is sent before the player plays');
+    eq(a.page.el('al-line').textContent.startsWith('auto latency: stick path unknown'), true, 'the line says why: no stick path yet');
+    await play(a);
+    await tickAll(a);
+    eq(sets(a), ['set beat_latency -20'], 'playing through the stick over USB: monitor 30 - stick 50 = -20 ms is sent, once');
+    eq(a.page.el('al-line').textContent, 'auto latency: sent -20 ms (speakers 30 - stick path 50)', 'the line shows what was sent');
+    a.page.clock.t += 1000;
+    await tickAll(a);
+    eq(sets(a).length, 1, 'rate limit: nothing more within 5 s');
+    a.page.el('al-resend').click();
+    await settle();
+    eq(sets(a).length, 2, 'Re-send sends again at once');
+    a.page.el('al-on').checked = false;
+    a.page.el('al-on').fire('change', {});
+    a.page.clock.t += 10000;
+    await tickAll(a);
+    a.page.el('al-resend').click();
+    await settle();
+    eq([sets(a).length, a.d.store.get('jank.autolat')], [2, '0'], 'the checkbox off: nothing is sent, and it is remembered');
+    a.page.box.disconnected();
+
+    const line = await setup('line');
+    await play(line);
+    await tickAll(line);
+    await tickAll(line);
+    eq([sets(line), line.page.el('al-line').textContent.includes('not USB')], [[], true], 'source is not USB: nothing sent, the line says so');
+    line.page.box.disconnected();
+
+    const near = await setup('usb');
+    near.midi.text.status = near.midi.text.status.replace('lat_auto=25', 'lat_auto=-19');
+    await play(near);
+    await tickAll(near);
+    await tickAll(near);
+    eq([sets(near), near.page.el('al-line').textContent.includes('within 3 ms')], [[], true], 'within 3 ms of the stick lat_auto: nothing sent');
+    near.page.box.disconnected();
+  }
+
+  // ---- the beat display delay: the page's own latencies, the estimate, the stored value; it never touches the stick ----
+  {
+    r = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
+    const delays = [];
+    r.page.box.document.addEventListener('jank-beat-delay', e => delays.push(e.detail.ms));
+    await play(r);
+    for (const [, tick] of r.page.intervals()) tick();
+    await settle();
+    eq([r.page.el('bd-mon').textContent, r.page.el('bd-stick').textContent], [30, 50], 'the page shows what it knows: the monitor 10 + 20 = 30 ms, the stick path 10 + 40 = 50 ms');
+    eq([r.page.el('bd-num').value, r.page.el('bd-slider').value, delays.at(-1)], [-45, -45, -45], 'the default is the estimate: monitor - stick - beat_latency = 30 - 50 - 25 = -45 ms');
+    eq(r.page.el('bd-beat').textContent, '25 (25 + 0)', "the stick's beat_latency, from get, with its two layers");
+    const sentBefore = r.midi.sent.length;
+    r.page.el('bd-slider').value = '120';
+    r.page.el('bd-slider').fire('input', {});
+    eq([r.page.el('bd-num').value, delays.at(-1), r.d.store.get('jank.beat.delay')], [120, 120, '120'], 'the slider sets the delay (the face is told) and it is remembered');
+    r.page.el('bd-num').value = '-37';
+    r.page.el('bd-num').fire('change', {});
+    eq([r.page.el('bd-num').value, delays.at(-1), r.d.store.get('jank.beat.delay')], [-35, -35, '-35'], 'the number box rounds to 5 ms');
+    r.page.el('bd-num').value = '9999';
+    r.page.el('bd-num').fire('change', {});
+    eq(delays.at(-1), 400, 'and stops at 400');
+    for (const [, tick] of r.page.intervals()) tick();
+    r.page.el('pl-audio').fire('timeupdate', {});
+    await settle();
+    eq(r.page.el('bd-num').value, 400, 'a stored delay is not replaced by a new estimate');
+    eq(r.midi.sent.slice(sentBefore).filter(c => c.startsWith('set ') || c.startsWith('nudge')), [], 'the delay sends nothing to the stick');
+    r.page.el('bd-estimate').click();
+    eq([r.page.el('bd-num').value, delays.at(-1), r.d.store.has('jank.beat.delay')], [-45, -45, false], 'Use the estimate: back to it, the stored value gone');
+    r.page.box.disconnected();
+    // a stored delay is used from the start
+    const dd = fakeDevices(true, null, null, {});
+    dd.store.set('jank.beat.delay', '75');
+    ({ page: p, midi } = await connected(undefined, dd.opts));
+    p.el('c-advanced').checked = true;
+    p.el('c-advanced').fire('change', {});
+    await settle();
+    eq(p.el('bd-num').value, 75, 'a stored delay is shown again on the next visit');
+    p.box.disconnected();
+  }
+
+  // ---- Play with a remembered folder that needs its permission after a reload: the click is the gesture ----
+  {
+    const fileHandle = (name) => ({ kind: 'file', name, getFile: async () => rel('Music/' + name) });
+    const dirHandle = (name, kids) => ({ kind: 'directory', name, entries: async function* () { for (const [n, h] of Object.entries(kids)) yield [n, h]; } });
+    const music = (perm) => {
+      const calls = { query: 0, request: 0 };
+      let allowed = false;
+      const handle = { ...dirHandle('Music', { A: dirHandle('A', { 'a1.mp3': fileHandle('a1.mp3'), 'a2.mp3': fileHandle('a2.mp3') }), B: dirHandle('B', { 'b1.mp3': fileHandle('b1.mp3') }), 'r.mp3': fileHandle('r.mp3') }),
+        queryPermission: async () => { calls.query++; return allowed ? 'granted' : 'prompt'; },
+        requestPermission: async () => { calls.request++; if (perm instanceof Error) throw perm; allowed = perm === 'granted'; return perm; } };
+      return { handle, calls };
+    };
+    const fakeIdb = (value) => ({ open: () => { const req = {}; queueMicrotask(() => { req.result = { createObjectStore() {}, transaction: () => ({ objectStore: () => ({ get: () => { const r = {}; queueMicrotask(() => { r.result = value; r.onsuccess(); }); return r; }, put: () => { const r = {}; queueMicrotask(() => { r.onsuccess(); }); return r; } }) }) }; req.onsuccess(); }); return req; } });
+    const withSaved = async (perm, StepChannel) => {
+      const m = music(perm), opts = { indexedDB: fakeIdb(m.handle), showDirectoryPicker: async () => m.handle };
+      if (StepChannel) opts.MessageChannel = StepChannel;
+      const c = await connected(undefined, opts);
+      c.page.el('c-advanced').checked = true;
+      c.page.el('c-advanced').fire('change', {});
+      await settle();
+      return { ...c, m };
+    };
+    // granted: Play is enabled with nothing loaded; nothing is asked before the click; random from the files found so far
+    const pending = [];
+    class StepChannel { constructor() { this.port1 = { onmessage: null, close() {} }; this.port2 = { postMessage: () => pending.push(this.port1), close() {} }; } }
+    const flush = async () => { const q = pending.splice(0); q.forEach(port => port.onmessage && port.onmessage()); await settle(4); };
+    let g = await withSaved('granted', StepChannel);
+    eq([g.page.el('pl-play').disabled, shown(g.page, 'pl-reopen'), g.page.el('pl-reopen').textContent, g.m.calls], [false, true, 'Open Music', { query: 1, request: 0 }], 'a saved folder that needs permission: Play is enabled, "Open Music" shows, and nothing was asked before a click');
+    eq(g.page.el('pl-name').textContent, '', 'nothing is loaded (no track name)');
+    vm.runInContext('Math.random = () => 0.99', g.page.box);
+    g.page.el('pl-then').value = 'random';
+    g.page.el('pl-then').fire('change', {});
+    g.page.el('pl-play').click();
+    await settle();
+    eq(g.m.calls, { query: 3, request: 1 }, 'the click asks: queryPermission, then requestPermission once (and the open checks it again)');
+    eq(g.page.el('pl-name').textContent, '', 'no track starts before the scan has found files');
+    await flush();
+    await flush();
+    ok(['a1.mp3', 'a2.mp3'].includes(g.page.el('pl-name').textContent), 'Play starts a random one of the files found so far (' + g.page.el('pl-name').textContent + ')');
+    await flush(); await flush(); await flush();
+    eq(g.page.el('pl-scope-line').textContent, '4 files in scope', 'the scan goes on to the whole scope');
+    eq([shown(g.page, 'pl-reopen'), g.page.el('pl-play').disabled], [false, false], 'the folder is open: the Open button is gone');
+    g.page.box.disconnected();
+    // Space over the card does the same
+    g = await withSaved('granted');
+    vm.runInContext('Math.random = () => 0', g.page.box);
+    g.page.el('pl-then').value = 'random';
+    g.page.el('pl-then').fire('change', {});
+    g.page.el('player').fire('pointerenter', {});
+    g.page.key('keydown', ' ');
+    await settle(30);
+    eq([g.m.calls.request, g.page.el('pl-name').textContent], [1, 'a1.mp3'], 'Space over the card is the same gesture: it asks, opens, starts a random track');
+    g.page.box.disconnected();
+    // denied
+    g = await withSaved('denied');
+    g.page.el('pl-play').click();
+    await settle();
+    eq([g.page.el('pl-note').textContent, g.page.el('pl-play').disabled, shown(g.page, 'pl-reopen'), g.page.el('pl-name').textContent],
+       ['Permission to read "Music" was not given: press the folder button to choose it again, or Open Music to be asked again.', true, true, ''], 'denied: one line says so, Play is disabled again, Open Music stays, nothing starts');
+    g.page.el('pl-reopen').click();
+    await settle();
+    eq(g.m.calls.request, 2, 'the Open button asks again');
+    g.page.box.disconnected();
+    // the folder is gone
+    g = await withSaved(Object.assign(new Error('A requested file or directory could not be found'), { name: 'NotFoundError' }));
+    g.page.el('pl-play').click();
+    await settle();
+    eq([g.page.el('pl-note').textContent, g.page.el('pl-play').disabled], ['The folder "Music" cannot be opened (A requested file or directory could not be found): press the folder button to choose it again.', true], 'a folder that is gone: said in one line, Play disabled');
+    g.page.box.disconnected();
+  }
 
   // ---- over Bluetooth: the face, no Advanced ----
   page = makePage();

@@ -1,5 +1,5 @@
 /* The face of a connected stick: the OLED module's ctx built from what the page's control line has read (the HOME line, `get`,
-   `status`, the beat reports), the control-line commands the face's buttons and menu send, and the button logic of the D-pad.
+   `status`), the control-line commands the face's buttons and menu send, and the button logic of the D-pad.
    No DOM, no timers: time is always passed in (ms). The plain XIAO has no screen, so this is a virtual screen of the stick's state:
    what the stick does not report is left empty ('---', a level at the floor, no beat), never made up.
    The commands are the ones beat/live/player.html's --xiao mode sends: `fold x2` / `fold /2` (AUDIO) or `tempo <bpm>` (LINK) on
@@ -12,38 +12,53 @@ const Stick = (() => {
   const FLOOR_DB = -99, SILENCE_DB = -60, TEMPO_RANGE = [20, 999], BAR_CONF_FULL = 2;
   const FRESH_USB_MS = 1500, FRESH_BLE_MS = 5000, STATUS_FRESH_MS = 5000;
   const SRC = ['auto', 'line', 'usb', 'link'], BLE = ['pair', 'auto', 'off'], AUTOBAR = ['off', 'start', 'always'], FOLDS = { x2: 2, x4: 4, '/2': 0.5, '/4': 0.25 };
-  const LED = { beatMs: 80, barMs: 150, flashCapDiv: 3, scale: 40, beat: [0, 30, 0], one: [40, 18, 0], armed: [30, 20, 0], lowConf: [40, 0, 0] };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const num = v => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
   const isUpDown = b => b === 'up' || b === 'down';
 
-  // ---- the beat reports: `b <n> <bpm x100> <mode> <audio> <lag us>` on each tracked beat, `t ...` once a second (docs/beat.md) ----
-  function parseBeat(text) {
-    const f = String(text).trim().split(/\s+/);
-    if (f[0] !== 'b' || f.length < 6) return null;
-    const [n, bpm100, , audio, lagUs] = f.slice(1).map(Number);
-    return [n, bpm100, audio, lagUs].every(Number.isFinite) ? { n, bpm: bpm100 / 100, mode: f[3], audio, lagUs } : null;
-  }
-
   // ---- what the stick says, as the OLED reads it ----
-  // state: { home (the page's parseHome), homeAt, get ({key: string}), status ({key: string}), statusAt, beat (parseBeat + at), overBle }
+  // state: { home (the page's parseHome), homeAt, get ({key: string}), status ({key: string}), statusAt, phase (phaseFeed, optional), delayMs (the display delay), overBle }
   const fresh = (at, now, maxMs) => at !== undefined && at !== null && now - at <= maxMs;
   const phase = (h, homeAt, now) => {                               // the session's place in the bar (beats), moving at the HOME line's tempo
     if (!h || !(h.bpm > 0) || h.bar === null || h.bar === undefined || !h.quantum) return null;
     return h.bar / 100 + (h.transport === 'stopped' ? 0 : Math.max(0, now - homeAt) / 60000 * h.bpm);
   };
-  // the tracker's mode from its last beat report (b ... <mode> ...: steady, faster, slower; the `beat` answer says speeding_up / slowing_down)
-  const MODE_FRESH_MS = 3000;
-  const trackerMode = (beat, now) => {
-    if (!beat || now - beat.at > MODE_FRESH_MS) return 'steady';
-    return /^(faster|speeding_up)$/.test(beat.mode) ? 'faster' : /^(slower|slowing_down)$/.test(beat.mode) ? 'slower' : 'steady';
-  };
+  // ---- the smooth local phase: the bar position the boxes show, advanced with the page's own clock between the stick's reports ----
+  // A report is the HOME line's bar position (beats) and tempo, taken at the page's time `t`. Between reports the position runs on at the last
+  // tempo; a new report corrects it softly: a quarter of the error, and backwards by 0.02 beat at most, unless it is further than half a
+  // beat out (then it snaps). A stopped transport holds the position; no report for 1.5 s, or a report with no session / no tempo (a lost
+  // lock), and there is no position at all: the boxes go empty instead of running on stale data.
+  const PHASE = { staleMs: 1500, snapBeats: 0.5, gain: 0.25, backBeats: 0.02 };
+  const createPhase = () => ({ pos: null, at: 0, bpm: 0, running: false, quantum: 4, reportAt: -Infinity });
+  const wrapDiff = (d, q) => ((((d + q / 2) % q) + q) % q) - q / 2;
+  const phaseReport = h => (h && h.bpm > 0 && h.bar !== null && h.bar !== undefined && h.quantum > 0 ? { bar: h.bar / 100, bpm: h.bpm, running: h.transport === 'playing', quantum: h.quantum } : null);
+  function phaseFeed(ph, r, t) {
+    if (!r) return createPhase();
+    if (ph.pos === null) return { pos: r.bar, at: t, bpm: r.bpm, running: r.running, quantum: r.quantum, reportAt: t };
+    const predicted = ph.running ? ph.pos + (t - ph.at) * ph.bpm / 60000 : ph.pos, e = wrapDiff(r.bar - predicted, r.quantum);
+    const pos = !r.running ? r.bar : Math.abs(e) > PHASE.snapBeats ? r.bar : predicted + (e >= 0 ? e * PHASE.gain : Math.max(e * PHASE.gain, -PHASE.backBeats));
+    return { pos, at: t, bpm: r.bpm, running: r.running, quantum: r.quantum, reportAt: t };
+  }
+  // the position (beats, not wrapped) the boxes show at `now`, shifted by the display delay (+: as it was that long ago); null: none to show
+  function phaseAt(ph, now, delayMs) {
+    if (ph.pos === null || now - ph.reportAt > PHASE.staleMs) return null;
+    return ph.running ? ph.pos + (now - (delayMs || 0) - ph.at) * ph.bpm / 60000 : ph.pos;
+  }
+  // The display delay the page can estimate from what it knows: the monitor reaches the ear `monitorMs` after the file position, the stick
+  // path `stickMs` (the part the browser can read), and the stick aligns its session beat by `beatLatencyMs` (the value it uses now). The
+  // boxes are drawn when the stick reports, so they are off by (stick path + beat_latency - monitor): the delay that undoes it is
+  // monitor - stick path - beat_latency. With Auto latency the stick's beat_latency becomes monitor - stick path and this is 0: the boxes
+  // are then not corrected twice. Without a known beat_latency: monitor - stick path, as before. To 5 ms.
+  const BEAT_DELAY_MAX = 400, BEAT_DELAY_KEY = 'jank.beat.delay';
+  const clampDelay = v => clamp(Math.round(v / 5) * 5, -BEAT_DELAY_MAX, BEAT_DELAY_MAX);
+  const beatDelayEstimate = l => (Number.isFinite(l.monitorMs) && Number.isFinite(l.stickMs) ? clampDelay(l.monitorMs - l.stickMs - (Number.isFinite(l.beatLatencyMs) ? l.beatLatencyMs : 0)) : 0);
+  const parseDelay = text => (text === null || text === undefined || text === '' || !Number.isFinite(Number(text)) ? null : clampDelay(Number(text)));
   const foldOf = h => (h && FOLDS[h.fold] ? FOLDS[h.fold] : 1);
 
   function ctx(state, now) {
     const g = state.get || {}, st = state.status && fresh(state.statusAt, now, STATUS_FRESH_MS) ? state.status : null;
     const h = state.home && fresh(state.homeAt, now, state.overBle ? FRESH_BLE_MS : FRESH_USB_MS) ? state.home : null;
-    const audio = !!(h && h.audio), pos = phase(h, state.homeAt, now);
+    const audio = !!(h && h.audio), delay = state.delayMs || 0, pos = state.phase ? phaseAt(state.phase, now, delay) : phase(h, state.homeAt, now - delay);
     const playing = !!h && h.transport === 'playing', armed = !!h && h.transport === 'armed';
     const level = h && h.level !== null ? h.level : FLOOR_DB;
     const barLead = st ? num(st.bar_lead) : null, barState = st && st.bar ? st.bar : null;
@@ -54,7 +69,7 @@ const Stick = (() => {
     const rssiRaw = st ? num(wifiMode ? st.wifi_rssi : st.rssi) : null, rssi = wifiMode && !h.net.up ? 0 : rssiRaw;
     const wifiBars = h && h.net && h.net.kind === 'wifi' && !h.net.up ? 'none' : st && num(st.rssi) !== null && num(st.rssi) !== 0 ? (num(st.rssi) > -70 ? 'good' : 'weak') : 'unknown';
     return {
-      link: !audio, bpm: audio && h.bpm > 0 ? h.bpm : null, linkBpm: !audio && h && h.bpm > 0 ? h.bpm : null, mode: trackerMode(state.beat, now),
+      link: !audio, bpm: audio && h.bpm > 0 ? h.bpm : null, linkBpm: !audio && h && h.bpm > 0 ? h.bpm : null, mode: 'steady',
       conf: h && h.conf !== null ? h.conf / 100 : 0, confKnown: !!h && h.conf !== null, rssi, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
       confStop: g.lowconf !== 'run', levelDb: level, levelMin: h && h.levelMin !== null ? h.levelMin : FLOOR_DB, levelMax: h && h.levelMax !== null ? h.levelMax : FLOOR_DB,
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
@@ -71,27 +86,6 @@ const Stick = (() => {
       autoBar: Math.max(0, AUTOBAR.indexOf(g.autobar)),
       bar: barState ? { state: barState, conf: barLead === null ? 0 : clamp(barLead / BAR_CONF_FULL, 0, 1) } : null,
     };
-  }
-
-  // ---- the beat LEDs: a flash at each beat the stick reports, the colours of the device's LED language (core/jank_led.h) ----
-  const ledPaint = rgb => rgb.map(v => Math.round(255 * Math.pow(Math.min(1, v / LED.scale), 0.6)));
-  const css = rgb => { const c = ledPaint(rgb); return `rgb(${c[0]},${c[1]},${c[2]})`; };
-  // The flash is anchored on a beat report (b ...) when one came lately, else on the HOME line's phase (Link mode, Bluetooth: no reports).
-  function leds(state, now) {
-    const dark = [null, null, null, null], h = state.home && fresh(state.homeAt, now, state.overBle ? FRESH_BLE_MS : FRESH_USB_MS) ? state.home : null;
-    if (!h) return dark;
-    if (h.transport === 'armed') return Array(4).fill(css(LED.armed));
-    if (h.transport !== 'playing' || !(h.bpm > 0)) return dark;
-    const period = 60000 / h.bpm, pos = phase(h, state.homeAt, now);
-    if (pos === null) return dark;
-    const b = state.beat, reported = b && now - b.at - b.lagUs / 1000 < 2 * period && now - b.at >= 0;
-    const sinceEdge = reported ? ((now - (b.at - b.lagUs / 1000)) % period + period) % period : (pos - Math.floor(pos)) * period;
-    const edgePos = pos - sinceEdge / period, index = ((Math.floor(edgePos + 1e-6) % h.quantum) + h.quantum) % h.quantum;
-    const one = index === 0, flash = Math.min(one ? LED.barMs : LED.beatMs, period / LED.flashCapDiv);
-    if (sinceEdge >= flash) return dark;
-    const gated = state.status && state.status.gated === '1';
-    const rgb = gated ? LED.lowConf : one ? LED.one : LED.beat;
-    return [0, 1, 2, 3].map(i => (i === index % 4 ? css(rgb) : null));
   }
 
   // ---- the control line: what a menu edit, a tempo step, Start / Stop and the nudges send ----
@@ -182,5 +176,5 @@ const Stick = (() => {
     return fb;
   };
 
-  return { KEY_BTN, KEY_HINT, REPEAT, parseBeat, ctx, leds, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, framebuffer };
+  return { KEY_BTN, KEY_HINT, REPEAT, PHASE, BEAT_DELAY_KEY, BEAT_DELAY_MAX, createPhase, phaseReport, phaseFeed, phaseAt, beatDelayEstimate, parseDelay, ctx, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, framebuffer };
 })();

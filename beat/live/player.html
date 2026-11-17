@@ -312,6 +312,7 @@ const QR = (() => {
 </script>
 <!--@include ui/oled.js-->
 <!--@include ui/face.js-->
+<!--@include ui/autolat.js-->
 <script>
 const $ = id => document.getElementById(id);
 let library = [], shown = [], prevStatus = null, seeking = false, pitchDragging = false, volDragging = false;
@@ -717,57 +718,11 @@ function showAccuracy(b) {
     : 'Link is ' + f1(b.link.mean_ms) + ' ms off: ' + (trim === null ? 'set beat_latency ' + f1(m.beat_latency_ms, 0) + ' -> ' + sug + ' ms'
       : 'the audio shift ' + trim + ' ms on top of the auto ' + xiaoLat().auto + ' ms');
 }
-/* Auto latency: the player works out the XIAO's beat_latency from the two output paths (live/latency.py: speaker path -
-   jank path, in /api/status) and sends `set beat_latency` when --xiao starts, when the XIAO's audio source turns to USB
-   (a new stream, or a restart) and whenever the suggestion moves by more than AUTOLAT_MIN_CHANGE_MS (at most one send per
-   AUTOLAT_MIN_GAP_MS). Two layers (jank M2h): this is the AUTO base; the user's AUDIO SHIFT (NUDGE MS, Calibrate's
-   `set lat_trim`) rides on top on the XIAO and never turns it off. Only the checkbox does ("manual"). */
-const AUTOLAT_MIN_CHANGE_MS = 2;
-const AUTOLAT_MIN_GAP_MS = 2000;
-const TAB_PATH_CONSTANT_MS = 0;        // Tab audio: both sinks are delayed to the same reported latency, so the paths differ by this
-function autoLatNew() { return { on: true, manual: false, sent: null, sentAt: -1e9, wasUsb: false }; }
-/* ev: tick {sug (ms or null), usb (the XIAO's source is USB), now} | manual | auto | reconnect. -> { st, send (ms or null) } */
-function autoLatStep(st, ev) {
-  switch (ev.type) {
-    case 'manual': return { st: { ...st, on: false, manual: true }, send: null };
-    case 'auto': return { st: { ...st, on: true, manual: false, sent: null }, send: null };
-    case 'reconnect': return { st: { ...st, sent: null, wasUsb: false }, send: null };
-    case 'tick': {
-      const next = { ...st, wasUsb: !!ev.usb };
-      if (!st.on || !ev.usb || !Number.isFinite(ev.sug)) return { st: next, send: null };
-      const sug = Math.round(ev.sug);
-      const first = st.sent === null || !st.wasUsb;
-      const moved = Math.abs(sug - st.sent) > AUTOLAT_MIN_CHANGE_MS && ev.now - st.sentAt >= AUTOLAT_MIN_GAP_MS;
-      if (!first && !moved) return { st: next, send: null };
-      return { st: { ...next, sent: sug, sentAt: ev.now }, send: sug };
-    }
-    default: return { st, send: null };
-  }
-}
-/* the suggestion for the pane: the player's paths, or (Tab audio, listening through jank) the aligned sinks' constant */
-function autoLatSuggestion(pane, tabState, tabToJank, statusSug) {
-  if (pane === 'tab') return tabState === 'listening' && tabToJank ? TAB_PATH_CONSTANT_MS : null;
-  return Number.isFinite(statusSug) ? statusSug : null;
-}
-function autoLatLabel(st, sug, usb, sentNow, trim = null) {
-  if (st.manual) return 'manual' + (st.sent === null ? '' : ' (auto had sent ' + st.sent + ' ms)');
-  if (!st.on) return 'off';
-  if (!usb) return 'waiting: the XIAO\'s source is not USB';
-  if (!Number.isFinite(sug)) return 'waiting for a suggestion';
-  const auto = st.sent === null ? sug : st.sent;
-  return (Number.isFinite(trim) ? 'auto ' + auto + ' ms + trim ' + trim + ' ms' : 'auto: ' + auto + ' ms') + (sentNow ? ' (sent)' : '');
-}
 /* --xiao: the XIAO's latency layers from a fresh `status` (M2h: lat_auto=, lat_trim=); null: none, or an older firmware */
 function xiaoLat() {
   const st = XIAO.status;
   if (!st || performance.now() - XIAO.statusAt > XIAO_STATUS_FRESH_MS || !Number.isFinite(st.lat_auto)) return null;
   return { auto: st.lat_auto, trim: Number.isFinite(st.lat_trim) ? st.lat_trim : 0 };
-}
-/* Calibrate (M2h): the AUDIO SHIFT that makes auto + shift the suggested latency, so it composes with Auto latency; null:
-   the XIAO's layers not known (an older firmware: the whole value goes to `set beat_latency`) */
-function calibTrim(sug, lat) {
-  if (sug === null || sug === undefined || !lat) return null;
-  return Math.round(sug) - lat.auto;
 }
 const AL = { st: autoLatNew(), out: null, sentNow: 0 };
 function autoLatApply(ev) { const r = autoLatStep(AL.st, ev); AL.st = r.st; $('autolat').checked = AL.st.on; return r.send; }
