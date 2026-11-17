@@ -112,7 +112,8 @@ const litCols = (d, y, h) => { const cols = []; for (let i = 0; i < d.w; i++) fo
 const BANDS = [['top bar', 0, 12], ['tempo', L.tempoY, L.tempoY + 7 * L.tempoScale - 1], ['beat boxes', L.boxY, L.boxY + L.boxH - 1], ['CF', L.rowCF, L.rowCF + 6], ['IN', L.rowIN, L.rowIN + 6], ['BAR', L.rowBAR, L.rowBAR + 6], ['status', L.statusY, L.statusY + 6]];
 for (let i = 1; i < BANDS.length; i++) ok(BANDS[i][1] > BANDS[i - 1][2], BANDS[i][0] + ' starts below ' + BANDS[i - 1][0] + ' (' + BANDS[i][1] + ' > ' + BANDS[i - 1][2] + '): the rows do not overlap');
 ok(BANDS[BANDS.length - 1][2] < LH, 'the last row is on the grid');
-eq([L.tempoY + 7 * L.tempoScale - 1, L.boxY + L.boxH - 1, 2 + 4 * L.boxW + 3 * L.boxGap], [49, 70, 158], 'tempo ends at y 49, the boxes at y 70 and x 157 (4 x 36 + 3 x 4 from x 2)');
+eq([L.tempoY + 7 * L.tempoScale - 1, L.boxY + L.boxH - 1, 2 + 4 * L.boxW + 3 * L.boxGap], [49, 77, 158], 'tempo ends at y 49, the boxes at y 77 and x 157 (4 x 36 + 3 x 4 from x 2)');
+ok(L.boxY - (L.tempoY + 7 * L.tempoScale) >= 1 && L.rowCF - (L.boxY + L.boxH) >= 2 && L.linkBoxY - (L.tempoY + 7 * L.tempoScale) >= 1 && L.statusY - (L.linkBoxY + L.linkBoxH) >= 2, 'the boxes keep a gap to the tempo above and to the CF row (AUDIO) or status line (LINK) below');
 const barOn = { bar: { state: 'locked', conf: 0.5 } };
 const full = drawn(ctxOf({ ctx: barOn }));
 {
@@ -149,12 +150,38 @@ eq(idsIn(healthy, ...R.inBar), [0], '... and its bar, fill and tick');
   const on = drawn(ctxOf({ ctx: { beatN: 4 } })), off = drawn(ctxOf({ ctx: { beatN: 1 } })), none = drawn(ctxOf({ ctx: { beatN: null } }));
   eq([idsIn(on, ...R.beat1), idsIn(off, ...R.beat1), idsIn(none, ...R.beat1)], [[INK.ONE], [0], [0]], 'beat 4 is the bar\'s first again (amber); beat 2 and no beat: the first box is a neutral frame');
   const box = (d, i) => litIn(d, L.boxX + i * (L.boxW + L.boxGap), L.boxY, L.boxW, L.boxH).length;
-  eq([box(on, 0), box(on, 1), box(off, 1), box(off, 0)], [L.boxW * L.boxH, 2 * L.boxW + 2 * (L.boxH - 2), L.boxW * L.boxH, 2 * L.boxW + 2 * (L.boxH - 2)], 'the lit box is filled, the others are 1 px frames');
+  const outline = (w, h) => w * h - (w - 4) * (h - 4);
+  eq([box(on, 0), box(on, 1), box(off, 1), box(off, 0)], [L.boxW * L.boxH, outline(L.boxW, L.boxH), L.boxW * L.boxH, outline(L.boxW, L.boxH)], 'the lit box is solid (36 x 26), the others are 2 px outlines');
+}
+
+// the four boxes, every beat, both layouts: exact rectangles, solid when lit, 2 px outline when not, even gaps, amber only for a lit first box
+for (const [mode, over, y, h] of [['AUDIO', {}, L.boxY, L.boxH], ['LINK', { home: { audio: false, link: 1 } }, L.linkBoxY, L.linkBoxH]]) {
+  for (let beat = 0; beat < 4; beat++) {
+    const d = drawn(ctxOf({ ...over, ctx: { beatN: beat } }));
+    const ids = [], solid = [];
+    for (let i = 0; i < 4; i++) {
+      const x = L.boxX + i * (L.boxW + L.boxGap), px = (dx, dy) => d.fb[(y + dy) * d.w + x + dx];
+      let ring = true, inner = 0, all = true;
+      for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < L.boxW; dx++) {
+        const edge = dx < 2 || dy < 2 || dx >= L.boxW - 2 || dy >= h - 2;
+        if (edge && !px(dx, dy)) ring = false;
+        if (!edge) inner += px(dx, dy) ? 1 : 0;
+        if (!px(dx, dy)) all = false;
+      }
+      solid.push(i === beat ? all : !all && ring && inner === 0);
+      ids.push(idsIn(d, x, y, L.boxW, h));
+    }
+    eq(solid, [true, true, true, true], mode + ' beat ' + (beat + 1) + ': box ' + (beat + 1) + ' is solid, the other three are 2 px outlines with a dark inside');
+    eq(ids, [0, 1, 2, 3].map(i => (i === 0 && beat === 0 ? [INK.ONE] : [0])), mode + ' beat ' + (beat + 1) + ': ink only on the first box, and only while it is lit');
+  }
+  const d = drawn(ctxOf({ ...over, ctx: { beatN: 1 } }));
+  let gapLit = 0; for (let g = 0; g < 3; g++) for (let k = 0; k < L.boxGap; k++) gapLit += litIn(d, L.boxX + (g + 1) * L.boxW + g * L.boxGap + k, y, 1, h).length;
+  eq([gapLit, litIn(d, 0, y, L.boxX, h).length, litIn(d, L.boxX + 4 * L.boxW + 3 * L.boxGap, y, d.w - (L.boxX + 4 * L.boxW + 3 * L.boxGap), h).length], [0, 0, 0], mode + ': the three 4 px gaps and the 2 px margins are dark');
 }
 
 // ---- confidence: the value, the bar's fill and the tick all carry the id of the rule ----
 const confCase = (conf, extra = {}, get) => drawn(ctxOf({ home: { conf }, ...extra }, get ? { get } : undefined));
-const TICK = L.barX + 1 + Math.round((L.barW - 3) * 0.7);                         // the stop threshold 70 %
+const TICK = L.barX + Math.round((L.barW - 1) * 0.7);                             // the stop threshold 70 %
 for (const [conf, id, why] of [[60, INK.BAD, 'below'], [69, INK.BAD, 'below'], [70, INK.WARN, 'at'], [75, INK.WARN, 'within 10 above'], [80, INK.WARN, '10 above'], [81, INK.GOOD, 'over 10 above'], [87, INK.GOOD, 'above'], [100, INK.GOOD, 'full']]) {
   const d = confCase(conf);
   const bar = idsIn(d, L.barX, L.rowCF, L.barW, 7).filter(v => v !== 0), val = idsIn(d, ...R.cfValue);
@@ -165,28 +192,31 @@ eq(idsIn(confCase(75, {}, { threshold: '90', lowconf: 'run' }), ...R.cfValue), [
 eq(idsIn(confCase(30, { ctx: { silent: true } }), ...R.cfValue), [INK.DIM], 'silence: the CF number is grey, not red (nothing to track)');
 eq(idsIn(drawn(ctxOf({ home: { conf: null } })), ...R.cfValue), [INK.DIM], 'no confidence reported: the dashes are grey');
 eq(idsIn(drawn(ctxOf({}, { status: null })), ...R.cfValue), [INK.GOOD], 'no status line: the confidence comes from the HOME line and is still green');
-// the bar's fill length at 0, 50 and 100 % (92 inner pixels), counted on the fill's middle row away from the tick column
-for (const [conf, n] of [[0, 0], [50, 46], [100, 92]]) {
-  const d = confCase(conf), row = (L.rowCF + 2) + 1;
-  let lit = 0; for (let x = L.barX + 1; x < L.barX + L.barW - 1; x++) if (x !== TICK && d.fb[row * d.w + x]) lit++;
-  eq(lit, n - (n > TICK - L.barX - 1 ? 1 : 0) + 0, 'CF ' + conf + ' %: the fill is ' + n + ' px of 92' + (n > TICK - L.barX - 1 ? ' (one is the tick\'s column)' : ''));
-  eq([d.fb[row * d.w + L.barX - 0], d.fb[row * d.w + L.barX + L.barW - 1]], [1, 1], '... inside a frame that is always there');
+// the CF line: ONE thin line (3 rows, y + 2..y + 4), its length the value on 94 px; fill length at 0, 50 and 100 %, counted on its middle row away from the notch
+for (const [conf, n] of [[0, 0], [50, 47], [100, 94]]) {
+  const d = confCase(conf), row = L.rowCF + 3, inLine = n > TICK - L.barX;
+  let lit = 0; for (let x = L.barX; x < L.barX + L.barW; x++) if (x !== TICK && d.fb[row * d.w + x]) lit++;
+  eq(lit, n - (inLine ? 1 : 0), 'CF ' + conf + ' %: the line is ' + n + ' px of 94' + (inLine ? ' (one is the notch\'s column)' : ''));
+  eq([d.fb[row * d.w + L.barX], d.fb[row * d.w + L.barX + L.barW - 1], d.fb[row * d.w + L.barX - 1]], [n > 0 ? 1 : 0, n === 94 ? 1 : 0, 0], '... it starts at x ' + L.barX + ' and ends at its value, nothing beyond');
+}
+{
+  const d = confCase(50), lineRows = [0, 1, 2, 3, 4, 5, 6].map(k => { let c = 0; for (let x = L.barX; x < L.barX + L.barW; x++) if (x !== TICK && d.fb[(L.rowCF + k) * d.w + x]) c++; return c; });
+  eq(lineRows, [0, 0, 47, 47, 47, 0, 0], 'CF 50 %: the line is exactly 3 rows (y + 2..y + 4): no outline above or below, no track, nothing in the rest of the row');
+  eq([d.fb[(L.rowCF + 3) * d.w + L.barX + 80], d.fb[(L.rowCF + 1) * d.w + L.barX + 80], d.fb[(L.rowCF + 5) * d.w + L.barX + 93]], [0, 0, 0], '... the unfilled remainder is plain background (no baseline)');
 }
 {
   const d = confCase(100), x = TICK;
-  eq([d.fb[L.rowCF * d.w + x], d.fb[(L.rowCF + 6) * d.w + x], d.ink[L.rowCF * d.w + x], d.ink[(L.rowCF + 6) * d.w + x]], [1, 1, INK.GOOD, INK.GOOD], 'the tick for 70 % is at x ' + x + ': it sticks out above and below the bar, in the number\'s colour');
-  eq([d.fb[(L.rowCF + 3) * d.w + x]], [0], '... and cuts a gap through a fill that passes it');
+  eq([d.fb[(L.rowCF + 1) * d.w + x], d.fb[(L.rowCF + 5) * d.w + x], d.ink[(L.rowCF + 1) * d.w + x], d.ink[(L.rowCF + 5) * d.w + x]], [1, 1, INK.GOOD, INK.GOOD], 'the notch for 70 % is at x ' + x + ': 1 px wide, 5 px tall (y + 1..y + 5), a stub above and below the line, in the number\'s colour');
+  eq([d.fb[(L.rowCF + 2) * d.w + x], d.fb[(L.rowCF + 3) * d.w + x], d.fb[(L.rowCF + 4) * d.w + x], d.fb[L.rowCF * d.w + x], d.fb[(L.rowCF + 6) * d.w + x]], [0, 0, 0, 0, 0], '... and cuts a gap through a line that passes it');
   const e = confCase(40), tickLit = [0, 1, 2, 3, 4, 5, 6].map(k => e.fb[(L.rowCF + k) * e.w + x]);
-  eq([tickLit, idsIn(e, x, L.rowCF, 1, 7)], [[1, 0, 1, 1, 1, 0, 1], [INK.BAD]], 'over an empty part of the bar the tick is a full line, outline notched, in red');
-  eq(barTick70(), TICK, 'the tick position is the threshold on the bar');
-  function barTick70() { return L.barX + 1 + Math.round((L.barW - 3) * 0.7); }
-  const t2 = confCase(60, {}, { threshold: '30', lowconf: 'stop' }), x2 = L.barX + 1 + Math.round((L.barW - 3) * 0.3);
-  ok(t2.fb[L.rowCF * t2.w + x2] === 1 && t2.ink[L.rowCF * t2.w + x2] === INK.GOOD, 'the tick follows the stick\'s threshold (30 %: x ' + x2 + ')');
+  eq([tickLit, idsIn(e, x, L.rowCF, 1, 7)], [[0, 1, 1, 1, 1, 1, 0], [INK.BAD]], 'over the empty part the notch is a 5 px line, in red');
+  const t2 = confCase(60, {}, { threshold: '30', lowconf: 'stop' }), x2 = L.barX + Math.round((L.barW - 1) * 0.3);
+  ok(t2.fb[(L.rowCF + 1) * t2.w + x2] === 1 && t2.ink[(L.rowCF + 1) * t2.w + x2] === INK.GOOD, 'the notch follows the stick\'s threshold (30 %: x ' + x2 + ')');
 }
 
 // ---- input level: number and bar; red clipping, amber too quiet, nothing else coloured ----
 const levelCase = (levelDb, peakDb, max) => drawn(ctxOf({ home: { level: levelDb, levelMax: max === undefined ? levelDb : max }, ctx: { peakDb } }));
-const levelIds = d => [idsIn(d, ...R.inValue).filter(v => v !== 0), idsIn(d, L.barX + 1, L.rowIN + 2, L.barW - 2, 3).filter(v => v !== 0)];
+const levelIds = d => [idsIn(d, ...R.inValue).filter(v => v !== 0), idsIn(d, L.barX, L.rowIN + 2, L.barW, 3).filter(v => v !== 0)];
 eq(levelIds(levelCase(-20, -12)), [[], []], 'a good level: number, fill and tick are neutral');
 eq(levelIds(levelCase(-20, -0.5)), [[INK.BAD], [INK.BAD]], 'the last second peaked at -0.5 dBFS: number and fill red (clipping)');
 eq(levelIds(levelCase(-20, -1)), [[INK.BAD], [INK.BAD]], '... -1 dBFS is the edge');
@@ -196,14 +226,16 @@ eq(levelIds(levelCase(-20, null, -10))[0], [], '... under it, neutral');
 eq(levelIds(levelCase(-55, -40)), [[INK.WARN], [INK.WARN]], 'under the tracker\'s -50 dBFS sound level: amber (too quiet to track)');
 eq(levelIds(levelCase(-50, -40)), [[], []], '... -50 itself is enough');
 {
-  const IN_TICK = L.barX + 1 + Math.round((L.barW - 3) * (40 / 90));                         // -50 dBFS on a -90..0 bar
-  for (const [db, n] of [[-90, 0], [-45, 46], [0, 92]]) {
-    const d = levelCase(db, -12, db), row = L.rowIN + 3;
-    let lit = 0; for (let x = L.barX + 1; x < L.barX + L.barW - 1; x++) if (x !== IN_TICK && d.fb[row * d.w + x]) lit++;
-    eq(lit, n - (n > IN_TICK - L.barX - 1 ? 1 : 0), 'IN ' + db + ' dB: the fill is ' + n + ' px of 92 (-90 dB is empty, 0 dB full)');
+  const IN_TICK = L.barX + Math.round((L.barW - 1) * (40 / 90));                  // -50 dBFS on a -90..0 line
+  for (const [db, n] of [[-90, 0], [-45, 47], [0, 94]]) {
+    const d = levelCase(db, -12, db), row = L.rowIN + 3, inLine = n > IN_TICK - L.barX;
+    let lit = 0; for (let x = L.barX; x < L.barX + L.barW; x++) if (x !== IN_TICK && d.fb[row * d.w + x]) lit++;
+    eq(lit, n - (inLine ? 1 : 0), 'IN ' + db + ' dB: the line is ' + n + ' px of 94 (-90 dB is empty, 0 dB full)');
   }
   const d = levelCase(-20, -12);
-  eq([d.fb[L.rowIN * d.w + IN_TICK], d.fb[(L.rowIN + 6) * d.w + IN_TICK], d.ink[L.rowIN * d.w + IN_TICK]], [1, 1, 0], 'the IN bar has a neutral tick at -50 dBFS (x ' + IN_TICK + '), the tracker\'s sound level');
+  eq([d.fb[(L.rowIN + 1) * d.w + IN_TICK], d.fb[(L.rowIN + 5) * d.w + IN_TICK], d.ink[(L.rowIN + 1) * d.w + IN_TICK], d.fb[L.rowIN * d.w + IN_TICK]], [1, 1, 0, 0], 'the IN line has a neutral 5 px notch at -50 dBFS (x ' + IN_TICK + '), the tracker\'s sound level');
+  const c = levelCase(-55, -40), rows = [0, 1, 2, 3, 4, 5, 6].map(k => { let n = 0; for (let x = L.barX; x < L.barX + L.barW; x++) if (x !== IN_TICK && c.fb[(L.rowIN + k) * c.w + x]) n++; return n; });
+  eq(rows, [0, 0, 37, 37, 37, 0, 0], 'IN -55 dB: a 3 row line of round(94 x 35 / 90) = 37 px, nothing else in the row');
 }
 
 // ---- the BAR row: AUTO BAR's state and confidence, neutral, only with AUTO BAR on ----
@@ -214,7 +246,7 @@ eq(levelIds(levelCase(-50, -40)), [[], []], '... -50 itself is enough');
   ok(rowLit(lock) > 100 && rowLit(lis) > rowLit(lock) && rowLit(man) > 0, 'LOCKED, LISTEN, MANUAL draw the row; the fill grows with the confidence');
   eq([lock, lis, man].map(d => idsIn(d, 0, L.rowBAR, d.w, 7)), [[0], [0], [0]], 'the BAR row is neutral');
   let lit = 0; const row = L.rowBAR + 3; for (let x = L.barX + 1; x < L.barX + L.barW - 1; x++) if (lock.fb[row * lock.w + x]) lit++;
-  eq(lit, 46, 'BAR 0.5: 46 px of 92');
+  eq([lit, lock.fb[(L.rowBAR + 1) * lock.w + L.barX + 40], lock.fb[(L.rowBAR + 5) * lock.w + L.barX + 40]], [46, 1, 1], 'BAR 0.5: the BAR row keeps its outlined bar (a frame above and below), 46 px of 92 filled');
 }
 
 // ---- the top bar: link, signal, battery (bigger, same rules) ----
@@ -265,8 +297,8 @@ eq(idsIn(drawn(ctxOf({ home: { battery: null } })), ...R.batt), [], 'no battery 
 {
   const link = drawn(ctxOf({ home: { audio: false, link: 1, bpm: 98.4 } }));
   eq([litIn(link, 0, L.linkBoxY + L.linkBoxH, link.w, L.statusY - L.linkBoxY - L.linkBoxH).length, outsideInk(link, [R.link, R.signal, R.batt, [L.boxX, L.linkBoxY, L.boxW, L.linkBoxH]])], [0, 0], 'LINK HOME: nothing between the boxes and the status line (no CF, IN or BAR rows), no stray ink');
-  eq(idsIn(link, L.boxX, L.linkBoxY, L.boxW, L.linkBoxH), [INK.ONE], 'LINK HOME: the first box (36 x 36), lit, is the bar 1');
-  eq(litIn(link, L.boxX + 2 * (L.boxW + L.boxGap), L.linkBoxY, L.boxW, L.linkBoxH).length, 2 * L.boxW + 2 * (L.linkBoxH - 2), 'the others are frames of the same size');
+  eq(idsIn(link, L.boxX, L.linkBoxY, L.boxW, L.linkBoxH), [INK.ONE], 'LINK HOME: the first box (36 x 52), lit, is the bar 1');
+  eq(litIn(link, L.boxX + 2 * (L.boxW + L.boxGap), L.linkBoxY, L.boxW, L.linkBoxH).length, L.boxW * L.linkBoxH - (L.boxW - 4) * (L.linkBoxH - 4), 'the others are 2 px outlines of the same size');
   eq(litIn(link, L.boxX + 3 * (L.boxW + L.boxGap) + L.boxW - 1, L.linkBoxY, 1, L.linkBoxH).length, L.linkBoxH, 'the fourth box ends at x 157');
   ok(litRows(link, 2, 133).has(L.tempoY) && litRows(link, 2, 133).has(L.tempoY + 34), 'the tempo is the same size as in AUDIO');
   eq(litIn(link, 0, L.statusY, link.w, 7).length, 0, 'no STOP / MIN text in LINK mode');
@@ -323,14 +355,14 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   const hov = { ...OLED.create(), overlay: { until: NOW + 1000, title: 'DOUBLE', value: '240.0' } };
   let d = drawn(ctxOf(), { ui: hov });
   const rowsLit = j => { let lo = -1, hi = -1; for (let i = 0; i < LW; i++) if (d.fb[j * LW + i]) { if (lo < 0) lo = i; hi = i; } return [lo, hi]; };
-  eq(rowsLit(84), [15, 144], 'the overlay box is 130 px wide, centred (15 px each side)');
+  eq(rowsLit(79), [15, 144], 'the overlay box is 130 px wide, centred (15 px each side)');
   eq(idsIn(d, 15, 30, 130, 60), [0], 'no ink under the overlay box');
   ok(litIn(d, 20, 50, 120, 30).length > 100, 'its value is big (scale 4 for 240.0)');
   d = drawn({ ...ctxOf(), saved: true });
-  eq([idsIn(d, 35, 42, 90, 34), (() => { const r = [-1, -1]; for (let i = 0; i < LW; i++) if (d.fb[73 * LW + i]) { if (r[0] < 0) r[0] = i; r[1] = i; } return r; })()], [[0], [35, 124]], 'the SAVED box is centred (35 px each side) and carries no ink');
+  eq([idsIn(d, 35, 42, 90, 34), (() => { const r = [-1, -1]; for (let i = 0; i < LW; i++) if (d.fb[50 * LW + i]) { if (r[0] < 0) r[0] = i; r[1] = i; } return r; })()], [[0], [35, 124]], 'the SAVED box is centred (35 px each side) and carries no ink');
   const hint = { ...OLED.create(), hint: { title: 'PHASE', up: 'UP: +1/2', down: 'DOWN: -1/2' } };
   d = drawn(ctxOf(), { ui: hint });
-  eq([rowsLit(84), idsIn(d, 15, 30, 130, 60)], [[15, 144], [0]], 'the NO / YES hint box is centred on the grid too');
+  eq([rowsLit(79), idsIn(d, 15, 30, 130, 60)], [[15, 144], [0]], 'the NO / YES hint box is centred on the grid too');
 }
 
 // ---- the stick feeds the ctx: nothing made up ----

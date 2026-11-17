@@ -41,30 +41,35 @@ XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens
 |---|---|---|---|
 | 0..12 | 13 | top bar | x 2 transport icon (triangle 9 high, square 7, blinks while armed); x 14 fold label or LINK option icon; `GRP n` / SSID right-aligned to x 66; x 70 link glyph + Link peer count; x 98 signal bars (3 bars 3 px wide, 3 / 6 / 9 high); x 112 Bluetooth rune; x 119 USB plug; x 134 battery icon 21 x 9 with nub |
 | 15..49 | 35 | TEMPO | font scale 5 (digits 25 x 35, `120.0` is 130 px wide, x 2..131; the widest, 999.9, also fits); `BPM` at x 138, y 43..49 |
-| 53..70 | 18 | beat boxes | four boxes 36 x 18, gap 4, from x 2 to x 157; the lit one is filled, the others 1 px frames; the first is amber only while it is the lit one |
-| 75..81 | 7 | `CF  92%` + bar | label x 2; value right-aligned to x 60; bar x 64..157 (94 x 5, 3 px fill), tick at the stop threshold |
-| 87..93 | 7 | `IN -18dB` + bar | the same columns; tick at the tracker's -50 dBFS sound level |
-| 99..105 | 7 | `BAR LOCKED` + bar | AUTO BAR's state word and its confidence; only with AUTO BAR on (the row stays empty otherwise: the rows never move) |
+| 52..77 | 26 | beat boxes | four boxes 36 x 26 (they were 36 x 18), gap 4, margins 2, from x 2 to x 157: the beat indicator now that there are no LEDs; the lit one is a solid fill, the others 2 px outlines; the first is amber only while it is the lit one |
+| 81..87 | 7 | `CF  92%` + line | label x 2; value right-aligned to x 60; one thin line from x 64 (3 px high, rows 83..85, its length the value on 94 px), a notch at the stop threshold (rows 82..86) |
+| 91..97 | 7 | `IN -18dB` + line | the same columns and line; notch at the tracker's -50 dBFS sound level |
+| 101..107 | 7 | `BAR LOCKED` + outlined bar | AUTO BAR's state word and its confidence, in v4's outlined bar (94 x 5, 3 px fill); only with AUTO BAR on (the row stays empty otherwise: the rows never move) |
 | 111..117 | 7 | status line | left: `GATED` / `HOLD` / `COAST`, else `BT PAIR m:ss`, else `PHONE`, else the Wi-Fi line; right-aligned: `STOP 70` or `MIN 70` |
 
-Every element has its own row, with gaps of 1 to 5 px between rows; the test checks that no lit pixel lies in a gap, that the rows are in
+Every element has its own row, with gaps of 2 to 5 px between rows (the meter rows moved from a 12 px to a 10 px pitch to give the boxes their height); the test checks that no lit pixel lies in a gap, that the rows are in
 increasing order, and that the status word and the threshold text on row 111 do not touch (the v3 overlap of GATED / COAST over STOP 70 is
 gone because the words moved to the left of the same row).
 
-**LINK layout**: the same top bar, tempo and status line (no STOP / MIN text, no words); the beat boxes are 36 x 36 at y 58..93; no audio rows.
+**LINK layout**: the same top bar, tempo and status line (no STOP / MIN text, no words); the beat boxes are 36 x 52 (they were 36 x 36) at y 54..105, the same 2 px outlines and solid lit fill; no audio rows. Boxes are drawn on HOME only; no other screen shows them.
 
-### The progress bars
+### The CF and IN meters: one thin line
 
-A row is: label (neutral), the value (coloured), an outlined bar 94 x 5 px (outline neutral), the fill 3 px high inside it (coloured), and
-a tick. The inner width is 92 px: **fill = round(92 x value)**; the tick sits at `barX + 1 + round(91 x tickFraction)` and is an XOR line
-7 px high through the bar (it sticks out 1 px above and below, notches the outline, cuts a gap through a fill that passes it). Value, fill
-and tick carry the same ink id.
+A row is: label (neutral), the value (coloured), and **one line**: 3 px high (rows y + 2..y + 4 of the 7 px row), no outline, no separate
+track. Its **length is the value on 94 px: line = round(94 x value)** from x 64; the unfilled remainder is plain background. **I chose no
+dotted baseline**: with the value written beside it and the notch marking the one line that matters, the end of the line reads without
+one (the screenshots show it). A **notch**, 1 px wide and 5 px tall (rows y + 1..y + 5), is XOR-ed through the line at
+`barX + round(93 x tickFraction)`: a gap in the line where it passes the notch, a 5 px stub (one above, one below the line's rows) where it does not.
+Value, line and notch carry the same ink id.
 
-| bar | fraction | tick | colour of value, fill and tick |
+| line | fraction | notch | colour of value, line and notch |
 |---|---|---|---|
-| CF | confidence 0..1 (0 / 50 / 100 % = 0 / 46 / 92 px) | the stick's stop threshold `th` (70 % = x 129) | red below `th`; amber from `th` up to `th` + 10 points; green above; grey when the stick reports no value (`--`, empty bar) or there is silence |
-| IN | (dBFS + 90) / 90 (-90 / -45 / 0 dB = 0 / 46 / 92 px) | -50 dBFS (x 105): the tracker's sound level | neutral; red when the last second's peak reaches -1 dBFS (or, if `peak_db` is not reported, the RMS maximum reaches -3 dB); amber under -50 dBFS (too quiet to track) |
-| BAR | AUTO BAR's confidence 0..1 (MANUAL: empty) | none | neutral |
+| CF | confidence 0..1 (0 / 50 / 100 % = 0 / 47 / 94 px) | the stick's stop threshold `th` (70 % = x 129) | red below `th`; amber from `th` up to `th` + 10 points; green above; grey when the stick reports no value (`--`, no line) or there is silence |
+| IN | (dBFS + 90) / 90 (-90 / -45 / 0 dB = 0 / 47 / 94 px) | -50 dBFS (x 105): the tracker's sound level | neutral; red when the last second's peak reaches -1 dBFS (or, if `peak_db` is not reported, the RMS maximum reaches -3 dB); amber under -50 dBFS (too quiet to track) |
+
+The BAR row keeps v4's outlined bar (94 x 5, a 3 px fill inside it, so the fill is round(92 x confidence), neutral, no tick): AUTO BAR's
+confidence is the only meter left with a frame. It sits under two frameless lines and is a little heavier, but it appears only with AUTO
+BAR on and I found no clash worth changing; if the owner wants it uniform, it is one function (`outlinedRow` to `progressRow`).
 
 **Position inside the bar**: not drawn as a bar (my choice, easy to add). The face's beat position is an extrapolation (`Stick.ctx` runs the
 HOME line's phase forward with `phaseAt`, then floors it to the whole beat `beatN`), so a position bar would show the same estimate as the
@@ -105,7 +110,7 @@ cursor in view by itself (all 11 menu items fit; the scan list centres on the se
 
 ## Recommendation
 
-Keep: the tempo as the biggest element, the CF and IN bars with their ticks, the beat boxes with the amber first one, the top bar. The BAR
+Keep: the tempo as the biggest element, the CF and IN lines with their notches, the beat boxes with the amber first one, the top bar. The BAR
 row is a candidate to cut if the owner never turns AUTO BAR on (the space then stays empty). `MIN 70` / `STOP 70` is useful but could be
 cut to the colour alone.
 
@@ -115,17 +120,17 @@ cut to the colour alone.
    `LCD2` row table above, and the lcd2 screens (lists, edit, info, setup, overlays) as `ui/oled.js` draws them. `jank_lcd.c` paints the 160 x
    120 frame x2 with the palette.
 2. `tests/oled_ref/gen_ink.js` writes planes of 128 x 64 (`W = OLED.W`) and the C `test_oled.c` replays them: both must move to the 160 x 120
-   grid (the generator throws today, see below), and new cases cover the bars at 0 / 50 / 100 %, the tick, the words, the lists and the overlays.
+   grid (the generator throws today, see below), and new cases cover the lines at 0 / 50 / 100 %, the notch, the words, the lists and the overlays.
 3. Ctx fields as before: `rssi`, `peakDb`, `confKnown`, `peers`, `layout`, plus `bar` for the BAR row.
 4. Firmware wishes (unchanged): a charging flag, Wi-Fi retry / loss shares, a "joining" Link state, `rssi` / `peak_db` on the HOME line.
 
 ## Tests in this stage
 
-`tests/test_lcd2.js` (171 checks): palette AA; sizes and the throw on a wrong buffer; the exact x2 (a full frame covers all 320 x 240, an empty one
-none, six single source pixels each become exactly their 2 x 2 block in their ink colour); the row table (rows increasing, no lit pixel in
-a gap, tempo 35 rows, the widest tempo fits); ink only in the allowed boxes; the CF rule at 60, 69, 70, 75, 80, 81, 87, 100 for value, bar
-and tick; fill lengths at 0 / 50 / 100 % and the tick position (also following the stick's threshold); IN clip / quiet edges and fills; the BAR
-row; link, signal, battery; the status words and the threshold text; the LINK layout; no ink in menus, sub menus, edit, info, net, scan,
+`tests/test_lcd2.js` (192 checks): palette AA; sizes and the throw on a wrong buffer; the exact x2 (a full frame covers all 320 x 240, an empty one
+none, six single source pixels each become exactly their 2 x 2 block in their ink colour); the four boxes on every beat in both layouts (exact rectangles, solid lit box, 2 px outline and dark inside for the rest, even 4 px gaps and dark margins, amber only for a lit first box, gaps to the rows above and below); the row table (rows increasing, no lit pixel in
+a gap, tempo 35 rows, the widest tempo fits); ink only in the allowed boxes; the CF rule at 60, 69, 70, 75, 80, 81, 87, 100 for value, line
+and notch; line lengths at 0 / 50 / 100 % (exactly 3 rows, no outline, no track) and the notch position (also following the stick's threshold); IN clip / quiet edges and lengths; the BAR
+row (still outlined); link, signal, battery; the status words and the threshold text; the LINK layout; no ink in menus, sub menus, edit, info, net, scan,
 text, confirm, setup and overlays; overlays and SAVED centred; the OLED layout equal to golden hashes made by the OLED module from before the
 lcd2 layout (8 screens) and unaffected after an lcd2 draw.
 
