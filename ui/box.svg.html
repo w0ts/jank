@@ -1,0 +1,53 @@
+<svg id="dev" viewBox="-22 -13 116 89" tabindex="0" aria-label="jank mini 2.2, top view, 1 unit = 1 mm">
+  <defs>
+    <filter id="seam" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="1.3"/></filter>
+    <linearGradient id="lidg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9da1"/><stop offset="1" stop-color="#83868a"/></linearGradient>
+  </defs>
+  <!-- all coordinates are board millimetres: the board is 0..72 x 0..72, the case 75.6 x 75.6 outside (-1.8 .. 73.8) -->
+  <g id="jacks">
+    <rect x="15.1" y="-5" width="5" height="3.2" rx="1" class="port"/>
+    <g id="linePlug" visibility="hidden"><rect x="16.8" y="-13" width="1.6" height="7" rx=".5" class="plug"/><rect x="16.3" y="-7.2" width="2.6" height="1.8" class="plug"/></g>
+    <rect x="31.6" y="-4.4" width="9" height="2.6" rx="1.2" class="port"/>
+    <rect x="46.1" y="-5" width="4.4" height="3.2" rx="1" class="port"/>
+    <rect x="52.7" y="-5" width="4.4" height="3.2" rx="1" class="port"/>
+    <rect x="-5.2" y="4" width="3.4" height="4.8" rx="1.1" class="port"/>
+    <rect x="73.8" y="4" width="3.4" height="4.8" rx="1.1" class="port"/>
+    <rect x="-5.4" y="16" width="3.6" height="13" rx="1.4" class="port"/>
+    <rect x="73.8" y="16" width="3.6" height="13" rx="1.4" class="port"/>
+  </g>
+  <rect x="-1.8" y="-1.8" width="75.6" height="75.6" rx="4.5" fill="url(#lidg)" class="lid"/>
+  <rect x="-.6" y="-.6" width="73.2" height="73.2" rx="3.6" class="lidshade"/>
+  <!-- faint glow of the board's LEDs through the lid seam on the left wall -->
+  <ellipse id="seamGlow" cx="-1.4" cy="40" rx=".8" ry="5" filter="url(#seam)" opacity="0" fill="#000"/>
+  <!-- edge labels -->
+  <text x="17.6" y="2.6" class="lbl">LINE IN</text><text x="36.1" y="2.6" class="lbl">USB-C</text>
+  <text x="48.3" y="2.6" class="lbl">CLK</text><text x="54.9" y="2.6" class="lbl">RST</text>
+  <text x="-6.5" y="7.2" class="lbl r">MIDI OUT 1</text><text x="-6.5" y="23.3" class="lbl r">DIN 1</text>
+  <text x="78.4" y="7.2" class="lbl l">MIDI OUT 2</text><text x="78.4" y="23.3" class="lbl l">DIN 2</text>
+  <!-- power toggle on the left wall (J11 at (5.0, 49.5), axis y 54.5) -->
+  <g id="pwr" class="toggle">
+    <rect x="-5.9" y="48" width="4.4" height="9" rx="1" class="slot"/>
+    <rect id="lever" x="-7.3" y="49.2" width="4.8" height="3.6" rx="1" class="lever"/>
+    <rect x="-10" y="44" width="10" height="17" fill="transparent"/>
+  </g>
+  <text x="-3" y="46.4" class="lbl r">ON</text><text x="-3" y="60" class="lbl r">OFF</text>
+  <!-- the OLED: lid window and active area at the chosen module's size and place (SCREENS below), same 128 x 64 pixels -->
+  <g id="oledView">
+    <rect id="oledBezel" class="bezel" rx="1.6" x="0" y="0" width="1" height="1"/>
+    <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="128" height="64"></canvas></foreignObject>
+  </g>
+  <!-- the 4 beat LEDs on every unit (the board's row, 2026-11-15: LED1..LED4 at x 3.0 / 10.5 / 18.0 / 25.5, y 54.6,
+       below both screens): a small hole in the lid over each; beat n lights LED n (the LED language of core/jank_led.h) -->
+  <g id="ledView">
+    <g id="ledGlows"></g><g id="ledHoles"></g>
+  </g>
+  <!-- D-pad at the bottom right: cross centre (61.5, 62.2), button pads 6.5 mm from the centre, arms 6 mm wide -->
+  <g id="dpad">
+    <g id="arm-up" data-b="up"><rect x="58.5" y="52.7" width="6" height="9.5" rx="1" class="btnarm"/><text x="61.5" y="56.7" class="glyph">&#9650;</text></g>
+    <g id="arm-down" data-b="down"><rect x="58.5" y="62.2" width="6" height="9.5" rx="1" class="btnarm"/><text x="61.5" y="69.8" class="glyph">&#9660;</text></g>
+    <g id="arm-no" data-b="no"><rect x="52" y="59.2" width="9.5" height="6" rx="1" class="btnarm"/><text x="55" y="63.2" class="glyph s">NO</text></g>
+    <g id="arm-yes" data-b="yes"><rect x="61.5" y="59.2" width="9.5" height="6" rx="1" class="btnarm"/><text x="68" y="63.2" class="glyph s">YES</text></g>
+    <rect x="58.5" y="59.2" width="6" height="6" class="btnarm" style="pointer-events:none"/>
+  </g>
+  <text x="22" y="69" class="brand">jank mini 2.2</text>
+</svg>

@@ -2,6 +2,7 @@
 #   make simulator [ARGS="--xiao"]   the live player / emulator page (beat/live/player.py, 127.0.0.1:8791)
 #   make flash [IMAGE=path.bin]       build, then install the new image on the running stick: the JANK drive if mounted, else MIDI
 #                                     (ota.py). With IMAGE=path.bin: install that file, no build.
+#   make page                         expand page/src/jank.html (+ ui/*) into page/jank.html, the file the firmware embeds
 #   make build                        build the XIAO firmware (scripts/build.sh xiao)
 # FW names the firmware checkout, BEAT the beat folder; both default to this checkout (main).
 
@@ -17,7 +18,7 @@ IMAGE      := $(SCRATCH)/build-xiao/jank.bin
 FLASH_DEPS := build
 endif
 
-.PHONY: simulator flash build
+.PHONY: simulator flash build page
 
 simulator:
 	cd $(BEAT) && .venv/bin/python -m live.player $(ARGS)
@@ -28,3 +29,8 @@ flash: $(FLASH_DEPS)
 
 build:
 	cd $(FW) && bash scripts/build.sh xiao
+
+page: page/jank.html
+
+page/jank.html: page/src/jank.html $(wildcard ui/*) scripts/inline_ui.py
+	python3 scripts/inline_ui.py page/src/jank.html -o page/jank.html

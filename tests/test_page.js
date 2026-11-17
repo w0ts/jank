@@ -8,6 +8,7 @@ const vm = require("vm");
 const assert = require("assert");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "page", "jank.html"), "utf8");
+const expandedTemplate = require("./load_html.js")(path.join(__dirname, "..", "page", "src", "jank.html"));
 const logic = html.match(/<script id="logic">([\s\S]*?)<\/script>/)[1];
 const ui = html.match(/<script id="ui">([\s\S]*?)<\/script>/)[1];
 const box = {};
@@ -28,6 +29,24 @@ function ok(c, what) {
 }
 
 // --- the page as a file ---
+ok(html === expandedTemplate, "page/jank.html is the expansion of page/src/jank.html: run make page");
+ok(!/<!--@include/.test(html), "no include marker left");
+ok(/<script id="face-ui">/.test(html) && /const Sim = /.test(html) && /const Face = /.test(html), "the device face's scripts are in the page");
+ok(/id="c-sim"[^>]*aria-pressed="true"/.test(html) && /id="c-midi"[^>]*aria-pressed="false"/.test(html), "Connect card: Simulator is the active connection to start with");
+ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id="c-off"/.test(html), "no Device or Connect heading, no tag, no status text, no Disconnect button");
+ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
+ok(/<summary>Details<\/summary>/.test(html), "the Details section is still there");
+ok(/id="c-advanced-box" class="hide"/.test(html) && /id="player" class="hide"/.test(html) && /id="advanced-extra" class="hide"/.test(html), "Advanced box, Player card and the advanced-extra room start hidden");
+ok(!/>Simulator</.test(html) && />Demo</.test(html), "the base connection is called Demo");
+const playerUi = html.match(/<script id="player-ui">([\s\S]*?)<\/script>/)[1];
+ok(!/analyser\.connect/.test(playerUi) && (playerUi.match(/\.destination/g) || []).length === 2, "the meter's analyser feeds no output; the stick path alone connects to the context's destination");
+ok(/id="pl-meter"/.test(html) && /id="pl-status"/.test(html) && !/jank-player-level/.test(html), "the player card shows a level meter and a status line; nothing of it feeds the Demo screen");
+ok(/id="pl-bpm"/.test(html) && /Player\.expectedBpm\(/.test(html), "the player shows the tag BPM times the pitch through Player.expectedBpm");
+ok(/id="pl-monitor" type="checkbox" checked/.test(html), "the monitor check box is on by default");
+ok(!/levelDb: -20|conf: 0\.9|bpm: 120/.test(html.match(/const Sim = [\s\S]*?\n\}\)\(\);/)[0]), "the Demo model holds no demo audio numbers");
+ok(!/data-mode|face-lite|face-pad|face-mode|mode=light/.test(html), "one face only: no light view");
+ok(/SCREEN = "2\.42"/.test(html), "the 2.42 in screen is the page's screen");
+ok(!/Bluetooth: press the jank/.test(html), "no Bluetooth help paragraph in the Connect card");
 ok(!/https?:\/\//.test(html), "the page loads nothing external");
 ok(!/<script[^>]+src=/.test(html) && !/<link/.test(html), "no script or style from elsewhere");
 ok(/<title>jank<\/title>/.test(html), "title");

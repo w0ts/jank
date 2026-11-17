@@ -2,7 +2,7 @@
 // rate_ratio= numbers; the follower's line says the state, the glide's drift and the last ratio taken
 const fs = require('fs');
 const assert = require('assert');
-const html = fs.readFileSync(process.argv[2], 'utf8');
+const html = require('../../tests/load_html.js')(process.argv[2]);
 const grab = name => html.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n'))[0];
 let checks = 0;
 const eq = (a, b) => { assert.deepStrictEqual(a, b); checks++; };

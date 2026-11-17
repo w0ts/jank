@@ -2,7 +2,7 @@
 // unit (single NO toggles the source, the LED language), the BLUETOOTH menu item and YES with the XIAO in AUDIO
 const fs = require('fs');
 const assert = require('assert');
-const html = fs.readFileSync(process.argv[2], 'utf8');
+const html = require('../../tests/load_html.js')(process.argv[2]);
 const OLED = new Function(html.match(/const OLED = \(\(\) => \{[\s\S]*?\n\}\)\(\);\n/)[0] + '; return OLED;')();
 const grab = name => {                                   // a function of the page, whole (one line, or up to its closing brace at the line start)
   const one = html.match(new RegExp('^function ' + name + '\\([^)]*\\) \\{[^\\n]*\\}\\n', 'm'));

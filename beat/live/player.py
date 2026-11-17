@@ -7,6 +7,7 @@ The page is served on 127.0.0.1 only."""
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import random
 import json
 import sys
@@ -33,6 +34,7 @@ from live.varispeed import VarispeedSource
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = Path(__file__).resolve().parent / "player.html"
+INLINE_UI = ROOT.parent / "scripts" / "inline_ui.py"     # expands the page's `<!--@include ui/...-->` markers
 TRAKTOR_INDEX = ROOT / "data" / "traktor" / "index.json"
 TRACKS_DIR = Path.home() / "Music" / "Tracks"
 ACCURACY_DIR = ROOT / "runs" / "accuracy"      # player --xiao: one CSV a day of the accuracy windows
@@ -45,6 +47,14 @@ MAX_OFFSET_MS = 200.0
 FOLDS = (0.25, 0.5, 1.0, 2.0, 4.0)   # x2 / /2 steps, two either way
 MAX_SHIFT_BEATS = 3        # the device nudges half a beat at a time
 DEFAULT_MIN_CONFIDENCE = 0.8    # measured 2026-11-14: locked tracks p10 0.94-0.97, wrong tempos median ~0.4
+
+
+def render_page(page: Path = PAGE) -> bytes:
+    """The page with its shared ui/ sources included, read afresh so an edit of ui/* shows on reload."""
+    spec = importlib.util.spec_from_file_location("inline_ui", INLINE_UI)
+    inline_ui = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(inline_ui)
+    return inline_ui.expand_file(page).encode("utf-8")
 
 
 def load_library(index: Path = TRAKTOR_INDEX, tracks: Path = TRACKS_DIR) -> list[dict]:
@@ -298,7 +308,7 @@ def make_handler(app: App):
 
         def do_GET(self) -> None:
             if self.path == "/":
-                self._send(HTTPStatus.OK, PAGE.read_bytes(), "text/html; charset=utf-8")
+                self._send(HTTPStatus.OK, render_page(), "text/html; charset=utf-8")
             elif self.path == "/api/status":
                 self._json(HTTPStatus.OK, app.status())
             elif self.path == "/api/library":

@@ -3,7 +3,7 @@
 // read back from `get`), and the Bluetooth rune in HOME's top bar (no overlaps)
 const fs = require('fs');
 const assert = require('assert');
-const html = fs.readFileSync(process.argv[2], 'utf8');
+const html = require('../../tests/load_html.js')(process.argv[2]);
 const grab = name => html.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n'))[0];
 const konst = name => html.match(new RegExp('const ' + name + ' = ([0-9.-]+);'))[0];
 const consts = ['XIAO_STATUS_FRESH_MS', 'XIAO_PLAY_WAIT_MS', 'XIAO_HOME_FRESH_MS', 'XIAO_REPORT_FRESH_MS'].map(konst).join('\n');

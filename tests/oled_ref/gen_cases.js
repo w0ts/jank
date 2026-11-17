@@ -6,7 +6,7 @@
 // draw the same bytes, and log the same setter calls.
 'use strict';
 const fs = require('fs');
-const html = fs.readFileSync(process.argv[2], 'utf8');
+const html = require('../load_html.js')(process.argv[2]);
 const grab = re => { const m = html.match(re); if (!m) throw new Error('not found: ' + re); return m[0]; };
 const OLED = new Function(grab(/const OLED = \(\(\) => \{[\s\S]*?\n\}\)\(\);\n/) + '; return OLED;')();
 const QR = new Function(grab(/const QR = \(\(\) => \{[\s\S]*?\n\}\)\(\);\n/) + '; return QR;')();

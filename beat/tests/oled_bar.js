@@ -2,7 +2,7 @@
 // on HOME (AUDIO layout) and the menu item, picked again with YES even unchanged (MANUAL -> listening)
 const fs = require('fs');
 const assert = require('assert');
-const html = fs.readFileSync(process.argv[2], 'utf8');
+const html = require('../../tests/load_html.js')(process.argv[2]);
 const src = html.match(/const OLED = \(\(\) => \{[\s\S]*?\n\}\)\(\);\n/)[0];
 const OLED = new Function(src + '; return OLED;')();
 let checks = 0;
