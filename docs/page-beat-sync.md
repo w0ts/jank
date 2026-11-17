@@ -56,8 +56,14 @@ A number box and a slider, -400 to +400 ms in 5 ms steps. **Positive delays the 
 beat), **negative advances them** with the local phase. It changes only what this page draws and never the stick's settings. It is remembered
 in this browser (`jank.beat.delay`).
 
-Default (until you move it): the estimate `monitor latency - stick path latency`, to 5 ms, both read from the page's own contexts; 0 when
-either is unknown. It covers the part of the difference the browser can read; the stick's USB buffering is inside `beat_latency` (which the
+Default (until you move it): the estimate `monitor latency - stick path latency - beat_latency`, to 5 ms, the two latencies read from the page's
+own contexts and beat_latency from the stick (what the stick already corrects: the LED and the boxes share it, so it must not be
+corrected twice; it is 0 once Auto latency has sent monitor - stick); 0 when either latency is unknown.
+
+Auto latency (Advanced, ui/autolat.js, as the Mac simulator does): while Advanced is ticked over USB, the stick's audio source is USB and the
+player plays through the stick path, the page sends `set beat_latency <monitor - stick, -300..300>` when it is more than 3 ms from the
+stick's `lat_auto`, at most once per 5 s, never at load. Unmeasured: the stick's USB buffering and the capture chain, so the value is
+incomplete; finish by ear with Audio shift (`lat_trim`). It covers the part of the difference the browser can read; the stick's USB buffering is inside `beat_latency` (which the
 page shows next to it) and is not in the estimate. 'Use the estimate' goes back to it.
 
 Set the rest by ear: play a track with a clear beat, move the slider until the box changes on the beat you hear.

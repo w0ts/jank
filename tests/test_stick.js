@@ -230,6 +230,8 @@ eq(Stick.KEY_BTN, { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'no', Escape: '
   // the estimate of the display delay and its storage
   eq([Stick.beatDelayEstimate({ monitorMs: 30, stickMs: 50 }), Stick.beatDelayEstimate({ monitorMs: 96, stickMs: 20 }), Stick.beatDelayEstimate({ monitorMs: null, stickMs: 50 }), Stick.beatDelayEstimate({ monitorMs: 900, stickMs: 0 }), Stick.beatDelayEstimate({ monitorMs: 0, stickMs: 900 })],
      [-20, 75, 0, 400, -400], 'the estimate: monitor minus stick latency to 5 ms, 0 when one is unknown, within +-400');
+  eq([Stick.beatDelayEstimate({ monitorMs: 30, stickMs: 50, beatLatencyMs: -20 }), Stick.beatDelayEstimate({ monitorMs: 30, stickMs: 50, beatLatencyMs: 25 }), Stick.beatDelayEstimate({ monitorMs: 30, stickMs: 50, beatLatencyMs: null })],
+     [0, -45, -20], 'the estimate leaves out what the stick already corrects (its beat_latency): 0 once Auto latency has synced');
   eq([Stick.parseDelay('120'), Stick.parseDelay('-7'), Stick.parseDelay('900'), Stick.parseDelay(''), Stick.parseDelay(null), Stick.parseDelay('x')], [120, -5, 400, null, null, null], 'a stored delay: rounded to 5, limited, or none');
 }
 

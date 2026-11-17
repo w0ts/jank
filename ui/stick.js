@@ -44,11 +44,14 @@ const Stick = (() => {
     if (ph.pos === null || now - ph.reportAt > PHASE.staleMs) return null;
     return ph.running ? ph.pos + (now - (delayMs || 0) - ph.at) * ph.bpm / 60000 : ph.pos;
   }
-  // The display delay the page can estimate from what it knows: the monitor reaches the ear `monitorMs` after the file position, the
-  // stick path `stickMs` (the part the browser can read); the boxes are drawn when the stick reports. Both known: their difference, to 5 ms.
+  // The display delay the page can estimate from what it knows: the monitor reaches the ear `monitorMs` after the file position, the stick
+  // path `stickMs` (the part the browser can read), and the stick aligns its session beat by `beatLatencyMs` (the value it uses now). The
+  // boxes are drawn when the stick reports, so they are off by (stick path + beat_latency - monitor): the delay that undoes it is
+  // monitor - stick path - beat_latency. With Auto latency the stick's beat_latency becomes monitor - stick path and this is 0: the boxes
+  // are then not corrected twice. Without a known beat_latency: monitor - stick path, as before. To 5 ms.
   const BEAT_DELAY_MAX = 400, BEAT_DELAY_KEY = 'jank.beat.delay';
   const clampDelay = v => clamp(Math.round(v / 5) * 5, -BEAT_DELAY_MAX, BEAT_DELAY_MAX);
-  const beatDelayEstimate = l => (Number.isFinite(l.monitorMs) && Number.isFinite(l.stickMs) ? clampDelay(l.monitorMs - l.stickMs) : 0);
+  const beatDelayEstimate = l => (Number.isFinite(l.monitorMs) && Number.isFinite(l.stickMs) ? clampDelay(l.monitorMs - l.stickMs - (Number.isFinite(l.beatLatencyMs) ? l.beatLatencyMs : 0)) : 0);
   const parseDelay = text => (text === null || text === undefined || text === '' || !Number.isFinite(Number(text)) ? null : clampDelay(Number(text)));
   const foldOf = h => (h && FOLDS[h.fold] ? FOLDS[h.fold] : 1);
 
