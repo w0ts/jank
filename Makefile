@@ -3,6 +3,7 @@
 #   make flash [IMAGE=path.bin]       build, then install the new image on the running stick: the JANK drive if mounted, else MIDI
 #                                     (ota.py). With IMAGE=path.bin: install that file, no build.
 #   make page                         expand page/src/jank.html (+ ui/*) into page/jank.html, the file the firmware embeds
+#   make publish-page                 publish the COMMITTED page to https://w0ts.github.io/jank/ (only gh-pages is pushed)
 #   make build                        build the XIAO firmware (scripts/build.sh xiao)
 # FW names the firmware checkout, BEAT the beat folder; both default to this checkout (main).
 
@@ -18,7 +19,7 @@ IMAGE      := $(SCRATCH)/build-xiao/jank.bin
 FLASH_DEPS := build
 endif
 
-.PHONY: simulator flash build page
+.PHONY: simulator flash build page publish-page
 
 simulator:
 	cd $(BEAT) && .venv/bin/python -m live.player $(ARGS)
@@ -34,3 +35,7 @@ page: page/jank.html
 
 page/jank.html: page/src/jank.html $(wildcard ui/*) scripts/inline_ui.py
 	python3 scripts/inline_ui.py page/src/jank.html -o page/jank.html
+
+# the committed page to https://w0ts.github.io/jank/ (gh-pages: only the page; main is not pushed)
+publish-page:
+	bash scripts/publish_page.sh
