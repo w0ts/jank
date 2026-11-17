@@ -72,9 +72,16 @@ int beat_nudge(int halves, int8_t *total, char *view, size_t cap);
 /* NUDGE MS for the device's YES + UP/DOWN is core/jank_core.h jk_nudge_ms on the settings (app_cfg_get, jk_nudge_ms,
  * app_cfg_set), as the control line's `nudge ms` does */                               /* AUTO BAR: 0 off, 1 listening, 2 locked, 3 manual (jb_down.h) */
 
+/* linein.c: the LINE IN (board.h BOARD_HAS_LINEIN) through ADC1 continuous mode into the tracker's ring (usb_audio.h), and
+ * the cell's level from the same ADC pattern. Boards without it: linein_start does nothing, no battery percent. */
+esp_err_t linein_start(void);
+int linein_batt_pct(void);                                   /* -1: no cell, or no reading yet */
+void linein_report(char *out, size_t cap);                   /* the `line` command's answer, ending in ok */
+
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);
 int64_t midi_now_us(void);
+int64_t midi_now_us_isr(void);                       /* the same, from an IRAM interrupt with the cache off; -1 before midi_start */
 void midi_set_quantum(uint32_t quantum);
 void midi_publish(const struct jc_map *m);
 void midi_want(int play);

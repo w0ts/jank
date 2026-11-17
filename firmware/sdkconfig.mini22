@@ -1,4 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# The jank mini 2.2 board (battery order): its pins (main/board.h) for USB host mode. After sdkconfig.fh4r2, as a build
-# check until the board exists: JANK_VARIANT=mini22 JANK_EXTRA_DEFAULTS="sdkconfig.fh4r2;sdkconfig.mini22" scripts/build.sh xiao
+# The jank mini 2.2 board (battery order): its pins (main/board.h) for USB host mode and the LINE IN. The board now carries an
+# ESP32-S3-WROOM-1U-N8R2 module (2026-11-15, was the bare FH4R2): 8 MB flash as the XIAO (partitions_usb.csv), 2 MB QUAD
+# PSRAM instead of the XIAO's octal. After sdkconfig.xiao, as a build check until the board exists:
+# JANK_VARIANT=mini22 JANK_EXTRA_DEFAULTS=sdkconfig.mini22 scripts/build.sh xiao
+# (sdkconfig.fh4r2 is the old chip's 4 MB check: no longer part of this build.)
 CONFIG_JANK_BOARD_MINI22=y
+CONFIG_SPIRAM_MODE_QUAD=y

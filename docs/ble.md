@@ -38,7 +38,7 @@ The setting `ble` (`set ble pair|auto|off`, saved):
 
   `net` is `j<group>` (MODE JANK) or `w1`/`w0` (on the Wi-Fi network / looking for it); `transport` 0 stopped, 1
   playing, 2 a start armed for a bar ahead (in AUDIO mode: the clock outputs, `core/jank_hold.h`); `bar` the session's
-  place in the bar in hundredths of a beat (`-` with no session); `battery` percent (`-`: no board has a gauge yet);
+  place in the bar in hundredths of a beat (`-` with no session); `battery` percent (`-`: no gauge; jank mini 2.2 reads its cell, docs/linein.md);
   `level` the input meter (RMS over 0.3 s, a value every 250 ms, dBFS), `conf` the confidence in percent (how well the
   last 8 s of tracked beats fit the published grid, `core/jank_conf.h`: LOW CONFIDENCE's), `min` / `max` the meter's lowest and highest values over the last 3 s (`-` with no audio
   stream), `mode` 1 AUDIO (the source has sound: the tracker leads, play / stop hold the outputs) or 0 LINK. `home` on the control line answers

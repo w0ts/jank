@@ -54,7 +54,7 @@ const char *jph_state_name(const struct jph *p);                       /* "off",
  *   quantum    beats a bar
  *   link peers Link peers in the session, the stick not counted
  *   air peers  units heard on the group's channel (MODE JANK; 0 on Wi-Fi)
- *   battery    percent, "-" with no gauge (no board measures one yet)
+ *   battery    percent, "-" with no gauge (jank mini 2.2 reads its cell: firmware/main/linein.c)
  *   level      the input meter: RMS over 0.3 s, a value every 250 ms, dBFS (-99 .. 0); "-" with no audio stream
  *   conf       the confidence: the last 8 s of tracked beats against the published grid (jank_conf.h), percent; "-"
  *              with no audio stream

@@ -226,7 +226,7 @@ static void role_task(void *arg)
         audio = jur_source(cfg.source, s_line.level, uac_stream_open());
         if (audio != routed) {
             routed = audio;
-            uac_route(audio == JUR_AUDIO_USB);   /* the line in's own path is not on this branch: LINE hears nothing yet */
+            uac_source(audio);         /* LINE: linein.c's samples (a board without LINE IN: nothing comes) */
         }
         publish(&in, &o, st.dir, audio);
         follow_latency(&cfg, audio);

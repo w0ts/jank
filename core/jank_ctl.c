@@ -158,7 +158,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put(w, "lowconf=%s\nthreshold=%u\nrate=%s\nfollower=%s\nskip=%s\ngraded=%s\n", lowconf_name(c->lowconf), c->threshold, on_off(c->rate),
         c->follower ? "robust" : "tuned", SKIP_NAME[c->skip < 3u ? c->skip : 0u], on_off(c->graded));
     put(w, "ble=%s\n", ble_name(c->ble));
-    put(w, "usb=%s\nsource=%s\n", jur_usb_name(c->usb), jur_src_name(c->source));
+    put(w, "usb=%s\nsource=%s\nline_gain=%d\n", jur_usb_name(c->usb), jur_src_name(c->source), c->line_gain_db);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "version=%s\nok\n", JK_VERSION);
@@ -399,6 +399,8 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
         jla_set(&c->lat, &computer, (int)v);
         c->beat_latency_ms = jla_get(&c->lat, &c->lat_key);
     }
+    else if (!strcmp(key, "line_gain") && !parse_int(val, JK_LINE_GAIN_MIN_DB, JK_LINE_GAIN_MAX_DB, &v))
+        c->line_gain_db = (int8_t)v;
     else
         return -1;
     return 0;
@@ -677,7 +679,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     } else if (!strcmp(s, "ble pair") || !strcmp(s, "ble close"))
         return s[4] == 'p' ? JK_CTL_BLE_PAIR : JK_CTL_BLE_CLOSE;
     else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|ble|usb|source|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nble pair|close\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|ble|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nble pair|close\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

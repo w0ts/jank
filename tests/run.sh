@@ -62,6 +62,9 @@ fi
 "$OUT/test_midiq"
 "$CC" $FLAGS "$HERE/tests/test_pcm.c" "$HERE/core/jank_pcm.c" -lm -o "$OUT/test_pcm"
 "$OUT/test_pcm"
+# LINE IN: the ADC framing, the timestamp fit, DC / gain / level, the cell, the cubic resampler and the chain on clicks
+"$CC" $FLAGS "$HERE/tests/test_line.c" "$HERE/core/jank_line.c" "$HERE/core/jank_pcm.c" -lm -o "$OUT/test_line"
+"$OUT/test_line"
 
 # The USB speaker's descriptor (firmware/main/usb_audio.h: macros only).
 "$CC" $FLAGS -I"$HERE/firmware/main" "$HERE/tests/test_uac_desc.c" -o "$OUT/test_uac_desc"
