@@ -36,7 +36,7 @@ TAGS = {   # short purposes, top (README "Twins", "Spare pads"): placed like a r
     "RT33": "BIAS", "RT34": "BIAS", "RT36": "PD", "RT37": "PD",
     "RT38": "DET", "RT51": "ICHG", "RT10": "VBAT", "RT11": "VBAT", "RT60": "SCL", "RT61": "SDA", "RT39": "GND LIFT", "RT120": "CLK GND", "RT121": "RST GND",
     "RT73": "CLK PU", "RT75": "CLK R", "RT79": "RST PU", "RT81": "RST R", "CT8": "VBAT C", "CT3": "VIN",
-    "C72": "VSYS BULK", "C92": "VSYS BULK", "C27": "VBUS DAMP", "C91": "VBUS DAMP", "R88": "VBUS SENSE", "U11": "ESD", "U12": "ESD", "U15": "IDEAL D", "U18": "5V AUX", "U19": "5V CLAMP", "U2": "3V3 BB", "U2B": "LDO 3V3 ALT", "C26": "PI", "C80": "DB", "C81": "DB", "C82": "DB", "C83": "DB", "C27": "VBUS", "C67": "GS",
+    "C72": "VREG BULK", "C92": "VREG BULK", "R155": "BULK R", "C27": "VBUS DAMP", "C91": "VBUS DAMP", "R88": "VBUS SENSE", "U11": "ESD", "U12": "ESD", "U15": "IDEAL D", "U18": "5V AUX", "U19": "5V CLAMP", "U2": "3V3 BB", "U2B": "LDO 3V3 ALT", "C26": "PI", "C80": "DB", "C81": "DB", "C82": "DB", "C83": "DB", "C27": "VBUS", "C67": "GS",
     "U17": "CC", "Q9": "VBUS ISO", "RT93": "HOST R", "R98": "LED FILT",
 }
 NOTES = [("R62", "USB ONLY: BRIDGE"), ("R39", "GND LIFT"), ("R63", "USB ONLY"), ("J11", "<- ON/OFF"),
