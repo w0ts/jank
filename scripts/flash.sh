@@ -17,7 +17,7 @@ echo "image: $IMAGE ($(wc -c < "$IMAGE" | tr -d ' ') bytes, $(date -r "$IMAGE" '
 
 if [ -d "$DRIVE" ]; then
     echo "drive: copying onto $DRIVE/jank.bin"
-    cp "$IMAGE" "$DRIVE/jank.bin"
+    "$PY" "$FW_DIR/scripts/copy_progress.py" "$IMAGE" "$DRIVE/jank.bin"
     sync
     echo "waiting for the stick to restart (it restarts after 1.5 s of quiet)..."
     gone=0
