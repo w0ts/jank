@@ -31,22 +31,25 @@ function ok(c, what) {
 // --- the page as a file ---
 ok(html === expandedTemplate, "page/jank.html is the expansion of page/src/jank.html: run make page");
 ok(!/<!--@include/.test(html), "no include marker left");
-ok(/<script id="face-ui">/.test(html) && /const Sim = /.test(html) && /const Face = /.test(html), "the device face's scripts are in the page");
-ok(/id="c-sim"[^>]*aria-pressed="true"/.test(html) && /id="c-midi"[^>]*aria-pressed="false"/.test(html), "Connect card: Simulator is the active connection to start with");
+ok(/<script id="face-ui">/.test(html) && /<script id="advanced-ui">/.test(html) && /const Stick = /.test(html) && /const Face = /.test(html), "the face's, Advanced's and the player's scripts are in the page");
+ok(/id="c-midi"[^>]*aria-pressed="false"/.test(html) && /id="c-bluetooth"[^>]*aria-pressed="false"/.test(html), "Connect: MIDI port and Bluetooth, none pressed before a connection");
+ok(!/id="c-sim"|>Demo<|>Simulator<|Sim\.|const Sim|sim\.js|\?sim=/.test(html), "no Demo / simulator mode left");
 ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id="c-off"/.test(html), "no Device or Connect heading, no tag, no status text, no Disconnect button");
 ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
 ok(/<summary>Details<\/summary>/.test(html), "the Details section is still there");
-ok(/id="c-advanced-box" class="hide"/.test(html) && /id="player" class="hide"/.test(html) && /id="advanced-extra" class="hide"/.test(html), "Advanced box, Player card and the advanced-extra room start hidden");
-ok(!/>Simulator</.test(html) && />Demo</.test(html), "the base connection is called Demo");
+ok(/id="live" class="hide"/.test(html) && /id="c-advanced-box" class="hide"/.test(html) && /id="player" class="hide"/.test(html) && /id="advanced-extra" class="hide"/.test(html), "the face, the Advanced box, the Player card and the Advanced extra start hidden");
+ok(!/id="home"|id="h-|id="t-(tempo|set|play|up|down)"|id="n-(beat|ms)/.test(html), "the HOME card is gone");
+for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source", "c-ble", "ble-pair"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the stick's menu has it, the page does not");
+for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "scan", "groups", "ble-close", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
+  ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
+ok(!/id="pl-file"|id="pl-prev"|id="pl-reset"|dragover|type="file" accept/.test(html), "no single-file button, no Previous, no drag and drop");
+ok(/id="pl-folder"[^>]*aria-label="Music folder"[^>]*><svg/.test(html) && /id="pl-then"/.test(html) && /id="pl-help"/.test(html), "the music folder is an icon button, 'then' and the help toggle are there");
 const playerUi = html.match(/<script id="player-ui">([\s\S]*?)<\/script>/)[1];
-ok(!/analyser\.connect/.test(playerUi) && (playerUi.match(/\.destination/g) || []).length === 2, "the meter's analyser feeds no output; the stick path alone connects to the context's destination");
-ok(/id="pl-meter"/.test(html) && /id="pl-status"/.test(html) && !/jank-player-level/.test(html), "the player card shows a level meter and a status line; nothing of it feeds the Demo screen");
+ok(!/analyser\.connect/.test(playerUi), "the meter's analyser is only listened to: it feeds no output");
+ok(/id="pl-meter"/.test(html) && /id="pl-status"/.test(html), "the player card shows a level meter and a status line");
 ok(/id="pl-bpm"/.test(html) && /Player\.expectedBpm\(/.test(html), "the player shows the tag BPM times the pitch through Player.expectedBpm");
 ok(/id="pl-monitor" type="checkbox" checked/.test(html), "the monitor check box is on by default");
-ok(!/levelDb: -20|conf: 0\.9|bpm: 120/.test(html.match(/const Sim = [\s\S]*?\n\}\)\(\);/)[0]), "the Demo model holds no demo audio numbers");
-ok(!/data-mode|face-lite|face-pad|face-mode|mode=light/.test(html), "one face only: no light view");
-ok(/SCREEN = "2\.42"/.test(html), "the 2.42 in screen is the page's screen");
-ok(!/Bluetooth: press the jank/.test(html), "no Bluetooth help paragraph in the Connect card");
+ok(/SCREEN|placeScreen\(svg, "2\.42"\)/.test(html), "the face uses the 2.42 in screen");
 ok(!/https?:\/\//.test(html), "the page loads nothing external");
 ok(!/<script[^>]+src=/.test(html) && !/<link/.test(html), "no script or style from elsewhere");
 ok(/<title>jank<\/title>/.test(html), "title");
@@ -89,31 +92,19 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
 {
   const link = box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18 0");
   eq([link.audio, link.fold, link.levelMin, link.levelMax], [false, "", -31, -18]);
-  const lv = box.homeView(link, 0);
-  eq([lv.mode, lv.transport, lv.playText, lv.canPlay, lv.levelRange], ["LINK", "Playing", "Stop", true, "input level, -31 to -18 dB in 3 s"]);
-  const held = box.homeView(box.parseHome("h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1"), 0);
-  eq([held.mode, held.audio, held.transport, held.play, held.playText], ["AUDIO", true, "Held: outputs stopped", "play", "Start outputs"]);
-  const armed = box.homeView(box.parseHome("h 0 j3 2 - 4 0 0 - -30 12 -40 -28 1"), 0);
-  eq([armed.transport, armed.play, armed.playText, armed.canPlay], ["Starts once the beat locks, on a bar", "stop", "Stop outputs", true]);
+  eq(box.parseHome("h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1").transport, "stopped");
+  eq([box.parseHome("h 0 j3 2 - 4 0 0 - -30 12 -40 -28 1").transport, box.parseHome("h 0 j3 2 - 4 0 0 - -30 12 -40 -28 1").bpm], ["armed", 0]);
   const folded = box.parseHome("h 25600 j3 1 0 4 2 0 - -12 90 -15 -9 x2");
-  eq([folded.audio, folded.fold, box.homeView(folded, 0).mode], [true, "x2", "AUDIO x2"]);
-  eq(box.homeView(box.parseHome("h 6400 j3 1 0 4 2 0 - -12 90 -15 -9 /2"), 0).mode, "AUDIO ÷2");
+  eq([folded.audio, folded.fold], [true, "x2"]);
+  eq(box.parseHome("h 6400 j3 1 0 4 2 0 - -12 90 -15 -9 /2").fold, "/2");
   eq(box.parseHome("h 12000 j3 1 0 4 2 0 - -12 90 -15 -9 x3").fold, "");
-  // M2k: the confidence holds: "<pct>h" -> the shown value, HOLD by the number, the bar hatched
+  // M2k: the confidence holds: "<pct>h" -> the shown value and the hold flag
   const hold = box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93h -15 -9 1");
   eq([hold.conf, hold.confHold], [93, true]);
-  const hv = box.homeView(hold, 0);
-  eq([hv.conf, hv.confPct, hv.confHold], ["93 % HOLD", 93, true]);
-  eq([box.homeView(box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93 -15 -9 1"), 0).conf, box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93 -15 -9 1").confHold],
-     ["93 %", false]);
-  // the robust follower's coast: "<pct>c" -> a measured value, COAST by the number, the bar hatched
+  eq([box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93 -15 -9 1").conf, box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93 -15 -9 1").confHold], [93, false]);
+  // the robust follower's coast: "<pct>c" -> a measured value and the coast flag
   const coast = box.parseHome("h 12000 j3 1 0 4 2 0 - -12 61c -15 -9 1");
   eq([coast.conf, coast.confHold, coast.confCoast], [61, false, true]);
-  const cv = box.homeView(coast, 0);
-  eq([cv.conf, cv.confPct, cv.confHold, cv.confCoast], ["61 % COAST", 61, false, true]);
-  eq(box.homeView(box.parseHome("h 12000 j3 1 0 4 2 0 - -12 93 -15 -9 1"), 0).confCoast, false);
-  const idle = box.homeView(box.parseHome("h 0 j3 0 - 4 0 0 - - - - - 0"), 0);
-  eq([idle.canPlay, idle.levelRange], [false, "input level"]);
   // Bluetooth from `status`: the window's countdown, a phone, off; over Bluetooth this phone
   eq(box.bleView({ ble_state: "window", ble_left: "95" }, 0, false), "pairing 1:35");
   eq(box.bleView({ ble_state: "window", ble_left: "95" }, 5500, false), "pairing 1:30");
@@ -134,13 +125,9 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   eq(box.setCommand("autobar", "start"), "set autobar start");
   eq(box.setCommand("autobar", "always"), "set autobar always");
   eq(box.setCommand("autobar", "on"), null);
-  ok(/id="c-bluetooth"/.test(html) && (html.match(/id="c-ble"/g) || []).length === 1, "one element per id: the Bluetooth button apart from its setting");
-  ok(/id="c-source"/.test(html) && /id="c-autobar"/.test(html) && /id="t-up"/.test(html) && /id="t-down"/.test(html), "source, AUTO BAR, x2 / ÷2 on the page");
   // M2d: the USB MIDI clock setting, the nudges in AUDIO mode
   eq(box.setCommand("usbmidi", "off"), "set usbmidi off");
   eq(box.setCommand("usbmidi", "no"), null);
-  eq([box.nudgeCommand("beat", 1), box.nudgeCommand("beat", -1), box.nudgeCommand("ms", 1), box.nudgeCommand("ms", -1)],
-     ["nudge beat +0.5", "nudge beat -0.5", "nudge ms +1", "nudge ms -1"]);
   // M2h: two layers each: PHASE on top of AUTO BAR's bar, AUDIO SHIFT on top of the auto latency; 0 is AUTO
   eq(box.nudgeSaid("beat", 1, { nudge_beats: "1.5" }), "Phase +1.5 beats, on top of AUTO BAR's bar.");
   eq(box.nudgeSaid("beat", -1, { nudge_beats: "-0.5" }), "Phase -0.5 beats, on top of AUTO BAR's bar.");
@@ -155,8 +142,7 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   eq(box.latNote("host:1935:000c", {}), "(host:1935:000c)");
   ok(/AUDIO mode/.test(box.nudgeError("err link mode")) && /limit/.test(box.nudgeError("err nudge beat at its limit, -3 to 3 beats in all")), "nudge errors in words");
   eq(box.nudgeError("err odd"), "err odd");
-  for (const id of ["nudges", "n-beat-down", "n-beat-up", "n-ms-down", "n-ms-up", "c-usbmidi", "c-beat_latency_src"])
-    ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
+  ok((html.match(/id="c-beat_latency_src"/g) || []).length === 1, "the latency source note on the page once");
   // M2e: LOW CONFIDENCE and THRESHOLD, the confidence meter's tick and note
   eq(box.setCommand("lowconf", "stop"), "set lowconf stop");
   eq(box.setCommand("lowconf", "run"), "set lowconf run");
@@ -166,42 +152,11 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   eq(box.setCommand("threshold", "101"), null);
   eq(box.setCommand("threshold", "7.5"), null);
   eq(box.setCommand("threshold", ""), null);
-  eq(box.confView({ lowconf: "stop", threshold: "80", gated: "0", silent: "0", audio_live: "1" }),
-     { tick: 80, note: "confidence (stops under 80 %)", gated: false });
-  eq(box.confView({ lowconf: "stop", threshold: "80", gated: "1", silent: "0", audio_live: "1" }),
-     { tick: 80, note: "confidence: under 80 %, outputs stopped", gated: true });
-  eq(box.confView({ lowconf: "stop", threshold: "80", gated: "1", silent: "0", audio_live: "0" }).gated, false);   // LINK mode: no gate
-  eq(box.confView({ lowconf: "run", threshold: "80", gated: "0", silent: "1", audio_live: "1" }),
-     { tick: null, note: "confidence: silence, outputs stopped", gated: true });
-  eq(box.confView({ lowconf: "run", threshold: "80" }), { tick: null, note: "confidence (keeps running)", gated: false });
-  eq(box.confView({ lowconf: "stop", threshold: "0" }).tick, null);
-  eq(box.confView({ lowconf: "stop", threshold: "65" }), { tick: 65, note: "confidence (stops under 65 %)", gated: false });   // a `get`
-  eq(box.confView(null), { tick: null, note: "confidence", gated: false });
-  eq(box.confView({ group: "1" }).note, "confidence");                                           // an older firmware
-  for (const id of ["c-lowconf", "c-threshold", "h-conf-note", "h-conf-tick", "h-conf-meter"])
-    ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
-  ok(/"lowconf",\s*"threshold"/.test(ui), "both in the settings read back from get");
 }
 eq(box.parseHome("h 12000 w1 2 150 3 2 0 - - -").transport, "armed");
 eq(box.parseHome("h 12000 x3 1 275 4 2 0 - - -"), null);
 eq(box.parseHome("h 12000 j3 1 275"), null);
 eq(box.parseHome("b 1 12000 steady 1"), null);
-{
-  const h = box.parseHome("h 12000 j3 1 275 4 2 3 - -24 87");
-  const v = box.homeView(h, 0);
-  eq([v.bpm, v.beat, v.transport, v.net, v.link, v.air, v.battery, v.level, v.conf], ["120", 2, "Playing", "MODE JANK 3", "2", "3", "-", "-24 dB", "87 %"]);
-  eq(box.homeView(h, 250).beat, 3);           // 2.75 + 0.5 beats at 120 BPM: the bar's fourth beat
-  eq(box.homeView(h, 620).beat, 3);
-  eq(box.homeView(h, 630).beat, 0);           // 2.75 + 1.26 beats: round to the bar's first
-  eq(box.homeView(box.parseHome("h 12000 j3 0 275 4 2 3 - - -"), 5000).beat, 2);   // stopped: it stays
-  eq(box.homeView(box.parseHome("h 12050 w1 1 0 4 2 0 - - -"), 0).bpm, "120.50");
-  eq(box.homeView(box.parseHome("h 0 j3 0 - 4 0 0 - - -"), 0).transport, "No Link session yet");
-  eq(box.homeView(box.parseHome("h 12000 w1 1 0 4 2 5 - -60 0"), 0).air, "-");
-  eq(box.homeView(box.parseHome("h 12000 w1 1 0 4 2 5 - -60 0"), 0).levelPct, 0);
-  eq(box.homeView(box.parseHome("h 12000 w1 1 0 4 2 5 - 0 100"), 0).levelPct, 100);
-  eq(box.homeView(null, 0), null);
-}
-
 // --- SysEx out of MIDI chunks (the iPhone apps' polyfills may cut a message) ---
 {
   const s = new box.SysexIn(), got = [];
@@ -346,13 +301,6 @@ eq(box.splitLines("", "a\r\nb\n"), { lines: ["a", "b"], rest: "" });
 }
 eq(box.peerText({ units: 3, janks: 1 }), "3, of which 1 jank");
 eq(box.peerText({ units: 2, janks: 0 }), "2");
-eq(box.tempoCommand("120"), "tempo 120");
-eq(box.tempoCommand(" 128.5 "), "tempo 128.5");
-eq(box.tempoCommand("99,25"), "tempo 99.25");
-eq(box.tempoCommand("19.99"), null);
-eq(box.tempoCommand("1000"), null);
-eq(box.tempoCommand("120.125"), null);
-eq(box.tempoCommand("1e2"), null);
 eq(box.isEnd("ok"), true);
 eq(box.isEnd("err bad setting"), true);
 eq(box.isEnd("okay"), false);

@@ -1,0 +1,127 @@
+# Replies of the firmware's own control line (core/jank_ctl.c, jk_ctl_line, default settings, one run on the host; the `### <command>` lines name the command).
+# Regenerate: a harness like tests/test_ctl.c's run() printing each reply. Home lines of a playing session: tests/test_phone.c.
+### get
+group=1
+channel=1
+name=jank
+filter=link
+peer=on
+transport=link
+quantum=4
+offset=0.00
+beat=on
+beat_latency=25
+lat_auto=25
+lat_trim=0
+beat_latency_src=usb
+autobar=start
+usbmidi=on
+lowconf=stop
+threshold=80
+rate=on
+follower=tuned
+skip=off
+graded=off
+ble=pair
+usb=device
+source=auto
+line_gain=0
+net=jank
+ssid=
+pass=none
+mac=02:11:22:33:44:55
+version=0.1.0
+ok
+### status
+usb=1
+uptime=12
+group=1
+channel=1
+peers=0
+rssi=0
+wifi=0
+wifi_ip=0.0.0.0
+wifi_rssi=0
+wifi_channel=0
+usb_in=0
+air_out=0
+air_in=0
+usb_out=0
+drop_filter=0
+drop_big=0
+drop_bad=0
+drop_dup=0
+drop_own=0
+drop_other=0
+drop_foreign=0
+mac_adopted=0
+tx_fail=0
+queue_full=0
+scan_lost=0
+lat_air_us=0
+lat_air_max_us=0
+lat_usb_us=0
+lat_usb_max_us=0
+link=0
+link_ip=0.0.0.0
+link_peers=0
+bpm=0.00
+beat=0.000
+playing=0
+settled=0
+armed=0
+midi_ticks=0
+midi_resync=0
+audio=0
+audio_live=0
+hold=0
+outputs=stopped
+fold=1
+fold_manual=0
+rms_db=0
+rms_min_db=0
+rms_max_db=0
+peak_db=0
+conf=0
+conf_hold=0
+coast=0
+act=0
+gated=0
+silent=0
+threshold=80
+lowconf=stop
+follow=stopped
+drift_ppm=0
+rate_ratio=0.0000
+bar=off
+bar_phi=0
+bar_lead=0.00
+nudge_beats=0
+beat_latency=25
+lat_auto=25
+lat_trim=0
+beat_latency_src=usb
+usbmidi=on
+usb_role=device
+usb_cc=nochip
+line_plugged=0
+audio_source=none
+ok
+### home
+home=h 0 j1 0 - 4 0 0 0 - - - - 0
+ok
+### fold x2
+### fold x3
+err fold x2, /2 or 1
+### tempo 5
+err tempo is 20 to 999 BPM
+### nudge beat 9
+err nudge beat +-0.5 to 3 in halves, or nudge ms +-1 to 10
+### set threshold 200
+err bad setting
+### set source bogus
+err bad setting
+### set lowconf stop
+ok
+### nope
+err unknown command
