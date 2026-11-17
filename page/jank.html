@@ -1307,6 +1307,9 @@ const OLED = (() => {
     ltmode: { title: 'LINK TRANSPORT', opts: LT_MODES, get: c => c.ltMode,      // LINK mode only: the session's start / stop
               help: [['CLOCKS RUN ON LINK', 'TEMPO, OWN START'], ['CLOCKS START + STOP', 'WITH THE SESSION'],
                      ['FOLLOWS, AND START/', 'STOP DRIVES LINK']] },
+    // the lcd2 layout only (ctx.layout 'lcd2', menuFor): the whole screen flashes on the beat, the bar's first beat in another colour (ui/lcd2.js)
+    beatflash: { title: 'BEAT FLASH', opts: ['BOXES', 'SCREEN'], get: c => (c.beatFlash ? 1 : 0),
+                 help: [['ONLY THE BOXES', 'SHOW THE BEAT'], ['WHOLE SCREEN FLASHES', 'FIRST BEAT: AMBER']] },
     bright: { title: 'BRIGHTNESS', lo: 10, hi: 100, step: 10, unit: '%', get: c => c.bright, help: ['SCREEN BRIGHTNESS', 'LOWER SAVES BATTERY'] },
     sleep: { title: 'SCREEN OFF', opts: SLEEP_NAMES, get: c => c.sleep,
              help: [['SCREEN STAYS ON', ''], ['DARK AFTER 30 S', 'ANY BUTTON WAKES IT'], ['DARK AFTER 1 MIN', 'ANY BUTTON WAKES IT'],
@@ -1341,6 +1344,9 @@ const OLED = (() => {
     { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'BLUETOOTH', edit: 'ble' }, { name: 'USB MIDI CLOCK', edit: 'usbmidi' }, { name: 'OFFSET', sub: 'offsets' },
     { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
   ];
+  // the lcd2 layout's menu: BEAT FLASH (the whole screen flashes on the beat) after DISPLAY. The OLED menus never list it, so they stay as they were.
+  const MENU_LCD2 = [...MENU.slice(0, -1), { name: 'BEAT FLASH', edit: 'beatflash' }, MENU[MENU.length - 1]];
+  const menuFor = c => (c.layout === 'lcd2' ? MENU_LCD2 : MENU);
   // sub-menus: a title and the EDITS they list
   const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
                  display: { title: 'DISPLAY', rows: ['bright', 'sleep'] } };
@@ -1427,11 +1433,11 @@ const OLED = (() => {
       else { ui.screen = 'menu'; ui.overlay = null; }
     } else if (ui.screen === 'menu') {
       if (d) {
-        ui.cursor = clamp(ui.cursor - d, 0, MENU.length - 1);
+        ui.cursor = clamp(ui.cursor - d, 0, menuFor(c).length - 1);
         ui.top = clamp(ui.top, ui.cursor - VISIBLE + 1, ui.cursor);
       } else if (btn === 'no') ui.screen = 'home';
       else {
-        const it = MENU[ui.cursor];
+        const it = menuFor(c)[ui.cursor];
         if (it.net) { ui.screen = 'net'; ui.ncur = 0; }
         else if (it.edit) startEdit(ui, it.edit, c);
         else if (it.sub) { ui.screen = 'sub'; ui.sub = it.sub; ui.ocur = 0; }
@@ -1909,11 +1915,12 @@ const OLED = (() => {
     if (right) textR(fb, right, W - 4, y, 1, v);
   }
   const menuValues = c => ({ 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': AUTOBAR_SHORT[autoBarIndex(c.autoBar)], NETWORK: NET_SHORT[c.net.mode],
-    USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' });
+    USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-',
+    'BEAT FLASH': c.beatFlash ? 'SCREEN' : 'BOXES' });
   function drawMenuLcd2(fb, ui, c) {
-    titleBarLcd2(fb, 'MENU', (ui.cursor + 1) + '/' + MENU.length);
-    const vals = menuValues(c), top = clamp(ui.cursor - L2_ROWS + 1, 0, Math.max(0, MENU.length - L2_ROWS));
-    for (let k = 0; k < L2_ROWS && top + k < MENU.length; k++) listRowLcd2(fb, L2_ROW0 + k * L2_PITCH, 9, top + k === ui.cursor, MENU[top + k].name, vals[MENU[top + k].name] || '');
+    titleBarLcd2(fb, 'MENU', (ui.cursor + 1) + '/' + MENU_LCD2.length);
+    const vals = menuValues(c), top = clamp(ui.cursor - L2_ROWS + 1, 0, Math.max(0, MENU_LCD2.length - L2_ROWS));
+    for (let k = 0; k < L2_ROWS && top + k < MENU_LCD2.length; k++) listRowLcd2(fb, L2_ROW0 + k * L2_PITCH, 9, top + k === ui.cursor, MENU_LCD2[top + k].name, vals[MENU_LCD2[top + k].name] || '');
   }
   function drawSubLcd2(fb, ui, c) {
     const sub = SUBS[ui.sub];
@@ -2139,27 +2146,68 @@ const Face = (() => {
      good    (72, 222, 128)    green: joined, strong, high, charged
      warn    (255, 176, 32)    amber: fair, near the line, low; also the bar's first beat (the LED language's bar 1)
      bad     (255, 104, 92)    red: poor, below the line, clipping, empty
-     dim     (150, 156, 168)   grey: no signal, nothing heard, not reported */
+     dim     (150, 156, 168)   grey: no signal, nothing heard, not reported
+   and, only while the BEAT FLASH setting is SCREEN and a beat flashes (see FLASH below), the two flash fields (FLASH_FIELD):
+     beat (214, 255, 226)      white-green: the field of an ordinary beat
+     bar  (255, 176, 32)       amber: the field of the bar's first beat (the LED language's bar 1)
+   During a flash the field is that colour and every lit pixel is near-black (the background colour), whatever its ink. */
 const Lcd2 = (() => {
   const SRC_W = 160, SRC_H = 120, SCALE = 2, W = SRC_W * SCALE, H = SRC_H * SCALE;
   const PALETTE = { bg: [8, 10, 14], neutral: [232, 236, 244], good: [72, 222, 128], warn: [255, 176, 32], bad: [255, 104, 92], dim: [150, 156, 168] };
+  // the field colour of a flash (its own table: PALETTE is the one the firmware's palette is tested against, tests/test_lcd_palette.js)
+  const FLASH_FIELD = { beat: [214, 255, 226], bar: [255, 176, 32] };
   // ink id (OLED.INK) -> palette key; index = id
   const INK_PALETTE = ['neutral', 'good', 'warn', 'bad', 'dim', 'warn'];
   const inkColour = id => PALETTE[INK_PALETTE[id] || 'neutral'];
 
-  // the RGB of every source pixel: unlit = background, lit = the colour of its ink id (neutral when ink is missing or 0)
-  function pixels(fb, ink) {
-    const out = new Uint8Array(SRC_W * SRC_H * 3);
+  // ---- FLASH: the BEAT FLASH setting SCREEN. A port of jk_led_lit (core/jank_core.c): the same window per beat, for the screen instead of the LED.
+  // A beat flashes for FLASH.beatMs (80), the bar's first beat for FLASH.barMs (150), neither longer than a beat / FLASH.capDiv (3), counted
+  // from the beat's start; core/jank_core.h's JK_BEAT_FLASH_MS, JK_BAR_FLASH_MS and JK_FLASH_CAP_DIV are the source (tests/test_lcd2.js reads them).
+  const FLASH = { beatMs: 80, barMs: 150, capDiv: 3 };
+  const UBEAT = 1000000;                                               // micro-beats in a beat, as the C
+  // the window of the beat `beatUb` (micro-beats, may be negative: before the session's beat 0) at `mpb` microseconds per beat:
+  // { at: micro-beats since the beat's start, flash: its length in micro-beats, bar: it is the first beat of a bar of `quantum` }
+  function flashWindow(beatUb, mpb, quantum) {
+    let at = beatUb % UBEAT;
+    if (at < 0) at += UBEAT;
+    const index = ((beatUb - at) / UBEAT) % (quantum || 1);            // floor, then C's remainder (JS keeps the sign too)
+    const bar = index === 0;
+    return { at, bar, flash: Math.min(Math.floor((bar ? FLASH.barMs : FLASH.beatMs) * 1000 * UBEAT / mpb), Math.floor(UBEAT / FLASH.capDiv)) };
+  }
+  // jk_led_lit: 1 when the LED is lit. `rest` is the state without a flash (the C: net == JK_NET_WIFI); no session or no tempo: the rest
+  function ledLit(rest, joined, beatUb, mpb, quantum) {
+    if (!joined || mpb <= 0) return rest ? 1 : 0;
+    const w = flashWindow(beatUb, mpb, quantum);
+    return w.at < w.flash ? (rest ? 0 : 1) : (rest ? 1 : 0);
+  }
+  // the flash now: null (none), 'beat' or 'bar', from the beat position (beats, fractional; null: no session / not playing) and the tempo
+  function flashAt(beatPos, bpm, quantum) {
+    if (beatPos === null || beatPos === undefined || !(bpm > 0)) return null;
+    const mpb = Math.round(60000000 / bpm), beatUb = Math.round(beatPos * UBEAT);
+    if (!ledLit(false, true, beatUb, mpb, quantum)) return null;
+    return flashWindow(beatUb, mpb, quantum).bar ? 'bar' : 'beat';
+  }
+  // the flash of a frame: only on HOME (screen 'home'), with the setting on SCREEN, never on menus, edits, setup, boot or the splash
+  function flashOf(c, screen) {
+    if (!c || !c.beatFlash || screen !== 'home' || c.setup || c.boot || c.splash) return null;
+    return flashAt(c.beatPos, c.beatBpm, c.quantum);
+  }
+
+  // the RGB of every source pixel: unlit = background, lit = the colour of its ink id (neutral when ink is missing or 0). With a flash
+  // ('beat' | 'bar') the field is the flash colour and every lit pixel is near-black.
+  function pixels(fb, ink, flash) {
+    const out = new Uint8Array(SRC_W * SRC_H * 3), field = flash ? FLASH_FIELD[flash] : PALETTE.bg;
     for (let i = 0; i < fb.length; i++) {
-      const col = fb[i] ? inkColour(ink ? ink[i] : 0) : PALETTE.bg;
+      const col = fb[i] ? (flash ? PALETTE.bg : inkColour(ink ? ink[i] : 0)) : field;
       out[3 * i] = col[0]; out[3 * i + 1] = col[1]; out[3 * i + 2] = col[2];
     }
     return out;
   }
 
   // paints the 320 x 240 canvas: source pixel (x, y) is the block (2x, 2y) .. (2x + 1, 2y + 1); the blocks tile the panel. img is a W x H ImageData.
-  function paint(ctx2d, img, fb, ink) {
-    const px = pixels(fb, ink), d = img.data;
+  // flash: null | 'beat' | 'bar' (see FLASH)
+  function paint(ctx2d, img, fb, ink, flash) {
+    const px = pixels(fb, ink, flash || null), d = img.data;
     for (let sy = 0; sy < SRC_H; sy++) for (let sx = 0; sx < SRC_W; sx++) {
       const p = 3 * (sy * SRC_W + sx);
       for (let dy = 0; dy < SCALE; dy++) for (let dx = 0; dx < SCALE; dx++) {
@@ -2180,7 +2228,7 @@ const Lcd2 = (() => {
     return (hi + 0.05) / (lo + 0.05);
   }
 
-  return { W, H, SRC_W, SRC_H, SCALE, PALETTE, INK_PALETTE, inkColour, pixels, paint, contrast };
+  return { W, H, SRC_W, SRC_H, SCALE, PALETTE, FLASH_FIELD, INK_PALETTE, FLASH, inkColour, flashWindow, ledLit, flashAt, flashOf, pixels, paint, contrast };
 })();
 </script>
 <script>
@@ -2360,6 +2408,10 @@ const Stick = (() => {
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
+      // for the colour screen's beat flash (ui/lcd2.js): the setting (`get` beat_flash, 0 / absent = BOXES, 1 = SCREEN), and the session's beat
+      // position (beats, fractional, display delay included), tempo and bar length; null / 0 when there is no beat to flash on
+      beatFlash: g.beat_flash === '1' ? 1 : 0, beatPos: h && pos !== null && playing ? pos : null, beatBpm: h && h.bpm > 0 ? h.bpm : null, quantum: h && h.quantum > 0 ? h.quantum : 4,
+      ...(state.layout ? { layout: state.layout } : {}),
       peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0,
       lineIn: g.source === 'line' || (!!st && st.audio_source === 'line'), bright: 100, sleep: 0, inOff: num(g.lat_trim) || 0, offs: [0, 0, 0], rate: 2,
       boot: false, splash: false, wifi: wifiBars, wifiQ: null, groupPeers: h ? h.air : 0, setup: false, saved: false,
@@ -2390,6 +2442,7 @@ const Stick = (() => {
   // an OLED edit (field, value as the OLED holds it) -> { commands: [...] } or { refuse: 'why' }
   function fieldCommands(field, val) {
     if (NO_STICK_SETTING[field]) return refuse(NO_STICK_SETTING[field]);
+    if (field === 'beatflash') return cmds('set beat_flash ' + (val ? 1 : 0));
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));
     if (field === 'group') return cmds('set group ' + (val + 1));
     if (field === 'gain') return cmds('set line_gain ' + clamp(Math.round(val), -12, 12));
@@ -2903,7 +2956,11 @@ const Player = (() => {
   const storedDelay = () => { try { return Stick.parseDelay(localStorage.getItem(Stick.BEAT_DELAY_KEY)); } catch (e) { return null; } };
   const beatDelay = { ms: storedDelay() === null ? 0 : storedDelay() };
   document.addEventListener("jank-beat-delay", (e) => { beatDelay.ms = e.detail.ms; });
-  const snapshot = () => ({ home: S.lastHome, homeAt: S.homeAt, get: S.lastGet, status: S.lastStatus, statusAt: S.statusAt, phase, delayMs: beatDelay.ms, overBle: S.ble });
+  // ?flash=screen previews the BEAT FLASH setting SCREEN before the stick knows its key (`beat_flash`, 0 = boxes, 1 = screen); a stick that
+  // reports the key wins. layout: the lcd2 menu lists BEAT FLASH, the OLED menu does not
+  const flashPreview = new URLSearchParams(location.search).get("flash") === "screen";
+  const snapshot = () => ({ home: S.lastHome, homeAt: S.homeAt, get: flashPreview && S.lastGet.beat_flash === undefined ? { ...S.lastGet, beat_flash: "1" } : S.lastGet,
+                            status: S.lastStatus, statusAt: S.statusAt, phase, delayMs: beatDelay.ms, overBle: S.ble, layout: screen === "lcd2" ? "lcd2" : undefined });
   const refresh = (commands) => commands.reduce((done, command) => done.then(() => send(command)), Promise.resolve());
   const fail = (e) => say(e.message, true);
 
@@ -2940,7 +2997,7 @@ const Player = (() => {
   // the screen of the box: the colour landscape LCD (ui/lcd2.js: its own 160 x 120 grid, painted x2) for every stick, whatever its board; ?screen=oled shows the old
   // black and white 2.42 in OLED
   const params = new URLSearchParams(location.search);
-  let screen = "";
+  let screen = "", lastLcd = null;
   function applyScreen() {
     const wanted = params.get("screen") === "oled" ? "2.42" : "lcd2";
     if (wanted === screen) return;
@@ -2949,6 +3006,7 @@ const Player = (() => {
     Face.showLeds(svg, screen);
     el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
     el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
+    lastLcd = null;                                              // resizing the canvas cleared it
   }
   function draw() {
     frame = requestAnimationFrame(draw);
@@ -2960,8 +3018,11 @@ const Player = (() => {
     }
     Stick.tick(model, now);
     if (screen === "lcd2") {
-      const lcd = Stick.screen(model, now, "lcd2");
-      Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), lcd.fb, lcd.ink);
+      // the beat flash is decided from the smooth beat phase (display delay included) and painted at render time; the canvas is repainted
+      // only when what it shows changed (the frame's pixels, ink or flash state), not on every animation frame
+      const lcd = Stick.screen(model, now, "lcd2"), flash = Lcd2.flashOf(model.getCtx(now), model.ui.screen);
+      const same = lastLcd && lastLcd.flash === flash && lastLcd.fb.every((v, i) => v === lcd.fb[i]) && lastLcd.ink.every((v, i) => v === lcd.ink[i]);
+      if (!same) { lastLcd = { fb: lcd.fb, ink: lcd.ink, flash }; Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), lcd.fb, lcd.ink, flash); }
     } else Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), Stick.framebuffer(model, now), 100);
     paintArms();
   }
