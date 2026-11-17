@@ -13,7 +13,7 @@ const assert = require('assert');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'page', 'jank.html'), 'utf8');
-const lib = ['ui/oled.js', 'ui/face.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Stick = Stick; this.Player = Player;';
+const lib = ['ui/oled.js', 'ui/face.js', 'ui/autolat.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Stick = Stick; this.Player = Player;';
 const script = id => html.match(new RegExp('<script id="' + id + '">([\\s\\S]*?)</script>'))[1];
 const transcript = {};
 for (const block of fs.readFileSync(path.join(root, 'tests', 'stick_ref', 'transcript.txt'), 'utf8').split('### ').slice(1)) {
@@ -603,6 +603,55 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     p.box.disconnected();
   }
 
+  // ---- Auto latency: set beat_latency from the two paths, only under its guards ----
+  {
+    const statusUsb = (source) => transcript.status.replace(/\nok\s*$/, '') + '\naudio_source=' + source + '\nok';
+    const sets = c => c.midi.sent.filter(s => s.startsWith('set beat_latency'));
+    const tickAll = async c => { for (const [, tick] of c.page.intervals()) tick(); c.page.el('pl-audio').fire('timeupdate', {}); await settle(); };
+    const setup = async (source) => {
+      const c = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
+      c.midi.text.status = statusUsb(source);
+      return c;
+    };
+    let a = await setup('usb');
+    await tickAll(a);
+    eq(sets(a), [], 'not at load: nothing is sent before the player plays');
+    eq(a.page.el('al-line').textContent.startsWith('auto latency: stick path unknown'), true, 'the line says why: no stick path yet');
+    await play(a);
+    await tickAll(a);
+    eq(sets(a), ['set beat_latency -20'], 'playing through the stick over USB: monitor 30 - stick 50 = -20 ms is sent, once');
+    eq(a.page.el('al-line').textContent, 'auto latency: sent -20 ms (speakers 30 - stick path 50)', 'the line shows what was sent');
+    a.page.clock.t += 1000;
+    await tickAll(a);
+    eq(sets(a).length, 1, 'rate limit: nothing more within 5 s');
+    a.page.el('al-resend').click();
+    await settle();
+    eq(sets(a).length, 2, 'Re-send sends again at once');
+    a.page.el('al-on').checked = false;
+    a.page.el('al-on').fire('change', {});
+    a.page.clock.t += 10000;
+    await tickAll(a);
+    a.page.el('al-resend').click();
+    await settle();
+    eq([sets(a).length, a.d.store.get('jank.autolat')], [2, '0'], 'the checkbox off: nothing is sent, and it is remembered');
+    a.page.box.disconnected();
+
+    const line = await setup('line');
+    await play(line);
+    await tickAll(line);
+    await tickAll(line);
+    eq([sets(line), line.page.el('al-line').textContent.includes('not USB')], [[], true], 'source is not USB: nothing sent, the line says so');
+    line.page.box.disconnected();
+
+    const near = await setup('usb');
+    near.midi.text.status = near.midi.text.status.replace('lat_auto=25', 'lat_auto=-19');
+    await play(near);
+    await tickAll(near);
+    await tickAll(near);
+    eq([sets(near), near.page.el('al-line').textContent.includes('within 3 ms')], [[], true], 'within 3 ms of the stick lat_auto: nothing sent');
+    near.page.box.disconnected();
+  }
+
   // ---- the beat display delay: the page's own latencies, the estimate, the stored value; it never touches the stick ----
   {
     r = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
@@ -612,7 +661,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     for (const [, tick] of r.page.intervals()) tick();
     await settle();
     eq([r.page.el('bd-mon').textContent, r.page.el('bd-stick').textContent], [30, 50], 'the page shows what it knows: the monitor 10 + 20 = 30 ms, the stick path 10 + 40 = 50 ms');
-    eq([r.page.el('bd-num').value, r.page.el('bd-slider').value, delays.at(-1)], [-20, -20, -20], 'the default is the estimate: monitor - stick = -20 ms');
+    eq([r.page.el('bd-num').value, r.page.el('bd-slider').value, delays.at(-1)], [-45, -45, -45], 'the default is the estimate: monitor - stick - beat_latency = 30 - 50 - 25 = -45 ms');
     eq(r.page.el('bd-beat').textContent, '25 (25 + 0)', "the stick's beat_latency, from get, with its two layers");
     const sentBefore = r.midi.sent.length;
     r.page.el('bd-slider').value = '120';
@@ -630,7 +679,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     eq(r.page.el('bd-num').value, 400, 'a stored delay is not replaced by a new estimate');
     eq(r.midi.sent.slice(sentBefore).filter(c => c.startsWith('set ') || c.startsWith('nudge')), [], 'the delay sends nothing to the stick');
     r.page.el('bd-estimate').click();
-    eq([r.page.el('bd-num').value, delays.at(-1), r.d.store.has('jank.beat.delay')], [-20, -20, false], 'Use the estimate: back to it, the stored value gone');
+    eq([r.page.el('bd-num').value, delays.at(-1), r.d.store.has('jank.beat.delay')], [-45, -45, false], 'Use the estimate: back to it, the stored value gone');
     r.page.box.disconnected();
     // a stored delay is used from the start
     const dd = fakeDevices(true, null, null, {});
