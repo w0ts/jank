@@ -43,6 +43,8 @@ void app_reboot(void);
 #define BAR_CONF_FULL 2.0               /* the downbeat estimator's commit level: the line is full here */
 #if CONFIG_JANK_BOARD_MINI22
 #define SPLASH_MODEL "MINI 2.2"
+#elif CONFIG_JANK_BOARD_LCD2
+#define SPLASH_MODEL "LCD2"
 #else
 #define SPLASH_MODEL "XIAO"
 #endif
@@ -173,6 +175,8 @@ static void net_ctx(struct jo_ctx *c, const struct jk_cfg *cfg, uint32_t now)
 {
     struct jo_net *n = &c->net;
     int rssi = cfg->net == JK_NET_WIFI ? (s_snap.wifi_up ? s_snap.wifi_rssi : 0) : jk_best_rssi(&s_snap.b, now);
+    c->has_rssi = 1;                    /* 0: none heard (jank: the best peer's, Wi-Fi client: the router's) */
+    c->rssi = rssi;
     n->mode = cfg->net == JK_NET_WIFI ? JO_NET_CLIENT : JO_NET_JANK;
     n->prev = n->mode;
     n->group = cfg->group;
@@ -214,6 +218,13 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->has_link_bpm = s_snap.mpb > 0;
     c->link_bpm = s_snap.mpb > 0 ? (double)((6000000000ull + (uint64_t)s_snap.mpb / 2u) / (uint32_t)s_snap.mpb) / 100.0 : 0.0;
     c->conf = audio ? b->conf_pct / 100.0 : 0.0;
+    c->layout_lcd2 = BOARD_LCD;
+    c->conf_unknown = !audio;
+    c->has_peak = (uint8_t)audio;       /* the input's peak over the last second, as the input gives it (no LEVEL offset) */
+    c->peak_db = b->peak_db;
+    c->silent = audio ? b->silent : 0;
+    c->gated = audio ? b->gated : 0;
+    c->conf_hold = audio ? b->conf_hold : 0;
     c->th = s_prefs.th;
     c->gain = s_prefs.gain;
     c->conf_stop = s_prefs.conf_stop;
@@ -400,13 +411,40 @@ void uis_cancel_no(void)
     s_want_frame = 1;
 }
 
+/* the frame into fb (and, on the colour screen, the ink plane lcd_ink() holds), and to the screen */
+static void draw_frame(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
+{
+#if BOARD_LCD
+    jo_draw_ink(fb, lcd_ink(), &s_ui, c, now);
+#else
+    jo_draw(fb, &s_ui, c, now);
+#endif
+}
+
+static void dark_frame(uint8_t *fb)
+{
+    memset(fb, 0, JO_FB_BYTES);
+#if BOARD_LCD
+    memset(lcd_ink(), 0, JO_INK_BYTES);
+#endif
+}
+
+static void show_frame(const uint8_t *fb)
+{
+#if BOARD_LCD
+    lcd_show(fb);
+#else
+    oled_show(fb, uis_contrast());
+#endif
+}
+
 void uis_boot_screen(void)
 {
     s_boot = 1;
     if (!s_screen)
         return;
-    jo_draw(s_fb, &s_ui, build_ctx(NULL, bridge_ms()), bridge_ms());
-    oled_show(s_fb, uis_contrast());
+    draw_frame(s_fb, build_ctx(NULL, bridge_ms()), bridge_ms());
+    show_frame(s_fb);
 }
 
 void uis_step(uint32_t now, struct uis_led *led)
@@ -435,8 +473,8 @@ void uis_step(uint32_t now, struct uis_led *led)
     if (!s_screen)
         return;
     if (jo_asleep(&s_in, c, now))
-        memset(fb, 0, JO_FB_BYTES);       /* SCREEN OFF: a dark frame; the panel stays on (the 2.42"'s power rule) */
+        dark_frame(fb);                   /* SCREEN OFF: a dark frame; the panel stays on (the 2.42"'s power rule) */
     else
-        jo_draw(fb, &s_ui, c, now);
-    oled_show(fb, uis_contrast());
+        draw_frame(fb, c, now);
+    show_frame(fb);
 }

@@ -320,6 +320,7 @@ struct jk_snapshot {
     struct jk_beat beat;
     int8_t batt_pct;                  /* -1: no battery gauge */
     uint8_t ble_built;                /* the build has Bluetooth for a phone */
+    char board[12];                   /* the board the firmware is built for ("xiao", "lcd2"): `get` says it so the page picks the screen */
     uint8_t ble_state;                /* enum jph_state (jank_phone.h): off, window, connected */
     uint32_t ble_left_s;              /* the pair window's seconds left */
     struct jk_usb usb;

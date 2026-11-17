@@ -1,10 +1,12 @@
 // node tests/oled_ref/gen_cases.js PLAYER_HTML > tests/oled_ref/cases.txt
+// node tests/oled_ref/gen_cases.js --ink > tests/oled_ref/cases_ink.txt   (the colour layout's ink plane: gen_ink.js, from ui/oled.js)
 // The reference frames for the OLED UI's C port (core/jank_oled*.c, tests/test_oled.c): the browser emulator's own code
 // (beat-listener live/player.html: the OLED module, the QR encoder and the host's button handling btnDown / btnUp,
 // armHint, comboStep), run in node on a fake clock, for a broad set of states and button sequences. Each frame is written
 // in the SSD1309's page layout (byte page * 128 + x, bit y % 8) as hex; test_oled.c replays the same steps and must
 // draw the same bytes, and log the same setter calls.
 'use strict';
+if (process.argv[2] === '--ink') { require('./gen_ink.js'); return; }       // node gen_cases.js --ink > cases_ink.txt
 const fs = require('fs');
 const html = require('../load_html.js')(process.argv[2]);
 const grab = re => { const m = html.match(re); if (!m) throw new Error('not found: ' + re); return m[0]; };
@@ -13,22 +15,10 @@ const QR = new Function(grab(/const QR = \(\(\) => \{[\s\S]*?\n\}\)\(\);\n/) + '
 // the host's buttons: from the HOME combos' comment to the end of btnUp
 const HOST_SRC = grab(/\/\/ HOME combos[\s\S]*?\nfunction btnUp\(b\) \{[\s\S]*?\n\}\n/);
 const W = OLED.W, H = OLED.H;
+const { baseState, dumpState: dumpStateInto, hex: hexOf } = require('./state.js');
 
 const FIELDS = ['netmode', 'inoff', 'out0', 'out1', 'out2', 'rate', 'threshold', 'gain', 'ltmode', 'bright', 'sleep', 'group',
                 'lowconf', 'insrc', 'usbrole', 'autobar', 'ssid', 'pass', 'appass', 'apname'];
-
-function baseState() {
-  return {
-    link: false, lineIn: true, bpm: 124, linkBpm: 124, conf: 0.9, th: 80, gain: 0, confStop: true,
-    levelDb: -20, levelMin: -25, levelMax: -15, running: true, armed: false, trackerLeads: false, xiao: false,
-    beatN: 1, peers: 2, wifi: 'good', wifiQ: null, usb: true, fitted: true, batt: 80,
-    ltMode: 2, inSrc: 0, usbRole: 0, autoBar: true, bar: { state: 'locked', conf: 1 }, inOff: 0, offs: [0, 0, 0],
-    rate: 2, bright: 100, sleep: 0, boot: false, splash: false, saved: false, groupPeers: 3,
-    net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9',
-           status: 'CONNECTED', ip: '192.168.1.42', apClients: 1, setupName: 'jank-setup-a3f9',
-           scan: [{ name: 'HomeNet', bars: 3 }, { name: 'jank-studio', bars: 2 }, { name: 'Cafe Guest', bars: 1 }, { name: 'FritzBox 7590', bars: 2 }] },
-  };
-}
 
 // one case's world: the state, the logged setter calls, the ui, the fake clock and the host's button code
 function world(state) {
@@ -96,29 +86,8 @@ function world(state) {
 
 const out = [];
 const B = { up: 'U', down: 'D', no: 'N', yes: 'Y' };
-function dumpState(s) {
-  const L = (k, v) => out.push('c ' + k + ' ' + v);
-  const num = v => (v === null || v === undefined ? 'null' : String(v));
-  for (const k of ['link', 'lineIn', 'confStop', 'running', 'armed', 'trackerLeads', 'xiao', 'usb', 'fitted', 'autoBar', 'boot', 'splash', 'saved'])
-    L(k, s[k] ? 1 : 0);
-  for (const k of ['bpm', 'linkBpm', 'conf', 'th', 'gain', 'levelDb', 'levelMin', 'levelMax', 'beatN', 'peers', 'batt', 'ltMode', 'inSrc',
-                   'usbRole', 'inOff', 'rate', 'bright', 'sleep', 'groupPeers'])
-    L(k, num(s[k]));
-  L('wifi', s.wifi);
-  L('offs', s.offs.join(' '));
-  L('wifiQ', s.wifiQ ? [s.wifiQ.rssi, s.wifiQ.kbps, s.wifiQ.tx, s.wifiQ.retried, s.wifiQ.lost].join(' ') : 'null');
-  L('bar', s.bar ? s.bar.state + ' ' + s.bar.conf : 'null');
-  const n = s.net;
-  for (const k of ['mode', 'prev', 'group', 'apClients']) L('net.' + k, n[k]);
-  for (const k of ['ssid', 'pass', 'appass', 'apName', 'status', 'ip', 'setupName']) L('net.' + k, n[k]);
-  for (const r of n.scan) L('scan', r.bars + ' ' + r.name);
-}
-function hex(fb) {
-  const pages = new Uint8Array(W * H / 8);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (fb[y * W + x]) pages[(y >> 3) * W + x] |= 1 << (y & 7);
-  return Buffer.from(pages).toString('hex');
-}
-
+const dumpState = s => dumpStateInto(out, s);
+const hex = fb => hexOf(fb, W, H);
 let ncase = 0, nframes = 0;
 // a case: a state, then steps: ['draw', t] | ['press', btn, t] | ['down', btn, t] | ['up', btn, t] | ['tick', t]
 function scenario(name, edit, steps) {

@@ -13,7 +13,7 @@ const assert = require('assert');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'page', 'jank.html'), 'utf8');
-const lib = ['ui/oled.js', 'ui/face.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Stick = Stick; this.Player = Player;';
+const lib = ['ui/oled.js', 'ui/face.js', 'ui/lcd2.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Stick = Stick; this.Player = Player;';
 const script = id => html.match(new RegExp('<script id="' + id + '">([\\s\\S]*?)</script>'))[1];
 const transcript = {};
 for (const block of fs.readFileSync(path.join(root, 'tests', 'stick_ref', 'transcript.txt'), 'utf8').split('### ').slice(1)) {
@@ -30,7 +30,7 @@ function makeElement() {
     addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
     click: () => (listeners.click || []).forEach(fn => fn({ target: el })),
     fire: (type, ev) => (listeners[type] || []).forEach(fn => fn(ev)), contains: () => false,
-    append: () => {}, add: () => {}, focus: () => {}, remove: () => {}, replaceChildren: (...kids) => { el.children = kids; },
+    append: () => {}, add: () => {}, focus: () => {}, remove: () => {}, removeAttribute: k => { delete attrs[k]; }, replaceChildren: (...kids) => { el.children = kids; },
     closest: () => null, cloneNode: () => makeElement(), setPointerCapture: () => {}, selectedOptions: [{ text: '' }],
     getContext: () => ({ createImageData: () => ({ data: new Uint8ClampedArray(128 * 64 * 4) }), putImageData(img) { el.lastImage = img; } }),
   });

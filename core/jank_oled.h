@@ -124,6 +124,15 @@ struct jo_ctx {
     int group_peers;
     const struct jo_qr *qr;               /* SETUP's hotspot code */
     const char *splash_model, *splash_fw; /* the splash's two lower lines ("MINI 2.2", "FW EMU" in the emulator) */
+    /* the colour layout (the lcd2: ui/oled.js's ctx.layout === 'lcd2'): HOME shows the confidence as a number, the Link peers
+     * and the signal beside the glyph, and fills the ink plane. The fields below feed it; has_* 0 = unreported (grey, never made up) */
+    uint8_t layout_lcd2;
+    uint8_t has_rssi;
+    int rssi;                             /* dBm of the best peer (jank) or the router (Wi-Fi client); 0: none heard */
+    uint8_t has_peak;
+    double peak_db;                       /* the input's peak over the last second, dBFS */
+    uint8_t conf_unknown;                 /* the tracker has no confidence to give: "--", grey */
+    uint8_t silent, gated, conf_hold;     /* silence on the source; the outputs stopped for low confidence; the confidence holds */
 };
 
 struct jo_edit {
@@ -170,6 +179,13 @@ struct jo_ops {
 void jo_ui_init(struct jo_ui *ui);
 void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx *c, const struct jo_ops *ops);
 void jo_draw(uint8_t fb[JO_FB_BYTES], const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now);
+
+/* The ink plane (ui/oled.js OLED.INK): one byte per pixel, y * JO_W + x, naming which LIT pixels carry information. The ids are
+ * meanings, never colours (core/jank_lcd.h maps them). jo_draw_ink fills it only with c->layout_lcd2 (else it stays all 0 and the
+ * frame is jo_draw's, bit for bit); ink NULL draws the same frame without a plane. */
+enum jo_ink { JO_INK_NONE = 0, JO_INK_GOOD, JO_INK_WARN, JO_INK_BAD, JO_INK_DIM, JO_INK_ONE, JO_INK_IDS };
+#define JO_INK_BYTES (JO_W * JO_H)
+void jo_draw_ink(uint8_t fb[JO_FB_BYTES], uint8_t ink[JO_INK_BYTES], const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now);
 /* one overlay box for 1 s (the emulator's showOverlay): drops the hint */
 void jo_show_overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value);
 

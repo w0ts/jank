@@ -7,6 +7,7 @@
 #include "sdkconfig.h"
 
 #if CONFIG_JANK_BOARD_XIAO
+#define BOARD_NAME "xiao"
 /* D6 = GPIO43 for data; the board's 3V3 pad is the source. The module has 499 ohm in series on D6 (v1.2 schematic, R6):
  * MIDI current falls to about 2.3 mA (docs/boards.md); the PCB uses GPIO1, 2, 5, 4 instead. The button is BOOT, the LED the single yellow one. */
 #define BOARD_BUTTON_GPIO 0
@@ -63,6 +64,7 @@
 #endif
 #define BOARD_CELL_GPIO (-1)
 #elif CONFIG_JANK_BOARD_MINI22
+#define BOARD_NAME "mini22"
 /* jank mini 2.2, battery order (ESP32-S3-WROOM-1U-N8R2 since 2026-11-15; was the bare FH4R2), from hardware/mini2/parts.py and README.md on hw/mini2.2 (2026-11-15,
  * being routed: check again when it is ordered). Only what this firmware drives so far: NO (the BOOT button, SW1), the two
  * RGB LEDs (WS2812B-2020, GPIO35), the D-pad, the screen, MIDI OUT 1 (UART1 GPIO21, 68 ohm sinks, a 3V3 source pin), and the USB
@@ -104,7 +106,47 @@
 #define BOARD_CELL_GPIO 4
 #define BOARD_CELL_DIV 2                          /* the cell's volts / the pin's */
 #define BOARD_CELL_EMPTY_MV 3300
+#elif CONFIG_JANK_BOARD_LCD2
+/* Waveshare ESP32-S3-LCD-2 (sku 30306, ESP32-S3R8, 16 MB flash), pins from the board's schematic (docs/lcd2.md has the
+ * sources and what is not verified). The screen is the 240 x 320 ST7789 on SPI, drawn in landscape (lcd.c); no I2C OLED.
+ * NO is the BOOT button; no D-pad pins are chosen yet and the board has no LED on a GPIO (its two LEDs are the charger's
+ * and the 3V3 rail's). MIDI TX is the XIAO's choice, GPIO43 (the header's U0_TXD pin). */
+#define BOARD_NAME "lcd2"
+#define BOARD_LCD 1
+#define BOARD_LCD_MOSI_GPIO 38
+#define BOARD_LCD_SCLK_GPIO 39
+#define BOARD_LCD_CS_GPIO 45
+#define BOARD_LCD_DC_GPIO 42
+#define BOARD_LCD_RST_GPIO (-1)                   /* the net LCD_RST is GPIO0 through R16 "NC/0R": the panel is reset by command */
+#define BOARD_LCD_BL_GPIO 1                       /* high: backlight on (R12 1 k into an SS8050 that pulls LEDK down) */
+#define BOARD_BUTTON_GPIO 0
+#define BOARD_BUTTON_ACTIVE_LOW 1
+#define BOARD_LED_RGB_GPIO (-1)
+#define BOARD_LED_MONO_GPIO (-1)
+#define BOARD_LED_COUNT 0
+#define BOARD_MIDI_TX_GPIO 43
+#define BOARD_MIDI_SOURCE_GPIO (-1)
+#define BOARD_I2C_SDA_GPIO (-1)
+#define BOARD_I2C_SCL_GPIO (-1)
+#define BOARD_BTN_UP_GPIO (-1)
+#define BOARD_BTN_DOWN_GPIO (-1)
+#define BOARD_BTN_YES_GPIO (-1)
+#define BOARD_BTN_NO2_GPIO (-1)
+#define BOARD_OLED 0
+#define BOARD_CC_SCL_GPIO (-1)
+#define BOARD_CC_SDA_GPIO (-1)
+#define BOARD_CC_INT_GPIO (-1)
+#define BOARD_HOST_EN_GPIO (-1)
+#define BOARD_VBUS_SENSE_GPIO (-1)
+#define BOARD_LINE_DETECT_GPIO (-1)
+#define BOARD_PUMP_GPIO (-1)
+#define BOARD_USBPORT_TUSB320 0
+#define BOARD_HAS_LINEIN 0
+#define BOARD_CELL_GPIO (-1)
 #else
 #error "no board chosen"
+#endif
+#ifndef BOARD_LCD
+#define BOARD_LCD 0
 #endif
 #endif

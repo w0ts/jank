@@ -8,7 +8,23 @@ menu "jank"
         config JANK_BOARD_MINI22
             bool "jank mini 2.2 (ESP32-S3FH4R2): USB host mode's parts; a build check until the board exists"
             depends on IDF_TARGET_ESP32S3
+        config JANK_BOARD_LCD2
+            bool "Waveshare ESP32-S3-LCD-2 (240 x 320 ST7789 in landscape; docs/lcd2.md): a build check until it runs"
+            depends on IDF_TARGET_ESP32S3
     endchoice
+
+    config JANK_LCD_MIRROR_X
+        bool "LCD2: mirror the landscape picture left to right"
+        depends on JANK_BOARD_LCD2
+        default y
+        help
+            Which of the four landscape orientations puts the picture upright for the way the board is held is not known
+            until it is on a bench (docs/lcd2.md, UNVERIFIED): these two switches turn it without touching the code.
+
+    config JANK_LCD_MIRROR_Y
+        bool "LCD2: mirror the landscape picture top to bottom"
+        depends on JANK_BOARD_LCD2
+        default n
 
     config JANK_UI_BENCH
         bool "XIAO UI bench: a 128 x 64 I2C OLED on D4 / D5 and four buttons on D3 / D8 / D9 / D10"

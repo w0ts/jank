@@ -2,7 +2,12 @@
 /* The OLED UI's C port against the browser emulator's own pixels: tests/oled_ref/cases.txt (gen_cases.js runs
  * player.html's OLED module, QR encoder and button host in node) holds states, button steps, the frames drawn and the
  * setter calls made. This replays each case through jo_press / jo_input_* and jo_draw and wants 0 differing pixels and
- * the same calls. Usage: test_oled CASES_TXT */
+ * the same calls.
+ *
+ * The colour layout (lcd2): tests/oled_ref/cases_ink.txt (gen_ink.js runs ui/oled.js with ctx.layout 'lcd2') holds the 1-bit
+ * frame and the ink plane of each case; jo_draw_ink must draw both exactly. And every frame of cases.txt that is not a HOME
+ * frame is drawn again with the lcd2 layout on: the same pixels, an empty ink plane (menus, edit, network and setup screens stay
+ * neutral, the OLED boards' bytes untouched). Usage: test_oled CASES_TXT [CASES_INK_TXT] */
 #include "jank_oled.h"
 #include "jank_oled_int.h"
 #include <stdarg.h>
@@ -11,6 +16,11 @@
 #include <string.h>
 
 static int s_fail, s_checks;
+struct stats {
+    int cases, frames, bad_frames;
+    int ink_frames, ink_bad, ink_lit;     /* ink planes compared pixel by pixel; those with a differing pixel; lit ink pixels seen */
+    int neutral_frames;                   /* non-HOME frames re-drawn with the lcd2 layout */
+};
 #define CHECK(c, ...)                                                    \
     do {                                                                 \
         s_checks++;                                                      \
@@ -196,7 +206,16 @@ static void parse_state(struct jo_ctx *c, const char *key, const char *v)
         c->has_bar = strcmp(v, "null") != 0;
         if (c->has_bar && sscanf(v, "%15s %lf", st, &c->bar_conf) == 2)
             c->bar_state = !strcmp(st, "off") ? JO_BAR_OFF : !strcmp(st, "listening") ? JO_BAR_LISTENING : !strcmp(st, "locked") ? JO_BAR_LOCKED : JO_BAR_MANUAL;
-    } else if (!strcmp(key, "net.mode")) n->mode = (uint8_t)atoi(v);
+    } else if (!strcmp(key, "layout")) c->layout_lcd2 = (uint8_t)atoi(v);
+    else if (!strcmp(key, "rssi")) {
+        parse_num(v, &c->has_rssi, &d);
+        c->rssi = (int)d;
+    } else if (!strcmp(key, "peakDb")) parse_num(v, &c->has_peak, &c->peak_db);
+    else if (!strcmp(key, "confKnown")) c->conf_unknown = !atoi(v);
+    else if (!strcmp(key, "silent")) c->silent = (uint8_t)atoi(v);
+    else if (!strcmp(key, "gated")) c->gated = (uint8_t)atoi(v);
+    else if (!strcmp(key, "confHold")) c->conf_hold = (uint8_t)atoi(v);
+    else if (!strcmp(key, "net.mode")) n->mode = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.prev")) n->prev = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.group")) n->group = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.apClients")) n->ap_clients = atoi(v);
@@ -244,6 +263,47 @@ static int compare(const uint8_t *fb, const char *hex, const char *name, unsigne
     return diff;
 }
 
+/* the ink plane as gen_ink.js wrote it ("id:length,..."): -1 when it is not a whole plane */
+static int decode_ink(const char *runs, uint8_t *plane)
+{
+    int n = 0;
+    while (*runs) {
+        char *end;
+        long id = strtol(runs, &end, 10), len;
+        if (*end != ':' || id < 0 || id >= JO_INK_IDS)
+            return -1;
+        len = strtol(end + 1, &end, 10);
+        if (len <= 0 || n + len > JO_INK_BYTES)
+            return -1;
+        memset(plane + n, (int)id, (size_t)len);
+        n += (int)len;
+        runs = *end == ',' ? end + 1 : end;
+    }
+    return n == JO_INK_BYTES ? 0 : -1;
+}
+
+static int compare_ink(const uint8_t *ink, const uint8_t *want, const char *name, unsigned long t)
+{
+    int diff = 0, first = 0;
+    for (int i = 0; i < JO_INK_BYTES; i++)
+        if (ink[i] != want[i]) {
+            if (!diff)
+                first = i;
+            diff++;
+        }
+    CHECK(diff == 0, "%s at t=%lu: %d ink pixels differ (first at x %d, y %d: C %d, ui/oled.js %d)", name, t, diff, first % JO_W, first / JO_W,
+          ink[first], want[first]);
+    return diff;
+}
+
+static int count_lit(const uint8_t *ink)
+{
+    int n = 0;
+    for (int i = 0; i < JO_INK_BYTES; i++)
+        n += ink[i] != 0;
+    return n;
+}
+
 static void dump(const uint8_t *fb)
 {
     for (int y = 0; y < JO_H; y++) {
@@ -253,12 +313,22 @@ static void dump(const uint8_t *fb)
     }
 }
 
-static int s_frames, s_cases, s_pixels_bad;
+/* the lcd2 layout on a screen that is not HOME: the OLED's own frame, no ink */
+static void check_neutral(const struct jo_ui *ui, struct jo_ctx c, const uint8_t *oled_fb, const char *name, unsigned long t, struct stats *st)
+{
+    uint8_t fb[JO_FB_BYTES], ink[JO_INK_BYTES];
+    memset(ink, 9, sizeof ink);
+    c.layout_lcd2 = 1;
+    jo_draw_ink(fb, ink, ui, &c, (uint32_t)t);
+    CHECK(!memcmp(fb, oled_fb, sizeof fb), "%s at t=%lu: the lcd2 layout changed a screen that is not HOME", name, t);
+    CHECK(count_lit(ink) == 0, "%s at t=%lu: ink on a screen that is not HOME", name, t);
+    st->neutral_frames++;
+}
 
-static void run_cases(const char *path)
+static void run_cases(const char *path, struct stats *st)
 {
     FILE *f = fopen(path, "r");
-    static char line[4096];
+    static char line[32768];
     char name[128] = "";
     struct world w;
     struct jo_ui ui;
@@ -266,7 +336,7 @@ static void run_cases(const char *path)
     struct jo_ops ops = {&w, tempo_step, set_field, set_text, set_hold, link_start_stop, shift_beats};
     struct jo_host host = {&ops, host_ctx};
     int want_log = 0, dumped = 0;
-    uint8_t fb[JO_FB_BYTES];
+    uint8_t fb[JO_FB_BYTES], ink[JO_INK_BYTES], want_ink[JO_INK_BYTES];
     if (!f) {
         CHECK(0, "cannot open %s", path);
         return;
@@ -293,10 +363,13 @@ static void run_cases(const char *path)
             parse_state(&w.c, line + 2, sp + 1);
             w.c.setup = w.c.net.mode == 3;
         } else if (!strncmp(line, "draw ", 5)) {
-            char *hex = strchr(line + 5, ' ');
+            char *hex = strchr(line + 5, ' '), *runs;
             t = strtoul(line + 5, NULL, 10);
             if (!hex)
                 continue;
+            runs = strchr(hex + 1, ' ');
+            if (runs)
+                *runs++ = 0;
             {
                 char txt[64];
                 snprintf(txt, sizeof txt, "WIFI:S:%s;T:nopass;;", w.c.net.setup_name);
@@ -304,15 +377,33 @@ static void run_cases(const char *path)
                 w.c.qr = &w.qr;
             }
             jo_input_tick(&in, &ui, (uint32_t)t, &host);
+            st->frames++;
+            if (runs) {                       /* an ink case: the frame (unless '-') and the plane */
+                CHECK(decode_ink(runs, want_ink) == 0, "%s: bad ink runs", name);
+                memset(ink, 9, sizeof ink);
+                jo_draw_ink(fb, ink, &ui, &w.c, (uint32_t)t);
+                if (strcmp(hex + 1, "-") && compare(fb, hex + 1, name, t)) {
+                    st->bad_frames++;
+                    if (!dumped++) {
+                        fprintf(stderr, "C frame of %s at %lu:\n", name, t);
+                        dump(fb);
+                    }
+                }
+                st->ink_frames++;
+                st->ink_lit += count_lit(want_ink);
+                st->ink_bad += compare_ink(ink, want_ink, name, t) != 0;
+                continue;
+            }
             jo_draw(fb, &ui, &w.c, (uint32_t)t);
-            s_frames++;
             if (compare(fb, hex + 1, name, t)) {
-                s_pixels_bad++;
+                st->bad_frames++;
                 if (!dumped++) {
                     fprintf(stderr, "C frame of %s at %lu:\n", name, t);
                     dump(fb);
                 }
             }
+            if (ui.screen != JO_HOME || w.c.setup || w.c.boot || w.c.splash)
+                check_neutral(&ui, w.c, fb, name, t, st);
         } else if (sscanf(line, "press %c %lu", &b, &t) == 2) {
             jo_input_tick(&in, &ui, (uint32_t)t, &host);
             jo_press(&ui, btn_of(b), (uint32_t)t, &w.c, &ops);
@@ -330,7 +421,7 @@ static void run_cases(const char *path)
             want_log++;
         } else if (!strcmp(line, "end")) {
             CHECK(want_log == w.nlog, "%s: %d calls, the emulator made %d", name, w.nlog, want_log);
-            s_cases++;
+            st->cases++;
         } else
             CHECK(0, "bad line: %.40s", line);
     }
@@ -356,17 +447,28 @@ static void test_js_numbers(void)
 
 int main(int argc, char **argv)
 {
+    struct stats oled = {0}, colour = {0};
     test_js_numbers();
     if (argc < 2) {
         fprintf(stderr, "usage: test_oled CASES_TXT\n");
         return 2;
     }
-    run_cases(argv[1]);
-    CHECK(s_cases >= 100 && s_frames >= 380, "only %d cases, %d frames", s_cases, s_frames);
+    run_cases(argv[1], &oled);
+    CHECK(oled.cases >= 100 && oled.frames >= 380, "only %d cases, %d frames", oled.cases, oled.frames);
+    CHECK(oled.neutral_frames >= 200, "only %d non-HOME frames re-drawn with the lcd2 layout", oled.neutral_frames);
+    if (argc > 2) {
+        run_cases(argv[2], &colour);
+        CHECK(colour.cases >= 80 && colour.ink_frames >= 80 && colour.ink_lit > 20000, "only %d ink cases, %d planes, %d lit ink pixels", colour.cases,
+              colour.ink_frames, colour.ink_lit);
+    }
     if (s_fail) {
-        fprintf(stderr, "test_oled: %d of %d checks failed (%d of %d frames differ)\n", s_fail, s_checks, s_pixels_bad, s_frames);
+        fprintf(stderr, "test_oled: %d of %d checks failed (%d of %d frames differ; %d of %d ink planes differ)\n", s_fail, s_checks,
+                oled.bad_frames + colour.bad_frames, oled.frames + colour.frames, colour.ink_bad, colour.ink_frames);
         return 1;
     }
-    printf("test_oled: %d cases, %d frames, 0 differing pixels against the emulator; %d checks\n", s_cases, s_frames, s_checks);
+    printf("test_oled: %d cases, %d frames, 0 differing pixels against the emulator; %d checks\n", oled.cases, oled.frames, s_checks);
+    printf("test_oled: lcd2 layout: %d non-HOME frames of those unchanged with an empty ink plane; %d ink cases, %d frames and %d ink planes (%d pixels "
+           "each, %d lit ink pixels) identical to ui/oled.js\n",
+           oled.neutral_frames, colour.cases, colour.frames, colour.ink_frames, JO_INK_BYTES, colour.ink_lit);
     return 0;
 }

@@ -80,6 +80,15 @@ eq([st.gated, st.bar, st.ble.left, st.ble.phone, st.net.ip], [true, { state: 'lo
 eq(Stick.ctx(state({ status: { ...status, ble_state: 'connected' }, statusAt: 1000 }), 1500).ble.phone, true, 'status: a phone connected');
 eq(Stick.ctx(state({ status: { ...status, gated: '1' }, statusAt: 0 }), 9000).gated, false, 'a status older than 5 s is not used');
 
+// ---- held by the user, or stopped by the silence / the gate (the status says which) ----
+{
+  const stopped = home('h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1');
+  eq(Stick.ctx(state({ home: stopped }), 1000).hold, true, 'transport stopped, no status: held');
+  eq(Stick.ctx(state({ home: stopped, status: { ...status, hold: '1' }, statusAt: 1000 }), 1100).hold, true, 'status hold=1: held');
+  eq(Stick.ctx(state({ home: stopped, status: { ...status, hold: '0', silent: '1' }, statusAt: 1000 }), 1100).hold, false, 'status hold=0: not the user\'s hold');
+  eq(Stick.ctx(state({ home: stopped, status: { ...status, silent: '1' }, statusAt: 1000 }), 1100).silent, true, 'status silent=1: silent, whatever the meter says');
+}
+
 // ---- the beat LEDs ----
 const GREEN = 'rgb(0,215,0)', AMBER = 'rgb(255,158,0)';
 const ledsAt = (over, now) => Stick.leds(state(over), now);
