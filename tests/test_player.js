@@ -77,7 +77,6 @@ eq(P.listTree(tree, []).map(e => e.name + ':' + e.kind), ['House:directory', 'a.
 eq(P.listTree(tree, ['House']).map(e => e.name), ['Deep', 'b.wav', 'd.txt'], 'one level down');
 eq(P.listTree(tree, ['House', 'Deep']).map(e => e.file), ['fc'], 'two levels down, the File kept');
 eq(P.listTree(tree, ['Nope']), [], 'no such folder');
-eq(P.stepIndex(3, 0, 1), 1, 'next'); eq(P.stepIndex(3, 2, 1), -1, 'no next after the last'); eq(P.stepIndex(3, 0, -1), -1, 'no previous before the first'); eq(P.stepIndex(3, 1, -1), 0, 'previous');
 
 eq(P.rmsOf([]), 0, 'no samples: rms 0');
 eq(P.rmsOf([0.5, -0.5, 0.5, -0.5]), 0.5, 'rms of a square wave');
@@ -95,12 +94,64 @@ eq(P.statusText({ ...base, hasFile: false }), 'no file', 'status: no file');
 eq(P.statusText({ ...base, paused: true, position: 0 }), 'stopped', 'status: stopped');
 eq(P.statusText({ ...base, paused: true }), 'paused 0:12 / 3:40', 'status: paused');
 eq(P.statusText(base), 'playing 0:12 / 3:40 \u00b7 monitor + JANK USB Audio', 'status: both outputs');
-eq(P.statusText({ ...base, jank: '' }), 'playing 0:12 / 3:40 \u00b7 jank output not found: monitor only', 'status: no jank device');
+eq(P.statusText({ ...base, jank: '' }), 'playing 0:12 / 3:40 \u00b7 no stick output chosen: monitor only', 'status: no stick output chosen');
 eq(P.statusText({ ...base, monitor: false }), 'playing 0:12 / 3:40 \u00b7 JANK USB Audio only (monitor off)', 'status: jank only');
-eq(P.statusText({ ...base, jank: '', monitor: false }), 'playing 0:12 / 3:40 \u00b7 no output: jank not found and monitor off', 'status: nowhere');
+eq(P.statusText({ ...base, jank: '', monitor: false }), 'playing 0:12 / 3:40 \u00b7 no output: no stick output chosen and monitor off', 'status: nowhere');
 eq(P.statusText({ ...base, jankError: 'NotAllowedError' }), 'playing 0:12 / 3:40 \u00b7 jank output failed: NotAllowedError, monitor only', 'status: the jank path failed, the monitor plays on');
 eq(P.statusText({ ...base, volumePct: 0 }), 'playing 0:12 / 3:40 \u00b7 monitor + JANK USB Audio \u00b7 no sound: volume is 0', 'status: volume 0 (the monitor)');
 eq(P.statusText({ ...base, volumePct: 0, monitor: false }), 'playing 0:12 / 3:40 \u00b7 JANK USB Audio only (monitor off)', 'volume 0 with the monitor off: not a "no sound" case, the stick still plays');
 eq(P.statusText({ ...base, error: 'NotAllowedError' }), 'error: NotAllowedError', 'status: an error wins');
+
+// ---- what follows a track ----
+eq([P.nextTrack(3, 0), P.nextTrack(3, 2), P.nextTrack(0, -1), P.nextTrack(1, 0)], [1, -1, -1, -1], 'next: the following file, none after the last or in an empty list');
+const seen = new Set();
+for (let i = 0; i < 20; i++) seen.add(P.randomTrack(5, 2, () => i / 20));
+eq([...seen].includes(2), false, 'random never picks the playing track');
+eq(P.randomTrack(5, 2, () => 0), 0, 'random, rng 0: the first other file');
+eq(P.randomTrack(5, 2, () => 0.9999999), 4, 'random, rng just under 1: the last other file');
+eq(P.randomTrack(5, 4, () => 0.9999999), 3, 'random, the playing one is the last: still another one');
+eq(P.randomTrack(5, 0, () => 1), 4, 'random, rng 1 (out of range): clamped to the last other file');
+eq([P.randomTrack(1, 0, () => 0.5), P.randomTrack(0, -1, () => 0.5)], [-1, -1], 'random: a single-file or empty list has no other file');
+eq(P.randomTrack(2, 0, () => 0.3), 1, 'random: two files, the other one');
+eq([P.afterTrack('next', 3, 1), P.afterTrack('next', 3, 2), P.afterTrack('stop', 3, 0), P.afterTrack('random', 3, 0, () => 0)], [2, -1, -1, 1], 'then: next, next at the last file stops, stop ends, random');
+eq([P.skipTrack('next', 3, 1), P.skipTrack('next', 3, 2), P.skipTrack('next', 1, 0), P.skipTrack('stop', 3, 0), P.skipTrack('random', 3, 1, () => 0)], [2, 0, -1, 1, 0], 'the Next button: the next file, back to the first after the last, nothing for a single file; random picks another');
+eq([P.parseAfterMode('random'), P.parseAfterMode('stop'), P.parseAfterMode('next'), P.parseAfterMode(null), P.parseAfterMode('x')], ['random', 'stop', 'next', 'next', 'next'], 'the remembered "then": junk falls back to next');
+eq(P.sortEntries([{ name: 'b10.mp3', kind: 'file' }, { name: 'b2.mp3', kind: 'file' }, { name: 'a.mp3', kind: 'file' }]).map(e => e.name), ['a.mp3', 'b2.mp3', 'b10.mp3'], 'the folder listing stays natural-sorted (the list random and next index into)');
+
+// ---- what this browser has ----
+const env = (over) => ({ captureStream: 'function', mozCaptureStream: 'undefined', audioContext: 'function', audioContextSetSinkId: 'function', elementSetSinkId: 'function', ...over });
+eq(P.playbackPlan(env({})), { path: 'captureStream', stick: 'context', missing: ['audio.mozCaptureStream'] }, 'everything there: the captureStream path, the stick through the context');
+eq(P.playbackPlan(env({ captureStream: 'undefined' })).path, 'webaudio', 'no captureStream: the Web Audio path');
+eq(P.playbackPlan(env({ captureStream: 'undefined', mozCaptureStream: 'function' })), { path: 'captureStream', stick: 'context', missing: ['audio.captureStream'] }, 'mozCaptureStream counts as captureStream');
+eq(P.playbackPlan(env({ captureStream: 'undefined' })), { path: 'webaudio', stick: 'element', missing: ['audio.captureStream', 'audio.mozCaptureStream'] }, 'Web Audio path: the stick through a hidden element when it has setSinkId');
+eq(P.playbackPlan(env({ captureStream: 'undefined', elementSetSinkId: 'undefined' })).stick, 'context', 'Web Audio path without element setSinkId: a second context');
+eq(P.playbackPlan(env({ captureStream: 'undefined', elementSetSinkId: 'undefined', audioContextSetSinkId: 'undefined' })).stick, 'none', 'no setSinkId anywhere: no way to the stick');
+eq(P.playbackPlan(env({ audioContextSetSinkId: 'undefined' })).path, 'webaudio', 'captureStream but a context that cannot choose its output: the Web Audio path');
+eq(P.playbackPlan(env({ audioContextSetSinkId: 'undefined' })).stick, 'element', '... which reaches the stick through the element');
+eq(P.playbackPlan(env({ audioContext: 'undefined' })), { path: 'none', stick: 'none', missing: ['audio.mozCaptureStream', 'AudioContext'] }, 'no AudioContext: no path');
+eq(P.planNote(P.playbackPlan(env({}))), '', 'nothing to say when both outputs work');
+eq(P.planNote(P.playbackPlan(env({ captureStream: 'undefined' }))), '', 'the Web Audio path works too: nothing to say');
+assert.match(P.planNote(P.playbackPlan(env({ captureStream: 'undefined', elementSetSinkId: 'undefined', audioContextSetSinkId: 'undefined' }))), /no setSinkId.*only the monitor plays/); checks++;
+assert.match(P.planNote(P.playbackPlan(env({ audioContext: 'undefined' }))), /no Web Audio/); checks++;
+const plan = P.playbackPlan(env({ captureStream: 'undefined' }));
+eq(P.planDetails(plan, env({ captureStream: 'undefined' }), 'Google Chrome 126'),
+   'path: webaudio · stick output: element · audio.captureStream: absent (undefined) · audio.mozCaptureStream: absent (undefined) · AudioContext: present · AudioContext.prototype.setSinkId: present · HTMLMediaElement.prototype.setSinkId: present · browser: Google Chrome 126', 'the details line names the path, every API and the browser');
+eq(P.browserBrand({ brands: [{ brand: 'Not.A/Brand', version: '8' }, { brand: 'Chromium', version: '126' }, { brand: 'Google Chrome', version: '126' }] }, 'UA'), 'Google Chrome 126', 'the real brand, not the GREASE one or Chromium');
+eq(P.browserBrand({ brands: [{ brand: 'Not;A=Brand', version: '99' }, { brand: 'Chromium', version: '126' }, { brand: 'Microsoft Edge', version: '126' }] }, 'UA'), 'Microsoft Edge 126', 'Edge');
+eq(P.browserBrand({ brands: [{ brand: 'Not.A/Brand', version: '8' }, { brand: 'Chromium', version: '126' }] }, 'UA'), 'Chromium 126', 'only Chromium');
+eq(P.browserBrand(undefined, 'Mozilla/5.0 (Macintosh) Safari/605.1.15'), 'Mozilla/5.0 (Macintosh) Safari/605.1.15', 'no userAgentData: the userAgent');
+eq(P.browserBrand(undefined, undefined), 'unknown', 'nothing known');
+
+// ---- the stick's output without the microphone ----
+const listed = [{ kind: 'audiooutput', label: '', deviceId: 'spk' }, { kind: 'audiooutput', label: '', deviceId: 'jk' }];
+eq(P.matchSaved(listed, { id: 'jk', label: 'JANK USB Audio' }), { id: 'jk', label: 'Output 2' }, 'the saved id is found in a list with no labels');
+eq(P.matchSaved([{ kind: 'audiooutput', label: 'JANK USB Audio', deviceId: 'new' }], { id: 'old', label: 'JANK USB Audio' }), { id: 'new', label: 'JANK USB Audio' }, 'the saved label is found when the id changed and labels are there');
+eq([P.matchSaved(listed, { id: 'gone' }), P.matchSaved(listed, null), P.matchSaved([], { id: 'jk' })], [null, null, null], 'a device that is not there: none');
+eq([P.outputButton({ working: true, hasSelectAudioOutput: true }), P.outputButton({ working: true, hasSelectAudioOutput: false })], ['none', 'none'], 'a chosen device that works: no button');
+eq(P.outputButton({ working: false, hasSelectAudioOutput: true }), 'choose', 'nothing chosen, the browser has an output chooser: the chooser button');
+eq(P.outputButton({ working: false, hasSelectAudioOutput: false }), 'allow', 'no chooser: only then the explicit microphone button');
+eq(P.OUTPUT_HELP.choose, "Choose the stick's output (jank) once.", 'the line that says what the click does');
+ok2(/microphone only to read the device names; nothing is recorded/.test(P.OUTPUT_HELP.allow), 'the microphone button says why');
+ok2(!/microphone/i.test(P.OUTPUT_HELP.choose + P.OUTPUT_BUTTON_TEXT.choose), 'the normal path never mentions the microphone');
 
 console.log('player: ' + checks + ' checks passed');

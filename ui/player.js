@@ -31,12 +31,45 @@ const Player = (() => {
   const smoothDb = (prev, next, dtMs, tauMs) => prev + (next - prev) * (1 - Math.exp(-Math.max(0, dtMs) / (tauMs || LEVEL_TAU_MS)));
   const meterFraction = db => clamp((db - LEVEL_FLOOR_DB) / -LEVEL_FLOOR_DB, 0, 1);
 
+  // ---- what this browser can do for the two outputs ----
+  // env: the `typeof` of each API: { captureStream, mozCaptureStream, audioContext, audioContextSetSinkId, elementSetSinkId }
+  // path: 'captureStream' (the element plays on the default output, its captureStream feeds the stick's context: the tested path),
+  // 'webaudio' (the element goes through Web Audio: a gain for the monitor, the analyser, a stream to the stick), 'none' (no Web Audio).
+  // stick: how the stick's output is reached: 'context' (AudioContext.setSinkId), 'element' (a hidden <audio> with setSinkId), 'none'.
+  const APIS = [['captureStream', 'audio.captureStream'], ['mozCaptureStream', 'audio.mozCaptureStream'], ['audioContext', 'AudioContext'],
+                ['audioContextSetSinkId', 'AudioContext.prototype.setSinkId'], ['elementSetSinkId', 'HTMLMediaElement.prototype.setSinkId']];
+  function playbackPlan(env) {
+    const has = key => env[key] === 'function';
+    const capture = has('captureStream') || has('mozCaptureStream');
+    const path = has('audioContext') && capture && has('audioContextSetSinkId') ? 'captureStream' : has('audioContext') ? 'webaudio' : 'none';
+    const stick = path === 'captureStream' ? 'context' : path === 'webaudio' ? (has('elementSetSinkId') ? 'element' : has('audioContextSetSinkId') ? 'context' : 'none') : 'none';
+    return { path, stick, missing: APIS.filter(([key]) => !has(key)).map(([, name]) => name) };
+  }
+  // one plain line when something is missing that matters, '' when both outputs can work
+  function planNote(plan) {
+    if (plan.path === 'none') return 'This browser has no Web Audio: only the monitor plays, and there is no level meter.';
+    if (plan.stick === 'none') return "This browser cannot send sound to a chosen output (no setSinkId): only the monitor plays.";
+    return '';
+  }
+  // the 'details' line the user can paste back: the path in use, every API with its type, and the browser
+  function planDetails(plan, env, brand) {
+    const apis = APIS.map(([key, name]) => name + ': ' + (env[key] === 'function' ? 'present' : 'absent (' + env[key] + ')')).join(' · ');
+    return 'path: ' + plan.path + ' · stick output: ' + plan.stick + ' · ' + apis + ' · browser: ' + brand;
+  }
+  // "Google Chrome 126" from navigator.userAgentData.brands (the real brand, not the GREASE one), else the start of the userAgent
+  function browserBrand(userAgentData, userAgent) {
+    const brands = (userAgentData && userAgentData.brands) || [];
+    const real = brands.filter(b => b && !/not.?a.?brand/i.test(b.brand) && b.brand !== 'Chromium');
+    const pick = real[real.length - 1] || brands.find(b => b && b.brand === 'Chromium');
+    return pick ? pick.brand + ' ' + pick.version : String(userAgent || 'unknown').slice(0, 90);
+  }
+
   // where the sound goes: the monitor (this computer's default output, scaled by the volume knob) and the stick's output
   // (the file at its true level): { monitor, jank (label or ''), jankError }
   function routeText(r) {
     if (r.jankError) return 'jank output failed: ' + r.jankError + (r.monitor ? ', monitor only' : '');
     if (r.jank) return r.monitor ? 'monitor + ' + r.jank : r.jank + ' only (monitor off)';
-    return r.monitor ? 'jank output not found: monitor only' : 'no output: jank not found and monitor off';
+    return r.monitor ? 'no stick output chosen: monitor only' : 'no output: no stick output chosen and monitor off';
   }
   // the status line of the card: { hasFile, paused, position, length, monitor, jank, jankError, volumePct, error } -> text
   function statusText(s) {
@@ -56,6 +89,26 @@ const Player = (() => {
   }
   // [{ id, label }] for the Output select; a device without a label (no media permission yet) is numbered
   const outputChoices = devices => outputs(devices).map((d, i) => ({ id: d.deviceId, label: d.label || 'Output ' + (i + 1) }));
+  // the output the user chose last time, found again in a device list (ids first; a label when the list has labels and the id changed)
+  function matchSaved(devices, saved) {
+    if (!saved || !saved.id) return null;
+    const list = outputChoices(devices);
+    return list.find(c => c.id === saved.id) || (saved.label ? list.find(c => c.label === saved.label) : null) || null;
+  }
+  // which button the card offers for the stick's output: 'none' while a chosen device works, 'choose' (the browser's own output
+  // chooser, selectAudioOutput: no microphone), or 'allow' (no chooser here: the explicit button that asks for the microphone only to
+  // read the device names). Never the microphone without that button.
+  function outputButton(s) {
+    if (s.working) return 'none';
+    return s.hasSelectAudioOutput ? 'choose' : 'allow';
+  }
+  const OUTPUT_HELP = {
+    choose: "Choose the stick's output (jank) once.",
+    allow: "Chrome will ask for the microphone only to read the device names; nothing is recorded.",
+    none: '',
+  };
+  const OUTPUT_BUTTON_TEXT = { choose: "Choose the stick's output", allow: 'Allow device names (asks for the microphone)', none: '' };
+
   // the stick's output: jank first, else the remembered device when it is still there, else none (id null: monitor only)
   function resolveOutput(devices, savedId) {
     const choices = outputChoices(devices), jank = pickOutput(devices, 'jank');
@@ -96,7 +149,22 @@ const Player = (() => {
     return [...Object.values(node.dirs).map(d => ({ name: d.name, kind: 'directory' })), ...node.files.map(f => ({ name: f.name, kind: 'file', file: f.file }))];
   }
   // the next / previous index in a list of `count` tracks, or -1 past either end
-  const stepIndex = (count, index, step) => { const i = index + step; return i >= 0 && i < count ? i : -1; };
+  // What follows a track, by index in the shown folder's list of `count` audio files (-1: nothing). `rng` returns [0, 1).
+  const nextTrack = (count, index) => (index + 1 < count ? index + 1 : -1);
+  function randomTrack(count, index, rng) {
+    const others = Array.from({ length: count }, (_, i) => i).filter(i => i !== index);
+    return others.length ? others[Math.min(others.length - 1, Math.floor((rng || Math.random)() * others.length))] : -1;
+  }
+  const AFTER_MODES = ['next', 'random', 'stop'];
+  const parseAfterMode = text => (AFTER_MODES.includes(text) ? text : 'next');
+  // a track that ran off its end: "then" next / random / stop
+  const afterTrack = (mode, count, index, rng) => (mode === 'next' ? nextTrack(count, index) : mode === 'random' ? randomTrack(count, index, rng) : -1);
+  // the Next button: random picks any other file, else the next one, back to the first after the last
+  function skipTrack(mode, count, index, rng) {
+    if (mode === 'random') return randomTrack(count, index, rng);
+    const n = nextTrack(count, index);
+    return n >= 0 ? n : (count > 0 && index !== 0 ? 0 : -1);
+  }
 
 
   // ---- the tempo tag of the playing file (never a folder scan): ID3v2 TBPM, MP4 tmpo, FLAC / Ogg Vorbis / Opus BPM= ----
@@ -295,5 +363,5 @@ const Player = (() => {
   const expectedBpm = (tag, rate) => tag * rate;
 
   return { MAX_TAG_BYTES, parseBpmText, id3TotalSize, parseId3, mp4Atom, parseMp4Tmpo, parseFlac, parseOgg, sniff, tagBpm, expectedBpm, PITCH_RANGE_PCT, DEFAULT_VOLUME_PCT, MAX_ROWS, AUDIO_EXT, LEVEL_FLOOR_DB, rmsOf, rmsToDb, smoothDb, meterFraction, statusText, pitchToRate, formatPitch, volumeFromPct, parseVolumePct, formatTime,
-           routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree, stepIndex };
+           matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, afterTrack, skipTrack, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
 })();

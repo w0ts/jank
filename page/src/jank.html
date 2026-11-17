@@ -11,7 +11,7 @@
 :root[data-theme="dark"] { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; --beat: #4cc497; --off: #2c2c2a; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
-main { max-width: 680px; margin: 0 auto; }
+main { max-width: 940px; margin: 0 auto; }
 h1 { font-size: 22px; margin: 0; }
 h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
@@ -32,22 +32,12 @@ th { color: var(--dim); font-weight: 500; font-size: 12px; }
 table.groups tbody tr.on td { color: var(--accent); font-weight: 600; }
 td button { padding: 4px 12px; min-height: 32px; }
 details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 2px; }
-.home-top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 12px; }
-.big { font-size: 44px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
-.boxes { display: flex; gap: 6px; flex-wrap: wrap; }
-.boxes span { width: 22px; height: 22px; border-radius: 4px; background: var(--off); }
-.boxes span.on { background: var(--beat); }
 .row { display: flex; gap: 8px; align-items: end; }
 .row input { width: 7em; }
 .meter { height: 8px; border-radius: 4px; background: var(--off); overflow: hidden; margin-top: 6px; }
 .meter i { display: block; height: 100%; width: 0; background: var(--accent); }
 .meter { position: relative; }
 .meter b.tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
-.meter.gated i { background: var(--warn); }
-/* M2k: the confidence holds (no evidence): the bar hatched and dimmed, "HOLD" by the number */
-.meter.hold i { opacity: 0.55; background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--off) 3px 6px); }
-/* the robust follower's COAST: the outputs run under the threshold, the value is measured: the bar hatched the other way, "COAST" by the number */
-.meter.coast i { opacity: 0.75; background-image: repeating-linear-gradient(45deg, transparent 0 3px, var(--off) 3px 6px); }
 #msg { color: var(--dim); min-height: 1.4em; margin: 0 0 12px; }
 #msg.bad { color: var(--warn); }
 #msg:empty { display: none; }
@@ -55,30 +45,52 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 [hidden] { display: none !important; }
 <!--@include ui/box.css-->
 #face .hint { margin: 10px 0 0; text-align: center; }
-#player.drop { outline: 2px dashed var(--accent); outline-offset: -6px; }
-#player .row { align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-#player .row > * { width: auto; }
-#player #pl-name { flex: 1 1 10em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-#player input[type="range"] { width: 100%; padding: 0; min-height: 28px; }
-#player input[type="file"] { padding: 6px; }
-#player .num { font-variant-numeric: tabular-nums; color: var(--dim); }
-#player #pl-pitchval { font-size: 18px; font-weight: 600; min-width: 5.5em; color: var(--ink); }
+.live-row { display: flex; gap: 12px; align-items: flex-start; }
+.live-row > #face { flex: 1 1 0; min-width: 0; }
+.live-row > #player { flex: 0 0 340px; width: 340px; }
+@media (max-width: 800px) { .live-row { flex-direction: column; align-items: stretch; } .live-row > #player { flex: none; width: auto; } }
+#player { padding: 10px 12px; }
+#player h2 { margin: 0; }
+#player .pl-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+#player .pl-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+#player .pl-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+#player .grow { flex: 1 1 auto; }
+#player button, #player select, #player input { min-height: 30px; padding: 3px 8px; font-size: 13px; }
+#player button.icon { width: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+#player button.icon.wide { width: auto; min-width: 54px; padding: 0 10px; }
+#player button.small { margin-top: 6px; }
 #player button.link { min-height: 0; padding: 0 2px; background: none; border: 0; color: var(--accent); text-decoration: underline; }
-#player label.monitor { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; margin-left: 10px; font-size: 13px; }
-#player label.monitor input { width: auto; min-height: 0; }
-#player .quiet-file { flex-direction: row; align-items: center; gap: 6px; }
-#pl-crumbs { gap: 4px; margin: 12px 0 6px; }
-#pl-crumbs button { min-height: 28px; padding: 2px 8px; }
-#pl-list { max-height: 360px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
-#pl-list button { display: block; width: 100%; text-align: left; min-height: 34px; padding: 6px 10px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); background: transparent; }
+#player input[type="range"].thin { width: 100%; padding: 0; min-height: 18px; margin: 4px 0 0; }
+#player input.mini { width: 5.2em; }
+#player input[type="checkbox"] { width: auto; min-height: 0; }
+#player select { width: auto; max-width: 100%; }
+#player label { flex-direction: row; align-items: center; gap: 4px; font-size: 12px; }
+#player .then { margin-left: auto; flex: none; }
+#player .pl-name-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+#player .pl-name-row #pl-name { flex: 1 1 auto; min-width: 0; margin-top: 0; }
+#player #pl-volval { white-space: nowrap; min-width: 3em; text-align: right; }
+#player .num { font-variant-numeric: tabular-nums; color: var(--dim); font-size: 12px; }
+#player #pl-pitchval { color: var(--ink); font-weight: 600; min-width: 5em; font-size: 13px; }
+#player p.note { margin: 4px 0 0; font-size: 12px; }
+#player p.note:empty { display: none; }
+#player #pl-name { margin-top: 6px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#player .meter { margin-top: 4px; height: 5px; }
+#player .quiet-file { margin-top: 6px; }
+#player details.pl-details { margin-top: 4px; font-size: 12px; color: var(--dim); }
+#pl-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 8px 0 4px; }
+#pl-crumbs button { min-height: 24px; padding: 1px 6px; }
+#pl-crumbs .folder { font-size: 12px; color: var(--dim); margin-right: 4px; }
+#pl-list { height: 232px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+#pl-list button { display: block; width: 100%; text-align: left; min-height: 0; height: 28px; padding: 2px 8px; font-size: 12px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #pl-list button.dir { font-weight: 600; }
 #pl-list button.playing { color: var(--accent); }
-#player select { width: auto; max-width: 100%; }
+.adv-boots { font-size: 20px; font-weight: 650; margin: 0 0 8px; }
+.adv-boots.restarted { color: var(--warn); }
 #c-advanced-box { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
 #c-advanced-box input { width: auto; min-height: 0; }
 #connect .buttons button { color: var(--ink); background: transparent; border: 1px solid var(--line); }
 #connect .buttons button[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-#face-box svg { width: 100%; max-width: 560px; height: auto; }
+#face-box svg { width: 100%; max-width: 520px; height: auto; }
 </style>
 </head>
 <body>
@@ -90,7 +102,6 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 
   <section id="connect">
     <div class="buttons">
-      <button id="c-sim" type="button" aria-pressed="true" title="the offline demo: a local model, no stick needed">Demo</button>
       <button id="c-midi" aria-pressed="false">MIDI port (USB, iPhone app)</button>
       <button id="c-bluetooth" aria-pressed="false">Bluetooth</button>
       <label id="c-advanced-box" class="hide"><input id="c-advanced" type="checkbox"> Advanced</label>
@@ -98,118 +109,98 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
     <label id="c-ports-box" class="hide" style="margin-top:10px">MIDI port <select id="c-ports"></select></label>
   </section>
 
-  <section id="face" class="device">
-    <div id="face-box">
-      <!--@include ui/box.svg.html-->
+  <div id="live" class="hide">
+    <div class="live-row">
+      <section id="face" class="device">
+        <div id="face-box">
+          <!--@include ui/box.svg.html-->
+        </div>
+        <p id="face-hint" class="note hint"></p>
+        <p class="note hint">The stick has no screen: this is a virtual screen of its state, and the buttons act on the stick.</p>
+      </section>
+      <section id="player" class="hide" tabindex="-1">
+        <div class="pl-title"><h2>Player</h2><button id="pl-help" class="link" type="button" aria-expanded="false" title="how the player works">?</button></div>
+        <p id="pl-help-text" class="note hide">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first time, choose the stick's output once in the browser's own output chooser (no microphone is used); it is remembered. The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card.</p>
+        <audio id="pl-audio" preload="auto"></audio>
+        <div class="pl-bar">
+          <button id="pl-folder" class="icon" type="button" title="Music folder" aria-label="Music folder"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2H19.5A1.5 1.5 0 0 1 21 8.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" fill="currentColor"/></svg></button>
+          <button id="pl-play" class="icon wide" type="button" disabled>Play</button>
+          <button id="pl-next" class="icon wide quiet" type="button" disabled title="the next track; with &quot;then random&quot;, a random one">Next</button>
+          <span class="num"><span id="pl-pos">0:00</span> / <span id="pl-len">0:00</span></span>
+        </div>
+        <label id="pl-dirpick" class="hide quiet-file">Choose music folder <input id="pl-dir" type="file" webkitdirectory multiple></label>
+        <button id="pl-reopen" class="quiet small hide" type="button"></button>
+        <div class="pl-name-row"><span id="pl-name" class="note">No track: choose a music folder</span>
+          <label class="then">then <select id="pl-then"><option value="next">next</option><option value="random">random</option><option value="stop">stop</option></select></label>
+        </div>
+        <input id="pl-seek" class="thin" type="range" min="0" max="1000" value="0" step="1" disabled aria-label="Position">
+        <div class="meter" aria-hidden="true" title="the file's level, as measured in this page"><i id="pl-meter"></i></div>
+        <div class="pl-row"><strong>Pitch</strong><span id="pl-pitchval" class="num">+0.00 %</span><input id="pl-pitch-num" class="mini" type="number" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, percent"></div>
+        <input id="pl-pitch" class="thin" type="range" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, varispeed">
+        <p id="pl-bpm" class="note hide"></p>
+        <div class="pl-row"><strong>Volume</strong><input id="pl-vol" class="thin grow" type="range" min="0" max="100" step="1" value="80" aria-label="Volume"><span id="pl-volval" class="num">80 %</span>
+          <label class="monitor"><input id="pl-monitor" type="checkbox" checked> monitor</label></div>
+        <p id="pl-status" class="note">no file</p>
+        <p class="note pl-out">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button">change</button></p>
+        <select id="pl-out" class="hide" aria-label="Stick output"><option value="">None (monitor only)</option></select>
+        <button id="pl-pick" class="quiet small hide" type="button"></button>
+        <p id="pl-pick-help" class="note hide"></p>
+        <p id="pl-note" class="note" aria-live="polite"></p>
+        <details class="pl-details"><summary>details</summary><p id="pl-details" class="note"></p></details>
+        <div id="pl-browser" class="hide">
+          <div id="pl-crumbs" class="pl-crumbs"></div>
+          <div id="pl-list"></div>
+        </div>
+      </section>
     </div>
-    <p id="face-hint" class="note hint"></p>
-  </section>
+  </div>
 
-  <div id="advanced-extra" class="hide"></div>
-
-  <section id="player" class="hide" tabindex="-1">
-    <h2>Player</h2>
-    <audio id="pl-audio" preload="auto"></audio>
-    <div class="row">
-      <input id="pl-file" type="file" accept="audio/*" aria-label="Open audio file">
-      <button id="pl-folder" class="quiet" type="button">Music folder</button>
-      <label id="pl-dirpick" class="hide quiet-file">Choose music folder <input id="pl-dir" type="file" webkitdirectory multiple></label>
-      <button id="pl-reopen" class="quiet hide" type="button"></button>
-    </div>
-    <div class="row"><span id="pl-name" class="note">No file: choose one, or drop it here</span></div>
-    <div class="row">
-      <button id="pl-prev" class="quiet" type="button" disabled>Previous</button>
-      <button id="pl-play" type="button" disabled>Play</button>
-      <button id="pl-next" class="quiet" type="button" disabled>Next</button>
-      <span class="num"><span id="pl-pos">0:00</span> / <span id="pl-len">0:00</span></span>
-    </div>
-    <div class="meter" aria-hidden="true" title="the file's level, as measured in this page"><i id="pl-meter"></i></div>
-    <p id="pl-status" class="note" style="margin:6px 0 8px">no file</p>
-    <input id="pl-seek" type="range" min="0" max="1000" value="0" step="1" disabled aria-label="Position">
-    <div class="row" style="margin-top:10px">
-      <strong>Pitch</strong><span id="pl-pitchval" class="num">+0.00 %</span>
-      <button id="pl-reset" class="quiet" type="button">0</button>
-    </div>
-    <input id="pl-pitch" type="range" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, varispeed">
-    <p id="pl-bpm" class="note hide" style="margin:4px 0 0"></p>
-    <div class="row" style="margin-top:10px"><strong>Volume</strong><span id="pl-volval" class="num">80 %</span></div>
-    <input id="pl-vol" type="range" min="0" max="100" step="1" value="80" aria-label="Volume">
-    <p class="note" style="margin:10px 0 0">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button">change</button>
-      <label class="monitor"><input id="pl-monitor" type="checkbox" checked> monitor</label></p>
-    <select id="pl-out" class="hide" aria-label="Stick output"><option value="">None (monitor only)</option></select>
-    <p id="pl-note" class="note" aria-live="polite">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first button pressed here asks once for permission to list the audio outputs (the browser needs it to show their names). The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card.</p>
-    <div id="pl-browser" class="hide">
-      <div id="pl-crumbs" class="row"></div>
-      <div id="pl-list"></div>
-    </div>
-  </section>
-
-  <section id="home">
-    <h2>Home</h2>
-    <div class="home-top">
-      <div><div class="big" id="h-bpm">-</div><span class="note">BPM</span></div>
-      <div><div class="boxes" id="h-boxes"></div><span class="note" id="h-transport">-</span></div>
-      <div><div class="big" id="h-mode">-</div><span class="note" id="h-mode-note">mode</span></div>
-    </div>
-    <div class="row" style="flex-wrap:wrap;margin-bottom:12px">
-      <label>New tempo <input id="t-tempo" inputmode="decimal" placeholder="120"></label>
-      <button id="t-set" disabled>Set</button>
-      <button id="t-play" disabled>Play</button>
-      <button id="t-up" class="quiet hide" disabled>x2</button>
-      <button id="t-down" class="quiet hide" disabled>÷2</button>
-    </div>
-    <div class="row hide" id="nudges" style="flex-wrap:wrap;margin-bottom:12px">
-      <span class="note">Phase</span>
-      <button id="n-beat-down" class="quiet" disabled title="Link's beats half a beat later">-½</button>
-      <button id="n-beat-up" class="quiet" disabled title="Link's beats half a beat earlier (fixes an off-beat lock)">+½</button>
-      <span class="note">Audio shift</span>
-      <button id="n-ms-down" class="quiet" disabled title="every output 1 ms earlier">-1 ms</button>
-      <button id="n-ms-up" class="quiet" disabled title="every output 1 ms later">+1 ms</button>
-    </div>
-    <div class="grid">
-      <div class="stat"><b id="h-net">-</b><span>network</span></div>
-      <div class="stat"><b id="h-link">-</b><span>Link peers</span></div>
-      <div class="stat"><b id="h-air">-</b><span>units on the air</span></div>
-      <div class="stat"><b id="h-batt">-</b><span>battery</span></div>
-      <div class="stat"><b id="h-level">-</b><span id="h-level-range">input level</span><div class="meter"><i id="h-level-bar"></i></div></div>
-      <div class="stat"><b id="h-conf">-</b><span id="h-conf-note">confidence</span><div class="meter" id="h-conf-meter"><i id="h-conf-bar"></i><b class="tick hide" id="h-conf-tick" title="the threshold"></b></div></div>
-      <div class="stat"><b id="h-ble">-</b><span>Bluetooth</span></div>
-    </div>
-  </section>
+  <div id="advanced-extra" class="hide">
+    <section>
+      <h2>Advanced</h2>
+      <p id="adv-boots" class="adv-boots">boots - &middot; reset: -</p>
+      <p id="adv-restart" class="note hide"></p>
+      <div class="grid">
+        <div class="stat"><b id="adv-net">-</b><span>network</span></div>
+        <div class="stat"><b id="adv-link">-</b><span>Link peers</span></div>
+        <div class="stat"><b id="adv-air">-</b><span>units on the air</span></div>
+        <div class="stat"><b id="adv-batt">-</b><span>battery</span></div>
+        <div class="stat"><b id="adv-ble">-</b><span>Bluetooth</span></div>
+        <div class="stat"><b id="adv-settled">-</b><span>Link settled</span></div>
+        <div class="stat"><b id="adv-drift">-</b><span>Link drift, ppb</span></div>
+        <div class="stat"><b id="adv-rtt">-</b><span>partner rtt, us</span></div>
+        <div class="stat"><b id="adv-drive">-</b><span>JANK drive</span></div>
+        <div class="stat"><b id="adv-save">-</b><span>settings save pending</span></div>
+      </div>
+      <p id="adv-diag-note" class="note"></p>
+      <h2 style="margin-top:14px">Beat follow and tuning</h2>
+      <div class="grid">
+        <label>Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
+        <label>Follower <select id="c-follower"><option value="tuned">Tuned</option><option value="robust">Robust</option></select></label>
+        <label>Skip <select id="c-skip"><option value="off">Off</option><option value="act">ACT</option><option value="pat">PAT</option></select></label>
+        <label>Graded confidence <select id="c-graded"><option value="off">Off</option><option value="on">On</option></select></label>
+        <label>Spectral rate <select id="c-rate"><option value="on">On</option><option value="off">Off</option></select></label>
+        <label>Audio shift, ms <input id="c-lat_trim" type="number" min="-600" max="600" inputmode="numeric"></label>
+        <label>Auto latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
+        <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
+        <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
+        <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16" inputmode="numeric"></label>
+        <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01" inputmode="decimal"></label>
+      </div>
+    </section>
+  </div>
 
   <section id="menu">
     <h2>Settings</h2>
     <div class="grid">
-      <label>Group <select id="c-group"></select></label>
-      <div class="row"><button id="scan" class="quiet" disabled>Scan</button></div>
+      <label>Name <input id="c-name" maxlength="23"></label>
+      <div class="row"><button id="scan" class="quiet" disabled>Scan the groups</button></div>
     </div>
     <table class="groups" style="margin-top:8px">
       <thead><tr><th>Group</th><th>Ch.</th><th>Peers</th><th>dBm</th><th></th></tr></thead>
       <tbody id="groups"></tbody>
     </table>
     <p id="scan-result" class="note"></p>
-    <div class="grid">
-      <label>MIDI start / stop <select id="c-transport"><option value="link">Link play / stop</option><option value="auto">Always in a session</option></select></label>
-      <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16" inputmode="numeric"></label>
-      <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01" inputmode="decimal"></label>
-      <label>Name <input id="c-name" maxlength="23"></label>
-      <label>Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
-      <label>Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
-      <label>Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
-      <label>Auto latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
-      <label>USB MIDI clock <select id="c-usbmidi"><option value="on">On: the clock also over USB</option><option value="off">Off: MIDI out (DIN / TRS) only</option></select></label>
-      <label>Low confidence <select id="c-lowconf"><option value="stop">Stop / start: the outputs stop under the threshold</option><option value="run">Keep running</option></select></label>
-      <label>Confidence threshold, % <input id="c-threshold" type="number" min="0" max="100" step="5" inputmode="numeric"></label>
-      <label>Auto bar <select id="c-autobar"><option value="start">At start: the 1 placed when playing starts</option><option value="always">Always: also while playing</option><option value="off">Off</option></select></label>
-      <label>Audio source <select id="c-source"><option value="auto">Auto: the line in when plugged, else USB</option><option value="usb">USB audio</option><option value="line">Line in</option><option value="link">None: Link only (a plugged line still wins)</option></select></label>
-      <label>Bluetooth <select id="c-ble"><option value="pair">Pair now: three clicks or the button</option><option value="auto">On start: also at every start</option><option value="off">Off</option></select></label>
-    </div>
-    <div class="buttons" style="margin-top:10px">
-      <button id="ble-pair" class="quiet" disabled>Pair now (two minutes)</button>
-      <button id="ble-close" class="quiet hide" disabled>Done: Bluetooth off</button>
-    </div>
-    <p class="note">Bluetooth shares the radio with Wi-Fi and MODE JANK, so it is on only for two minutes after three clicks (or
-    after a start, set to "also at every start") and while a phone stays connected.</p>
 
     <h2 style="margin-top:14px">Network</h2>
     <p id="net-state" class="note">-</p>
@@ -219,7 +210,10 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <label>Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
     </div>
     <p class="note" id="net-note">2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.</p>
-    <button id="net-apply" disabled>Save and restart</button>
+    <div class="buttons">
+      <button id="net-apply" disabled>Save and restart</button>
+      <button id="ble-close" class="quiet hide" disabled>Done: Bluetooth off</button>
+    </div>
   </section>
 
   <details class="more" id="more">
@@ -342,36 +336,6 @@ function parseHome(text) {
            audio: f.length > 13 && f[13] !== "0", fold: f.length > 13 && /^[x/][24]$/.test(f[13]) ? f[13] : "" };
 }
 
-/* what HOME shows, ageMs after the line came: the beat goes on at the line's tempo between lines */
-function homeView(h, ageMs) {
-  if (!h) return null;
-  const v = { bpm: h.bpm > 0 ? (Number.isInteger(h.bpm) ? String(h.bpm) : h.bpm.toFixed(2)) : "-", beat: null, quantum: h.quantum };
-  if (h.bpm > 0 && h.bar !== null) {
-    const pos = h.bar / 100 + (h.transport === "stopped" ? 0 : Math.max(0, ageMs) / 60000 * h.bpm);
-    v.beat = Math.floor(((pos % h.quantum) + h.quantum) % h.quantum);
-  }
-  /* AUDIO mode: the transport is the clock outputs' (core/jank_hold.h): stopped only while held by Stop */
-  v.audio = h.audio;
-  v.mode = h.audio ? "AUDIO" + (h.fold ? " " + h.fold.replace("/", "÷") : "") : "LINK";
-  v.modeNote = h.audio ? "the beat tracker leads" : "Link's session";
-  if (h.audio) v.transport = { stopped: "Held: outputs stopped", playing: "Playing", armed: "Starts once the beat locks, on a bar" }[h.transport];
-  else v.transport = h.bpm > 0 ? { stopped: "Stopped", playing: "Playing", armed: "Starts on the next bar" }[h.transport] : "No Link session yet";
-  v.play = h.transport === "stopped" ? "play" : "stop";
-  v.playText = h.audio ? (v.play === "play" ? "Start outputs" : "Stop outputs") : v.play === "play" ? "Play" : "Stop";
-  v.canPlay = h.audio || h.bpm > 0;
-  v.net = h.net.kind === "jank" ? "MODE JANK " + h.net.group : h.net.up ? "Wi-Fi" : "Wi-Fi (looking)";
-  v.link = String(h.link);
-  v.air = h.net.kind === "jank" ? String(h.air) : "-";
-  v.battery = h.battery === null ? "-" : h.battery + " %";
-  v.level = h.level === null ? "-" : h.level + " dB";
-  v.levelRange = h.levelMin === null || h.levelMax === null ? "input level" : "input level, " + h.levelMin + " to " + h.levelMax + " dB in 3 s";
-  v.levelPct = h.level === null ? 0 : Math.max(0, Math.min(100, (h.level + 60) / 60 * 100));
-  v.conf = h.conf === null ? "-" : h.conf + " %" + (h.confHold ? " HOLD" : h.confCoast ? " COAST" : "");
-  v.confHold = !!h.confHold;
-  v.confCoast = !!h.confCoast;
-  v.confPct = h.conf === null ? 0 : Math.max(0, Math.min(100, h.conf));
-  return v;
-}
 
 /* MIDI bytes in any chunks (the iPhone apps' polyfills hand SysEx over as it comes) -> whole F0 .. F7 messages */
 class SysexIn {
@@ -594,13 +558,6 @@ function peerText(row) {
   return row.janks ? row.units + ", of which " + row.janks + " jank" : String(row.units);
 }
 
-/* the tempo box's command, or null: Link's 20..999 BPM, two decimals at most; a comma as the decimal point too */
-function tempoCommand(raw) {
-  const value = String(raw).trim().replace(",", ".");
-  if (!/^\d{1,3}(\.\d{1,2})?$/.test(value)) return null;
-  const bpm = Number(value);
-  return bpm >= 20 && bpm <= 999 ? "tempo " + value : null;
-}
 
 function faultDrops(v) {
   return ["drop_big", "drop_bad", "tx_fail", "queue_full", "drop_foreign"].reduce((sum, k) => sum + Number(v[k] || 0), 0);
@@ -623,18 +580,6 @@ function audioView(v) {
            peak_db: v.peak_db ?? "-" };
 }
 
-/* LOW CONFIDENCE on the confidence meter, from `status` (fresh: the age is the caller's) or `get`: the threshold's tick
-   (percent, null: none, KEEP RUNNING or 0) and the note under the number; gated: the outputs are stopped by it (AUDIO mode) */
-function confView(v) {
-  if (!v || v.lowconf === undefined) return { tick: null, note: "confidence", gated: false };
-  const th = Number(v.threshold);
-  const on = v.lowconf === "stop" && th > 0;
-  const gated = on && v.gated === "1" && v.audio_live === "1";
-  const silent = v.silent === "1" && v.audio_live === "1";
-  const note = silent ? "confidence: silence, outputs stopped" : gated ? "confidence: under " + th + " %, outputs stopped"
-             : on ? "confidence (stops under " + th + " %)" : "confidence (keeps running)";
-  return { tick: on ? Math.max(0, Math.min(100, th)) : null, note, gated: gated || silent };
-}
 
 /* a setting's command, or null when the value is not one the jank takes */
 function setCommand(key, raw) {
@@ -643,7 +588,7 @@ function setCommand(key, raw) {
     if (!/^-?\d{1,3}(\.\d{1,2})?$/.test(value) || Math.abs(Number(value)) > 100) return null;
     return "set offset " + value;
   }
-  const range = { group: [1, 9], quantum: [1, 16], beat_latency: [-300, 300], threshold: [0, 100] }[key];
+  const range = { group: [1, 9], quantum: [1, 16], beat_latency: [-300, 300], threshold: [0, 100], lat_trim: [-600, 600] }[key];
   if (range) {
     const n = Number(value);
     if (value === "" || !Number.isInteger(n) || n < range[0] || n > range[1]) return null;
@@ -651,18 +596,12 @@ function setCommand(key, raw) {
   }
   const choices = { filter: ["link", "all"], peer: ["on", "off"], transport: ["link", "auto"], beat: ["on", "off"], ble: ["pair", "off", "auto"],
                     source: ["auto", "line", "usb", "link"], autobar: ["off", "start", "always"], usbmidi: ["on", "off"],
-                    lowconf: ["run", "stop"] }[key];
+                    lowconf: ["run", "stop"], follower: ["tuned", "robust"], skip: ["off", "act", "pat"], graded: ["on", "off"], rate: ["on", "off"] }[key];
   if (choices) return choices.includes(value) ? "set " + key + " " + value : null;
   if (key === "name" && /^[\x20-\x7e]{1,23}$/.test(value)) return "set name " + value;
   return null;
 }
 
-/* AUDIO mode's nudges (the device's NO / YES held + UP / DOWN): kind "beat" moves Link's beats half a beat (+: earlier),
-   "ms" the AUDIO IN offset 1 ms (+: every output later) */
-function nudgeCommand(kind, dir) {
-  if (kind === "beat") return "nudge beat " + (dir > 0 ? "+0.5" : "-0.5");
-  return "nudge ms " + (dir > 0 ? "+1" : "-1");
-}
 
 /* what the page says after a nudge's answer (values: its key=value lines). Two layers each (M2h): the PHASE (beats) on top
    of AUTO BAR's bar, the AUDIO SHIFT (ms) on top of the auto latency; 0 is AUTO. (A firmware before M2h: no lat_trim) */
@@ -695,14 +634,13 @@ function nudgeError(message) {
 
 <script id="ui">
 const $ = (id) => document.getElementById(id);
-const SETTINGS = ["group", "name", "filter", "peer", "transport", "quantum", "offset", "beat", "beat_latency", "autobar", "usbmidi", "lowconf",
-                  "threshold", "source", "ble"];
+/* the settings that have a control on the page: the stick's own menu edits the rest (the face) */
+const SETTINGS = ["name", "beat", "follower", "skip", "graded", "rate", "lat_trim", "beat_latency", "filter", "peer", "quantum", "offset"];
 const BLE_SVC = "03b80e5a-ede8-4b33-a751-6ce34ec4c700", BLE_CHR = "7772e5db-3868-4112-a1a9-f2669d106bf3";
 const BLE_CAP = 20;                   /* write payload: the default ATT MTU's, which every link takes (Web Bluetooth does not say the MTU) */
 const HOME_EVERY_USB_MS = 300, STATUS_EVERY_MS = 1500, HOME_STALE_MS = 3000, BLE_WAIT_MS = 5000;
-const PAIR_WATCH_MS = 125000;         /* after Pair now, `status` is polled for the window's countdown this long */
 const S = { line: null, kind: null, ble: false, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastScans: [], timers: [],
-            lastStatus: null, statusAt: 0, pairAt: -Infinity };
+            lastStatus: null, statusAt: 0, lastBeat: null };
 
 function say(text, bad) {
   $("msg").textContent = text;
@@ -723,42 +661,10 @@ function send(command, waitMs) {
   return S.line.send(command, waitMs || (S.ble ? BLE_WAIT_MS : 2000));
 }
 
-function showHome() {
-  const v = homeView(S.lastHome, performance.now() - S.homeAt);
-  const boxes = $("h-boxes");
-  const q = v ? v.quantum : 0;
-  if (boxes.children.length !== q) boxes.replaceChildren(...Array.from({ length: q }, () => document.createElement("span")));
-  for (let i = 0; i < q; i++) boxes.children[i].classList.toggle("on", v.beat === i);
-  $("h-bpm").textContent = v ? v.bpm : "-";
-  $("h-transport").textContent = v ? v.transport : "-";
-  $("h-mode").textContent = v ? v.mode : "-";
-  $("h-mode-note").textContent = v ? v.modeNote : "mode";
-  $("h-level-range").textContent = v ? v.levelRange : "input level";
-  $("h-ble").textContent = bleView(S.lastStatus, performance.now() - S.statusAt, S.ble);
-  for (const k of ["net", "link", "air", "level", "conf"]) $("h-" + k).textContent = v ? v[k] : "-";
-  $("h-batt").textContent = v ? v.battery : "-";
-  $("h-level-bar").style.width = (v ? v.levelPct : 0) + "%";
-  $("h-conf-bar").style.width = (v ? v.confPct : 0) + "%";
-  const fresh = S.lastStatus && performance.now() - S.statusAt < HOME_STALE_MS;
-  const c = confView(fresh ? S.lastStatus : S.lastGet);     /* (a `get` has the settings, no gate) */
-  $("h-conf-note").textContent = c.note;
-  $("h-conf-tick").classList.toggle("hide", c.tick === null);
-  if (c.tick !== null) $("h-conf-tick").style.left = c.tick + "%";
-  $("h-conf-meter").classList.toggle("gated", c.gated);
-  $("h-conf-meter").classList.toggle("hold", !!(v && v.confHold));
-  if (v && v.confHold) $("h-conf-note").textContent = "confidence: holding, no beats to judge (the outputs keep running)";
-  $("h-conf-meter").classList.toggle("coast", !!(v && v.confCoast));
-  if (v && v.confCoast) $("h-conf-note").textContent = "confidence: coasting under the threshold (the outputs keep running on the follower's tempo and phase)";
-  const on = !!(S.line && S.lastHome && S.lastHome.bpm > 0);
-  $("t-set").disabled = !on;
-  $("t-play").disabled = !(S.line && v && v.canPlay);
-  $("t-play").textContent = v ? v.playText : "Play";
-  for (const id of ["t-up", "t-down"]) {         /* AUDIO mode: the fold, x2 / ÷2 of the tracked tempo (`fold`) */
-    $(id).classList.toggle("hide", !(v && v.audio));
-    $(id).disabled = !(S.line && v && v.audio);
-  }
-  $("nudges").classList.toggle("hide", !(v && v.audio));   /* AUDIO mode: the nudges (`nudge beat`, `nudge ms`) */
-  for (const id of ["n-beat-down", "n-beat-up", "n-ms-down", "n-ms-up"]) $(id).disabled = !(S.line && v && v.audio);
+
+function takeBeat(text) {
+  const b = Stick.parseBeat(text);
+  if (b) S.lastBeat = { ...b, at: performance.now() };
 }
 
 function takeHome(text) {
@@ -795,7 +701,7 @@ function showStatus({ values: v, units }) {
 
 function showGroups(scans) {
   S.lastScans = scans;
-  const home = $("c-group").value;
+  const home = String(S.lastGet.group);
   $("groups").replaceChildren(...scans.map((g) => {
     const on = String(g.group) === home;
     const row = document.createElement("tr");
@@ -805,10 +711,15 @@ function showGroups(scans) {
       action = document.createElement("button");
       action.textContent = "Join";
       action.disabled = !S.line;
-      action.addEventListener("click", () => {
-        $("c-group").value = String(g.group);
-        change("group");
-        showGroups(S.lastScans);
+      action.addEventListener("click", async () => {
+        try {
+          await send("set group " + g.group);
+          showSettings(await send("get"));
+          showGroups(S.lastScans);
+          say("Saved on the jank.");
+        } catch (e) {
+          say(e.message, true);
+        }
       });
     }
     return cells(row, [g.group, g.channel, peerText(g), g.rssi, action]);
@@ -864,7 +775,7 @@ async function pollHome() {
   }
 }
 async function pollStatus() {
-  if (!S.line || S.ble || (!$("more").open && performance.now() - S.pairAt > PAIR_WATCH_MS)) return;
+  if (!S.line || S.ble) return;
   try {
     showStatus(await send("status"));
   } catch (e) {
@@ -891,16 +802,16 @@ function rememberAdvanced(on) {
 function setConnected(kind, ble) {
   S.kind = kind;
   S.ble = ble;
-  $("c-sim").setAttribute("aria-pressed", String(!kind));
   $("c-midi").setAttribute("aria-pressed", String(kind === "midi"));
   $("c-bluetooth").setAttribute("aria-pressed", String(kind === "ble"));
+  $("live").classList.toggle("hide", !kind);
   paintAdvanced();
+  document.dispatchEvent(new CustomEvent("jank-connection", { detail: { kind } }));
   $("more").classList.toggle("hide", ble);
   $("ble-close").classList.toggle("hide", !ble);
-  $("ble-pair").classList.toggle("hide", ble);
   $("net-pass").disabled = ble;
   $("net-note").textContent = ble ? "The Wi-Fi password goes over USB only: the Bluetooth link is not encrypted. A saved password stays." : "2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.";
-  for (const id of ["scan", "net-apply", "bootloader", "ble-pair", "ble-close"]) $(id).disabled = !kind;
+  for (const id of ["scan", "net-apply", "bootloader", "ble-close"]) $(id).disabled = !kind;
 }
 
 function disconnected(text) {
@@ -912,7 +823,6 @@ function disconnected(text) {
   S.drop = null;
   S.lastHome = null;
   setConnected(null, false);
-  showHome();
   showGroups(S.lastScans);
   if (text) say(text, true);
 }
@@ -920,7 +830,10 @@ function disconnected(text) {
 async function started(line, kind, ble, drop) {
   S.line = line;
   S.drop = drop;
-  line.onPush = (p) => { if (p.type === JX_PUSH_HOME) takeHome(p.text); };
+  line.onPush = (p) => {
+    if (p.type === JX_PUSH_HOME) takeHome(p.text);
+    else if (p.type === JX_PUSH_BEAT) takeBeat(p.text);
+  };
   setConnected(kind, ble);
   try {
     let got;
@@ -932,7 +845,6 @@ async function started(line, kind, ble, drop) {
     disconnected(e.message + (ble ? "" : ". If the app asks for SysEx, turn it on."));
     return;
   }
-  S.timers.push(setInterval(showHome, 50));
   S.timers.push(setInterval(pollHome, S.ble ? 1000 : HOME_EVERY_USB_MS));
   S.timers.push(setInterval(pollStatus, STATUS_EVERY_MS));
 }
@@ -1033,45 +945,23 @@ async function connectBle() {
   }
 }
 
-for (let g = 1; g <= 9; g++) $("c-group").add(new Option("Group " + g + " (channel " + [1, 6, 11][(g - 1) % 3] + ")", String(g)));
 for (const key of SETTINGS) $("c-" + key).addEventListener("change", () => change(key));
-/* Demo is the base: pressing the active connection again, or Demo, leaves it; every way out ends in disconnected() */
+/* pressing the active connection again leaves it; every way out (the port gone, the link ended, a failed connect) ends in disconnected() */
 $("c-midi").addEventListener("click", () => (S.kind === "midi" ? disconnected() : connectMidi()));
 $("c-bluetooth").addEventListener("click", () => (S.kind === "ble" ? disconnected() : connectBle()));
-$("c-sim").addEventListener("click", () => { if (S.kind) disconnected(); });
 $("c-advanced").checked = storedAdvanced();
 $("c-advanced").addEventListener("change", () => { rememberAdvanced($("c-advanced").checked); paintAdvanced(); });
 $("scan").addEventListener("click", scan);
-$("t-set").addEventListener("click", () => {
-  const command = tempoCommand($("t-tempo").value);
-  if (!command) { say("A tempo is 20 to 999 BPM.", true); return; }
-  session(command, "Tempo sent to the session.").then(() => { $("t-tempo").value = ""; });
-});
-$("t-up").addEventListener("click", () => session("fold x2", "Tempo doubled (x2)."));
-$("t-down").addEventListener("click", () => session("fold /2", "Tempo halved (÷2)."));
-async function nudge(kind, dir) {
+/* the face's NO / YES held with UP / DOWN: `command` is Stick.nudgeCommand's; the answer says what moved */
+async function nudge(kind, command) {
   try {
-    const { values } = await send(nudgeCommand(kind, dir));
-    say(nudgeSaid(kind, dir, values));
+    const { values } = await send(command);
+    say(nudgeSaid(kind, 0, values));
     if (kind === "ms" && document.activeElement !== $("c-beat_latency")) $("c-beat_latency").value = latField(values);
   } catch (e) {
     say(nudgeError(e.message), true);
   }
 }
-$("n-beat-down").addEventListener("click", () => nudge("beat", -1));
-$("n-beat-up").addEventListener("click", () => nudge("beat", 1));
-$("n-ms-down").addEventListener("click", () => nudge("ms", -1));
-$("n-ms-up").addEventListener("click", () => nudge("ms", 1));
-$("t-play").addEventListener("click", () => {
-  const v = homeView(S.lastHome, 0);
-  const play = !v || v.play === "play";
-  const done = v && v.audio ? (play ? "Outputs start once the beat locks, on the next bar." : "Outputs stopped.")
-    : play ? "The session starts on the next bar." : "Session stopped.";
-  session(play ? "play" : "stop", done);
-});
-$("ble-pair").addEventListener("click", async () => {
-  try { await send("ble pair"); S.pairAt = performance.now(); say("Bluetooth is open for two minutes: connect the phone now."); pollStatus(); } catch (e) { say(e.message === "err ble is off" ? "Bluetooth is set to off: change the setting first." : e.message, true); }
-});
 $("ble-close").addEventListener("click", async () => {
   try { await send("ble close"); } catch (e) { /* the link may end before the answer: that is the point */ }
   disconnected("Bluetooth is off on the jank. Three clicks open it again.");
@@ -1096,58 +986,92 @@ $("bootloader").addEventListener("click", async () => {
 });
 $("c-bluetooth").classList.toggle("hide", !navigator.bluetooth);
 setConnected(null, false);
-showHome();
 </script>
 <!--@include ui/oled.js-->
 <!--@include ui/face.js-->
-<!--@include ui/sim.js-->
+<!--@include ui/stick.js-->
 <!--@include ui/player.js-->
 <script id="face-ui">
 (() => {
   const el = (id) => document.getElementById(id);
   const ARMS = ["up", "down", "no", "yes"];
-  const IDLE_REDRAW_MS = 100, SCREEN = "2.42";
   const svg = el("dev"), card = el("face");
-  const sim = Sim.create();
-  let hovered = false, pending = 0, wake = 0;
+  let model = null, frame = 0, hovered = false;
+  const padButtons = new Map();
 
-  const paintCanvas = (canvas, fb) => {
-    const ctx2d = canvas.getContext("2d");
-    Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), fb, sim.dev.bright);
-  };
-  const paintArms = () => {
-    for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", sim.held[b]);
-  };
-  const paintLeds = (now) => Sim.ledCss(sim, now).forEach((css, i) => Face.paintLed(svg, i, css));
+  // what the stick has said, as the logic script holds it
+  const snapshot = () => ({ home: S.lastHome, homeAt: S.homeAt, get: S.lastGet, status: S.lastStatus, statusAt: S.statusAt, beat: S.lastBeat, overBle: S.ble });
+  const refresh = (commands) => commands.reduce((done, command) => done.then(() => send(command)), Promise.resolve());
+  const fail = (e) => say(e.message, true);
 
-  function draw() {
-    pending = 0;
-    const now = performance.now();
-    Sim.tick(sim, now);
-    paintCanvas(el("oled"), Sim.framebuffer(sim, now));
-    paintLeds(now);
-    paintArms();
-    clearTimeout(wake);
-    if (Sim.busy(sim, now)) schedule();
-    else wake = setTimeout(schedule, Math.min(Sim.nextBeatInMs(sim, now), IDLE_REDRAW_MS * 5));
+  // the face's actions: everything goes out through the page's one command function (send), so the answers, the err texts and the
+  // Bluetooth / USB timing are the page's own; what changed shows when the stick next reports it
+  let getQueued = false;
+  async function readBack() {
+    if (getQueued) return;
+    getQueued = true;
+    try { showSettings(await send("get")); } catch (e) { fail(e); } finally { getQueued = false; }
   }
-  function schedule() { if (!pending) pending = requestAnimationFrame(draw); }
+  const context = (now) => ({
+    ...Stick.ctx(snapshot(), now),
+    setField(name, value) {
+      const r = Stick.fieldCommands(name, value);
+      if (r.refuse) { say("Not from here: " + r.refuse + ".", true); return; }
+      refresh(r.commands).then(readBack, fail);
+    },
+    tempoStep(d) {
+      const r = Stick.tempoCommand(Stick.ctx(snapshot(), performance.now()), d);
+      if (r.refuse) { say(r.refuse + ".", true); return null; }
+      session(r.commands[0], r.commands[0] === "fold x2" ? "Tempo doubled (x2)." : r.commands[0] === "fold /2" ? "Tempo halved (÷2)." : "Tempo sent to the session.");
+      return r.expected;
+    },
+    setHold() {},
+    linkStartStop(on) { session(Stick.playCommand(on), on ? "Start sent." : "Stop sent."); },
+  });
+  const combo = (mod, d) => {
+    const r = Stick.nudgeCommand(Stick.ctx(snapshot(), performance.now()), mod, d);
+    if (r.refuse) say(r.refuse + ".", true); else nudge(mod === "no" ? "beat" : "ms", r.commands[0]);
+  };
 
-  const pressDown = (b) => { Sim.down(sim, b, performance.now()); schedule(); };
-  const pressUp = (b) => { Sim.up(sim, b, performance.now()); schedule(); };
+  const paintArms = () => { for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", model.held[b]); };
+  function draw() {
+    frame = requestAnimationFrame(draw);
+    const now = performance.now(), ctx2d = el("oled").getContext("2d");
+    Stick.tick(model, now);
+    Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), Stick.framebuffer(model, now), 100);
+    Stick.leds(snapshot(), now).forEach((css, i) => Face.paintLed(svg, i, css));
+    paintArms();
+  }
+  const pressDown = (b) => { if (model) Stick.down(model, b, performance.now()); };
+  const pressUp = (b) => { if (model) Stick.up(model, b, performance.now()); };
 
-  const padButton = new Map();
+  // the face exists while a stick is connected: it is made on connect from the stick's state and dropped with the connection
+  function attach() {
+    if (model) return;
+    model = Stick.create(context, combo);
+    frame = requestAnimationFrame(draw);
+  }
+  function detach() {
+    if (!model) return;
+    Stick.releaseAll(model, performance.now());
+    cancelAnimationFrame(frame);
+    frame = 0;
+    model = null;
+    padButtons.clear();
+  }
+  document.addEventListener("jank-connection", (e) => (e.detail.kind ? attach() : detach()));
+
   el("dpad").addEventListener("pointerdown", (e) => {
     const target = e.target.closest("[data-b]");
-    if (!target) return;
+    if (!target || !model) return;
     e.preventDefault();
-    padButton.set(e.pointerId, target.dataset.b);
+    padButtons.set(e.pointerId, target.dataset.b);
     pressDown(target.dataset.b);
   });
   const onPointerEnd = (e) => {
-    const b = padButton.get(e.pointerId);
+    const b = padButtons.get(e.pointerId);
     if (!b) return;
-    padButton.delete(e.pointerId);
+    padButtons.delete(e.pointerId);
     pressUp(b);
   };
   window.addEventListener("pointerup", onPointerEnd);
@@ -1155,7 +1079,7 @@ showHome();
 
   const typing = (t) => ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(t.tagName);
   const faceActive = () => hovered || card.contains(document.activeElement);
-  const keyButton = (e) => (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey ? null : Sim.KEY_BTN[e.key] || null);
+  const keyButton = (e) => (!model || typing(e.target) || e.metaKey || e.ctrlKey || e.altKey ? null : Stick.KEY_BTN[e.key] || null);
   window.addEventListener("keydown", (e) => {
     const b = keyButton(e);
     if (!b) return;
@@ -1168,33 +1092,89 @@ showHome();
     if (faceActive()) e.preventDefault();
     pressUp(b);
   });
-  window.addEventListener("blur", () => { Sim.releaseAll(sim, performance.now()); schedule(); });
+  window.addEventListener("blur", () => { if (model) Stick.releaseAll(model, performance.now()); });
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });
 
-  // ?sim=NO,DOWN presses those buttons once, in order, at load: a preview / test hook (no keyboard needed)
-  const replay = (list) => list.split(",").filter(Boolean).forEach((name) => {
-    const b = name.toLowerCase(), at = performance.now();
-    if (!ARMS.includes(b)) throw new Error("?sim: unknown button " + name);
-    Sim.down(sim, b, at); Sim.up(sim, b, at + 1);
-  });
-
-  const params = new URLSearchParams(location.search);
-  Face.placeScreen(svg, SCREEN);
+  Face.placeScreen(svg, "2.42");
   Face.makeLeds(svg);
-  el("face-hint").textContent = Sim.KEY_HINT;
-  if (params.has("sim")) replay(params.get("sim"));
-  schedule();
+  el("face-hint").textContent = Stick.KEY_HINT;
+})();
+</script>
+<script id="advanced-ui">
+(() => {
+  const el = (id) => document.getElementById(id);
+  const DIAG_EVERY_MS = 2000;
+  let timer = 0, lastBoots = null;
+  const dash = (v) => (v === undefined || v === "" ? "-" : v);
+
+  // what the HOME line and `get` / `status` already say, as small read-only lines (the face shows the rest)
+  function paintInfo() {
+    const h = S.lastHome;
+    el("adv-net").textContent = S.lastGet.net ? networkLine({ ...S.lastGet, ...(S.lastStatus || {}) }) : "-";
+    el("adv-link").textContent = h ? h.link : "-";
+    el("adv-air").textContent = h ? h.air : "-";
+    el("adv-batt").textContent = h && h.battery !== null ? h.battery + " %" : "-";
+    el("adv-ble").textContent = bleView(S.lastStatus, performance.now() - S.statusAt, S.ble);
+  }
+  // `diag`: boots and the reset reason first, so a restart of the stick shows at once
+  function paintDiag(v) {
+    const boots = Number(v.boots), restarted = lastBoots !== null && boots !== lastBoots;
+    el("adv-boots").textContent = "boots " + dash(v.boots) + " · reset: " + dash(v.reset);
+    if (restarted) {
+      el("adv-restart").textContent = "The stick restarted: boots " + lastBoots + " → " + boots + ", reset: " + dash(v.reset) + ", at " + new Date().toTimeString().slice(0, 8) + ".";
+      el("adv-restart").classList.remove("hide");
+      el("adv-boots").classList.add("restarted");
+    }
+    lastBoots = boots;
+    el("adv-settled").textContent = v.link_settled === "1" ? "yes" : v.link_settled === "0" ? "no" : "-";
+    el("adv-drift").textContent = dash(v.link_drift_ppb);
+    el("adv-rtt").textContent = dash(v.link_partner_rtt_us);
+    el("adv-drive").textContent = dash(v.drive);
+    el("adv-save").textContent = v.save_pending === "1" ? "yes (unplugging loses it)" : v.save_pending === "0" ? "no" : "-";
+  }
+  async function poll() {
+    paintInfo();
+    try {
+      paintDiag((await send("diag")).values);
+      el("adv-diag-note").textContent = "";
+    } catch (e) {
+      el("adv-diag-note").textContent = e.message === "err unknown command" ? "This firmware has no diag command." : e.message;
+    }
+  }
+  function start() {
+    if (timer) return;
+    poll();
+    timer = setInterval(poll, DIAG_EVERY_MS);
+  }
+  function stop() {
+    clearInterval(timer);
+    timer = 0;
+    lastBoots = null;
+    el("adv-restart").classList.add("hide");
+    el("adv-boots").classList.remove("restarted");
+    el("adv-boots").textContent = "boots - · reset: -";
+  }
+  document.addEventListener("jank-advanced", (e) => (e.detail.visible ? start() : stop()));
 })();
 </script>
 <script id="player-ui">
 (() => {
   const el = (id) => document.getElementById(id);
   const card = el("player"), audio = el("pl-audio");
-  const KEY = { output: "jank.player.output", volume: "jank.player.volume" };
+  const KEY = { output: "jank.player.output", volume: "jank.player.volume", then: "jank.player.then" };
   const DB = { name: "jank-player", store: "handles", key: "music" };
-  let url = null, hovered = false, seeking = false, outputAsked = false, error = "", level = Player.LEVEL_FLOOR_DB, lastFrame = 0, frame = 0;
+  let url = null, hovered = false, seeking = false, error = "", level = Player.LEVEL_FLOOR_DB, lastFrame = 0, frame = 0;
   const tap = { context: null, source: null, analyser: null, samples: null, url: null, routed: false, sinkId: "", missing: false };
+  const web = { src: null, volume: null, monitor: null, dest: null, stickEl: null, stickCtx: null };
+  // what this browser has decides the path: captureStream (the tested one) or Web Audio; the plan and its details line say which
+  const typeOf = (object, key) => (object ? typeof object[key] : "undefined");
+  const env = {
+    captureStream: typeOf(audio, "captureStream"), mozCaptureStream: typeOf(audio, "mozCaptureStream"), audioContext: typeOf(window, "AudioContext"),
+    audioContextSetSinkId: typeOf(window.AudioContext && window.AudioContext.prototype, "setSinkId"),
+    elementSetSinkId: typeOf(typeof HTMLMediaElement === "function" ? HTMLMediaElement.prototype : null, "setSinkId"),
+  };
+  const plan = Player.playbackPlan(env);
   const jank = { id: "", label: "", error: "" };
   let tagBpm;                                   // undefined: not read yet, null: the file has no BPM tag
   const queue = { entries: [], index: -1 };
@@ -1211,6 +1191,7 @@ showHome();
   // ---- playback: pitch (varispeed), volume, position ----
   function applyPitch() {
     const pct = Number(el("pl-pitch").value), rate = Player.pitchToRate(pct);
+    el("pl-pitch-num").value = pct;
     audio.preservesPitch = false;
     audio.defaultPlaybackRate = rate;
     audio.playbackRate = rate;
@@ -1261,7 +1242,7 @@ showHome();
   }
   function applyVolume() {
     const pct = Number(el("pl-vol").value);
-    audio.volume = Player.volumeFromPct(pct);
+    if (web.volume) web.volume.gain.value = Player.volumeFromPct(pct); else audio.volume = Player.volumeFromPct(pct);
     el("pl-volval").textContent = pct + " %";
   }
   function paintTime() {
@@ -1279,10 +1260,8 @@ showHome();
   }
   const setError = (text) => { error = text; paintStatus(); };
   const paintPlay = () => { el("pl-play").textContent = audio.paused ? "Play" : "Pause"; paintStatus(); };
-  const paintSteps = () => {
-    el("pl-prev").disabled = Player.stepIndex(queue.entries.length, queue.index, -1) < 0;
-    el("pl-next").disabled = Player.stepIndex(queue.entries.length, queue.index, 1) < 0;
-  };
+  const thenMode = () => Player.parseAfterMode(el("pl-then").value);
+  const paintSteps = () => { el("pl-next").disabled = Player.skipTrack(thenMode(), queue.entries.length, queue.index, () => 0) < 0; };
 
   function load(file) {
     if (!file) return;
@@ -1299,42 +1278,94 @@ showHome();
     paintPlay();
   }
   async function play() {
+    wakeContext();
     try { await audio.play(); } catch (err) { setError("cannot play: " + errorText(err)); }
   }
-  // One source, two paths: the element plays on the default output (the monitor; its volume is the knob) and its captureStream
-  // feeds an AudioContext whose sink is the stick's output (the file at its true level, not scaled by the knob). The same
-  // stream feeds the analyser of the meter (not connected to any output). The context is created and resumed inside the Play gesture.
+  // One source, two outputs: the monitor (this computer's default output, scaled by the volume knob) and the stick's USB audio (the
+  // file at its true level). Path "captureStream": the element plays on the default output and its captureStream feeds an AudioContext
+  // whose sink is the stick's device. Path "webaudio" (no captureStream here): the element goes through Web Audio, a gain for the volume
+  // knob and one for the monitor box on the monitor branch only, and a stream destination feeds the stick through a hidden element
+  // (or a second context) with its sink set. The meter's analyser listens before any gain in both. Created inside the Play gesture.
   function wakeContext() {
-    if (!tap.context && typeof AudioContext === "function") tap.context = new AudioContext({ latencyHint: "interactive" });
-    if (tap.context) tap.context.resume().catch((err) => note("Cannot start the audio path to the stick: " + errorText(err), true));
+    if (plan.path === "none") return;
+    if (!tap.context) {
+      tap.context = new AudioContext({ latencyHint: "interactive" });
+      if (plan.path === "webaudio") buildWebAudio();
+    }
+    tap.context.resume().catch((err) => note("Cannot start the audio path to the stick: " + errorText(err), true));
+  }
+  function buildWebAudio() {
+    const ctx = tap.context, analyser = ctx.createAnalyser();
+    analyser.fftSize = 16384;
+    web.src = ctx.createMediaElementSource(audio);
+    web.volume = ctx.createGain();
+    web.monitor = ctx.createGain();
+    web.dest = ctx.createMediaStreamDestination();
+    web.src.connect(analyser);
+    web.src.connect(web.volume);
+    web.volume.connect(web.monitor);
+    web.monitor.connect(ctx.destination);
+    web.src.connect(web.dest);
+    Object.assign(tap, { analyser, samples: new Float32Array(analyser.fftSize) });
+    audio.volume = 1;
+    audio.muted = false;
+    applyVolume();
+    applyMonitor();
+  }
+  async function routeWeb() {
+    if (!web.dest) return;
+    if (!jank.id) {
+      if (web.stickEl) web.stickEl.pause();
+      if (web.stickCtx) await web.stickCtx.suspend();
+      return;
+    }
+    if (plan.stick === "element") {
+      if (!web.stickEl) { web.stickEl = new Audio(); web.stickEl.srcObject = web.dest.stream; }
+      await web.stickEl.setSinkId(jank.id);
+      await web.stickEl.play();
+    } else if (plan.stick === "context") {
+      if (!web.stickCtx) {
+        web.stickCtx = new AudioContext({ latencyHint: "interactive" });
+        web.stickCtx.createMediaStreamSource(web.dest.stream).connect(web.stickCtx.destination);
+      }
+      await web.stickCtx.setSinkId(jank.id);
+      await web.stickCtx.resume();
+    } else {
+      throw new Error("this browser cannot choose the stick's output (no setSinkId)");
+    }
+  }
+  async function routeCapture() {
+    if (!tap.source) return;
+    if (jank.id) {
+      if (tap.sinkId !== jank.id) { await tap.context.setSinkId(jank.id); tap.sinkId = jank.id; }
+      if (!tap.routed) { tap.source.connect(tap.context.destination); tap.routed = true; }
+    } else if (tap.routed) {
+      tap.source.disconnect(tap.context.destination);
+      tap.routed = false;
+    }
   }
   async function routeJank() {
-    if (!tap.context || !tap.source) return;
+    if (!tap.context) return;
     try {
-      if (jank.id) {
-        if (typeof tap.context.setSinkId !== "function") throw new Error("this browser cannot choose the stick's output (AudioContext.setSinkId)");
-        if (tap.sinkId !== jank.id) { await tap.context.setSinkId(jank.id); tap.sinkId = jank.id; }
-        if (!tap.routed) { tap.source.connect(tap.context.destination); tap.routed = true; }
-      } else if (tap.routed) {
-        tap.source.disconnect(tap.context.destination);
-        tap.routed = false;
-      }
+      await (plan.path === "webaudio" ? routeWeb() : routeCapture());
       jank.error = "";
     } catch (err) {
       jank.error = errorText(err);
     }
     paintStatus();
+    paintOutputUi();
   }
   function startTap() {
-    if (tap.missing || tap.url === url) return;
-    if (typeof audio.captureStream !== "function" || !tap.context) {
-      tap.missing = true;
-      note("This browser cannot take the player's sound for the stick and the meter (no captureStream): only the monitor plays.", true);
+    if (tap.missing || tap.url === url || plan.path === "none" || !tap.context) return;
+    if (plan.path === "webaudio") {
+      tap.url = url;
+      routeJank();
       return;
     }
     try {
       if (tap.source) tap.source.disconnect();
-      const source = tap.context.createMediaStreamSource(audio.captureStream());
+      const stream = typeof audio.captureStream === "function" ? audio.captureStream() : audio.mozCaptureStream();
+      const source = tap.context.createMediaStreamSource(stream);
       const analyser = tap.context.createAnalyser();
       analyser.fftSize = 16384;
       source.connect(analyser);
@@ -1346,7 +1377,10 @@ showHome();
     }
     routeJank();
   }
-  const applyMonitor = () => { audio.muted = !el("pl-monitor").checked; paintStatus(); };
+  const applyMonitor = () => {
+    if (web.monitor) web.monitor.gain.value = el("pl-monitor").checked ? 1 : 0; else audio.muted = !el("pl-monitor").checked;
+    paintStatus();
+  };
   function levelFrame(now) {
     frame = 0;
     if (audio.paused) return;
@@ -1383,7 +1417,9 @@ showHome();
     error = "";
     tagBpm = undefined;
     paintBpm();
-    el("pl-name").textContent = "No file: choose one, or drop it here";
+    el("pl-name").textContent = "No track: choose a music folder";
+    tap.url = null;
+    if (tap.context) tap.context.suspend().catch((err) => note("Cannot suspend the audio path: " + errorText(err), true));
     el("pl-play").disabled = true;
     el("pl-seek").disabled = true;
     paintSteps();
@@ -1393,7 +1429,6 @@ showHome();
   async function togglePlay() {
     if (url === null) return;
     if (!audio.paused) { audio.pause(); return; }
-    wakeContext();
     await play();
   }
   const entryFile = (entry) => (entry.file ? Promise.resolve(entry.file) : entry.handle.getFile());
@@ -1405,23 +1440,25 @@ showHome();
     try { load(await entryFile(queue.entries[index])); } catch (err) { setError("cannot open that file: " + errorText(err)); return; }
     await play();
   }
-  const step = (delta) => playQueued(Player.stepIndex(queue.entries.length, queue.index, delta));
+  const skip = () => playQueued(Player.skipTrack(thenMode(), queue.entries.length, queue.index));
+  const afterEnd = () => playQueued(Player.afterTrack(thenMode(), queue.entries.length, queue.index));
 
-  // ---- output: the stick's USB audio ("jank") when it is listed ----
-  async function listOutputs() {
-    if (!navigator.mediaDevices) throw new Error("device names need a secure page (https, localhost or a file)");
-    try {
-      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
-      for (const track of probe.getTracks()) track.stop();
-    } catch (err) {
-      if (typeof navigator.mediaDevices.selectAudioOutput !== "function") throw err;
-      return [await navigator.mediaDevices.selectAudioOutput()];
-    }
-    return navigator.mediaDevices.enumerateDevices();
+  // ---- output: the stick's USB audio ("jank"), chosen once in the browser's own output chooser (selectAudioOutput: no microphone) ----
+  // The chosen device is remembered and tried silently next time. enumerateDevices() needs no permission for the ids. The microphone
+  // is asked for only by the explicit "Allow device names" button, and only where the browser has no output chooser.
+  const canSelect = () => !!navigator.mediaDevices && typeof navigator.mediaDevices.selectAudioOutput === "function";
+  function paintOutputUi() {
+    const kind = Player.outputButton({ working: jank.id !== "" && jank.error === "", hasSelectAudioOutput: canSelect() });
+    el("pl-pick").classList.toggle("hide", kind === "none");
+    el("pl-pick").textContent = Player.OUTPUT_BUTTON_TEXT[kind];
+    el("pl-pick").dataset.kind = kind;
+    el("pl-pick-help").classList.toggle("hide", kind === "none");
+    el("pl-pick-help").textContent = Player.OUTPUT_HELP[kind];
   }
   function fillOutputs(devices) {
     const select = el("pl-out");
     select.replaceChildren(new Option("None (monitor only)", ""), ...Player.outputChoices(devices).map((c) => new Option(c.label, c.id)));
+    select.value = jank.id;
   }
   // the stick's output: the monitor is always the default output; this picks the second path's device
   async function useOutput(choice) {
@@ -1431,30 +1468,51 @@ showHome();
     if (choice.id) store.set(KEY.output, JSON.stringify({ id: choice.id, label: choice.label }));
     await routeJank();
     paintStatus();
+    paintOutputUi();
   }
   const savedOutput = () => {
     try { const o = JSON.parse(store.get(KEY.output)); return o && o.id ? o : null; } catch (err) { return null; }
   };
-  async function chooseOutput(devices) {
+  async function pickOutput() {
+    try {
+      if (el("pl-pick").dataset.kind === "choose") {
+        const device = await navigator.mediaDevices.selectAudioOutput();
+        await useOutput({ id: device.deviceId, label: device.label || "chosen output" });
+        note("The stick's output is " + jank.label + ".");
+      } else {
+        await allowNames();
+      }
+    } catch (err) {
+      note("Cannot choose the output (" + errorText(err) + "): only the monitor plays.", true);
+    }
+  }
+  // the last resort, behind its own button: the microphone permission, only to read the device names (the stream is stopped at once)
+  async function allowNames() {
+    const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+    for (const track of probe.getTracks()) track.stop();
+    const devices = await navigator.mediaDevices.enumerateDevices();
     fillOutputs(devices);
     const saved = savedOutput(), choice = Player.resolveOutput(devices, saved && saved.id);
     await useOutput(choice);
-    if (choice.why === "default") note('The stick\'s USB audio ("jank") is not listed: plug it in and run the firmware with the audio build. Only the monitor plays.');
-    else note(choice.why === "jank" ? "The stick's USB audio is the second output." : "The second output is " + choice.label + ".");
+    note(choice.why === "default" ? 'The stick\'s USB audio ("jank") is not listed: plug it in and run the firmware with the audio build. Only the monitor plays.'
+      : choice.why === "jank" ? "The stick's USB audio is the second output." : "The second output is " + choice.label + ".");
   }
-  // the permission is asked once, on the first button press in the card: a page cannot read device names without it
-  async function settleOutput() {
-    outputAsked = true;
-    try { await chooseOutput(await listOutputs()); } catch (err) { note("Cannot list the audio outputs (" + errorText(err) + "): only the monitor plays.", true); }
-  }
-  const firstGesture = () => { if (!outputAsked) settleOutput(); };
-  async function recheckOutputs() {
-    if (!outputAsked || !navigator.mediaDevices) return;
-    try { await chooseOutput(await navigator.mediaDevices.enumerateDevices()); } catch (err) { note("Cannot list the audio outputs (" + errorText(err) + ").", true); }
+  // no permission: the ids are listed, the labels maybe not; the chosen device is found again by its id (or its label) and tried
+  async function readDevices() {
+    if (!navigator.mediaDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      fillOutputs(devices);
+      const saved = savedOutput(), found = Player.matchSaved(devices, saved);
+      if (found) await useOutput({ id: found.id, label: saved.label || found.label });
+    } catch (err) {
+      note("Cannot list the audio outputs (" + errorText(err) + ").", true);
+    }
   }
   async function reuseSavedOutput() {
     const saved = savedOutput();
     if (saved) await useOutput(saved);
+    else paintOutputUi();
   }
 
   // ---- the music folder ----
@@ -1507,7 +1565,7 @@ showHome();
   function paintList() {
     el("pl-browser").classList.toggle("hide", browser.rootName === "");
     const crumbs = Player.breadcrumbs([browser.rootName, ...browser.names]).slice(1);
-    el("pl-crumbs").replaceChildren(...crumbs.map((c) => rowButton(c.label, "quiet", () => goTo(c.depth - 1))));
+    el("pl-crumbs").replaceChildren(el("pl-folder").firstElementChild.cloneNode(true), ...crumbs.map((c) => rowButton(c.label, "quiet", () => goTo(c.depth - 1))));
     const files = browser.entries.filter((e) => e.kind === "file");
     const playing = queue.entries.length ? queue.entries[queue.index] : null;
     const rows = [];
@@ -1552,18 +1610,24 @@ showHome();
     el("pl-reopen").onclick = () => openHandle(handle, true).catch((err) => note("Cannot open the folder: " + errorText(err), true));
   }
   function chooseTree(fileList) {
-    const items = [...fileList].filter((f) => Player.isAudioFile(f.name)).map((f) => ({ path: f.webkitRelativePath || f.name, file: f }));
+    const items = [...fileList].filter((f) => Player.isAudioFile(f.name)).map((f) => ({ path: f.webkitRelativePath || "Files/" + f.name, file: f }));
     Object.assign(browser, { rootName: Player.buildTree(items).name, names: [], handles: [], tree: Player.buildTree(items) });
     showFolder();
   }
 
   // ---- wiring ----
-  el("pl-file").addEventListener("change", (e) => { queue.entries = []; queue.index = -1; paintSteps(); load(e.target.files[0]); });
   el("pl-play").addEventListener("click", togglePlay);
-  el("pl-prev").addEventListener("click", () => step(-1));
-  el("pl-next").addEventListener("click", () => step(1));
+  el("pl-next").addEventListener("click", skip);
   el("pl-pitch").addEventListener("input", applyPitch);
-  el("pl-reset").addEventListener("click", () => { el("pl-pitch").value = 0; applyPitch(); });
+  el("pl-pitch-num").addEventListener("input", () => {
+    const v = Number(el("pl-pitch-num").value);
+    if (el("pl-pitch-num").value !== "" && Number.isFinite(v)) { el("pl-pitch").value = Math.max(-Player.PITCH_RANGE_PCT, Math.min(Player.PITCH_RANGE_PCT, v)); applyPitch(); }
+  });
+  el("pl-then").addEventListener("change", () => { store.set(KEY.then, thenMode()); paintSteps(); });
+  el("pl-help").addEventListener("click", () => {
+    const open = el("pl-help-text").classList.toggle("hide") === false;
+    el("pl-help").setAttribute("aria-expanded", String(open));
+  });
   el("pl-vol").addEventListener("input", () => { applyVolume(); store.set(KEY.volume, el("pl-vol").value); paintStatus(); });
   el("pl-seek").addEventListener("input", () => { seeking = true; });
   el("pl-seek").addEventListener("change", () => {
@@ -1579,22 +1643,13 @@ showHome();
   for (const type of ["timeupdate", "loadedmetadata", "durationchange"]) audio.addEventListener(type, paintTime);
   audio.addEventListener("loadedmetadata", applyPitch);
   for (const type of ["play", "pause", "ended"]) audio.addEventListener(type, paintPlay);
-  audio.addEventListener("ended", () => step(1));
+  audio.addEventListener("ended", afterEnd);
   audio.addEventListener("error", () => setError("cannot decode this file as audio"));
   audio.addEventListener("playing", () => { error = ""; startTap(); startLevel(); });
   for (const type of ["pause", "ended", "emptied"]) audio.addEventListener(type, stopLevel);
-  card.addEventListener("click", firstGesture, true);
   document.addEventListener("jank-advanced", (e) => { if (!e.detail.visible) releasePlayer(); });
-  if (navigator.mediaDevices) navigator.mediaDevices.addEventListener("devicechange", recheckOutputs);
-
-  card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("drop"); });
-  card.addEventListener("dragleave", () => card.classList.remove("drop"));
-  card.addEventListener("drop", (e) => {
-    e.preventDefault();
-    card.classList.remove("drop");
-    queue.entries = []; queue.index = -1; paintSteps();
-    load([...e.dataTransfer.files].find((f) => f.type.startsWith("audio/")));
-  });
+  if (navigator.mediaDevices) navigator.mediaDevices.addEventListener("devicechange", readDevices);
+  el("pl-pick").addEventListener("click", pickOutput);
 
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });
@@ -1603,7 +1658,6 @@ showHome();
     if (e.key !== " " || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
     if (!(hovered || card.contains(document.activeElement)) || !spaceTarget(e.target)) return;
     e.preventDefault();
-    firstGesture();
     togglePlay();
   });
 
@@ -1613,12 +1667,15 @@ showHome();
   el("pl-folder").addEventListener("click", pickFolder);
   el("pl-dir").addEventListener("change", (e) => chooseTree(e.target.files));
 
+  el("pl-then").value = Player.parseAfterMode(store.get(KEY.then));
+  el("pl-details").textContent = Player.planDetails(plan, env, Player.browserBrand(navigator.userAgentData, navigator.userAgent));
+  if (Player.planNote(plan)) note(Player.planNote(plan), true);
   el("pl-vol").value = Player.parseVolumePct(store.get(KEY.volume));
   applyVolume();
   applyPitch();
   applyMonitor();
   paintSteps();
-  reuseSavedOutput();
+  reuseSavedOutput().then(readDevices);
   if (hasPicker) restoreFolder();
 })();
 </script>
