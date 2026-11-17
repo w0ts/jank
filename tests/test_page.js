@@ -37,7 +37,7 @@ ok(/id="c-midi"[^>]*aria-pressed="false"/.test(html) && /id="c-bluetooth"[^>]*ar
 ok(!/id="c-sim"|>Demo<|>Simulator<|Sim\.|const Sim|sim\.js|\?sim=/.test(html), "no Demo / simulator mode left");
 ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id="c-off"/.test(html), "no Device or Connect heading, no tag, no status text, no Disconnect button");
 ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
-ok(/<summary>Details<\/summary>/.test(html), "the Details section is still there");
+ok(/<summary[^>]*>Details<\/summary>/.test(html), "the Details section is still there");
 ok(/id="live" class="hide"/.test(html) && /id="c-advanced-box" class="hide"/.test(html) && /id="player" class="hide"/.test(html) && /id="advanced-extra" class="hide"/.test(html), "the face, the Advanced box, the Player card and the Advanced extra start hidden");
 ok(!/face-hint|The stick has no screen: this is a virtual screen of its state/.test(html), "no key-hint line and no 'no screen' note around the device");
 ok(/#face \.lbl, #face \.brand \{ display: none; \}/.test(html) && !/max-width: 520px/.test(html), "the edge labels and the caption are hidden on this page; the drawing is no longer capped at 520 px");
@@ -335,5 +335,30 @@ eq(box.setCommand("filter", "some"), null);
 eq(box.setCommand("ble", "auto"), "set ble auto");
 eq(box.setCommand("ble", "on"), null);
 eq(box.setCommand("pass", "secret12"), null);         // not through the settings form
+
+// --- tooltips: every control the user can change says what it changes ---
+{
+  const VOID = new Set(["input", "br", "img", "meta", "link", "hr", "path", "rect", "circle", "line", "use", "stop", "text"]);
+  const body = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<(script|style)[\s\S]*?<\/\1>/g, "");
+  const attrsOf = (s) => { const out = {}; s.replace(/([a-zA-Z-]+)(?:="([^"]*)")?/g, (m, k, v) => { out[k] = v === undefined ? "" : v; return m; }); return out; };
+  const stack = [], bare = [], titles = [];
+  for (const m of body.matchAll(/<(\/?)([a-zA-Z0-9]+)([^>]*)>/g)) {
+    const [, close, name, rest] = m, tag = name.toLowerCase();
+    if (close) { while (stack.length && stack.pop().tag !== tag); continue; }
+    const a = attrsOf(rest), tip = (a.title || a["aria-label"] || "").trim();
+    if (a.title !== undefined) titles.push([a.id || tag, a.title]);
+    const interactive = ["button", "select", "textarea", "summary"].includes(tag) || (tag === "input" && a.type !== "hidden") || a.role === "button" || (a.tabindex !== undefined && a.tabindex !== "-1");
+    if (interactive && !tip && !stack.some((s) => s.tip)) bare.push(a.id || tag);
+    if (!VOID.has(tag) && !/\/\s*$/.test(rest)) stack.push({ tag, tip });
+  }
+  // exceptions: none. (A tabindex of -1, the player card's, is a programmatic focus target, not a control.)
+  eq(bare, []);
+  ok(titles.length > 40, "the page carries its tooltips (" + titles.length + ")");
+  eq(titles.filter(([, v]) => !v.trim() || v.length > 240).map(([id, v]) => id + " (" + v.length + ")"), []);
+  const tipOf = (id) => (html.match(new RegExp('<[a-z]+ [^>]*id="' + id + '"[^>]*>')) || [""])[0];
+  for (const id of ["c-midi", "pl-play", "pl-vol", "bd-slider", "al-on", "net-apply", "bootloader", "scan"]) ok(/\stitle="[^"]+"/.test(tipOf(id)), id + " has a tooltip of its own");
+  ok(/action\.title = "Makes the stick join this group/.test(html), "the Join buttons of the group list are built with a tooltip");
+  ok(/Pitch[^"]*tempo the stick tracks/.test(tipOf("pl-pitch")) && /Off mutes only your speakers/.test(html) && /restarts it/.test(tipOf("net-apply")), "the tooltips carry the side effects: pitch moves the tracked tempo, monitor off mutes only the speakers, Save and restart restarts the stick");
+}
 
 lineTests().then(() => console.log("page: " + checks + " checks passed"), (e) => { console.error(e); process.exit(1); });
