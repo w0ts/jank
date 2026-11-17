@@ -38,6 +38,16 @@ ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id=
 ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
 ok(/<summary>Details<\/summary>/.test(html), "the Details section is still there");
 ok(/id="live" class="hide"/.test(html) && /id="c-advanced-box" class="hide"/.test(html) && /id="player" class="hide"/.test(html) && /id="advanced-extra" class="hide"/.test(html), "the face, the Advanced box, the Player card and the Advanced extra start hidden");
+ok(!/face-hint|The stick has no screen: this is a virtual screen of its state/.test(html), "no key-hint line and no 'no screen' note around the device");
+ok(/#face \.lbl, #face \.brand \{ display: none; \}/.test(html) && !/max-width: 520px/.test(html), "the edge labels and the caption are hidden on this page; the drawing is no longer capped at 520 px");
+ok(/setAttribute\("viewBox", "-8\.5 -6 87 80\.5"\)/.test(html) && /card\.title = Stick\.KEY_HINT/.test(html), "the box is cropped to its jacks and the keys are a tooltip");
+ok(!/pl-test|testStick|Test stick output|createOscillator/.test(html), "no 'Test stick output': no link, no handler, no tone generator");
+ok(/id="pl-out-row" class="note pl-out hide"/.test(html), "the 'stick output' line starts hidden: it shows only when something needs the user");
+ok(/Allow on every visit/.test(html), "the ? help says what 'Allow on every visit' does");
+const faceUi = html.match(/<script id="face-ui">([\s\S]*?)<\/script>/)[1];
+ok(/#ledView, #seamGlow \{ display: none; \}/.test(html) && !/makeLeds|paintLed|Stick\.leds/.test(faceUi), "the control page shows no LED dots and draws none (the Mac simulator still does)");
+ok(!/lastBeat|takeBeat|parseBeat/.test(html), "the page keeps no beat-report code any more: only the LEDs used it");
+ok(/Stick\.phaseFeed/.test(faceUi) && /id="bd-num"/.test(html) && /id="bd-slider"/.test(html), "the beat boxes run on the smooth phase, with the display delay row under Advanced");
 ok(!/id="home"|id="h-|id="t-(tempo|set|play|up|down)"|id="n-(beat|ms)/.test(html), "the HOME card is gone");
 for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source", "c-ble", "ble-pair"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the stick's menu has it, the page does not");
 for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "scan", "groups", "ble-close", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])

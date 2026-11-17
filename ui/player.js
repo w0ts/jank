@@ -131,12 +131,13 @@ const Player = (() => {
         if (e.kind === 'directory') await walk(e, [...path, e.name]);
         else if (files.length >= max) { capped = true; return; } else files.push({ ...e, path: [...path, e.name] });
       }
-      onProgress(files.length);
+      onProgress(files.length, files);
     }
     await walk(root, []);
     return { files, capped, cancelled: shouldStop() };
   }
-  const scopeLine = s => (s.scanning ? 'scanning: ' + s.count.toLocaleString('en-US') + ' files' : s.capped ? s.count.toLocaleString('en-US') + ' files (capped)' : s.count.toLocaleString('en-US') + ' files in scope');
+  // s: { scanning, count, capped, done (a scan ran to its end), root (the picked folder's name) }
+  const scopeLine = s => (s.scanning ? 'scanning: ' + s.count.toLocaleString('en-US') + ' files' : s.done && s.count === 0 ? 'no audio files under ' + (s.root || 'the folder') : s.capped ? s.count.toLocaleString('en-US') + ' files (capped)' : s.count.toLocaleString('en-US') + ' files in scope');
 
   // the output the user chose last time, found again in a device list (ids first; a label when the list has labels and the id changed)
   function matchSaved(devices, saved) {
@@ -204,6 +205,8 @@ const Player = (() => {
     const others = Array.from({ length: count }, (_, i) => i).filter(i => i !== index);
     return others.length ? others[Math.min(others.length - 1, Math.floor((rng || Math.random)() * others.length))] : -1;
   }
+  // the first track when Play is pressed with nothing loaded: random picks any file of the list, next and stop the first one (-1: none)
+  const firstTrack = (mode, count, rng) => (count <= 0 ? -1 : mode === 'random' ? Math.min(count - 1, Math.floor((rng || Math.random)() * count)) : 0);
   const AFTER_MODES = ['next', 'random', 'stop'];
   const parseAfterMode = text => (AFTER_MODES.includes(text) ? text : 'next');
   // a track that ran off its end: "then" next / random / stop
@@ -412,5 +415,5 @@ const Player = (() => {
   const expectedBpm = (tag, rate) => tag * rate;
 
   return { MAX_TAG_BYTES, parseBpmText, id3TotalSize, parseId3, mp4Atom, parseMp4Tmpo, parseFlac, parseOgg, sniff, tagBpm, expectedBpm, PITCH_RANGE_PCT, DEFAULT_VOLUME_PCT, MAX_ROWS, AUDIO_EXT, LEVEL_FLOOR_DB, rmsOf, rmsToDb, smoothDb, meterFraction, statusText, pitchToRate, formatPitch, volumeFromPct, parseVolumePct, formatTime,
-           savedStatus, sinkMatches, outputReport, SCOPE_CAP, isJunkName, pathKey, scanTree, scopeLine, matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, afterTrack, skipTrack, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
+           savedStatus, sinkMatches, outputReport, SCOPE_CAP, isJunkName, pathKey, scanTree, scopeLine, matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, firstTrack, afterTrack, skipTrack, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
 })();

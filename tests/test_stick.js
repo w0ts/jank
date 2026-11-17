@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // The face of a connected stick (ui/stick.js) on transcripts of the firmware's own control line (tests/stick_ref/transcript.txt, made
 // by running core/jank_ctl.c; home lines of a playing session from tests/test_phone.c): the OLED ctx from the stick's state, the
-// beat LEDs, the commands the face sends, and the D-pad. Exit status: non-zero on a failure.
+// smooth beat phase, the commands the face sends, and the D-pad. Exit status: non-zero on a failure.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -80,24 +80,6 @@ eq([st.gated, st.bar, st.ble.left, st.ble.phone, st.net.ip], [true, { state: 'lo
 eq(Stick.ctx(state({ status: { ...status, ble_state: 'connected' }, statusAt: 1000 }), 1500).ble.phone, true, 'status: a phone connected');
 eq(Stick.ctx(state({ status: { ...status, gated: '1' }, statusAt: 0 }), 9000).gated, false, 'a status older than 5 s is not used');
 
-// ---- the beat LEDs ----
-const GREEN = 'rgb(0,215,0)', AMBER = 'rgb(255,158,0)';
-const ledsAt = (over, now) => Stick.leds(state(over), now);
-const at = (bar, extra = '1') => home('h 12000 j3 1 ' + bar + ' 4 2 0 64 -24 87 -31 -18 ' + extra);
-eq(ledsAt({ home: at(300) }, 1000), [null, null, null, GREEN], 'bar position 3.00: the beat just came, LED 4 flashes green');
-eq(ledsAt({ home: at(400) }, 1000), [AMBER, null, null, null], 'bar position 4.00 = the next bar: LED 1, amber');
-eq(ledsAt({ home: at(300) }, 1000 + 90), [null, null, null, null], 'dark after the flash (80 ms)');
-eq(ledsAt({ home: at(275) }, 1000 + 125), [null, null, null, GREEN], 'the phase moves at the HOME line tempo: 2.75 + 0.25 beat = 3.00');
-eq(ledsAt({ home: at(275) }, 1000), [null, null, null, null], 'between beats: dark');
-eq(ledsAt({ home: at(400), beat: { n: 7, bpm: 120, mode: 'steady', audio: 2, lagUs: 0, at: 1000 } }, 1040), [AMBER, null, null, null], 'a beat report anchors the flash');
-eq(ledsAt({ home: at(450), beat: { n: 7, bpm: 120, mode: 'steady', audio: 2, lagUs: 30000, at: 1030 } }, 1050), [AMBER, null, null, null], "a report's lag moves the beat back: heard 30 ms before it arrived");
-eq(ledsAt({ home: at(450), beat: { n: 7, bpm: 120, mode: 'steady', audio: 2, lagUs: 0, at: 1000 } }, 1000 + 1500), ledsAt({ home: at(450) }, 1000 + 1500), 'a report older than two beats is ignored: the phase takes over');
-eq(ledsAt({ home: home('h 12000 j3 2 275 4 2 0 64 -24 87 -31 -18 1') }, 1000), Array(4).fill('rgb(215,168,0)'), 'armed: all four amber');
-eq(ledsAt({ home: home('h 12000 j3 0 300 4 2 0 64 -24 87 -31 -18 1') }, 1000), [null, null, null, null], 'stopped: dark');
-eq(ledsAt({ home: at(300), status: { ...status, gated: '1' }, statusAt: 1000 }, 1000), [null, null, null, 'rgb(255,0,0)'], 'gated: the beat flashes red');
-eq(Stick.leds({ home: null }, 0), [null, null, null, null], 'no data: dark');
-eq(Stick.parseBeat('b 12 12000 steady 2 1500'), { n: 12, bpm: 120, mode: 'steady', audio: 2, lagUs: 1500 }, 'a beat report');
-eq([Stick.parseBeat('t 12 12000 steady 2 25'), Stick.parseBeat('b 1 x steady 2 5'), Stick.parseBeat('')], [null, null, null], 'a once-a-second report, junk, empty: no beat');
 
 // ---- the commands ----
 const F = Stick.fieldCommands;
@@ -184,5 +166,71 @@ Stick.down(f.m, 'up', 200);
 Stick.releaseAll(f.m, 210);
 eq(Object.keys(f.m.repeatAt).length, 0, 'releaseAll stops the repeats');
 eq(Stick.KEY_BTN, { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'no', Escape: 'no', Backspace: 'no', ArrowRight: 'yes', Enter: 'yes' }, 'the keyboard mapping is the Mac simulator\'s');
+
+
+// ---- the smooth local phase, on a fake clock ----
+{
+  const rep = (bar, bpm = 120, running = true) => ({ bar, bpm, running, quantum: 4 });
+  const beatsAt = (bpm, ms) => ms * bpm / 60000;
+  let ph = Stick.phaseFeed(Stick.createPhase(), rep(2.75), 1000);
+  eq(Stick.phaseAt(ph, 1000, 0), 2.75, 'the first report is taken as it is');
+  eq(Stick.phaseAt(ph, 1250, 0), 3.25, 'between reports the position runs on at the tempo (0.5 beat in 250 ms at 120)');
+  // a steady tempo: exact reports every 300 ms keep the position exact and never go backwards
+  ph = Stick.phaseFeed(Stick.createPhase(), rep(0), 0);
+  let worst = 0, last = 0;
+  for (let t = 300; t <= 6000; t += 300) {
+    ph = Stick.phaseFeed(ph, rep(beatsAt(120, t) % 4), t);
+    worst = Math.max(worst, Math.abs(Stick.phaseAt(ph, t, 0) - beatsAt(120, t)));
+    ok(Stick.phaseAt(ph, t, 0) >= last, 'never backwards at ' + t);
+    last = Stick.phaseAt(ph, t, 0);
+  }
+  ok(worst < 1e-9, 'steady tempo: the shown position follows the truth to 1e-9 beat (' + worst + ')');
+  // a tempo change: the new tempo is taken at once, the position carries on from where it was
+  ph = Stick.phaseFeed(Stick.createPhase(), rep(0), 0);
+  ph = Stick.phaseFeed(ph, rep(0.6), 300);
+  const before = Stick.phaseAt(ph, 300, 0);
+  ph = Stick.phaseFeed(ph, rep(0.6 + beatsAt(120, 300) + 0.01, 128), 600);
+  ok(Math.abs(Stick.phaseAt(ph, 600, 0) - (0.6 + beatsAt(120, 300))) < 0.01, 'a tempo change: the position stays close (a quarter of a 0.01 beat error taken)');
+  eq(Math.round((Stick.phaseAt(ph, 1600, 0) - Stick.phaseAt(ph, 600, 0)) * 1e6) / 1e6, Math.round(beatsAt(128, 1000) * 1e6) / 1e6, 'and from then on runs at 128 BPM');
+  ok(before < Stick.phaseAt(ph, 600, 0), 'forward all the way');
+  // a late report: it says we are 0.24 beat behind the truth... reported late means its position is OLD: it asks for a step back. At most 0.02.
+  ph = Stick.phaseFeed(Stick.createPhase(), rep(1), 0);
+  const predicted = Stick.phaseAt(ph, 600, 0);
+  ph = Stick.phaseFeed(ph, rep(1 + beatsAt(120, 480)), 600);                  // the same line, 120 ms late: its position is 0.24 beat behind
+  ok(Stick.phaseAt(ph, 600, 0) >= predicted - Stick.PHASE.backBeats - 1e-9, 'a late report moves the boxes back by 0.02 beat at most (' + (predicted - Stick.phaseAt(ph, 600, 0)).toFixed(4) + ')');
+  ok(Stick.phaseAt(ph, 600, 0) < predicted, 'but it does move toward the report');
+  // an early report is taken forward by a quarter of the error
+  ph = Stick.phaseFeed(Stick.createPhase(), rep(1), 0);
+  ph = Stick.phaseFeed(ph, rep(1 + beatsAt(120, 300) + 0.2), 300);
+  ok(Math.abs(Stick.phaseAt(ph, 300, 0) - (1 + beatsAt(120, 300) + 0.05)) < 1e-9, 'a report ahead of us pulls forward by a quarter of the error');
+  // a jump of more than half a beat snaps (a new lock, a bar moved)
+  ph = Stick.phaseFeed(ph, rep(3.9), 600);
+  eq(Stick.phaseAt(ph, 600, 0), 3.9, 'a jump over half a beat snaps');
+  ph = Stick.phaseFeed(Stick.phaseFeed(Stick.createPhase(), rep(3.9), 0), rep(0.1), 100);
+  ok(Math.abs(Stick.phaseAt(ph, 100, 0) - 3.9 - beatsAt(120, 100) - 0.25 * 0.2 + 0.0) < 0.3, 'the bar wrap (3.9 to 0.1) is a small step, not a jump');
+  // stopped holds the position
+  ph = Stick.phaseFeed(Stick.phaseFeed(Stick.createPhase(), rep(1), 0), rep(1.5, 120, false), 300);
+  eq([Stick.phaseAt(ph, 300, 0), Stick.phaseAt(ph, 1300, 0)], [1.5, 1.5], 'stopped: the position holds');
+  // stale: no running on old data past 1.5 s; a lost lock clears at once
+  ph = Stick.phaseFeed(Stick.createPhase(), rep(1), 0);
+  eq([Stick.phaseAt(ph, 1500, 0) !== null, Stick.phaseAt(ph, 1501, 0)], [true, null], 'no report for 1.5 s: the boxes go empty, not on running on stale data');
+  eq(Stick.phaseAt(Stick.phaseFeed(ph, null, 200), 200, 0), null, 'a report with no session or tempo (lost lock): empty at once');
+  eq(Stick.phaseReport({ bpm: 0, bar: null, quantum: 4, transport: 'stopped' }), null, 'no tempo, no bar: no report');
+  eq(Stick.phaseReport({ bpm: 120, bar: 275, quantum: 4, transport: 'playing' }), { bar: 2.75, bpm: 120, running: true, quantum: 4 }, 'the HOME line as a report');
+  // the display delay: + shows the position of that long ago, - runs ahead
+  ph = Stick.phaseFeed(Stick.createPhase(), rep(2), 1000);
+  eq([Stick.phaseAt(ph, 1200, 0), Stick.phaseAt(ph, 1200, 100), Stick.phaseAt(ph, 1200, -100)], [2.4, 2.2, 2.6], 'delay +100 ms: 0.2 beat behind; -100 ms: 0.2 ahead');
+  // in the ctx
+  const base = { home: AUDIO, homeAt: 1000, get, status: null, statusAt: 0, overBle: false };
+  const withPhase = (delayMs, now) => { const st2 = { ...base, phase: Stick.phaseFeed(Stick.createPhase(), { bar: 2.75, bpm: 120, running: true, quantum: 4 }, 1000), delayMs }; return Stick.ctx(st2, now).beatN; };
+  eq(withPhase(0, 1250), 3, 'ctx: the box from the smooth phase');
+  eq(withPhase(250, 1250), 2, 'ctx: delayed 250 ms: still the previous box');
+  eq(withPhase(-250, 1000), 3, 'ctx: advanced 250 ms: the next box already');
+  eq(withPhase(0, 1000 + 1501), null, 'the stale phase draws no box');
+  // the estimate of the display delay and its storage
+  eq([Stick.beatDelayEstimate({ monitorMs: 30, stickMs: 50 }), Stick.beatDelayEstimate({ monitorMs: 96, stickMs: 20 }), Stick.beatDelayEstimate({ monitorMs: null, stickMs: 50 }), Stick.beatDelayEstimate({ monitorMs: 900, stickMs: 0 }), Stick.beatDelayEstimate({ monitorMs: 0, stickMs: 900 })],
+     [-20, 75, 0, 400, -400], 'the estimate: monitor minus stick latency to 5 ms, 0 when one is unknown, within +-400');
+  eq([Stick.parseDelay('120'), Stick.parseDelay('-7'), Stick.parseDelay('900'), Stick.parseDelay(''), Stick.parseDelay(null), Stick.parseDelay('x')], [120, -5, 400, null, null, null], 'a stored delay: rounded to 5, limited, or none');
+}
 
 console.log('stick: ' + checks + ' checks passed');
