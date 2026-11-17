@@ -112,8 +112,8 @@ Where the role comes from (`core/jank_usbrole.c`, host-tested):
   VBUS out): another chip (a power-bank IC with its own role logic) is another file, the role logic stays as it is.
 
 `set source auto|line|usb` (AUDIO > SOURCE, stored, default `auto`): AUTO hears the line in when a plug is in, else USB
-audio when a stream is open (the computer's in device mode, the hosted device's in host mode). The line in's own audio
-path is not in this firmware yet: LINE hears nothing for now. Host mode has no network adapter, drive or USB control
+audio when a stream is open (the computer's in device mode, the hosted device's in host mode). The line in goes to the
+tracker on boards with one (docs/linein.md; the XIAO only with its bench option). Host mode has no network adapter, drive or USB control
 line; a phone over Bluetooth (docs/ble.md) still gets the control page's lines, `status` among them.
 
 jank does not switch power to the device. On a bare XIAO the 5V pin is the USB-C socket's VBUS with nothing between

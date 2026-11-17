@@ -118,6 +118,8 @@ enum jk_net {
 #define JK_BEAT_LATENCY_MIN_MS (-300)   /* negative: the stick hears the audio after the speakers do (player --xiao) */
 #define JK_BEAT_LATENCY_MAX_MS 300
 #define JK_BEAT_LATENCY_DEFAULT_MS 25
+#define JK_LINE_GAIN_MIN_DB (-12)        /* LINE IN gain (core/jank_line.h JL_GAIN_*) */
+#define JK_LINE_GAIN_MAX_DB 12
 struct jk_cfg {
     uint8_t group, filter;
     uint8_t peer;                     /* 1: jank is a Link peer itself */
@@ -159,6 +161,7 @@ struct jk_cfg {
     /* Stored in their own blob (store.c, key "lat1") since M2d: beat_latency per audio source (core/jank_lat.h) */
     struct jla lat;
     struct jla_key lat_key;           /* the source beat_latency_ms belongs to now (not stored: usbrole.c follows it) */
+    int8_t line_gain_db;              /* LINE IN gain, JK_LINE_GAIN_MIN_DB..MAX (a bench setting: not stored, 0 at every start) */
 };
 void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */

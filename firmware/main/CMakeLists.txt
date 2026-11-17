@@ -11,7 +11,7 @@ endif()
 message(NOTICE "jank: BEAT-FOLLOW BENCH BUILD with madmom's weights (CC BY-NC-SA 4.0): bench only, never ship")
 idf_component_register(
     SRCS "main.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c"
-         "usb_audio.c" "beat.c"
+         "usb_audio.c" "beat.c" "linein.c" "${core}/jank_line.c"
          "usb_hostlib.c" "usb_uac_host.c" "usbrole.c" "usbport_tusb320.c" "pump.c"
          "board_i2c.c" "oled.c" "uiscreen.c" "${core}/jank_led.c"
          "${core}/jank_oled_gfx.c" "${core}/jank_oled_menu.c" "${core}/jank_oled_press.c" "${core}/jank_oled_draw.c" "${core}/jank_oled_qr.c" "${core}/jank_oled_input.c"
@@ -22,7 +22,8 @@ idf_component_register(
          "${beat}/jb_down.c" "${beat}/down_model.c" "${beat}/jb_follow.c" "${beat}/jb_rate.c" "${beat}/jb_weak.c" "${beat}/jb_comb.c" "${beat}/jb_robust.c" "${beat}/jb_skip.c" "${beat}/jb_graded.c"
          "${link}/link.c" ${ble_srcs}
     INCLUDE_DIRS "." "${core}" "${link}" "${beat}"
-    PRIV_REQUIRES app_update esp_partition usb esp_wifi esp_event esp_netif nvs_flash esp_driver_gptimer esp_driver_uart esp_driver_gpio esp_driver_mcpwm esp_driver_i2c esp_driver_ledc esp_timer hal soc esp_hw_support esp_system heap bt esp_coex
+    LDFRAGMENTS "linker.lf"
+    PRIV_REQUIRES app_update esp_partition usb esp_wifi esp_event esp_netif nvs_flash esp_driver_gptimer esp_driver_uart esp_driver_gpio esp_driver_mcpwm esp_driver_i2c esp_driver_ledc esp_timer hal soc esp_hw_support esp_system heap bt esp_coex esp_adc
 )
 # a test build's clock probe at the pin (clkprobe.c): JANK_CLOCK_PROBE=1 scripts/build.sh xiao
 if(DEFINED ENV{JANK_CLOCK_PROBE} AND "$ENV{JANK_CLOCK_PROBE}" STREQUAL "1")

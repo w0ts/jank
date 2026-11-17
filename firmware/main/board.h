@@ -52,6 +52,16 @@
 #define BOARD_BTN_NO2_GPIO (-1)
 #define BOARD_OLED 0
 #endif
+/* LINE IN: none on the XIAO. The bench option (Kconfig JANK_LINEIN_BENCH, sdkconfig.linein-bench) samples pad D3 = GPIO4
+ * (ADC1_CH3; not a strapping pin, unused by this firmware; Seeed's XIAO ESP32S3 pin table) as a line input through a bias
+ * network (docs/linein.md), so the LINE IN path can be tried on the XIAO. No cell, no plug detect: `set source line`. */
+#if CONFIG_JANK_LINEIN_BENCH
+#define BOARD_HAS_LINEIN 1
+#define BOARD_LINEIN_GPIO 4
+#else
+#define BOARD_HAS_LINEIN 0
+#endif
+#define BOARD_CELL_GPIO (-1)
 #elif CONFIG_JANK_BOARD_MINI22
 /* jank mini 2.2, battery order (ESP32-S3-WROOM-1U-N8R2 since 2026-11-15; was the bare FH4R2), from hardware/mini2/parts.py and README.md on hw/mini2.2 (2026-11-15,
  * being routed: check again when it is ordered). Only what this firmware drives so far: NO (the BOOT button, SW1), the two
@@ -86,6 +96,14 @@
 #define BOARD_LINE_DETECT_GPIO 16                 /* J7's switch, R38 1 M up: low = no plug */
 #define BOARD_PUMP_GPIO (-1)                      /* the charge pump is gone (2026-11-15): pump_hold answers not supported, so
                                                      USB host mode's 5 V signal waits for the 5 V aux boost's enable pin */
+/* LINE IN (linein.c): the LMV321 summer's output through R35 120 ohm / C36 100 nF to GPIO9 = ADC1_CH8; the cell through
+ * R10 / R11 100 k / 100 k (C8 100 nF) to GPIO4 = ADC1_CH3, read in the same ADC pattern (TIMING.md trap 6). The usb order
+ * holds GPIO4 at 0 V: no cell, no percent. The cell's empty point: ~3.3 V with the TPS63802 (POWER-STUDY.md, 2026-11-15) */
+#define BOARD_HAS_LINEIN 1
+#define BOARD_LINEIN_GPIO 9
+#define BOARD_CELL_GPIO 4
+#define BOARD_CELL_DIV 2                          /* the cell's volts / the pin's */
+#define BOARD_CELL_EMPTY_MV 3300
 #else
 #error "no board chosen"
 #endif

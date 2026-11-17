@@ -2,13 +2,16 @@
 /* The USB audio speaker's receive path (usb_audio.h): TinyUSB's audio class calls tud_audio_rx_done_isr for each 1 ms packet,
  * which mixes it to mono int16 into a ring the tracker task drains, and keeps the offset between the sample count and the
  * local clock: off = arrival time - samples / 44100, smoothed, so that a sample's local time is off + s / 44100 whatever the
- * packets' jitter. The computer's clock is the stream's; ours drifts against it a little, which the smoothing follows. */
+ * packets' jitter. The computer's clock is the stream's; ours drifts against it a little, which the smoothing follows.
+ * The LINE IN (linein.c) feeds the same ring when it is the source (AUDIO > SOURCE), with sample-stamped times: the tracker,
+ * beat_latency and AUTO BAR see one kind of stream either way. */
 #include <string.h>
 #include "esp_timer.h"
 #include "app.h"
 #include "esp_attr.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
+#include "jank_usbrole.h"
 #include "tusb.h"
 #include "usb_audio.h"
 
@@ -28,31 +31,41 @@ static uint32_t s_seen;                     /* packets since the offset started 
 static struct uac_stats s_st;
 static volatile uint32_t s_epoch;
 static uint8_t s_stream;                    /* a stream is open: the computer's (alt 1) or the hosted device's */
-static uint8_t s_route = 1;                 /* the audio source is USB (usbrole.c): else the samples are dropped */
+static uint8_t s_line;                      /* the LINE IN path runs (linein.c) */
+static uint8_t s_src = JUR_AUDIO_USB;       /* what the tracker hears (enum jur_audio, usbrole.c): the other's samples are dropped */
 
 static int64_t sample_us(uint32_t samples) { return (int64_t)samples * 10000 / 441; }
 
-/* the stream as the tracker sees it: open and routed to it; any change restarts the tracker */
-static void set_stream(int stream, int route)
+/* the stream as the tracker sees it: the chosen source's, and open. Any change restarts the tracker: open or closed, a new
+ * USB stream, or another source (USB and LINE IN are two clocks: one's sample count does not continue the other's) */
+static void set_state(int stream, int line, int src)
 {
+    uint8_t open;
     portENTER_CRITICAL_SAFE(&s_mux);
     if (stream >= 0)
         s_stream = (uint8_t)stream;
-    if (route >= 0)
-        s_route = (uint8_t)route;
-    if (s_st.open != (s_stream && s_route) || stream > 0) {
-        s_st.open = (uint8_t)(s_stream && s_route);
+    if (line >= 0)
+        s_line = (uint8_t)line;
+    if (src >= 0 && (uint8_t)src != s_src) {
+        s_src = (uint8_t)src;
+        s_epoch++;
+    }
+    open = (uint8_t)((s_src == JUR_AUDIO_USB && s_stream) || (s_src == JUR_AUDIO_LINE && s_line));
+    if (s_st.open != open || (stream > 0 && s_src == JUR_AUDIO_USB)) {
+        s_st.open = open;
         s_epoch++;
     }
     portEXIT_CRITICAL_SAFE(&s_mux);
 }
+
+static void set_stream(int stream) { set_state(stream, -1, -1); }
 
 /* the host's side of the descriptor: which alternate setting is on */
 bool tud_audio_set_itf_cb(uint8_t rhport, tusb_control_request_t const *p_request)
 {
     (void)rhport;
     if ((p_request->wValue & 0xFFu) != 0u)
-        set_stream(1, -1);
+        set_stream(1);
     return true;
 }
 
@@ -60,13 +73,17 @@ bool tud_audio_set_itf_close_ep_cb(uint8_t rhport, tusb_control_request_t const 
 {
     (void)rhport;
     (void)p_request;
-    set_stream(0, -1);
+    set_stream(0);
     return true;
 }
 
-void uac_host_stream(int open) { set_stream(open ? 1 : 0, -1); }
+void uac_host_stream(int open) { set_stream(open ? 1 : 0); }
 
-void uac_route(int usb) { set_stream(-1, usb ? 1 : 0); }
+void uac_source(uint8_t audio) { set_state(-1, -1, audio); }
+
+void uac_line_running(int on) { set_state(-1, on ? 1 : 0, -1); }
+
+uint8_t uac_source_now(void) { return s_src; }   /* (one byte: read without the lock) */
 
 int uac_stream_open(void) { return s_stream; }
 
@@ -103,15 +120,16 @@ bool tud_audio_set_req_entity_cb(uint8_t rhport, tusb_control_request_t const *r
     return TU_U16_HIGH(rq->wIndex) == UAC_CLOCK_ID;
 }
 
-/* mono samples that arrived at `now` (local us): into the ring, and the offset updated. The USB interrupt (device) or the
- * USB host client's task (host, usb_uac_host.c). */
-void uac_feed(const int16_t *pk, uint32_t frames, int64_t now)
+/* mono samples from src that arrived at `now` (local us): into the ring when src is what the tracker hears, and the offset
+ * updated. USB: the USB interrupt (device) or the USB host client's task (host, usb_uac_host.c), `now` the arrival.
+ * LINE IN: linein.c's task, `now` the sample-stamped time just after the last sample, so the offset is exact and stays. */
+static void feed(uint8_t src, const int16_t *pk, uint32_t frames, int64_t now)
 {
     if (!frames)
         return;
     portENTER_CRITICAL_SAFE(&s_mux);
-    if (!s_route) {
-        /* the tracker hears the line in: nothing of this goes to it */
+    if (src != s_src) {
+        /* the tracker hears the other source: nothing of this goes to it */
     } else if (RING - (s_head - s_tail) < frames) {
         s_st.overflows++;
         s_epoch++;                      /* the tracker starts again from here */
@@ -144,6 +162,10 @@ void uac_feed(const int16_t *pk, uint32_t frames, int64_t now)
     }
     portEXIT_CRITICAL_SAFE(&s_mux);
 }
+
+void uac_feed(const int16_t *pk, uint32_t frames, int64_t now) { feed(JUR_AUDIO_USB, pk, frames, now); }
+
+void uac_line_feed(const int16_t *mono, uint32_t frames, int64_t now) { feed(JUR_AUDIO_LINE, mono, frames, now); }
 
 /* each packet of the computer's stream: mono already. In the USB interrupt. */
 bool tud_audio_rx_done_isr(uint8_t rhport, uint16_t n_bytes_received, uint8_t func_id, uint8_t ep_out, uint8_t cur_alt_setting)

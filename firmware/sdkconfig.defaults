@@ -27,3 +27,6 @@ CONFIG_GPTIMER_ISR_HANDLER_IN_IRAM=y
 CONFIG_GPTIMER_CTRL_FUNC_IN_IRAM=y
 CONFIG_GPTIMER_ISR_CACHE_SAFE=y
 CONFIG_GPTIMER_OBJ_CACHE_SAFE=y
+# LINE IN (linein.c): the ADC's DMA interrupt keeps filling while flash is written (the timing audit, trap 1; ESP-IDF
+# adc_continuous.rst "IRAM Safe"); its callback and jl_parse are in IRAM (main/linker.lf)
+CONFIG_ADC_CONTINUOUS_ISR_IRAM_SAFE=y

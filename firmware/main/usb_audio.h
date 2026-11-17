@@ -81,6 +81,11 @@ int32_t uac_offset_us(void);
 /* mono 44.1 kHz samples that arrived at local time `now` (us), the newest last: a task or an interrupt */
 void uac_feed(const int16_t *mono, uint32_t frames, int64_t now);
 void uac_host_stream(int open);         /* the hosted device's stream started (1) or stopped (0): as alt 1 / 0 in device mode */
-void uac_route(int usb);                /* 1: the tracker hears USB audio (AUDIO > SOURCE); 0: it is dropped */
+void uac_source(uint8_t audio);         /* what the tracker hears (enum jur_audio, AUDIO > SOURCE): the other's samples are dropped */
+uint8_t uac_source_now(void);           /* the same, as set last */
 int uac_stream_open(void);              /* a USB stream is open, routed or not (AUTO's "USB audio when it plays") */
+/* the LINE IN (linein.c): its path runs (it is "open" when it is the source), and its 44.1 kHz samples, `now` = the local
+ * time just after the last of them, from the ADC's sample clock */
+void uac_line_running(int on);
+void uac_line_feed(const int16_t *mono, uint32_t frames, int64_t now);
 #endif
