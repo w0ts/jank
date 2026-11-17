@@ -14,6 +14,7 @@ const ui = html.match(/<script id="ui">([\s\S]*?)<\/script>/)[1];
 const box = {};
 vm.createContext(box);
 vm.runInContext(logic, box);
+vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "ui", "ports.js"), "utf8") + "\nthis.jankPortName = jankPortName; this.jankPorts = jankPorts; this.overBluetooth = overBluetooth; this.outputFor = outputFor; this.portNames = portNames;", box);
 // classes and consts are the script's lexical names, not properties of its global: hand them out
 vm.runInContext("this.SysexIn = SysexIn; this.BleMidiIn = BleMidiIn; this.LineClient = LineClient; this.JX_PUSH_HOME = JX_PUSH_HOME;", box);
 new vm.Script(ui);                       // the DOM part at least parses
@@ -38,6 +39,16 @@ ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id=
 ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
 ok(/<summary>Details<\/summary>/.test(html), "the Details section is still there");
 ok(/id="live" class="hide"/.test(html) && /id="c-advanced-box" class="hide"/.test(html) && /id="player" class="hide"/.test(html) && /id="advanced-extra" class="hide"/.test(html), "the face, the Advanced box, the Player card and the Advanced extra start hidden");
+ok(!/face-hint|The stick has no screen: this is a virtual screen of its state/.test(html), "no key-hint line and no 'no screen' note around the device");
+ok(/#face \.lbl, #face \.brand \{ display: none; \}/.test(html) && !/max-width: 520px/.test(html), "the edge labels and the caption are hidden on this page; the drawing is no longer capped at 520 px");
+ok(/setAttribute\("viewBox", "-8\.5 -6 87 80\.5"\)/.test(html) && /card\.title = Stick\.KEY_HINT/.test(html), "the box is cropped to its jacks and the keys are a tooltip");
+ok(!/pl-test|testStick|Test stick output|createOscillator/.test(html), "no 'Test stick output': no link, no handler, no tone generator");
+ok(/id="pl-out-row" class="note pl-out hide"/.test(html), "the 'stick output' line starts hidden: it shows only when something needs the user");
+ok(/Allow on every visit/.test(html), "the ? help says what 'Allow on every visit' does");
+const faceUi = html.match(/<script id="face-ui">([\s\S]*?)<\/script>/)[1];
+ok(/#ledView, #seamGlow \{ display: none; \}/.test(html) && !/makeLeds|paintLed|Stick\.leds/.test(faceUi), "the control page shows no LED dots and draws none (the Mac simulator still does)");
+ok(!/lastBeat|takeBeat|parseBeat/.test(html), "the page keeps no beat-report code any more: only the LEDs used it");
+ok(/Stick\.phaseFeed/.test(faceUi) && /id="bd-num"/.test(html) && /id="bd-slider"/.test(html), "the beat boxes run on the smooth phase, with the display delay row under Advanced");
 ok(!/id="home"|id="h-|id="t-(tempo|set|play|up|down)"|id="n-(beat|ms)/.test(html), "the HOME card is gone");
 for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source", "c-ble", "ble-pair"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the stick's menu has it, the page does not");
 for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "scan", "groups", "ble-close", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
@@ -49,7 +60,7 @@ ok(!/analyser\.connect/.test(playerUi), "the meter's analyser is only listened t
 ok(/id="pl-meter"/.test(html) && /id="pl-status"/.test(html), "the player card shows a level meter and a status line");
 ok(/id="pl-bpm"/.test(html) && /Player\.expectedBpm\(/.test(html), "the player shows the tag BPM times the pitch through Player.expectedBpm");
 ok(/id="pl-monitor" type="checkbox" checked/.test(html), "the monitor check box is on by default");
-ok(/SCREEN|placeScreen\(svg, "2\.42"\)/.test(html), "the face uses the 2.42 in screen");
+ok(/params\.get\("screen"\) === "oled" \? "2\.42" : "lcd2"/.test(html) && !/board === "lcd2"|params\.get\("scale"\)/.test(html), "the face shows the colour lcd2 screen by default for every board; only ?screen=oled gives the 2.42 in OLED; no ?scale= any more");
 ok(!/https?:\/\//.test(html), "the page loads nothing external");
 ok(!/<script[^>]+src=/.test(html) && !/<link/.test(html), "no script or style from elsewhere");
 ok(/<title>jank<\/title>/.test(html), "title");
@@ -263,6 +274,10 @@ async function lineTests() {
   eq(box.portList(new Map([["a", usb], ["b", gone]])).map((p) => p.id), ["1"]);
   eq(box.portList(undefined), []);
   eq(box.jankPorts(box.portList(polyfill)).map((p) => p.name), ["jank", "jank 1A2B"]);   // USB first
+  eq(["jank", "jank 1A2B", "jank (USB)", "jank1A2B", "My jank", "JANK"].map(box.jankPortName), [true, true, true, true, true, true]);
+  eq(["Digitone Audio+MIDI Elektron Digitone II", "FM1-E040", "Jankowski", "jankins", "Bluetooth", "", undefined].map(box.jankPortName), [false, false, false, false, false, false, false]);
+  eq(box.jankPorts([other, { name: "Digitone" }]), []);
+  eq(box.portNames([other, usb]) + "|" + box.portNames([]), "FM1-E040, jank|none");
   eq(box.overBluetooth("jank 1A2B"), true);
   eq(box.overBluetooth("jank"), false);
   eq(box.overBluetooth("FM1-E040"), false);

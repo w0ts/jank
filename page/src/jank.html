@@ -11,7 +11,7 @@
 :root[data-theme="dark"] { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; --beat: #4cc497; --off: #2c2c2a; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
-main { max-width: 940px; margin: 0 auto; }
+main { max-width: 1100px; margin: 0 auto; }
 h1 { font-size: 22px; margin: 0; }
 h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
@@ -44,7 +44,6 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .hide { display: none !important; }
 [hidden] { display: none !important; }
 <!--@include ui/box.css-->
-#face .hint { margin: 10px 0 0; text-align: center; }
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
 .live-row > #player { flex: 0 0 340px; width: 340px; }
@@ -88,11 +87,16 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 #pl-list button.playing { color: var(--accent); }
 .adv-boots { font-size: 20px; font-weight: 650; margin: 0 0 8px; }
 .adv-boots.restarted { color: var(--warn); }
+.check { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
+.check input { width: auto; min-height: 0; }
 #c-advanced-box { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
 #c-advanced-box input { width: auto; min-height: 0; }
 #connect .buttons button { color: var(--ink); background: transparent; border: 1px solid var(--line); }
 #connect .buttons button[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-#face-box svg { width: 100%; max-width: 520px; height: auto; }
+/* units have no RGB LEDs any more: the box drawing's LED group is not shown on this page (the Mac simulator still draws it) */
+#ledView, #seamGlow { display: none; }
+#face .lbl, #face .brand { display: none; }
+#face-box svg { width: 100%; height: auto; }
 </style>
 </head>
 <body>
@@ -117,12 +121,10 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <div id="face-box">
           <!--@include ui/box.svg.html-->
         </div>
-        <p id="face-hint" class="note hint"></p>
-        <p class="note hint">The stick has no screen: this is a virtual screen of its state, and the buttons act on the stick.</p>
       </section>
       <section id="player" class="hide" tabindex="-1">
         <div class="pl-title"><h2>Player</h2><button id="pl-help" class="link" type="button" aria-expanded="false" title="how the player works">?</button></div>
-        <p id="pl-help-text" class="note hide">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first time, choose the stick's output once in the browser's own output chooser (no microphone is used); it is remembered. The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card.</p>
+        <p id="pl-help-text" class="note hide">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first time, choose the stick's output once in the browser's own output chooser (no microphone is used); it is remembered. The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card. After a reload the remembered folder needs one click (Play or Open) to be allowed again; on the https address Chrome 122 and later offers "Allow on every visit" in that prompt, which makes this step silent.</p>
         <audio id="pl-audio" preload="auto"></audio>
         <div class="pl-bar">
           <button id="pl-folder" class="icon" type="button" title="Music folder" aria-label="Music folder"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2H19.5A1.5 1.5 0 0 1 21 8.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" fill="currentColor"/></svg></button>
@@ -132,7 +134,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         </div>
         <label id="pl-dirpick" class="hide quiet-file">Choose music folder <input id="pl-dir" type="file" webkitdirectory multiple></label>
         <button id="pl-reopen" class="quiet small hide" type="button"></button>
-        <div class="pl-name-row"><span id="pl-name" class="note">No track: choose a music folder</span>
+        <div class="pl-name-row"><span id="pl-name" class="note">No track</span>
           <label class="then"><input id="pl-scope" type="checkbox" checked title="next, random and the end of a track use every audio file under the folder you picked"> all folders</label>
           <label class="then">then <select id="pl-then"><option value="next">next</option><option value="random">random</option><option value="stop">stop</option></select></label>
         </div>
@@ -144,8 +146,8 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <div class="pl-row"><strong>Volume</strong><input id="pl-vol" class="thin grow" type="range" min="0" max="100" step="1" value="80" aria-label="Volume"><span id="pl-volval" class="num">80 %</span>
           <label class="monitor"><input id="pl-monitor" type="checkbox" checked> monitor</label></div>
         <p id="pl-status" class="note">no file</p>
-        <p class="note pl-out">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button">change</button>
-          <button id="pl-test" class="link" type="button" title="a 1 kHz tone for 1 s, through the stick's path only">Test stick output</button></p>
+        <p id="pl-out-row" class="note pl-out hide">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button">change</button>
+</p>
         <select id="pl-out" class="hide" aria-label="Stick output"><option value="">None (monitor only)</option></select>
         <button id="pl-pick" class="quiet small hide" type="button"></button>
         <p id="pl-pick-help" class="note hide"></p>
@@ -192,6 +194,27 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <label>Beats a bar <input id="c-quantum" type="number" min="1" max="16" inputmode="numeric"></label>
         <label>Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01" inputmode="decimal"></label>
       </div>
+      <h2 style="margin-top:14px">Beat display</h2>
+      <div class="grid">
+        <label>Beat display delay, ms <input id="bd-num" type="number" min="-400" max="400" step="5" inputmode="numeric"></label>
+        <label>&nbsp;<input id="bd-slider" type="range" min="-400" max="400" step="5" value="0" aria-label="Beat display delay, ms"></label>
+        <div class="stat"><b id="bd-mon">-</b><span>monitor output latency, ms</span></div>
+        <div class="stat"><b id="bd-stick">-</b><span>stick path output latency, ms</span></div>
+        <div class="stat"><b id="bd-beat">-</b><span>stick beat_latency, ms (auto + shift)</span></div>
+        <div class="row"><button id="bd-estimate" class="quiet" type="button">Use the estimate</button></div>
+      </div>
+      <p class="note">Positive delays the beat boxes, negative advances them. It changes only what this page draws, never the stick's settings. The estimate is the
+      monitor's output latency minus the stick path's minus the stick's own beat_latency (so it is 0 once Auto latency has set that), to 5 ms: the page cannot see the stick's USB audio buffering (the stick's beat_latency covers that), so set the
+      rest by ear.</p>
+      <h2 style="margin-top:14px">Auto latency</h2>
+      <div class="buttons">
+        <label class="check"><input id="al-on" type="checkbox" checked> Auto latency</label>
+        <button id="al-resend" class="quiet" type="button">Re-send</button>
+      </div>
+      <p id="al-line" class="note">-</p>
+      <p class="note">While the player plays through the stick and the stick's audio source is USB, the page sends the stick's beat_latency (the auto base,
+      <code>set beat_latency</code>) as the monitor's output latency minus the stick path's, when it is more than 3 ms away from the stick's, at most once in 5 s.
+      The page cannot see the stick's USB buffering or the capture chain's, so finish by ear with Audio shift (the manual layer, above).</p>
     </section>
   </div>
 
@@ -291,7 +314,7 @@ function networkLine(v) {
 
 /* the control line in SysEx, as core/jank_sysex.c: F0 7D 'J' 'K' <7-bit text> F7, 30 characters a frame; text runs across frames */
 const JX_HEAD = [0xf0, 0x7d, 0x4a, 0x4b], JX_PUSH = [0xf0, 0x7d, 0x4a, 0x42], JX_TEXT_MAX = 30;
-const JX_PUSH_BEAT = 0x10, JX_PUSH_HOME = 0x11;
+const JX_PUSH_HOME = 0x11;
 function textToSysex(text) {
   const frames = [];
   for (let at = 0; at < text.length; at += JX_TEXT_MAX) {
@@ -544,20 +567,6 @@ function portList(map) {
   if (map && typeof map.forEach === "function") map.forEach((port) => { if (port && port.state !== "disconnected") out.push(port); });
   return out;
 }
-/* the jank among the ports: "jank" exactly is the USB port; "jank XXXX" a jank over Bluetooth (its BLE name). -> the
-   inputs to choose from, best first, and whether the first is a Bluetooth one */
-function jankPorts(inputs) {
-  const named = inputs.filter((p) => /jank/i.test(p.name || ""));
-  named.sort((a, b) => (b.name === "jank") - (a.name === "jank"));
-  return named;
-}
-function overBluetooth(name) {
-  return /jank/i.test(name || "") && name !== "jank";
-}
-function outputFor(input, outputs) {
-  return outputs.find((o) => o.name === input.name) || outputs.find((o) => /jank/i.test(o.name || "")) || null;
-}
-
 /* the FM-1s and janks heard in a group: a jank shows only by its MAC prefix */
 function peerText(row) {
   return row.janks ? row.units + ", of which " + row.janks + " jank" : String(row.units);
@@ -643,9 +652,10 @@ const $ = (id) => document.getElementById(id);
 const SETTINGS = ["name", "beat", "follower", "skip", "graded", "rate", "lat_trim", "beat_latency", "filter", "peer", "quantum", "offset"];
 const BLE_SVC = "03b80e5a-ede8-4b33-a751-6ce34ec4c700", BLE_CHR = "7772e5db-3868-4112-a1a9-f2669d106bf3";
 const BLE_CAP = 20;                   /* write payload: the default ATT MTU's, which every link takes (Web Bluetooth does not say the MTU) */
+const JANK_WAIT_MS = 15000;
 const HOME_EVERY_USB_MS = 300, STATUS_EVERY_MS = 1500, HOME_STALE_MS = 3000, BLE_WAIT_MS = 5000;
 const S = { line: null, kind: null, ble: false, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastScans: [], timers: [],
-            lastStatus: null, statusAt: 0, lastBeat: null };
+            lastStatus: null, statusAt: 0, waiting: null };
 
 function say(text, bad) {
   $("msg").textContent = text;
@@ -666,11 +676,6 @@ function send(command, waitMs) {
   return S.line.send(command, waitMs || (S.ble ? BLE_WAIT_MS : 2000));
 }
 
-
-function takeBeat(text) {
-  const b = Stick.parseBeat(text);
-  if (b) S.lastBeat = { ...b, at: performance.now() };
-}
 
 function takeHome(text) {
   const h = parseHome(text);
@@ -820,6 +825,7 @@ function setConnected(kind, ble) {
 }
 
 function disconnected(text) {
+  stopWaiting();
   for (const t of S.timers) clearInterval(t);
   S.timers = [];
   if (S.line) S.line.close(text);
@@ -832,12 +838,11 @@ function disconnected(text) {
   if (text) say(text, true);
 }
 
-async function started(line, kind, ble, drop) {
+async function started(line, kind, ble, drop, portName) {
   S.line = line;
   S.drop = drop;
   line.onPush = (p) => {
     if (p.type === JX_PUSH_HOME) takeHome(p.text);
-    else if (p.type === JX_PUSH_BEAT) takeBeat(p.text);
   };
   setConnected(kind, ble);
   try {
@@ -847,7 +852,8 @@ async function started(line, kind, ble, drop) {
     say("");
     await pollHome();
   } catch (e) {
-    disconnected(e.message + (ble ? "" : ". If the app asks for SysEx, turn it on."));
+    const named = portName ? e.message.replace(/^(no answer to \S+)/, "$1 from " + portName) : e.message;
+    disconnected(named + (ble ? "" : ". If the app asks for SysEx, turn it on."));
     return;
   }
   S.timers.push(setInterval(pollHome, S.ble ? 1000 : HOME_EVERY_USB_MS));
@@ -880,7 +886,50 @@ function attachMidi(access, input) {
   access.onstatechange = () => {
     if (!portList(access.inputs).some((p) => p.id === input.id)) disconnected("The jank's MIDI port went away.");
   };
-  started(line, "midi", ble, () => { input.onmidimessage = null; access.onstatechange = null; });
+  started(line, "midi", ble, () => { input.onmidimessage = null; access.onstatechange = null; }, input.name || "the MIDI port");
+}
+
+function stopWaiting() {
+  const w = S.waiting;
+  if (!w) return;
+  S.waiting = null;
+  clearTimeout(w.timer);
+  w.access.onstatechange = null;
+}
+
+window.addEventListener("pagehide", stopWaiting);
+
+/* a jank input with its output next to it, or null: the only port the page ever attaches to */
+function readyJank(access) {
+  const outputs = portList(access.outputs);
+  return jankPorts(portList(access.inputs)).find((input) => outputFor(input, outputs)) || null;
+}
+
+function noJankText(access) {
+  return "No MIDI port named jank. Plug it in (USB), or connect it in the app's Bluetooth MIDI settings. MIDI ports I see: " + portNames(portList(access.inputs));
+}
+
+/* no jank port yet: keep the MIDIAccess and its statechange for JANK_WAIT_MS, connect once when one shows up */
+function waitForJank(access) {
+  stopWaiting();
+  const timer = setTimeout(() => {
+    stopWaiting();
+    say("Stopped waiting for a jank port after " + JANK_WAIT_MS / 1000 + " s. Press MIDI port to try again. MIDI ports I see: " + portNames(portList(access.inputs)), true);
+  }, JANK_WAIT_MS);
+  S.waiting = { access, timer };
+  access.onstatechange = () => {
+    const input = readyJank(access);
+    if (!input) return;
+    stopWaiting();
+    say("jank found: connecting");
+    try { attachMidi(access, input); } catch (e) { disconnected(e.message); }
+  };
+}
+
+function showJankChoice(access, choices) {
+  $("c-ports").replaceChildren(...choices.map((p, i) => new Option(p.name, String(i))));
+  $("c-ports-box").classList.remove("hide");
+  $("c-ports").onchange = () => { disconnected(); attachMidi(access, choices[Number($("c-ports").value)]); };
 }
 
 async function connectMidi() {
@@ -889,20 +938,17 @@ async function connectMidi() {
     return;
   }
   disconnected();
+  $("c-ports-box").classList.add("hide");
   try {
     const access = await midiAccess();
-    const inputs = portList(access.inputs);
-    const jank = jankPorts(inputs);
-    const choices = jank.length ? jank : inputs;
-    if (!choices.length) throw new Error("No MIDI port at all. Is the jank plugged in, or connected in the app's Bluetooth MIDI settings?");
-    if (choices.length > 1 || !jank.length) {
-      $("c-ports").replaceChildren(...choices.map((p, i) => new Option(p.name || "port " + (i + 1), String(i))));
-      $("c-ports-box").classList.remove("hide");
-      $("c-ports").onchange = () => { disconnected(); attachMidi(access, choices[Number($("c-ports").value)]); };
-    } else {
-      $("c-ports-box").classList.add("hide");
+    const jank = jankPorts(portList(access.inputs));
+    if (!jank.length) {
+      say(noJankText(access), true);
+      waitForJank(access);
+      return;
     }
-    attachMidi(access, choices[0]);
+    if (jank.length > 1) showJankChoice(access, jank);
+    attachMidi(access, jank[0]);
   } catch (e) {
     disconnected(e && e.message ? e.message : "No MIDI access (code " + (e && e.code) + ").");
   }
@@ -995,6 +1041,8 @@ setConnected(null, false);
 <!--@include ui/oled.js-->
 <!--@include ui/face.js-->
 <!--@include ui/lcd2.js-->
+<!--@include ui/ports.js-->
+<!--@include ui/autolat.js-->
 <!--@include ui/stick.js-->
 <!--@include ui/player.js-->
 <script id="face-ui">
@@ -1006,7 +1054,13 @@ setConnected(null, false);
   const padButtons = new Map();
 
   // what the stick has said, as the logic script holds it
-  const snapshot = () => ({ home: S.lastHome, homeAt: S.homeAt, get: S.lastGet, status: S.lastStatus, statusAt: S.statusAt, beat: S.lastBeat, overBle: S.ble });
+  // the beat boxes run on the page's own clock between the stick's HOME lines (Stick.phaseFeed), and are shifted by the display delay
+  // (Advanced): it changes only what is drawn here. The stored delay applies from the start; the Advanced row changes it live.
+  let phase = Stick.createPhase(), seenHomeAt = -1;
+  const storedDelay = () => { try { return Stick.parseDelay(localStorage.getItem(Stick.BEAT_DELAY_KEY)); } catch (e) { return null; } };
+  const beatDelay = { ms: storedDelay() === null ? 0 : storedDelay() };
+  document.addEventListener("jank-beat-delay", (e) => { beatDelay.ms = e.detail.ms; });
+  const snapshot = () => ({ home: S.lastHome, homeAt: S.homeAt, get: S.lastGet, status: S.lastStatus, statusAt: S.statusAt, phase, delayMs: beatDelay.ms, overBle: S.ble });
   const refresh = (commands) => commands.reduce((done, command) => done.then(() => send(command)), Promise.resolve());
   const fail = (e) => say(e.message, true);
 
@@ -1040,13 +1094,13 @@ setConnected(null, false);
   };
 
   const paintArms = () => { for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", model.held[b]); };
-  // the screen of the box: the OLED, or the colour LCD of the lcd2 variant (the stick's `get` says board=lcd2; no such key: the OLED);
-  // ?screen=lcd2 shows the variant as a preview, ?scale=2 or ?scale=2.5 picks how its 128 x 64 UI is scaled onto 320 x 240
+  // the screen of the box: the colour landscape LCD (ui/lcd2.js, scaled x2) for every stick, whatever its board; ?screen=oled shows the old
+  // black and white 2.42 in OLED
   const params = new URLSearchParams(location.search);
-  const scaling = params.get("scale") === "2.5" ? "2.5" : "2";
+  const LCD2_SCALING = "2";
   let screen = "";
   function applyScreen() {
-    const wanted = params.get("screen") === "lcd2" || S.lastGet.board === "lcd2" ? "lcd2" : "2.42";
+    const wanted = params.get("screen") === "oled" ? "2.42" : "lcd2";
     if (wanted === screen) return;
     screen = wanted;
     Face.placeScreen(svg, screen);
@@ -1058,14 +1112,14 @@ setConnected(null, false);
     frame = requestAnimationFrame(draw);
     const now = performance.now(), ctx2d = el("oled").getContext("2d");
     applyScreen();
+    if (S.homeAt !== seenHomeAt) {
+      seenHomeAt = S.homeAt;
+      phase = Stick.phaseFeed(phase, Stick.phaseReport(S.lastHome), S.homeAt);
+    }
     Stick.tick(model, now);
     const ink = screen === "lcd2" ? new Uint8Array(OLED.W * OLED.H) : null, fb = Stick.framebuffer(model, now, ink);
-    if (screen === "lcd2") {
-      Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), fb, ink, scaling);
-    } else {
-      Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), fb, 100);
-      Stick.leds(snapshot(), now).forEach((css, i) => Face.paintLed(svg, i, css));
-    }
+    if (screen === "lcd2") Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), fb, ink, LCD2_SCALING);
+    else Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), fb, 100);
     paintArms();
   }
   const pressDown = (b) => { if (model) Stick.down(model, b, performance.now()); };
@@ -1083,6 +1137,8 @@ setConnected(null, false);
     cancelAnimationFrame(frame);
     frame = 0;
     model = null;
+    phase = Stick.createPhase();
+    seenHomeAt = -1;
     padButtons.clear();
   }
   document.addEventListener("jank-connection", (e) => (e.detail.kind ? attach() : detach()));
@@ -1123,8 +1179,10 @@ setConnected(null, false);
   card.addEventListener("pointerleave", () => { hovered = false; });
 
   applyScreen();
-  Face.makeLeds(svg);
-  el("face-hint").textContent = Stick.KEY_HINT;
+  // the keys are only a tooltip and a label: no text around the drawing; its viewBox is cropped to the box with its jacks and ports
+  svg.setAttribute("viewBox", "-8.5 -6 87 80.5");
+  svg.setAttribute("aria-label", Stick.KEY_HINT);
+  card.title = Stick.KEY_HINT;
 })();
 </script>
 <script id="advanced-ui">
@@ -1142,6 +1200,8 @@ setConnected(null, false);
     el("adv-air").textContent = h ? h.air : "-";
     el("adv-batt").textContent = h && h.battery !== null ? h.battery + " %" : "-";
     el("adv-ble").textContent = bleView(S.lastStatus, performance.now() - S.statusAt, S.ble);
+    const g = S.lastGet;
+    el("bd-beat").textContent = g.beat_latency === undefined ? "-" : g.beat_latency + (g.lat_auto === undefined ? "" : " (" + g.lat_auto + " + " + g.lat_trim + ")");
   }
   // `diag`: boots and the reset reason first, so a restart of the stick shows at once
   function paintDiag(v) {
@@ -1181,6 +1241,89 @@ setConnected(null, false);
     el("adv-boots").classList.remove("restarted");
     el("adv-boots").textContent = "boots - · reset: -";
   }
+  // the beat display delay: the stored value, else the estimate from the latencies the page knows (the player publishes them)
+  const bd = { user: null, estimate: 0 };
+  const readDelay = () => { try { return Stick.parseDelay(localStorage.getItem(Stick.BEAT_DELAY_KEY)); } catch (e) { return null; } };
+  const writeDelay = (ms) => {
+    try { if (ms === null) localStorage.removeItem(Stick.BEAT_DELAY_KEY); else localStorage.setItem(Stick.BEAT_DELAY_KEY, String(ms)); } catch (e) { /* not remembered */ }
+  };
+  function applyDelay() {
+    const ms = bd.user === null ? bd.estimate : bd.user;
+    el("bd-num").value = ms;
+    el("bd-slider").value = ms;
+    document.dispatchEvent(new CustomEvent("jank-beat-delay", { detail: { ms } }));
+  }
+  const setDelay = (raw) => {
+    const ms = Stick.parseDelay(raw);
+    if (ms === null) return;
+    bd.user = ms;
+    writeDelay(ms);
+    applyDelay();
+  };
+  // ---- Auto latency: the stick's beat_latency (its auto base) from the two paths the browser knows; the decision logic is ui/autolat.js's ----
+  const AL = { st: autoLatNew(), on: true, force: false, sent: null, error: "", getAt: -Infinity, advanced: false, last: { monitorMs: null, stickMs: null, playing: false } };
+  const readAutoOn = () => { try { return localStorage.getItem("jank.autolat") !== "0"; } catch (e) { return true; } };
+  const writeAutoOn = (on) => { try { localStorage.setItem("jank.autolat", on ? "1" : "0"); } catch (e) { /* not remembered */ } };
+  const statusFresh = () => (S.lastStatus && performance.now() - S.statusAt < 5000 && S.statusAt > AL.getAt ? S.lastStatus : null);
+  const autoSource = () => { const st = S.lastStatus && performance.now() - S.statusAt < 5000 ? S.lastStatus : null; return st && st.audio_source ? st.audio_source : null; };
+  const currentAuto = () => { const v = statusFresh() && statusFresh().lat_auto !== undefined ? statusFresh() : S.lastGet; return v.lat_auto !== undefined && Number.isFinite(Number(v.lat_auto)) ? Number(v.lat_auto) : null; };
+  const beatLatencyNow = () => { const v = statusFresh() && statusFresh().beat_latency !== undefined ? statusFresh() : S.lastGet; return v.beat_latency !== undefined ? Number(v.beat_latency) : null; };
+  const paintAuto = () => {
+    el("al-line").textContent = "auto latency: " + autoLatPageLabel({ on: AL.on, error: AL.error, playing: AL.last.playing, monitorMs: AL.last.monitorMs, stickMs: AL.last.stickMs, source: autoSource(), current: currentAuto(), sent: AL.sent });
+  };
+  async function sendAuto(ms) {
+    try {
+      await send("set beat_latency " + ms);
+      AL.sent = ms;
+      AL.error = "";
+      AL.getAt = performance.now();
+      showSettings(await send("get"));
+    } catch (e) {
+      AL.error = e.message;
+      say(e.message, true);
+    }
+    paintAuto();
+  }
+  function autoLatencyTick(l) {
+    AL.last = l;
+    const sug = autoLatPageSuggestion(l.monitorMs, l.stickMs), current = currentAuto();
+    const ready = AL.advanced && AL.on && S.kind === "midi" && l.playing && autoSource() === "usb" && sug !== null;
+    const within = current !== null && sug !== null && Math.abs(sug - current) <= AUTOLAT_PAGE.minChangeMs && !AL.force;
+    if (!ready || within) { paintAuto(); return; }
+    if (AL.force) { AL.st = autoLatStep(AL.st, { type: "reconnect" }).st; AL.force = false; }
+    const r = autoLatStep(AL.st, { type: "tick", sug, usb: true, now: performance.now() }, AUTOLAT_PAGE);
+    AL.st = r.st;
+    if (r.send === null) { paintAuto(); return; }
+    sendAuto(r.send);
+  }
+  AL.on = readAutoOn();
+  el("al-on").checked = AL.on;
+  el("al-on").addEventListener("change", () => {
+    AL.on = el("al-on").checked;
+    writeAutoOn(AL.on);
+    AL.st = autoLatNew();
+    AL.sent = null;
+    AL.error = "";
+    paintAuto();
+  });
+  el("al-resend").addEventListener("click", () => { AL.force = true; AL.error = ""; AL.sent = null; autoLatencyTick(AL.last); });
+  document.addEventListener("jank-advanced", (e) => {
+    AL.advanced = e.detail.visible;
+    if (!e.detail.visible) Object.assign(AL, { st: autoLatNew(), sent: null, error: "", force: false });
+    paintAuto();
+  });
+  document.addEventListener("jank-latency", (e) => {
+    const l = e.detail;
+    bd.estimate = Stick.beatDelayEstimate({ ...l, beatLatencyMs: beatLatencyNow() });
+    el("bd-mon").textContent = l.monitorMs === null ? "-" : l.monitorMs;
+    el("bd-stick").textContent = l.stickMs === null ? "-" : l.stickMs;
+    if (bd.user === null) applyDelay();
+    autoLatencyTick(l);
+  });
+  el("bd-num").addEventListener("change", () => setDelay(el("bd-num").value));
+  el("bd-slider").addEventListener("input", () => setDelay(el("bd-slider").value));
+  el("bd-estimate").addEventListener("click", () => { bd.user = null; writeDelay(null); applyDelay(); });
+  document.addEventListener("jank-advanced", (e) => { if (e.detail.visible) { bd.user = readDelay(); applyDelay(); } });
   document.addEventListener("jank-advanced", (e) => (e.detail.visible ? start() : stop()));
 })();
 </script>
@@ -1204,9 +1347,10 @@ setConnected(null, false);
   const jank = { id: "", label: "", error: "" };
   let tagBpm;                                   // undefined: not read yet, null: the file has no BPM tag
   const queue = { entries: [], index: -1, current: "" };
-  const scope = { on: true, files: [], count: 0, scanning: false, capped: false, token: null };
+  const scope = { on: true, files: [], count: 0, scanning: false, capped: false, done: false, token: null };
   const state = { devices: [], permission: "unknown" };
-  const stick = { test: null };
+  const pending = { handle: null, busy: false };      // a remembered folder that needs its permission: Play's click is the gesture
+  let probe = null;                                      // a default-sink context, only to read the monitor's output latency (captureStream path)
   const browser = { rootName: "", names: [], handles: [], tree: null, entries: [], shown: Player.MAX_ROWS };
 
   const note = (text, bad) => { el("pl-note").textContent = text; el("pl-note").style.color = bad ? "var(--warn)" : ""; };
@@ -1276,6 +1420,7 @@ setConnected(null, false);
   }
   function paintTime() {
     paintStatus();
+    if (!audio.paused) publishLatency();
     el("pl-pos").textContent = Player.formatTime(audio.currentTime);
     el("pl-len").textContent = Player.formatTime(audio.duration);
     if (!seeking && Number.isFinite(audio.duration) && audio.duration > 0) el("pl-seek").value = Math.round(1000 * audio.currentTime / audio.duration);
@@ -1288,7 +1433,7 @@ setConnected(null, false);
     el("pl-status").style.color = error ? "var(--warn)" : "";
   }
   const setError = (text) => { error = text; paintStatus(); };
-  const paintPlay = () => { el("pl-play").textContent = audio.paused ? "Play" : "Pause"; paintStatus(); };
+  const paintPlay = () => { el("pl-play").textContent = audio.paused ? "Play" : "Pause"; paintStatus(); paintPlayEnabled(); };
   const thenMode = () => Player.parseAfterMode(el("pl-then").value);
   const paintSteps = () => { el("pl-next").disabled = Player.skipTrack(thenMode(), queue.entries.length, queue.index, () => 0) < 0; };
 
@@ -1327,8 +1472,16 @@ setConnected(null, false);
     if (typeof ctx.setSinkId !== "function") throw new Error("this browser cannot choose the stick's output (AudioContext.setSinkId)");
     await ctx.setSinkId(sinkId);
   }
+  const latencyMs = (ctx) => (ctx ? Math.round(((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000) : null);
+  // what the browser knows of the two paths, for the Advanced row (the beat display delay): the monitor (default output) and the stick path
+  function publishLatency() {
+    const monitor = plan.path === "webaudio" ? tap.context : probe;
+    const stickCtx = plan.path === "webaudio" ? web.stickCtx : (tap.routed ? tap.context : null);
+    document.dispatchEvent(new CustomEvent("jank-latency", { detail: { monitorMs: latencyMs(monitor), stickMs: latencyMs(stickCtx), playing: !audio.paused } }));
+  }
   function wakeContext() {
     if (plan.path === "none") return;
+    if (plan.path === "captureStream" && !probe && tap.context) probe = new AudioContext({ latencyHint: "interactive" });
     if (!tap.context) {
       tap.context = makeContext(jank.id);
       tap.mono = tap.context.createGain();                      // the stick is 1 channel: a stereo file is mixed down here, whatever the device
@@ -1337,7 +1490,9 @@ setConnected(null, false);
       tap.mono.channelInterpretation = "speakers";
       tap.mono.connect(tap.context.destination);
       if (plan.path === "webaudio") buildWebAudio();
+      if (plan.path === "captureStream") probe = new AudioContext({ latencyHint: "interactive" });
     }
+    if (probe) probe.resume().catch((err) => note("Cannot read the monitor's latency: " + errorText(err), true));
     tap.context.resume().catch((err) => note("Cannot start the audio path to the stick: " + errorText(err), true));
   }
   function buildWebAudio() {
@@ -1404,6 +1559,7 @@ setConnected(null, false);
     paintStatus();
     paintOutputUi();
     paintDetails();
+    publishLatency();
   }
   function startTap() {
     if (tap.missing || tap.url === url || plan.path === "none" || !tap.context) return;
@@ -1457,7 +1613,7 @@ setConnected(null, false);
   // leaving Advanced (or the USB connection) takes the player away: playback stops and the file is released
   function releasePlayer() {
     cancelScan();
-    Object.assign(scope, { files: [], count: 0, capped: false });
+    Object.assign(scope, { files: [], count: 0, capped: false, done: false });
     paintScope();
     if (url === null) return;
     audio.pause();
@@ -1470,18 +1626,49 @@ setConnected(null, false);
     error = "";
     tagBpm = undefined;
     paintBpm();
-    el("pl-name").textContent = "No track: choose a music folder";
+    el("pl-name").textContent = "No track";
     tap.url = null;
     queue.current = "";
     if (tap.context) tap.context.suspend().catch((err) => note("Cannot suspend the audio path: " + errorText(err), true));
-    el("pl-play").disabled = true;
+    if (probe) probe.suspend().catch((err) => note("Cannot suspend the latency probe: " + errorText(err), true));
     el("pl-seek").disabled = true;
     paintSteps();
     paintTime();
     paintPlay();
   }
+  // the files Play can start from with nothing loaded: the whole scope when "all folders" is on (the files found so far while the scan
+  // runs), else the folder shown; always the picked source's, never before it exists
+  const folderFiles = () => browser.entries.filter((e) => e.kind === "file").map((e) => ({ ...e, path: [...browser.names, e.name] }));
+  const startList = () => (browser.rootName === "" ? [] : scope.on ? scope.files : folderFiles());
+  const paintPlayEnabled = () => { el("pl-play").disabled = url === null && startList().length === 0 && pending.handle === null; };
+  const scanWaiters = [];
+  const notifyScan = () => scanWaiters.splice(0).forEach((resume) => resume());
+  const firstFiles = () => (startList().length > 0 || !scope.scanning ? Promise.resolve() : new Promise((resolve) => scanWaiters.push(resolve)));
+  // Play with a remembered folder that is not allowed yet (after a reload): its click asks for the permission, opens the folder, and as
+  // soon as the scan has found the first files starts a track by the 'then' mode over the whole scope
+  async function startFromSaved() {
+    if (pending.busy) return;
+    pending.busy = true;
+    try {
+      if (!(await grantAndOpen(pending.handle))) return;
+      await firstFiles();
+      const list = startList(), first = Player.firstTrack(thenMode(), list.length);
+      if (first < 0) return;
+      queue.entries = list;
+      await playQueued(first);
+    } finally {
+      pending.busy = false;
+    }
+  }
   async function togglePlay() {
-    if (url === null) return;
+    if (url === null) {
+      if (pending.handle) { await startFromSaved(); return; }
+      const list = startList(), first = Player.firstTrack(thenMode(), list.length);
+      if (first < 0) return;
+      queue.entries = list;
+      await playQueued(first);
+      return;
+    }
     if (!audio.paused) { audio.pause(); return; }
     await play();
   }
@@ -1510,9 +1697,12 @@ setConnected(null, false);
     el("pl-pick").classList.toggle("hide", kind === "none");
     el("pl-pick").textContent = Player.OUTPUT_BUTTON_TEXT[kind];
     el("pl-pick").dataset.kind = kind;
+    // the line (the label and 'change') is shown only when something needs the user: nothing chosen yet, a saved id that failed, a routing error
+    const resolved = jank.id !== "" && jank.error === "";
+    el("pl-out-row").classList.toggle("hide", resolved);
+    if (resolved) el("pl-out").classList.add("hide");
     el("pl-pick-help").classList.toggle("hide", kind === "none");
     el("pl-pick-help").textContent = Player.OUTPUT_HELP[kind];
-    el("pl-test").disabled = jank.id === "";
   }
   function paintDetails() {
     const ctx = plan.path === "webaudio" ? web.stickCtx : tap.context;
@@ -1587,29 +1777,6 @@ setConnected(null, false);
     if (saved) await useOutput(saved);
     else paintOutputUi();
   }
-  // a tone through the stick's path only: its own context with the chosen sink, 1 kHz for 1 s, and what happened
-  async function testStick() {
-    if (jank.id === "") { note("No stick output chosen: nothing to test.", true); return; }
-    let ctx = null;
-    try {
-      ctx = makeContext(jank.id);
-      await aimContext(ctx, jank.id);
-      await ctx.resume();
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.frequency.value = 1000;
-      gain.gain.value = 0.2;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.onended = () => ctx.close();
-      osc.start();
-      osc.stop(ctx.currentTime + 1);
-      note("tone sent to " + jank.label);
-    } catch (err) {
-      note("Test tone failed: " + errorText(err), true);
-      if (ctx) ctx.close();
-    }
-  }
-
   // ---- the music folder ----
   const idbOpen = () => new Promise((resolve, reject) => {
     const req = indexedDB.open(DB.name, 1);
@@ -1638,6 +1805,7 @@ setConnected(null, false);
     try { browser.entries = Player.sortEntries(await listEntries()); } catch (err) { note("Cannot read that folder: " + errorText(err), true); return; }
     browser.shown = Player.MAX_ROWS;
     paintList();
+    paintPlayEnabled();
   }
   const rowButton = (text, className, onClick) => {
     const b = document.createElement("button");
@@ -1698,11 +1866,13 @@ setConnected(null, false);
   const paintScope = () => {
     const visible = scope.on && browser.rootName !== "";
     el("pl-scope-row").classList.toggle("hide", !visible);
-    el("pl-scope-line").textContent = visible ? Player.scopeLine(scope) : "";
+    el("pl-scope-line").textContent = visible ? Player.scopeLine({ ...scope, root: browser.rootName }) : "";
+    paintPlayEnabled();
   };
   function cancelScan() {
     if (scope.token) scope.token.cancelled = true;
     Object.assign(scope, { token: null, scanning: false });
+    notifyScan();
   }
   async function listHandle(dir) {
     const out = [];
@@ -1711,7 +1881,7 @@ setConnected(null, false);
   }
   async function scanScope() {
     cancelScan();
-    Object.assign(scope, { files: [], count: 0, capped: false });
+    Object.assign(scope, { files: [], count: 0, capped: false, done: false });
     if (!scope.on || browser.rootName === "") { paintScope(); return; }
     const token = { cancelled: false }, channel = new MessageChannel();
     scope.token = token;
@@ -1723,7 +1893,7 @@ setConnected(null, false);
     try {
       result = await Player.scanTree({
         root, list: tree ? async (dir, path) => Player.listTree(tree, path) : (dir) => listHandle(dir.handle), shouldStop: () => token.cancelled, yieldFn,
-        onProgress: (n) => { if (!token.cancelled) { scope.count = n; paintScope(); } }, cap: Player.SCOPE_CAP,
+        onProgress: (n, found) => { if (!token.cancelled) { scope.files = found; scope.count = n; paintScope(); notifyScan(); } }, cap: Player.SCOPE_CAP,
       });
     } catch (err) {
       if (!token.cancelled) note("Cannot scan the folders: " + errorText(err), true);
@@ -1732,9 +1902,10 @@ setConnected(null, false);
       channel.port2.close();
     }
     if (token.cancelled) return;
-    Object.assign(scope, { files: result ? result.files : [], count: result ? result.files.length : 0, capped: !!(result && result.capped), scanning: false, token: null });
+    Object.assign(scope, { files: result ? result.files : [], count: result ? result.files.length : 0, capped: !!(result && result.capped), scanning: false, done: result !== null, token: null });
     reanchor();
     paintScope();
+    notifyScan();
   }
   async function openHandle(handle, mayAsk) {
     const options = { mode: "read" };
@@ -1754,6 +1925,7 @@ setConnected(null, false);
       return;
     }
     try { await rememberHandle(handle); } catch (err) { note("The folder is open but cannot be remembered: " + errorText(err), true); }
+    pending.handle = null;
     await openHandle(handle, true);
   }
   async function restoreFolder() {
@@ -1763,13 +1935,37 @@ setConnected(null, false);
     try {
       if (await openHandle(handle, false)) return;
     } catch (err) { note("The remembered folder is not available: " + errorText(err), true); return; }
+    pending.handle = handle;
     el("pl-reopen").textContent = "Open " + handle.name;
     el("pl-reopen").classList.remove("hide");
-    el("pl-reopen").onclick = () => openHandle(handle, true).catch((err) => note("Cannot open the folder: " + errorText(err), true));
+    el("pl-reopen").onclick = () => grantAndOpen(handle);
+    paintPlayEnabled();
+  }
+  // a click (Play or 'Open <name>') is the gesture: the permission is asked here and never before; it is not given, or the folder is gone:
+  // one line says so, Play is disabled again and the 'Open <name>' / folder button stays
+  async function grantAndOpen(handle) {
+    const options = { mode: "read" };
+    const refused = (text) => { pending.handle = null; note(text, true); paintPlayEnabled(); return false; };
+    try {
+      let state = await handle.queryPermission(options);
+      if (state !== "granted") state = await handle.requestPermission(options);
+      if (state !== "granted") return refused('Permission to read "' + handle.name + '" was not given: press the folder button to choose it again, or Open ' + handle.name + ' to be asked again.');
+      await openHandle(handle, false);
+    } catch (err) {
+      return refused('The folder "' + handle.name + '" cannot be opened (' + errorText(err) + '): press the folder button to choose it again.');
+    }
+    pending.handle = null;
+    paintPlayEnabled();
+    return true;
   }
   function chooseTree(fileList) {
-    const items = [...fileList].filter((f) => Player.isAudioFile(f.name)).map((f) => ({ path: f.webkitRelativePath || "Files/" + f.name, file: f }));
-    Object.assign(browser, { rootName: Player.buildTree(items).name, names: [], handles: [], tree: Player.buildTree(items) });
+    const all = [...fileList];
+    if (all.length === 0) return;
+    const rootOf = (f) => (f.webkitRelativePath || "Files/" + f.name).split("/")[0];
+    const items = all.filter((f) => Player.isAudioFile(f.name)).map((f) => ({ path: f.webkitRelativePath || "Files/" + f.name, file: f }));
+    const tree = Player.buildTree(items);
+    tree.name = tree.name || rootOf(all[0]);                 // a folder with no audio file still has its name
+    Object.assign(browser, { rootName: tree.name, names: [], handles: [], tree });
     scanScope();
     showFolder();
   }
@@ -1786,7 +1982,7 @@ setConnected(null, false);
   el("pl-scope").addEventListener("change", () => {
     scope.on = el("pl-scope").checked;
     store.set(KEY.scope, scope.on ? "1" : "0");
-    if (scope.on) scanScope(); else { cancelScan(); reanchor(); paintScope(); }
+    if (scope.on) scanScope(); else { cancelScan(); reanchor(); paintScope(); paintPlayEnabled(); }
   });
   el("pl-rescan").addEventListener("click", scanScope);
   el("pl-help").addEventListener("click", () => {
@@ -1815,7 +2011,6 @@ setConnected(null, false);
   document.addEventListener("jank-advanced", (e) => { if (!e.detail.visible) releasePlayer(); else if (scope.on && browser.rootName !== "") scanScope(); });
   if (navigator.mediaDevices) navigator.mediaDevices.addEventListener("devicechange", readDevices);
   el("pl-pick").addEventListener("click", pickOutput);
-  el("pl-test").addEventListener("click", testStick);
 
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });

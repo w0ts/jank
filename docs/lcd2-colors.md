@@ -2,11 +2,13 @@
 
 The variant uses a 2.0 inch 240 x 320 ST7789 colour LCD **in landscape** (320 x 240), no touch, no RGB LEDs. The UI is the same simple
 128 x 64 1-bit UI (`ui/oled.js`), drawn at integer **x2 = 256 x 128, centred at (32, 56)**; the 56 px bands above and below stay black
-(the owner chose scaling (a); `ui/lcd2.js` still has the x2.5 geometry for `?scale=2.5`, unused by default).
+(the owner chose scaling (a); `ui/lcd2.js` still has the x2.5 geometry, no longer reachable from the page: the `?scale=` parameter is gone).
+
+**Default screen of the control page:** the colour landscape lcd2 layout (x2, the lcd2 lid window) for every stick, whatever its `board=` (the XIAO included): the owner decided it after flashing the XIAO and seeing the black and white screen. `?screen=oled` gives the old black and white 2.42 in OLED look. The Mac simulator is unchanged.
 
 The first preview (whole-screen accent colour, state words in the bands) was rejected: "not color just for the sake of color". This one
 is **neutral** (near-white on near-black, menus and edit screens included, the selected row the white inverted bar). A colour appears
-only on an element that says something the white version cannot. Screens: `lcd2v2-home.png` (the control page, `?screen=lcd2`) and
+only on an element that says something the white version cannot. Screens: `lcd2v2-home.png` (the control page, now the default view) and
 `lcd2v2-states.png` (12 situations).
 
 ## v3 (owner, 2026-11-17: "we dont need the sliders/progress bars for confidence etc. or at least not as big. color will help")

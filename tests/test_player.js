@@ -200,5 +200,37 @@ eq([P.afterTrack('next', listLen, listLen - 1), P.skipTrack('next', listLen, lis
 const picks = new Set();
 for (let i = 0; i < 100; i++) picks.add(P.randomTrack(listLen, 2, () => i / 100));
 eq([picks.has(2), picks.size], [false, listLen - 1], 'random over the whole scope: never the one just played, any other can come');
+
+  // ---- Play with nothing loaded: the first track ----
+  eq([P.firstTrack('random', 10, () => 0), P.firstTrack('random', 10, () => 0.9999999), P.firstTrack('random', 10, () => 1), P.firstTrack('random', 10, () => 0.5)], [0, 9, 9, 5], 'random: the rng picks any file of the list, edge values 0 and just under 1 (and an out of range 1 is clamped)');
+  eq([P.firstTrack('next', 10), P.firstTrack('stop', 10), P.firstTrack('next', 1), P.firstTrack('random', 1, () => 0.7)], [0, 0, 0, 0], 'next and stop: the first file; a single file: that file');
+  eq([P.firstTrack('random', 0, () => 0.5), P.firstTrack('next', 0), P.firstTrack('stop', 0)], [-1, -1, -1], 'an empty list: nothing starts');
+  eq(P.scopeLine({ scanning: false, count: 0, done: true, root: 'Music' }), 'no audio files under Music', 'an empty scope after the scan says so');
+  eq(P.scopeLine({ scanning: false, count: 0, done: false, root: 'Music' }), '0 files in scope', 'a scope never scanned (or cancelled) does not claim it is empty');
+  const seenFiles = [];
+  await P.scanTree({ root: {}, list: async (dir, path) => tree[path.join('/')] || [], shouldStop: () => false, yieldFn: async () => {}, onProgress: (n, files) => seenFiles.push([n, files.length]), cap: 100 });
+  eq(seenFiles, [[1, 1], [2, 2], [5, 5]], 'the progress callback also hands over the files found so far');
+
+  // ---- random and next over a tree of three folders: any folder, not the playing one's ----
+  const three = {
+    '': [{ name: 'A', kind: 'directory' }, { name: 'B', kind: 'directory' }, { name: 'C', kind: 'directory' }],
+    A: [{ name: 'a1.mp3', kind: 'file' }, { name: 'a2.mp3', kind: 'file' }], B: [{ name: 'b1.mp3', kind: 'file' }, { name: 'b2.mp3', kind: 'file' }], C: [{ name: 'c1.mp3', kind: 'file' }],
+  };
+  const scopeScan = await P.scanTree({ root: {}, list: async (dir, path) => three[path.join('/')] || [], shouldStop: () => false, yieldFn: async () => {}, onProgress: () => {} });
+  const folderOf = i => scopeScan.files[i].path[0], count3 = scopeScan.files.length;
+  eq(scopeScan.files.map(f => f.path.join('/')), ['A/a1.mp3', 'A/a2.mp3', 'B/b1.mp3', 'B/b2.mp3', 'C/c1.mp3'], 'the scope lists the files of all three folders in one list');
+  const folders = new Set(), neverSame = [];
+  for (let from = 0; from < count3; from++) for (let k = 0; k < 40; k++) {
+    const to = P.randomTrack(count3, from, () => k / 40);
+    folders.add(folderOf(to));
+    neverSame.push(to !== from);
+  }
+  eq([...folders].sort(), ['A', 'B', 'C'], 'random over the scope reaches all three folders');
+  ok2(neverSame.every(Boolean), 'and never the track that is playing');
+  eq(folderOf(P.randomTrack(count3, 0, () => 0.9999999)) !== 'A', true, 'from a file in A, random can land in another folder (C here)');
+  eq(folderOf(P.afterTrack('next', count3, 1)), 'B', 'a track ending in A\'s last file: next goes on into B');
+  eq(folderOf(P.afterTrack('random', count3, 4, () => 0)), 'A', 'from the last file, random can go back to A');
+  eq(folderOf(P.skipTrack('next', count3, 4)), 'A', 'the Next button wraps from the last folder to the first');
+
   console.log('player: ' + checks + ' checks passed');
 })().catch(e => { console.error(e); process.exit(1); });
