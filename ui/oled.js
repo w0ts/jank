@@ -193,6 +193,9 @@ const OLED = (() => {
     ltmode: { title: 'LINK TRANSPORT', opts: LT_MODES, get: c => c.ltMode,      // LINK mode only: the session's start / stop
               help: [['CLOCKS RUN ON LINK', 'TEMPO, OWN START'], ['CLOCKS START + STOP', 'WITH THE SESSION'],
                      ['FOLLOWS, AND START/', 'STOP DRIVES LINK']] },
+    // the lcd2 layout only (ctx.layout 'lcd2', menuFor): the whole screen flashes on the beat, the bar's first beat in another colour (ui/lcd2.js)
+    beatflash: { title: 'BEAT FLASH', opts: ['BOXES', 'SCREEN'], get: c => (c.beatFlash ? 1 : 0),
+                 help: [['ONLY THE BOXES', 'SHOW THE BEAT'], ['WHOLE SCREEN FLASHES', 'FIRST BEAT: AMBER']] },
     bright: { title: 'BRIGHTNESS', lo: 10, hi: 100, step: 10, unit: '%', get: c => c.bright, help: ['SCREEN BRIGHTNESS', 'LOWER SAVES BATTERY'] },
     sleep: { title: 'SCREEN OFF', opts: SLEEP_NAMES, get: c => c.sleep,
              help: [['SCREEN STAYS ON', ''], ['DARK AFTER 30 S', 'ANY BUTTON WAKES IT'], ['DARK AFTER 1 MIN', 'ANY BUTTON WAKES IT'],
@@ -227,6 +230,9 @@ const OLED = (() => {
     { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'BLUETOOTH', edit: 'ble' }, { name: 'USB MIDI CLOCK', edit: 'usbmidi' }, { name: 'OFFSET', sub: 'offsets' },
     { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
   ];
+  // the lcd2 layout's menu: BEAT FLASH (the whole screen flashes on the beat) after DISPLAY. The OLED menus never list it, so they stay as they were.
+  const MENU_LCD2 = [...MENU.slice(0, -1), { name: 'BEAT FLASH', edit: 'beatflash' }, MENU[MENU.length - 1]];
+  const menuFor = c => (c.layout === 'lcd2' ? MENU_LCD2 : MENU);
   // sub-menus: a title and the EDITS they list
   const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
                  display: { title: 'DISPLAY', rows: ['bright', 'sleep'] } };
@@ -313,11 +319,11 @@ const OLED = (() => {
       else { ui.screen = 'menu'; ui.overlay = null; }
     } else if (ui.screen === 'menu') {
       if (d) {
-        ui.cursor = clamp(ui.cursor - d, 0, MENU.length - 1);
+        ui.cursor = clamp(ui.cursor - d, 0, menuFor(c).length - 1);
         ui.top = clamp(ui.top, ui.cursor - VISIBLE + 1, ui.cursor);
       } else if (btn === 'no') ui.screen = 'home';
       else {
-        const it = MENU[ui.cursor];
+        const it = menuFor(c)[ui.cursor];
         if (it.net) { ui.screen = 'net'; ui.ncur = 0; }
         else if (it.edit) startEdit(ui, it.edit, c);
         else if (it.sub) { ui.screen = 'sub'; ui.sub = it.sub; ui.ocur = 0; }
@@ -795,11 +801,12 @@ const OLED = (() => {
     if (right) textR(fb, right, W - 4, y, 1, v);
   }
   const menuValues = c => ({ 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': AUTOBAR_SHORT[autoBarIndex(c.autoBar)], NETWORK: NET_SHORT[c.net.mode],
-    USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' });
+    USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-',
+    'BEAT FLASH': c.beatFlash ? 'SCREEN' : 'BOXES' });
   function drawMenuLcd2(fb, ui, c) {
-    titleBarLcd2(fb, 'MENU', (ui.cursor + 1) + '/' + MENU.length);
-    const vals = menuValues(c), top = clamp(ui.cursor - L2_ROWS + 1, 0, Math.max(0, MENU.length - L2_ROWS));
-    for (let k = 0; k < L2_ROWS && top + k < MENU.length; k++) listRowLcd2(fb, L2_ROW0 + k * L2_PITCH, 9, top + k === ui.cursor, MENU[top + k].name, vals[MENU[top + k].name] || '');
+    titleBarLcd2(fb, 'MENU', (ui.cursor + 1) + '/' + MENU_LCD2.length);
+    const vals = menuValues(c), top = clamp(ui.cursor - L2_ROWS + 1, 0, Math.max(0, MENU_LCD2.length - L2_ROWS));
+    for (let k = 0; k < L2_ROWS && top + k < MENU_LCD2.length; k++) listRowLcd2(fb, L2_ROW0 + k * L2_PITCH, 9, top + k === ui.cursor, MENU_LCD2[top + k].name, vals[MENU_LCD2[top + k].name] || '');
   }
   function drawSubLcd2(fb, ui, c) {
     const sub = SUBS[ui.sub];

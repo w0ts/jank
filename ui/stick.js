@@ -75,6 +75,10 @@ const Stick = (() => {
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
+      // for the colour screen's beat flash (ui/lcd2.js): the setting (`get` beat_flash, 0 / absent = BOXES, 1 = SCREEN), and the session's beat
+      // position (beats, fractional, display delay included), tempo and bar length; null / 0 when there is no beat to flash on
+      beatFlash: g.beat_flash === '1' ? 1 : 0, beatPos: h && pos !== null && playing ? pos : null, beatBpm: h && h.bpm > 0 ? h.bpm : null, quantum: h && h.quantum > 0 ? h.quantum : 4,
+      ...(state.layout ? { layout: state.layout } : {}),
       peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0,
       lineIn: g.source === 'line' || (!!st && st.audio_source === 'line'), bright: 100, sleep: 0, inOff: num(g.lat_trim) || 0, offs: [0, 0, 0], rate: 2,
       boot: false, splash: false, wifi: wifiBars, wifiQ: null, groupPeers: h ? h.air : 0, setup: false, saved: false,
@@ -105,6 +109,7 @@ const Stick = (() => {
   // an OLED edit (field, value as the OLED holds it) -> { commands: [...] } or { refuse: 'why' }
   function fieldCommands(field, val) {
     if (NO_STICK_SETTING[field]) return refuse(NO_STICK_SETTING[field]);
+    if (field === 'beatflash') return cmds('set beat_flash ' + (val ? 1 : 0));
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));
     if (field === 'group') return cmds('set group ' + (val + 1));
     if (field === 'gain') return cmds('set line_gain ' + clamp(Math.round(val), -12, 12));

@@ -32,8 +32,8 @@ function drawn(c, { ink = true, layout = true, ui = null } = {}) {
   return { fb, ink: plane, w: size.w, h: size.h };
 }
 const sha = fbs => crypto.createHash('sha256').update(Buffer.concat(fbs.map(f => Buffer.from(f)))).digest('hex').slice(0, 16);
-const withUi = (c, keys) => {                                      // a menu state: the ui after these button presses
-  const cc = { ...c, tempoStep: () => null, setField() {}, setHold() {}, linkStartStop() {} }, m = Stick.create(() => cc, () => {});
+const withUi = (c, keys, layout) => {                                // a menu state: the ui after these button presses (layout: the ctx the buttons see)
+  const cc = { ...c, ...(layout ? { layout } : {}), tempoStep: () => null, setField() {}, setHold() {}, linkStartStop() {} }, m = Stick.create(() => cc, () => {});
   let t = 0;
   for (const k of keys) { Stick.down(m, k, t); t += 30; Stick.up(m, k, t); t += 30; }
   return { c: cc, ui: m.ui };
@@ -64,7 +64,8 @@ eq([OLED.W, OLED.H, OLED.size(), OLED.size('oled'), OLED.size('lcd2')], [128, 64
 }
 
 // ---- the palette: small, complete, readable ----
-eq(Object.keys(P).sort(), ['bad', 'bg', 'dim', 'good', 'neutral', 'warn'], 'the palette: background, neutral, good, warn, bad, dim');
+eq(Object.keys(P).sort(), ['bad', 'bg', 'dim', 'good', 'neutral', 'warn'], 'the palette: background, neutral, good, warn, bad, dim (the firmware\'s table is tested against exactly this)');
+eq(Object.keys(Lcd2.FLASH_FIELD), ['beat', 'bar'], 'the flash fields are a table of their own: beat and bar');
 for (const [name, rgb] of Object.entries(P)) ok(rgb.length === 3 && rgb.every(v => Number.isInteger(v) && v >= 0 && v <= 255), name + ': exact 8-bit RGB');
 ok(Math.max(...P.bg) <= 20, 'the background is near black');
 ok(Math.min(...P.neutral) >= 220, 'the neutral is near white');
@@ -308,24 +309,24 @@ eq(idsIn(drawn(ctxOf({ home: { battery: null } })), ...R.batt), [], 'no battery 
 const noInk = (d, what) => ok(d.fb.some(v => v === 1) && d.ink.every(v => v === 0), what + ': drawn, and no ink at all');
 const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ length: 25 }, (_, x) => ((x * y + x + y) % 3 === 0 ? 1 : 0))) };
 {
-  const menu = withUi(ctxOf(), ['no']);
+  const menu = withUi(ctxOf(), ['no'], 'lcd2');
   let d = drawn(menu.c, { ui: menu.ui });
   noInk(d, 'MENU');
   eq([d.fb[0], d.fb[LW - 1], d.fb[10 * LW], d.fb[11 * LW]], [1, 1, 1, 0], 'the title bar is 11 rows, the full width');
   const rowBand = k => litIn(d, 0, 13 + 9 * k, d.w, 7).length;
-  eq([rowBand(0), rowBand(1), rowBand(10)].map(n => n > 0), [true, true, true], 'the 11 menu items are rows of 9 px from y 13 (the last at y ' + (13 + 90) + ')');
+  eq([rowBand(0), rowBand(1), rowBand(11)].map(n => n > 0), [true, true, true], 'the 12 menu items are rows of 9 px from y 13 (the last at y ' + (13 + 99) + ')');
   eq([d.fb[(13 - 1) * LW], d.fb[(13 - 1) * LW + LW - 1], d.fb[20 * LW + 2]], [1, 1, 1], 'the selected row (the first) is inverted over the full width');
   eq(litIn(d, 0, 13 + 9 - 1, 1, 9).length, 0, 'the next row is not');
   const lastLit = Math.max(...litRows(d));
-  ok(lastLit >= 13 + 9 * 10 && lastLit < LH, 'the list reaches y ' + lastLit + ' of 119: the grid is used');
-  const dn = withUi(ctxOf(), ['no', ...Array(10).fill('down')]);
+  ok(lastLit >= 13 + 9 * 11 && lastLit < LH, 'the list reaches y ' + lastLit + ' of 119: the grid is used');
+  const dn = withUi(ctxOf(), ['no', ...Array(11).fill('down')], 'lcd2');
   d = drawn(dn.c, { ui: dn.ui });
   noInk(d, 'MENU, last item selected');
-  eq(d.fb[(13 + 90 - 1) * LW + 100], 1, 'the last item (BATTERY) is the selected, inverted row at the bottom');
-  const sub = withUi(ctxOf(), ['no', 'yes']);
+  eq(d.fb[(13 + 99 - 1) * LW + 100], 1, 'the last item (BATTERY) is the selected, inverted row at the bottom');
+  const sub = withUi(ctxOf(), ['no', 'yes'], 'lcd2');
   d = drawn(sub.c, { ui: sub.ui });
   noInk(d, 'a sub menu (' + sub.ui.screen + ')');
-  const ed = withUi(ctxOf(), ['no', 'yes', 'yes']);
+  const ed = withUi(ctxOf(), ['no', 'yes', 'yes'], 'lcd2');
   d = drawn(ed.c, { ui: ed.ui });
   noInk(d, 'an edit screen (' + ed.ui.screen + ')');
   if (ed.ui.screen === 'edit') {
@@ -363,6 +364,99 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   const hint = { ...OLED.create(), hint: { title: 'PHASE', up: 'UP: +1/2', down: 'DOWN: -1/2' } };
   d = drawn(ctxOf(), { ui: hint });
   eq([rowsLit(79), idsIn(d, 15, 30, 130, 60)], [[15, 144], [0]], 'the NO / YES hint box is centred on the grid too');
+}
+
+// ---- the BEAT FLASH setting: the flash window (a port of jk_led_lit), the colours, the menu item ----
+{
+  const core = fs.readFileSync(path.join(__dirname, '..', 'core', 'jank_core.h'), 'utf8'), def = name => Number(new RegExp('#define ' + name + ' (\\d+)').exec(core)[1]);
+  eq([Lcd2.FLASH.beatMs, Lcd2.FLASH.barMs, Lcd2.FLASH.capDiv], [def('JK_BEAT_FLASH_MS'), def('JK_BAR_FLASH_MS'), def('JK_FLASH_CAP_DIV')], 'the flash durations are core/jank_core.h\'s: 80 ms, 150 ms, a third of a beat');
+  eq([Lcd2.FLASH.beatMs, Lcd2.FLASH.barMs, Lcd2.FLASH.capDiv], [80, 150, 3], '... namely 80, 150 and 3');
+  // the cases of test_ctl.c's test_led, with the same numbers: JANK = no flash is the rest (0), WIFI = lit is the rest
+  const BEAT = 1000000, mpb = 500000, flash = Math.floor(80 * 1000 * BEAT / mpb), bar = Math.floor(150 * 1000 * BEAT / mpb);
+  const J = (joined, ub, m, q) => Lcd2.ledLit(false, joined, ub, m, q), WF = (joined, ub, m, q) => Lcd2.ledLit(true, joined, ub, m, q);
+  eq([J(1, 0, mpb, 4), J(1, BEAT + flash - 1, mpb, 4), J(1, BEAT + flash, mpb, 4), J(1, 7 * BEAT + 10, mpb, 4), J(1, -BEAT + 10, mpb, 4)], [1, 1, 0, 1, 1], 'jk_led_lit cases: lit on each beat for 80 ms, also before the session\'s beat 0');
+  eq([J(1, -10, mpb, 4), WF(1, 0, mpb, 4), WF(1, BEAT / 2, mpb, 4)], [0, 0, 1], '... -10 micro-beats is the end of the previous beat; the station\'s is the other way round');
+  eq([J(0, 0, mpb, 4), WF(0, 0, mpb, 4), J(1, 0, 0, 4)], [0, 1, 0], '... no session: the mode\'s rest; no tempo: the rest');
+  eq([J(1, bar - 1, mpb, 4), J(1, bar, mpb, 4), J(1, 8 * BEAT + bar - 1, mpb, 4), J(1, -4 * BEAT + bar - 1, mpb, 4)], [1, 0, 1, 1], '... the bar\'s first beat flashes longer (beats 0, 4, 8 of a 4-beat bar, and -4)');
+  eq([J(1, BEAT + bar - 1, mpb, 4), J(1, -3 * BEAT + bar - 1, mpb, 4), J(1, 3 * BEAT + bar - 1, mpb, 3), WF(1, bar - 1, mpb, 4)], [0, 0, 1, 0], '... beat 2 has the short flash; a 3-beat bar; the station\'s off longer');
+  eq([J(1, BEAT / 3 - 1, 200000, 4) + 0, J(1, Math.floor(BEAT / 3), 200000, 4)], [1, 0], '... fast (300 BPM): the downbeat\'s 150 ms is cut to a third of the beat');
+  eq(J(1, Math.floor(80 * 1000 * BEAT / 2000000) - 1, 2000000, 4), 1, '... a slow session\'s flash is still 80 ms long');
+}
+{
+  // the flash seen from the beat position (beats) at 120 BPM (a beat is 500 ms): ms -> fraction of a beat
+  const at = (beat, ms, bpm = 120, q = 4) => Lcd2.flashAt(beat + ms / (60000 / bpm), bpm, q);
+  eq([at(1, 0), at(1, 79), at(1, 81), at(2, 40), at(3, 100)], ['beat', 'beat', null, 'beat', null], 'an ordinary beat flashes at its start for 80 ms (white-green)');
+  eq([at(0, 0), at(0, 149), at(0, 151), at(4, 100), at(8, 149), at(4, 200)], ['bar', 'bar', null, 'bar', 'bar', null], 'the bar\'s first beat (0, 4, 8) flashes for 150 ms (amber)');
+  eq([at(-4, 100), at(-1, 50), at(-3, 100, 120, 3)], ['bar', 'beat', 'bar'], 'before the session\'s beat 0: beat -4 is a bar start, -1 an ordinary beat; a 3-beat bar starts at -3');
+  eq([at(1, 66, 300), at(1, 68, 300), at(0, 66, 300), at(0, 68, 300)], ['beat', null, 'bar', null], 'at 300 BPM (200 ms) both flashes are cut to a third of a beat (66 ms)');
+  eq([at(0, 140, 40), at(0, 151, 40), at(1, 79, 40), at(1, 81, 40)], ['bar', null, 'beat', null], 'at 40 BPM (1.5 s) they keep their full 150 / 80 ms');
+  eq([Lcd2.flashAt(null, 120, 4), Lcd2.flashAt(undefined, 120, 4), Lcd2.flashAt(1.01, 0, 4), Lcd2.flashAt(1.01, null, 4)], [null, null, null, null], 'no beat position or no tempo: no flash');
+  eq(Lcd2.flashAt(1.01, 120, 0), 'bar', 'a bar length of 0 counts as 1 (every beat is a bar start), as the C');
+
+  // flashOf: the setting, the screen, the session
+  const live = over => ({ ...ctxOf(), beatFlash: 1, beatPos: 1.05, beatBpm: 120, quantum: 4, ...over });
+  eq([Lcd2.flashOf(live({}), 'home'), Lcd2.flashOf(live({ beatPos: 4.05 }), 'home'), Lcd2.flashOf(live({ beatPos: 1.4 }), 'home')], ['beat', 'bar', null], 'flashOf: SCREEN flashes on HOME: beat, bar, between flashes nothing');
+  eq(Lcd2.flashOf(live({ beatFlash: 0 }), 'home'), null, 'BOXES (the default): never');
+  eq(['menu', 'sub', 'edit', 'info', 'net', 'scan', 'text', 'netinfo', 'confirm'].map(sc => Lcd2.flashOf(live({}), sc)), Array(9).fill(null), 'menus, sub menus, edit, info, network screens never flash');
+  eq([Lcd2.flashOf(live({ setup: true }), 'home'), Lcd2.flashOf(live({ boot: true }), 'home'), Lcd2.flashOf(live({ splash: true }), 'home')], [null, null, null], 'SETUP, BOOT and the splash never flash');
+  eq([Lcd2.flashOf(live({ beatPos: null }), 'home'), Lcd2.flashOf(live({ beatBpm: null }), 'home'), Lcd2.flashOf(null, 'home')], [null, null, null], 'no session / not playing (no beat position), no tempo, no ctx: nothing flashes');
+  // both modes: AUDIO and LINK take the same beat position from the HOME line
+  const fromStick = (over, beatFlash) => Stick.ctx({ home: { ...home, ...over }, homeAt: 1000, get: beatFlash === undefined ? {} : { beat_flash: beatFlash }, status: null, statusAt: 0 }, NOW);
+  eq([fromStick({ audio: true }, '1').beatFlash, fromStick({ audio: true }, '0').beatFlash, fromStick({}).beatFlash, fromStick({}, 'x').beatFlash], [1, 0, 0, 0], 'ctx.beatFlash reads `get` beat_flash: 1 = SCREEN, 0 or absent (or anything else) = BOXES');
+  const a = fromStick({ audio: true, bar: 200 }, '1'), l = fromStick({ audio: false, bar: 200 }, '1');
+  ok(Math.abs(a.beatPos - 2.0 - 100 / 500) < 0.01 && Math.abs(l.beatPos - a.beatPos) < 1e-9, 'ctx.beatPos is the session\'s beat position (here 2.2 beats, 100 ms after the HOME line), the same in AUDIO and LINK');
+  eq([a.beatBpm, a.quantum, fromStick({ transport: 'stopped' }, '1').beatPos, fromStick({ transport: 'armed' }, '1').beatPos], [120, 4, null, null], 'ctx.beatBpm and ctx.quantum come from the HOME line; stopped or armed: no beat position');
+  const f1 = fromStick({ audio: true, bar: 190 }, '1'), f2 = fromStick({ audio: false, bar: 190 }, '1'), f3 = fromStick({ audio: true, bar: 390 }, '1'), f4 = fromStick({ audio: false, bar: 390 }, '1');
+  eq([a, l].map(c => Lcd2.flashOf(c, 'home')), [null, null], 'at 2.2 beats (200 ms into a beat of 500 ms) no flash is on: the 80 ms are over');
+  eq([f1, f2, f3, f4].map(c => Lcd2.flashOf(c, 'home')), ['beat', 'beat', 'bar', 'bar'], 'AUDIO and LINK flash alike: 2.1 beats is an ordinary beat, 4.1 the first beat of the next bar');
+  eq(Lcd2.flashOf(fromStick({ audio: true, bar: 390, transport: 'stopped' }, '1'), 'home'), null, 'a stopped transport does not flash');
+}
+// the colours: the field of a flash, near-black text on it (WCAG AA), what lit pixels become
+{
+  const near = P.bg, FF = Lcd2.FLASH_FIELD;
+  for (const name of ['beat', 'bar']) {
+    const r = Lcd2.contrast(near, FF[name]);
+    ok(r >= AA, 'flash ' + name + ': near-black text on the flash field reads (' + r.toFixed(2) + ' >= 4.5)');
+  }
+  eq(FF.bar, P.warn, 'the bar\'s first beat is amber, the LED language\'s bar 1 (the same amber as WARN and the first box)');
+  ok(FF.beat[2] > 200 && FF.bar[2] < 100 && FF.beat[1] > 240 && Lcd2.contrast(FF.beat, FF.bar) >= 1.5 && Lcd2.contrast(FF.beat, P.bg) >= 15, 'the two fields are clearly different: white-green (blue channel high) against amber (blue channel low), ' + Lcd2.contrast(FF.beat, FF.bar).toFixed(2) + ' : 1 apart');
+  const fb = new Uint8Array(LW * LH), ink = new Uint8Array(LW * LH);
+  fb[0] = 1; ink[0] = INK.BAD; fb[1] = 1; ink[1] = INK.GOOD; fb[2] = 1;
+  for (const [flash, field] of [['beat', FF.beat], ['bar', FF.bar], [null, P.bg]]) {
+    const c = canvas(); Lcd2.paint(c.ctx, c.img, fb, ink, flash);
+    const lit = [flash ? near : P.bad, flash ? near : P.good, flash ? near : P.neutral];
+    eq([px(c.img, 0, 0), px(c.img, 2, 0), px(c.img, 4, 0), px(c.img, 319, 239), px(c.img, 160, 120)], [lit[0], lit[1], lit[2], field, field], 'paint(flash ' + flash + '): the field is ' + (flash ? flash + ' colour' : 'the background') + ', lit pixels are ' + (flash ? 'near-black whatever their ink' : 'their ink colour'));
+    let others = 0; for (let i = 0; i < 320 * 240; i++) { const c3 = c.img.data.slice(4 * i, 4 * i + 3).join(); if (c3 !== field.join() && !lit.some(l3 => l3.join() === c3)) others++; }
+    eq(others, 0, 'paint(flash ' + flash + '): every one of the 76800 pixels is the field or a lit pixel');
+  }
+  const c = canvas(); Lcd2.paint(c.ctx, c.img, fb, ink);
+  eq(px(c.img, 0, 0), P.bad, 'paint without a flash argument is as before');
+  eq([...Lcd2.pixels(fb, ink, 'beat').slice(0, 3)], near, 'pixels(fb, ink, flash) is the table the paint uses');
+}
+// the menu: BEAT FLASH after DISPLAY, only on the lcd2 layout; its edit screen
+{
+  const keys = n => ['no', ...Array(n).fill('down')];
+  const oledM = withUi(ctxOf(), keys(15)), lcdM = withUi(ctxOf(), keys(15), 'lcd2');
+  eq([oledM.ui.cursor, lcdM.ui.cursor], [10, 11], 'the OLED menu has 11 items (the cursor stops at 10), the lcd2 menu 12 (it stops at 11)');
+  const m = withUi(ctxOf(), keys(10), 'lcd2');
+  let d = drawn(m.c, { ui: m.ui });
+  noInk(d, 'the lcd2 MENU with BEAT FLASH selected');
+  eq([m.ui.cursor, d.fb[(13 + 90 - 1) * LW + 100], d.fb[(13 + 81 - 1) * LW + 100]], [10, 1, 0], 'BEAT FLASH is the 11th row, right after DISPLAY (the 10th) and before BATTERY, the selected row inverted');
+  const on = withUi({ ...ctxOf(), beatFlash: 1 }, keys(10), 'lcd2'), d2 = drawn(on.c, { ui: on.ui });
+  ok(!Buffer.from(d2.fb).equals(Buffer.from(d.fb)), 'the row says SCREEN when the setting is on (a different picture from BOXES)');
+  // the edit screen
+  const edit = withUi(ctxOf(), [...keys(10), 'yes'], 'lcd2');
+  eq(edit.ui.screen, 'edit', 'YES on BEAT FLASH opens its edit screen');
+  d = drawn(edit.c, { ui: edit.ui }); noInk(d, 'the BEAT FLASH edit screen');
+  const boxesPicture = Buffer.from(d.fb), set = [];
+  edit.c.setField = (f, v) => set.push([f, v]);
+  const m2 = Stick.create(() => edit.c, () => {}); m2.ui = edit.ui;
+  Stick.down(m2, 'up', 0); Stick.up(m2, 'up', 30);
+  eq(set, [['beatflash', 1]], 'UP changes BOXES to SCREEN live: setField(beatflash, 1)');
+  ok(!Buffer.from(drawn({ ...edit.c, beatFlash: 1 }, { ui: edit.ui }).fb).equals(boxesPicture), 'the edit screen shows the new value');
+  Stick.down(m2, 'no', 100); Stick.up(m2, 'no', 130);
+  eq([set[set.length - 1], edit.ui.screen], [['beatflash', 0], 'menu'], 'NO restores the old value and returns to the menu');
+  eq([Stick.fieldCommands('beatflash', 1), Stick.fieldCommands('beatflash', 0)], [{ commands: ['set beat_flash 1'] }, { commands: ['set beat_flash 0'] }], 'the control line: set beat_flash 1 (screen) / 0 (boxes)');
 }
 
 // ---- the stick feeds the ctx: nothing made up ----

@@ -94,7 +94,7 @@ row shows what the stick reports about the bar that the boxes do not: AUTO BAR's
 | screen | geometry |
 |---|---|
 | title bar | 11 rows, full width, text at y 2 |
-| MENU | 12 rows of 9 px from y 13 (the 11 items all fit: no scrolling; row k at y 13 + 9k, last at y 103), value right-aligned at x 156, selected row inverted over the full width |
+| MENU | 12 rows of 9 px from y 13 (the 12 items of the lcd2 menu all fit: no scrolling; row k at y 13 + 9k, last at y 112; the OLED menu has 11), value right-aligned at x 156, selected row inverted over the full width |
 | sub menu (AUDIO, OFFSET, DISPLAY) | rows of 12 px from y 16 |
 | edit | the value at font scale 2 in an inverted box centred on 160 (scale 1 if it would not fit), the two help lines at y 70 and 82 |
 | info (BATTERY) | text rows of 12 px from y 18, the level bar 152 px wide at y 92 |
@@ -106,7 +106,56 @@ row shows what the stick reports about the bar that the boxes do not: AUTO BAR's
 | BOOT / splash | `BOOT` at scale 5; `JANK` at scale 5 and `MINI 2.2` at scale 3 |
 
 The cursor logic in `OLED.press` still scrolls as if 6 menu rows were visible (`ui.top`); the lcd2 draw ignores `ui.top` and keeps the
-cursor in view by itself (all 11 menu items fit; the scan list centres on the selection), so no state is shared between the layouts.
+cursor in view by itself (all 12 menu items fit; the scan list centres on the selection), so no state is shared between the layouts.
+
+## BEAT FLASH: the whole screen flashes on the beat (design preview)
+
+The beat boxes are the beat indicator now that there are no LEDs. A new setting lets the whole screen flash instead of, or as well as, them.
+
+**The setting** `beat_flash` (control-line key; **not in the firmware yet**: `set beat_flash 0|1`, read back from `get`; absent = 0): 0 = BOXES
+(today's look, the default), 1 = SCREEN. `ctx.beatFlash` (`ui/stick.js` reads `get.beat_flash`, anything but `'1'` is BOXES). The menu item is
+**BEAT FLASH**, an EDIT screen with the two values (BOXES, SCREEN), on the **lcd2 menu only**, right after DISPLAY (the 11th of 12 rows,
+before BATTERY). The OLED menus have 11 items and are unchanged: `OLED.press` picks the list from `ctx.layout` (the page's ctx carries it),
+and the OLED draw never lists the item. The page also takes `?flash=screen` as a preview until the stick reports the key.
+
+**The flash rule** is `jk_led_lit` (core/jank_core.c) ported to `Lcd2.ledLit` / `Lcd2.flashWindow` (`ui/lcd2.js`), with the same numbers:
+a beat flashes for **80 ms** (JK_BEAT_FLASH_MS), the bar's first beat for **150 ms** (JK_BAR_FLASH_MS), neither longer than **a third of a
+beat** (JK_FLASH_CAP_DIV 3: at 300 BPM both are 66 ms), counted from the start of the beat, before the session's beat 0 too; the bar's first beat
+is index 0 of `quantum` beats (HOME line). `tests/test_lcd2.js` replays the cases of `test_ctl.c`'s `test_led` and reads the three macros from
+`core/jank_core.h`. `Lcd2.flashAt(beatPos, bpm, quantum)` gives `null | 'beat' | 'bar'`; `Lcd2.flashOf(ctx, screen)` adds the rules:
+only on **HOME** with the setting on SCREEN, in **AUDIO and LINK mode alike**, only **while playing with a beat position**
+(`ctx.beatPos`: the session's fractional beat position from the page's smooth phase `Stick.phaseAt`, display delay included; null when stopped,
+armed, stale or with no session / tempo), **never on menus, edit, info, network, text, confirm, SETUP, BOOT or the splash**. Between flashes the
+normal screen is shown.
+
+The two field colours are a table of their own (`Lcd2.FLASH_FIELD`), not part of `PALETTE`: the firmware's palette is tested against `PALETTE`
+(`tests/test_lcd_palette.js`), and the C side gains the two fields when it gets the flash.
+
+**How it looks** (render time, the UI is not drawn again): `Lcd2.paint(ctx2d, img, fb, ink, flash)`, `flash` = `null | 'beat' | 'bar'`. During a
+flash the field (every unlit pixel) is the flash colour and every lit pixel is near-black (the background colour, whatever its ink colour),
+so the text stays readable on the bright field and the lit beat box becomes a black block:
+
+| flash | field | RGB | near-black text on it (WCAG, AA = 4.5) |
+|---|---|---|---|
+| beat | white-green (`FLASH_FIELD.beat`) | 214, 255, 226 (#d6ffe2) | 18.2 |
+| first beat of the bar | amber (`FLASH_FIELD.bar`) | 255, 176, 32 (#ffb020, the same amber as WARN and the first box) | 10.8 |
+
+The two fields are 1.7 : 1 apart in luminance but far apart in hue (blue channel 226 against 32), and an amber field is the "bar 1" colour of
+the LED language. I considered plain white for the beat (19.8 : 1 on near-black) and kept white-green so that a flash is not mistaken for a
+white screen of death; amber for bar 1 matches everything else on the screen.
+
+**The page's face** flashes the same way, from `Stick.phaseAt` (the smooth local phase, with the display delay), and **repaints only when the
+frame's pixels, ink or flash state changed** (it compares with the last painted frame). The animation-frame loop itself still runs (it also advances
+the buttons' key repeat and the face's own blinking); only the canvas work is skipped. A flash of 80 ms is 5 animation frames at 60 Hz.
+
+**What the C side will need** (not written): the scaler takes a **background colour and a foreground colour for a frame** (field and lit pixels:
+`jank_lcd.c` paints with the palette today; a flash frame is the same 160 x 120 frame with two colours), and `jk_led_lit`'s window drives it on the
+beat count (`jk_led_bar_one` for the first beat), **in the existing beat code, not a copy**. While a flash is on the screen must be **presented
+at about 30 fps** (a flash of 80 ms is only 2 to 3 frames at 30 fps, and the first frame must be on the beat): the present rate, the SPI/DMA
+time of a full 320 x 240 frame at that rate and the CPU cost of the two-colour scaler are **unmeasured**; the ST7789 can also be driven with
+a full-screen fill instead of a repaint (the fastest flash), which needs the frame's text to be re-sent afterwards: not designed here.
+The firmware needs the `beat_flash` key (`set` / `get`, saved in flash like the other settings) and the menu item in `core/jank_oled_menu.c`
+for the lcd2 layout only.
 
 ## Recommendation
 
@@ -126,7 +175,7 @@ cut to the colour alone.
 
 ## Tests in this stage
 
-`tests/test_lcd2.js` (192 checks): palette AA; sizes and the throw on a wrong buffer; the exact x2 (a full frame covers all 320 x 240, an empty one
+`tests/test_lcd2.js` (242 checks): the beat flash (the `jk_led_lit` cases, the macros read from core/jank_core.h, 80 / 150 ms windows, the cap at 300 BPM, negative beats, no flash without a session, on menus or in SETUP, the paint colours and their AA ratios, the BEAT FLASH menu item and edit screen, the OLED menu unchanged); palette AA; sizes and the throw on a wrong buffer; the exact x2 (a full frame covers all 320 x 240, an empty one
 none, six single source pixels each become exactly their 2 x 2 block in their ink colour); the four boxes on every beat in both layouts (exact rectangles, solid lit box, 2 px outline and dark inside for the rest, even 4 px gaps and dark margins, amber only for a lit first box, gaps to the rows above and below); the row table (rows increasing, no lit pixel in
 a gap, tempo 35 rows, the widest tempo fits); ink only in the allowed boxes; the CF rule at 60, 69, 70, 75, 80, 81, 87, 100 for value, line
 and notch; line lengths at 0 / 50 / 100 % (exactly 3 rows, no outline, no track) and the notch position (also following the stick's threshold); IN clip / quiet edges and lengths; the BAR
