@@ -4,26 +4,26 @@
 
 | | usb: 5 boards | usb: 10 boards | battery: 5 boards | battery: 10 boards |
 |---|---|---|---|---|
-| parts / lines / joints a board | 118 / 39 / 358 | 118 / 39 / 358 | 134 / 42 / 410 | 134 / 42 / 410 |
-| part types (feeder fee each) | 39 | 39 | 42 | 42 |
-| **total, USD** | **148.13** | **189.13** | **160.83** | **207.71** |
-| per board, USD | 29.63 | 18.91 | 32.17 | 20.77 |
+| parts / lines / joints a board | 119 / 41 / 360 | 119 / 41 / 360 | 135 / 44 / 412 | 135 / 44 / 412 |
+| part types (feeder fee each) | 41 | 41 | 44 | 44 |
+| **total, USD** | **153.61** | **196.34** | **166.30** | **214.93** |
+| per board, USD | 30.72 | 19.63 | 33.26 | 21.49 |
 
 ## The usb order
 
-118 parts on 39 lines, 358 joints a board.
+119 parts on 41 lines, 360 joints a board.
 
 | | 5 boards, USD | 10 boards, USD |
 |---|---|---|
 | PCB (bare) | 3.30 | 6.40 |
 | Standard setup | 25.75 | 25.75 |
 | Standard stencil | 8.27 | 8.27 |
-| feeder loading (39 part types x 1.55) | 60.45 | 60.45 |
-| SMT (358 joints a board) | 3.77 | 7.55 |
+| feeder loading (41 part types x 1.55) | 63.55 | 63.55 |
+| SMT (360 joints a board) | 3.79 | 7.59 |
 | packaging | 0.51 | 0.51 |
-| parts (with JLC's loss) | 46.08 | 80.20 |
-| **total** | **148.13** (EUR 127.39) | **189.13** (EUR 162.65) |
-| **per board** | **29.63** (EUR 25.48) | **18.91** (EUR 16.26) |
+| parts (with JLC's loss) | 48.43 | 84.27 |
+| **total** | **153.61** (EUR 132.10) | **196.34** (EUR 168.85) |
+| **per board** | **30.72** (EUR 26.42) | **19.63** (EUR 16.89) |
 
 ### Parts (5 boards)
 
@@ -35,7 +35,8 @@
 | C15850 | CL21A106KAYNNNE | Basic | 8914222 | 4 | 30 | 0.0311 | 0.93 |
 | C17168 | 0402WGF0000TCE | Basic | 15190115 | 1 | 15 | 0.0012 | 0.02 |
 | C17957 | 1206W4F2200T5E | Extended | 41185 | 8 | 50 | 0.0057 | 0.29 |
-| C19702 | CL10A106KP8NNNC | Basic | 11368171 | 5 | 35 | 0.0233 | 0.82 |
+| C19702 | CL10A106KP8NNNC | Basic | 11368171 | 4 | 30 | 0.0233 | 0.70 |
+| C20917 | AO3400A | Basic | 1178920 | 4 | 24 | 0.0790 | 1.90 |
 | C21189 | 0603WAF0000T5E | Basic | 16885442 | 1 | 15 | 0.0021 | 0.03 |
 | C23186 | 0603WAF5101T5E | Basic | 19091751 | 2 | 20 | 0.0015 | 0.03 |
 | C2500 | BAV99,215 | Basic | 1369106 | 2 | 15 | 0.0111 | 0.17 |
@@ -43,14 +44,15 @@
 | C25077 | 0402WGF100JTCE | Basic | 2777052 | 2 | 25 | 0.0010 | 0.03 |
 | C25086 | 0402WGF100KTCE | Extended (preferred) | 340906 | 2 | 20 | 0.0017 | 0.03 |
 | C25092 | 0402WGF220JTCE | Basic | 4632516 | 3 | 30 | 0.0010 | 0.03 |
-| C25271 | 0805W8F100KT5E | Basic | 344663 | 1 | 15 | 0.0054 | 0.08 |
-| C25741 | 0402WGF1003TCE | Basic | 10013970 | 14 | 82 | 0.0009 | 0.07 |
+| C25271 | 0805W8F100KT5E | Basic | 344663 | 2 | 20 | 0.0054 | 0.11 |
+| C25741 | 0402WGF1003TCE | Basic | 10013970 | 13 | 77 | 0.0009 | 0.07 |
 | C25744 | 0402WGF1002TCE | Basic | 20623259 | 2 | 25 | 0.0015 | 0.04 |
 | C25752 | 0402WGF1202TCE | Basic | 784041 | 3 | 30 | 0.0018 | 0.05 |
 | C25755 | 0402WGF1503TCE | Extended (preferred) | 1029142 | 2 | 20 | 0.0011 | 0.02 |
-| C25765 | 0402WGF2002TCE | Basic | 2830969 | 10 | 60 | 0.0010 | 0.06 |
+| C25765 | 0402WGF2002TCE | Basic | 2830969 | 9 | 55 | 0.0010 | 0.06 |
+| C25768 | 0402WGF2202TCE | Basic | 1212186 | 1 | 15 | 0.0010 | 0.01 |
 | C25879 | 0402WGF2201TCE | Basic | 3002186 | 2 | 20 | 0.0011 | 0.02 |
-| C26083 | 0402WGF1004TCE | Basic | 2265036 | 2 | 25 | 0.0012 | 0.03 |
+| C26083 | 0402WGF1004TCE | Basic | 2265036 | 3 | 30 | 0.0012 | 0.04 |
 | C2765186 | TYPE-C 16PIN 2MD(073) | Extended | 1020851 | 1 | 8 | 0.0748 | 0.60 |
 | C2845237 | TPS63802DLAR | Extended | 20689 | 1 | 5 | 0.9082 | 4.54 |
 | C2991172 | 0603CG222J500NT | Extended | 66758 | 4 | 30 | 0.0142 | 0.43 |
@@ -59,13 +61,13 @@
 | C318884 | TS-1187A-B-A-B | Basic | 840462 | 4 | 28 | 0.0215 | 0.60 |
 | C38838 | PESD15VL2BT,215 | Extended | 56659 | 2 | 12 | 0.1162 | 1.39 |
 | C4410 | 1206W4F1001T5E | Basic | 1383342 | 2 | 14 | 0.0085 | 0.12 |
+| C45783 | CL21A226MAQNNNE | Basic | 3823110 | 1 | 9 | 0.1085 | 0.98 |
 | C52923 | CL05A105KA5NQNC | Basic | 9643403 | 5 | 37 | 0.0055 | 0.20 |
 | C55109522 | WS2812C-2020-V6 | Extended | 98590 | 4 | 24 | 0.0994 | 2.39 |
 | C59461 | CL10A226MQ8NRNC | Basic | 6145992 | 2 | 20 | 0.0221 | 0.44 |
 | C668312 | DFE201612E-R47M=P2 | Extended | 12990 | 2 | 12 | 0.1771 | 2.13 |
 | C7420376 | SRV05-4 | Extended (preferred) | 562887 | 3 | 19 | 0.0851 | 1.62 |
 | C8190 | SN74AHCT04PWR | Extended | 1758 | 1 | 6 | 0.3241 | 1.94 |
-| C8545 | 2N7002 | Basic | 6205250 | 4 | 28 | 0.0158 | 0.44 |
 | C8678 | SS34 | Basic | 2651421 | 1 | 13 | 0.0351 | 0.46 |
 | C919459 | TPS61023DRLR | Extended | 3455 | 1 | 6 | 0.2331 | 1.40 |
 
@@ -73,19 +75,19 @@ Extended types that pay the fee: C17957, C2765186, C2845237, C2991172, C3013944,
 
 ## The battery order
 
-134 parts on 42 lines, 410 joints a board.
+135 parts on 44 lines, 412 joints a board.
 
 | | 5 boards, USD | 10 boards, USD |
 |---|---|---|
 | PCB (bare) | 3.30 | 6.40 |
 | Standard setup | 25.75 | 25.75 |
 | Standard stencil | 8.27 | 8.27 |
-| feeder loading (42 part types x 1.55) | 65.10 | 65.10 |
-| SMT (410 joints a board) | 4.32 | 8.64 |
+| feeder loading (44 part types x 1.55) | 68.20 | 68.20 |
+| SMT (412 joints a board) | 4.34 | 8.69 |
 | packaging | 0.51 | 0.51 |
-| parts (with JLC's loss) | 53.58 | 93.04 |
-| **total** | **160.83** (EUR 138.31) | **207.71** (EUR 178.63) |
-| **per board** | **32.17** (EUR 27.66) | **20.77** (EUR 17.86) |
+| parts (with JLC's loss) | 55.93 | 97.11 |
+| **total** | **166.30** (EUR 143.02) | **214.93** (EUR 184.84) |
+| **per board** | **33.26** (EUR 28.60) | **21.49** (EUR 18.48) |
 
 ### Parts (5 boards)
 
@@ -97,21 +99,23 @@ Extended types that pay the fee: C17957, C2765186, C2845237, C2991172, C3013944,
 | C15525 | CL05A106MQ5NUNC | Basic | 8197133 | 1 | 15 | 0.0197 | 0.30 |
 | C15850 | CL21A106KAYNNNE | Basic | 8914222 | 4 | 30 | 0.0311 | 0.93 |
 | C17957 | 1206W4F2200T5E | Extended | 41185 | 8 | 50 | 0.0057 | 0.29 |
-| C19702 | CL10A106KP8NNNC | Basic | 11368171 | 7 | 45 | 0.0233 | 1.05 |
+| C19702 | CL10A106KP8NNNC | Basic | 11368171 | 6 | 40 | 0.0233 | 0.93 |
+| C20917 | AO3400A | Basic | 1178920 | 4 | 24 | 0.0790 | 1.90 |
 | C2500 | BAV99,215 | Basic | 1369106 | 2 | 15 | 0.0111 | 0.17 |
 | C25076 | 0402WGF1000TCE | Basic | 10661046 | 4 | 35 | 0.0012 | 0.04 |
 | C25077 | 0402WGF100JTCE | Basic | 2777052 | 2 | 25 | 0.0010 | 0.03 |
 | C25086 | 0402WGF100KTCE | Extended (preferred) | 340906 | 3 | 25 | 0.0017 | 0.04 |
 | C25092 | 0402WGF220JTCE | Basic | 4632516 | 3 | 30 | 0.0010 | 0.03 |
-| C25271 | 0805W8F100KT5E | Basic | 344663 | 1 | 15 | 0.0054 | 0.08 |
-| C25741 | 0402WGF1003TCE | Basic | 10013970 | 16 | 92 | 0.0009 | 0.08 |
+| C25271 | 0805W8F100KT5E | Basic | 344663 | 2 | 20 | 0.0054 | 0.11 |
+| C25741 | 0402WGF1003TCE | Basic | 10013970 | 14 | 82 | 0.0009 | 0.07 |
 | C25744 | 0402WGF1002TCE | Basic | 20623259 | 2 | 25 | 0.0015 | 0.04 |
 | C25752 | 0402WGF1202TCE | Basic | 784041 | 4 | 35 | 0.0018 | 0.06 |
 | C25755 | 0402WGF1503TCE | Extended (preferred) | 1029142 | 2 | 20 | 0.0011 | 0.02 |
-| C25765 | 0402WGF2002TCE | Basic | 2830969 | 11 | 65 | 0.0010 | 0.07 |
+| C25765 | 0402WGF2002TCE | Basic | 2830969 | 10 | 60 | 0.0010 | 0.06 |
+| C25768 | 0402WGF2202TCE | Basic | 1212186 | 1 | 15 | 0.0010 | 0.01 |
 | C25800 | 0402WGF9103TCE | Extended | 38159 | 1 | 15 | 0.0010 | 0.01 |
 | C25879 | 0402WGF2201TCE | Basic | 3002186 | 3 | 25 | 0.0011 | 0.03 |
-| C26083 | 0402WGF1004TCE | Basic | 2265036 | 2 | 25 | 0.0012 | 0.03 |
+| C26083 | 0402WGF1004TCE | Basic | 2265036 | 4 | 35 | 0.0012 | 0.04 |
 | C2765186 | TYPE-C 16PIN 2MD(073) | Extended | 1020851 | 1 | 8 | 0.0748 | 0.60 |
 | C2836598 | TUSB320LIRWBR | Extended | 4484 | 1 | 5 | 0.7724 | 3.86 |
 | C2845237 | TPS63802DLAR | Extended | 20689 | 1 | 5 | 0.9082 | 4.54 |
@@ -123,6 +127,7 @@ Extended types that pay the fee: C17957, C2765186, C2845237, C2991172, C3013944,
 | C37704 | BAT54C,215 | Extended (preferred) | 329846 | 1 | 10 | 0.0145 | 0.15 |
 | C38838 | PESD15VL2BT,215 | Extended | 56659 | 2 | 12 | 0.1162 | 1.39 |
 | C4410 | 1206W4F1001T5E | Basic | 1383342 | 2 | 14 | 0.0085 | 0.12 |
+| C45783 | CL21A226MAQNNNE | Basic | 3823110 | 1 | 9 | 0.1085 | 0.98 |
 | C52923 | CL05A105KA5NQNC | Basic | 9643403 | 5 | 37 | 0.0055 | 0.20 |
 | C55109522 | WS2812C-2020-V6 | Extended | 98590 | 4 | 24 | 0.0994 | 2.39 |
 | C59461 | CL10A226MQ8NRNC | Basic | 6145992 | 2 | 20 | 0.0221 | 0.44 |
@@ -130,7 +135,6 @@ Extended types that pay the fee: C17957, C2765186, C2845237, C2991172, C3013944,
 | C7420376 | SRV05-4 | Extended (preferred) | 562887 | 3 | 19 | 0.0851 | 1.62 |
 | C80628 | XB5353A | Extended | 3831 | 1 | 7 | 0.0871 | 0.61 |
 | C8190 | SN74AHCT04PWR | Extended | 1758 | 1 | 6 | 0.3241 | 1.94 |
-| C8545 | 2N7002 | Basic | 6205250 | 4 | 28 | 0.0158 | 0.44 |
 | C8678 | SS34 | Basic | 2651421 | 2 | 18 | 0.0351 | 0.63 |
 | C919459 | TPS61023DRLR | Extended | 3455 | 1 | 6 | 0.2331 | 1.40 |
 
@@ -161,10 +165,10 @@ The full-options rows below take the 1.54 in (the 1.54 inch module, HS154L03W2C0
 
 | | usb: 5 | usb: 10 | battery: 5 | battery: 10 |
 |---|---|---|---|---|
-| JLC board only | 29.63 | 18.91 | 32.17 | 20.77 |
-| + the five jacks (3 PJ-307C, 2 PJ-320A) and the FPC antenna (battery: + 2 PH2.0 and the rocker): the minimum to use it | 30.47 | 19.65 | 33.33 | 21.82 |
-| + the DINs | 31.21 | 20.39 | 34.07 | 22.57 |
-| + the DINs + the screen (header, module) | 38.21 | 27.39 | 41.07 | 29.57 |
+| JLC board only | 30.72 | 19.63 | 33.26 | 21.49 |
+| + the five jacks (3 PJ-307C, 2 PJ-320A) and the FPC antenna (battery: + 2 PH2.0 and the rocker): the minimum to use it | 31.56 | 20.37 | 34.42 | 22.55 |
+| + the DINs | 32.31 | 21.11 | 35.17 | 23.29 |
+| + the DINs + the screen (header, module) | 39.30 | 28.11 | 42.16 | 30.29 |
 
 (The battery order's cells are not included: the user's own.)
 
@@ -172,10 +176,10 @@ The full-options rows below take the 1.54 in (the 1.54 inch module, HS154L03W2C0
 
 | | JLC | bought with the order (the user solders) | total | a board |
 |---|---|---|---|---|
-| **one battery order of 10**, 5 of them finished by hand as MIDI-only (no cells, no toggle: R62's pads bridged, no CV jacks; their charger, cell parts and CLK / RST drivers fitted but unused) | 207.71 | 8.38 | **216.09** | 21.61 |
-| **two orders**: usb x 5 (MIDI-only) + battery x 5 (full) | 308.96 | 8.38 | **317.34** | 31.73 |
+| **one battery order of 10**, 5 of them finished by hand as MIDI-only (no cells, no toggle: R62's pads bridged, no CV jacks; their charger, cell parts and CLK / RST drivers fitted but unused) | 214.93 | 8.38 | **223.31** | 22.33 |
+| **two orders**: usb x 5 (MIDI-only) + battery x 5 (full) | 319.91 | 8.38 | **328.29** | 32.83 |
 
-One order saves 101.25 USD (one set of setup / stencil / feeder fees instead of two). The MIDI-only boards from the battery order run from USB through the power path and the TPS63802 (no cell needed); R62 is a DNP 0402 land in that order: a blob or a 0 ohm 0402 bridges it. Shipping: one parcel either way (not included; JLC's checkout shows it).
+One order saves 104.98 USD (one set of setup / stencil / feeder fees instead of two). The MIDI-only boards from the battery order run from USB through the power path and the TPS63802 (no cell needed); R62 is a DNP 0402 land in that order: a blob or a 0 ohm 0402 bridges it. Shipping: one parcel either way (not included; JLC's checkout shows it).
 
 ## Sources
 
