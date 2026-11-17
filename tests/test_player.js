@@ -154,4 +154,51 @@ eq(P.OUTPUT_HELP.choose, "Choose the stick's output (jank) once.", 'the line tha
 ok2(/microphone only to read the device names; nothing is recorded/.test(P.OUTPUT_HELP.allow), 'the microphone button says why');
 ok2(!/microphone/i.test(P.OUTPUT_HELP.choose + P.OUTPUT_BUTTON_TEXT.choose), 'the normal path never mentions the microphone');
 
-console.log('player: ' + checks + ' checks passed');
+// ---- which output, and what the details say ----
+const dflt = [{ kind: 'audiooutput', label: 'Default - JANK USB Audio', deviceId: 'default' }, { kind: 'audiooutput', label: 'MacBook Speakers', deviceId: 'spk' }, { kind: 'audiooutput', label: 'jank (303a:4a4b)', deviceId: 'abcdef0123456789' }];
+eq(P.pickOutput(dflt), 'abcdef0123456789', 'a named jank device is preferred over the system default entry');
+eq(P.pickOutput([dflt[0]]), 'default', 'when only the default entry names jank, it is used');
+eq(P.pickOutput([{ kind: 'audiooutput', label: 'jank (303a:4a4b)', deviceId: 'x' }]), 'x', "'jank (303a:4a4b)' matches, any case");
+eq([P.savedStatus(dflt, { id: 'spk' }), P.savedStatus(dflt, { id: 'gone', label: 'nothing' }), P.savedStatus(dflt, { id: 'new', label: 'MacBook Speakers' }), P.savedStatus(dflt, null)], ['found', 'stale', 'found', 'none'], 'saved output: found by id, stale, found by label, none');
+eq(P.savedStatus([{ kind: 'audiooutput', label: '', deviceId: '' }], { id: 'jk' }), 'unknown', 'no ids listed (no permission): only tried, never dropped');
+eq([P.sinkMatches('jk', 'jk'), P.sinkMatches('', 'jk'), P.sinkMatches({ type: 'none' }, 'jk')], [true, false, false], 'AudioContext.sinkId read back');
+eq(P.outputReport({ permission: 'granted', devices: dflt, saved: { id: 'abcdef0123456789', label: 'jank (303a:4a4b)' }, chosen: { id: 'abcdef0123456789', label: 'jank (303a:4a4b)' }, ctxState: 'running', ctxSinkId: 'abcdef0123456789', lastError: '' }),
+   'permission: granted · outputs: Default - JANK USB Audio (default), MacBook Speakers (spk), jank (303a:4a4b) (abcdef01) · saved: abcdef01 "jank (303a:4a4b)" · chosen: abcdef01 "jank (303a:4a4b)" · stick context: running, sinkId abcdef01 · last sink error: none', 'the details: permission, outputs with 8 chars of the id, saved, chosen, the context, the last error');
+eq(P.outputReport({ devices: [], ctxState: '', lastError: 'NotFoundError' }), 'permission: unknown · outputs: none listed · saved: none · chosen: none · stick context: none yet · last sink error: NotFoundError', 'the details with nothing known yet');
+
+(async () => {
+// ---- the play scope ----
+const tree = {
+  '': [{ name: 'b2.mp3', kind: 'file' }, { name: 'Sub', kind: 'directory' }, { name: 'a.mp3', kind: 'file' }, { name: '.hidden.mp3', kind: 'file' }, { name: '__MACOSX', kind: 'directory' }, { name: '$RECYCLE.BIN', kind: 'directory' }, { name: 'b10.mp3', kind: 'file' }, { name: 'cover.jpg', kind: 'file' }, { name: '._a.mp3', kind: 'file' }],
+  Sub: [{ name: 'z.flac', kind: 'file' }, { name: 'Deep', kind: 'directory' }, { name: 'notes.txt', kind: 'file' }],
+  'Sub/Deep': [{ name: 'd1.ogg', kind: 'file' }],
+  __MACOSX: [{ name: 'junk.mp3', kind: 'file' }], '$RECYCLE.BIN': [{ name: 'trash.mp3', kind: 'file' }],
+};
+const listed = [];
+const walkAll = async (over = {}) => P.scanTree({ root: {}, list: async (dir, path) => { listed.push(path.join('/')); return tree[path.join('/')] || []; }, shouldStop: () => false, yieldFn: async () => {}, onProgress: () => {}, ...over });
+let scan = await walkAll();
+eq(scan.files.map(f => f.path.join('/')), ['Sub/Deep/d1.ogg', 'Sub/z.flac', 'a.mp3', 'b2.mp3', 'b10.mp3'], 'depth-first, folders first, natural order, audio only, junk skipped');
+eq([scan.capped, scan.cancelled, listed.filter(x => /MACOSX|RECYCLE/.test(x)).length], [false, false, 0], 'junk folders are not even listed');
+scan = await walkAll({ cap: 3 });
+eq([scan.files.length, scan.capped], [3, true], 'a cap of 3 files: capped');
+let stopAfter = 0;
+scan = await walkAll({ yieldFn: async () => { stopAfter++; }, shouldStop: () => stopAfter >= 2 });
+eq([scan.cancelled, scan.files.length < 5], [true, true], 'cancelled between directories: it stops and says so');
+let yields = 0;
+await walkAll({ yieldFn: async () => { yields++; } });
+eq(yields, 3, 'the page gets a turn after each directory (3 here)');
+const progress = [];
+await walkAll({ onProgress: n => progress.push(n) });
+eq(progress, [1, 2, 5], 'progress counts the files found so far, folder by folder');
+eq(P.SCOPE_CAP, 100000, 'the cap is 100,000 files');
+eq([P.scopeLine({ scanning: true, count: 1234 }), P.scopeLine({ scanning: false, count: 5, capped: false }), P.scopeLine({ scanning: false, count: 100000, capped: true })], ['scanning: 1,234 files', '5 files in scope', '100,000 files (capped)'], 'the live line');
+eq([P.isJunkName('.Trash'), P.isJunkName('._x.mp3'), P.isJunkName('$RECYCLE.BIN'), P.isJunkName('__MACOSX'), P.isJunkName('Music')], [true, true, true, true, false], 'junk names');
+const order = scan2 => scan2.files.map(f => f.path.join('/'));
+const full = await walkAll();
+const listLen = full.files.length;
+eq([P.afterTrack('next', listLen, listLen - 1), P.skipTrack('next', listLen, listLen - 1)], [-1, 0], 'the scope: a track ending on the last file stops, the Next button wraps');
+const picks = new Set();
+for (let i = 0; i < 100; i++) picks.add(P.randomTrack(listLen, 2, () => i / 100));
+eq([picks.has(2), picks.size], [false, listLen - 1], 'random over the whole scope: never the one just played, any other can come');
+  console.log('player: ' + checks + ' checks passed');
+})().catch(e => { console.error(e); process.exit(1); });

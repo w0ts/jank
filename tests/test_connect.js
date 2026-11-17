@@ -41,8 +41,9 @@ function makeElement() {
   return el;
 }
 
-function makeAudio(media) {
+function makeAudio(media, withCapture) {
   const audio = makeElement();
+  if (withCapture) audio.captureStream = () => ({ tracks: 1 });
   Object.assign(audio, { tagName: 'AUDIO', paused: true, ended: false, currentTime: 0, duration: NaN, volume: 1, src: '', pause() { audio.paused = true; media.paused++; }, load() {}, removeAttribute() { audio.src = ''; }, play() { audio.paused = false; return Promise.resolve(); } });
   return audio;
 }
@@ -52,7 +53,7 @@ function makePage(opts = {}) {
   let nextTimer = 1, nextFrame = 1;
   const bus = {}, winBus = {}, media = { paused: 0, revoked: [] }, clock = { t: 1000 };
   const document = {
-    getElementById: id => { if (!elements.has(id)) elements.set(id, id === 'pl-audio' ? makeAudio(media) : makeElement()); return elements.get(id); },
+    getElementById: id => { if (!elements.has(id)) elements.set(id, id === 'pl-audio' ? makeAudio(media, !!opts.audioApi && opts.audioApi.capture !== false) : makeElement()); return elements.get(id); },
     addEventListener: (type, fn) => { (bus[type] = bus[type] || []).push(fn); },
     dispatchEvent: ev => { (bus[ev.type] || []).forEach(fn => fn(ev)); return true; },
     createElement: () => makeElement(), createElementNS: () => makeElement(), activeElement: null,
@@ -67,8 +68,9 @@ function makePage(opts = {}) {
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } }, navigator: { mediaDevices: opts.mediaDevices },
     localStorage: opts.storage || { getItem: () => null, setItem: () => {} },
     URL: { createObjectURL: f => 'blob:' + f.name, revokeObjectURL: u => media.revoked.push(u) },
-    window: { addEventListener: (type, fn) => { (winBus[type] = winBus[type] || []).push(fn); } }, location: { search: '' }, URLSearchParams, TextDecoder, Uint8Array, Float32Array,
+    window: { addEventListener: (type, fn) => { (winBus[type] = winBus[type] || []).push(fn); } }, location: { search: '' }, URLSearchParams, TextDecoder, Uint8Array, Float32Array, MessageChannel,
   };
+  if (opts.audioApi) { box.AudioContext = opts.audioApi.Context; box.window.AudioContext = opts.audioApi.Context; }
   vm.createContext(box);
   vm.runInContext(script('logic'), box);
   vm.runInContext(script('ui'), box);
@@ -80,6 +82,24 @@ function makePage(opts = {}) {
   const key = (type, k) => (winBus[type] || []).forEach(fn => fn({ key: k, target: { tagName: 'BODY' }, repeat: false, preventDefault() {} }));
   const runFrame = () => { const [f] = [...frames]; if (f) { frames.delete(f); f.fn(clock.t); } };
   return { box, el: id => document.getElementById(id), timers, frames, media, clock, key, runFrame, intervals: () => [...(box.__intervals || [])] };
+}
+
+
+// a fake Web Audio: records every context, setSinkId call and connection, so the routing to the stick can be asserted exactly
+function fakeAudioApi(options = {}) {
+  const log = [], contexts = [], gains = [];
+  class Context {
+    constructor(o) { this.opts = o || {}; this.state = 'suspended'; this.sinkId = options.ignoreCtorSink ? '' : (this.opts.sinkId || ''); this.destination = { kind: 'destination' }; this.currentTime = 0; contexts.push(this); log.push(['new', this.opts.sinkId || null, this.opts.sampleRate || null]); }
+    async resume() { log.push(['resume']); this.state = 'running'; }
+    async suspend() { log.push(['suspend']); this.state = 'suspended'; }
+    async close() { log.push(['close']); this.state = 'closed'; }
+    createAnalyser() { return { kind: 'analyser', fftSize: 0, getFloatTimeDomainData: a => a.fill(0.1) }; }
+    createGain() { const g = { kind: 'gain', gain: { value: 1 }, channelCount: 2, connect: n => { log.push(['gain->', n.kind]); }, disconnect() {} }; gains.push(g); return g; }
+    createMediaStreamSource() { const src = { kind: 'source', connect: n => { log.push(['source->', n.kind]); }, disconnect: () => log.push(['source disconnect']) }; return src; }
+    createOscillator() { const osc = { kind: 'osc', frequency: { value: 0 }, connect: n => log.push(['osc->', n.kind]), start: () => log.push(['osc start', osc.frequency.value]), stop: () => { log.push(['osc stop']); queueMicrotask(() => osc.onended && osc.onended()); } }; return osc; }
+  }
+  if (!options.noSinkId) Context.prototype.setSinkId = async function (id) { log.push(['setSinkId', id]); if (options.rejectSink) throw new Error(options.rejectSink); this.sinkId = id; };
+  return { Context, log, contexts, gains, capture: options.capture };
 }
 
 // the fake stick: one MIDI port pair that answers each command line with the firmware's reply
@@ -240,6 +260,16 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   eq([p.el('adv-boots').textContent, p.el('adv-boots').classList.contains('restarted'), p.el('adv-restart').classList.contains('hide'), p.el('adv-save').textContent],
      ['boots 4 \u00b7 reset: sw', true, false, 'yes (unplugging loses it)'], 'a restart shows: boots and the reset reason change, a notice appears');
   assert.match(p.el('adv-restart').textContent, /boots 3 \u2192 4, reset: sw/); checks++;
+  // a diag answer with no boots field is no restart
+  midi.text.diag = 'save_pending=0\nok';
+  for (const [, tick] of p.intervals()) tick();
+  await settle();
+  eq(p.el('adv-boots').textContent, 'boots - \u00b7 reset: -', 'a diag without boots: shown as unknown');
+  assert.match(p.el('adv-restart').textContent, /boots 3 \u2192 4/); checks++;
+  midi.text.diag = 'boots=4\nreset=sw\nsave_pending=1\nlink_settled=0\nlink_drift_ppb=0\nlink_last_err_us=0\nlink_far=0\nlink_partner_rtt_us=0\ndrive=ok\nok';
+  for (const [, tick] of p.intervals()) tick();
+  await settle();
+  eq(p.el('adv-restart').textContent.includes('NaN'), false, 'no NaN notice');
   // untick: the poll stops
   p.el('c-advanced').checked = false;
   p.el('c-advanced').fire('change', {});
@@ -303,15 +333,15 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
 
 
   // ---- the stick's output without the microphone ----
-  const fakeDevices = (withChooser, saved) => {
-    const calls = { getUserMedia: 0, selectAudioOutput: 0, enumerate: 0, stopped: 0 }, store = new Map(saved ? [['jank.player.output', JSON.stringify(saved)]] : []);
+  const fakeDevices = (withChooser, saved, listing, extra = {}) => {
+    const calls = { getUserMedia: 0, selectAudioOutput: 0, enumerate: 0, stopped: 0 }, handlers = {}, store = new Map(saved ? [['jank.player.output', JSON.stringify(saved)]] : []);
     const mediaDevices = {
-      enumerateDevices: async () => { calls.enumerate++; return [{ kind: 'audiooutput', label: '', deviceId: 'spk' }, { kind: 'audiooutput', label: '', deviceId: 'jk' }]; },
+      enumerateDevices: async () => { calls.enumerate++; return (extra.current || listing || [{ kind: 'audiooutput', label: '', deviceId: 'spk' }, { kind: 'audiooutput', label: '', deviceId: 'jk' }]); },
       getUserMedia: async () => { calls.getUserMedia++; return { getTracks: () => [{ stop: () => { calls.stopped++; } }] }; },
-      addEventListener: () => {},
+      addEventListener: (type, fn) => { handlers[type] = fn; },
     };
-    if (withChooser) mediaDevices.selectAudioOutput = async () => { calls.selectAudioOutput++; return { deviceId: 'jk', label: 'JANK USB Audio' }; };
-    return { calls, store, opts: { mediaDevices, storage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v) } } };
+    if (withChooser) mediaDevices.selectAudioOutput = async () => { calls.selectAudioOutput++; return { deviceId: 'jk', label: extra.chosenLabel || 'JANK USB Audio' }; };
+    return { calls, store, handlers, extra, opts: { mediaDevices, storage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v) } } };
   };
   let dev = fakeDevices(true);
   ({ page: p, midi } = await connected(undefined, dev.opts));
@@ -346,6 +376,154 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   p.el('pl-pick').click();
   await settle();
   eq([dev.calls.getUserMedia, dev.calls.stopped], [1, 1], 'only the button asks, once, and the stream is stopped at once');
+  p.box.disconnected();
+
+
+  // ---- the routing to the stick, branch by branch, with a fake Web Audio that records every call ----
+  const oneFile = (name = 'a.mp3') => ({ target: { files: [{ name, webkitRelativePath: 'Music/' + name, slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) }) }] } });
+  const startPlayback = async (audioOpts, devOpts, saved, listing) => {
+    const api = fakeAudioApi(audioOpts), d = fakeDevices(true, saved, listing, devOpts);
+    d.opts.audioApi = api;
+    const c = await connected(undefined, d.opts);
+    c.page.el('c-advanced').checked = true;
+    c.page.el('c-advanced').fire('change', {});
+    await settle();
+    c.page.el('pl-monitor').checked = true;
+    c.page.el('pl-monitor').fire('change', {});
+    c.page.el('pl-dir').fire('change', oneFile());
+    await settle();
+    return { ...c, api, d };
+  };
+  const play = async (c) => { c.page.el('pl-list').children[0].click(); await settle(); c.page.el('pl-audio').fire('playing', {}); await settle(); };
+  // saved id valid, labels absent: the context is created with the sink, read back, no extra setSinkId, source -> mono gain -> destination
+  let r = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
+  await play(r);
+  eq(r.api.log.filter(e => e[0] === 'new'), [['new', 'jk', 44100]], 'saved id: the stick context is created with sinkId and 44.1 kHz');
+  eq(r.api.log.filter(e => e[0] === 'setSinkId'), [], 'its sinkId reads back as the saved id: no second setSinkId needed');
+  eq(r.api.log.filter(e => /->/.test(e[0])).map(e => e.join('')), ['gain->destination', 'source->analyser', 'source->gain'], 'captureStream -> MediaStreamSource -> mono gain -> that context\'s destination');
+  eq([r.api.gains[0].channelCount, r.api.gains[0].channelCountMode, r.api.gains[0].channelInterpretation], [1, 'explicit', 'speakers'], 'the stick path is mixed down to one channel explicitly');
+  eq([r.api.contexts[0].state, r.api.contexts[0].sinkId, r.d.calls.getUserMedia], ['running', 'jk', 0], 'the context runs, aimed at the stick, no microphone');
+  assert.match(r.page.el('pl-output-report').textContent, /stick context: running, sinkId jk/); checks++;
+  assert.match(r.page.el('pl-status').textContent, /monitor \+ jank \(303a:4a4b\)/); checks++;
+  // muting the monitor leaves the captured stream alone
+  r.page.el('pl-monitor').checked = false;
+  r.page.el('pl-monitor').fire('change', {});
+  eq([r.page.el('pl-audio').muted, r.api.contexts.length, r.api.log.filter(e => e[0] === 'source disconnect').length], [true, 1, 0], 'monitor off mutes the element only: the stick path is untouched');
+  r.page.box.disconnected();
+
+  // the constructor does not take the sink (older browser): setSinkId is awaited and called with the saved id
+  r = await startPlayback({ ignoreCtorSink: true }, {}, { id: 'jk', label: 'jank' });
+  await play(r);
+  eq(r.api.log.filter(e => e[0] === 'setSinkId'), [['setSinkId', 'jk']], 'a context that did not take the sink: `await ctx.setSinkId(id)` with the saved id');
+  r.page.box.disconnected();
+
+  // setSinkId rejecting: the exact error is shown, the monitor goes on, the choose button comes back
+  r = await startPlayback({ ignoreCtorSink: true, rejectSink: 'NotFoundError: no such device' }, {}, { id: 'jk', label: 'jank' });
+  await play(r);
+  assert.match(r.page.el('pl-status').textContent, /jank output failed: NotFoundError: no such device, monitor only/); checks++;
+  eq([shown(r.page, 'pl-pick'), r.page.el('pl-audio').paused], [true, false], 'the button to choose again is shown and the monitor keeps playing');
+  assert.match(r.page.el('pl-output-report').textContent, /last sink error: NotFoundError: no such device/); checks++;
+  r.page.box.disconnected();
+
+  // the context exists before the device is known; choosing it later re-aims it live, with no restart of the track
+  r = await startPlayback({}, {}, null);
+  await play(r);
+  eq([r.api.contexts.length, r.api.log.filter(e => e[0] === 'new'), r.api.log.filter(e => e.join('') === 'source->gain').length], [1, [['new', null, 44100]], 0], 'no output chosen: a context for the meter, nothing sent to the stick');
+  const pausedBefore = r.page.media.paused;
+  r.page.el('pl-pick').click();
+  await settle();
+  eq(r.api.log.filter(e => e[0] === 'setSinkId'), [['setSinkId', 'jk']], 'the choice re-aims the running context: setSinkId(jk)');
+  eq([r.api.contexts.length, r.page.media.paused - pausedBefore, r.page.el('pl-audio').paused, r.api.log.filter(e => e[0] === 'source->').map(e => e[1])], [1, 0, false, ['analyser', 'gain']], 'live: same context, the track was not stopped, the source now feeds the stick path');
+  r.page.box.disconnected();
+
+  // a saved device that is not listed (ids shown, no match) is dropped; when it appears (devicechange) it is used, live
+  const listed2 = [{ kind: 'audiooutput', label: 'MacBook Speakers', deviceId: 'spk' }];
+  r = await startPlayback({}, { current: listed2 }, { id: 'jk', label: 'jank (303a:4a4b)' }, listed2);
+  await settle();
+  eq([r.page.el('pl-outlabel').textContent, shown(r.page, 'pl-pick')], ['none', true], 'a saved output that is not in a list that shows ids: dropped, the button is back');
+  await play(r);
+  eq(r.api.log.filter(e => e[0] === 'setSinkId'), [], 'nothing is sent to a device that is not there');
+  r.d.extra.current = [{ kind: 'audiooutput', label: 'MacBook Speakers', deviceId: 'spk' }, { kind: 'audiooutput', label: 'jank (303a:4a4b)', deviceId: 'jk' }];
+  await r.d.handlers.devicechange();
+  await settle();
+  eq([r.page.el('pl-outlabel').textContent, r.api.log.filter(e => e[0] === 'setSinkId'), shown(r.page, 'pl-pick')], ['jank (303a:4a4b)', [['setSinkId', 'jk']], false], 'the stick appears (devicechange): the saved device is found again and the running context is aimed at it');
+  r.page.box.disconnected();
+
+  // labels present: the explicit button reads the names; "jank (303a:4a4b)" is matched in any case
+  const named = [{ kind: 'audiooutput', label: 'Default - MacBook Speakers', deviceId: 'default' }, { kind: 'audiooutput', label: 'MacBook Speakers', deviceId: 'spk' }, { kind: 'audiooutput', label: 'JANK (303a:4a4b)', deviceId: 'jk' }];
+  const dn = fakeDevices(false, null, null, { current: [{ kind: 'audiooutput', label: '', deviceId: '' }] });
+  dn.opts.audioApi = fakeAudioApi({});
+  ({ page: p, midi } = await connected(undefined, dn.opts));
+  p.el('c-advanced').checked = true;
+  p.el('c-advanced').fire('change', {});
+  await settle();
+  dn.extra.current = named;
+  p.el('pl-pick').click();
+  await settle();
+  eq([p.el('pl-outlabel').textContent, dn.calls.getUserMedia, dn.calls.stopped], ['JANK (303a:4a4b)', 1, 1], 'after the one permission: jank found by its label, any case; the probe stopped at once');
+  assert.match(p.el('pl-note').textContent, /^Output names unlocked\./); checks++;
+  eq(JSON.parse(dn.store.get('jank.player.output')), { id: 'jk', label: 'JANK (303a:4a4b)' }, 'the id and the label are saved');
+  p.box.disconnected();
+
+  // the test tone: the stick path only, its own context with the sink
+  r = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
+  r.page.el('pl-test').click();
+  await settle();
+  eq(r.api.log.filter(e => e[0] === 'new' || e[0] === 'osc start' || e[0] === 'osc stop' || e[0] === 'close' || e[0] === 'setSinkId'), [['new', 'jk', 44100], ['osc start', 1000], ['osc stop'], ['close']], 'the test tone: a context with the chosen sink, 1 kHz, 1 s, then closed');
+  eq(r.page.el('pl-note').textContent, 'tone sent to jank (303a:4a4b)', 'and the result line');
+  r.page.box.disconnected();
+  r = await startPlayback({ ignoreCtorSink: true, rejectSink: 'NotAllowedError: blocked' }, {}, { id: 'jk', label: 'jank' });
+  r.page.el('pl-test').click();
+  await settle();
+  eq([r.page.el('pl-note').textContent, r.api.log.filter(e => e[0] === 'osc start').length], ['Test tone failed: NotAllowedError: blocked', 0], 'a failing test tone shows the exact error and plays nothing');
+  r.page.box.disconnected();
+
+  // ---- the play scope: every audio file under the picked folder ----
+  const rel = (path) => ({ name: path.split('/').pop(), webkitRelativePath: path, slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) }) });
+  ({ page: p, midi } = await connected());
+  p.el('c-advanced').checked = true;
+  p.el('c-advanced').fire('change', {});
+  await settle();
+  p.el('pl-dir').fire('change', { target: { files: ['Music/a.mp3', 'Music/Sub/b.mp3', 'Music/Sub/Deep/c.mp3', 'Music/Sub/Deep/.hidden.mp3', 'Music/__MACOSX/x.mp3', 'Music/$RECYCLE.BIN/y.mp3', 'Music/cover.jpg'].map(rel) } });
+  await settle();
+  eq(p.el('pl-scope-line').textContent, '3 files in scope', 'the scope: audio files under the picked folder, junk and hidden skipped');
+  eq([p.el('pl-scope').checked, shown(p, 'pl-scope-row')], [true, true], 'all folders is on by default');
+  p.el('pl-list').children.find(b => b.textContent === 'a.mp3').click();
+  await settle();
+  eq(p.el('pl-name').textContent, 'a.mp3', 'a file of the opened folder plays');
+  p.el('pl-audio').fire('ended', {});
+  await settle();
+  eq(p.el('pl-name').textContent, 'a.mp3', 'a.mp3 is the last file of the whole tree (folders first, depth first): ending there stops');
+  p.el('pl-next').click();
+  await settle();
+  eq(p.el('pl-name').textContent, 'c.mp3', 'the Next button wraps to the first file of the tree (Sub/Deep/c.mp3)');
+  p.el('pl-audio').fire('ended', {});
+  await settle();
+  eq(p.el('pl-name').textContent, 'b.mp3', 'next goes on through the tree: Sub/b.mp3, though only the root folder is open');
+  p.el('pl-then').value = 'random';
+  p.el('pl-then').fire('change', {});
+  vm.runInContext('Math.random = () => 0', p.box);
+  p.el('pl-audio').fire('ended', {});
+  await settle();
+  eq(p.el('pl-name').textContent, 'c.mp3', 'random picks any other file of the whole scope (never b.mp3 again)');
+  p.el('pl-scope').checked = false;
+  p.el('pl-scope').fire('change', {});
+  await settle();
+  p.el('pl-list').children.find(b => b.textContent === 'a.mp3').click();
+  await settle();
+  p.el('pl-then').value = 'next';
+  p.el('pl-then').fire('change', {});
+  eq([p.el('pl-next').disabled, shown(p, 'pl-scope-row')], [true, false], 'all folders off: the old behaviour, this folder only (a single file: nothing next)');
+  p.el('pl-scope').checked = true;
+  p.el('pl-scope').fire('change', {});
+  await settle();
+  eq(p.el('pl-next').disabled, false, 'on again: the whole tree is the scope again');
+  p.el('pl-rescan').click();
+  await settle();
+  eq(p.el('pl-scope-line').textContent, '3 files in scope', 'rescan walks it again');
+  p.el('c-advanced').checked = false;
+  p.el('c-advanced').fire('change', {});
+  eq(p.el('pl-scope-line').textContent, '0 files in scope', 'leaving Advanced cancels the scan and clears the list');
   p.box.disconnected();
 
   // ---- over Bluetooth: the face, no Advanced ----
