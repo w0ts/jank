@@ -31,8 +31,8 @@ static uint32_t get32(const uint8_t *p) { return (uint32_t)p[0] | (uint32_t)p[1]
 
 static uint32_t clusters_of(uint32_t size) { return (size + JV_SECTOR - 1u) / JV_SECTOR; }
 
-void jv_init(struct jv *d, const uint8_t *html, uint32_t html_size, const char *note, uint32_t serial, uint32_t slot_size,
-             jv_alloc_fn alloc, void *alloc_ctx)
+void jv_init(struct jv *d, const uint8_t *html, uint32_t html_size, const char *note, const char *readme, uint32_t serial,
+             uint32_t slot_size, jv_alloc_fn alloc, void *alloc_ctx)
 {
     uint32_t next = 2;
     memset(d, 0, sizeof *d);
@@ -50,6 +50,14 @@ void jv_init(struct jv *d, const uint8_t *html, uint32_t html_size, const char *
         d->file[1].data = (const uint8_t *)note;
         d->file[1].size = (uint32_t)strlen(note);
         d->nfiles = 2;
+    }
+    if (readme && readme[0]) {
+        struct jv_file *f = &d->file[d->nfiles];
+        memcpy(f->sfn, "README  TXT", 11);
+        f->lfn = "README.txt";
+        f->data = (const uint8_t *)readme;
+        f->size = (uint32_t)strlen(readme);
+        d->nfiles++;
     }
     for (uint32_t i = 0; i < d->nfiles; i++) {
         d->file[i].cluster = d->file[i].size ? next : 0u;

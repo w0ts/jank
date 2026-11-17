@@ -117,6 +117,7 @@ static void wr16(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v
 
 static const char HTML[] = "<!doctype html><title>jank</title>... a page long enough to take two sectors ...";
 static uint8_t s_html[1300];
+static const char *s_readme;                 /* README.txt's text for the next mount; NULL: none */
 
 static void mount(const char *note)
 {
@@ -124,7 +125,7 @@ static void mount(const char *note)
     memcpy(s_html, HTML, sizeof HTML - 1u);
     for (size_t i = sizeof HTML - 1u; i < sizeof s_html; i++)
         s_html[i] = (uint8_t)('a' + i % 26u);
-    jv_init(&s_d, s_html, sizeof s_html, note, 0x4A414E4Bu, s_slot_size, alloc_sector, NULL);
+    jv_init(&s_d, s_html, sizeof s_html, note, s_readme, 0x4A414E4Bu, s_slot_size, alloc_sector, NULL);
     memset(s_slot, 0x5A, sizeof s_slot);           /* the slot's old contents: never 0xFF, so a missing erase shows */
     s_flash_faults = 0;
     s_phase = JV_IDLE;
@@ -238,6 +239,33 @@ static void test_files(void)
     n = list_root(e, 8);
     CHECK(n == 3 && !strncmp(e[2].name, "UPDATE  TXT", 11) && e[2].cluster == 5);
     CHECK(file_is(e[2].cluster, e[2].size, (const uint8_t *)"jank.bin installed from the drive, restarted\n"));
+}
+
+/* README.txt: a file of its own after UPDATE.TXT when there is one, in clusters of its own, readable through its chain */
+static void test_readme(void)
+{
+    static char text[700];
+    struct entry e[8];
+    int n;
+    for (size_t i = 0; i < sizeof text - 1u; i++)
+        text[i] = i % 60u == 59u ? '\n' : (char)('A' + i % 26u);
+    text[sizeof text - 1u] = 0;
+    s_readme = text;
+    mount(NULL);
+    n = list_root(e, 8);
+    CHECK(n == 3 && !strcmp(e[2].name, "README.txt") && e[2].size == strlen(text) && e[2].cluster == 5);
+    CHECK(file_is(e[2].cluster, e[2].size, (const uint8_t *)text));
+    CHECK(fat_get(5, 0) == 6 && fat_get(6, 0) == 0xFFFF && fat_get(7, 0) == 0 && fat_get(5, 1) == 6);
+    mount("jank.bin installed from the drive, restarted\n");
+    n = list_root(e, 8);
+    CHECK(n == 4 && !strncmp(e[2].name, "UPDATE  TXT", 11) && e[2].cluster == 5);
+    CHECK(!strcmp(e[3].name, "README.txt") && e[3].cluster == 6 && e[3].size == strlen(text));
+    CHECK(file_is(e[3].cluster, e[3].size, (const uint8_t *)text));
+    CHECK(file_is(e[2].cluster, e[2].size, (const uint8_t *)"jank.bin installed from the drive, restarted\n"));
+    s_readme = "";
+    mount(NULL);
+    CHECK(list_root(e, 8) == 2);                    /* empty text: no file */
+    s_readme = NULL;
 }
 
 /* --- images --- */
@@ -536,6 +564,7 @@ int main(void)
 {
     test_boot_sector();
     test_files();
+    test_readme();
     test_len();
     test_orders();
     test_not_images();

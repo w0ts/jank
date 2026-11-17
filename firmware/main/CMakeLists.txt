@@ -32,3 +32,4 @@ endif()
 # the drive's page: the made-up JANK volume serves it from the image (drive.c, core/jank_vdrive.h); nothing is stored on a
 # FAT partition any more (the XIAO's table still has its 2 MB "storage", unused)
 target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_LIST_DIR}/../../page/jank.html" TEXT)
+target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_LIST_DIR}/../../docs/drive-readme.txt" TEXT)
