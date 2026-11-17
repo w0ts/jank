@@ -1,116 +1,135 @@
-# jank on the Waveshare ESP32-S3-LCD-2: colour only where it informs (design preview, v3: numbers, no bars)
+# jank on the Waveshare ESP32-S3-LCD-2: the colour screen on its own 160 x 120 grid (design preview, v4)
 
-The variant uses a 2.0 inch 240 x 320 ST7789 colour LCD **in landscape** (320 x 240), no touch, no RGB LEDs. The UI is the same simple
-128 x 64 1-bit UI (`ui/oled.js`), drawn at integer **x2 = 256 x 128, centred at (32, 56)**; the 56 px bands above and below stay black
-(the owner chose scaling (a); `ui/lcd2.js` still has the x2.5 geometry, no longer reachable from the page: the `?scale=` parameter is gone).
+The variant uses a 2.0 inch 240 x 320 ST7789 colour LCD **in landscape** (320 x 240), no touch, no RGB LEDs. The owner said the screen
+was not used fully (the 128 x 64 UI doubled is 256 x 128 with black bands and small text) and asked for more visual feedback, small
+progress bars. So the lcd2 layout has **its own logical grid of 160 x 120 pixels (4:3)**, the same 5 x 7 font and primitives at integer
+scales, painted **exactly x2** on 320 x 240: no bands, no centring, every pixel square. The lid window (43.4 x 33.2 mm) and the active
+area (40.8 x 30.6 mm) are 4:3 too, so a source pixel is a 0.255 mm square. The OLED boards keep 128 x 64 and are bit-identical.
 
-**Default screen of the control page:** the colour landscape lcd2 layout (x2, the lcd2 lid window) for every stick, whatever its `board=` (the XIAO included): the owner decided it after flashing the XIAO and seeing the black and white screen. `?screen=oled` gives the old black and white 2.42 in OLED look. The Mac simulator is unchanged.
+Colour is information only: the screen is neutral (near-white on near-black, menus and edit screens included) and a colour appears only
+on an element that says something the white version cannot. Screens: `lcd2v4-states.png` (12 situations), `lcd2v4-home.png` (the control
+page), `lcd2v4-menus.png` (menus, sub menu, edit, info, overlay).
 
-The first preview (whole-screen accent colour, state words in the bands) was rejected: "not color just for the sake of color". This one
-is **neutral** (near-white on near-black, menus and edit screens included, the selected row the white inverted bar). A colour appears
-only on an element that says something the white version cannot. Screens: `lcd2v2-home.png` (the control page, now the default view) and
-`lcd2v2-states.png` (12 situations).
+## How a caller learns the size
 
-## v3 (owner, 2026-11-17: "we dont need the sliders/progress bars for confidence etc. or at least not as big. color will help")
+`OLED.size(layout)` returns `{ w, h }`: `OLED.size()` / `'oled'` = 128 x 64, `'lcd2'` = 160 x 120 (`OLED.SIZES`). `OLED.W` and `OLED.H` stay
+the OLED's. `OLED.draw(fb, ui, ctx, now, ink)` keeps its signature: with `ctx.layout === 'lcd2'` `fb` (and `ink`) must be 160 * 120 bytes
+(else it throws), any other layout 128 * 64. The grid is a module variable set for the duration of one `draw()` and restored after.
+`Stick.screen(model, now, layout)` makes the buffers itself and returns `{ fb, ink, w, h }`; `Stick.framebuffer(model, now)` is the OLED's
+128 x 64 as before. `Lcd2.paint(ctx2d, img, fb, ink)` paints a 160 x 120 frame as 320 x 240.
 
-On the lcd2 HOME there are **no bars**: the CF bar is the number `CF 87` (v2), the IN bar is now the number `IN -20` (dBFS, rounded, no unit), small
-text (scale 1) at x 3, y 33, its digits coloured by the level rule (red clipping, amber too quiet, neutral otherwise). **No meter line at all:** the
-number already moves with the level (a value every 250 ms), the colour carries the alarm, and a meter would need its own rules (width, colour,
-min / max, a silence tick). Gone with the bar: the threshold tick, the min / max lines, the downbeat estimator's growing line under the four
-boxes. Kept: the locked underline under the first box and the M (state marks, not sliders), the battery and signal icons (icons, not bars).
-Rows 30..43 are empty on purpose (the tempo digits do not grow: they are scale 3 against the boxes at x 87, and a bigger size would need a new
-layout rule). Menus, edit screens and every OLED layout are untouched. Layout, rows: top bar 0..8, tempo 9..29, IN 33..39, CF number 44..57, status 57..63.
+## The ink plane (unchanged idea)
 
-## The mechanism: an ink plane
+`ink` is a `Uint8Array(160 * 120)`; 0 = neutral. Ids (`OLED.INK`, meanings not colours): `GOOD` 1, `WARN` 2, `BAD` 3, `DIM` 4, `ONE` 5 (the
+bar's first beat while lit). **No id was added.** Only lit pixels carry ink (`draw()` clears ink under unlit pixels, e.g. where a tick is
+XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens and overlays: no ink at all.
 
-`OLED.draw(fb, ui, ctx, now, ink)` takes an optional second output, `ink`: a `Uint8Array(128 * 64)`. 0 = default neutral. The ids are
-meanings, never colours (`OLED.INK`): `GOOD` 1, `WARN` 2, `BAD` 3, `DIM` 4, `ONE` 5 (the bar's first beat, only while it is the lit one). The draw functions tag the
-pixels of exactly the informative elements, and only those that are lit (`tag()` in `ui/oled.js`). `ui/lcd2.js` maps id to palette and
-paints the 256 x 128 picture. Two switches keep the OLED untouched:
-
-- the ink plane is filled only with `ctx.layout === 'lcd2'` (`Stick.framebuffer(model, now, ink)` sets it when it is given a plane);
-- the confidence NUMBER replaces the CF bar only with `ctx.layout === 'lcd2'`; every OLED board keeps its bar.
-
-Without the flag the bytes are the old ones: `tests/test_lcd2.js` holds golden hashes made by the unmodified `ui/oled.js` for 8 screens
-(6 HOME states, the menu, a sub menu), and `tests/oled_ref`, `tests/test_oled.c` and the 11 beat node tests pass unchanged.
-Overlays (the hint box, the value box, SAVED) clear the ink under their box. Menus, sub menus, edit, scan, setup: no ink at all.
-
-## The palette (exact RGB, WCAG AA against the background, tested)
+## The palette (exact RGB, WCAG AA against the background, tested; unchanged)
 
 | name | RGB | hex | contrast on bg | means |
 |---|---|---|---|---|
 | bg | 8, 10, 14 | #080a0e | | unlit |
 | neutral | 232, 236, 244 | #e8ecf4 | 16.7 | everything without a meaning |
 | good | 72, 222, 128 | #48de80 | 11.4 | joined, strong, above the line, charged |
-| warn | 255, 176, 32 | #ffb020 | 10.8 | fair, near the line, low, too quiet; also the bar's first beat while it is lit |
+| warn | 255, 176, 32 | #ffb020 | 10.8 | fair, near the line, low, too quiet; also the bar's first beat |
 | bad | 255, 104, 92 | #ff685c | 7.0 | poor, below the line, clipping, empty |
 | dim | 150, 156, 168 | #969ca8 | 7.2 | nothing there / not reported |
 
-The test checks each colour on the background and the background on each colour (an inverted label), and that the five are different.
+## HOME (AUDIO) on 160 x 120: the row table (`OLED.LCD2` holds the numbers)
 
-## What is coloured, and what the stick reports for it today
+| y | height | element | content and colour |
+|---|---|---|---|
+| 0..12 | 13 | top bar | x 2 transport icon (triangle 9 high, square 7, blinks while armed); x 14 fold label or LINK option icon; `GRP n` / SSID right-aligned to x 66; x 70 link glyph + Link peer count; x 98 signal bars (3 bars 3 px wide, 3 / 6 / 9 high); x 112 Bluetooth rune; x 119 USB plug; x 134 battery icon 21 x 9 with nub |
+| 15..49 | 35 | TEMPO | font scale 5 (digits 25 x 35, `120.0` is 130 px wide, x 2..131; the widest, 999.9, also fits); `BPM` at x 138, y 43..49 |
+| 53..70 | 18 | beat boxes | four boxes 36 x 18, gap 4, from x 2 to x 157; the lit one is filled, the others 1 px frames; the first is amber only while it is the lit one |
+| 75..81 | 7 | `CF  92%` + bar | label x 2; value right-aligned to x 60; bar x 64..157 (94 x 5, 3 px fill), tick at the stop threshold |
+| 87..93 | 7 | `IN -18dB` + bar | the same columns; tick at the tracker's -50 dBFS sound level |
+| 99..105 | 7 | `BAR LOCKED` + bar | AUTO BAR's state word and its confidence; only with AUTO BAR on (the row stays empty otherwise: the rows never move) |
+| 111..117 | 7 | status line | left: `GATED` / `HOLD` / `COAST`, else `BT PAIR m:ss`, else `PHONE`, else the Wi-Fi line; right-aligned: `STOP 70` or `MIN 70` |
 
-| element | colour rule | what the stick reports today |
+Every element has its own row, with gaps of 1 to 5 px between rows; the test checks that no lit pixel lies in a gap, that the rows are in
+increasing order, and that the status word and the threshold text on row 111 do not touch (the v3 overlap of GATED / COAST over STOP 70 is
+gone because the words moved to the left of the same row).
+
+**LINK layout**: the same top bar, tempo and status line (no STOP / MIN text, no words); the beat boxes are 36 x 36 at y 58..93; no audio rows.
+
+### The progress bars
+
+A row is: label (neutral), the value (coloured), an outlined bar 94 x 5 px (outline neutral), the fill 3 px high inside it (coloured), and
+a tick. The inner width is 92 px: **fill = round(92 x value)**; the tick sits at `barX + 1 + round(91 x tickFraction)` and is an XOR line
+7 px high through the bar (it sticks out 1 px above and below, notches the outline, cuts a gap through a fill that passes it). Value, fill
+and tick carry the same ink id.
+
+| bar | fraction | tick | colour of value, fill and tick |
+|---|---|---|---|
+| CF | confidence 0..1 (0 / 50 / 100 % = 0 / 46 / 92 px) | the stick's stop threshold `th` (70 % = x 129) | red below `th`; amber from `th` up to `th` + 10 points; green above; grey when the stick reports no value (`--`, empty bar) or there is silence |
+| IN | (dBFS + 90) / 90 (-90 / -45 / 0 dB = 0 / 46 / 92 px) | -50 dBFS (x 105): the tracker's sound level | neutral; red when the last second's peak reaches -1 dBFS (or, if `peak_db` is not reported, the RMS maximum reaches -3 dB); amber under -50 dBFS (too quiet to track) |
+| BAR | AUTO BAR's confidence 0..1 (MANUAL: empty) | none | neutral |
+
+**Position inside the bar**: not drawn as a bar (my choice, easy to add). The face's beat position is an extrapolation (`Stick.ctx` runs the
+HOME line's phase forward with `phaseAt`, then floors it to the whole beat `beatN`), so a position bar would show the same estimate as the
+four boxes, only smoother, and `ctx` does not expose the fractional position today (it would need one more field, e.g. `barPos`). The BAR
+row shows what the stick reports about the bar that the boxes do not: AUTO BAR's state and confidence.
+
+## What the stick reports for each coloured item (unchanged)
+
+| element | colour rule | reported today |
 |---|---|---|
-| **Confidence** number `CF 87` (the digits; the label `CF` stays white) | red below the stop threshold `ctx.th`, amber from the threshold up to 10 points above it, green above; grey with no value or in silence | HOME line field `conf` (percent) and the `threshold` / `lowconf` settings (`get`): reported. No HOME line: `CF --` in grey. Rounding: the shown integer is compared. |
-| `STOP 70` / `MIN 70` under the right block | white text: the line the colours refer to | `threshold`, `lowconf`: reported |
-| Word right of the number | `GATED` red (outputs stopped for low confidence), `HOLD` grey, `COAST` amber (running under the threshold) | `status gated=1` (needs a fresh status), HOME `h` suffix (hold / coast): reported |
-| **Link icon** (the three linked dots) and the peer count `2` | joined (at least 1 Link peer) green; alone: grey in AUDIO mode, red in LINK mode | HOME line `link` field = Link peers: reported. "Searching" is not reported separately: not joined and searching look the same. |
-| **Signal bars** (3 bars) | good >= -67 dBm green (3 bars), fair -80..-68 amber (2), poor < -80 red (1), none grey stubs | see below |
-| **Battery** | green from 30 %, amber 15..29, red under 15 | HOME `battery` percent: reported. **Charging is not reported** (the OLED's "CHARGING" is inferred from USB present and < 100 %); no charging mark drawn. |
-| **Input level** number `IN -20` (the number; the label `IN` stays white) | neutral; red when the last second's peak reaches -1 dBFS (clipping); amber under -50 dBFS (below the tracker's sound level, too quiet to track) | `status peak_db` (last second's peak) reported; if missing, the RMS maximum over -3 dB counts. Level: HOME (the min / max lines are gone with the bar). |
-| **Downbeat**: first of the four beat boxes | amber **only while that box is the current beat** (owner decision 2026-11-17: a flash on the downbeat, not a static accent); neutral otherwise, and the other boxes always | Link's bar phase (HOME `bar`, `quantum`): reported. With AUTO BAR off the "1" is Link's bar 1, as the LEDs show it. |
+| CF value, bar, tick | the rule above | HOME `conf`, `get` threshold and lowconf: yes |
+| words `GATED` red, `HOLD` grey, `COAST` amber | outputs stopped for low confidence / holding / running under the threshold | status `gated=1`, HOME hold / coast suffix: yes |
+| link glyph + count | joined (>= 1 Link peer) green; alone: grey in AUDIO mode, red in LINK mode | HOME `link` (Link peers): yes. "Searching" is not reported |
+| signal bars | >= -67 dBm green (3 bars), -80..-68 amber (2), < -80 red (1), none or not reported grey stubs | status `rssi` (best jank peer, 0 = none) or `wifi_rssi`: yes. Retry / loss shares: no |
+| battery | green from 30 %, amber 15..29, red under 15 | HOME `battery` percent: yes. **Charging: not reported** (no mark drawn) |
+| IN | rule above | HOME `level`, status `peak_db`: yes |
+| first beat | amber while it is the lit box | Link bar phase: yes |
+| BAR row | neutral | status `bar`, `bar_lead` (via `Stick.ctx` `bar`): yes, when AUTO BAR is on |
 
-Why red for "alone" only in LINK mode: in AUDIO mode the stick leads its own session, so having no peer is normal and red would cry wolf
-(grey says "nothing there"); in LINK mode it has no tempo to follow, which is a fault.
+## The other screens on the bigger grid (neutral, the selected row inverted, no ink)
 
-### Signal: the control line does carry a value
+| screen | geometry |
+|---|---|
+| title bar | 11 rows, full width, text at y 2 |
+| MENU | 12 rows of 9 px from y 13 (the 11 items all fit: no scrolling; row k at y 13 + 9k, last at y 103), value right-aligned at x 156, selected row inverted over the full width |
+| sub menu (AUDIO, OFFSET, DISPLAY) | rows of 12 px from y 16 |
+| edit | the value at font scale 2 in an inverted box centred on 160 (scale 1 if it would not fit), the two help lines at y 70 and 82 |
+| info (BATTERY) | text rows of 12 px from y 18, the level bar 152 px wide at y 92 |
+| NETWORK / scan list | rows of 9 px like the menu (scan: 11 rows, the selected one kept near the middle, signal bars at x 144), the selected row's help at y 101 and 110 |
+| text editor | 25 character cells of 6 px from x 5, the help lines at y 46, 58, 70 |
+| confirm | two lines centred at y 34 and 46, `YES      NO` at scale 2 at y 84 |
+| SETUP (QR) | the QR box on the left at module size 4, 3 or 2 (the largest that fits 118 rows and leaves 66 px for the text: 25 modules at 3 px = 81 px box); text right of it |
+| overlays | one box 130 x 60 at (15, 30), centred; the value at the largest scale of 4, 3, 2, 1 that fits; the NO / YES hint and the pair countdown use it too; SAVED: 90 x 34 at (35, 42), text scale 2 |
+| BOOT / splash | `BOOT` at scale 5; `JANK` at scale 5 and `MINI 2.2` at scale 3 |
 
-`status` has `rssi=` (dBm of the best jank peer, `jk_best_rssi`, **0 = none heard**, in `core/jank_ctl.c cmd_status`) and `wifi_rssi=` (the
-Wi-Fi router's, in Wi-Fi client mode). `Stick.ctx` feeds `rssi`: jank mode the peer's, Wi-Fi mode the router's (0 while not joined), `null`
-when no fresh status (5 s) is there: grey stubs, never made up. Not reported: the retry and loss shares of Optimist's Wi-Fi page
-(`wifiQ`), so the status line's `R3% L0%` text stays unused. The thresholds are the Wi-Fi page's own: -80 dBm is its BAD line. -67 is
-a guess for "good": measure it with real sticks before keeping it.
-
-## Proposals, not drawn
-
-- **SILENT** (no sound on the source): the IN bar is then empty and the CF number grey; a word would add little. Left out.
-- **Lost lock** is already `GATED` (red) with the red number; `HOLD` and `COAST` are the softer cases.
-- **Bar locked** (`bar.state === 'locked'`): a green bar under the first box instead of white: a small green accent that says "the 1 is
-  the music's". Not drawn to keep the screen calm.
-- **Charging**: needs the firmware to report it (see below).
+The cursor logic in `OLED.press` still scrolls as if 6 menu rows were visible (`ui.top`); the lcd2 draw ignores `ui.top` and keeps the
+cursor in view by itself (all 11 menu items fit; the scan list centres on the selection), so no state is shared between the layouts.
 
 ## Recommendation
 
-Keep: the confidence number (the one change that makes the screen read at a glance), the signal bars, the battery, the link glyph.
-Keep the clipping red; the quiet amber is useful but rarely seen. The first-beat amber is a flash on the downbeat only (owner decision: amber while that box is the current beat, neutral otherwise). Cut: nothing else; the bands carry nothing.
+Keep: the tempo as the biggest element, the CF and IN bars with their ticks, the beat boxes with the amber first one, the top bar. The BAR
+row is a candidate to cut if the owner never turns AUTO BAR on (the space then stays empty). `MIN 70` / `STOP 70` is useful but could be
+cut to the colour alone.
 
-## The C side (stage 2, built, never run on the board)
+## What the C side will need later (not written)
 
-- `core/jank_oled_draw.c`: `jo_draw_ink(fb, ink, ui, ctx, now)` is `jo_draw` plus the ink plane; `ctx->layout_lcd2` switches the layout
-  (the CF and IN numbers, the net cluster, the lcd2 status line, no bars). `jo_draw` is `jo_draw_ink` with no plane, and the OLED boards'
-  ctx never sets the flag: their bytes are what they were (`tests/test_oled.c`: the 385 frames of `cases.txt`, and 283 non-HOME frames
-  drawn again with the layout on come out the same with an empty plane).
-- Parity with `ui/oled.js`: `tests/oled_ref/cases_ink.txt` (`node tests/oled_ref/gen_cases.js --ink`, made by `ui/oled.js` itself) holds 88
-  cases, 90 frames: the 1-bit frame and the 8192-byte ink plane of each, and `test_oled` reproduces both pixel for pixel. `tests/run.sh`
-  makes the file again and wants it to be the one kept.
-- `core/jank_lcd.[ch]`: the palette (`JLC_PALETTE`, `JLC_INK_MAP`; `tests/test_lcd_palette.js` compares them with `ui/lcd2.js`), RGB565 once,
-  `jlc_row` expands the frame + plane to a 320-pixel row; `firmware/main/lcd.c` sends it (changed pages, pixels or ink).
-- Fed in `firmware/main/uiscreen.c` from what the firmware has: `rssi` (`jk_best_rssi`, or the router's in Wi-Fi client mode; 0 = none heard),
-  `peak_db` (the tracker's last-second peak, no LEVEL offset), `silent`, `gated`, `conf_hold`, the confidence, the stored threshold and
-  STOP / KEEP RUNNING, `peers`, the battery percent. In LINK mode (no audio) the AUDIO layout is not shown, so `conf_unknown` there is moot.
+1. `jo_draw` / `jo_draw_ink` get a layout size: 160 x 120 frame buffer and ink plane (19200 bytes each; the OLED path keeps 1024 / 8192), the
+   `LCD2` row table above, and the lcd2 screens (lists, edit, info, setup, overlays) as `ui/oled.js` draws them. `jank_lcd.c` paints the 160 x
+   120 frame x2 with the palette.
+2. `tests/oled_ref/gen_ink.js` writes planes of 128 x 64 (`W = OLED.W`) and the C `test_oled.c` replays them: both must move to the 160 x 120
+   grid (the generator throws today, see below), and new cases cover the bars at 0 / 50 / 100 %, the tick, the words, the lists and the overlays.
+3. Ctx fields as before: `rssi`, `peakDb`, `confKnown`, `peers`, `layout`, plus `bar` for the BAR row.
+4. Firmware wishes (unchanged): a charging flag, Wi-Fi retry / loss shares, a "joining" Link state, `rssi` / `peak_db` on the HOME line.
 
-Not done, wishes: a **charging** flag (the device infers CHARGING from USB present and under 100 %), the **Wi-Fi retry / loss** counts in jank
-mode (the status line shows `R--` `L--`), a **"Link session found, joining"** state, and `rssi` / `peak_db` on the HOME line: that line is
-positional and rate-limited (`jph_home_due`), the page's parser is not mine to change, and a value that moves every frame would defeat its
-de-duplication, so the face keeps reading both from `status`.
+## Tests in this stage
 
-Known difference, not caused by the colour layout: the C port of the OLED UI is a port of player.html's module (commit 78e5cd4's version),
-`ui/oled.js` has moved on (the BLUETOOTH and USB MIDI CLOCK menu items, the fold label, the Bluetooth rune, a different top-bar name for MODE
-JANK, the min / max meter lines that avoid the label). The lcd2 HOME is ported from `ui/oled.js`; the menus and edit screens stay the C
-port's, so the screens other than HOME are compared for "unchanged, no ink", not against `ui/oled.js`'s frames.
+`tests/test_lcd2.js` (171 checks): palette AA; sizes and the throw on a wrong buffer; the exact x2 (a full frame covers all 320 x 240, an empty one
+none, six single source pixels each become exactly their 2 x 2 block in their ink colour); the row table (rows increasing, no lit pixel in
+a gap, tempo 35 rows, the widest tempo fits); ink only in the allowed boxes; the CF rule at 60, 69, 70, 75, 80, 81, 87, 100 for value, bar
+and tick; fill lengths at 0 / 50 / 100 % and the tick position (also following the stick's threshold); IN clip / quiet edges and fills; the BAR
+row; link, signal, battery; the status words and the threshold text; the LINK layout; no ink in menus, sub menus, edit, info, net, scan,
+text, confirm, setup and overlays; overlays and SAVED centred; the OLED layout equal to golden hashes made by the OLED module from before the
+lcd2 layout (8 screens) and unaffected after an lcd2 draw.
 
-## The screen (unchanged from v1)
-
-Active area 40.8 x 30.6 mm landscape (diagonal 51.0 mm = 2.008 in); the lid window 43.4 x 33.2 mm (1.3 mm of bezel each side, a guess:
-measure it) centred at (36.0, 21.5) mm on the board, above the D-pad. No LED dots on this variant.
+`tests/run.sh` **fails on purpose at its first lcd2 step**: it regenerates the ink references with `node tests/oled_ref/gen_cases.js --ink`
+(`gen_ink.js`), which hands 128 x 64 buffers to the lcd2 layout, and `OLED.draw` now refuses them (`needs a 160 x 120 frame buffer`). That
+is the C parity for the lcd2 ink cases (`cases_ink.txt` and the C `jo_draw_ink`, both still the 128 x 64 design); it stops the script before
+`test_oled.c` and everything after it. Everything after that step was run without it and passes (see the report).

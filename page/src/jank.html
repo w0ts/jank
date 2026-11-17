@@ -1094,10 +1094,9 @@ setConnected(null, false);
   };
 
   const paintArms = () => { for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", model.held[b]); };
-  // the screen of the box: the colour landscape LCD (ui/lcd2.js, scaled x2) for every stick, whatever its board; ?screen=oled shows the old
+  // the screen of the box: the colour landscape LCD (ui/lcd2.js: its own 160 x 120 grid, painted x2) for every stick, whatever its board; ?screen=oled shows the old
   // black and white 2.42 in OLED
   const params = new URLSearchParams(location.search);
-  const LCD2_SCALING = "2";
   let screen = "";
   function applyScreen() {
     const wanted = params.get("screen") === "oled" ? "2.42" : "lcd2";
@@ -1117,9 +1116,10 @@ setConnected(null, false);
       phase = Stick.phaseFeed(phase, Stick.phaseReport(S.lastHome), S.homeAt);
     }
     Stick.tick(model, now);
-    const ink = screen === "lcd2" ? new Uint8Array(OLED.W * OLED.H) : null, fb = Stick.framebuffer(model, now, ink);
-    if (screen === "lcd2") Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), fb, ink, LCD2_SCALING);
-    else Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), fb, 100);
+    if (screen === "lcd2") {
+      const lcd = Stick.screen(model, now, "lcd2");
+      Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), lcd.fb, lcd.ink);
+    } else Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), Stick.framebuffer(model, now), 100);
     paintArms();
   }
   const pressDown = (b) => { if (model) Stick.down(model, b, performance.now()); };
