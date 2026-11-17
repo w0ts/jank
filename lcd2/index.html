@@ -1778,12 +1778,12 @@ const OLED = (() => {
   //
   //   HOME (AUDIO)  y 0..12   top bar: transport icon, fold / LINK option icon, GRP n, link glyph + peers, signal bars, BLE rune, USB plug, battery
   //                 y 15..49  the TEMPO, font scale 5 (130 px wide for '120.0'), 'BPM' at its right
-  //                 y 53..70  four big beat boxes, 36 x 18, gap 4; the first is amber only while it is the lit one
-  //                 y 75      CF  87%  [bar, tick at the stop threshold]     number and bar coloured by the threshold rule
-  //                 y 87      IN -20dB [bar, tick at the tracker's -50 dBFS] neutral; red clipping, amber too quiet
-  //                 y 99      BAR LOCKED [bar]                               AUTO BAR state and its confidence, neutral; only with AUTO BAR on
+  //                 y 52..77  four big beat boxes, 36 x 26, gap 4, the beat indicator; lit = solid, unlit = 2 px outline; the first is amber only while lit
+  //                 y 81      CF  87%  [line, notch at the stop threshold]   number and line coloured by the threshold rule
+  //                 y 91      IN -20dB [line, notch at the tracker's -50 dBFS] neutral; red clipping, amber too quiet
+  //                 y 101     BAR LOCKED [outlined bar]                      AUTO BAR state and its confidence, neutral; only with AUTO BAR on
   //                 y 111     status line: GATED / HOLD / COAST (left), STOP 70 / MIN 70 (right); or BT PAIR, PHONE, the Wi-Fi line
-  //   HOME (LINK)   the same top bar, tempo and status line; the beat boxes 36 x 36 at y 58; no audio bars
+  //   HOME (LINK)   the same top bar, tempo and status line; the beat boxes 36 x 52 at y 54..105; no audio bars
   //   lists         title bar 11 px, 12 rows of 9 px from y 13; sub menus and info 12 px rows; edit: the value at scale 2
   const SIZES = { oled: { w: OLED_W, h: OLED_H }, lcd2: { w: 160, h: 120 } };
   const sizeOf = layout => (layout === 'lcd2' ? SIZES.lcd2 : SIZES.oled);
@@ -1805,13 +1805,12 @@ const OLED = (() => {
   const L2 = {
     topH: 13, left: 14, nameRight: 66, linkX: 70, signalX: 98, bleX: 112, plugX: 119, battX: 134, battW: 21,
     tempoY: 15, tempoScale: 5, bpmX: 138, bpmY: 43,
-    boxX: 2, boxW: 36, boxGap: 4, boxY: 53, boxH: 18, linkBoxY: 58, linkBoxH: 36,
-    rowCF: 75, rowIN: 87, rowBAR: 99, labelX: 2, valueXR: 60, barX: 64, barW: 94, barH: 5,
+    boxX: 2, boxW: 36, boxGap: 4, boxY: 52, boxH: 26, linkBoxY: 54, linkBoxH: 52, boxBorder: 2,
+    rowCF: 81, rowIN: 91, rowBAR: 101, labelX: 2, valueXR: 60, barX: 64, barW: 94, lineH: 3,
     statusY: 111,
   };
-  const L2_BAR_INNER = L2.barW - 2;
-  const barFillWidth = frac => Math.round(L2_BAR_INNER * clamp(frac, 0, 1));
-  const barTickX = tickFrac => L2.barX + 1 + Math.round((L2_BAR_INNER - 1) * tickFrac);
+  const barFillWidth = frac => Math.round(L2.barW * clamp(frac, 0, 1));          // the line's length: the value on 94 px
+  const barTickX = tickFrac => L2.barX + Math.round((L2.barW - 1) * tickFrac);
 
   function drawTopBarLcd2(fb, c, now) {
     const tri = c.running || (c.armed && Math.floor(now / ARMED_BLINK_MS) % 2 === 0);
@@ -1838,22 +1837,30 @@ const OLED = (() => {
     }
   }
 
-  // a small progress row: label, the value right-aligned, a 94 x 5 outlined bar with a 3 px fill; an XOR tick through it when tickFrac
-  // is given. The value, the fill and the tick carry `ink`; the label and the outline stay neutral.
+  // a small progress row: label, the value right-aligned, and ONE thin line (3 px high, no outline, no track): its length is the value on
+  // 94 px, the rest is background. A notch, 1 px wide and 5 px tall, is XOR-ed through the line at tickFrac when given (a gap in the line
+  // where it passes, a stub above and below where it does not). The value, the line and the notch carry `ink`; the label stays neutral.
   function progressRow(fb, y, label, value, frac, tickFrac, ink) {
     text(fb, label, L2.labelX, y, 1, 1);
     text(fb, value, L2.valueXR - textW(value, 1), y, 1, 1);
     tag(ink, L2.valueXR - textW(value, 1), y, textW(value, 1), 7);
-    frame(fb, L2.barX, y + 1, L2.barW, L2.barH, 1);
     const n = barFillWidth(frac);
-    rect(fb, L2.barX + 1, y + 2, n, 3, 1);
-    tag(ink, L2.barX + 1, y + 2, n, 3);
-    if (tickFrac !== null && tickFrac !== undefined) { const x = barTickX(tickFrac); xorCol(fb, x, y, y + 6); tag(ink, x, y, 1, 7); }
+    rect(fb, L2.barX, y + 2, n, L2.lineH, 1);
+    tag(ink, L2.barX, y + 2, n, L2.lineH);
+    if (tickFrac !== null && tickFrac !== undefined) { const x = barTickX(tickFrac); xorCol(fb, x, y + 1, y + 5); tag(ink, x, y + 1, 1, 5); }
   }
-  function beatBoxesLcd2(fb, c, y, h) {                                  // the lit beat's box is filled; the first one is amber only while lit
+  // the BAR row keeps v4's outlined bar (94 x 5, a 3 px fill inside, so the fill is round(92 x value)); neutral, no tick
+  function outlinedRow(fb, y, label, value, frac) {
+    text(fb, label, L2.labelX, y, 1, 1);
+    text(fb, value, L2.valueXR - textW(value, 1), y, 1, 1);
+    frame(fb, L2.barX, y + 1, L2.barW, 5, 1);
+    rect(fb, L2.barX + 1, y + 2, Math.round((L2.barW - 2) * clamp(frac, 0, 1)), 3, 1);
+  }
+  function beatBoxesLcd2(fb, c, y, h) {                                  // the beat indicator (no LEDs): the lit box solid, the others 2 px outlines; the first one is amber only while lit
     for (let i = 0; i < 4; i++) {
       const x = L2.boxX + i * (L2.boxW + L2.boxGap), on = c.beatN != null && ((c.beatN % 4) + 4) % 4 === i;
-      if (on) rect(fb, x, y, L2.boxW, h, 1); else frame(fb, x, y, L2.boxW, h, 1);
+      if (on) rect(fb, x, y, L2.boxW, h, 1);
+      else { frame(fb, x, y, L2.boxW, h, 1); frame(fb, x + 1, y + 1, L2.boxW - 2, h - 2, 1); }          // an unlit box: a 2 px outline
       if (i === 0 && on) tag(INK.ONE, x, y, L2.boxW, h);
     }
   }
@@ -1888,7 +1895,7 @@ const OLED = (() => {
     const known = c.confKnown !== false, ci = confInk(c);
     progressRow(fb, L2.rowCF, 'CF', known ? Math.round(c.conf * 100) + '%' : '--', known ? c.conf : 0, c.th / 100, ci);
     progressRow(fb, L2.rowIN, 'IN', Math.round(c.levelDb) + 'dB', (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (QUIET_DB - METER_MIN_DB) / -METER_MIN_DB, levelInk(c));
-    if (c.bar && BAR_WORDS[c.bar.state]) progressRow(fb, L2.rowBAR, 'BAR', BAR_WORDS[c.bar.state], c.bar.state === 'manual' ? 0 : c.bar.conf || 0, null, INK.NONE);
+    if (c.bar && BAR_WORDS[c.bar.state]) outlinedRow(fb, L2.rowBAR, 'BAR', BAR_WORDS[c.bar.state], c.bar.state === 'manual' ? 0 : c.bar.conf || 0);
     drawStatusLcd2(fb, c, now);
   }
 
