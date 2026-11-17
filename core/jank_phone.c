@@ -111,6 +111,8 @@ size_t jph_home_line(const struct jk_cfg *c, const struct jk_snapshot *s, uint32
     field(conf, sizeof conf, s->beat.audio, s->beat.conf_pct);
     if (s->beat.audio && s->beat.conf_hold)    /* M2k: the hold, "<pct>h", 99 at most: no wider than "100" */
         snprintf(conf, sizeof conf, "%uh", s->beat.conf_pct > 99u ? 99u : (unsigned)s->beat.conf_pct);
+    else if (s->beat.audio && s->beat.coast)   /* the coast (robust follower: the outputs run under the threshold): "<pct>c" */
+        snprintf(conf, sizeof conf, "%uc", s->beat.conf_pct > 99u ? 99u : (unsigned)s->beat.conf_pct);
     field(lo, sizeof lo, s->beat.audio, s->beat.level_min_db);
     field(hi, sizeof hi, s->beat.audio, s->beat.level_max_db);
     /* the mode: 0 LINK, 1 AUDIO, or AUDIO folded: x2 x4 /2 /4 (core/jank_fold.h) */

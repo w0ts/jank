@@ -93,7 +93,7 @@ static void test_dbn(void)
     for (int j = 0; j < d.n_intervals; ++j) {
         double s = 0;
         for (int i = 0; i < d.n_intervals; ++i)
-            s += d.trans[j][i];
+            s += d.trans[i][j];                                       /* [to][from] since M2m: a column is a row of the matrix */
         CHECK(fabs(s - 1.0) < 1e-5);
     }
     CHECK(jb_dbn_init(&d, 20, 240, 100) == -1);                       /* too many states for the fixed tables */

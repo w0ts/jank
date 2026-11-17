@@ -41,14 +41,29 @@ void jb_beat_push(struct jb_beat *b, const float *x, size_t n, jb_frame_fn fn, v
     float feat[BEAT_INPUTS];
     while (n) {
         int ready;
+        const uint32_t c0 = b->clock ? b->clock() : 0u;
         size_t took = jb_fe_push(&b->fe, x, n, feat, &ready);
+        if (b->clock) {
+            uint32_t c = b->clock() - c0;
+            b->cyc_fe += c;
+            b->max_fe = c > b->max_fe ? c : b->max_fe;
+        }
         x += took;
         n -= took;
         if (!ready)
             continue;
         struct jb_frame f = {.index = jb_fe_last_frame(&b->fe), .bands = feat};
+        const uint32_t c1 = b->clock ? b->clock() : 0u;
         f.act = b->q16 ? jb_lstm_q16_step(&b->net, feat) : jb_lstm_step(&b->net, feat);
+        const uint32_t c2 = b->clock ? b->clock() : 0u;
         f.beat = jb_dbn_step(&b->dbn, f.act, &f.time);
+        if (b->clock) {
+            uint32_t cd = b->clock() - c2;
+            b->cyc_net += c2 - c1;
+            b->cyc_dbn += cd;
+            b->max_net = c2 - c1 > b->max_net ? c2 - c1 : b->max_net;
+            b->max_dbn = cd > b->max_dbn ? cd : b->max_dbn;
+        }
         if (fn)
             fn(ctx, &f);
     }

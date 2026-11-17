@@ -164,6 +164,36 @@ def test_playing():
         raise AssertionError("an update went on while playing")
 
 
+class Crowded(Device):
+    """Another client on the port: after each of our lines the stick's wire also carries that client's answers (the bare "ok" ending a
+    `get`, `beat` or `status`, an error of its own), arriving before ours."""
+
+    def send(self, text):
+        n = len(self.pending)
+        super().send(text)
+        if len(self.pending) > n:                       # ours came: put the strays in front of it
+            ours = self.pending.pop()
+            self.pending.extend(["ok", "beat=on", "err bad setting", "ok", ours])
+
+
+def test_other_clients(binary, scratch):
+    """A bare "ok" or another command's error between our lines used to crash the update (IndexError on parts[1]) or stop it."""
+    out = os.path.join(scratch, "crowded.flashed")
+    if os.path.exists(out):
+        os.remove(out)
+    dev = Crowded(binary, out)
+    img = image(2500)
+    try:
+        ota.Uploader(dev.send, dev.recv).upload(img)
+    finally:
+        dev.close()
+    assert open(out, "rb").read() == img
+    for good in ("ok 120", "ok 0 120", "err gap 240", "err playing 0", "err crc 120"):
+        assert ota.OTA_ANSWER.match(good), good
+    for stray in ("ok", "ok ", "err bad setting", "err", "beat=on", "okay 5", "ok x"):
+        assert not ota.OTA_ANSWER.match(stray), stray
+
+
 def test_frames():
     f = ota.frame("get\n")
     assert f == [0xF0, 0x7D, 0x4A, 0x4B, 0x67, 0x65, 0x74, 0x0A, 0xF7]
@@ -186,4 +216,5 @@ if __name__ == "__main__":
     test_busy_from_an_earlier_run(binary, scratch)
     test_idle(binary, scratch)
     test_playing()
+    test_other_clients(binary, scratch)
     print("ota (python): ok")

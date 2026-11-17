@@ -135,7 +135,14 @@ struct jk_cfg {
     uint8_t beat;                     /* 1: the beat tracker steers the Link session */
     int16_t beat_latency_ms;          /* the music is heard this long after its samples reach the stick (JK_BEAT_LATENCY_MIN_MS..MAX):
                                          the current source's value from `lat` below (stored there, since M2d) */
+    uint16_t burn_us;                 /* BENCH: extra work the tracker does per frame, us (0..9000), to find where the core overloads.
+                                         Not stored: 0 at every start */
     uint8_t autobar_picks;            /* counts `set autobar start|always|on`: picked again, it leaves MANUAL even when on */
+    uint8_t follower;                 /* M2m A/B: 0 (default) the tuned follower (tuned-l16, M2j), 1 the robust one (all-d-f60,
+                                         core/beat/jb_robust.h). Not stored: 0 again at every start */
+    uint8_t skip;                     /* SKIP (core/beat/jb_skip.h, on the robust follower): 0 off, 1 ACT, 2 PAT. Not stored */
+    uint8_t graded;                   /* the shown confidence is the graded one (core/beat/jb_graded.h): display only; 0 off, 1 on.
+                                         Not stored. Both need follower robust */
     /* Stored apart from the blob above (store.c, key "usb1"), so the blob stays 130: USB host mode (core/jank_usbrole.h)
      * and AUTO BAR */
     uint8_t autobar;                  /* enum jk_autobar: the downbeat estimator puts the session's bar on the music's 1 */
@@ -180,7 +187,7 @@ size_t jk_intr_summary(const char *dump, char *out, size_t cap);
 /* drive and MIDI updates: refused while playing ("stop first"): flash erases would stall USB, Wi-Fi and the tracker */
 #define JK_STOP_FIRST "the session or the MIDI clock is playing: stop first"
 
-#define JK_CTL_OUT_MAX 1920u         /* the firmware's answer buffer (ctl.c): the longest status (1859 since M2i, tests/test_ctl.c) fits with its ok; under usb.c's 2048 */
+#define JK_CTL_OUT_MAX 2040u         /* the firmware's answer buffer (ctl.c): the longest status (1871) and `beat` with every counter at its largest (1963, M2m's profile) fit with the ok, tests/test_ctl.c; under usb.c's 2048 */
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
 struct jk_beat {
@@ -238,6 +245,28 @@ struct jk_beat {
     uint32_t coasts;                  /* lines with no tracked beat the grid was corrected on from the activation */
     uint32_t weak_beats;              /* weak tracked beats taken as weak observations */
     uint32_t fast_jumps;              /* new grids (a section change) the follower jumped to at once */
+    /* the robust follower (M2m, core/beat/jb_robust.h) and the cost counters for the A/B */
+    uint8_t follower;                 /* the one running: 0 tuned, 1 robust (the setting, and its PSRAM there) */
+    uint8_t skip, graded;             /* the ones running (follower robust only): SKIP 0 off, 1 ACT, 2 PAT; the graded confidence shown */
+    uint8_t coast;                    /* the outputs run under the threshold (not a HOLD): the confidence is the robust follower's coast */
+    uint16_t skip_resyncs, skip_act_resyncs, skip_gated;   /* since the tracker started (saturating): phase re-syncs, those from the activation, confidence steps with SKIP on and the gate closed */
+    uint32_t conf_us;                 /* the confidence step's work (follow_conf) over the last second, us (10000 = 1 % of core 0);
+                                         it is not in cpu_pct, which is the tracker's work (frames, beats, the gate's questions) */
+    uint32_t robust_refresh_us, robust_refresh_max_us;    /* the agreement refresh (every 0.5 s): its total over the second, its longest */
+    uint32_t robust_gate_us, robust_gate_max_us;          /* the lock/jump gate's questions (ratio check): total, longest */
+    uint32_t robust_tick_us;          /* the robust tick without its refresh */
+    /* the profile (M2m): the tracker task's cycles per stage over the last second, us; order: pull, meter, fe (without the
+     * rate's tap), rate (the tap), net, dbn, down, act, feed, coast, rstep, conf, step, burn. idle: core 0's idle task's share
+     * over the second, x10 percent (Wi-Fi, Link, USB and the tracker are the rest) */
+    uint32_t prof_us[14];
+    uint32_t prof_max_us[14];         /* the longest single call of each stage in the last second (fe, net, dbn: one frame), us */
+    uint32_t hop_win_max_us, hop_over10;   /* the longest tracker pass (wall time, preemption included) in the last second, and how many
+                                              passes took over 10 ms (a frame's worth of audio) */
+    uint32_t uptime_s;
+    uint32_t gap_at_ms[6], gap_len_ms[6];  /* the last audio gaps: when (ms since boot) and how long (ms) */
+    uint32_t core0_idle_x10;
+    uint16_t burn_us;
+    uint32_t robust_asked, robust_refused_memory, robust_refused_ratio, robust_coast_ticks, robust_prior_ticks;
 };
 
 /* the USB port, for `status` (firmware/main/usbrole.c fills it) */

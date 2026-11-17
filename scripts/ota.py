@@ -11,6 +11,7 @@ against the firmware's own C logic (tests/test_ota.py).
 """
 import argparse
 import os
+import re
 import struct
 import sys
 import time
@@ -29,6 +30,11 @@ STOP_FIRST = ("the stick is playing (the Link session or its MIDI clock): update
 
 class OtaError(Exception):
     pass
+
+
+# What the stick answers to an `ota` line (core/jank_ota.c): "ok <offset>" ("ok <offset> <chunk>" to begin) or "err <name> <offset>".
+# Anything else on the port is another client's: the bare "ok" that ends every other answer (get, beat, status), their errors.
+OTA_ANSWER = re.compile(r"^(ok( \d+){1,2}|err (busy|size|arg|state|gap|crc|header|short|idle|playing)( \d+)?)$")
 
 
 def frame(text):
@@ -89,7 +95,7 @@ class Uploader:
             end = time.monotonic() + REPLY_TIMEOUT
             while time.monotonic() < end:
                 line = self.recv(max(0.0, end - time.monotonic()))
-                if line is not None and (line.startswith("ok") or line.startswith("err")):
+                if line is not None and OTA_ANSWER.match(line):      # (others on the port, e.g. a bare "ok", are skipped)
                     return line
         raise OtaError("no answer to %r" % text.split(" ")[0:2])
 

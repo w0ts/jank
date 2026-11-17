@@ -74,5 +74,8 @@ int jb_follow_fast_jump(struct jb_follow *f, double t, double rel);
 int jb_follow_weak_obs(struct jb_follow *f, double obs, double r_s, double gate);
 void jb_follow_outcome(struct jb_follow *f, uint8_t fitted);
 void jb_follow_jump(struct jb_follow *f, double t);
+/* RobustBpm._jump: the jump asked of the gate first (period: the new grid's, <= 0 for None: not asked); refused: the misses
+ * are cleared and nothing moves. Without a gate it is jb_follow_jump. 1: jumped. */
+int jb_follow_try_jump(struct jb_follow *f, double t, double period);
 
 #endif

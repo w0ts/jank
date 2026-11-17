@@ -63,6 +63,8 @@ const char *jph_state_name(const struct jph *p);                       /* "off",
  *              (core/jank_fold.h): x2 x4 /2 /4
  *              (M2k) "<pct>h" (pct 99 at most) while the confidence holds (no evidence: a break, a track change): the
  *              value shown, easing toward the threshold, not a measurement (jank_conf.h jcf_show_step); the CF bar HOLD
+ *              "<pct>c" while the outputs COAST (the robust follower runs them under the threshold: a measurement, the CF bar
+ *              hatched with COAST); with the graded confidence on the value is the graded one (jank_conf.h's gate is unchanged)
  * -> its length, 0 when it does not fit */
 size_t jph_home_line(const struct jk_cfg *c, const struct jk_snapshot *s, uint32_t now_ms, char *out, size_t cap);
 

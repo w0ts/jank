@@ -17,7 +17,7 @@ idf_component_register(
          "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c" "${core}/jank_start.c"
          "${core}/jank_phone.c" "${core}/jank_vdrive.c" "${core}/jank_live.c" "${core}/jank_hold.c" "${core}/jank_fold.c" "${core}/jank_lat.c" "${core}/jank_conf.c"
          "${beat}/jb_beat.c" "${beat}/jb_dbn.c" "${beat}/jb_fe.c" "${beat}/jb_lstm.c" "${beat}/jb_lstm_q16.c" "${beat}/jb_mode.c" "${beat}/beat_model.c"
-         "${beat}/jb_down.c" "${beat}/down_model.c" "${beat}/jb_follow.c" "${beat}/jb_rate.c" "${beat}/jb_weak.c"
+         "${beat}/jb_down.c" "${beat}/down_model.c" "${beat}/jb_follow.c" "${beat}/jb_rate.c" "${beat}/jb_weak.c" "${beat}/jb_comb.c" "${beat}/jb_robust.c" "${beat}/jb_skip.c" "${beat}/jb_graded.c"
          "${link}/link.c" ${ble_srcs}
     INCLUDE_DIRS "." "${core}" "${link}" "${beat}"
     PRIV_REQUIRES app_update esp_partition usb esp_wifi esp_event esp_netif nvs_flash esp_driver_gptimer esp_driver_uart esp_driver_gpio esp_driver_mcpwm esp_driver_i2c esp_driver_ledc esp_timer hal soc esp_hw_support esp_system heap bt esp_coex

@@ -49,7 +49,13 @@ struct jb_mode {
     uint8_t has_last_jump;
     int beats_seen;
     int lock_beats;                     /* LOCK_BEATS (JB_LOCK_BEATS by jb_mode_init) */
+    /* M2m: the robust follower's gate (jb_robust.h), asked before a lock (stopped -> steady) and before a jump; NULL: not
+     * asked (today's follower, bit for bit). Returns 1 to allow. period: the grid's, seconds. */
+    int (*gate)(void *ctx, int kind, double now, double period);
+    void *gate_ctx;
 };
+#define JB_GATE_LOCK 0
+#define JB_GATE_JUMP 1
 
 void jb_mode_init(struct jb_mode *m);
 void jb_mode_update(struct jb_mode *m, double t);

@@ -60,6 +60,8 @@ struct uac_stats {
     uint32_t gaps;                      /* 1 ms frames with no packet while streaming (a packet more than 1.5 ms after the last) */
     uint32_t overflows;                 /* the ring was full: the tracker restarts */
     uint32_t resets;                    /* the stream opened or the tracker restarted */
+    /* the last gaps (M2m diagnosis): when each began (ms since boot) and how long it was (ms), oldest first, 0 = none */
+    uint32_t gap_at_ms[6], gap_len_ms[6];
 };
 
 /* The ring and the mapping are the tracker task's: it calls these from one task. */

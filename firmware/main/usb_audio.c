@@ -4,6 +4,7 @@
  * local clock: off = arrival time - samples / 44100, smoothed, so that a sample's local time is off + s / 44100 whatever the
  * packets' jitter. The computer's clock is the stream's; ours drifts against it a little, which the smoothing follows. */
 #include <string.h>
+#include "esp_timer.h"
 #include "app.h"
 #include "esp_attr.h"
 #include "freertos/FreeRTOS.h"
@@ -128,8 +129,14 @@ void uac_feed(const int16_t *pk, uint32_t frames, int64_t now)
             }
             /* a gap: longer since the last feed than this feed's own audio and half a millisecond (device: 1 ms packets, so
              * over 1.5 ms; host: a transfer of a few packets at a time) */
-            if (s_last_us && now - s_last_us > sample_us(frames) + GAP_SLACK_US)
-                s_st.gaps += (uint32_t)((now - s_last_us - sample_us(frames) + GAP_SLACK_US) / 1000);
+            if (s_last_us && now - s_last_us > sample_us(frames) + GAP_SLACK_US) {
+                uint32_t len = (uint32_t)((now - s_last_us - sample_us(frames) + GAP_SLACK_US) / 1000);
+                s_st.gaps += len;
+                memmove(s_st.gap_at_ms, s_st.gap_at_ms + 1, sizeof s_st.gap_at_ms - sizeof s_st.gap_at_ms[0]);
+                memmove(s_st.gap_len_ms, s_st.gap_len_ms + 1, sizeof s_st.gap_len_ms - sizeof s_st.gap_len_ms[0]);
+                s_st.gap_at_ms[5] = (uint32_t)(esp_timer_get_time() / 1000);   /* (`now` is the Link host clock: its own origin) */
+                s_st.gap_len_ms[5] = len;
+            }
             s_last_us = now;
             s_seen++;
         }

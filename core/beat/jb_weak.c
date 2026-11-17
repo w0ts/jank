@@ -153,7 +153,8 @@ int jw_update(struct jb_weak *w, struct jb_follow *f, double t)
         m->misses++;
         w->weak_misses++;
         if (m->misses >= m->miss_limit && jb_mode_recent_consistent(m))
-            jb_follow_jump(f, t);
+            jb_follow_try_jump(f, t, m->gate ? jb_short_period(m->recent.v + (m->recent.n > m->lock_beats ? m->recent.n - m->lock_beats : 0),
+                                                           m->recent.n > m->lock_beats ? m->lock_beats : m->recent.n) : 0.0);
     }
     return 0;
 }

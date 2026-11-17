@@ -146,6 +146,24 @@ void jb_follow_jump(struct jb_follow *f, double t)
     seed(f);
 }
 
+int jb_follow_try_jump(struct jb_follow *f, double t, double period)
+{
+    if (f->m.gate && period > 0.0 && !f->m.gate(f->m.gate_ctx, JB_GATE_JUMP, t, period)) {
+        f->m.misses = 0;
+        return 0;
+    }
+    jb_follow_jump(f, t);
+    return 1;
+}
+
+/* the period of the last lock_beats recent beats, only when a gate will ask (the Python's short_period(recent[-LOCK:])) */
+static double gate_period(const struct jb_follow *f)
+{
+    const struct jb_mode *m = &f->m;
+    int n = m->recent.n > m->lock_beats ? m->lock_beats : m->recent.n;
+    return jb_short_period(m->recent.v + (m->recent.n - n), n);
+}
+
 /* FollowBpm.apply_ratio: the period divided by the ratio, the drift cleared, the next line moved as if the music had
  * run at the new rate from since; only on a trusted glide. 1 taken */
 static int apply_ratio(struct jb_follow *f, double ratio, int has_since, double since)
@@ -233,8 +251,8 @@ void jb_follow_update(struct jb_follow *f, double t)
         m->misses++;
         m->in_a_row = 0;
         if (m->misses >= m->miss_limit && jb_mode_recent_consistent(m)) {
-            jb_follow_jump(f, t);
-            return;
+            jb_follow_try_jump(f, t, m->gate ? gate_period(f) : 0.0);
+            return;                            /* (a refused jump too: the misses are cleared, the Python returns as well) */
         }
     }
     /* the beats' own tempo far from the glide's for CHANGE_BEATS beats (a lock on a 4:3 of the music, whose every
@@ -245,7 +263,7 @@ void jb_follow_update(struct jb_follow *f, double t)
     m->disagree = fabs(sp / f->x[1] - 1.0) > TEMPO_REL ? m->disagree + 1 : 0;
     if (m->disagree >= CHANGE_BEATS) {
         m->disagree = 0;
-        jb_follow_jump(f, t);
+        jb_follow_try_jump(f, t, sp);
     }
 }
 
@@ -296,7 +314,8 @@ int jb_follow_fast_jump(struct jb_follow *f, double t, double rel)
     double r = f->x[1] / sp, lr = log2(r), near = rint(lr);
     if (fabs(r - 1.0) <= rel || (near != 0.0 && fabs(lr - near) <= OCTAVE_TOL) || !jb_mode_recent_consistent(m))
         return 0;
-    jb_follow_jump(f, t);
+    if (!jb_follow_try_jump(f, t, sp))
+        return 0;
     f->fast_jumps++;
     return 1;
 }

@@ -68,6 +68,11 @@ fi
 # studies/tempo-changes chain (tuned-l16; golden vectors, tests/tempo_ref, scripts/tempo_golden.py).
 "$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_tempo.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_follow.c" "$HERE/core/beat/jb_weak.c" "$HERE/core/beat/jb_mode.c" -lm -o "$OUT/test_tempo"
 "$OUT/test_tempo" "$HERE/tests/tempo_ref"
+# The robust follower, all-d-f60 (M2m): the comb checks, the DBN's tempo prior, the lock and jump gate, the agreement
+# confidence and the coast against beat-listener's studies/follow-robust (golden vectors, tests/robust_ref, scripts/robust_golden.py);
+# and SKIP (jb_skip.c: ACT / PAT) with the graded shown confidence (jb_graded.c) against its skip configs (tests/skip_ref, robust_golden.py --skip-out).
+"$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_robust.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_follow.c" "$HERE/core/beat/jb_weak.c" "$HERE/core/beat/jb_mode.c" "$HERE/core/beat/jb_dbn.c" "$HERE/core/beat/jb_comb.c" "$HERE/core/beat/jb_robust.c" "$HERE/core/beat/jb_skip.c" "$HERE/core/beat/jb_graded.c" -lm -o "$OUT/test_robust"
+"$OUT/test_robust" "$HERE/tests/robust_ref" "$HERE/tests/skip_ref"
 "$OUT/test_fold"
 "$OUT/test_live"
 
