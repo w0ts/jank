@@ -11,10 +11,19 @@ TREE="${1:-$HERE}"
 SRC="$(ls -d "$IDF_COMPONENT_CACHE_PATH"/*/espressif__esp_tinyusb_3.0.0_* 2>/dev/null | head -n 1)"
 [ -n "$SRC" ] || { echo "esp_tinyusb 3.0.0 is not in $IDF_COMPONENT_CACHE_PATH: run one build without the override first (git stash the idf_component.yml line)"; exit 1; }
 DEST="$TREE/third_party/esp_tinyusb"
+# the copy is made again only when the registry's copy or a patch is not what it was made from: new files would get new
+# modification times and ninja would compile all of esp_tinyusb again on every build
+STAMP="$DEST/.jank-patch-stamp"
+NEW_STAMP="$SRC $(cat "$HERE/third_party/esp_tinyusb-uac2.patch" "$HERE/third_party/esp_tinyusb-msc-weak.patch" | shasum | cut -d' ' -f1)"
+if [ -d "$DEST" ] && [ "$(cat "$STAMP" 2>/dev/null)" = "$NEW_STAMP" ]; then
+    echo "esp_tinyusb with the audio class and weak MSC callbacks: $DEST (as it was)"
+    exit 0
+fi
 rm -rf "$DEST"
 mkdir -p "$TREE/third_party"
 cp -R "$SRC" "$DEST"
 (cd "$DEST" && patch -p1 --silent < "$HERE/third_party/esp_tinyusb-uac2.patch")
 # its TinyUSB mass storage callbacks weak: firmware/main/drive.c serves a made-up volume with its own (the streaming drive)
 (cd "$DEST" && patch -p1 --silent < "$HERE/third_party/esp_tinyusb-msc-weak.patch")
+echo "$NEW_STAMP" > "$STAMP"
 echo "esp_tinyusb with the audio class and weak MSC callbacks: $DEST"
