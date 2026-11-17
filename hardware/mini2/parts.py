@@ -335,6 +335,9 @@ PARTS = [
     ("C102", "C", "100n", "c0402", "C1525", {"1": "VLED", "2": "GND"}),
     ("R40", "R", "22", "r0402", "C25092", {"1": "LED_DATA", "2": "LED_DI"}),   # (experiment A: R24's 22 ohm, was 33)
     ("C96", "C", "100n", "c0402", "C1525", {"1": "VLED", "2": "GND"}),
+    # (sign-off stage 2, 2026-11-17, C2: one 100 nF per LED as the sheet asks: C96 LED1, C97 LED2, C102 LED3, C103 LED4)
+    ("C97", "C", "100n", "c0402", "C1525", {"1": "VLED", "2": "GND"}),
+    ("C103", "C", "100n", "c0402", "C1525", {"1": "VLED", "2": "GND"}),
     ("R98", "R", "10", "r0402", "C25077", {"1": "V5A", "2": "VLED"}),   # (chain list 1, 2026-11-15: R145's 10 ohm, was 4.7 0603; from the 5 V aux rail)
     ("C98", "C", "10u", "c0603", "C19702", {"1": "VLED", "2": "GND"}),
     #      ESCAPE HATCHES: R98 is VLED's cut (lift it: the RGB LEDs unpowered). The plain-LED fallback, right under the
@@ -445,6 +448,11 @@ AUX5 = [
      {"1": "V5_FB", "2": "V5_EN", "3": "VREG", "4": "GND", "5": "V5_SW", "6": "V5A"}),
     ("L5", "L", "0.47u", "ind2016", "C668312", {"1": "VREG", "2": "V5_SW"}),
     ("C99", "C", "10u", "c0603", "C19702", {"1": "VREG", "2": "GND"}),
+    # (sign-off stage 2, 2026-11-17, R6: C99 sits ~10 mm of copper from U18's VIN; TI (SLVSF14B 10.1) wants the input
+    #  capacitor at VIN / GND: C104 by pins 3 and 4. An 0402 (Samsung CL05A106MQ5NUNC, 6.3 V X5R, Basic): an 0603 has
+    #  no room between R134 and U18; at 5 V it keeps ~2 .. 3 uF (DC bias, ASSUMED from the class), the HF loop's part;
+    #  C99 and C72 / C92 hold the bulk)
+    ("C104", "C", "10u", "c0402", "C15525", {"1": "VREG", "2": "GND"}),
     ("C100", "C", "10u 25V", "c0805", "C15850", {"1": "V5A", "2": "GND"}),
     ("C101", "C", "10u 25V", "c0805", "C15850", {"1": "V5A", "2": "GND"}),
     ("R134", "R", "1M", "r0402", "C26083", {"1": "V5A", "2": "V5_FB"}),
@@ -535,7 +543,7 @@ LCSC = {
     "C23186": "5.1 k 1% 0603", "C25092": "22 ohm 5% 0402",
     "C22859": "10 ohm 1% 0603", "C17168": "0 ohm 0402", "C25744": "10 k 1% 0402",
     "C59461": "22 uF 6.3 V X5R 0603", "C19702": "10 uF 10 V X5R 0603",
-    "C1525": "100 nF 16 V X7R 0402", "C12530": "2.2 uF 6.3 V X5R 0402", "C15195": "10 nF 50 V X7R 0402",
+    "C1525": "100 nF 16 V X7R 0402", "C25271": "1 ohm 1% 0805 (Basic; R155, the VREG bulk's series R)", "C15525": "10 uF 6.3 V X5R 0402 (Basic; C104, U18's input)", "C12530": "2.2 uF 6.3 V X5R 0402", "C15195": "10 nF 50 V X7R 0402",
     "C52923": "1 uF 25 V X5R 0402", "C32949": "10 pF 50 V C0G 0402",
     # mini 2, LINE IN
     "C7972": "TI LMV321IDBVR, op-amp, rail-to-rail output, 1 MHz, 130 uA, 2.7..5.5 V, SOT-23-5 (a preferred Extended part)",
@@ -570,7 +578,7 @@ LCSC = {
     "C37704": "Nexperia BAT54C,215, dual Schottky 30 V, common cathode, SOT-23 (preferred; one half: D16)",
     "C52917434": "WorldSemi WS2812B-2020-V6, addressable RGB LED, 3.3 .. 5.3 V, 2.0 x 2.0 mm",
     "C25105": "33 ohm 1% 0402 (Basic)", "C25879": "2.2 k 1% 0402 (Basic)",
-    "C15008": "100 uF 6.3 V X5R 1206 (Basic; C72 / C92, VSYS's bulk)",
+    "C15008": "100 uF 6.3 V X5R 1206 (Basic; C72 / C92, VREG's bulk behind R155)",
     "C2845237": "TI TPS63802DLAR, 2 A buck-boost, VIN 1.3 .. 5.5 V, 11 uA, VSON-10 2 x 3 (+3V3)",
     "C919459": "TI TPS61023DRLR, 3.7 A synchronous boost, VIN 0.5 .. 5.5 V, PFM, true disconnect, SOT-563 (the 5 V aux rail)",
     "C668312": "Murata DFE201612E-R47M, 0.47 uH 5.5 A, 2016 (L4 / L5: TI's list for the TPS63802)",
@@ -587,8 +595,17 @@ SPARES = [
     # (review pass 2, the user's Q2: no bench test, so inside the datasheets: the unplug ride-through as two 100 uF
     #  X5R on VSYS (C72, C92: the LDO's input side) + one 100 uF tantalum on +3V3 (C86: inside the TLV757P's 200 uF).
     #  Battery order only. Sim, the worst corner, a 3.6 V cell, U15's tON 40 / 90 us: +3V3 3.09 / 3.02 V)
-    ("C72", "C", "100u", "c1206", "C15008", {"1": "VSYS", "2": "GND"}),
-    ("C92", "C", "100u", "c1206", "C15008", {"1": "VSYS", "2": "GND"}),
+    # (sign-off stage 2, 2026-11-17, R1: on VREG, after the power switch, and fitted in BOTH orders. On VSYS they
+    #  dumped 80 uF through the switch's wires into VREG's 2 x 10 uF at every switch-on: VREG rang to 5.2 .. 7.9 V
+    #  (the TPS63802's VIN abs max 6 V); the usb order's hot plug reached 5.93 / 6.23 V. On VREG: <= 5.59 V
+    #  (worktrees/mini22-review-scratch/REVIEW.md). Cost: ~1000 uC more USB inrush in the usb order (accepted, C4))
+    # (the same day, Henri's pick for the usb order's inrush: R155 1 ohm in series with the bulk only (VREG -> VREG_B).
+    #  Sim: VREG <= 5.16 V at switch-on and hot plug (bulk 3 mohm: 5.40), the host port's own rail dips 0.94 V (1.63);
+    #  R155 carries 4.9 A peak, 1.0 mJ per plug (0.62 mJ at switch-on from a cell): an 0805, not the 0402 (no pulse
+    #  curve in Uniroyal's sheet; adiabatic estimate ~10 K in an 0805's film vs ~65 K in an 0402's))
+    ("C72", "C", "100u", "c1206", "C15008", {"1": "VREG_B", "2": "GND"}),
+    ("C92", "C", "100u", "c1206", "C15008", {"1": "VREG_B", "2": "GND"}),
+    ("R155", "R", "1", "r0805", "C25271", {"1": "VREG", "2": "VREG_B"}),
     # (J10B: the 2.42" module's lead (its header is down its left side, over J5's DIN), on the screen's four nets;
     #  review pass 2: dropped, then kept by the user's call (pads only, no part, no cost: through hole). J10 takes the
     #  1.54"; the 1.3" is dropped (the user's, 2026-11-15))
@@ -599,7 +616,7 @@ SPARES = [
     ("C83", "C", "DNP", "c0603", "", {"1": "BTN_YES", "2": "GND"}),
 ]
 PARTS += SPARES
-DNP |= {p[0] for p in SPARES if p[0] not in ("C72", "C92")} | {"R144", "U2B", "R126", "R127", "R128", "R129", "R123"}
+DNP |= {p[0] for p in SPARES if p[0] not in ("C72", "C92", "R155")} | {"R144", "U2B", "R126", "R127", "R128", "R129", "R123"}
 
 # ---- the twins (stage 2, the user's standing rule, as hardware/sd-board's in the optimist repo): every resistor whose
 #      value may need changing after the boards arrive gets a bare hand-solder pad pair in parallel (1.4 x 2.0 mm pads
@@ -625,7 +642,7 @@ TWINS = {   # twin: (its resistor, the reason)
     # (the outputs' 1 k series R75 / R81 1206: not twinned)
     # (stage 2, spare lands as twins of capacitors: the crystal's load, the LINE IN filter, CHIP_PU's delay, the
     #  regulators' input / output, +3V3 by the chip)
-    # (review pass 1: CT3, C3's twin, gone: C3 sits at the LDO's pin with no room beside it, and C72 / C92, VSYS's 2 x 100 uF, are
+    # (review pass 1: CT3, C3's twin, gone: C3 sits at the LDO's pin with no room beside it, and C72 / C92, the 2 x 100 uF bulk (VREG since sign-off stage 2), are
     #  fitted now)
     # (72 x 72: these three on the BOTTOM under their parts, make_board.BOTTOM_TWINS: on top CT9 / CT10 closed the way
     #  round the crystal, CT8 had no room in the fan-out lanes)
@@ -649,7 +666,7 @@ HOST = ("U17", "C95", "R94", "R92", "R93", "D16", "Q9")
 ONLY = {"R62": "usb",                                       # (review pass 1: U2, the LDL1117, in both orders)
         "R63": "usb", "R3": "usb", "R4": "usb",              # (host mode: Q9 and U17 take their places in "battery")
         **{r: "battery" for r in ("Q1", "R50", "D9", "U8", "R51", "C40", "C41", "R86", "U9", "R52", "C42", "Q2",
-                                  "R10", "C72", "C92")},   # (the bulk: no inrush on USB-only boards)
+                                  "R10")},   # (sign-off stage 2: C72 / C92, VREG's bulk, now in both orders)
         **{r: "battery" for r in HOST}}                     # (USB host mode: the battery order only, the user's)
 
 

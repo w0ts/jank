@@ -228,7 +228,7 @@ PLACE = {
     "R86": (16.2, 44.5, 90),                        # (review pass 1: C41's 1 ohm, beside it)
     "D9": (13.0, 41.6, 0),                 # (review pass 2: an SS34 (SMA) beside U15, BAT_P -> VSYS)
     # the 3.3 V LDO (review pass 2: a TLV757P, WSON-6, both orders): C3 right of IN (pin 6), C5 / C6 left of OUT
-    # (pin 1); D15 (OUT -> IN) under it; C72 / C92 (VSYS bulk, battery order) at the left edge
+    # (pin 1); D15 (OUT -> IN) under it; C72 / C92 (VREG bulk behind R155, both orders since sign-off stage 2) at the left edge
     "U2": (10.0, 54.0, 0),
     "C3": (10.0, 50.9, 0), "C5": (7.4, 53.6, 90), "C6": (5.9, 53.6, 90), "C92": (2.6, 53.75, 90),   # (2026-11-15: C3 above U2)
     # (stage 2: the cell's divider and its twins in the middle, between the header and the sockets)

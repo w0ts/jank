@@ -5,6 +5,25 @@
 `case/` the case. Each stage's section supersedes the older ones where they differ (2, 1f, 1e, 1d, then 1c); "mini 2.2
 (stage 1)" and "1b" are superseded (the encoder and the RGB LEDs are gone); everything after them is mini 2's text.
 
+## Sign-off stage 2 (2026-11-17): applied to the routed board (`signoff2.py`)
+
+The stage-1 sign-off (`~/GitHub/jank/worktrees/mini22-review-scratch/REVIEW.md`) and its fixes:
+- **R1:** C72 / C92 (2 x 100 uF) moved from VSYS to VREG, after the power switch, in both orders, behind R155 (1 ohm
+  0805). Sim: VREG <= 5.16 V at switch-on and hot plug (was up to 7.9 V).
+- **Inrush (usb order):** ~555 uC per plug (USB 2.0 asks 50 uC; 145 uC before). A host port's rail dips ~0.94 V for
+  ~0.1 ms; another device on a bus-powered hub may reset. All of it passes R62 (0402, 0 ohm, ~14 A peak).
+- **R6:** C104 (10 uF 0402) at U18's VIN. VBUS no longer runs on the bottom under U2, L4 or C5; it still skirts C3.
+- **C2:** C97 / C103 added. Each LED now has its own 100 nF (C96, C97, C102, C103).
+- **R5 not done:** CC2, UDP's via and CC1's via stay under J1's shell. The router found no way out (`signoff2.py`).
+- **VSYS / VBUS:** with the toggle off, VSYS has no capacitance; a hot plug rings it to ~6.3 V. Add no part rated
+  6 V or less there.
+- **Never two cells.** J8 and J9 are in parallel before Q2 and the XB5353A. Q2 does not protect one cell from the
+  other: a reversed or unequal second cell shorts or equalises through the sockets. Fit one cell in one socket.
+- **Meter before soldering:** the DIN-504B (pad 2 = DIN 5, pad 4 = DIN 4), the PJ-307C (tip = pad 5) and each cell
+  lead (+ on the square pad).
+- **JP1 / JP2:** bridge one side only (G or V). GND is on one end and +3V3 on the other; a blob across all three pads
+  shorts the rail.
+
 ## DIN-504B-M10 and PJ-320A pinouts: checked on paper (2026-11-15), confirm with a meter
 
 Review pass 1's M5. A pinout agent checked the makers' drawings, EasyEDA's footprints, independent SDS-50J footprints
@@ -21,7 +40,7 @@ Its verdict: **all correct**, so no swap jumpers.
 
 - The DIN / PJ-320A pinouts above: a meter on the first socket and jack.
 - **JLC's placement preview** (review pass 1, LOW 9): the orientation of every IC (U1 the module, U2, U5, U6, U7, U8, U9,
-  U11, U12, U15 .. U19), FET (Q2 .. Q13), diode (D3, D7 .. D11, D14, D16), LED (LED1, LED2), L4 / L5 and J1, before paying.
+  U11, U12, U15 .. U19, U21), FET (Q2 .. Q13), diode (D3, D7 .. D11, D14, D16), LED (LED1 .. LED4), L4 / L5 and J1, before paying.
 - `sh case/make_stl.sh` re-run on the final board before printing (review pass 1, LOW 5: **not re-run** this round (the coordinator: the STLs come later); J4 moved under the RF line, the case reads it (`place_args.py`)).
 - **Check every cell's polarity** with a meter (pin 1, the square pad, = +) before plugging it: see "a reversed cell"
   below.
