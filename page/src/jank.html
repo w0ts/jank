@@ -567,20 +567,6 @@ function portList(map) {
   if (map && typeof map.forEach === "function") map.forEach((port) => { if (port && port.state !== "disconnected") out.push(port); });
   return out;
 }
-/* the jank among the ports: "jank" exactly is the USB port; "jank XXXX" a jank over Bluetooth (its BLE name). -> the
-   inputs to choose from, best first, and whether the first is a Bluetooth one */
-function jankPorts(inputs) {
-  const named = inputs.filter((p) => /jank/i.test(p.name || ""));
-  named.sort((a, b) => (b.name === "jank") - (a.name === "jank"));
-  return named;
-}
-function overBluetooth(name) {
-  return /jank/i.test(name || "") && name !== "jank";
-}
-function outputFor(input, outputs) {
-  return outputs.find((o) => o.name === input.name) || outputs.find((o) => /jank/i.test(o.name || "")) || null;
-}
-
 /* the FM-1s and janks heard in a group: a jank shows only by its MAC prefix */
 function peerText(row) {
   return row.janks ? row.units + ", of which " + row.janks + " jank" : String(row.units);
@@ -666,9 +652,10 @@ const $ = (id) => document.getElementById(id);
 const SETTINGS = ["name", "beat", "follower", "skip", "graded", "rate", "lat_trim", "beat_latency", "filter", "peer", "quantum", "offset"];
 const BLE_SVC = "03b80e5a-ede8-4b33-a751-6ce34ec4c700", BLE_CHR = "7772e5db-3868-4112-a1a9-f2669d106bf3";
 const BLE_CAP = 20;                   /* write payload: the default ATT MTU's, which every link takes (Web Bluetooth does not say the MTU) */
+const JANK_WAIT_MS = 15000;
 const HOME_EVERY_USB_MS = 300, STATUS_EVERY_MS = 1500, HOME_STALE_MS = 3000, BLE_WAIT_MS = 5000;
 const S = { line: null, kind: null, ble: false, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastScans: [], timers: [],
-            lastStatus: null, statusAt: 0 };
+            lastStatus: null, statusAt: 0, waiting: null };
 
 function say(text, bad) {
   $("msg").textContent = text;
@@ -838,6 +825,7 @@ function setConnected(kind, ble) {
 }
 
 function disconnected(text) {
+  stopWaiting();
   for (const t of S.timers) clearInterval(t);
   S.timers = [];
   if (S.line) S.line.close(text);
@@ -850,7 +838,7 @@ function disconnected(text) {
   if (text) say(text, true);
 }
 
-async function started(line, kind, ble, drop) {
+async function started(line, kind, ble, drop, portName) {
   S.line = line;
   S.drop = drop;
   line.onPush = (p) => {
@@ -864,7 +852,8 @@ async function started(line, kind, ble, drop) {
     say("");
     await pollHome();
   } catch (e) {
-    disconnected(e.message + (ble ? "" : ". If the app asks for SysEx, turn it on."));
+    const named = portName ? e.message.replace(/^(no answer to \S+)/, "$1 from " + portName) : e.message;
+    disconnected(named + (ble ? "" : ". If the app asks for SysEx, turn it on."));
     return;
   }
   S.timers.push(setInterval(pollHome, S.ble ? 1000 : HOME_EVERY_USB_MS));
@@ -897,7 +886,50 @@ function attachMidi(access, input) {
   access.onstatechange = () => {
     if (!portList(access.inputs).some((p) => p.id === input.id)) disconnected("The jank's MIDI port went away.");
   };
-  started(line, "midi", ble, () => { input.onmidimessage = null; access.onstatechange = null; });
+  started(line, "midi", ble, () => { input.onmidimessage = null; access.onstatechange = null; }, input.name || "the MIDI port");
+}
+
+function stopWaiting() {
+  const w = S.waiting;
+  if (!w) return;
+  S.waiting = null;
+  clearTimeout(w.timer);
+  w.access.onstatechange = null;
+}
+
+window.addEventListener("pagehide", stopWaiting);
+
+/* a jank input with its output next to it, or null: the only port the page ever attaches to */
+function readyJank(access) {
+  const outputs = portList(access.outputs);
+  return jankPorts(portList(access.inputs)).find((input) => outputFor(input, outputs)) || null;
+}
+
+function noJankText(access) {
+  return "No MIDI port named jank. Plug it in (USB), or connect it in the app's Bluetooth MIDI settings. MIDI ports I see: " + portNames(portList(access.inputs));
+}
+
+/* no jank port yet: keep the MIDIAccess and its statechange for JANK_WAIT_MS, connect once when one shows up */
+function waitForJank(access) {
+  stopWaiting();
+  const timer = setTimeout(() => {
+    stopWaiting();
+    say("Stopped waiting for a jank port after " + JANK_WAIT_MS / 1000 + " s. Press MIDI port to try again. MIDI ports I see: " + portNames(portList(access.inputs)), true);
+  }, JANK_WAIT_MS);
+  S.waiting = { access, timer };
+  access.onstatechange = () => {
+    const input = readyJank(access);
+    if (!input) return;
+    stopWaiting();
+    say("jank found: connecting");
+    try { attachMidi(access, input); } catch (e) { disconnected(e.message); }
+  };
+}
+
+function showJankChoice(access, choices) {
+  $("c-ports").replaceChildren(...choices.map((p, i) => new Option(p.name, String(i))));
+  $("c-ports-box").classList.remove("hide");
+  $("c-ports").onchange = () => { disconnected(); attachMidi(access, choices[Number($("c-ports").value)]); };
 }
 
 async function connectMidi() {
@@ -906,20 +938,17 @@ async function connectMidi() {
     return;
   }
   disconnected();
+  $("c-ports-box").classList.add("hide");
   try {
     const access = await midiAccess();
-    const inputs = portList(access.inputs);
-    const jank = jankPorts(inputs);
-    const choices = jank.length ? jank : inputs;
-    if (!choices.length) throw new Error("No MIDI port at all. Is the jank plugged in, or connected in the app's Bluetooth MIDI settings?");
-    if (choices.length > 1 || !jank.length) {
-      $("c-ports").replaceChildren(...choices.map((p, i) => new Option(p.name || "port " + (i + 1), String(i))));
-      $("c-ports-box").classList.remove("hide");
-      $("c-ports").onchange = () => { disconnected(); attachMidi(access, choices[Number($("c-ports").value)]); };
-    } else {
-      $("c-ports-box").classList.add("hide");
+    const jank = jankPorts(portList(access.inputs));
+    if (!jank.length) {
+      say(noJankText(access), true);
+      waitForJank(access);
+      return;
     }
-    attachMidi(access, choices[0]);
+    if (jank.length > 1) showJankChoice(access, jank);
+    attachMidi(access, jank[0]);
   } catch (e) {
     disconnected(e && e.message ? e.message : "No MIDI access (code " + (e && e.code) + ").");
   }
@@ -1011,6 +1040,7 @@ setConnected(null, false);
 </script>
 <!--@include ui/oled.js-->
 <!--@include ui/face.js-->
+<!--@include ui/ports.js-->
 <!--@include ui/autolat.js-->
 <!--@include ui/stick.js-->
 <!--@include ui/player.js-->

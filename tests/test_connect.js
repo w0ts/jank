@@ -13,7 +13,7 @@ const assert = require('assert');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'page', 'jank.html'), 'utf8');
-const lib = ['ui/oled.js', 'ui/face.js', 'ui/autolat.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Stick = Stick; this.Player = Player;';
+const lib = ['ui/oled.js', 'ui/face.js', 'ui/ports.js', 'ui/autolat.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Stick = Stick; this.Player = Player;';
 const script = id => html.match(new RegExp('<script id="' + id + '">([\\s\\S]*?)</script>'))[1];
 const transcript = {};
 for (const block of fs.readFileSync(path.join(root, 'tests', 'stick_ref', 'transcript.txt'), 'utf8').split('### ').slice(1)) {
@@ -61,8 +61,8 @@ function makePage(opts = {}) {
   const setTimer = () => { const id = nextTimer++; timers.add(id); return id; };
   const box = {
     document, console, performance: { now: () => clock.t }, Option: class { constructor(text, value) { this.text = text; this.value = value; } },
-    setInterval: (fn, ms) => { const id = setTimer(); box.__intervals = box.__intervals || new Map(); box.__intervals.set(id, fn); return id; }, setTimeout: setTimer,
-    clearInterval: id => timers.delete(id), clearTimeout: id => timers.delete(id),
+    setInterval: (fn, ms) => { const id = setTimer(); box.__intervals = box.__intervals || new Map(); box.__intervals.set(id, fn); return id; }, setTimeout: fn => { const id = setTimer(); box.__timeouts = box.__timeouts || new Map(); box.__timeouts.set(id, fn); return id; },
+    clearInterval: id => timers.delete(id), clearTimeout: id => { timers.delete(id); if (box.__timeouts) box.__timeouts.delete(id); },
     requestAnimationFrame: fn => { const id = nextFrame++; frames.add({ id, fn }); return id; },
     cancelAnimationFrame: id => { for (const f of frames) if (f.id === id) frames.delete(f); },
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } }, navigator: { mediaDevices: opts.mediaDevices },
@@ -82,7 +82,7 @@ function makePage(opts = {}) {
   vm.runInContext('this.S = S; this.disconnected = disconnected;', box);
   const key = (type, k) => (winBus[type] || []).forEach(fn => fn({ key: k, target: { tagName: 'BODY' }, repeat: false, preventDefault() {} }));
   const runFrame = () => { const [f] = [...frames]; if (f) { frames.delete(f); f.fn(clock.t); } };
-  return { box, el: id => document.getElementById(id), timers, frames, media, clock, key, runFrame, intervals: () => [...(box.__intervals || [])] };
+  return { box, el: id => document.getElementById(id), timers, frames, media, clock, key, runFrame, intervals: () => [...(box.__intervals || [])], timeouts: () => [...(box.__timeouts || [])] };
 }
 
 
@@ -601,6 +601,89 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await settle();
     eq([p.el('pl-play').disabled, p.el('pl-scope-line').textContent], [true, 'no audio files under Music'], 'no audio file under the source: it says so and Play stays disabled');
     p.box.disconnected();
+  }
+
+  // ---- only a port named jank is ever attached to; no jank port: nothing is sent anywhere, and the page waits 15 s for one ----
+  {
+    const decoy = (id, name) => {
+      const out = { id: 'o' + id, name, state: 'connected', frames: 0, send() { this.frames++; } };
+      return { input: { id: 'i' + id, name, state: 'connected', onmidimessage: null }, output: out };
+    };
+    const open = async (names, withJank, extraJank = []) => {
+      const page = makePage(), midi = fakeMidi();
+      midi.attach(page);
+      const decoys = names.map((n, i) => decoy(i, n));
+      const ins = new Map(), outs = new Map();
+      for (const d of decoys) { ins.set(d.input.id, d.input); outs.set(d.output.id, d.output); }
+      const extras = extraJank.map((n, i) => decoy('b' + i, n));
+      if (withJank) { ins.set('in', midi.input); outs.set('out', midi.output); }
+      for (const d of extras) { ins.set(d.input.id, d.input); outs.set(d.output.id, d.output); }
+      const access = { inputs: ins, outputs: outs, onstatechange: null };
+      page.box.navigator.requestMIDIAccess = () => Promise.resolve(access);
+      page.el('c-midi').click();
+      await settle();
+      return { page, midi, access, decoys, extras, frames: () => decoys.reduce((n, d) => n + d.output.frames, 0) };
+    };
+    const addJank = (c) => { c.access.outputs.set('out', c.midi.output); c.access.inputs.set('in', c.midi.input); };
+    const gets = c => c.midi.sent.filter(s => s === 'get').length;
+
+    // (a) Digitone + FM1 only: nothing attached, nothing sent, the error names the ports, the buttons stay usable
+    let c = await open(['Digitone Audio+MIDI Elektron Digitone II', 'FM1-E040'], false);
+    eq([c.frames(), c.midi.sent.length, c.page.box.S.line], [0, 0, null], '(a) no jank port: no byte sent to any port, nothing attached');
+    eq(c.page.el('msg').textContent, "No MIDI port named jank. Plug it in (USB), or connect it in the app's Bluetooth MIDI settings. MIDI ports I see: Digitone Audio+MIDI Elektron Digitone II, FM1-E040", '(a) the line names what the browser sees');
+    eq([c.page.el('msg').classList.contains('bad'), shown(c.page, 'c-ports-box'), shown(c.page, 'live'), pressed(c.page), c.page.el('c-midi').disabled, c.page.el('c-bluetooth').disabled], [true, false, false, ['false', 'false'], false, false], '(a) an error, no chooser, no face, both connection buttons usable');
+    eq(c.page.timeouts().length, 1, '(a) one wait timer (the 15 s) is running');
+    c.page.box.disconnected();
+    eq([c.page.timers.size, c.access.onstatechange], [0, null], '(a) a disconnect releases the wait: no timer, no listener');
+
+    // (b) Digitone + jank: jank only
+    c = await open(['Digitone Audio+MIDI Elektron Digitone II'], true);
+    eq([c.frames(), gets(c) > 0, c.page.box.S.line !== null, shown(c.page, 'c-ports-box')], [0, true, true, false], '(b) jank attached and spoken to, the Digitone never');
+    c.page.box.disconnected();
+
+    // (c) jank appears later: connects once; the input alone (output not yet there) is not enough
+    c = await open(['Digitone Audio+MIDI Elektron Digitone II'], false);
+    c.access.inputs.set('in', c.midi.input);
+    c.access.onstatechange();
+    await settle();
+    eq([c.midi.sent.length, c.page.box.S.line], [0, null], '(c) a jank input without its output yet: still waiting');
+    c.access.outputs.set('out', c.midi.output);
+    c.access.onstatechange();
+    await settle();
+    const first = gets(c);
+    eq([first, c.page.timeouts().length, c.frames()], [1, 0, 0], '(c) jank appeared: connected, one get, the wait timer cleared, the Digitone untouched');
+    c.access.onstatechange();
+    c.access.onstatechange();
+    await settle();
+    eq(gets(c), 1, '(c) more state changes attach nothing again');
+    c.page.box.disconnected();
+
+    // (d) 15 s without a jank: stop listening, say so, no late auto-connect
+    c = await open(['FM1-E040'], false);
+    for (const [, fn] of c.page.timeouts()) fn();
+    eq(c.page.el('msg').textContent.startsWith('Stopped waiting for a jank port after 15 s. Press MIDI port to try again. MIDI ports I see: FM1-E040'), true, '(d) after 15 s it says it stopped');
+    eq([c.access.onstatechange, c.page.timers.size], [null, 0], '(d) no listener, no timer left');
+    addJank(c);
+    await settle();
+    eq([c.midi.sent.length, c.frames()], [0, 0], '(d) a jank plugged in after that connects nothing by itself');
+    c.page.box.disconnected();
+
+    // (e) USB + Bluetooth jank: the chooser lists those two, never the Digitone
+    c = await open(['Digitone Audio+MIDI Elektron Digitone II'], true, ['jank 1A2B']);
+    eq(c.page.el('c-ports').children.map(o => o.text), ['jank', 'jank 1A2B'], '(e) the chooser: USB first, then Bluetooth, no other device');
+    eq([shown(c.page, 'c-ports-box'), c.frames()], [true, 0], '(e) shown, and the Digitone untouched');
+    c.page.box.disconnected();
+
+    // the error names the port that did not answer
+    const wrong = fakeMidi({ get: '' });
+    wrong.output.send = () => {};
+    const wp = makePage();
+    wrong.attach(wp);
+    wp.box.navigator.requestMIDIAccess = () => Promise.resolve(wrong.access);
+    wp.el('c-midi').click();
+    await settle();
+    for (let k = 0; k < 2; k++) { for (const [id, fn] of wp.timeouts()) { wp.box.clearTimeout(id); fn(); } await settle(); }
+    eq(wp.el('msg').textContent.startsWith('no answer to get from jank. If the app asks for SysEx, turn it on.'), true, 'no answer to get: names the port, keeps the SysEx hint');
   }
 
   // ---- Auto latency: set beat_latency from the two paths, only under its guards ----
