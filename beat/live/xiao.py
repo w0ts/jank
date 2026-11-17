@@ -15,6 +15,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from live.audiostats import CallbackStats
 from live.tracker import HOP, SAMPLE_RATE
 
 DEVICE_NAME = "jank"
@@ -34,6 +35,7 @@ class DriftStatus:
     overflows: int         # pushes that found the FIFO full (the oldest samples went)
     target: int = 0        # the level aimed at now (grows after underruns)
     avg_level: float = 0.0 # the smoothed level after a pull: the FIFO's share of the jank path's latency
+    ratio: float = 1.0     # ResampleBuffer: input samples used per output sample (1 + the drift it follows)
 
 
 class DriftBuffer:
@@ -101,6 +103,74 @@ class DriftBuffer:
                                self.target, self._avg if self._avg is not None else 0.0)
 
 
+TAU_S = 3.0                # ResampleBuffer: the level error is worked off over this long (the ratio is 1 + error / (TAU_S rate))
+MAX_RATIO = 0.01           # and never more than 1 % off (17 cents)
+RESAMPLE_MAX_TARGET_BLOCKS = 16     # the speakers' stream with a big buffer (--speaker-latency 0.1) feeds the FIFO in bursts of
+RESAMPLE_CAPACITY_BLOCKS = 32       # ~8 blocks; underruns deepen the target to ride them out, so room for it (160 / 320 ms)
+
+
+class ResampleBuffer:
+    """The same FIFO as DriftBuffer, following the two clocks' drift by resampling: each pull reads `ratio` input samples per
+    output sample (linear interpolation), the ratio being 1 plus the smoothed level's distance from the target over TAU_S
+    seconds. DriftBuffer repeats or drops one sample per pull at most (0.23 % of drift, as a 100 Hz buzz at its limit);
+    this follows up to MAX_RATIO smoothly. An underrun deepens the target as there."""
+
+    def __init__(self, target: int = TARGET_BLOCKS * HOP, capacity: int = RESAMPLE_CAPACITY_BLOCKS * HOP,
+                 max_target: int = RESAMPLE_MAX_TARGET_BLOCKS * HOP) -> None:
+        if not 0 < target <= max_target < capacity:
+            raise ValueError(f"bad FIFO sizes: target {target}, max {max_target}, capacity {capacity}")
+        self.target, self.capacity, self.max_target = target, capacity, max_target
+        self._buf = np.zeros(0, dtype=np.float32)
+        self._pos = 0.0                    # the read position inside _buf (the fraction past its first sample)
+        self._avg: float | None = None
+        self._ratio = 1.0
+        self._lock = threading.Lock()
+        self._underruns = self._overflows = 0
+
+    def push(self, samples: np.ndarray) -> None:
+        x = np.asarray(samples, dtype=np.float32).reshape(-1)
+        with self._lock:
+            buf = np.concatenate([self._buf, x])
+            if len(buf) > self.capacity:
+                self._overflows += 1
+                cut = len(buf) - self.capacity
+                buf = buf[cut:]
+                self._pos = max(self._pos - cut, 0.0)
+            self._buf = buf
+
+    def pull(self, n: int) -> np.ndarray:
+        with self._lock:
+            buf, pos = self._buf, self._pos
+            left = (len(buf) - pos) - n
+            self._avg = float(left) if self._avg is None else self._avg + (left - self._avg) * LEVEL_SMOOTH
+            err = self._avg - self.target
+            self._ratio = 1.0 + float(np.clip(err / (TAU_S * SAMPLE_RATE), -MAX_RATIO, MAX_RATIO))
+            idx = pos + self._ratio * np.arange(n, dtype=np.float64)
+            i0 = idx.astype(np.int64)
+            ok = i0 + 1 < len(buf)
+            out = np.zeros(n, dtype=np.float32)
+            if ok.all():
+                frac = (idx - i0).astype(np.float32)
+                out = buf[i0] * (1.0 - frac) + buf[i0 + 1] * frac
+                used = pos + self._ratio * n
+                k = int(used)
+                self._buf, self._pos = buf[k:], used - k
+                return out.astype(np.float32, copy=False)
+            m = int(ok.sum())
+            if m:
+                frac = (idx[:m] - i0[:m]).astype(np.float32)
+                out[:m] = buf[i0[:m]] * (1.0 - frac) + buf[i0[:m] + 1] * frac
+            self._underruns += 1
+            self.target = min(self.target + HOP, self.max_target)
+            self._buf, self._pos = np.zeros(0, dtype=np.float32), 0.0
+            return out
+
+    def status(self) -> DriftStatus:
+        with self._lock:
+            return DriftStatus(int(len(self._buf) - self._pos), 0, 0, self._underruns, self._overflows, self.target,
+                               self._avg if self._avg is not None else 0.0, self._ratio)
+
+
 def find_device(devices: list[dict[str, Any]], name: str = DEVICE_NAME) -> int | None:
     """The index of the output device called `name` (exactly, ignoring case) or else whose name contains it."""
     outputs = [(i, d) for i, d in enumerate(devices) if int(d.get("max_output_channels", 0)) >= 1]
@@ -117,7 +187,8 @@ class XiaoOutput:
     """The second output stream: mono, 44.1 kHz, 441-sample blocks, on the jank device."""
 
     def __init__(self, stream_factory: Callable[..., Any] | None = None,
-                 devices: list[dict[str, Any]] | None = None, name: str = DEVICE_NAME) -> None:
+                 devices: list[dict[str, Any]] | None = None, name: str = DEVICE_NAME, latency: float | None = None,
+                 resample: bool = False) -> None:
         if stream_factory is None or devices is None:
             import sounddevice as sd
             stream_factory = stream_factory or sd.OutputStream
@@ -126,10 +197,12 @@ class XiaoOutput:
         if index is None:
             raise RuntimeError(f'no audio output named "{name}": is the XIAO plugged in and running the USB audio build?')
         self.device_name = str(devices[index]["name"])
-        self.fifo = DriftBuffer()
+        self.fifo = ResampleBuffer() if resample else DriftBuffer()
         self.callbacks = 0
+        self.cb_stats = CallbackStats(HOP / SAMPLE_RATE)
+        kw = {} if latency is None else {"latency": latency}
         self._stream = stream_factory(samplerate=SAMPLE_RATE, channels=1, dtype="float32", blocksize=HOP,
-                                      device=index, callback=self._callback)
+                                      device=index, callback=self._callback, **kw)
         self.latency_ms = float(getattr(self._stream, "latency", 0.0)) * 1000.0
 
     def push(self, block: np.ndarray) -> None:
@@ -138,8 +211,10 @@ class XiaoOutput:
         self.fifo.push(b.mean(axis=1, dtype=np.float32) if b.ndim == 2 else b)
 
     def _callback(self, outdata, frames, time_info, status) -> None:
+        t0 = self.cb_stats.enter()
         outdata[:, 0] = self.fifo.pull(frames)
         self.callbacks += 1
+        self.cb_stats.leave(t0, status)
 
     def start(self) -> None:
         self._stream.start()
@@ -153,4 +228,5 @@ class XiaoOutput:
         return {"device": self.device_name, "callbacks": self.callbacks, "latency_ms": self.latency_ms,
                 "fifo": s.level, "dropped": s.slips_dropped, "repeated": s.slips_repeated,
                 "underruns": s.underruns, "overflows": s.overflows, "fifo_target": s.target,
-                "fifo_ms": round(s.avg_level / SAMPLE_RATE * 1000.0, 2)}
+                "fifo_ms": round(s.avg_level / SAMPLE_RATE * 1000.0, 2), "fifo_ratio": round(s.ratio, 5),
+                "cb": self.cb_stats.snapshot()}

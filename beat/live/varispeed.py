@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from live.audio import load_audio
+from live.audiostats import CallbackStats
 from live.sources import Chunk, NowUs, _StreamSource
 from live.tracker import HOP, SAMPLE_RATE
 
@@ -48,7 +49,7 @@ class PlayerState:
 class VarispeedSource(_StreamSource):
     """Plays a track at a variable rate through the default output and feeds the output to the tracker."""
 
-    def __init__(self, now_us: NowUs, device: int | str | None = None) -> None:
+    def __init__(self, now_us: NowUs, device: int | str | None = None, latency: float | None = None) -> None:
         import sounddevice as sd
         super().__init__(now_us)
         self._lock = threading.Lock()
@@ -64,8 +65,10 @@ class VarispeedSource(_StreamSource):
         self.tap = None      # called with each block as rendered (full level), e.g. live.xiao.XiaoOutput.push
         self.on_block = None  # called with (path, file sample, rate, frames, heard us) of each block played
         self._played = None
+        self.cb_stats = CallbackStats(HOP / SAMPLE_RATE)     # what the stream's callback saw (the page's status, /api/status)
+        kw = {} if latency is None else {"latency": latency}
         self._stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=2, dtype="float32", blocksize=HOP,
-                                       device=device, callback=self._callback)
+                                       device=device, callback=self._callback, **kw)
         self.latency_ms = self._stream.latency * 1000.0
 
     def load(self, path: str) -> None:
@@ -132,6 +135,13 @@ class VarispeedSource(_StreamSource):
             return block
 
     def _callback(self, outdata, frames, time_info, status) -> None:
+        t0 = self.cb_stats.enter()
+        try:
+            self._render_block(outdata, frames, time_info)
+        finally:
+            self.cb_stats.leave(t0, status)
+
+    def _render_block(self, outdata, frames, time_info) -> None:
         block = self._next_block(frames)
         outdata[:] = block * self._volume
         if self.tap is not None:

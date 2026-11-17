@@ -748,7 +748,13 @@ const OLED = (() => {
       for (let yy = y + 1; yy < y + 10; yy++) for (let xx = 3; xx < 3 + wFill; xx++) if ((xx + yy) % 2 === 0) px(fb, xx, yy, 1);
     } else rect(fb, 3, y + 1, wFill, 9, 1);                                 // no outline: the fill, its text and the tick only
     xorCol(fb, 2 + Math.round(123 * tickFrac), y - 1, y + 11);
-    const tmp = new Uint8Array(W * H); text(tmp, label, right ? 123 - textW(label, 1) : 5, y + 2, 1, 1);
+    const lx = right ? 123 - textW(label, 1) : 5;
+    const tmp = new Uint8Array(W * H); text(tmp, label, lx, y + 2, 1, 1);
+    if (hatch) {                                                            // a checkerboard under XOR-ed text is unreadable: clear a box for the label, then OR it in
+      for (let yy = y + 1; yy < y + 10; yy++) for (let xx = lx - 1; xx < lx + textW(label, 1) + 1; xx++) px(fb, xx, yy, 0);
+      for (let i = 0; i < tmp.length; i++) fb[i] |= tmp[i];
+      return;
+    }
     for (let i = 0; i < tmp.length; i++) fb[i] ^= tmp[i];
   }
   // the placeholder jank glyph, 11 x 8: three linked dots (no jank icon exists in ~/GitHub/jank or ~/GitHub/optimist yet)
@@ -865,7 +871,7 @@ const OLED = (() => {
   //   AUDIO (any source: line in, USB audio, the XIAO's):
   //     y9   BPM x3 (left); four beat boxes (right), the current beat's box filled; under them the AUTO BAR marks
   //          (barMarks: the 1's box lit when LOCKED, an M when MANUAL; the confidence line under the boxes)
-  //     y31  IN bar (smoothed short-term RMS in dBFS, min / max lines over the last few seconds, tick = -60 silence)   y44  CF bar (tick = threshold; hatched with HOLD while the XIAO's confidence holds); each value is written inside its bar
+  //     y31  IN bar (smoothed short-term RMS in dBFS, min / max lines over the last few seconds, tick = -60 silence)   y44  CF bar (tick = threshold; hatched with HOLD while the XIAO's confidence holds, with COAST while the outputs run under the threshold); each value is written inside its bar
   //     y57  status line, cycling every STATUS_CYCLE_MS: the Link peers (none: empty)
   //   LINK: BPM x4, four wide beat boxes across the width, the same status line at y57
   //   (the mode picks the layout, whatever the source: a line in, USB audio, the XIAO's)
@@ -893,10 +899,16 @@ const OLED = (() => {
     text(fb, c.bpm ? c.bpm.toFixed(1) : '---', 2, 9, 3, 1);
     beatBoxes(fb, c, 87, 9, 9, 9, 1);
     barMarks(fb, c.bar, 87, 9, 9, 9, 1);
-    valueBar(fb, 31, (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, 'IN ' + Math.round(c.levelDb) + 'dB');
-    for (const db of [c.levelMin, c.levelMax]) xorCol(fb, 3 + Math.round(121 * clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1)), 32, 41);   // min / max lines
+    const inLabel = 'IN ' + Math.round(c.levelDb) + 'dB';
+    valueBar(fb, 31, (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, inLabel);
+    for (const db of [c.levelMin, c.levelMax]) {                           // min / max lines: not through the label (a line across a letter reads as another letter)
+      const x = 3 + Math.round(121 * clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1));
+      if (x >= 4 && x <= 6 + textW(inLabel, 1)) { xorCol(fb, x, 32, 32); xorCol(fb, x, 41, 41); } else xorCol(fb, x, 32, 41);
+    }
     // CF: hatched, HOLD, while the confidence holds (jank M2k: no evidence; the value shown eases toward the threshold)
-    valueBar(fb, 44, c.conf, c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%' + (c.confHold ? ' HOLD' : ''), false, !!c.confHold);
+    // COAST: the outputs keep running under the threshold (the robust follower holds a tempo through weak patches): hatched too
+    const coast = !c.confHold && !!c.running && c.conf * 100 < c.th;
+    valueBar(fb, 44, c.conf, c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%' + (c.confHold ? ' HOLD' : coast ? ' COAST' : ''), false, !!c.confHold || coast);
     statusLine(fb, c, now, 57);
   }
   function drawMenu(fb, ui, c) {
@@ -1048,6 +1060,7 @@ function renderList() {
   const q = $('q').value.toLowerCase().trim();
   const rows = library.filter(t => !q || t.name.toLowerCase().includes(q)).slice(0, 200);
   shown = rows;                                  // the order "play the next track" follows
+  publishQueue();
   $('list').replaceChildren(...rows.map(t => {
     const d = document.createElement('div');
     const n = document.createElement('span'); n.textContent = t.name.split('/').slice(-1)[0];
@@ -1101,7 +1114,9 @@ function skipTrack(mode, path) {
 }
 $('next').addEventListener('click', () => { const n = skipTrack($('auto').value, S && S.path); if (n) load(n.path); });
 try { const v = localStorage.getItem(AFTER_KEY); if (v === 'next' || v === 'random' || v === 'stop') $('auto').value = v; } catch (e) { /* not remembered */ }
-$('auto').addEventListener('change', () => { try { localStorage.setItem(AFTER_KEY, $('auto').value); } catch (e) { /* not remembered */ } });
+$('auto').addEventListener('change', () => { try { localStorage.setItem(AFTER_KEY, $('auto').value); } catch (e) { /* not remembered */ } publishQueue(); });
+// the list and the "then" choice go to the player, so the Mac's media keys (next / previous) follow what this page shows
+function publishQueue() { api('queue', { paths: shown.map(t => t.path), mode: $('auto').value }).catch(() => {}); }
 
 function show(s) {
   if (trackEnded(prevStatus, s)) { const n = afterTrack($('auto').value, s.path); if (n) load(n.path); }
