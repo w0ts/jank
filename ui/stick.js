@@ -169,12 +169,15 @@ const Stick = (() => {
     }
   }
   const releaseAll = (m, now) => { for (const b of Object.keys(m.held)) up(m, b, now); };
-  // ink: an optional Uint8Array(OLED.W * OLED.H) the colour screen (ui/lcd2.js) passes: it gets the lcd2 layout and its ink plane filled
-  const framebuffer = (m, now, ink) => {
-    const fb = new Uint8Array(OLED.W * OLED.H), c = m.getCtx(now);
-    OLED.draw(fb, m.ui, ink ? { ...c, layout: 'lcd2' } : c, now, ink);
-    return fb;
-  };
+  // the screen of a layout: { fb, ink, w, h }. 'oled' (default): the 128 x 64 frame buffer, no ink. 'lcd2': the colour screen's own grid
+  // (OLED.size('lcd2'), 160 x 120) with its ink plane (ui/lcd2.js paints them). Buffers are made here, so a caller never guesses a size.
+  function screen(m, now, layout) {
+    const lcd = layout === 'lcd2', size = OLED.size(layout), fb = new Uint8Array(size.w * size.h), ink = lcd ? new Uint8Array(size.w * size.h) : null;
+    const c = m.getCtx(now);
+    OLED.draw(fb, m.ui, lcd ? { ...c, layout } : c, now, ink);
+    return { fb, ink, w: size.w, h: size.h };
+  }
+  const framebuffer = (m, now) => screen(m, now, 'oled').fb;                 // the OLED's 128 x 64
 
-  return { KEY_BTN, KEY_HINT, REPEAT, PHASE, BEAT_DELAY_KEY, BEAT_DELAY_MAX, createPhase, phaseReport, phaseFeed, phaseAt, beatDelayEstimate, parseDelay, ctx, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, framebuffer };
+  return { KEY_BTN, KEY_HINT, REPEAT, PHASE, BEAT_DELAY_KEY, BEAT_DELAY_MAX, createPhase, phaseReport, phaseFeed, phaseAt, beatDelayEstimate, parseDelay, ctx, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, screen, framebuffer };
 })();
