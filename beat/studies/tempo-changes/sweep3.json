@@ -1,0 +1,22 @@
+{
+  "c3": {"base": "m2i+rate", "consts": {"rate.CONFIRM": 3}},
+  "c3_cl": {"base": "m2i+rate", "consts": {"rate.CONFIRM": 3}, "clear_lines": true},
+  "c3_fj6": {"base": "m2i+rate", "consts": {"rate.CONFIRM": 3}, "fast_jump": 0.06, "clear_lines": true},
+  "c3_fj4": {"base": "m2i+rate", "consts": {"rate.CONFIRM": 3}, "fast_jump": 0.04, "clear_lines": true},
+  "c3_fj10": {"base": "m2i+rate", "consts": {"rate.CONFIRM": 3}, "fast_jump": 0.10, "clear_lines": true},
+  "c3_l12": {"base": "m2i+rate", "consts": {"rate.CONFIRM": 3, "mode_bpm.LOCK_BEATS": 12, "follow_bpm.LOCK_BEATS": 12}},
+  "c3_l16": {"base": "m2i+rate", "consts": {"rate.CONFIRM": 3, "mode_bpm.LOCK_BEATS": 16, "follow_bpm.LOCK_BEATS": 16}},
+  "c3_l16_fj6": {"base": "m2i+rate", "consts": {"rate.CONFIRM": 3, "mode_bpm.LOCK_BEATS": 16,
+                 "follow_bpm.LOCK_BEATS": 16}, "fast_jump": 0.06, "clear_lines": true},
+  "weak_c3": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3}},
+  "weak_c3_l16": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3, "mode_bpm.LOCK_BEATS": 16,
+                  "follow_bpm.LOCK_BEATS": 16}},
+  "weak_c3_fj6": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3}, "fast_jump": 0.06, "clear_lines": true},
+  "weak_c3_l16_fj6": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3, "mode_bpm.LOCK_BEATS": 16,
+                      "follow_bpm.LOCK_BEATS": 16}, "fast_jump": 0.06, "clear_lines": true},
+  "weak_c3_r20": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3}, "weak": {"r_weak": 0.02}},
+  "weak_c3_sal3.5": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3}, "weak": {"salience": 3.5}},
+  "weak_c3_hold60": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3}, "weak": {"hold_s": 60.0}},
+  "weak_c3_g75": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3}, "threshold": 0.75},
+  "weak_c3_rel0.6": {"base": "weak+rate", "consts": {"rate.CONFIRM": 3}, "weak": {"strong_rel": 0.6}}
+}

@@ -1,0 +1,2551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beat Player</title>
+<style>
+  :root { --bg:#f6f6f4; --fg:#1b1b1b; --muted:#6b6b6b; --line:#d9d9d4; --card:#fff; --accent:#2a6fdb; --ok:#1e8a4c; --bad:#c2410c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#ececec; --muted:#9a9a9a; --line:#333; --card:#1e1e1e; --accent:#6aa0ff; --ok:#4cc38a; --bad:#ff8a4c; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.4 -apple-system, system-ui, sans-serif; }
+  main { max-width:1360px; margin:0 auto; padding:16px; display:grid; gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  h1 { font-size:17px; margin:0; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; min-width:90px; }
+  input[type=text], input[type=search], select { font:inherit; padding:6px 8px; border-radius:7px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+  input[type=search] { width:100%; }
+  input[type=range] { width:100%; }
+  #list { flex:1 1 0; min-height:260px; overflow:auto; border:1px solid var(--line); border-radius:7px; margin-top:8px; }
+  #list div { padding:5px 8px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; border-bottom:1px solid var(--line); }
+  #list div:hover { background:var(--bg); }
+  #list span.b { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .now { font-weight:600; overflow-wrap:anywhere; }
+  .muted { color:var(--muted); }
+  .num { font-variant-numeric:tabular-nums; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  #pitchval { font-size:20px; font-weight:600; min-width:90px; display:inline-block; }
+  #err { color:var(--bad); min-height:1.2em; }
+  .device { overflow-x:auto; }
+  /* the device keeps its true size (its svg is sized in PX_PER_MM); the XIAO card sits to its right, below it when narrow */
+  #devwrap { display:flex; flex-wrap:wrap; gap:12px; align-items:stretch; }
+  #leftcol { flex:0 1 auto; max-width:100%; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  #leftcol > .device { flex:0 0 auto; }
+  /* the XIAO card never moves the layout: it takes the device's width without widening the column (width 0 + min-width
+     100 %), every changing line keeps its height, stays on one line and is cut with "..." */
+  #leftcol > #xiaocard { width:0; min-width:100%; box-sizing:border-box; }
+  #xiaocard .row { min-height:1.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-wrap:nowrap; }
+  /* the numbers: one short labelled line each, a fixed count per block, so the card's height never moves */
+  #xiaocard .ln { min-height:1.4em; line-height:1.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #xiaocard .ln b { font-weight:600; opacity:.9; }
+  /* the status line wraps onto exactly two lines (always two lines tall, so its height never changes) */
+  #xiaocard #xmsg { overflow:hidden; }
+  #xiaocard #accmodel, #xiaocard #accxstats, #xiaocard #calibmsg, #xiaocard #autolatmsg { display:block; }
+  #xiaocard #calibmsg, #xiaocard #autolatmsg { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #xiaocard #xaudio { display:inline-block; min-width:9.5em; text-align:center; }
+  #xiaocard #xbpm { display:inline-block; min-width:4.2em; text-align:right; font-variant-numeric:tabular-nums; }
+  #xiaocard #xn { display:inline-block; min-width:3.6em; font-variant-numeric:tabular-nums; }
+  #rightcol { flex:1 1 420px; min-width:0; display:flex; flex-direction:column; gap:12px; }
+  .tabs { display:flex; gap:3px; margin-bottom:-13px; position:relative; z-index:1; padding-left:10px; }
+  .tabs button { border-radius:8px 8px 0 0; border-bottom-color:var(--line); background:var(--bg); color:var(--muted); padding:7px 16px; }
+  .tabs button[aria-selected="true"] { background:var(--card); color:var(--fg); font-weight:600; border-bottom-color:var(--card); }
+  /* the column is as tall as the left one: the track list takes the rest and scrolls inside (260 px at least when wrapped) */
+  .tabpanel { display:flex; flex-direction:column; gap:10px; border-top-left-radius:0; flex:1 1 auto; min-height:0; }
+  .tabpanel > [data-pane="player"] { flex:1 1 0; min-height:0; display:flex; flex-direction:column; }
+  .tabpanel .ctl { border-top:1px solid var(--line); padding-top:8px; }
+  .device svg { display:block; flex:none; margin:0 auto; outline:none; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .device .lid { fill:#8d9094; stroke:#5d6064; stroke-width:.5; }
+  .device .lidshade { fill:none; stroke:#a9acb0; stroke-width:.4; }
+  .device .port { fill:#16171a; stroke:#4a4d50; stroke-width:.35; }
+  .device .pending { fill:none; stroke:#7a7d80; stroke-width:.35; stroke-dasharray:.9 .7; }
+  .device .plug { fill:#d8b14a; stroke:#8a6d1c; stroke-width:.25; }
+  .device .lbl { fill:#4a4d50; font-size:2.3px; text-anchor:middle; font-family:-apple-system, system-ui, sans-serif; }
+  .device .lbl.l { text-anchor:start; } .device .lbl.r { text-anchor:end; }
+  .device .lbl.pend { fill:#7a7d80; font-style:italic; font-size:1.4px; }
+  .device .brand { fill:#4a4d50; font-size:3px; text-anchor:middle; font-family:-apple-system, system-ui, sans-serif; letter-spacing:.1px; }
+  .device .win { fill:#202225; stroke:#5d6064; stroke-width:.4; }
+  .device .frost { fill:#34373b; opacity:.9; }
+  .device .led { mix-blend-mode:screen; }
+  .device .bezel { fill:#0b0c0d; stroke:#5d6064; stroke-width:.4; }
+  .device .btnarm { fill:#2c2e31; stroke:#16171a; stroke-width:.3; cursor:pointer; }
+  .device .btnarm.on { fill:#4b4f54; }
+  .device .glyph { fill:#c9ccd0; font-size:3.2px; text-anchor:middle; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
+  .device .glyph.s { font-size:2.5px; }
+  .device .toggle { cursor:pointer; }
+  .device .slot { fill:#16171a; stroke:#4a4d50; stroke-width:.3; }
+  .device .lever { fill:#d6d8db; stroke:#6d7074; stroke-width:.3; }
+  .device canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#04060a; }
+  [hidden] { display:none !important; }
+  /* setup page (a phone-sized panel) */
+  #sp-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:50; padding:12px; }
+  .sp-phone { width:360px; max-width:100%; max-height:92vh; overflow:auto; background:var(--card); color:var(--fg); border:8px solid #1c1c1e; border-radius:30px; padding:18px 16px 20px; display:grid; gap:12px; font-size:15px; }
+  .sp-head { display:flex; justify-content:space-between; align-items:center; font-size:18px; }
+  .sp-head button { border:0; background:none; font-size:26px; line-height:1; padding:0 6px; color:var(--muted); }
+  .sp-sub { color:var(--muted); font-size:13px; margin-top:-6px; }
+  .sp-phone label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
+  .sp-phone input, .sp-phone select { font:inherit; font-size:15px; color:var(--fg); padding:9px 10px; border-radius:9px; border:1px solid var(--line); background:var(--bg); width:100%; }
+  .sp-phone fieldset { border:1px solid var(--line); border-radius:10px; padding:8px 10px 10px; display:grid; gap:8px; }
+  .sp-phone legend { color:var(--muted); font-size:13px; padding:0 4px; }
+  #sp-jank, #sp-client, #sp-ap-box { display:grid; gap:12px; }
+
+  .sp-actions { display:flex; align-items:center; gap:12px; }
+  .sp-actions button { min-width:110px; padding:10px 14px; }
+  #sp-msg { color:var(--ok); font-weight:600; }
+  .seg { display:flex; justify-content:center; margin-bottom:10px; }
+  .devrow { justify-content:center; margin-top:8px; text-align:center; }
+  .devpanel { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:6px 14px; margin-top:10px; font-size:14px; }
+  .devpanel select { max-width:100%; }
+  .devpanel label { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .srcbadge { justify-self:start; align-self:center; font:700 12px/1 ui-monospace, monospace; letter-spacing:1px; padding:4px 8px; border-radius:4px; background:#555; color:#fff; }
+  .srcbadge.xiao { background:#2e7d32; }
+  .xaudio { padding:1px 8px; border-radius:9px; font-weight:600; background:#555; color:#fff; }
+  .xaudio.on { background:#2e7d32; }
+  .devpanel input[type=range] { flex:1; min-width:90px; width:auto; }
+</style>
+</head>
+<body>
+<main>
+
+  <div id="devwrap">
+  <div id="leftcol">
+  <div class="card device">
+    <div class="devpanel" id="viewbar">
+      <label>Screen <select id="scr"><option value="1.54">1.54 in</option><option value="2.42">2.42 in</option><option value="none">no screen</option></select></label>
+      <span id="srcbadge" class="srcbadge" title="LOCAL: the Mac player's own tracker draws this screen. XIAO: the player runs with --xiao; tempo, peers and the beat come from the jank XIAO">LOCAL</span>
+    </div>
+    
+    <svg id="dev" viewBox="-22 -13 116 89" tabindex="0" aria-label="jank mini 2.2 emulator, top view, 1 unit = 1 mm">
+      <defs>
+        <filter id="seam" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="1.3"/></filter>
+        <linearGradient id="lidg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9da1"/><stop offset="1" stop-color="#83868a"/></linearGradient>
+      </defs>
+      <!-- all coordinates are board millimetres: the board is 0..72 x 0..72, the case 75.6 x 75.6 outside (-1.8 .. 73.8) -->
+      <g id="jacks">
+        <rect x="15.1" y="-5" width="5" height="3.2" rx="1" class="port"/>
+        <g id="linePlug" visibility="hidden"><rect x="16.8" y="-13" width="1.6" height="7" rx=".5" class="plug"/><rect x="16.3" y="-7.2" width="2.6" height="1.8" class="plug"/></g>
+        <rect x="31.6" y="-4.4" width="9" height="2.6" rx="1.2" class="port"/>
+        <rect x="46.1" y="-5" width="4.4" height="3.2" rx="1" class="port"/>
+        <rect x="52.7" y="-5" width="4.4" height="3.2" rx="1" class="port"/>
+        <rect x="-5.2" y="4" width="3.4" height="4.8" rx="1.1" class="port"/>
+        <rect x="73.8" y="4" width="3.4" height="4.8" rx="1.1" class="port"/>
+        <rect x="-5.4" y="16" width="3.6" height="13" rx="1.4" class="port"/>
+        <rect x="73.8" y="16" width="3.6" height="13" rx="1.4" class="port"/>
+      </g>
+      <rect x="-1.8" y="-1.8" width="75.6" height="75.6" rx="4.5" fill="url(#lidg)" class="lid"/>
+      <rect x="-.6" y="-.6" width="73.2" height="73.2" rx="3.6" class="lidshade"/>
+      <!-- faint glow of the board's LEDs through the lid seam on the left wall -->
+      <ellipse id="seamGlow" cx="-1.4" cy="40" rx=".8" ry="5" filter="url(#seam)" opacity="0" fill="#000"/>
+      <!-- edge labels -->
+      <text x="17.6" y="2.6" class="lbl">LINE IN</text><text x="36.1" y="2.6" class="lbl">USB-C</text>
+      <text x="48.3" y="2.6" class="lbl">CLK</text><text x="54.9" y="2.6" class="lbl">RST</text>
+      <text x="-6.5" y="7.2" class="lbl r">MIDI OUT 1</text><text x="-6.5" y="23.3" class="lbl r">DIN 1</text>
+      <text x="78.4" y="7.2" class="lbl l">MIDI OUT 2</text><text x="78.4" y="23.3" class="lbl l">DIN 2</text>
+      <!-- power toggle on the left wall (J11 at (5.0, 49.5), axis y 54.5) -->
+      <g id="pwr" class="toggle">
+        <rect x="-5.9" y="48" width="4.4" height="9" rx="1" class="slot"/>
+        <rect id="lever" x="-7.3" y="49.2" width="4.8" height="3.6" rx="1" class="lever"/>
+        <rect x="-10" y="44" width="10" height="17" fill="transparent"/>
+      </g>
+      <text x="-3" y="46.4" class="lbl r">ON</text><text x="-3" y="60" class="lbl r">OFF</text>
+      <!-- the OLED: lid window and active area at the chosen module's size and place (SCREENS below), same 128 x 64 pixels -->
+      <g id="oledView">
+        <rect id="oledBezel" class="bezel" rx="1.6" x="0" y="0" width="1" height="1"/>
+        <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="128" height="64" xmlns="http://www.w3.org/1999/xhtml"></canvas></foreignObject>
+      </g>
+      <!-- the 4 beat LEDs on every unit (the board's row, 2026-11-15: LED1..LED4 at x 3.0 / 10.5 / 18.0 / 25.5, y 54.6,
+           below both screens): a small hole in the lid over each; beat n lights LED n (the LED language of core/jank_led.h) -->
+      <g id="ledView">
+        <g id="ledGlows"></g><g id="ledHoles"></g>
+      </g>
+      <!-- D-pad at the bottom right: cross centre (61.5, 62.2), button pads 6.5 mm from the centre, arms 6 mm wide -->
+      <g id="dpad">
+        <g id="arm-up" data-b="up"><rect x="58.5" y="52.7" width="6" height="9.5" rx="1" class="btnarm"/><text x="61.5" y="56.7" class="glyph">&#9650;</text></g>
+        <g id="arm-down" data-b="down"><rect x="58.5" y="62.2" width="6" height="9.5" rx="1" class="btnarm"/><text x="61.5" y="69.8" class="glyph">&#9660;</text></g>
+        <g id="arm-no" data-b="no"><rect x="52" y="59.2" width="9.5" height="6" rx="1" class="btnarm"/><text x="55" y="63.2" class="glyph s">NO</text></g>
+        <g id="arm-yes" data-b="yes"><rect x="61.5" y="59.2" width="9.5" height="6" rx="1" class="btnarm"/><text x="68" y="63.2" class="glyph s">YES</text></g>
+        <rect x="58.5" y="59.2" width="6" height="6" class="btnarm" style="pointer-events:none"/>
+      </g>
+      <text x="22" y="69" class="brand">jank mini 2.2</text>
+    </svg>
+    <div id="setupbar" class="row devrow" hidden><button id="setupbtn" type="button" class="primary">Open the setup page (as on a phone)</button></div>
+    <div class="devpanel">
+      <label>Wi-Fi <select id="wifi"><option value="good">good</option><option value="weak">weak</option><option value="none">none</option></select></label>
+      <label><input type="checkbox" id="usb" checked> USB plugged</label>
+      <label><input type="checkbox" id="bat" checked> battery fitted</label>
+      <label>Battery <input type="range" id="battlvl" min="0" max="100" value="80"> <b id="battv" class="num">80 %</b></label>
+      <label><input type="checkbox" id="linein" checked> line in plugged</label>
+      <label><input type="checkbox" id="usbaudio"> USB audio playing</label>
+      <label><input type="checkbox" id="blephone"> phone connected (Bluetooth)</label>
+    </div>
+  </div>
+
+  <div class="card" id="xiaocard" hidden>
+    <div class="row">
+      <b>XIAO audio beat tracker</b>
+      <span id="xaudio" class="xaudio">no report yet</span>
+    </div>
+    <div class="row">
+      <span id="xbeat" title="flashes on each beat the XIAO's tracker hears" style="display:inline-block;width:14px;height:14px;border-radius:7px;background:#333"></span>
+      <span><b id="xbpm" class="num">---</b> BPM heard</span>
+      <span>tracker <b id="xmode">-</b></span>
+      <span>beats heard <b id="xn" class="num">-</b></span>
+    </div>
+    <div class="row num" style="font-size:12px"><span title="the follower (jank M2i): lock = ModeBpm's grid, glide = the Kalman follower; its drift; the last pitch ratio taken from the spectrum">follow <b id="xfollow">-</b></span></div>
+    <div id="xmsg" class="num" style="opacity:.7"></div>
+    <div id="accmodel" class="num" style="opacity:.8;font-size:12px;margin-top:4px"></div>
+    <div id="accxstats" class="num" style="opacity:.8;font-size:12px"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="calib" disabled>Calibrate</button>
+      <span id="calibmsg" class="num" style="font-size:12px"></span>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <label><input type="checkbox" id="autolat" checked> Auto latency</label>
+      <span id="autolatmsg" class="num" style="font-size:12px"></span>
+    </div>
+    <div id="autolathint" class="num" style="font-size:12px;color:#e0a84f" hidden></div>
+  </div>
+  </div>
+  <div id="rightcol">
+    <div class="tabs" role="tablist">
+      <button id="panebtn-player" role="tab" type="button">Player</button>
+      <button id="panebtn-tab" role="tab" type="button">Tab audio</button>
+    </div>
+    <div class="card tabpanel">
+  <div data-pane="player">
+    <input id="q" type="search" placeholder="Search your Traktor tracks…" autocomplete="off">
+    <div id="list"></div>
+    <div class="row" style="margin-top:6px">
+      <input id="path" type="text" placeholder="…or any audio file path" style="flex:1; min-width:200px">
+      <button id="loadpath">Open</button>
+    </div>
+    <div id="err"></div>
+  </div>
+  <div id="tabcard" data-pane="tab">
+    <div class="row">
+      <b>Listen to a tab</b>
+      <button id="tabbtn" class="primary">Listen to a tab</button>
+      <button id="tabstop" hidden>Stop listening</button>
+    </div>
+    <div id="tabstat" class="num" style="font-size:13px"></div>
+    <div id="tablat" class="num muted" style="font-size:12px"></div>
+    <div class="muted" style="font-size:12px;margin-top:4px">The accuracy numbers (the CSV log, Calibrate) need annotated tracks: a tab has no reference beat grid, so they show nothing for a tab.</div>
+  </div>
+
+  <div class="ctl">
+    <div data-pane="player">
+      <div class="now" id="now">No track</div>
+      <div class="row" style="margin-top:6px">
+        <button class="primary" id="play">Play</button>
+        <button id="next" title="the next track; with &quot;then random&quot;, a random one">Next</button>
+        <label>then <select id="auto"><option value="next">next</option><option value="random">random</option><option value="stop">stop</option></select></label>
+        <span class="num muted" id="time">0:00 / 0:00</span>
+      </div>
+      <input id="seek" type="range" min="0" max="1000" value="0" style="margin-top:6px;width:100%">
+      <div class="row" style="margin-top:8px">
+        <strong>Pitch</strong>
+        <span id="pitchval" class="num">+0.00 %</span>
+        <button id="reset">0</button>
+        <label class="muted">range
+          <select id="range"><option value="8">±8 %</option><option value="16">±16 %</option><option value="50">±50 %</option></select>
+        </label>
+      </div>
+      <input id="pitch" type="range" min="-8" max="8" step="0.01" value="0" style="width:100%">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <strong>Volume</strong>
+      <span id="volval" class="num muted">100 %</span>
+    </div>
+    <input id="vol" type="range" min="0" max="100" step="1" value="100" style="width:100%">
+  </div>
+    </div>
+  </div>
+  </div>
+
+</main>
+<!-- ===================== SETUP PAGE: the device's web setup form (a draft of the firmware's page) =====================
+     Self-contained: markup, styles (.sp-*) and script (spOpen / spSave / spClose) only touch the dev state and setField(). -->
+<div id="sp-overlay" hidden>
+  <form id="sp-form" class="sp-phone" autocomplete="off">
+    <div class="sp-head"><b>jank setup</b><button type="button" id="sp-x" aria-label="close">&times;</button></div>
+    <div class="sp-sub">connected to <span id="sp-ap"></span> &middot; 192.168.4.1</div>
+    <label>Network mode<select id="sp-net"><option value="0">JANK</option><option value="1">LINK CLIENT</option><option value="2">LINK AP</option></select></label>
+    <div id="sp-jank"><label>Jank group<select id="sp-group"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option></select></label></div>
+    <div id="sp-client">
+      <label>Network<select id="sp-ssid"></select></label>
+      <label>Passkey<input id="sp-pass" type="text" maxlength="63" autocomplete="off"></label>
+    </div>
+    <div id="sp-ap-box">
+      <label>AP name<input id="sp-apname" type="text" maxlength="31" autocomplete="off"></label>
+      <label>AP passkey<input id="sp-appass" type="text" maxlength="63" autocomplete="off"></label>
+    </div>
+    <fieldset><legend>Output offsets (ms)</legend>
+      <label>Audio in<input id="sp-oin" type="number" min="-100" max="100" step="1"></label>
+      <label>MIDI OUT 1<input id="sp-o0" type="number" min="-50" max="50" step="1"></label>
+      <label>MIDI OUT 2<input id="sp-o1" type="number" min="-50" max="50" step="1"></label>
+      <label>CLK OUT<input id="sp-o2" type="number" min="-50" max="50" step="1"></label>
+    </fieldset>
+    <label>Clock rate<select id="sp-rate"></select></label>
+    <label>Screen brightness (%)<input id="sp-bright" type="number" min="10" max="100" step="10"></label>
+    <label>Screen off<select id="sp-sleep"><option value="0">never</option><option value="1">after 30 s</option><option value="2">after 1 min</option><option value="3">after 5 min</option></select></label>
+    <label>Input level (dB)<input id="sp-gain" type="number" min="-12" max="12" step="1"></label>
+    <label>Low confidence<select id="sp-lowconf"><option value="0">Keep running</option><option value="1">Stop / start</option></select></label>
+    <label>Confidence threshold (%)<input id="sp-th" type="number" min="0" max="100" step="5"></label>
+    <div class="sp-actions"><button type="submit" class="primary">Save</button><span id="sp-msg"></span></div>
+  </form>
+</div>
+<script>
+/* Minimal QR encoder: byte mode, error correction L, versions 1-5 (one block each). Used for the setup-mode hotspot code.
+   encode(text) -> { size, mod } with mod[y][x] true for a dark module. */
+const QR = (() => {
+  const EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+  { let x = 1; for (let i = 0; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 256) x ^= 0x11d; } for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255]; }
+  const mul = (a, b) => (a && b ? EXP[LOG[a] + LOG[b]] : 0);
+  function rsEncode(data, n) {                       // remainder of data(x) * x^n by the generator polynomial
+    let g = [1];
+    for (let i = 0; i < n; i++) { const ng = new Array(g.length + 1).fill(0); for (let j = 0; j < g.length; j++) { ng[j] ^= g[j]; ng[j + 1] ^= mul(g[j], EXP[i]); } g = ng; }
+    const res = new Array(n).fill(0);
+    for (const b of data) { const f = b ^ res.shift(); res.push(0); for (let i = 0; i < n; i++) res[i] ^= mul(g[i + 1], f); }
+    return res;
+  }
+  const CAP = { 1: [19, 7], 2: [34, 10], 3: [55, 15], 4: [80, 20], 5: [108, 26] };   // [data codewords, ecc codewords], level L
+  const MASKS = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+    (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => ((x * y) % 2) + ((x * y) % 3) === 0,
+    (x, y) => (((x * y) % 2) + ((x * y) % 3)) % 2 === 0, (x, y) => (((x + y) % 2) + ((x * y) % 3)) % 2 === 0];
+
+  function codewords(bytes, version) {
+    const [nd, ne] = CAP[version], bits = [];
+    const put = (v, n) => { for (let i = n - 1; i >= 0; i--) bits.push((v >>> i) & 1); };
+    put(4, 4); put(bytes.length, 8); bytes.forEach(b => put(b, 8));
+    for (let i = 0; i < 4 && bits.length < nd * 8; i++) bits.push(0);
+    while (bits.length % 8) bits.push(0);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+    for (let pad = 0xec; data.length < nd; pad ^= 0xec ^ 0x11) data.push(pad);
+    return data.concat(rsEncode(data, ne));
+  }
+
+  function build(version, cw, mask) {
+    const size = 17 + 4 * version;
+    const mod = Array.from({ length: size }, () => new Array(size).fill(false));
+    const fn = Array.from({ length: size }, () => new Array(size).fill(false));
+    const set = (x, y, v) => { if (x >= 0 && x < size && y >= 0 && y < size) { mod[y][x] = v; fn[y][x] = true; } };
+    for (let i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+    for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]])
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const d = Math.max(Math.abs(dx), Math.abs(dy)); set(cx + dx, cy + dy, d !== 2 && d !== 4); }
+    if (version >= 2) { const c = size - 7; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(c + dx, c + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1); }
+    const data = (1 << 3) | mask;                                  // level L = 01
+    let rem = data; for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    const fb = ((data << 10) | rem) ^ 0x5412, bit = i => ((fb >>> i) & 1) !== 0;
+    for (let i = 0; i <= 5; i++) set(8, i, bit(i));
+    set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8));
+    for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+    for (let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+    for (let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+    set(8, size - 8, true);
+    let k = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j, y = ((right + 1) & 2) === 0 ? size - 1 - vert : vert;
+        if (!fn[y][x] && k < cw.length * 8) { mod[y][x] = ((cw[k >>> 3] >>> (7 - (k & 7))) & 1) !== 0; k++; }
+      }
+    }
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!fn[y][x] && MASKS[mask](x, y)) mod[y][x] = !mod[y][x];
+    return { size, mod };
+  }
+
+  function penalty(q) {
+    const { size, mod } = q; let p = 0, dark = 0;
+    const lines = [];
+    for (let i = 0; i < size; i++) { lines.push(mod[i].map(v => (v ? 1 : 0)).join('')); lines.push(mod.map(r => (r[i] ? 1 : 0)).join('')); }
+    for (const s of lines) {
+      for (const m of s.matchAll(/0{5,}|1{5,}/g)) p += 3 + m[0].length - 5;
+      p += 40 * ((s.match(/(?=10111010000|00001011101)/g) || []).length);
+    }
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      if (mod[y][x]) dark++;
+      if (x < size - 1 && y < size - 1 && mod[y][x] === mod[y][x + 1] && mod[y][x] === mod[y + 1][x] && mod[y][x] === mod[y + 1][x + 1]) p += 3;
+    }
+    return p + 10 * (Math.ceil(Math.abs(dark * 20 - size * size * 10) / (size * size)) - 1);
+  }
+
+  function encode(text) {
+    const bytes = Array.from(new TextEncoder().encode(text));
+    const version = [1, 2, 3, 4, 5].find(v => bytes.length <= CAP[v][0] - 2);
+    if (!version) throw new Error('QR text too long');
+    const cw = codewords(bytes, version);
+    let best = null, bestP = Infinity;
+    for (let m = 0; m < 8; m++) { const q = build(version, cw, m); const p = penalty(q); if (p < bestP) { bestP = p; best = q; } }
+    return best;
+  }
+  return { encode };
+})();
+</script>
+<script>
+/* ====================================================================================================
+   OLED UI for jank mini 2.2, screen version. 128 x 64, 1 bit per pixel, 5x7 pixel font (scaled x2/x3 for big text).
+   Pure logic: no DOM. Input: press(ui, button, now_ms, ctx) with button 'up' | 'down' | 'no' (left arm) | 'yes'
+   (right arm); output: draw(fb, ui, ctx, now_ms) fills a 128*64 Uint8Array (1 = white pixel). Written so it can be
+   ported to the firmware as it is: one state struct, one input function, one draw function, a tiny font.
+
+   ctx, read by the UI (the host fills it from /api/status and its own emulated state): link (mode is LINK; the host derives it from the line-in plug detect: plugged = AUDIO, unplugged = LINK), bpm
+   (audio mode, after the half/double fold), linkBpm, mode, conf 0..1, th percent, levelDb (dBFS), silent, gated, hold,
+   playing (Link transport), running / armed (the transport icon), fold (AUDIO: 1 2 4 0.5 0.25, the label X2 /2 ... top left; --xiao from the status's fold= / the home line's mode), foldAuto (AUTO RANGE set it), xiao (--xiao: YES sends play / stop in both modes), ble { mode 0 PAIR NOW | 1 ON START | 2 OFF, left (seconds of the pair window left, null = closed), phone (connected) }, peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
+   autoBar (the AUTO BAR setting: 0 OFF, 1 AT START, 2 ALWAYS; true / false = 1 / 0), bar (the downbeat estimator: { state, conf } or null),
+   offs [MIDI OUT 1, MIDI OUT 2, CLK] in ms, rate (index into the clock divisions), boot, splash.
+   net: { mode 0 JANK | 1 LINK CLIENT | 2 LINK AP | 3 SETUP, prev (mode to return to after SETUP), group (the jank GROUP 1..9: the units on the same group form one Link session over open Wi-Fi frames, no router), ssid, pass, appass, apName,
+   status, ip, apClients, scan [{name, bars}], setupName }, groupPeers, setup (mode is SETUP), qr { size, mod }, saved.
+   ctx actions: tempoStep(+1|-1) -> new BPM shown, setField(name, value), setHold(bool) (stop: hold; start: resync, then release).
+
+   BUTTONS: UP / DOWN / NO (left) / YES (right).
+   SCREENS AND TRANSITIONS
+     HOME     everything at once: mode tag AUDIO|LINK, state (STEADY FASTER SLOWER STOPPED GATED SILENT PLAYING), BPM large,
+              the layouts are described at drawHome.
+                UP / DOWN   LINK mode: Link tempo +/-1 BPM (the host auto-repeats while held).
+                            AUDIO mode: x2 / /2, the tracker's half/double fix. 1 s overlay with the new BPM
+                YES         (on release) Stop / Start of the outputs (MIDI clock, modular clock); the top-left icon shows
+                            it. AUDIO: Stop holds Link and the clocks, Start resyncs and runs. LINK: the device's own
+                            clocks start / stop (and the session, in FOLLOW+LEAD; see LINK TRANSPORT).        NO (on release) -> MENU
+                            With the XIAO (--xiao): `play` (it starts on its next bar line) or `stop`, by the icon, in LINK and
+                            in AUDIO (the hold of the outputs). UP / DOWN in AUDIO send `fold x2` / `fold /2`.
+                TRANSPORT ICON  triangle = running, square = stopped, blinking triangle = armed: a start asked for and
+                            not reached yet, one that resolves by itself (the next bar line, the tracker locking on
+                            music it hears) or by YES; never shown for a session that is merely stopped
+                NO + UP/DOWN   AUDIO mode: PHASE, half a beat relative to the tracked phase (1 s overlay "PHASE +1/2", "AUTO"
+                               at 0): one step fixes an off-beat lock, two move the bar's 1 by a beat. Two layers (jank
+                               M2h): the user's PHASE rides on AUTO BAR's bar, which stays in charge; 0 is AUTO
+                BAR MARKS   AUDIO mode, AUTO BAR on: a bar under the first box = LOCKED (the bar's 1 is the music's 1),
+                            the line under the boxes = how sure; nothing under the boxes = still listening
+                YES + UP/DOWN  AUDIO mode: AUDIO SHIFT, the timing 1 ms (every output; repeats while held; 1 s overlay
+                               "AUDIO SHIFT +3 MS", "AUTO" at 0): the user's shift on top of the auto latency (jank M2h).
+                               A combo cancels the NO / YES release action.
+     MENU     AUDIO, LINK TRANSPORT (LINK mode: IGNORE = the clocks run on Link's tempo and beat, own Start / Stop only;
+              FOLLOW = they also start / stop with the session; FOLLOW+LEAD = and our Start / Stop starts / stops the session),
+              AUTO BAR (AUDIO mode: OFF = the bar left where it is; AT START = the bar's 1 found in the music and Link's bar moved onto it
+              at a start only, never while playing; ALWAYS = also while playing),
+              NETWORK, USB, BLUETOOTH (PAIR NOW / ON START / OFF; YES on PAIR NOW opens the 2 minute pair window, which HOME's
+              status line counts down), OFFSET, CLK RATE, DISPLAY, BATTERY (UP/DOWN move; the mode is not a setting: plugging in the line = AUDIO)
+                YES on AUDIO / OFFSET -> SUB                    YES on NETWORK -> NET
+                YES on CLK RATE / AUTO BAR / USB / BLUETOOTH -> EDIT              YES on BATTERY -> INFO       NO -> HOME
+     SUB      a list of EDITS: UP/DOWN move, YES -> EDIT, NO -> MENU
+                DISPLAY: BRIGHTNESS (10..100 %), SCREEN OFF (NEVER / 30 S / 1 MIN / 5 MIN without a button; the first
+                         press on a dark screen only wakes it; SETUP keeps the screen on)
+                AUDIO:  LEVEL (-12..+12 dB, attenuator / boost before the tracker), LOW CONFIDENCE (KEEP RUNNING or
+                        STOP / START: under the threshold the transport stops), THRESHOLD (%); --xiao: the XIAO's own
+                        (`set lowconf stop|run`, `set threshold N`, read back from its status / get)
+                OFFSET: AUDIO IN (-100..+100 ms: the input latency, moves every output; the YES + UP/DOWN nudge
+                        changes it), MIDI OUT 1, MIDI OUT 2, CLK OUT in ms (-50..+50, per output)
+     NET      TYPE (JANK / LINK CLIENT / LINK AP / SETUP, applied on YES) and per mode: JANK: PEERS; CLIENT: NETWORK (-> SCAN),
+              PASSKEY (-> TEXT), STATUS (-> NETINFO); AP: NAME and PASSKEY (-> TEXT), STATUS (-> NETINFO). NO -> MENU.
+              Choosing SETUP goes to CONFIRM ("STOP AND START SETUP?", YES starts, NO back).
+     SCAN     fake scan list with signal bars: UP/DOWN move, YES picks, NO back
+     TEXT     character editor (a-z A-Z 0-9 - _ . ! @ #): UP/DOWN cycle the character at the cursor (the host repeats while held),
+              YES = next character, YES on the empty slot past the end = confirm, NO = delete the last character,
+              NO on an empty text = cancel. Passkeys are masked except at the cursor. Hint: easier: web UI + address
+     SETUP    replaces every screen: the device is stopped, the open hotspot jank-setup-XXXX runs; the screen shows its QR code,
+              the name and 192.168.4.1. NO asks "LEAVE SETUP?": YES returns to the previous network mode and runs again
+     INFO     read-only (battery: %, charging/discharging, estimated volt)  NO or YES -> MENU
+     EDIT     (choices cycle round, numbers stop at their ends) the value drawn inverted (white box, black text). UP/DOWN change it (applied live), YES keeps it and
+              returns to where EDIT was opened (MENU or SUB), NO restores the old value and returns.
+   ==================================================================================================== */
+const OLED = (() => {
+  const W = 128, H = 64;
+  const ROWS = 7;
+  const FONT_SRC = {
+    '0': '.###.|#...#|#..##|#.#.#|##..#|#...#|.###.', '1': '..#..|.##..|..#..|..#..|..#..|..#..|.###.',
+    '2': '.###.|#...#|....#|...#.|..#..|.#...|#####', '3': '.###.|#...#|....#|..##.|....#|#...#|.###.',
+    '4': '...#.|..##.|.#.#.|#..#.|#####|...#.|...#.', '5': '#####|#....|####.|....#|....#|#...#|.###.',
+    '6': '..##.|.#...|#....|####.|#...#|#...#|.###.', '7': '#####|....#|...#.|..#..|.#...|.#...|.#...',
+    '8': '.###.|#...#|#...#|.###.|#...#|#...#|.###.', '9': '.###.|#...#|#...#|.####|....#|...#.|.##..',
+    'A': '.###.|#...#|#...#|#####|#...#|#...#|#...#', 'B': '####.|#...#|#...#|####.|#...#|#...#|####.',
+    'C': '.###.|#...#|#....|#....|#....|#...#|.###.', 'D': '###..|#..#.|#...#|#...#|#...#|#..#.|###..',
+    'E': '#####|#....|#....|####.|#....|#....|#####', 'F': '#####|#....|#....|####.|#....|#....|#....',
+    'G': '.###.|#...#|#....|#.###|#...#|#...#|.####', 'H': '#...#|#...#|#...#|#####|#...#|#...#|#...#',
+    'I': '.###.|..#..|..#..|..#..|..#..|..#..|.###.', 'J': '..###|...#.|...#.|...#.|...#.|#..#.|.##..',
+    'K': '#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#', 'L': '#....|#....|#....|#....|#....|#....|#####',
+    'M': '#...#|##.##|#.#.#|#.#.#|#...#|#...#|#...#', 'N': '#...#|##..#|#.#.#|#..##|#...#|#...#|#...#',
+    'O': '.###.|#...#|#...#|#...#|#...#|#...#|.###.', 'P': '####.|#...#|#...#|####.|#....|#....|#....',
+    'Q': '.###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#', 'R': '####.|#...#|#...#|####.|#.#..|#..#.|#...#',
+    'S': '.####|#....|#....|.###.|....#|....#|####.', 'T': '#####|..#..|..#..|..#..|..#..|..#..|..#..',
+    'U': '#...#|#...#|#...#|#...#|#...#|#...#|.###.', 'V': '#...#|#...#|#...#|#...#|#...#|.#.#.|..#..',
+    'W': '#...#|#...#|#...#|#.#.#|#.#.#|##.##|#...#', 'X': '#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#',
+    'Y': '#...#|#...#|.#.#.|..#..|..#..|..#..|..#..', 'Z': '#####|....#|...#.|..#..|.#...|#....|#####',
+    ',': '.....|.....|.....|.....|.....|.##..|.#...', '.': '.....|.....|.....|.....|.....|.##..|.##..', ':': '.....|.##..|.##..|.....|.##..|.##..|.....',
+    '%': '##..#|##..#|...#.|..#..|.#...|#..##|#..##', '+': '.....|..#..|..#..|#####|..#..|..#..|.....',
+    '-': '.....|.....|.....|#####|.....|.....|.....', '/': '....#|....#|...#.|..#..|.#...|#....|#....',
+    ' ': '.....|.....|.....|.....|.....|.....|.....',
+    'a': '.....|.....|.###.|....#|.####|#...#|.####', 'b': '#....|#....|####.|#...#|#...#|#...#|####.',
+    'c': '.....|.....|.###.|#....|#....|#...#|.###.', 'd': '....#|....#|.####|#...#|#...#|#...#|.####',
+    'e': '.....|.....|.###.|#...#|#####|#....|.###.', 'f': '..##.|.#..#|.#...|###..|.#...|.#...|.#...',
+    'g': '.....|.####|#...#|#...#|.####|....#|.###.', 'h': '#....|#....|#.##.|##..#|#...#|#...#|#...#',
+    'i': '..#..|.....|.##..|..#..|..#..|..#..|.###.', 'j': '...#.|.....|..##.|...#.|...#.|#..#.|.##..',
+    'k': '#....|#....|#..#.|#.#..|##...|#.#..|#..#.', 'l': '.##..|..#..|..#..|..#..|..#..|..#..|.###.',
+    'm': '.....|.....|##.#.|#.#.#|#.#.#|#...#|#...#', 'n': '.....|.....|#.##.|##..#|#...#|#...#|#...#',
+    'o': '.....|.....|.###.|#...#|#...#|#...#|.###.', 'p': '.....|####.|#...#|#...#|####.|#....|#....',
+    'q': '.....|.####|#...#|#...#|.####|....#|....#', 'r': '.....|.....|#.##.|##..#|#....|#....|#....',
+    's': '.....|.....|.####|#....|.###.|....#|####.', 't': '.#...|.#...|###..|.#...|.#...|.#..#|..##.',
+    'u': '.....|.....|#...#|#...#|#...#|#..##|.##.#', 'v': '.....|.....|#...#|#...#|#...#|.#.#.|..#..',
+    'w': '.....|.....|#...#|#...#|#.#.#|#.#.#|.#.#.', 'x': '.....|.....|#...#|.#.#.|..#..|.#.#.|#...#',
+    'y': '.....|#...#|#...#|.####|....#|....#|.###.', 'z': '.....|.....|#####|...#.|..#..|.#...|#####',
+    '_': '.....|.....|.....|.....|.....|.....|#####', '!': '..#..|..#..|..#..|..#..|..#..|.....|..#..',
+    '@': '.###.|#...#|#.###|#.#.#|#.###|#....|.###.', '#': '.#.#.|#####|.#.#.|.#.#.|.#.#.|#####|.#.#.',
+    '*': '.....|#.#.#|.###.|#####|.###.|#.#.#|.....',
+  };
+  const FONT = {};
+  for (const k of Object.keys(FONT_SRC)) FONT[k] = FONT_SRC[k].split('|');
+  const NARROW = { '.': 1, ':': 1, ',': 1 };                 // glyphs drawn from column 1, two columns wide
+  const adv = ch => (NARROW[ch] ? 3 : ch === ' ' ? 4 : 6);
+
+  const px = (fb, x, y, v) => { if (x >= 0 && x < W && y >= 0 && y < H) fb[y * W + x] = v; };
+  const rect = (fb, x, y, w, h, v) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(fb, x + i, y + j, v); };
+  const frame = (fb, x, y, w, h, v) => { rect(fb, x, y, w, 1, v); rect(fb, x, y + h - 1, w, 1, v); rect(fb, x, y, 1, h, v); rect(fb, x + w - 1, y, 1, h, v); };
+  const xorCol = (fb, x, y0, y1) => { for (let y = y0; y <= y1; y++) if (x >= 0 && x < W && y >= 0 && y < H) fb[y * W + x] ^= 1; };
+  const textW = (s, sc) => { let w = 0; for (const ch of s) w += adv(ch) * sc; return Math.max(0, w - sc); };
+  function text(fb, s, x, y, sc, v) {
+    let cx = x;
+    for (const ch of String(s)) {
+      const g = FONT[ch] || FONT[' '], off = NARROW[ch] || 0;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < 5; c++) if (g[r][c] === '#') rect(fb, cx + (c - off) * sc, y + r * sc, sc, sc, v);
+      cx += adv(ch) * sc;
+    }
+  }
+  const textR = (fb, s, xr, y, sc, v) => text(fb, s, xr - textW(String(s), sc), y, sc, v);
+  const textC = (fb, s, y, sc, v) => text(fb, s, Math.round((W - textW(String(s), sc)) / 2), y, sc, v);
+
+  const RATES = ['1/4', '1/8', '1/16', '1/32', '24 PPQN'];          // the modular CLK output's division
+  const RATES_SHORT = ['1/4', '1/8', '1/16', '1/32', '24P'];
+  const DEFAULT_RATE = 2;
+  const NET_MODES = ['JANK', 'LINK CLIENT', 'LINK AP', 'SETUP'], NET_SHORT = ['JANK', 'CLIENT', 'AP', 'SETUP'];
+  const SETUP = 3;
+  const CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.!@#';
+  const MAX_TEXT = 63;
+  // what EDIT can change: opts = a list of choices (value = index), else a number lo..hi in steps
+  // help: two short lines (21 characters at most) under the value; for a list of choices, one pair per choice
+  const LATER = '+ LATER  - EARLIER';
+  const SLEEP_NAMES = ['NEVER', '30 S', '1 MIN', '5 MIN'];
+  const LT_MODES = ['IGNORE', 'FOLLOW', 'FOLLOW+LEAD'];                // index = dev.ltMode; default FOLLOW+LEAD (2)
+  const LT_SHORT = ['IGNORE', 'FOLLOW', 'LEAD'];
+  // the HOME top bar's LINK-mode transport icons, 1-bit rows ('#' = lit): IGNORE = a crossed circle (our own start only),
+  // FOLLOW = an arrow coming in (the session's start / stop), FOLLOW+LEAD = a double arrow (in and out)
+  const LT_ICONS = [
+    ['..###..', '.#...##', '#...#.#', '#..#..#', '#.#...#', '##...#.', '..###..'],
+    ['...#.....', '..##.....', '.#######.', '########.', '.#######.', '..##.....', '...#.....'],
+    ['.........', '..#...#..', '.##...##.', '#########', '.##...##.', '..#...#..', '.........'],
+  ];
+  const NET_ICON_XR = 86;                                            // the network icon's right edge: a gap before the plug
+  const NET_ICON_XR_BLE = 82;                                        // ... with the Bluetooth rune beside it (4 columns further left)
+  const BLE_ICON_X = 86, PLUG_X = 92, BATT_X = 107;                  // the rune (5 wide) sits between the network icon and the plug
+  // the Bluetooth rune, 5 x 7: hidden while no window is open and no phone is connected, blinking (ARMED_BLINK_MS) while the
+  // pair window is open, solid while a phone is connected
+  const BLE_ICON = ['..#..', '..##.', '#.#.#', '.###.', '#.#.#', '..##.', '..#..'];
+  const BLE_SHORT = ['PAIR', 'START', 'OFF'];
+  const AUTOBAR_NAMES = ['OFF', 'AT START', 'ALWAYS'], AUTOBAR_SHORT = ['OFF', 'START', 'ALWAYS'];   // index = dev.autoBar (the old true / false = 1 / 0)
+  const autoBarIndex = v => (v === true ? 1 : v === false || v == null ? 0 : v);
+  // the fold's label on HOME (AUDIO): x2 x4 /2 /4, nothing at 1
+  const foldLabel = k => (k === 2 ? 'X2' : k === 4 ? 'X4' : k === 0.5 ? '/2' : k === 0.25 ? '/4' : '');
+  const BLE_WINDOW_S = 120;                                          // the pair window: 2 minutes
+  const mmss = s => { const t = Math.max(0, Math.ceil(s)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+  const USB_ICON = ['.....####..', '.....######', '#########..', '.....######', '.....####..'];
+  function icon(fb, rows, x, y) { rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') px(fb, x + i, y + j, 1); }); }                       // the menu row (LINK TRANSPORT + value fits 21 characters)
+  const EDITS = {
+    netmode: { title: 'NETWORK', opts: NET_MODES, get: c => c.net.mode, live: false,      // applied on YES, SETUP asks first
+               help: [['JANK GROUP NETWORK', ''], ['JOIN A WIFI ROUTER', ''], ['OWN WIFI NETWORK', ''], ['STOPS THE DEVICE', 'OPENS SETUP HOTSPOT']] },
+    inoff: { title: 'AUDIO IN', lo: -100, hi: 100, step: 1, unit: ' MS', get: c => c.inOff,     // input latency: moves every output
+             help: ['INPUT LATENCY, MOVES', 'ALL OUTPUTS. + LATER'] },
+    out0: { title: 'MIDI OUT 1', lo: -50, hi: 50, step: 1, unit: ' MS', get: c => c.offs[0], help: ['MIDI OUT 1 TIMING', LATER] },
+    out1: { title: 'MIDI OUT 2', lo: -50, hi: 50, step: 1, unit: ' MS', get: c => c.offs[1], help: ['MIDI OUT 2 TIMING', LATER] },
+    out2: { title: 'CLK OUT', lo: -50, hi: 50, step: 1, unit: ' MS', get: c => c.offs[2], help: ['MODULAR CLOCK TIMING', LATER] },
+    rate: { title: 'CLOCK RATE', opts: RATES, get: c => c.rate,
+            help: [['1 PULSE PER BEAT', 'ON CLK OUT'], ['2 PULSES PER BEAT', 'ON CLK OUT'], ['4 PULSES PER BEAT', 'ON CLK OUT'],
+                   ['8 PULSES PER BEAT', 'ON CLK OUT'], ['24 PULSES PER BEAT', 'ON CLK OUT']] },
+    threshold: { title: 'THRESHOLD', lo: 0, hi: 100, step: 5, unit: '%', get: c => c.th, help: ['BELOW IT: STOP', '(LOW CONFIDENCE)'] },
+    gain: { title: 'LEVEL', lo: -12, hi: 12, step: 1, unit: ' dB', get: c => c.gain, help: ['INPUT LEVEL', '- CUT   + BOOST'] },   // before the tracker
+    ltmode: { title: 'LINK TRANSPORT', opts: LT_MODES, get: c => c.ltMode,      // LINK mode only: the session's start / stop
+              help: [['CLOCKS RUN ON LINK', 'TEMPO, OWN START'], ['CLOCKS START + STOP', 'WITH THE SESSION'],
+                     ['FOLLOWS, AND START/', 'STOP DRIVES LINK']] },
+    bright: { title: 'BRIGHTNESS', lo: 10, hi: 100, step: 10, unit: '%', get: c => c.bright, help: ['SCREEN BRIGHTNESS', 'LOWER SAVES BATTERY'] },
+    sleep: { title: 'SCREEN OFF', opts: SLEEP_NAMES, get: c => c.sleep,
+             help: [['SCREEN STAYS ON', ''], ['DARK AFTER 30 S', 'ANY BUTTON WAKES IT'], ['DARK AFTER 1 MIN', 'ANY BUTTON WAKES IT'],
+                    ['DARK AFTER 5 MIN', 'ANY BUTTON WAKES IT']] },
+    group: { title: 'JANK GROUP', opts: ['1', '2', '3', '4', '5', '6', '7', '8', '9'], get: c => c.net.group - 1, live: false,
+             help: Array(9).fill(['UNITS ON THE SAME', 'GROUP PLAY TOGETHER']) },     // the jank README: GROUP 1..9, no router
+    lowconf: { title: 'LOW CONFIDENCE', opts: ['KEEP RUNNING', 'STOP / START'], get: c => (c.confStop ? 1 : 0),
+               help: [['NEVER STOPS', ''], ['STOPS BELOW THE', 'THRESHOLD']] },
+    // what the tracker listens to: AUTO = the line in when plugged, else USB audio when it plays
+    // (LINK: USB audio is ignored, a plug in the line in still wins: it is mechanical)
+    insrc: { title: 'SOURCE', opts: ['AUTO', 'LINE IN', 'USB AUDIO', 'LINK'], get: c => c.inSrc,
+             help: [['LINE IN IF PLUGGED', 'ELSE USB AUDIO'], ['THE LINE IN JACK', 'ONLY'], ['AUDIO OVER USB', 'ONLY'], ['USB AUDIO IGNORED', 'LINE STILL WINS']] },
+    // the phone's Bluetooth: PAIR NOW = on only for a pair window (YES opens it, even unchanged), ON START = a window at
+    // every start too, OFF = never. The triple NO opens the window as well (HOME, no screen needed)
+    ble: { title: 'BLUETOOTH', opts: ['PAIR NOW', 'ON START', 'OFF'], get: c => c.ble.mode, live: false, repick: true,
+           help: [['YES OPENS A 2 MIN', 'WINDOW FOR A PHONE'], ['A 2 MIN WINDOW AT', 'EVERY POWER ON'], ['NO BLUETOOTH', 'AT ALL']] },
+    // the USB port's role; MIDI and USB audio work in both (host: battery units, the gear has its own power)
+    usbrole: { title: 'USB', opts: ['DEVICE', 'HOST'], get: c => c.usbRole,
+               help: [['TO A COMPUTER', 'MIDI + AUDIO'], ['TO SELF-POWERED', 'MIDI + AUDIO GEAR']] },
+    // the MIDI clock over USB-MIDI (to the computer, or to the gear in HOST), M2d's usbmidi; the MIDI outs always have it
+    usbmidi: { title: 'USB MIDI CLOCK', opts: ['ON', 'OFF'], get: c => c.usbMidi,
+               help: [['CLOCK ALSO OVER USB', 'TO COMPUTER OR GEAR'], ['CLOCK ON MIDI OUTS', 'ONLY, NOT OVER USB']] },
+    // the downbeat estimator (AUDIO mode): ON finds the bar's 1 in the music and moves Link's bar onto it. A NUDGE BEAT
+    // makes it MANUAL (an M on HOME) until AUTO BAR is picked again (YES on ON, even unchanged) or the tempo starts over
+    // OFF: no placement. AT START (default): the 1 is placed while the session is stopped or its start is not reached, or
+    // once at a new start for the bar; never mid-play. ALWAYS: also while playing (moves can come at any time)
+    autobar: { title: 'AUTO BAR', opts: AUTOBAR_NAMES, get: c => autoBarIndex(c.autoBar), live: false, repick: true,
+               help: [['THE BAR 1 STAYS', 'WHERE IT IS'], ['1 PLACED AT A START', 'NEVER WHILE PLAYING'], ['MOVES THE 1 ALSO', 'WHILE PLAYING']] },
+  };
+  const helpOf = (sp, v) => (sp.opts ? sp.help[v] : sp.help) || ['', ''];
+  const MENU = [                                                    // the top-level menu, in order
+    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'BLUETOOTH', edit: 'ble' }, { name: 'USB MIDI CLOCK', edit: 'usbmidi' }, { name: 'OFFSET', sub: 'offsets' },
+    { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
+  ];
+  // sub-menus: a title and the EDITS they list
+  const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
+                 display: { title: 'DISPLAY', rows: ['bright', 'sleep'] } };
+  const VISIBLE = 6;
+  const OVERLAY_MS = 1000;
+  const METER_MIN_DB = -90, SILENCE_DB = -60;
+  const sgn = v => (v > 0 ? '+' : '') + v;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  const create = () => ({ screen: 'home', cursor: 0, top: 0, ocur: 0, ncur: 0, scur: 0, stop: 0, edit: null, txt: null, leave: false, overlay: null });
+  const editText = (spec, v) => (spec.opts ? spec.opts[v] : (spec.lo < 0 ? sgn(v) : v) + spec.unit);
+
+  function startEdit(ui, field, c) {
+    const orig = EDITS[field].get(c);
+    ui.edit = { field, orig, val: orig, ret: ui.screen };
+    ui.screen = 'edit';
+  }
+  function stepEdit(ui, c, d) {
+    const e = ui.edit, sp = EDITS[e.field];
+    const n = sp.opts ? sp.opts.length : 0;                       // choices cycle round; numbers stop at their ends
+    e.val = sp.opts ? (e.val + d + n) % n : clamp(e.val + sp.step * d, sp.lo, sp.hi);
+    if (sp.live !== false) c.setField(e.field, e.val);              // live
+  }
+  function endEdit(ui, c, keep) {
+    const e = ui.edit, sp = EDITS[e.field];
+    ui.edit = null; ui.screen = e.ret;
+    if (sp.live === false) {                                         // applied only when confirmed (repick: also unchanged)
+      if (keep && (e.val !== e.orig || sp.repick)) {
+        if (e.field === 'netmode' && e.val === SETUP) ui.screen = 'confirm';      // stopping the device needs a second YES
+        else c.setField(e.field, e.val);
+      }
+    } else if (!keep) c.setField(e.field, e.orig);
+  }
+  // NETWORK screen rows for the current mode: { name, val, act } (act = what YES does, null = read-only)
+  function netRows(c) {
+    const n = c.net, rows = [{ name: 'TYPE', val: NET_SHORT[n.mode], act: 'mode', help: ['HOW THE DEVICE JOINS', 'A NETWORK'] }];
+    if (n.mode === 0) rows.push({ name: 'GROUP', val: String(n.group), act: 'group', help: ['UNITS ON THE SAME', 'GROUP PLAY TOGETHER'] },
+                                { name: 'PEERS', val: String(c.groupPeers), act: null, help: ['JANK DEVICES IN', 'THE GROUP'] });
+    else if (n.mode === 1) rows.push({ name: 'NETWORK', val: n.ssid || '-', act: 'ssid', help: ['THE ROUTER TO JOIN', ''] },
+                                     { name: 'PASSKEY', val: '*'.repeat(Math.min(n.pass.length, 6)), act: 'pass', help: ['ITS WIFI PASSKEY', ''] },
+                                     { name: 'STATUS', val: n.status, act: 'status', help: ['CONNECTION STATE', 'AND IP ADDRESS'] });
+    else rows.push({ name: 'NAME', val: n.apName, act: 'apname', help: ['NAME OF THE', 'DEVICE NETWORK'] },
+                   { name: 'PASSKEY', val: '*'.repeat(Math.min(n.appass.length, 6)), act: 'appass', help: ['PASSKEY OF THE', 'DEVICE NETWORK'] },
+                   { name: 'STATUS', val: n.apClients + ' CLIENTS', act: 'status', help: ['ADDRESS AND', 'CONNECTED CLIENTS'] });
+    return rows;
+  }
+  function startText(ui, c, field) {
+    const text = { pass: c.net.pass, appass: c.net.appass, apname: c.net.apName }[field];
+    ui.txt = { field, text, pos: 0, mask: field === 'pass' || field === 'appass' };
+    ui.screen = 'text';
+  }
+  // character editor: UP/DOWN cycle the character at the cursor, YES next (on the empty slot past the end: confirm),
+  // NO deletes the last character (on an empty text: cancel)
+  function pressText(ui, c, btn, d) {
+    const t = ui.txt, n = t.text.length;
+    if (d) {
+      if (t.pos >= n) { if (n < MAX_TEXT) t.text += CHARS[d > 0 ? 0 : CHARS.length - 1]; }
+      else {
+        const i = CHARS.indexOf(t.text[t.pos]), j = i < 0 ? 0 : (i + d + CHARS.length) % CHARS.length;
+        t.text = t.text.slice(0, t.pos) + CHARS[j] + t.text.slice(t.pos + 1);
+      }
+    } else if (btn === 'yes') {
+      if (t.pos >= n) { c.setField(t.field, t.text); ui.txt = null; ui.screen = 'net'; }
+      else t.pos++;
+    } else if (n === 0) { ui.txt = null; ui.screen = 'net'; }
+    else { t.text = t.text.slice(0, -1); t.pos = Math.min(t.pos, t.text.length); }
+  }
+
+  function press(ui, btn, now, c) {
+    const d = btn === 'up' ? 1 : btn === 'down' ? -1 : 0;
+    if (c.setup) {                                                   // SETUP replaces every other screen
+      if (ui.leave) { if (btn === 'yes') c.setField('netmode', c.net.prev); if (!d) ui.leave = false; }
+      else if (btn === 'no') ui.leave = true;
+      return;
+    }
+    if (ui.screen === 'home') {
+      if (d) {
+        const v = c.tempoStep(d);                                  // link: +/-1 BPM; audio: x2 or /2 (--xiao: `fold x2` / `fold /2`)
+        ui.overlay = { until: now + OVERLAY_MS, title: c.link ? 'LINK TEMPO' : (d > 0 ? 'DOUBLE' : 'HALF'), value: v == null ? '---' : v.toFixed(1) };
+      } else if (btn === 'yes') {                                   // Stop / Start the outputs; the transport icon shows it
+        if (c.link || c.xiao) c.linkStartStop(!(c.running || c.armed));     // LINK: the clocks, and the session in FOLLOW+LEAD; --xiao: play / stop
+        else c.setHold(c.running || c.armed);                        // AUDIO: follows the icon: running/armed -> Stop (hold), stopped -> Start
+      }
+      else { ui.screen = 'menu'; ui.overlay = null; }
+    } else if (ui.screen === 'menu') {
+      if (d) {
+        ui.cursor = clamp(ui.cursor - d, 0, MENU.length - 1);
+        ui.top = clamp(ui.top, ui.cursor - VISIBLE + 1, ui.cursor);
+      } else if (btn === 'no') ui.screen = 'home';
+      else {
+        const it = MENU[ui.cursor];
+        if (it.net) { ui.screen = 'net'; ui.ncur = 0; }
+        else if (it.edit) startEdit(ui, it.edit, c);
+        else if (it.sub) { ui.screen = 'sub'; ui.sub = it.sub; ui.ocur = 0; }
+        else { ui.screen = 'info'; ui.page = it.info; }
+      }
+    } else if (ui.screen === 'sub') {
+      const rows = SUBS[ui.sub].rows;
+      if (d) ui.ocur = clamp(ui.ocur - d, 0, rows.length - 1);
+      else if (btn === 'no') ui.screen = 'menu';
+      else startEdit(ui, rows[ui.ocur], c);
+    } else if (ui.screen === 'net') {
+      const rows = netRows(c);
+      if (d) ui.ncur = clamp(ui.ncur - d, 0, rows.length - 1);
+      else if (btn === 'no') ui.screen = 'menu';
+      else {
+        const act = rows[ui.ncur].act;
+        if (act === 'mode') startEdit(ui, 'netmode', c);
+        else if (act === 'ssid') { ui.screen = 'scan'; ui.scur = 0; ui.stop = 0; }
+        else if (act === 'group') startEdit(ui, 'group', c);
+        else if (act === 'pass' || act === 'appass' || act === 'apname') startText(ui, c, act);
+        else if (act === 'status') ui.screen = 'netinfo';
+      }
+    } else if (ui.screen === 'scan') {
+      const list = c.net.scan;
+      if (d) { ui.scur = clamp(ui.scur - d, 0, Math.max(0, list.length - 1)); ui.stop = clamp(ui.stop, ui.scur - 4, ui.scur); }
+      else if (btn === 'yes' && list.length) { c.setField('ssid', list[ui.scur].name); ui.screen = 'net'; }
+      else if (btn === 'no') ui.screen = 'net';
+    } else if (ui.screen === 'text') {
+      pressText(ui, c, btn, d);
+    } else if (ui.screen === 'netinfo') {
+      if (!d) ui.screen = 'net';
+    } else if (ui.screen === 'confirm') {
+      if (btn === 'yes') { c.setField('netmode', SETUP); ui.screen = 'net'; }
+      else if (btn === 'no') ui.screen = 'net';
+    } else if (ui.screen === 'info') {
+      if (!d) ui.screen = 'menu';
+    } else if (ui.screen === 'edit') {
+      if (d) stepEdit(ui, c, d);
+      else endEdit(ui, c, btn === 'yes');
+    }
+  }
+
+  const titleBar = (fb, title, right) => {
+    rect(fb, 0, 0, W, 9, 1); text(fb, title, 2, 1, 1, 0); if (right) textR(fb, right, W - 2, 1, 1, 0);
+  };
+  const boxed = (fb, x, y, w, h) => { rect(fb, x, y, w, h, 1); frame(fb, x + 2, y + 2, w - 4, h - 4, 0); };
+  const bar = (fb, x, y, w, frac, tickFrac) => {                 // outlined bar, fill, an XOR tick through it
+    frame(fb, x, y, w, 7, 1); rect(fb, x + 1, y + 1, Math.round((w - 2) * clamp(frac, 0, 1)), 5, 1);
+    if (tickFrac != null) xorCol(fb, x + Math.round((w - 1) * tickFrac), y - 2, y + 8);
+  };
+
+  // a full-width 11 px bar with its value written inside, XOR-ed so it reads over the fill and over the empty part
+  function valueBar(fb, y, frac, tickFrac, label, right, hatch) {
+    const wFill = Math.round(122 * clamp(frac, 0, 1));
+    if (hatch) {                                                            // a HOLD: every other pixel, a checkerboard
+      for (let yy = y + 1; yy < y + 10; yy++) for (let xx = 3; xx < 3 + wFill; xx++) if ((xx + yy) % 2 === 0) px(fb, xx, yy, 1);
+    } else rect(fb, 3, y + 1, wFill, 9, 1);                                 // no outline: the fill, its text and the tick only
+    xorCol(fb, 2 + Math.round(123 * tickFrac), y - 1, y + 11);
+    const lx = right ? 123 - textW(label, 1) : 5;
+    const tmp = new Uint8Array(W * H); text(tmp, label, lx, y + 2, 1, 1);
+    if (hatch) {                                                            // a checkerboard under XOR-ed text is unreadable: clear a box for the label, then OR it in
+      for (let yy = y + 1; yy < y + 10; yy++) for (let xx = lx - 1; xx < lx + textW(label, 1) + 1; xx++) px(fb, xx, yy, 0);
+      for (let i = 0; i < tmp.length; i++) fb[i] |= tmp[i];
+      return;
+    }
+    for (let i = 0; i < tmp.length; i++) fb[i] ^= tmp[i];
+  }
+  // the placeholder jank glyph, 11 x 8: three linked dots (no jank icon exists in ~/GitHub/jank or ~/GitHub/optimist yet)
+  function drawJankGlyph(fb, x, y) {
+    for (const [gx, gy, w, h] of [[0, 5, 3, 3], [4, 0, 3, 3], [8, 5, 3, 3]]) rect(fb, x + gx, y + gy, w, h, 1);
+    for (const [gx, gy] of [[3, 4], [3, 3], [7, 3], [7, 4], [3, 6], [4, 6], [5, 6], [6, 6], [7, 6]]) px(fb, x + gx, y + gy, 1);
+  }
+  // network icon of the top bar, right edge xr: JANK glyph, Wi-Fi bars (CLIENT), bars + AP (AP); crossed out without signal
+  function drawNetIcon(fb, c, xr) {
+    const m = c.net.mode, bars = c.wifi === 'good' ? 3 : c.wifi === 'weak' ? 1 : 0;
+    let left = xr - 10;
+    if (m === 0) drawJankGlyph(fb, xr - 10, 0);
+    else {
+      const bx = m === 2 ? xr - 20 : xr - 7;
+      for (let i = 0; i < 3; i++) { const h = 2 + 2 * i; if (i < bars) rect(fb, bx + 3 * i, 8 - h, 2, h, 1); else rect(fb, bx + 3 * i, 7, 2, 1, 1); }
+      if (m === 2) text(fb, 'AP', xr - 10, 0, 1, 1);
+      left = bx;
+    }
+    if (c.wifi === 'none') for (let i = 0; i < 9; i++) fb[(8 - i) * W + left + i + (m === 0 ? 1 : 0)] ^= 1;
+  }
+  // the HOME top bar's boxes (x ranges, inclusive; null = not drawn), so that nothing can overlap: the transport icon, in LINK
+  // mode the transport option's icon, in AUDIO mode the fold label (X2 /2 ...), the network's name (right-aligned, truncated
+  // to what is left), the network icon, the Bluetooth rune, the USB plug, the battery
+  function topBar(c) {
+    const m = c.net.mode, bleOn = !!(c.ble && (c.ble.phone || c.ble.left != null));
+    const xr = bleOn ? NET_ICON_XR_BLE : NET_ICON_XR, netL = xr - [10, 7, 20][m];
+    const lt = c.link ? LT_ICONS[c.ltMode] : null, fl = !c.link ? foldLabel(c.fold) : '';
+    const left = lt ? { l: 12, r: 12 + lt[0].length - 1 } : fl ? { l: 12, r: 12 + textW(fl, 1) - 1 } : null;
+    const nameLeft = left ? left.r + 5 : 10;
+    const full = [c.net.group != null ? 'GRP ' + c.net.group : '', c.net.ssid, c.net.apName][m] || '';
+    const name = full ? fit(full, netL - 2 - nameLeft) : '';
+    return { tri: { l: 2, r: 8 }, left, label: fl, lt, name, nameBox: name ? { l: netL - 2 - textW(name, 1), r: netL - 3 } : null, nameR: netL - 2,
+             net: { l: netL, r: xr }, xr, ble: bleOn ? { l: BLE_ICON_X, r: BLE_ICON_X + 4, solid: !!c.ble.phone } : null,
+             usb: c.usb ? { l: PLUG_X, r: PLUG_X + USB_ICON[0].length - 1 } : null, batt: c.fitted ? { l: BATT_X, r: BATT_X + 16 } : null };
+  }
+  function drawPower(fb, c, now) {
+    const t = topBar(c);
+    drawNetIcon(fb, c, t.xr);
+    if (t.ble && (t.ble.solid || Math.floor(now / ARMED_BLINK_MS) % 2 === 0)) icon(fb, BLE_ICON, t.ble.l, 0);
+    if (c.usb) icon(fb, USB_ICON, PLUG_X, 1);                        // a plug on its cable
+    if (c.fitted) {
+      frame(fb, 107, 0, 15, 7, 1); rect(fb, 122, 2, 2, 3, 1);
+      rect(fb, 109, 2, Math.round(clamp(c.batt, 0, 100) / 100 * 11), 3, 1);
+    }
+  }
+  // the bottom status line: one item at a time, cycling (as on Optimist)
+  const STATUS_CYCLE_MS = 2000;                                      // 2 s each, as Optimist's STATE line
+  const ARMED_BLINK_MS = 400;
+  // Wi-Fi quality, as Optimist's Wi-Fi page shows it (op_wifi.c wf_q_text): the signal and the rate, then the share of
+  // the frames sent over the last 10 s that needed a retry and that were never acknowledged. Optimist colours them (good /
+  // warn / bad); a 1-bit screen draws a BAD value inverted instead. Same thresholds as Optimist.
+  // one line (the user: "retry, loss % and wifi stats could fit on one status line"): "-58dBm 24M R3% L0%" spread over
+  // the width, each part inverted on its own when BAD; the worst case "-100dBm 72M R99% L99%" is 21 characters
+  function wifiItems(q) {
+    if (!q) return [];
+    if (!q.rssi) return [{ segs: [{ t: 'NO SIGNAL', bad: true }] }];
+    const pct = n => (q.tx ? Math.round(100 * n / q.tx) : null), retry = pct(q.retried), lost = pct(q.lost);
+    return [{ segs: [
+      { t: q.rssi + 'dBm', bad: q.rssi < -80 },
+      { t: Math.round(q.kbps / 1000) + 'M', bad: q.rssi < -80 },
+      { t: 'R' + (retry == null ? '--' : retry + '%'), bad: retry != null && retry >= 30 },
+      { t: 'L' + (lost == null ? '--' : lost + '%'), bad: lost != null && lost >= 10 },
+    ], spread: true }];
+  }
+  function statusLine(fb, c, now, y) {
+    const items = [];                                                // the mode is not listed: the meters (or their absence) say it
+    // Link peers in every network mode (jank is Link too, over its own air); no peers: no peer item. The count joins the
+    // Wi-Fi line as "P2" when it fits (the user: "the number of peers could also fit in the same status line with wifi"),
+    // else it keeps an item of its own in the cycle
+    const wifi = wifiItems(c.wifiQ);
+    const peerSeg = c.peers > 0 ? { t: 'P' + c.peers, bad: false } : null;
+    const fits = segs => segs.reduce((a, g) => a + textW(g.t, 1), 0) + (segs.length - 1) * (adv(' ') + 1) <= W - 4;
+    if (peerSeg && wifi.length && fits([peerSeg, ...wifi[0].segs])) wifi[0] = { ...wifi[0], segs: [peerSeg, ...wifi[0].segs], spread: true };
+    else if (peerSeg) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false });
+    items.push(...wifi);
+    if (c.ble && c.ble.phone) items.push({ t: 'PHONE', bad: false });
+    if (c.ble && c.ble.left != null && !c.ble.phone) { text(fb, 'BT PAIR ' + mmss(c.ble.left), 2, y, 1, 1); return; }   // the open window: shown alone, its count runs
+    if (!items.length) return;
+    const it = items[Math.floor(now / STATUS_CYCLE_MS) % items.length];
+    const segs = it.segs || [{ t: it.t, bad: it.bad }];
+    // spread (the user: "make better use of the space"): the parts fill the whole width, the first flush left, the last
+    // flush right, the free pixels shared out as equal gaps
+    const ws = segs.map(s => textW(s.t, 1)), free = W - 4 - ws.reduce((a, b) => a + b, 0);
+    const n = segs.length - 1, gaps = it.spread && n > 0 && free >= n * (adv(' ') + 1) ? n : 0;   // too tight: plain spaces
+    let x = 2;
+    segs.forEach((s, i) => {                                           // each part inverted on its own when BAD
+      const w = ws[i];
+      if (s.bad) { rect(fb, x - 2, y - 1, w + 4, 9, 1); text(fb, s.t, x, y, 1, 0); }
+      else text(fb, s.t, x, y, 1, 1);
+      // spread: gap i gets its share of the free pixels; else the 1 px glyph gap textW drops
+      x += w + (gaps ? Math.floor(free * (i + 1) / gaps) - Math.floor(free * i / gaps) : 1 + (it.spread ? adv(' ') : 0));
+    });
+  }
+  function beatBoxes(fb, c, x0, y, w, h, gap) {          // the current beat's box is filled for the whole beat; no beat: all empty
+    for (let i = 0; i < 4; i++) {
+      const x = x0 + i * (w + gap), on = c.beatN != null && ((c.beatN % 4) + 4) % 4 === i;
+      if (on) rect(fb, x, y, w, h, 1);
+      else frame(fb, x, y, w, h, 1);
+    }
+  }
+  // the downbeat estimator under the AUDIO boxes (bar: { state 'off'|'listening'|'locked'|'manual', conf 0..1 } or null):
+  // LOCKED lights the 1's box (a bar under the first box: the bar's 1 is the music's), a 1-pixel tick under the four boxes
+  // grows with the confidence (the lead against the commit level; listening and locked), MANUAL writes an M; OFF: nothing
+  function barMarks(fb, bar, x0, y, w, h, gap) {
+    if (!bar || bar.state === 'off') return;
+    if (bar.state === 'manual') { text(fb, 'M', x0, y + h + 3, 1, 1); return; }
+    if (bar.state === 'locked') rect(fb, x0, y + h + 1, w, 2, 1);
+    const n = Math.round((4 * (w + gap) - gap) * clamp(bar.conf || 0, 0, 1));          // up to the boxes' width
+    if (n > 0) rect(fb, x0, y + h + 4, n, 1, 1);
+  }
+  // HOME has two layouts, each designed for its content. Less is better: the UI explains itself.
+  //   top bar: the transport icon (triangle = playing, blinking = waiting, square = stopped), in LINK mode the transport
+  //            option's icon (LT_ICONS), the network's name (truncated), network icon, USB plug, battery
+  //   AUDIO (any source: line in, USB audio, the XIAO's):
+  //     y9   BPM x3 (left); four beat boxes (right), the current beat's box filled; under them the AUTO BAR marks
+  //          (barMarks: the 1's box lit when LOCKED, an M when MANUAL; the confidence line under the boxes)
+  //     y31  IN bar (smoothed short-term RMS in dBFS, min / max lines over the last few seconds, tick = -60 silence)   y44  CF bar (tick = threshold; hatched with HOLD while the XIAO's confidence holds, with COAST while the outputs run under the threshold); each value is written inside its bar
+  //     y57  status line, cycling every STATUS_CYCLE_MS: the Link peers (none: empty)
+  //   LINK: BPM x4, four wide beat boxes across the width, the same status line at y57
+  //   (the mode picks the layout, whatever the source: a line in, USB audio, the XIAO's)
+  function drawHome(fb, c, now) {
+    // the transport only: silence and low confidence are already on the IN and CF bars
+    const stopped = !c.running;
+    drawPower(fb, c, now);
+    // the transport: a triangle = playing, a blinking triangle = started and waiting (locking / next bar), a square = stopped
+    const tri = !stopped || (c.armed && Math.floor(now / ARMED_BLINK_MS) % 2 === 0);
+    if (tri) for (let r = 0; r < 7; r++) rect(fb, 2, r, Math.min(r, 6 - r) + 1, 1, 1);
+    else if (!c.armed) rect(fb, 2, 1, 5, 5, 1);
+    // the network's name, right-aligned against the network icon (the Bluetooth rune moves both left): group (JANK), SSID
+    // (CLIENT), AP name (AP); SETUP has its own screen. LINK mode: the transport option's icon after the transport icon
+    // (LT_ICONS); AUDIO mode leads Link anyway: its place shows the fold (X2 /2 ...) when there is one
+    const t = topBar(c);
+    if (t.lt) icon(fb, t.lt, 12, 0);
+    else if (t.label) text(fb, t.label, 12, 0, 1, 1);
+    if (t.name) textR(fb, t.name, t.nameR, 0, 1, 1);
+    if (c.link) {                                                    // LINK: big and plain
+      text(fb, c.linkBpm == null ? '---' : c.linkBpm.toFixed(1), 2, 9, 4, 1);     // null: no session tempo known yet
+      beatBoxes(fb, c, 2, 41, 30, 12, 2);
+      statusLine(fb, c, now, 57);
+      return;
+    }
+    text(fb, c.bpm ? c.bpm.toFixed(1) : '---', 2, 9, 3, 1);
+    beatBoxes(fb, c, 87, 9, 9, 9, 1);
+    barMarks(fb, c.bar, 87, 9, 9, 9, 1);
+    const inLabel = 'IN ' + Math.round(c.levelDb) + 'dB';
+    valueBar(fb, 31, (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, inLabel);
+    for (const db of [c.levelMin, c.levelMax]) {                           // min / max lines: not through the label (a line across a letter reads as another letter)
+      const x = 3 + Math.round(121 * clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1));
+      if (x >= 4 && x <= 6 + textW(inLabel, 1)) { xorCol(fb, x, 32, 32); xorCol(fb, x, 41, 41); } else xorCol(fb, x, 32, 41);
+    }
+    // CF: hatched, HOLD, while the confidence holds (jank M2k: no evidence; the value shown eases toward the threshold)
+    // COAST: the outputs keep running under the threshold (the robust follower holds a tempo through weak patches): hatched too
+    const coast = !c.confHold && !!c.running && c.conf * 100 < c.th;
+    valueBar(fb, 44, c.conf, c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%' + (c.confHold ? ' HOLD' : coast ? ' COAST' : ''), false, !!c.confHold || coast);
+    statusLine(fb, c, now, 57);
+  }
+  function drawMenu(fb, ui, c) {
+    titleBar(fb, 'MENU', (ui.cursor + 1) + '/' + MENU.length);
+    const vals = { 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': AUTOBAR_SHORT[autoBarIndex(c.autoBar)], NETWORK: NET_SHORT[c.net.mode],
+                   USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' };
+    for (let k = 0; k < VISIBLE; k++) {
+      const i = ui.top + k; if (i >= MENU.length) break;
+      const y = 11 + k * 9, sel = i === ui.cursor, v = sel ? 0 : 1;
+      if (sel) rect(fb, 0, y - 1, W, 9, 1);
+      text(fb, MENU[i].name, 4, y, 1, v); textR(fb, vals[MENU[i].name] || '', W - 4, y, 1, v);
+    }
+  }
+  function drawSub(fb, ui, c) {
+    const sub = SUBS[ui.sub];
+    titleBar(fb, sub.title);
+    sub.rows.forEach((f, i) => {
+      const y = 14 + i * 11, sel = i === ui.ocur, v = sel ? 0 : 1, sp = EDITS[f];
+      if (sel) rect(fb, 0, y - 2, W, 11, 1);
+      text(fb, sp.title, 4, y, 1, v); textR(fb, sp.opts ? (f === 'lowconf' ? (sp.get(c) ? 'STOP' : 'RUN') : sp.opts[sp.get(c)]) : editText(sp, sp.get(c)), W - 4, y, 1, v);
+    });
+  }
+  function drawInfo(fb, ui, c) {
+    titleBar(fb, 'BATTERY');
+    const rows = [];
+    if (!c.fitted) rows.push('NO CELL FITTED', 'POWER ' + (c.usb ? 'USB' : 'NONE'));
+    else {
+      const volt = 3.3 + 0.9 * c.batt / 100;                        // rough: 3.3 V empty, 4.2 V full
+      rows.push('LEVEL ' + c.batt + '%', 'VOLT ' + volt.toFixed(2) + 'V EST', c.usb ? (c.batt < 100 ? 'CHARGING' : 'FULL') : 'DISCHARGING');
+      bar(fb, 4, 50, 120, c.batt / 100, null);
+    }
+    rows.forEach((r, i) => text(fb, r, 4, 14 + i * 11, 1, 1));
+  }
+  function drawEdit(fb, ui) {
+    const e = ui.edit, sp = EDITS[e.field];
+    titleBar(fb, sp.title);
+    const s = editText(sp, e.val);                                    // the menus' one font size, always
+    const w = textW(s, 1) + 12, x = Math.round((W - w) / 2);
+    rect(fb, x, 16, w, 13, 1); text(fb, s, x + 6, 19, 1, 0);                 // the value, inverted
+    const [h1, h2] = helpOf(sp, e.val);
+    textC(fb, h1, 44, 1, 1); textC(fb, h2, 54, 1, 1);                         // what the setting does
+  }
+  const fit = (s, w) => (s.length * 6 > w ? s.slice(0, Math.floor(w / 6)) : s);
+  function drawNet(fb, ui, c) {
+    titleBar(fb, 'NETWORK');
+    netRows(c).forEach((r, i) => {
+      const y = 11 + i * 9, sel = i === ui.ncur, v = sel ? 0 : 1;
+      if (sel) rect(fb, 0, y - 1, W, 9, 1);
+      text(fb, r.name, 4, y, 1, v); textR(fb, fit(r.val, 124 - 8 - textW(r.name, 1)), W - 4, y, 1, v);
+      if (sel) r.help.forEach((l, k) => { if (l) text(fb, l, 2, 49 + 8 * k, 1, 1); });     // what the selected row is
+    });
+  }
+  function drawScan(fb, ui, c) {
+    titleBar(fb, 'NETWORK', c.net.scan.length ? (ui.scur + 1) + '/' + c.net.scan.length : '');
+    if (!c.net.scan.length) { textC(fb, 'NO NETWORKS', 28, 1, 1); return; }
+    for (let k = 0; k < 5; k++) {
+      const i = ui.stop + k, n = c.net.scan[i]; if (!n) break;
+      const y = 11 + k * 10, sel = i === ui.scur, v = sel ? 0 : 1;
+      if (sel) rect(fb, 0, y - 1, W, 10, 1);
+      text(fb, (n.name === c.net.ssid ? '*' : ' ') + fit(n.name, 90), 2, y, 1, v);
+      for (let b = 0; b < 3; b++) { const h = 2 + 2 * b; if (b < n.bars) rect(fb, 112 + 4 * b, y + 7 - h, 3, h, v); else px(fb, 113 + 4 * b, y + 6, v); }
+    }
+  }
+  function drawText(fb, ui, c) {
+    const t = ui.txt, n = t.text.length, start = Math.max(0, t.pos - 18);    // the menus' one font size: 19 cells of 6 px
+    titleBar(fb, t.field === 'apname' ? 'AP NAME' : 'PASSKEY', String(n));
+    for (let k = 0; k < 19; k++) {
+      const i = start + k; if (i > n) break;
+      const x = 7 + k * 6, sel = i === t.pos, real = i < n ? t.text[i] : ' ';
+      if (sel) { rect(fb, x - 1, 15, 7, 11, 1); text(fb, real, x, 17, 1, 0); }
+      else text(fb, t.mask && i < n ? '*' : real, x, 17, 1, 1);
+    }
+    textC(fb, 'YES NEXT  NO DEL', 33, 1, 1);
+    textC(fb, 'easier: web UI', 43, 1, 1);
+    textC(fb, c.net.mode === 2 ? '192.168.4.1' : 'jank.local', 53, 1, 1);
+  }
+  function drawNetInfo(fb, ui, c) {
+    const n = c.net;
+    titleBar(fb, n.mode === 1 ? 'LINK CLIENT' : 'LINK AP');
+    const rows = n.mode === 1 ? ['STATE ' + n.status, 'IP ' + n.ip, 'SSID ' + fit(n.ssid || '-', 100)]
+      : ['IP 192.168.4.1', 'CLIENTS ' + n.apClients, 'NAME ' + n.apName];
+    rows.forEach((r, i) => text(fb, r, 4, 14 + i * 11, 1, 1));
+  }
+  function drawConfirm(fb, title, line1, line2) {
+    titleBar(fb, title); textC(fb, line1, 16, 1, 1); textC(fb, line2, 27, 1, 1); textC(fb, 'YES      NO', 48, 1, 1);
+  }
+  // setup: the open hotspot's QR code (standard Wi-Fi code, dark modules on a lit box so it scans) with the text beside it
+  function drawSetup(fb, ui, c) {
+    if (ui.leave) { drawConfirm(fb, 'SETUP', 'LEAVE SETUP?', 'RUN AGAIN'); return; }
+    rect(fb, 0, 1, 62, 62, 1);
+    const q = c.qr;
+    for (let y = 0; y < q.size; y++) for (let x = 0; x < q.size; x++) if (q.mod[y][x]) rect(fb, 2 + 2 * x, 3 + 2 * y, 2, 2, 0);
+    const a = c.net.setupName.slice(0, 11), b = c.net.setupName.slice(11);
+    text(fb, 'SETUP MODE', 63, 3, 1, 1); text(fb, a, 63, 15, 1, 1); text(fb, b, 63, 24, 1, 1);
+    text(fb, 'open', 63, 37, 1, 1); text(fb, '192.168.4.1', 63, 46, 1, 1); text(fb, 'NO: LEAVE', 63, 56, 1, 1);
+  }
+  // the triple NO's pair window: a box with its countdown (the window's own seconds come from ctx.ble.left)
+  const PAIR_OVERLAY_MS = 3000;
+  function pairOverlay(ui, now) { ui.hint = null; ui.overlay = { until: now + PAIR_OVERLAY_MS, title: 'BLUETOOTH PAIR', value: '', live: 'pair' }; }
+  function drawOverlays(fb, ui, now, c) {
+    if (ui.hint) {                                                   // NO / YES held on HOME: what UP / DOWN will do
+      boxed(fb, 6, 12, 116, 40);
+      textC(fb, ui.hint.title, 17, 1, 0); textC(fb, ui.hint.up, 31, 1, 0); textC(fb, ui.hint.down, 42, 1, 0);
+      return;
+    }
+    if (ui.overlay && now < ui.overlay.until) {
+      boxed(fb, 14, 12, 100, 40);
+      const v = ui.overlay.live === 'pair' ? mmss(c.ble && c.ble.left != null ? c.ble.left : BLE_WINDOW_S) : ui.overlay.value, sc = [3, 2, 1].find(k => textW(v, k) <= 96) || 1;   // the largest size that fits the box
+      textC(fb, ui.overlay.title, 17, 1, 0); textC(fb, v, 38 - Math.round(7 * sc / 2), sc, 0);
+    }
+  }
+
+  function draw(fb, ui, c, now) {
+    fb.fill(0);
+    if (c.boot) { textC(fb, 'BOOT', 14, 4, 1); textC(fb, 'BOOTLOADER', 48, 1, 1); return; }
+    if (c.splash) { textC(fb, 'JANK', 8, 3, 1); textC(fb, 'MINI 2.2', 34, 2, 1); textC(fb, 'FW EMU', 54, 1, 1); return; }
+    if (c.setup) drawSetup(fb, ui, c);
+    else if (ui.screen === 'home') drawHome(fb, c, now);
+    else if (ui.screen === 'net') drawNet(fb, ui, c);
+    else if (ui.screen === 'scan') drawScan(fb, ui, c);
+    else if (ui.screen === 'text') drawText(fb, ui, c);
+    else if (ui.screen === 'netinfo') drawNetInfo(fb, ui, c);
+    else if (ui.screen === 'confirm') drawConfirm(fb, 'SETUP', 'STOP AND START', 'SETUP?');
+    else if (ui.screen === 'menu') drawMenu(fb, ui, c);
+    else if (ui.screen === 'sub') drawSub(fb, ui, c);
+    else if (ui.screen === 'info') drawInfo(fb, ui, c);
+    else if (ui.screen === 'edit') drawEdit(fb, ui);
+    drawOverlays(fb, ui, now, c);
+    if (c.saved) { boxed(fb, 30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
+  }
+
+  return { W, H, create, press, draw, pairOverlay, mmss, BLE_WINDOW_S, DEFAULT_RATE, topBar, foldLabel, autoBarIndex, AUTOBAR_NAMES };
+})();
+</script>
+<script>
+const $ = id => document.getElementById(id);
+let library = [], shown = [], prevStatus = null, seeking = false, pitchDragging = false, volDragging = false;
+
+async function api(name, body) {
+  const r = await fetch('/api/' + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const j = await r.json();
+  $('err').textContent = r.ok ? '' : j.error;
+  return j;
+}
+const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const name = p => p ? p.split('/').slice(-1)[0].replace(/\.[^.]+$/, '') : 'No track';
+
+function renderList() {
+  const q = $('q').value.toLowerCase().trim();
+  const rows = library.filter(t => !q || t.name.toLowerCase().includes(q)).slice(0, 200);
+  shown = rows;                                  // the order "play the next track" follows
+  publishQueue();
+  $('list').replaceChildren(...rows.map(t => {
+    const d = document.createElement('div');
+    const n = document.createElement('span'); n.textContent = t.name.split('/').slice(-1)[0];
+    const b = document.createElement('span'); b.className = 'b'; b.textContent = t.bpm.toFixed(2) + ' BPM';
+    d.append(n, b); d.title = t.name;
+    d.onclick = () => load(t.path);
+    return d;
+  }));
+}
+
+async function load(path) {
+  if (typeof TAB !== 'undefined' && TAB.state === 'listening') tabStop('Stopped listening: the player plays a track.');
+  $('now').textContent = 'Loading…';
+  await api('load', { path });
+  await api('play', { playing: true });
+}
+
+function setPitchUi(rate) {
+  const pct = (rate - 1) * 100;
+  $('pitchval').textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + ' %';
+  if (!pitchDragging) $('pitch').value = pct;
+}
+
+// a track that ran off its end (playing -> stopped at the end): the next one in the shown list (else the library)
+const END_SLACK_S = 0.3;
+function trackEnded(prev, s) {
+  return prev && prev.playing && !s.playing && s.path === prev.path && s.duration_s > 0 && s.position_s >= s.duration_s - END_SLACK_S;
+}
+function nextTrack(path) {
+  for (const list of [shown, library]) {
+    const i = list.findIndex(t => t.path === path);
+    if (i >= 0 && i + 1 < list.length) return list[i + 1];
+  }
+  return null;
+}
+// "random": any other track of the shown list (else the library), never the one that just ended
+function randomTrack(path, rnd = Math.random) {
+  const list = shown.length > 1 ? shown : library;
+  const others = list.filter(t => t.path !== path);
+  return others.length ? others[Math.floor(rnd() * others.length)] : null;
+}
+// what follows a track that ran off its end: the "then" choice (next / random / stop), remembered in this browser
+const AFTER_KEY = 'jank-player-after';
+function afterTrack(mode, path) { return mode === 'next' ? nextTrack(path) : mode === 'random' ? randomTrack(path) : null; }
+// the Next button (the user: "should respect random"): random picks any other track, else the next one in the list,
+// back to the first after the last ("stop" only matters at a track's end)
+function skipTrack(mode, path) {
+  if (mode === 'random') return randomTrack(path);
+  const list = shown.length ? shown : library;
+  return nextTrack(path) || (list.length && list[0].path !== path ? list[0] : null);
+}
+$('next').addEventListener('click', () => { const n = skipTrack($('auto').value, S && S.path); if (n) load(n.path); });
+try { const v = localStorage.getItem(AFTER_KEY); if (v === 'next' || v === 'random' || v === 'stop') $('auto').value = v; } catch (e) { /* not remembered */ }
+$('auto').addEventListener('change', () => { try { localStorage.setItem(AFTER_KEY, $('auto').value); } catch (e) { /* not remembered */ } publishQueue(); });
+// the list and the "then" choice go to the player, so the Mac's media keys (next / previous) follow what this page shows
+function publishQueue() { api('queue', { paths: shown.map(t => t.path), mode: $('auto').value }).catch(() => {}); }
+
+function show(s) {
+  if (trackEnded(prevStatus, s)) { const n = afterTrack($('auto').value, s.path); if (n) load(n.path); }
+  prevStatus = s;
+  S = s; tPoll = performance.now();
+  syncFromStatus(s);
+  $('now').textContent = name(s.path);
+  $('play').textContent = s.playing ? 'Pause' : 'Play';
+  $('time').textContent = fmt(s.position_s) + ' / ' + fmt(s.duration_s);
+  if (!seeking && s.duration_s > 0) $('seek').value = Math.round(1000 * s.position_s / s.duration_s);
+  setPitchUi(s.rate);
+  if (!volDragging) { $('vol').value = Math.round(s.volume * 100); $('volval').textContent = Math.round(s.volume * 100) + ' %'; }
+}
+
+async function poll() {
+  try { const s = await (await fetch('/api/status')).json(); show(s); showXiao(s.xiao, s.bench); } catch (e) { $('err').textContent = 'player not running'; }
+  setTimeout(poll, 100);
+}
+
+/* --xiao: the jank XIAO's own beat reports, straight from its USB MIDI port (Web MIDI with SysEx; the page asks for
+   permission once). The firmware sends F0 7D 'J' 'B' 0x10 "<b|t> <n> <bpm x100> <mode> <audio> [<extra>]" F7: 'b' on
+   each beat it tracks (extra: its lag, us: how long before the report it takes the beat to be heard), 't' once a
+   second (extra: its beat_latency, ms) (jank docs/beat.md). Each 'b' goes to the player dated as the XIAO takes the beat
+   to be heard: the event's own timeStamp (Chrome: when CoreMIDI got the USB packet) on the epoch clock, minus the lag.
+   The control line (F0 7D 'J' 'K' text) reads the XIAO's `beat` numbers every few seconds, its `status` every second
+   (the Link session the device screen shows: tempo, beat, transport, the outputs, Bluetooth) and `get` once (the quantum,
+   the source), and `home` 4 a second in AUDIO (the IN and CF bars: level, min, max, confidence): reads, they change
+   nothing. The device's YES in LINK and AUDIO sends `play` / `stop` by the transport icon (linkStartStop), UP / DOWN in LINK
+   `tempo <bpm>` (tempoStep); the source choice `set source auto|line|usb|link`, the Bluetooth choice `set ble pair|auto|off`
+   and the pair window `ble pair` (YES on PAIR NOW, or the triple NO) go out only on the user's choice on the device
+   screen or its buttons; the Calibrate button sends `set lat_trim` (the AUDIO SHIFT on top of the auto latency, M2h;
+   an older firmware `set beat_latency`), only when pressed. Only asked for when the player runs with --xiao. */
+const XIAO = { asked: false, port: null, out: null, portMsg: 'asking for MIDI access', lastBeatAt: 0, lastLineAt: 0,
+               latency: null, text: '', lines: [], answerAt: 0, stats: null, statsAt: 0, status: null, statusAt: 0, statusAskedAt: 0,
+               cfg: null, cfgAskedAt: 0, rep: null, repAt: 0, sent: null, err: '', errAt: 0,
+               home: null, homeAt: 0, homeAskedAt: 0, pairAt: 0, srcSynced: false, foldSent: null };
+const XIAO_STATUS_FRESH_MS = 5000;       // older `status` numbers than this are not shown (the XIAO unplugged)
+const XIAO_STATUS_MS = 1000;             // `status` (a read) this often: the session's tempo, beat and transport
+const XIAO_PLAY_WAIT_MS = 2500;          // a play / stop the page sent counts until a status answers it, at most this long
+const XIAO_REPORT_FRESH_MS = 3000;       // the tracker's reports: one a second at least while the XIAO runs
+const XIAO_HOME_MS = 250;                // `home` (a short read: the meter's numbers) this often while in AUDIO
+const XIAO_HOME_FRESH_MS = 1500;         // a `home` answer older than this is not shown (then the status's rms_db, else nothing)
+const XIAO_FLOOR_DB = -99;               // the XIAO's meter floor: no sound, or the source is not open
+/* --xiao: the XIAO's Link session as the device screen shows it, from its last `status` (st: numbers, taken at statusAt,
+   performance.now() ms) extrapolated to now with its BPM. quantum: beats a bar (`get`). sent: the page's last
+   { cmd: 'play' | 'stop', at } (answered once a status is newer). null: no fresh status (nothing known: no tempo, no
+   transport shown). Otherwise { joined, bpm, beat, box, playing, armed, running }:
+     armed    a start asked for and not reached yet: the XIAO's armed=1 (a play waiting for its bar line, sent for a bar still
+              ahead, or the MIDI start waiting for the next bar) until the extrapolated beat reaches its start=, or a `play`
+              the page sent that no status has answered yet (at most XIAO_PLAY_WAIT_MS). Each one ends by itself.
+     running  the session plays and no start is pending.
+     box      the bar's beat 0..quantum-1 (0 = beat 1 of the bar: Link's phase, beat mod quantum). */
+function xiaoLink(st, statusAt, now, quantum, sent) {
+  if (!st || now - statusAt > XIAO_STATUS_FRESH_MS) return null;
+  if (!(st.bpm > 0) || !Number.isFinite(st.beat)) return { joined: false, bpm: null, beat: null, box: null, playing: false, armed: false, running: false };
+  const q = quantum > 0 ? quantum : 4, beat = st.beat + (now - statusAt) / 60000 * st.bpm;
+  const answered = !sent || sent.at <= statusAt || now - sent.at > XIAO_PLAY_WAIT_MS;
+  let playing = !!st.playing;
+  let armed = st.armed === 1 && !(Number.isFinite(st.start) && beat >= st.start);
+  if (!answered && sent.cmd === 'stop') { playing = false; armed = false; }
+  if (!answered && sent.cmd === 'play' && !playing) armed = true;
+  return { joined: true, bpm: st.bpm, beat, box: ((Math.floor(beat) % q) + q) % q, playing, armed, running: playing && !armed };
+}
+/* what the XIAO hears, from its last report (r: xiaoReport's, null none): the source is not open / open, no sound (LINK
+   mode) / sound (AUDIO mode) */
+function xiaoHearing(r) {
+  if (!r) return { on: false, text: 'no report yet' };
+  if (!r.audio) return { on: false, text: 'no audio' };
+  return r.live ? { on: true, text: 'hearing music' } : { on: false, text: 'stream open, no sound' };
+}
+/* --xiao: the clock outputs (what the transport icon shows) from the status's outputs=stopped|armed|running and hold=,
+   with the same sent-not-answered-yet handling as xiaoLink. null: no fresh status, or one without outputs= (an older
+   firmware: xiaoLink's session then) */
+function xiaoOutputs(st, statusAt, now, sent) {
+  if (!st || now - statusAt > XIAO_STATUS_FRESH_MS || !['stopped', 'armed', 'running'].includes(st.outputs)) return null;
+  const answered = !sent || sent.at <= statusAt || now - sent.at > XIAO_PLAY_WAIT_MS;
+  let o = st.hold === 1 ? 'stopped' : st.outputs;
+  if (!answered && sent.cmd === 'stop') o = 'stopped';
+  if (!answered && sent.cmd === 'play' && o === 'stopped') o = 'armed';
+  return { running: o === 'running', armed: o === 'armed' };
+}
+/* `home`'s answer line "home=h <bpm x100> <net> <transport> <bar> <quantum> <link peers> <air peers> <batt> <level> <conf>
+   <min> <max> [<mode>]" -> numbers ('-' = none: null), or null when the line is no such answer. mode (the firmware's M2c): 0 LINK,
+   1 AUDIO, x2 x4 /2 /4 AUDIO folded -> mode 'link' | 'audio' and fold 1 | 2 | 4 | 0.5 | 0.25 (null: the line has none) */
+function parseHome(line) {
+  const f = line.trim().split(/\s+/);
+  if (f[0] !== 'home=h' || f.length < 13) return null;
+  const n = t => (t === '-' || !Number.isFinite(Number(t)) ? null : Number(t));
+  return { bpm: n(f[1]) == null ? null : n(f[1]) / 100, net: f[2], transport: n(f[3]), bar: n(f[4]), quantum: n(f[5]), linkPeers: n(f[6]), airPeers: n(f[7]),
+           batt: n(f[8]), level: n(f[9]), conf: /^\d+h$/.test(f[10]) ? Number(f[10].slice(0, -1)) : n(f[10]), confHold: /^\d+h$/.test(f[10]),
+           min: n(f[11]), max: n(f[12]), ...homeMode(f[13]) };
+}
+/* `home`'s mode token -> { mode, fold } */
+function homeMode(t) {
+  const folds = { x2: 2, x4: 4, '/2': 0.5, '/4': 0.25 };
+  if (t === '0') return { mode: 'link', fold: null };
+  if (t === '1') return { mode: 'audio', fold: 1 };
+  return t in folds ? { mode: 'audio', fold: folds[t] } : { mode: null, fold: null };
+}
+/* the fold in force, { k, auto } (AUDIO mode): --xiao: the `home` line's mode token (fresh) or the status's fold= / fold_manual=,
+   a `fold` the page sent and no status has answered yet counting for a moment (sent: { k, at }); local: the page's own k and the
+   player's fold_auto. auto = AUTO RANGE set it (the status's fold_manual=0; the home line does not say: then unknown = false) */
+function foldNow(isXiao, st, statusAt, home, homeAt, sent, now, localK, localAuto) {
+  if (!isXiao) return { k: localK || 1, auto: !!localAuto && localK !== 1 };
+  const stFresh = st && now - statusAt <= XIAO_STATUS_FRESH_MS && Number.isFinite(st.fold);
+  const answered = !sent || sent.at <= statusAt || now - sent.at > XIAO_PLAY_WAIT_MS;
+  if (!answered) return { k: sent.k, auto: false };
+  let k = 1;
+  if (home && now - homeAt <= XIAO_HOME_FRESH_MS && home.fold != null) k = home.fold;
+  else if (stFresh) k = st.fold;
+  return { k, auto: k !== 1 && !!stFresh && st.fold === k && st.fold_manual === 0 };
+}
+/* UP / DOWN in AUDIO: the next fold (x2 / /2 within 0.25..4) */
+function foldNext(k, d) {
+  return Math.min(4, Math.max(0.25, k * (d > 0 ? 2 : 0.5)));
+}
+/* --xiao LOW CONFIDENCE as the XIAO has it (M2e, jank core/jank_conf.h): { confStop, th } from a fresh `status` (lowconf=,
+   threshold=), else its `get`; null when neither says (an older firmware: the page's own setting stays) */
+function xiaoLowConf(cfg, st, statusAt, now) {
+  const has = v => !!v && Number.isFinite(v.threshold) && (v.lowconf === 'run' || v.lowconf === 'stop');
+  const src = has(st) && now - statusAt <= XIAO_STATUS_FRESH_MS ? st : has(cfg) ? cfg : null;
+  return src ? { confStop: src.lowconf === 'stop', th: src.threshold } : null;
+}
+/* the follower in a few words (jank M2i status follow= / drift_ppm= / rate_ratio=, or the player's own follow engine):
+   "glide, drift -35 ppm, rate x1.0200"; null when it says nothing (an older firmware, today's engine) */
+function followText(f) {
+  if (!f || typeof f.follow !== 'string') return null;
+  const parts = [f.follow];
+  if (Number.isFinite(f.drift_ppm) && f.follow === 'glide') parts.push('drift ' + f.drift_ppm + ' ppm');
+  if (Number.isFinite(f.rate_ratio) && f.rate_ratio !== 1) parts.push('rate x' + f.rate_ratio.toFixed(4));
+  return parts.join(', ');
+}
+/* --xiao: the XIAO's gate from a fresh `status` (M2e: gated= the confidence under the threshold with STOP / START, silent=
+   0.5 s of silence; either stops its outputs). null: no fresh status, or an older firmware without them */
+function xiaoGate(st, statusAt, now) {
+  if (!st || now - statusAt > XIAO_STATUS_FRESH_MS || !('gated' in st)) return null;
+  return { gated: st.gated === 1, silent: st.silent === 1 };
+}
+/* --xiao AUDIO: the meter's numbers from the XIAO: its `home` answer (fresh), else its status's rms_db / rms_min_db / rms_max_db /
+   conf; null when neither is fresh. level / min / max dBFS or null (source not open), conf 0..1 (M2e: the grid-fit
+   confidence, LOW CONFIDENCE's; M2d's was the network's activation, now act=) */
+function xiaoMeters(home, homeAt, st, statusAt, now) {
+  // (jank M2k: conf "<pct>h" in `home`, conf_hold=1 in `status`: the confidence holds, the value shown easing to the threshold)
+  if (home && now - homeAt <= XIAO_HOME_FRESH_MS)
+    return { level: home.level, min: home.min, max: home.max, conf: home.conf == null ? 0 : home.conf / 100, hold: !!home.confHold };
+  if (st && now - statusAt <= XIAO_STATUS_FRESH_MS && 'rms_db' in st)
+    return { level: st.rms_db, min: st.rms_min_db === undefined ? null : st.rms_min_db, max: st.rms_max_db === undefined ? null : st.rms_max_db,
+             conf: (st.conf || 0) / 100, hold: st.conf_hold === 1 };
+  return null;
+}
+/* the numbers the IN and CF bars draw: with --xiao the XIAO's (the floor when it says nothing), else the page's own meter
+   (local: { bar, lo, hi, conf }) */
+function meterNumbers(isXiao, xm, local) {
+  if (!isXiao) return local;
+  if (!xm) return { bar: XIAO_FLOOR_DB, lo: XIAO_FLOOR_DB, hi: XIAO_FLOOR_DB, conf: 0, hold: false };
+  const db = v => (v == null ? XIAO_FLOOR_DB : v);
+  return { bar: db(xm.level), lo: db(xm.min), hi: db(xm.max), conf: xm.conf, hold: !!xm.hold };
+}
+/* the Bluetooth pair window and the phone, as HOME shows them: { left: seconds left | null (closed), phone: connected }.
+   --xiao: status ble_state=off|window|connected, ble_left (extrapolated), and a `ble pair` the page sent that no status has
+   answered yet counts as open (the full window) for a moment; local: dev's own window end (ms) and the panel's phone box */
+function bleNow(isXiao, st, statusAt, pairAt, localEnd, localPhone, now) {
+  if (!isXiao) return { left: now < localEnd ? (localEnd - now) / 1000 : null, phone: !!localPhone };
+  const pending = pairAt > statusAt && now - pairAt < XIAO_PLAY_WAIT_MS ? (BLE_WINDOW_S - (now - pairAt) / 1000) : null;
+  if (!st || now - statusAt > XIAO_STATUS_FRESH_MS) return { left: pending, phone: false };
+  if (pending != null) return { left: pending, phone: false };
+  if (st.ble_state === 'connected') return { left: null, phone: true };
+  if (st.ble_state === 'window') return { left: Math.max(0, (st.ble_left || 0) - (now - statusAt) / 1000), phone: false };
+  return { left: null, phone: false };
+}
+/* the XIAO's Link and jank peers, from its last `status` answer (null: none, or too old) */
+function xiaoPeers(now) {
+  const st = XIAO.status;
+  if (!st || now - XIAO.statusAt > XIAO_STATUS_FRESH_MS) return null;
+  return { link: st.link_peers || 0, group: st.peers || 0 };
+}
+const BLE_WINDOW_S = 120;                // the Bluetooth pair window: 2 minutes (OLED.BLE_WINDOW_S: the same)
+const XIAO_FLASH_MS = 120, XIAO_SILENT_MS = 3000, XIAO_STATS_MS = 5000, JX_TEXT_MAX = 30;
+function xiaoReport(data) {
+  const head = [0xf0, 0x7d, 0x4a, 0x42, 0x10];
+  if (data.length < head.length + 1 || data[data.length - 1] !== 0xf7 || head.some((b, i) => data[i] !== b)) return null;
+  const f = String.fromCharCode(...Array.from(data).slice(head.length, data.length - 1)).trim().split(/\s+/);
+  if (f.length < 5 || (f[0] !== 'b' && f[0] !== 't')) return null;
+  const r = { kind: f[0], n: Number(f[1]), bpm: Number(f[2]) / 100, mode: f[3], audio: f[4] !== '0', live: f[4] === '2' };   // audio: 0 not open, 1 open (LINK), 2 sound (AUDIO)
+  if (f.length > 5 && Number.isFinite(Number(f[5]))) r[f[0] === 'b' ? 'lagUs' : 'latencyMs'] = Number(f[5]);
+  if (f[0] === 'b' && f.length > 6 && f[6] !== '-' && Number.isFinite(Number(f[6]))) r.linkUs = Number(f[6]);   // the session's beat from it
+  return r;
+}
+/* the epoch ms at which the XIAO takes a reported beat to be heard: received at timeStamp (ms since timeOrigin) */
+function xiaoBeatEpochMs(timeOrigin, timeStamp, lagUs) { return timeOrigin + timeStamp - lagUs / 1000; }
+/* control-line text out of a 'J' 'K' frame, or null */
+function jxText(data) {
+  const head = [0xf0, 0x7d, 0x4a, 0x4b];
+  if (data.length < head.length + 1 || data[data.length - 1] !== 0xf7 || head.some((b, i) => data[i] !== b)) return null;
+  return String.fromCharCode(...Array.from(data).slice(head.length, data.length - 1));
+}
+/* a control line as 'J' 'K' frames of at most 30 characters */
+function jxFrames(line) {
+  const text = line + '\n', frames = [];
+  for (let i = 0; i < text.length; i += JX_TEXT_MAX)
+    frames.push([0xf0, 0x7d, 0x4a, 0x4b, ...Array.from(text.slice(i, i + JX_TEXT_MAX), c => c.charCodeAt(0) & 0x7f), 0xf7]);
+  return frames;
+}
+/* `beat`'s answer (key=value lines up to "ok") -> numbers the player logs */
+function beatStats(lines) {
+  const out = {};
+  for (const l of lines) {
+    const m = /^([a-z_]+)=(-?[0-9.]+)$/.exec(l.trim());
+    if (m) out[m[1]] = Number(m[2]);
+    const w = /^(bar|audio_source|ble_state|outputs|source|autobar|usbmidi|lowconf|follow)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting, USB MIDI CLOCK, LOW CONFIDENCE, the follower (M2i)
+    if (w) out[w[1]] = w[2];
+  }
+  return out;
+}
+/* the control line's answers. at: when this frame came; an answer's numbers are dated by its first frame (the XIAO reads
+   its state, then sends: the rest of a long answer only takes longer to arrive) */
+function onXiaoLineText(t, at) {
+  if (!XIAO.text && !XIAO.lines.length) XIAO.answerAt = at;
+  XIAO.text += t;
+  let i;
+  while ((i = XIAO.text.indexOf('\n')) >= 0) {
+    const line = XIAO.text.slice(0, i).trim();
+    XIAO.text = XIAO.text.slice(i + 1);
+    // the end of a reply: "ok" or "err <why>" (with the space: the `beat` reply's "err_us=..." is a number, not an error)
+    const isErr = line === 'err' || line.startsWith('err ');
+    if (line === 'ok' || isErr) {
+      const stats = beatStats(XIAO.lines);
+      const homeLine = XIAO.lines.find(l => l.startsWith('home=h'));
+      XIAO.lines = [];
+      if (homeLine && line === 'ok') { XIAO.home = parseHome(homeLine); XIAO.homeAt = XIAO.answerAt; }       // `home`: the meter's numbers
+      else if (isErr) { XIAO.err = line; XIAO.errAt = performance.now(); xiaoNudgeErr(line); }
+      else if ('phase_forces' in stats) { XIAO.stats = stats; api('xiao_stats', stats); }
+      else if ('link_peers' in stats) { XIAO.status = stats; XIAO.statusAt = XIAO.answerAt; }
+      else if ('quantum' in stats) XIAO.cfg = stats;
+      else if ('nudge_beats' in stats) xiaoNudged('no', stats);           // `nudge beat`'s answer: the user's nudges in all
+      else if ('beat_latency' in stats) xiaoNudged('yes', stats);         // `nudge ms`'s: the AUDIO IN offset (beat_latency)
+      XIAO.answerAt = at;
+    } else XIAO.lines.push(line);
+  }
+}
+const askStatus = () => { XIAO.statusAskedAt = performance.now(); xiaoSend('status'); };
+const askHome = () => { XIAO.homeAskedAt = performance.now(); xiaoSend('home'); };
+const askGet = () => { XIAO.cfgAskedAt = performance.now(); xiaoSend('get'); };
+/* --xiao: the device's mode is the XIAO's own: AUDIO while it hears sound on its source (its reports' live flag), LINK
+   otherwise (also with a stream open and no sound). The USB audio box shows it and is not the user's to change */
+function syncXiaoMode(now) {
+  const box = $('usbaudio'), line = $('linein');      // the XIAO hears the player over USB audio; it has no line in
+  box.disabled = true; line.disabled = true; line.checked = false;
+  box.title = '--xiao: the XIAO is in AUDIO mode while it hears sound on its source (RMS above -50 dBFS for 1 s), LINK otherwise';
+  if (!XIAO.rep || now - XIAO.repAt > XIAO_REPORT_FRESH_MS) return;
+  box.checked = XIAO.rep.live;
+  if (dev.link === XIAO.rep.live) setField('mode', XIAO.rep.live ? 0 : 1);
+}
+function xiaoSend(line) { if (XIAO.out) for (const f of jxFrames(line)) XIAO.out.send(f); }
+function onXiaoReport(r, ev) {
+  const now = performance.now();
+  XIAO.lastLineAt = now;
+  XIAO.rep = r;
+  XIAO.repAt = now;
+  if (r.kind === 't' && r.latencyMs !== undefined) XIAO.latency = r.latencyMs;
+  if (r.kind === 'b') {                           // the flash: on the report, not on the next poll
+    XIAO.lastBeatAt = now;
+    $('xbeat').style.background = '#7fdc7f';
+    setTimeout(() => { if (performance.now() - XIAO.lastBeatAt >= XIAO_FLASH_MS - 5) $('xbeat').style.background = '#333'; }, XIAO_FLASH_MS);
+    if (r.lagUs !== undefined && ev) api('xiao_beat', { epoch_ms: xiaoBeatEpochMs(performance.timeOrigin, ev.timeStamp, r.lagUs), bpm: r.bpm || null,
+                                                link_ms: r.linkUs === undefined ? null : r.linkUs / 1000 });
+  }
+  $('xbpm').textContent = r.bpm > 0 ? r.bpm.toFixed(2) : '---';
+  $('xmode').textContent = r.mode;
+  $('xn').textContent = String(r.n);
+  const h = xiaoHearing(r);
+  $('xaudio').textContent = h.text;
+  $('xaudio').classList.toggle('on', h.on);
+}
+async function askXiao() {
+  XIAO.asked = true;
+  if (!navigator.requestMIDIAccess) { XIAO.portMsg = 'this browser has no Web MIDI (use Chrome or Edge)'; return; }
+  try {
+    const access = await navigator.requestMIDIAccess({ sysex: true });
+    const find = ports => [...ports.values()].find(p => p.name === 'jank') || [...ports.values()].find(p => /jank/i.test(p.name)) || null;
+    const attach = () => {
+      const port = find(access.inputs);
+      XIAO.out = find(access.outputs);
+      if (port === XIAO.port) return;
+      if (XIAO.port) XIAO.port.onmidimessage = null;
+      XIAO.port = port;
+      if (port) port.onmidimessage = ev => {
+        const r = xiaoReport(ev.data);
+        if (r) { onXiaoReport(r, ev); return; }
+        const t = jxText(ev.data);
+        if (t !== null) onXiaoLineText(t, ev.timeStamp || performance.now());
+      };
+      XIAO.portMsg = port ? 'port "' + port.name + '"' : 'no port named jank';
+      if (port && XIAO.out) { askGet(); askStatus(); }             // at once, not after the first period (reads only)
+    };
+    access.onstatechange = attach;
+    attach();
+  } catch (e) { XIAO.portMsg = 'no MIDI access: ' + e.message; }
+}
+// a block of labelled lines, one per [label, text], always the same count, so the card keeps its height
+function setLines(id, rows) {
+  $(id).replaceChildren(...rows.map(([label, text]) => {
+    const d = document.createElement('div');
+    d.className = 'ln';
+    if (label) { const b = document.createElement('b'); b.textContent = label + ': '; d.append(b); }
+    d.append(text || '\u00a0');
+    return d;
+  }));
+}
+const f1 = (v, d = 1) => (v === null || v === undefined ? '-' : Number(v).toFixed(d));
+function showAccuracy(b) {
+  if (!b || !b.xiao) return;
+  const m = b.model || {};
+  setLines('accmodel', [
+    ['This track', 'ref ' + f1(b.ref_bpm, 2) + ' BPM, ' + b.ref_beats + ' beats, phase forces ' + f1(b.xiao_phase_forces, 0) +
+      ', tempo sets ' + f1(b.xiao_tempo_sets, 0) + ', gaps ' + f1(b.xiao_gaps, 0)],
+    ['Latencies', 'speakers ' + f1(m.speakers_latency_ms) + ', jank ' + f1(m.jank_latency_ms) + ', buffer ' + f1(m.fifo_ms) +
+      ', beat_latency ' + f1(m.beat_latency_ms, 0) + ' ms → XIAO predicted ' + f1(m.predicted_xiao_ms) + ' ms'],
+  ]);
+  const s = XIAO.stats;
+  setLines('accxstats', s ? [
+    ['XIAO load', 'cpu ' + f1(s.cpu_pct) + ' %, hop max ' + s.hop_max_us + ' us, heap min ' + s.heap_min + ', gaps ' + s.gaps],
+    ['XIAO tracking', 'tempo sets ' + s.tempo_sets + ', phase forces ' + s.phase_forces + ', err ' + f1(s.err_us / 1000, 2) + ' ms'],
+  ] : [['XIAO', 'no `beat` numbers yet'], ['', '']]);
+  const sug = m.suggested_latency_ms;
+  $('calib').disabled = sug === null || sug === undefined || !XIAO.out || b.link.n < 8;
+  const trim = calibTrim(sug, xiaoLat());
+  $('calibmsg').textContent = sug === null || sug === undefined ? 'needs 8+ Link beats and the XIAO\'s latency'
+    : 'Link is ' + f1(b.link.mean_ms) + ' ms off: ' + (trim === null ? 'set beat_latency ' + f1(m.beat_latency_ms, 0) + ' -> ' + sug + ' ms'
+      : 'the audio shift ' + trim + ' ms on top of the auto ' + xiaoLat().auto + ' ms');
+}
+/* Auto latency: the player works out the XIAO's beat_latency from the two output paths (live/latency.py: speaker path -
+   jank path, in /api/status) and sends `set beat_latency` when --xiao starts, when the XIAO's audio source turns to USB
+   (a new stream, or a restart) and whenever the suggestion moves by more than AUTOLAT_MIN_CHANGE_MS (at most one send per
+   AUTOLAT_MIN_GAP_MS). Two layers (jank M2h): this is the AUTO base; the user's AUDIO SHIFT (NUDGE MS, Calibrate's
+   `set lat_trim`) rides on top on the XIAO and never turns it off. Only the checkbox does ("manual"). */
+const AUTOLAT_MIN_CHANGE_MS = 2;
+const AUTOLAT_MIN_GAP_MS = 2000;
+const TAB_PATH_CONSTANT_MS = 0;        // Tab audio: both sinks are delayed to the same reported latency, so the paths differ by this
+function autoLatNew() { return { on: true, manual: false, sent: null, sentAt: -1e9, wasUsb: false }; }
+/* ev: tick {sug (ms or null), usb (the XIAO's source is USB), now} | manual | auto | reconnect. -> { st, send (ms or null) } */
+function autoLatStep(st, ev) {
+  switch (ev.type) {
+    case 'manual': return { st: { ...st, on: false, manual: true }, send: null };
+    case 'auto': return { st: { ...st, on: true, manual: false, sent: null }, send: null };
+    case 'reconnect': return { st: { ...st, sent: null, wasUsb: false }, send: null };
+    case 'tick': {
+      const next = { ...st, wasUsb: !!ev.usb };
+      if (!st.on || !ev.usb || !Number.isFinite(ev.sug)) return { st: next, send: null };
+      const sug = Math.round(ev.sug);
+      const first = st.sent === null || !st.wasUsb;
+      const moved = Math.abs(sug - st.sent) > AUTOLAT_MIN_CHANGE_MS && ev.now - st.sentAt >= AUTOLAT_MIN_GAP_MS;
+      if (!first && !moved) return { st: next, send: null };
+      return { st: { ...next, sent: sug, sentAt: ev.now }, send: sug };
+    }
+    default: return { st, send: null };
+  }
+}
+/* the suggestion for the pane: the player's paths, or (Tab audio, listening through jank) the aligned sinks' constant */
+function autoLatSuggestion(pane, tabState, tabToJank, statusSug) {
+  if (pane === 'tab') return tabState === 'listening' && tabToJank ? TAB_PATH_CONSTANT_MS : null;
+  return Number.isFinite(statusSug) ? statusSug : null;
+}
+function autoLatLabel(st, sug, usb, sentNow, trim = null) {
+  if (st.manual) return 'manual' + (st.sent === null ? '' : ' (auto had sent ' + st.sent + ' ms)');
+  if (!st.on) return 'off';
+  if (!usb) return 'waiting: the XIAO\'s source is not USB';
+  if (!Number.isFinite(sug)) return 'waiting for a suggestion';
+  const auto = st.sent === null ? sug : st.sent;
+  return (Number.isFinite(trim) ? 'auto ' + auto + ' ms + trim ' + trim + ' ms' : 'auto: ' + auto + ' ms') + (sentNow ? ' (sent)' : '');
+}
+/* --xiao: the XIAO's latency layers from a fresh `status` (M2h: lat_auto=, lat_trim=); null: none, or an older firmware */
+function xiaoLat() {
+  const st = XIAO.status;
+  if (!st || performance.now() - XIAO.statusAt > XIAO_STATUS_FRESH_MS || !Number.isFinite(st.lat_auto)) return null;
+  return { auto: st.lat_auto, trim: Number.isFinite(st.lat_trim) ? st.lat_trim : 0 };
+}
+/* Calibrate (M2h): the AUDIO SHIFT that makes auto + shift the suggested latency, so it composes with Auto latency; null:
+   the XIAO's layers not known (an older firmware: the whole value goes to `set beat_latency`) */
+function calibTrim(sug, lat) {
+  if (sug === null || sug === undefined || !lat) return null;
+  return Math.round(sug) - lat.auto;
+}
+const AL = { st: autoLatNew(), out: null, sentNow: 0 };
+function autoLatApply(ev) { const r = autoLatStep(AL.st, ev); AL.st = r.st; $('autolat').checked = AL.st.on; return r.send; }
+function autoLatencyTick(now) {
+  if (!XIAO.out) return;
+  if (AL.out !== XIAO.out) { AL.out = XIAO.out; autoLatApply({ type: 'reconnect' }); }
+  const usb = !!XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS && XIAO.status.audio_source === 'usb';
+  const toJank = !!(TAB.mode && TAB.mode.includes('jank'));
+  const sug = autoLatSuggestion(pane, TAB.state, toJank, S ? S.suggested_beat_latency_ms : null);
+  const send = autoLatApply({ type: 'tick', sug, usb, now });
+  if (send !== null) { xiaoSend('set beat_latency ' + send); AL.sentNow = now; }
+  const lat = xiaoLat();
+  $('autolatmsg').textContent = autoLatLabel(AL.st, sug, usb, now - AL.sentNow < 3000, lat ? lat.trim : null);
+  const sp = S && S.speaker;
+  $('autolathint').hidden = !(sp && sp.wireless);
+  $('autolathint').textContent = sp && sp.wireless ? 'wireless output (' + sp.device + ', ' + sp.latency_ms + ' ms): auto latency may be off, use Calibrate' : '';
+}
+$('autolat').onchange = () => autoLatApply({ type: $('autolat').checked ? 'auto' : 'manual' });
+$('calib').onclick = () => {
+  const sug = S && S.bench && S.bench.model ? S.bench.model.suggested_latency_ms : null;
+  if (sug === null || sug === undefined) return;
+  const trim = calibTrim(sug, xiaoLat());
+  if (trim === null) {                                    // an older firmware: no layers, the whole value (and no auto)
+    autoLatApply({ type: 'manual' });
+    xiaoSend('set beat_latency ' + sug);
+  } else {
+    xiaoSend('set lat_trim ' + trim);                     // M2h: the AUDIO SHIFT, Auto latency stays on underneath
+  }
+  $('calibmsg').textContent = 'sent: ' + (trim === null ? 'set beat_latency ' + sug : 'set lat_trim ' + trim) + ' (the next 16 beats show the result)';
+};
+function showXiao(x, bench) {
+  $('xiaocard').hidden = !x;
+  if (!x) return;
+  if (!XIAO.asked) askXiao();
+  const now = performance.now();
+  if (XIAO.out && now - XIAO.statsAt > XIAO_STATS_MS) { XIAO.statsAt = now; xiaoSend('beat'); }     // reads only
+  if (XIAO.out && now - XIAO.statusAskedAt > XIAO_STATUS_MS) askStatus();
+  if (XIAO.out && !dev.link && now - XIAO.homeAskedAt > XIAO_HOME_MS) askHome();       // AUDIO: the meter's numbers, 4 a second (reads only)
+  if (XIAO.out && !XIAO.cfg && now - XIAO.cfgAskedAt > 3000) askGet();         // (asked again if the answer was lost)
+  autoLatencyTick(now);
+  syncXiaoMode(now);
+  const stale = XIAO.port && XIAO.lastLineAt && now - XIAO.lastLineAt > XIAO_SILENT_MS ? ' | no report for ' + Math.round((now - XIAO.lastLineAt) / 1000) + ' s' : '';
+  if (XIAO.rep && now - XIAO.repAt > XIAO_REPORT_FRESH_MS) { $('xaudio').textContent = 'no report'; $('xaudio').classList.remove('on'); }
+  // the Mac's side, not the XIAO's (the user: "it sits in the XIAO audio beat tracker section"): the player's buffer that
+  // feeds the "jank" USB output; its underruns are the Mac running late (silence sent), the XIAO's own counters are `gaps`
+  const ms = n => f1(n / 44.1, 0);
+  const audio = 'buffer ' + f1(x.fifo_ms) + ' ms (aim ' + ms(x.fifo_target) + '), slips ' + (x.dropped + x.repeated) + ', underruns ' + x.underruns;
+  const err = XIAO.err && now - XIAO.errAt < 5000 ? ' | XIAO: ' + XIAO.err : '';
+  setLines('xmsg', [['MIDI', XIAO.portMsg + stale + err], ['Mac → ' + x.device + ' audio', audio]]);
+  showAccuracy(bench);
+}
+
+// ---- jank mini 2.2 emulator host: power, D-pad, indicator light, battery, jacks; the screen UI is the OLED module above ----
+let S = null, tPoll = 0;
+const holdUntil = { th: 0, off: 0, mode: 0, hold: 0, tempo: 0, fold: 0, autobar: 0 };     // keep a local value until the server has caught up
+const NO_SCREEN = 'none';                         // the screenless unit: a plain lid, the LED window, no OLED
+const VIEW_KEY = 'beatEmuView';
+const view = { scr: '1.54' };                     // the user's choice (2026-11-14): 1.54 inch
+try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')); } catch (e) { /* storage blocked: the default */ }
+const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: false, no: false, yes: false },
+              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, usbMidi: 0, autoBar: 1, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1, bleMode: 1, bleEnd: 0, srcFlash: null,
+              repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
+              net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
+/* remembered in this browser (localStorage; a blocked storage only means nothing is remembered): the test panel
+   (Wi-Fi, USB, battery, battery level, line in) and the device's emulator-only settings. The settings the player owns
+   (threshold, low confidence, input offset, fold, hold) come back from the player itself. Passwords are not kept. */
+const PANEL_KEY = 'beatEmuPanel', DEV_KEY = 'beatEmuDevice';
+const PANEL_IDS = ['wifi', 'usb', 'bat', 'battlvl', 'linein', 'usbaudio', 'blephone'];
+const DEV_FIELDS = ['ltMode', 'gain', 'bright', 'sleep', 'offs', 'rate', 'inSrc', 'usbRole', 'usbMidi', 'bleMode'];
+const NET_FIELDS = ['mode', 'group', 'ssid', 'apName'];
+const loadJson = key => { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; } };
+const saveJson = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { /* not remembered */ } };
+function savePanel() {
+  const o = {};
+  for (const id of PANEL_IDS) o[id] = $(id).type === 'checkbox' ? $(id).checked : $(id).value;
+  saveJson(PANEL_KEY, o);
+}
+function restorePanel() {
+  const o = loadJson(PANEL_KEY);
+  for (const id of PANEL_IDS) {
+    if (!(id in o)) continue;
+    if ($(id).type === 'checkbox') $(id).checked = !!o[id]; else $(id).value = String(o[id]);
+  }
+  for (const id of PANEL_IDS) { $(id).addEventListener('change', savePanel); $(id).addEventListener('input', savePanel); }
+}
+function saveDevice() {
+  const o = { net: {} };
+  for (const k of DEV_FIELDS) o[k] = dev[k];
+  for (const k of NET_FIELDS) o.net[k] = k === 'mode' && dev.net.mode === 3 ? dev.net.prev : dev.net[k];   // never come back in SETUP
+  saveJson(DEV_KEY, o);
+}
+function restoreDevice() {
+  const o = loadJson(DEV_KEY);
+  for (const k of DEV_FIELDS) if (k in o && typeof o[k] === typeof dev[k]) dev[k] = Array.isArray(dev[k]) ? o[k].slice(0, dev[k].length) : o[k];
+  for (const k of NET_FIELDS) if (o.net && k in o.net && typeof o.net[k] === typeof dev.net[k]) dev.net[k] = o.net[k];
+}
+restoreDevice();
+const SETUP_NAME = 'jank-setup-a3f9';                // emu: the real one ends in the chip id
+const SCAN = [{ name: 'HomeNet', bars: 3 }, { name: 'jank-studio', bars: 2 }, { name: 'Cafe Guest', bars: 1 }, { name: 'FritzBox 7590', bars: 2 }];   // emu: a fake scan
+const QR_CODE = QR.encode('WIFI:S:' + SETUP_NAME + ';T:nopass;;');
+const RATE_NAMES = ['1/4', '1/8', '1/16', '1/32', '24 PPQN'];
+const ui = OLED.create();
+const FLASH_MS = 90;
+const TEMPO_RANGE = [90, 180];                       // the tracker's range (the server enforces its own)
+// battery blink on the light, on battery only: period falls from slowMs at lowPct to fastMs at critPct and below
+const BATT = { lowPct: 30, critPct: 5, slowMs: 3000, fastMs: 300, flashMs: 100 };
+const REPEAT = { firstMs: 400, everyMs: 120 };
+const OLED_ON = [226, 236, 255], OLED_OFF = [4, 6, 10];
+const fb = new Uint8Array(OLED.W * OLED.H);
+const oledCtx = $('oled').getContext('2d');
+const oledImg = oledCtx.createImageData(OLED.W, OLED.H);
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+const battLevel = () => Number($('battlvl').value);
+const powered = () => dev.sw && ($('usb').checked || ($('bat').checked && battLevel() > 0));
+const lowPeriodMs = pct => BATT.fastMs + (BATT.slowMs - BATT.fastMs) * clampN((pct - BATT.critPct) / (BATT.lowPct - BATT.critPct), 0, 1);
+
+const AUTOBAR_WORDS = ['off', 'start', 'always'];
+/* AUTO BAR's setting (index 0 OFF, 1 AT START, 2 ALWAYS) from where it is read back: --xiao `get`'s autobar= (cfg), before it
+   answers the status's bar=off; local: the player's status autobar. null: not known */
+function autoBarFrom(isXiao, cfg, st, s) {
+  if (!isXiao) return AUTOBAR_WORDS.includes(s.autobar) ? AUTOBAR_WORDS.indexOf(s.autobar) : null;
+  if (cfg && AUTOBAR_WORDS.includes(cfg.autobar)) return AUTOBAR_WORDS.indexOf(cfg.autobar);
+  return st && st.bar === 'off' ? 0 : null;
+}
+function syncFromStatus(s) {
+  const now = performance.now();
+  if (now > holdUntil.th && s.xiao) {        // --xiao: the XIAO is the truth (its lowconf= and threshold=, both stored there)
+    const lc = xiaoLowConf(XIAO.cfg, XIAO.status, XIAO.statusAt, now);
+    if (lc) { dev.confStop = lc.confStop; dev.th = lc.th; }
+  } else if (now > holdUntil.th) {           // the player is the truth: 0 = keep running (our threshold is kept for later)
+    dev.confStop = s.min_confidence > 0;
+    if (dev.confStop) dev.th = Math.round(s.min_confidence * 100);
+  }
+  if (now > holdUntil.off) dev.inOff = Math.round(s.offset_ms);       // the audio input offset is the player's Link offset
+  if (now > holdUntil.hold) dev.hold = s.xiao && XIAO.status && 'hold' in XIAO.status ? XIAO.status.hold === 1 : !!s.hold;
+  if (now > holdUntil.fold && s.fold) dev.foldK = s.fold;
+  // --xiao: the session's tempo is the XIAO's (its `status`), not the player's local model (SimLink, 120 by default)
+  const xs = s.xiao && XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS ? XIAO.status : null;
+  if (s.xiao && XIAO.cfg && !XIAO.srcSynced) {              // --xiao: the XIAO's source choice, once (after that the page's changes are the truth)
+    XIAO.srcSynced = true;
+    if (SRC_NAMES.includes(XIAO.cfg.source)) dev.inSrc = SRC_NAMES.indexOf(XIAO.cfg.source);
+  }
+  if (s.link_playing) dev.startAsked = false;   // the start was reached: a later stop by a peer is a stop, not "armed"
+  if (now > holdUntil.tempo) dev.linkBpm = s.xiao ? (xs && xs.bpm > 0 ? xs.bpm : null) : s.link_bpm;   // --xiao: never SimLink's 120
+  if (now > holdUntil.autobar) {                            // AUTO BAR: the player's (or the XIAO's) setting is the truth
+    const i = autoBarFrom(!!s.xiao, XIAO.cfg, xs, s);
+    if (i != null) dev.autoBar = i;
+  }
+  if (s.xiao) {                                             // the XIAO's follower beside the player's own (M2i: the same one)
+    const mine = followText(s.follow), its = followText(xs);
+    $('xfollow').textContent = (its || '-') + (mine ? '  (player: ' + mine + ')' : '');
+  }
+}
+const hold = key => { holdUntil[key] = performance.now() + 1200; };
+
+// what the screen UI changes goes out through here; "emu" = kept in the emulator only, nothing on the server
+/* USB MIDI CLOCK's index (0 ON, 1 OFF): --xiao the XIAO's `get` usbmidi= once known, else the page's own */
+function usbMidiNow() { return S && S.xiao && XIAO.cfg && (XIAO.cfg.usbmidi === 'on' || XIAO.cfg.usbmidi === 'off') ? (XIAO.cfg.usbmidi === 'on' ? 0 : 1) : dev.usbMidi; }
+function setField(field, val) {
+  if (field === 'threshold') { dev.th = val; sendThreshold('threshold'); }
+  else if (field === 'lowconf') { dev.confStop = val === 1; sendThreshold('lowconf'); }
+  else if (field === 'ltmode') dev.ltMode = val;            // emu: the outputs live in the device
+  else if (field === 'gain') dev.gain = val;
+  else if (field === 'bright') dev.bright = val;            // emu: the panel's contrast
+  else if (field === 'sleep') dev.sleep = val;              // emu                // emu: shifts the input meter only (the tracker hears the player's output)
+  else if (field === 'inoff') { dev.inOff = val; hold('off'); api('offset', { ms: val }); }
+  else if (field === 'out0') dev.offs[0] = val;             // emu
+  else if (field === 'out1') dev.offs[1] = val;             // emu
+  else if (field === 'out2') dev.offs[2] = val;             // emu
+  else if (field === 'rate') dev.rate = val;                // emu
+  else if (field === 'mode') { dev.link = val === 1; dev.clocks = true; dev.startAsked = false; dev.foldK = 1; hold('fold'); api('fold', { factor: 1 }); api('mode', { mode: dev.link ? 'link' : 'audio' }); }     // from the line-in plug detect
+  else if (field === 'netmode') setNetMode(val);            // network fields are emu only
+  else if (field === 'ssid') { dev.net.ssid = val; dev.net.changedAt = performance.now(); }
+  else if (field === 'pass') { dev.net.pass = val; dev.net.changedAt = performance.now(); }
+  else if (field === 'appass') dev.net.appass = val;
+  else if (field === 'apname') dev.net.apName = val;
+  else if (field === 'group') dev.net.group = val + 1;       // emu: the choice index 0..8 = GROUP 1..9
+  else if (field === 'insrc') {                             // the source picks AUDIO / LINK with the plug
+    dev.inSrc = val;
+    if (S && S.xiao) xiaoSend('set source ' + SRC_NAMES[val]);      // --xiao: the XIAO's own (its mode follows its sound)
+    else syncModeFromPlug();                                        // emu
+  }
+  else if (field === 'ble') {                               // PAIR NOW (YES opens the window) / ON START / OFF
+    dev.bleMode = val;
+    if (S && S.xiao) xiaoSend('set ble ' + BLE_NAMES[val]);
+    else if (val === 2) dev.bleEnd = 0;
+    if (val === 0) pairNow(performance.now());
+  }
+  else if (field === 'usbrole') dev.usbRole = val;          // emu: DEVICE (to a computer) / HOST (self-powered gear)
+  else if (field === 'usbmidi') {                           // ON / OFF; --xiao: the XIAO's `set usbmidi`, read back from `get`
+    dev.usbMidi = val;
+    if (S && S.xiao) { xiaoSend('set usbmidi ' + (val === 0 ? 'on' : 'off')); setTimeout(askGet, 300); }
+  }
+  else if (field === 'autobar') {                           // the player's downbeat estimator, or the XIAO's (--xiao)
+    dev.autoBar = val; hold('autobar');
+    const word = AUTOBAR_WORDS[val];
+    if (S && S.xiao) { xiaoSend('set autobar ' + word); setTimeout(askGet, 300); }     // read back from `get`
+    else api('autobar', { mode: word });
+  }
+  saveDevice();
+}
+// low confidence: STOP / START sends the threshold; KEEP RUNNING sends 0 (never gate), the threshold stays for later.
+// --xiao: the XIAO's own settings, the item changed (`set lowconf stop|run`, `set threshold N`), read back from `get`
+const SRC_NAMES = ['auto', 'line', 'usb', 'link'], BLE_NAMES = ['pair', 'auto', 'off'];     // the choices' `set source` / `set ble` words
+function lowConfCommand(item, confStop, th) { return item === 'lowconf' ? 'set lowconf ' + (confStop ? 'stop' : 'run') : 'set threshold ' + th; }
+function sendThreshold(item) {
+  hold('th');
+  if (S && S.xiao) { xiaoSend(lowConfCommand(item, dev.confStop, dev.th)); setTimeout(askGet, 300); return; }
+  api('threshold', { min_confidence: dev.confStop ? dev.th / 100 : 0 });
+}
+function setNetMode(v) {
+  const n = dev.net;
+  if (v === 3) { if (n.mode !== 3) n.prev = n.mode; n.mode = 3; setHold(true); return; }     // SETUP: stop operating, open hotspot
+  const wasSetup = n.mode === 3;
+  n.mode = v;
+  if (wasSetup) { setHold(false); spClose(); }                                               // leaving SETUP: resync and run
+}
+// emu: the Wi-Fi quality the firmware would measure (Optimist's plat_wifi_quality: rssi, tx rate, frames sent / retried /
+// lost over the last 10 s), from the panel's Wi-Fi select, wobbling a little so the numbers move. jank's air is broadcast at
+// 1 Mbit/s; a joined network runs faster. 'none' = no frames heard: NO SIGNAL, nothing counted
+const WIFI_EMU = { good: { rssi: -58, retry: 0.04, lost: 0.003 }, weak: { rssi: -79, retry: 0.24, lost: 0.04 } };
+function wifiQuality(now) {
+  const w = WIFI_EMU[$('wifi').value];
+  if (!w) return { rssi: 0, kbps: 0, tx: 0, retried: 0, lost: 0 };
+  const wob = Math.sin(now / 1700), tx = 400;
+  return { rssi: Math.round(w.rssi + 3 * wob), kbps: dev.net.mode === 0 ? 1000 : 24000, tx,
+           retried: Math.round(tx * w.retry * (1 + 0.3 * wob)), lost: Math.round(tx * w.lost * (1 + 0.5 * wob)) };
+}
+function netCtx(now) {
+  const n = dev.net, w = $('wifi').value;
+  let status = 'NO NETWORK', ip = '-';
+  if (n.ssid) {
+    if (w === 'none') status = 'FAILED';
+    else if (now - n.changedAt < 2000) status = 'CONNECTING';
+    else if (n.pass.length < 8) status = 'FAILED';
+    else { status = 'CONNECTED'; ip = '192.168.1.42'; }
+  }
+  return { mode: n.mode, prev: n.prev, group: n.group, ssid: n.ssid, pass: n.pass, appass: n.appass, apName: n.apName, status, ip,
+           apClients: w === 'none' ? 0 : 1, setupName: SETUP_NAME,
+           scan: w === 'none' ? [] : SCAN.map(x => ({ name: x.name, bars: w === 'weak' ? 1 : x.bars })) };
+}
+// LINK mode: the device's own Start / Stop of its clock outputs (emu: the outputs live in the device, the session runs on)
+// LINK mode Stop / Start: IGNORE / FOLLOW = the device's clocks only; FOLLOW+LEAD = also the session (starts on the next bar)
+// (Stop used to leave the clocks on in IGNORE and FOLLOW, so YES could not stop them and FOLLOW blinked "armed" until another
+// peer started the session: forever with none. Now Stop is Stop in every option.)
+// --xiao: the XIAO's session instead: `play` (it starts on its next bar line) or `stop`, the XIAO's own commands
+// Alone (no Link peer: jank M2l, as a lone Ableton Live), the session is the device's whatever the option: Start starts it
+// on its next bar line and the clocks with it, Stop stops both
+function linkStartStop(on) {
+  if (S && S.xiao) {
+    const cmd = on ? 'play' : 'stop';
+    xiaoSend(cmd);
+    XIAO.sent = { cmd, at: performance.now() };
+    setTimeout(askStatus, 300);                  // its armed / start soon, not at the next period
+    return;
+  }
+  dev.clocks = on;
+  dev.startAsked = on;                           // armed until the session plays (FOLLOW+LEAD: on its next bar)
+  dev.hold = !on; hold('hold'); api('hold', { hold: !on });   // the user's layer (jank M2g): this Stop holds in both modes
+  if (dev.ltMode === 2 || !(S && S.peers)) api('transport', { playing: on });
+}
+// the outputs (MIDI clock, modular clock) run: AUDIO = not held and Link playing (the device leads);
+// LINK = started on the device and the session playing; IGNORE: a peer there is enough (jank jc_should_play), alone the
+// device's own session's start / stop (M2l). The user's Stop (dev.hold, either mode) holds in both: nothing automatic
+// starts them again, only the user's Start (jank M2g's two layers)
+const outputsRun = s => (dev.link ? !dev.hold && dev.clocks && ((dev.ltMode === 0 && !!s.peers) || !!s.link_playing) : !dev.hold && !!s.link_playing);
+/* the transport icon's "armed" (blinking): a start asked for and not reached yet, one that resolves by itself or by YES.
+   AUDIO: not held, the tracker hears music with a tempo (not silent, not gated) and Link has not started yet: it locks
+   and starts on the next bar, or the music stops and it is stopped again. LINK: Start was pressed (dev.startAsked) and the
+   session does not play yet (FOLLOW+LEAD: its next bar; FOLLOW: another peer's start; YES stops it). A session that is
+   merely stopped (page start-up, a mode switch) is not armed: the square. IGNORE with a peer runs the clocks: never armed;
+   alone (jank M2l) every option waits for the device's own session's next bar line */
+function armedLocal(s) {
+  if (!dev.link) return !dev.hold && !s.link_playing && !s.silent && !s.gated && !!s.bpm;
+  return !dev.hold && dev.clocks && dev.startAsked && (dev.ltMode !== 0 || !s.peers) && !s.link_playing;
+}
+async function setHold(on) {                  // Stop = hold; Start = resync, then release the hold
+  dev.hold = on; hold('hold');
+  if (!on) { dev.foldK = 1; await api('resync', {}); }
+  await api('hold', { hold: on });
+}
+function tempoStep(d) {
+  if (dev.link && S && S.xiao) {                 // --xiao: the XIAO's session tempo (`tempo <bpm>`); none known: nothing
+    if (dev.linkBpm == null) return null;
+    const bpm = clampN(Math.round(dev.linkBpm) + d, TEMPO_RANGE[0], TEMPO_RANGE[1]);
+    dev.linkBpm = bpm; hold('tempo'); xiaoSend('tempo ' + bpm);
+    setTimeout(askStatus, 300);
+    return bpm;
+  }
+  if (dev.link) {
+    if (dev.linkBpm == null) return null;        // (before the first status)
+    const bpm = clampN(Math.round(dev.linkBpm) + d, TEMPO_RANGE[0], TEMPO_RANGE[1]);
+    dev.linkBpm = bpm; hold('tempo'); api('tempo', { bpm });
+    return bpm;
+  }
+  if (S && S.xiao) {                              // --xiao AUDIO: the XIAO folds (`fold x2` / `fold /2`; its reports are folded)
+    const f = foldNow(true, XIAO.status, XIAO.statusAt, XIAO.home, XIAO.homeAt, XIAO.foldSent, performance.now(), 1, false);
+    const k = foldNext(f.k, d), rep = XIAO.rep && performance.now() - XIAO.repAt <= XIAO_REPORT_FRESH_MS ? XIAO.rep : null;
+    xiaoSend(d > 0 ? 'fold x2' : 'fold /2');
+    XIAO.foldSent = { k, at: performance.now() };
+    setTimeout(askStatus, 300); setTimeout(askHome, 300);
+    return rep && rep.bpm > 0 ? rep.bpm * k / f.k : 0;
+  }
+  dev.foldK = clampN(dev.foldK * (d > 0 ? 2 : 0.5), 0.25, 4);      // x2 / /2: Link gets it too (the player's fold)
+  hold('fold'); api('fold', { factor: dev.foldK });
+  return S && S.bpm ? S.bpm * dev.foldK : 0;
+}
+
+/* the downbeat estimator for the screen, { state, conf } or null: the player's own (status.bar), or with --xiao the
+   XIAO's (its `status`: bar=off|listening|locked|manual, bar_lead in score units) */
+const BAR_CONF_FULL = 2;                         // the commit level (live/downbeat.py: conf = lead / commit): the tick is full here
+function barNow(s, now) {
+  if (s.xiao) {
+    const st = XIAO.status;
+    if (!st || now - XIAO.statusAt > XIAO_STATUS_FRESH_MS || !st.bar) return null;
+    return { state: st.bar, conf: clampN((st.bar_lead || 0) / BAR_CONF_FULL, 0, 1) };
+  }
+  return s.bar ? { state: s.bar.state, conf: s.bar.conf } : null;
+}
+
+/* --xiao: the XIAO's session now (xiaoLink), or null */
+const xiaoNow = now => xiaoLink(XIAO.status, XIAO.statusAt, now, XIAO.cfg ? XIAO.cfg.quantum : 4, XIAO.sent);
+function beatInfo(now) {
+  if (S && S.xiao) {                             // --xiao: the XIAO's Link beat; n = the bar's beat (0 = beat 1 of the bar)
+    const x = xiaoNow(now);
+    if (!x || x.beat == null) return null;
+    return { n: x.box, ms: (x.beat - Math.floor(x.beat)) * 60000 / x.bpm, from: 'link', bpm: x.bpm };
+  }
+  if (!S || S.beat == null || !S.beat_bpm) return null;
+  const beat = S.beat + (now - tPoll) / 60000 * S.beat_bpm;
+  const n = Math.floor(beat);
+  return { n, ms: (beat - n) * 60000 / S.beat_bpm, from: S.beat_from, bpm: S.beat_bpm };
+}
+
+function buildCtx(now, beat) {
+  const s = S || {};
+  const lineIn = $('linein').checked;
+  // --xiao: the player is not on Link (SimLink), so the peers are the XIAO's own, from its `status`
+  const xp = s.xiao ? xiaoPeers(now) : null;
+  const linkPeers = s.xiao ? (xp ? xp.link : 0) : (s.peers || 0);
+  const badge = $('srcbadge');
+  badge.textContent = s.xiao ? 'XIAO' : 'LOCAL';
+  badge.classList.toggle('xiao', !!s.xiao);
+  // --xiao: tempo, transport and beat are the XIAO's (its `status`), nothing from the local model; before the first
+  // fresh status: no tempo, a stopped transport. AUDIO: the BPM is its tracker's (its reports)
+  const x = s.xiao ? xiaoNow(now) : null;
+  const xrep = s.xiao && XIAO.rep && now - XIAO.repAt <= XIAO_REPORT_FRESH_MS ? XIAO.rep : null;
+  // --xiao in AUDIO: the transport icon is the XIAO's outputs= (held = stopped), not its Link session
+  const xo = s.xiao && !dev.link ? xiaoOutputs(XIAO.status, XIAO.statusAt, now, XIAO.sent) : null;
+  const running = s.xiao ? (xo ? xo.running : !!(x && x.running)) : outputsRun(s);
+  const audioIn = lineIn || $('usbaudio').checked;                  // sound comes from a source (the line, USB audio, the XIAO's)
+  // --xiao in AUDIO: the IN and CF bars are the XIAO's numbers (its `home`), else the page's own meter
+  const xm = s.xiao && !dev.link ? xiaoMeters(XIAO.home, XIAO.homeAt, XIAO.status, XIAO.statusAt, now) : null;
+  const xg = s.xiao && !dev.link ? xiaoGate(XIAO.status, XIAO.statusAt, now) : null;
+  const mn = meterNumbers(!!s.xiao, xm, { bar: meter.bar, lo: meter.lo, hi: meter.hi, conf: s.confidence || 0 });
+  const ble = bleNow(!!s.xiao, XIAO.status, XIAO.statusAt, XIAO.pairAt, dev.bleEnd, $('blephone').checked, now);
+  const bpm = s.xiao ? (xrep && xrep.bpm > 0 ? xrep.bpm : null) : s.bpm ? s.bpm * dev.foldK : null;     // (--xiao: the report's tempo is the folded one)
+  const fold = dev.link ? { k: 1, auto: false } : foldNow(!!s.xiao, XIAO.status, XIAO.statusAt, XIAO.home, XIAO.homeAt, XIAO.foldSent, now, dev.foldK, s.fold_auto);
+  return {
+    link: dev.link, bpm, linkBpm: s.xiao && x && now > holdUntil.tempo ? x.bpm : dev.linkBpm, mode: s.xiao ? (xrep ? xrep.mode : 'stopped') : s.mode,
+    conf: mn.conf, confHold: !!mn.hold, th: dev.th, gain: dev.gain, confStop: dev.confStop, levelDb: mn.bar, levelMin: mn.lo, levelMax: mn.hi,
+    // --xiao: the XIAO's own gate (status gated= / silent=, M2e); an older firmware's: the CF bar against the threshold
+    silent: !audioIn || (!s.xiao && !!s.silent) || !!(xg && xg.silent),
+    gated: s.xiao ? (xg ? xg.gated : !!xm && dev.confStop && mn.conf * 100 < dev.th) : !!s.gated, hold: dev.hold, playing: s.xiao ? !!(x && x.playing) : !!s.link_playing, peers: $('wifi').value === 'none' ? 0 : linkPeers, wifi: $('wifi').value,
+    running, ltMode: dev.ltMode, xiao: !!s.xiao, fold: fold.k, foldAuto: fold.auto,
+    armed: s.xiao ? (xo ? xo.armed : !!(x && x.armed)) : armedLocal(s),        // armedLocal / xiaoLink say what armed means
+    // the boxes need a bar (Link's count; the estimate has none) and running outputs: stopped, they stand still
+    beatN: beat && beat.from === 'link' && running ? beat.n : null,
+    beatMs: beat ? beat.ms : 0, usb: $('usb').checked, fitted: $('bat').checked,
+    batt: battLevel(), lineIn, bright: dev.bright, sleep: dev.sleep, inOff: dev.inOff, offs: dev.offs, rate: dev.rate, boot: dev.boot, splash: now - dev.powerOnAt < 800,
+    net: netCtx(now), wifiQ: wifiQuality(now), groupPeers: $('wifi').value === 'none' ? 0 : xp ? xp.group : 3, setup: dev.net.mode === 3, qr: QR_CODE, saved: now < dev.savedUntil,
+    ble: { mode: dev.bleMode, left: ble.left, phone: ble.phone },
+    inSrc: dev.inSrc, usbRole: dev.usbRole, usbMidi: usbMidiNow(), autoBar: dev.autoBar, bar: barNow(s, now),
+    tempoStep, setField, setHold, linkStartStop,
+  };
+}
+
+// the light: [red, green] 0..1 before the resistor scaling
+function lightMix(now, c, beat) {
+  if (!powered()) return [0, 0];
+  if (dev.boot) return [0.6, 0.6];
+  if (dev.net.mode === 3) return now % 2400 < 1200 ? [0.9, 0.7] : [0, 0];      // setup: slow yellow blink
+  if (now - dev.powerOnAt < 300) return [1, 1];
+  let r = 0, g = 0;
+  const flash = beat && beat.ms < FLASH_MS ? 1 - beat.ms / FLASH_MS : 0;
+  const bar = beat && ((beat.n % 4) + 4) % 4 === 0;
+  if (dev.hold) { /* held stopped: the outputs are quiet */ }
+  else if (dev.link) { if (beat && beat.from === 'link') { g = flash * (bar ? 1 : 0.7); r = bar ? flash * 0.9 : 0; } }
+  else if (c.silent) { /* dark */ }
+  else if (c.gated) r = 0.7;
+  else if (beat && beat.from === 'link') { g = flash * (bar ? 1 : 0.7); r = bar ? flash * 0.9 : 0; }
+  else if (beat) g = flash * 0.3;
+  if (!$('usb').checked && $('bat').checked && battLevel() < BATT.lowPct) {
+    if (now % lowPeriodMs(battLevel()) < BATT.flashMs) { r = 1; g = 0; }      // the low-battery blink interleaves with the beat
+  }
+  return [r, g];
+}
+
+// the board's red and green LEDs have no window in the lid: only a faint glow along the lid seam
+const LED_K = 0.45;                                  // the 1k resistors as fitted
+function paintLight(r, g) {
+  const kr = r * LED_K * 0.85, kg = g * LED_K, v = Math.max(kr, kg);
+  $('seamGlow').setAttribute('fill', `rgb(${Math.round(255 * kr / (v || 1))},${Math.round(230 * kg / (v || 1))},40)`);
+  $('seamGlow').setAttribute('opacity', Math.min(0.35, v * 0.45).toFixed(3));
+}
+
+/* ---- the 4 beat LEDs (every unit): they say what the screen would (core/jank_led.c, jlg_color), plus the source flash ----
+   Values 0..255 as the firmware drives them (low: the LEDs are bright). st: now (ms), flash { until, rgb } (the source
+   flash), pair (a pair window is open, no phone yet), battPct (-1: no gauge), onUsb, joined (in a Link session), running,
+   armed, lowConf (the confidence is under the threshold), barLocked (AUTO BAR locked), barOne (this beat is the bar's 1),
+   beatMs (ms since the beat), bpm. */
+const LED = { pairMs: 250, beatMs: 80, barMs: 150, flashCapDiv: 3, breathMs: 4000, breathMax: 12, scale: 40,
+              beat: [0, 30, 0], one: [40, 18, 0], armed: [30, 20, 0], lowConf: [40, 0, 0], batt: [40, 0, 0], pair: [0, 0, 40] };
+const SRC_FLASH = { ms: 400, usbAudio: [0, 30, 30], link: [20, 0, 40] };      // cyan = USB AUDIO, purple = LINK
+function ledColor(st) {
+  if (st.flash && st.now < st.flash.until) return st.flash.rgb;
+  if (st.pair) return st.now % LED.pairMs < LED.pairMs / 2 ? LED.pair : [0, 0, 0];      // blue, 4 a second
+  if (!st.onUsb && st.battPct >= 0 && st.battPct < BATT.lowPct && st.now % lowPeriodMs(st.battPct) < BATT.flashMs) return LED.batt;
+  if (st.running && st.joined) {
+    const mpb = st.bpm > 0 ? 60000 / st.bpm : 0;
+    const flash = Math.min(st.barOne ? LED.barMs : LED.beatMs, mpb / LED.flashCapDiv);       // never longer than a third of a beat
+    if (!(st.beatMs < flash)) return [0, 0, 0];
+    if (st.lowConf) return LED.lowConf;
+    return st.barLocked && st.barOne ? LED.one : LED.beat;
+  }
+  if (st.armed) return LED.armed;
+  if (st.joined) {
+    const t = st.now % LED.breathMs, half = LED.breathMs / 2;
+    return [0, Math.floor(LED.breathMax * (t < half ? t : LED.breathMs - t) / half), 0];  // stopped in a session: breathing green
+  }
+  return [0, 0, 0];
+}
+// the colour drawn for a firmware value: the lit channel at full for 40, a gamma so the dim breath still shows
+const ledPaint = rgb => rgb.map(v => Math.round(255 * Math.pow(Math.min(1, v / LED.scale), 0.6)));
+function ledState(now, c, beat) {
+  const link = !!beat && beat.from === 'link';
+  return { now, flash: dev.srcFlash, pair: c.ble.left != null && !c.ble.phone, battPct: c.fitted ? c.batt : -1, onUsb: c.usb,
+           joined: link && (c.peers > 0 || c.running), running: c.running, armed: c.armed, lowConf: !dev.link && c.gated,
+           barLocked: !!c.bar && c.bar.state === 'locked', barOne: !!beat && ((beat.n % 4) + 4) % 4 === 0,
+           beatIdx: beat ? ((beat.n % 4) + 4) % 4 : -1,
+           beatMs: beat ? beat.ms : 1e9, bpm: beat ? beat.bpm : 0 };
+}
+// the 4 LEDs (board mm): beat n's flash on LED n only; every other state (pair, battery, armed, breathing, the source
+// flash) on all four, as the two LEDs showed it before
+const LED_X = [3.0, 10.5, 18.0, 25.5], LED_Y = 54.6, LED_HOLE_R = 1.2, LED_GLOW_R = 3.2;
+function ledColors(st) {
+  const rgb = ledColor(st);
+  const beatFlash = !(st.flash && st.now < st.flash.until) && !st.pair && st.running && st.joined;
+  return LED_X.map((_, i) => (!beatFlash || i === st.beatIdx ? rgb : [0, 0, 0]));
+}
+(function makeLeds() {
+  const ns = 'http://www.w3.org/2000/svg', mk = (tag, a) => { const e = document.createElementNS(ns, tag); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  LED_X.forEach((x, i) => {
+    $('ledGlows').append(mk('circle', { id: 'ledGlow' + i, cx: x, cy: LED_Y, r: LED_GLOW_R, filter: 'url(#seam)', opacity: 0, fill: '#000' }));
+    $('ledHoles').append(mk('circle', { id: 'led' + i, cx: x, cy: LED_Y, r: LED_HOLE_R, fill: '#1c1e20', stroke: '#34373b', 'stroke-width': '.3' }));
+  });
+})();
+function paintLeds(now, c, beat) {
+  const on = powered() && !dev.boot, cols = on ? ledColors(ledState(now, c, beat)) : LED_X.map(() => [0, 0, 0]);
+  cols.forEach((rgb, i) => {
+    const lit = rgb.some(v => v > 0), col = ledPaint(rgb), css = `rgb(${col[0]},${col[1]},${col[2]})`;
+    $('led' + i).setAttribute('fill', lit ? css : '#1c1e20');
+    $('ledGlow' + i).setAttribute('fill', css); $('ledGlow' + i).setAttribute('opacity', lit ? '0.55' : '0');
+  });
+}
+/* one NO click without a screen: USB AUDIO <-> LINK, as the source (AUTO <-> LINK). The line in is mechanical: plugged, NO
+   does nothing. Returns null (nothing) or the new source and its colour flash (cyan = USB AUDIO, purple = LINK) */
+function sourceToggle(inSrc, linePlugged, now) {
+  if (linePlugged) return null;
+  const src = inSrc === 3 ? 0 : 3;
+  return { src, flash: { until: now + SRC_FLASH.ms, rgb: src === 3 ? SRC_FLASH.link : SRC_FLASH.usbAudio } };
+}
+const linePlugged = now => (S && S.xiao ? !!XIAO.status && now - XIAO.statusAt <= XIAO_STATUS_FRESH_MS && XIAO.status.audio_source === 'line' : $('linein').checked);
+
+// the screen goes dark after SLEEP_MS[dev.sleep] without a button (0 = never); SETUP keeps it on (its QR must show); no screen: never
+const SLEEP_MS = [0, 30000, 60000, 300000];
+const asleep = now => view.scr !== 'none' && SLEEP_MS[dev.sleep] > 0 && dev.net.mode !== 3 &&
+  now - Math.max(dev.lastInput, AUDIO_WAKE.at) > SLEEP_MS[dev.sleep];
+// an audio event wakes the screen too (the user, 2026-11-15): the beat lost, the beat back, the BPM moved by more than
+// 0.1 since the last wake. It counts as activity for the sleep timer only: a button press still acts as on a lit screen
+const AUDIO_WAKE = { at: -1e9, had: false, bpm: 0, minBpmStep: 0.1 };
+function audioWake(now, c) {
+  const has = c.bpm > 0;
+  const moved = has && AUDIO_WAKE.had && Math.abs(c.bpm - AUDIO_WAKE.bpm) > AUDIO_WAKE.minBpmStep;
+  if (has !== AUDIO_WAKE.had || moved) { AUDIO_WAKE.at = now; AUDIO_WAKE.bpm = has ? c.bpm : 0; }
+  AUDIO_WAKE.had = has;
+}
+function paintScreen(now, c) {
+  if (view.scr === 'none') return;
+  fb.fill(0);
+  if (powered() && !asleep(now)) OLED.draw(fb, ui, c, now);
+  const d = oledImg.data, k = dev.bright / 100;
+  const on = OLED_ON.map((v, j) => Math.round(OLED_OFF[j] + (v - OLED_OFF[j]) * k));      // brightness: the lit pixels' level
+  for (let i = 0; i < fb.length; i++) {
+    const col = fb[i] ? on : OLED_OFF;
+    d[4 * i] = col[0]; d[4 * i + 1] = col[1]; d[4 * i + 2] = col[2]; d[4 * i + 3] = 255;
+  }
+  oledCtx.putImageData(oledImg, 0, 0);
+}
+
+const ARM_SHIFT = { up: [0, -.3], down: [0, .3], no: [-.3, 0], yes: [.3, 0] };
+const ARM_CENTER = { up: [61.5, 55.7], down: [61.5, 68.7], no: [55, 62.2], yes: [68, 62.2] };     // board mm
+function paintArms() {
+  for (const b of ['up', 'down', 'no', 'yes']) {
+    const on = dev.held[b], [cx, cy] = ARM_CENTER[b], [dx, dy] = ARM_SHIFT[b];
+    const tf = on ? `translate(${dx} ${dy}) translate(${cx} ${cy}) scale(.94) translate(${-cx} ${-cy})` : '';
+    if (dev.armCache[b] !== tf) {
+      dev.armCache[b] = tf;
+      const g = $('arm-' + b); g.setAttribute('transform', tf); g.firstElementChild.classList.toggle('on', on);
+    }
+  }
+  const lever = powerLeverY();
+  if ($('lever').getAttribute('y') !== String(lever)) $('lever').setAttribute('y', lever);
+}
+const powerLeverY = () => (dev.sw ? 49.2 : 53.8);
+
+// the input meter: updated METER.everyMs (not every frame: the device saves its CPU for audio and Link), the bar eases
+// toward the short-term level, the min / max lines toward the extremes of the last METER.spanMs, all in dB
+const METER = { everyMs: 250, spanMs: 3000, barTauS: 0.6, lineTauS: 0.5, floorDb: -120 };
+const meter = { at: 0, bar: METER.floorDb, lo: METER.floorDb, hi: METER.floorDb, hist: [] };
+function meterInput() {
+  if (!$('linein').checked || !S || S.level_fast_db == null) return METER.floorDb;
+  return Math.min(0, S.level_fast_db + dev.gain);
+}
+function updateMeter(now) {
+  if (now - meter.at < METER.everyMs) return;      // (--xiao: its numbers are used as they are; this local meter only feeds LOCAL)
+  const dt = meter.at ? (now - meter.at) / 1000 : 1e9;
+  meter.at = now;
+  const db = meterInput();
+  meter.hist.push({ t: now, db });
+  while (meter.hist.length && now - meter.hist[0].t > METER.spanMs) meter.hist.shift();
+  const ease = (from, to, tau) => from + (to - from) * (1 - Math.exp(-dt / tau));
+  meter.bar = ease(meter.bar, db, METER.barTauS);
+  meter.lo = ease(meter.lo, Math.min(...meter.hist.map(h => h.db)), METER.lineTauS);
+  meter.hi = ease(meter.hi, Math.max(...meter.hist.map(h => h.db)), METER.lineTauS);
+}
+
+function frame(now) {
+  updateMeter(now);
+  const beat = beatInfo(now), c = buildCtx(now, beat);
+  audioWake(now, c);
+  const [r, g] = lightMix(now, c, beat);
+  paintLight(r, g);
+  paintScreen(now, c);
+  paintLeds(now, c, beat);                               // the 4 beat LEDs: on every unit
+  const e = clicker(clickNo, 'tick', performance.now()); if (e) noEvent(e, performance.now());      // a click is said 350 ms after its release
+  paintArms();
+  $('battv').textContent = battLevel() + ' %';
+  $('setupbar').hidden = dev.net.mode !== 3;
+  $('linePlug').setAttribute('visibility', $('linein').checked ? 'visible' : 'hidden');
+  requestAnimationFrame(frame);
+}
+
+function setPower(on) {
+  if (on === dev.sw) return;
+  dev.sw = on;
+  if (on) {
+    dev.boot = dev.held.no; dev.powerOnAt = dev.lastInput = performance.now(); ui.screen = 'home'; ui.edit = null; ui.overlay = null;
+  } else dev.boot = false;
+}
+
+// HOME combos (AUDIO mode only): NO held + UP/DOWN = move the bar one beat, YES held + UP/DOWN = nudge the timing 1 ms.
+// So on HOME, YES alone acts on release, and only when no combo was used while it was held.
+// NO on HOME is the firmware's one button (core/jank_ui.c jb_step), fed with the page's press and release events:
+//   single click  said 350 ms after its release, when no second press came in time: its action (the menu; without a screen
+//                 the source toggle). A second press must start within 350 ms of the first release.
+//   double        said 350 ms after the second release: nothing
+//   triple        said on the third press itself: the Bluetooth pair window (the screenless units' way)
+//   a press held 1.5 s or more is a long press, not a click. NO held with UP / DOWN (the nudges) is a combo: the sequence is
+//   cancelled and nothing is said when NO is released. Off HOME (a menu, an edit) NO acts at once, as before.
+const CLICK = { doubleMs: 350, longMs: 1500 };
+function clicker(k, ev, now) {
+  switch (k.st) {
+    case 'down1':
+      if (ev === 'up') { if (now - k.tDown >= CLICK.longMs) k.st = 'idle'; else { k.st = 'wait2'; k.tEdge = now; } }
+      else if (ev === 'cancel') k.st = 'held';
+      return null;
+    case 'wait2':
+      if (ev === 'cancel') { k.st = 'idle'; return null; }
+      if (ev === 'tick' && now - k.tEdge >= CLICK.doubleMs) { k.st = 'idle'; return 'click'; }
+      if (ev !== 'down') return null;
+      if (now - k.tEdge >= CLICK.doubleMs) { k.st = 'down1'; k.tDown = now; return 'click'; }       // (the tick was late)
+      k.st = 'down2';
+      return null;
+    case 'down2':
+      if (ev === 'up') { k.st = 'wait3'; k.tEdge = now; } else if (ev === 'cancel') k.st = 'held';
+      return null;
+    case 'wait3':
+      if (ev === 'cancel') { k.st = 'idle'; return null; }
+      if (ev === 'tick' && now - k.tEdge >= CLICK.doubleMs) { k.st = 'idle'; return 'double'; }
+      if (ev !== 'down') return null;
+      if (now - k.tEdge >= CLICK.doubleMs) { k.st = 'down1'; k.tDown = now; return 'double'; }
+      k.st = 'held';
+      return 'triple';
+    case 'held':
+      if (ev === 'up') k.st = 'idle';
+      return null;
+    default:
+      if (ev === 'down') { k.st = 'down1'; k.tDown = now; }
+      return null;
+  }
+}
+const clickNo = { st: 'idle', tDown: 0, tEdge: 0 };
+// the Bluetooth pair window (2 min): --xiao `ble pair` (the XIAO counts; status ble_state / ble_left say it), local: simulated.
+// OFF in the local simulation: no window (the XIAO decides for itself)
+function pairNow(now) {
+  if (S && S.xiao) { xiaoSend('ble pair'); XIAO.pairAt = now; setTimeout(askStatus, 300); }
+  else if (dev.bleMode === 2) return;
+  else dev.bleEnd = now + BLE_WINDOW_S * 1000;
+  OLED.pairOverlay(ui, now);
+}
+// NO's single click: the menu (screen), or without a screen USB AUDIO <-> LINK with a colour flash
+function noClick(now) {
+  if (view.scr === 'none') {
+    const t = sourceToggle(dev.inSrc, linePlugged(now), now);
+    if (t) { dev.srcFlash = t.flash; setField('insrc', t.src); }
+    return;
+  }
+  OLED.press(ui, 'no', now, buildCtx(now, null));
+}
+function noEvent(e, now) {
+  if (!powered() || dev.boot || !onHome()) return;
+  if (e === 'click') noClick(now);
+  else if (e === 'triple') { dev.combo = true; pairNow(now); }       // (the held third press is no hint, no click)
+}
+const onHome = () => ui.screen === 'home' && dev.net.mode !== 3;
+const NUDGE_MS = 1;
+const NUDGE_BEATS = 0.5;           // half a beat: fixes an off-beat lock; two steps move the bar's 1 by a beat
+const XIAO_NUDGE_ANSWER_MS = 2000; // an answer this soon after a nudge is its own (the overlay shows it)
+/* beats in halves for the overlay: 0.5 -> "+1/2", -1.5 -> "-1 1/2", 2 -> "+2", 0 -> "0" */
+function halvesText(b) {
+  const h = Math.round(Math.abs(b) * 2), w = Math.floor(h / 2), half = h % 2 ? '1/2' : '';
+  return h === 0 ? '0' : (b < 0 ? '-' : '+') + (w ? w + (half ? ' ' + half : '') : half);
+}
+/* --xiao: the overlay from the XIAO's answer, two layers each (jank M2h), 0 = AUTO: mod 'no' (`nudge beat`): the PHASE,
+   nudge_beats, the user's nudges in all (+-3) on top of AUTO BAR's bar; 'yes' (`nudge ms`): the AUDIO SHIFT, lat_trim, on top
+   of the auto latency (an older firmware, no lat_trim: beat_latency, the AUDIO IN offset) */
+function nudgeOverlay(mod, stats) {
+  if (mod === 'no') return { title: 'PHASE', value: Number(stats.nudge_beats) ? halvesText(stats.nudge_beats) : 'AUTO' };
+  if (!('lat_trim' in stats)) return { title: 'NUDGE MS', value: 'AUDIO IN ' + (stats.beat_latency > 0 ? '+' : '') + stats.beat_latency + ' MS' };
+  return { title: 'AUDIO SHIFT', value: stats.lat_trim ? (stats.lat_trim > 0 ? '+' : '') + stats.lat_trim + ' MS' : 'AUTO' };
+}
+/* --xiao: a nudge refused: the reason as an overlay, null for an err that is not a nudge's */
+function nudgeErrOverlay(line) {
+  if (/^err nudge beat at its limit/.test(line)) return { title: 'PHASE', value: 'MAX 3 BEATS' };
+  if (line === 'err no beat yet') return { title: 'PHASE', value: 'NO BEAT YET' };
+  if (line === 'err link mode') return { title: 'LINK MODE', value: '' };
+  if (line === 'err busy') return { title: 'NUDGE', value: 'BUSY' };
+  return null;
+}
+function xiaoNudged(mod, stats) {
+  if (performance.now() - (XIAO.nudgeAt || -1e9) > XIAO_NUDGE_ANSWER_MS) return;
+  const o = nudgeOverlay(mod, stats);
+  showOverlay(o.title, o.value);
+}
+function xiaoNudgeErr(line) {
+  const o = performance.now() - (XIAO.nudgeAt || -1e9) <= XIAO_NUDGE_ANSWER_MS ? nudgeErrOverlay(line) : null;
+  if (o) showOverlay(o.title, o.value);
+}
+function showOverlay(title, value) { ui.hint = null; ui.overlay = { until: performance.now() + 1000, title, value }; }
+// NO / YES held on HOME (AUDIO mode) longer than HINT_MS without UP / DOWN: a hint says what UP / DOWN will do
+const HINT_MS = 400;
+// (UP adds half a beat to Link's count, so its beats come half a beat earlier; a + offset makes every output later)
+const HINTS = { no: { title: 'PHASE', up: 'UP: 1/2 BEAT EARLY', down: 'DOWN: 1/2 BEAT LATE' },
+                yes: { title: 'AUDIO SHIFT', up: 'UP: 1 MS LATER', down: 'DOWN: 1 MS EARLIER' } };
+function armHint(b) {
+  clearTimeout(dev.hintTimer);
+  dev.hintTimer = setTimeout(() => { if (dev.held[b] && !dev.combo && !dev.link && onHome()) ui.hint = HINTS[b]; }, HINT_MS);
+}
+function dropHint() { clearTimeout(dev.hintTimer); ui.hint = null; }
+function comboStep(mod, d) {
+  if (dev.link) return;                                          // LINK mode: the session owns the bar and the timing
+  if (S && S.xiao) {                                             // --xiao: the XIAO's nudges (M2d); the overlay from its answer
+    xiaoSend(mod === 'no' ? 'nudge beat ' + (d > 0 ? '+0.5' : '-0.5') : 'nudge ms ' + (d > 0 ? '+1' : '-1'));
+    XIAO.nudgeAt = performance.now();
+    return;
+  }
+  if (mod === 'no') {                                            // the PHASE (M2h): AUTO at 0
+    api('shift', { beats: d * NUDGE_BEATS });
+    dev.phase = (dev.phase || 0) + d * NUDGE_BEATS;
+    showOverlay('PHASE', dev.phase ? halvesText(dev.phase) : 'AUTO');
+  } else {
+    const ms = clampN(dev.inOff + d * NUDGE_MS, -100, 100);         // the AUDIO SHIFT (here the audio input offset): every output
+    setField('inoff', ms); showOverlay('AUDIO SHIFT', ms ? (ms > 0 ? '+' : '') + ms + ' MS' : 'AUTO');
+  }
+}
+function btnDown(b) {
+  if (dev.held[b]) return;
+  dev.held[b] = true;
+  if (!powered() || dev.boot) return;
+  const now = performance.now();
+  if (asleep(now)) { dev.lastInput = now; dev.woke[b] = true; return; }     // a dark screen: the press only wakes it
+  dev.lastInput = now;
+  const ud = b === 'up' || b === 'down', mod = dev.held.no ? 'no' : dev.held.yes ? 'yes' : null;
+  if (b === 'no' && onHome()) { dev.combo = false; dev.deferred.no = true; armHint('no'); noEvent(clicker(clickNo, 'down', now), now); return; }
+  if (b === 'yes' && onHome()) { dev.combo = false; dev.deferred.yes = true; armHint('yes'); return; }     // decided on release
+  let act = () => OLED.press(ui, b, performance.now(), buildCtx(performance.now(), null));
+  if (ud && mod && dev.deferred[mod] && onHome()) {                // the modifier must have been pressed on HOME too
+    dev.combo = true;
+    if (mod === 'no') clicker(clickNo, 'cancel', now);
+    const d = b === 'up' ? 1 : -1;
+    act = () => comboStep(mod, d);
+    if (mod === 'no') { act(); return; }                         // a beat at a time: no auto-repeat
+  }
+  act();
+  if (ud) dev.repeat[b] = setTimeout(function again() { act(); dev.repeat[b] = setTimeout(again, REPEAT.everyMs); }, REPEAT.firstMs);
+}
+function btnUp(b) {
+  if (!dev.held[b]) return;
+  dev.held[b] = false;
+  clearTimeout(dev.repeat[b]);
+  if (b === 'no' || b === 'yes') dropHint();
+  if (dev.woke[b]) { dev.woke[b] = false; return; }            // the wake-up press does nothing else
+  dev.lastInput = performance.now();
+  if (!dev.deferred[b]) return;                                // only a press that started on HOME acts on release
+  dev.deferred[b] = false;
+  if (b === 'no') { clicker(clickNo, 'up', performance.now()); return; }     // its click comes 350 ms later (frame)
+  if (powered() && !dev.boot && onHome() && !dev.combo) OLED.press(ui, b, performance.now(), buildCtx(performance.now(), null));
+}
+
+const ptrBtn = new Map();                             // pointer id -> arm: two fingers can hold a combo (NO + UP)
+$('dpad').addEventListener('pointerdown', e => {
+  const g = e.target.closest('[data-b]'); if (!g) return;
+  e.preventDefault(); $('dev').focus(); ptrBtn.set(e.pointerId, g.dataset.b); btnDown(g.dataset.b);
+});
+const ptrEnd = e => { const b = ptrBtn.get(e.pointerId); if (b) { ptrBtn.delete(e.pointerId); btnUp(b); } };
+window.addEventListener('pointerup', ptrEnd);
+window.addEventListener('pointercancel', ptrEnd);
+$('pwr').addEventListener('click', () => setPower(!dev.sw));
+
+const KEY_BTN = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'no', Escape: 'no', Backspace: 'no', ArrowRight: 'yes', Enter: 'yes' };
+const typing = t => ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(t.tagName);
+window.addEventListener('keydown', e => {
+  if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'p' || e.key === 'P') { e.preventDefault(); if (!e.repeat) setPower(!dev.sw); return; }
+  const b = KEY_BTN[e.key]; if (!b) return;
+  e.preventDefault(); if (!e.repeat) btnDown(b);
+});
+window.addEventListener('keyup', e => { const b = KEY_BTN[e.key]; if (b && !typing(e.target)) { e.preventDefault(); btnUp(b); } });
+window.addEventListener('blur', () => { for (const b of ['up', 'down', 'no', 'yes']) btnUp(b); });
+
+// the mode follows the chosen source (AUDIO > SOURCE): AUTO = the line-in plug (GPIO16), else USB audio while it plays;
+// LINE IN / USB AUDIO = that one only. A live source = AUDIO, none = LINK; sent at load and on every change
+const audioLive = () => { const line = $('linein').checked, usbA = $('usbaudio').checked;
+  return dev.inSrc === 1 ? line : dev.inSrc === 2 ? usbA : line || usbA; };
+function syncModeFromPlug(force) { const m = audioLive() ? 0 : 1; if (force === true || dev.link !== (m === 1)) setField('mode', m); }
+$('linein').onchange = syncModeFromPlug;
+$('usbaudio').onchange = syncModeFromPlug;
+restorePanel();                                       // the remembered panel; the mode follows the restored plug
+syncModeFromPlug(true);
+setPower(true);
+requestAnimationFrame(frame);
+
+$('q').oninput = renderList;
+$('loadpath').onclick = () => load($('path').value.trim());
+$('path').onkeydown = e => { if (e.key === 'Enter') load($('path').value.trim()); };
+$('play').onclick = () => api('play', { playing: $('play').textContent === 'Play' });
+$('seek').oninput = () => { seeking = true; };
+$('seek').onchange = async () => {
+  const s = await (await fetch('/api/status')).json();
+  await api('seek', { seconds: s.duration_s * $('seek').value / 1000 });
+  seeking = false;
+};
+$('pitch').oninput = () => { pitchDragging = true; api('rate', { rate: 1 + $('pitch').value / 100 }); };
+$('pitch').onchange = () => { pitchDragging = false; };
+$('vol').oninput = () => { volDragging = true; $('volval').textContent = $('vol').value + ' %'; api('volume', { volume: $('vol').value / 100 }); };
+$('vol').onchange = () => { volDragging = false; };
+$('reset').onclick =() => { $('pitch').value = 0; api('rate', { rate: 1 }); };
+$('range').onchange = () => {
+  const r = Number($('range').value);
+  $('pitch').min = -r; $('pitch').max = r;
+};
+
+fetch('/api/library').then(r => r.json()).then(l => { library = l; renderList(); });
+poll();
+</script>
+<script>
+// setup page logic (see the section comment above)
+function spFill() {
+  const n = dev.net, nc = netCtx(performance.now());
+  $('sp-ap').textContent = SETUP_NAME;
+  $('sp-net').value = String(n.prev);
+  $('sp-ssid').replaceChildren(...SCAN.map(x => { const o = document.createElement('option'); o.value = o.textContent = x.name; return o; }));
+  $('sp-group').value = n.group; $('sp-ssid').value = n.ssid; $('sp-pass').value = n.pass; $('sp-apname').value = n.apName; $('sp-appass').value = n.appass;
+  dev.offs.forEach((v, i) => { $('sp-o' + i).value = v; }); $('sp-oin').value = dev.inOff;
+  $('sp-rate').replaceChildren(...RATE_NAMES.map((t, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = t; return o; }));
+  $('sp-rate').value = String(dev.rate); $('sp-th').value = dev.th; $('sp-bright').value = dev.bright; $('sp-sleep').value = String(dev.sleep);
+  $('sp-gain').value = dev.gain; $('sp-lowconf').value = dev.confStop ? '1' : '0';
+  spShowGroups();
+  return nc;
+}
+function spShowGroups() { const m = $('sp-net').value; $('sp-jank').hidden = m !== '0'; $('sp-client').hidden = m !== '1'; $('sp-ap-box').hidden = m !== '2'; }
+function spOpen() { spFill(); $('sp-msg').textContent = ''; $('sp-overlay').hidden = false; }
+function spClose() { $('sp-overlay').hidden = true; }
+function spSave() {
+  const n = dev.net, num = (id, lo, hi) => clampN(Math.round(Number($(id).value) || 0), lo, hi);
+  n.prev = Number($('sp-net').value);                       // the network mode the device returns to when setup is left
+  setField('group', Number($('sp-group').value) - 1);
+  setField('ssid', $('sp-ssid').value); setField('pass', $('sp-pass').value);
+  setField('apname', $('sp-apname').value.trim() || n.apName); setField('appass', $('sp-appass').value);
+  setField('bright', Math.round(num('sp-bright', 10, 100) / 10) * 10); setField('sleep', Number($('sp-sleep').value));
+  setField('inoff', num('sp-oin', -100, 100)); setField('out0', num('sp-o0', -50, 50)); setField('out1', num('sp-o1', -50, 50)); setField('out2', num('sp-o2', -50, 50));
+  setField('rate', Number($('sp-rate').value)); setField('threshold', num('sp-th', 0, 100));
+  setField('gain', num('sp-gain', -12, 12)); setField('lowconf', Number($('sp-lowconf').value));
+  dev.savedUntil = performance.now() + 2000;                // the device screen shows SAVED
+  $('sp-msg').textContent = 'saved';
+}
+$('setupbtn').onclick = spOpen;
+$('sp-x').onclick = spClose;
+$('sp-net').onchange = spShowGroups;
+$('sp-form').onsubmit = e => { e.preventDefault(); spSave(); };
+$('sp-overlay').addEventListener('pointerdown', e => { if (e.target === $('sp-overlay')) spClose(); });
+</script>
+<script>
+// ---- exact size and the screen module. The device SVG is in millimetres; it is drawn at PXMM css px per mm. ----
+const VIEW_MM = { w: 116, h: 89 };                           // the SVG's viewBox, in mm
+// true size on the user's MacBook Pro 16 (Mac16,5): the built-in panel is 3456 x 2234 px at 254 ppi = 345.6 mm wide, and the
+// desktop's scaling "looks like" 1728 x 1117 points, so 1 mm = 1728 / 345.6 = exactly 5 CSS px at browser zoom 100 %.
+// The SVG is never scaled by CSS: a window narrower than the device scrolls sideways.
+const PX_PER_MM = 1728 / 345.6;
+// each module: active area (aw x ah) and the lid window (ww x wh), both centred on (cx, cy); board mm, y down
+const SCREENS = {
+  '1.54': { aw: 35.05, ah: 17.52, cx: 38.0, cy: 30.3, ww: 37.8, wh: 19.7 },
+  '2.42': { aw: 55.01, ah: 27.49, cx: 36.0, cy: 19.9, ww: 57.5, wh: 29.5 },
+};
+if (!(view.scr in SCREENS) && view.scr !== NO_SCREEN) view.scr = '1.54';
+function saveView() { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ scr: view.scr })); } catch (e) { /* not remembered */ } }
+function applyView() {
+  $('dev').style.width = (VIEW_MM.w * PX_PER_MM) + 'px'; $('dev').style.height = (VIEW_MM.h * PX_PER_MM) + 'px';
+  $('scr').value = view.scr;
+  $('oledView').toggleAttribute('hidden', view.scr === NO_SCREEN);
+  if (view.scr === NO_SCREEN) return;
+  const m = SCREENS[view.scr], set = (id, o) => { for (const key in o) $(id).setAttribute(key, o[key]); };
+  set('oledBezel', { x: m.cx - m.ww / 2, y: m.cy - m.wh / 2, width: m.ww, height: m.wh });
+  set('oledFO', { x: m.cx - m.aw / 2, y: m.cy - m.ah / 2, width: m.aw, height: m.ah });
+}
+$('scr').onchange = () => {
+  view.scr = $('scr').value; saveView(); applyView();
+  if (view.scr === NO_SCREEN) { ui.screen = 'home'; ui.edit = null; ui.overlay = null; ui.hint = null; }       // no menu without a screen
+};
+applyView();
+</script>
+<script>
+/* "Listen to a tab": Chrome's getDisplayMedia hands over a tab's audio (MDN: MediaDevices.getDisplayMedia; Chrome's
+   suppressLocalAudioPlayback mutes the tab itself, so the speakers get it only from this page). The captured stream is
+   played by this page to the default output (a gain: the Volume slider) and, with --xiao, to the "jank" USB audio device
+   through a second AudioContext whose output is set with AudioContext.setSinkId (MDN: AudioContext/setSinkId, Chrome 110+).
+   Device labels are empty until the page holds a media permission (MDN: MediaDevices.enumerateDevices), so the one-time
+   getUserMedia({audio}) permission is taken and its stream stopped at once (selectAudioOutput is not in Chrome).
+   Without --xiao, an AudioWorklet posts the mono 44.1 kHz samples to /api/tab_audio for the player's tracker. */
+const TAB_RATE = 44100, TAB_BLOCK = 4096, TAB_BACKLOG = 20, TAB_MAX_DELAY_S = 0.5;
+function tabCaptureOptions() {
+  return { video: true, preferCurrentTab: false, selfBrowserSurface: 'exclude', systemAudio: 'exclude',
+           audio: { suppressLocalAudioPlayback: true, echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
+}
+function pickJankDevice(devices, needle) {
+  const n = String(needle || 'jank').toLowerCase();
+  const d = (devices || []).find(x => x.kind === 'audiooutput' && String(x.label || '').toLowerCase().includes(n));
+  return d ? d.deviceId : null;
+}
+function tabLabel(raw) {
+  const s = String(raw || '').trim();
+  return !s || /^[a-z-]+:\/\//i.test(s) ? 'a Chrome tab' : s;
+}
+function tabLevelDb(rms) { return rms > 0 ? Math.max(-99, 20 * Math.log10(rms)) : -99; }
+function latencyAlign(mainS, jankS) {
+  const a = Number.isFinite(mainS) ? mainS : 0, b = Number.isFinite(jankS) ? jankS : 0;
+  const cap = x => Math.min(TAB_MAX_DELAY_S, Math.max(0, x));
+  return { main: cap(b - a), jank: cap(a - b) };
+}
+/* the state machine: idle > asking (Chrome's picker is open) > listening; every end goes back to idle with a message */
+function tabStep(state, ev) {
+  switch (ev.type) {
+    case 'start': return state === 'idle' ? { state: 'asking', msg: 'Pick a tab in Chrome\'s dialog and tick "Share tab audio".', error: false } : { state, msg: '', error: false };
+    case 'granted':
+      return ev.hasAudio ? { state: 'listening', msg: 'Listening to ' + tabLabel(ev.label), error: false }
+        : { state: 'idle', msg: 'No audio in that share: pick the tab again and tick "Share tab audio" (it must be a tab, not a window).', error: true };
+    case 'denied':
+      return ev.name === 'NotAllowedError' ? { state: 'idle', msg: 'The share was cancelled or not allowed.', error: false }
+        : { state: 'idle', msg: 'Chrome could not share a tab: ' + (ev.name || 'error'), error: true };
+    case 'nodevice': return { state: 'idle', msg: 'No audio output named "jank" (is the XIAO plugged in, and the microphone permission allowed so Chrome shows device names?)', error: true };
+    case 'ended': return state === 'listening' ? { state: 'idle', msg: 'The share was stopped (from Chrome\'s bar or the tab was closed).', error: false } : { state, msg: '', error: false };
+    case 'stop': return { state: 'idle', msg: ev.msg || 'Stopped listening.', error: false };
+    case 'fail': return { state: 'idle', msg: ev.msg || 'Listening failed.', error: true };
+    default: return { state, msg: '', error: false };
+  }
+}
+</script>
+<script>
+const TAB = { state: 'idle', msg: '', error: false, stream: null, ctxs: [], gain: null, delays: null, level: -99, queue: [], sending: false,
+              mode: '', label: '', lat: '', postErr: '' };
+const TAB_WORKLET = `class Tap extends AudioWorkletProcessor {
+  constructor(o) { super(); this.post = !!o.processorOptions.post; this.buf = new Float32Array(${TAB_BLOCK}); this.n = 0; this.sumsq = 0; }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0];
+    if (!inp.length) return true;
+    for (let c = 0; c < out.length; c++) out[c].set(inp[Math.min(c, inp.length - 1)]);
+    for (let i = 0; i < inp[0].length; i++) {
+      let m = 0; for (const ch of inp) m += ch[i]; m /= inp.length;
+      this.buf[this.n++] = m; this.sumsq += m * m;
+      if (this.n === this.buf.length) {
+        const rms = Math.sqrt(this.sumsq / this.n);
+        if (this.post) { const copy = this.buf.slice(); this.port.postMessage({ rms, pcm: copy.buffer }, [copy.buffer]); }
+        else this.port.postMessage({ rms });
+        this.n = 0; this.sumsq = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('tab-tap', Tap);`;
+async function jankDeviceId() {
+  const probe = await navigator.mediaDevices.getUserMedia({ audio: true });      // only to unlock the device names
+  for (const t of probe.getTracks()) t.stop();
+  return pickJankDevice(await navigator.mediaDevices.enumerateDevices(), 'jank');
+}
+function tabApply(ev) {
+  const r = tabStep(TAB.state, ev);
+  TAB.state = r.state; if (r.msg) { TAB.msg = r.msg; TAB.error = r.error; }
+}
+async function tabPostLoop() {
+  if (TAB.sending) return;
+  TAB.sending = true;
+  try {
+    while (TAB.queue.length && TAB.state === 'listening') {
+      const body = TAB.queue.shift();
+      const r = await fetch('/api/tab_audio?rate=' + TAB_RATE, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body });
+      TAB.postErr = r.ok ? '' : 'player refused the audio: ' + ((await r.json()).error || r.status);
+    }
+  } catch (e) { TAB.postErr = 'player not reachable: ' + e.message; }
+  TAB.sending = false;
+}
+function tabOnTap(ev, local) {
+  TAB.level = tabLevelDb(ev.data.rms);
+  if (!local || !ev.data.pcm) return;
+  TAB.queue.push(ev.data.pcm);
+  while (TAB.queue.length > TAB_BACKLOG) TAB.queue.shift();       // never a growing lag: drop the oldest
+  tabPostLoop();
+}
+async function tabGraph(stream, jankId) {
+  const local = !jankId;
+  const main = new AudioContext({ sampleRate: TAB_RATE, latencyHint: 'interactive' });
+  TAB.ctxs.push(main);
+  if (main.sampleRate !== TAB_RATE && local) throw new Error('this browser runs audio at ' + main.sampleRate + ' Hz, not ' + TAB_RATE);
+  const url = URL.createObjectURL(new Blob([TAB_WORKLET], { type: 'application/javascript' }));
+  await main.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+  const tap = new AudioWorkletNode(main, 'tab-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], processorOptions: { post: local } });
+  tap.port.onmessage = ev => tabOnTap(ev, local);
+  const gain = main.createGain(); gain.gain.value = $('vol').value / 100;
+  const dMain = main.createDelay(TAB_MAX_DELAY_S);
+  main.createMediaStreamSource(stream).connect(tap); tap.connect(gain); gain.connect(dMain); dMain.connect(main.destination);
+  TAB.gain = gain; TAB.delays = { main: dMain, jank: null };
+  const lat = [['speakers', main]];
+  if (jankId) {                                                   // jank always gets the full level (like the player's own stream)
+    const jank = new AudioContext({ sampleRate: TAB_RATE, latencyHint: 'interactive' });
+    TAB.ctxs.push(jank);
+    await jank.setSinkId(jankId);
+    const dJank = jank.createDelay(TAB_MAX_DELAY_S);
+    jank.createMediaStreamSource(stream).connect(dJank); dJank.connect(jank.destination);
+    TAB.delays.jank = dJank; lat.push(['jank', jank]);
+  }
+  for (const c of TAB.ctxs) if (c.state !== 'running') await c.resume();
+  TAB.mode = local ? 'speakers + the player\'s tracker' : 'speakers + jank';
+  setTimeout(() => tabAlign(lat), 1500);                         // outputLatency is only known once the sinks run
+}
+function tabAlign(lat) {
+  if (TAB.state !== 'listening') return;
+  const secs = lat.map(([, c]) => (c.baseLatency || 0) + (c.outputLatency || 0));
+  TAB.lat = lat.map(([n, c], i) => n + ' ' + Math.round(secs[i] * 1000) + ' ms (base ' + Math.round((c.baseLatency || 0) * 1000) + ' + output ' + Math.round((c.outputLatency || 0) * 1000) + ')').join(', ');
+  if (lat.length === 2) {
+    const d = latencyAlign(secs[0], secs[1]);
+    TAB.delays.main.delayTime.value = d.main; TAB.delays.jank.delayTime.value = d.jank;
+    TAB.lat += ' | delay added: speakers ' + Math.round(d.main * 1000) + ' ms, jank ' + Math.round(d.jank * 1000) + ' ms';
+  }
+}
+function tabTeardown() {
+  if (TAB.stream) for (const t of TAB.stream.getTracks()) t.stop();
+  for (const c of TAB.ctxs) c.close().catch(() => {});
+  Object.assign(TAB, { stream: null, ctxs: [], gain: null, delays: null, queue: [], level: -99, mode: '', lat: '' });
+}
+function tabStop(msg) { tabTeardown(); tabApply({ type: 'stop', msg }); tabRender(); }
+async function tabStart() {
+  if (TAB.state !== 'idle') return;
+  tabApply({ type: 'start' }); tabRender();
+  let stream;
+  try { stream = await navigator.mediaDevices.getDisplayMedia(tabCaptureOptions()); }
+  catch (e) { tabApply({ type: 'denied', name: e.name }); tabRender(); return; }
+  for (const v of stream.getVideoTracks()) { v.stop(); stream.removeTrack(v); }          // only the sound is wanted
+  const audio = stream.getAudioTracks();
+  if (!audio.length) { for (const t of stream.getTracks()) t.stop(); tabApply({ type: 'granted', hasAudio: false }); tabRender(); return; }
+  TAB.stream = stream;
+  let jankId = null;
+  try {
+    if (S && S.xiao) {
+      jankId = await jankDeviceId();
+      if (!jankId) { tabTeardown(); tabApply({ type: 'nodevice' }); tabRender(); return; }
+    }
+    await api('play', { playing: false });                       // the player's own track must not play along (CoreAudio would mix them)
+    audio[0].addEventListener('ended', () => { tabTeardown(); tabApply({ type: 'ended' }); tabRender(); });
+    await tabGraph(stream, jankId);
+  } catch (e) { tabTeardown(); tabApply({ type: 'fail', msg: 'Listening failed: ' + e.message }); tabRender(); return; }
+  tabApply({ type: 'granted', hasAudio: true, label: audio[0].label });
+  TAB.label = tabLabel(audio[0].label);
+  tabRender();
+}
+function tabRender() {
+  const on = TAB.state === 'listening';
+  $('tabbtn').disabled = TAB.state !== 'idle';
+  $('tabstop').hidden = TAB.state === 'idle';
+  const fed = !(S && S.xiao) && on ? (S && S.tab ? ' | tracker is fed' : ' | tracker not fed yet') : '';
+  $('tabstat').textContent = (TAB.msg || 'Not listening.') + (on ? ' | to ' + TAB.mode + ' | level ' + Math.round(TAB.level) + ' dB' + fed : '') + (TAB.postErr ? ' | ' + TAB.postErr : '');
+  $('tabstat').style.color = TAB.error ? '#e0674f' : '';
+  $('tablat').textContent = on && TAB.lat ? 'reported latency: ' + TAB.lat : '';
+}
+$('tabbtn').onclick = tabStart;
+$('tabstop').onclick = () => tabStop();
+$('vol').addEventListener('input', () => { if (TAB.gain) TAB.gain.gain.value = $('vol').value / 100; });     // the speakers only
+$('play').addEventListener('click', () => { if (TAB.state === 'listening') tabStop('Stopped listening: the player plays a track.'); });
+setInterval(tabRender, 250);
+tabRender();
+
+/* the tab bar: Player | Tab audio; one pane is shown at a time (the device, the XIAO card, the meters stay in both).
+   Tab audio pauses the player's track; Player stops the tab listening (the capture and both sinks close). */
+const PANE_KEY = 'jank-player-pane';
+function panePick(saved) {
+  return saved === 'tab' ? 'tab' : 'player';
+}
+function paneSwitchPlan(from, to, tabState) {
+  return { pane: panePick(to), pausePlayer: to === 'tab' && from !== 'tab', stopTab: to !== 'tab' && tabState === 'listening' };
+}
+let pane = 'player';
+function setPane(to) {
+  const plan = paneSwitchPlan(pane, to, TAB.state);
+  pane = plan.pane;
+  if (plan.pausePlayer) api('play', { playing: false });
+  if (plan.stopTab) tabStop('Stopped listening: back on the Player tab.');
+  for (const el of document.querySelectorAll('[data-pane]')) el.hidden = el.dataset.pane !== pane;
+  for (const n of ['player', 'tab']) { const b = $('panebtn-' + n); b.setAttribute('aria-selected', String(n === pane)); }
+  try { localStorage.setItem(PANE_KEY, pane); } catch (e) { /* not remembered */ }
+}
+$('panebtn-player').onclick = () => setPane('player');
+$('panebtn-tab').onclick = () => setPane('tab');
+let savedPane = null;
+try { savedPane = localStorage.getItem(PANE_KEY); } catch (e) { /* storage blocked: the Player tab */ }
+setPane(panePick(savedPane));
+</script>
+</body>
+</html>

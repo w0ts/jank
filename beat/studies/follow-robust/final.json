@@ -1,0 +1,100 @@
+{
+ "coast30": {
+  "coast": {
+   "hold_s": 30.0,
+   "on_jump": "follow"
+  }
+ },
+ "coast30-gate": {
+  "coast": {
+   "hold_s": 30.0,
+   "on_jump": "gate"
+  }
+ },
+ "mem-w04-f10-l48": {
+  "memory": {
+   "mode": "hold",
+   "width": 0.04,
+   "floor": 0.1,
+   "related_beats": 48
+  }
+ },
+ "ratio-m05": {
+  "ratio": {
+   "margin": 0.05,
+   "span_s": 10.0
+  }
+ },
+ "agree-ltp-75": {
+  "agree": {
+   "threshold": 0.75,
+   "parts": [
+    "lines",
+    "tempo",
+    "phase"
+   ]
+  }
+ },
+ "agree-ltpd-80": {
+  "agree": {
+   "threshold": 0.8,
+   "parts": [
+    "lines",
+    "tempo",
+    "phase",
+    "dbn"
+   ]
+  }
+ },
+ "all-d-f60": {
+  "coast": {
+   "hold_s": 30.0,
+   "on_jump": "gate",
+   "floor": 0.6
+  },
+  "memory": {
+   "mode": "hold",
+   "width": 0.04,
+   "floor": 0.1,
+   "related_beats": 48
+  },
+  "ratio": {
+   "margin": 0.05,
+   "span_s": 10.0
+  },
+  "agree": {
+   "threshold": 0.8,
+   "parts": [
+    "lines",
+    "tempo",
+    "phase",
+    "dbn"
+   ]
+  }
+ },
+ "all-d-f60-nocoast": {
+  "base": "all-d-f60",
+  "coast": null
+ },
+ "agd80-mem-ratio": {
+  "memory": {
+   "mode": "hold",
+   "width": 0.04,
+   "floor": 0.1,
+   "related_beats": 48
+  },
+  "ratio": {
+   "margin": 0.05,
+   "span_s": 10.0
+  },
+  "agree": {
+   "threshold": 0.8,
+   "parts": [
+    "lines",
+    "tempo",
+    "phase",
+    "dbn"
+   ]
+  }
+ }
+}
