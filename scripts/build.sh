@@ -1,15 +1,15 @@
 #!/bin/bash
 # Builds in the scratch folder from a copy, so managed_components, sdkconfig and build/ never appear in the checkout.
-# Usage: scripts/build.sh [xiao]   (the Seeed XIAO ESP32-S3, the only board)
+# Usage: scripts/build.sh [xiao|lcd2]   (the Seeed XIAO ESP32-S3; the Waveshare ESP32-S3-LCD-2, docs/lcd2.md)
 # JANK_VARIANT names the build (build-<variant>, sdkconfig.<variant>; default the board), JANK_EXTRA_DEFAULTS adds
 # sdkconfig fragments from firmware/, ';'-separated, after the board's (e.g. JANK_EXTRA_DEFAULTS=sdkconfig.ble).
 set -eu
 BOARD="${1:-xiao}"
-case "$BOARD" in xiao) ;; *) echo "unknown board $BOARD: xiao"; exit 2 ;; esac
+case "$BOARD" in xiao | lcd2) ;; *) echo "unknown board $BOARD: xiao lcd2"; exit 2 ;; esac
 VARIANT="${JANK_VARIANT:-$BOARD}"
 EXTRA="${JANK_EXTRA_DEFAULTS:+;$JANK_EXTRA_DEFAULTS}"
 . "$(dirname "$0")/env.sh"
-SRC="$JANK_SCRATCH/src/$BOARD"
+SRC="$JANK_SCRATCH/src/$VARIANT"
 mkdir -p "$SRC/jank"
 rsync -a --delete --exclude /worktrees --exclude .git --exclude build --exclude sdkconfig --exclude managed_components --exclude /third_party/esp_tinyusb "$JANK_ROOT/" "$SRC/jank/"
 # esp_tinyusb with its audio class on (the speaker for the beat tracker): the registry's copy plus a patch

@@ -56,8 +56,12 @@ static void led_show(uint8_t r, uint8_t g, uint8_t b)
             led_strip_set_pixel(s_strip, BOARD_LED_COUNT - 1, r, g, b);
     }
     led_strip_refresh(s_strip);
-#else
+#elif BOARD_LED_MONO_GPIO >= 0
     gpio_set_level(BOARD_LED_MONO_GPIO, !(r || g || b));   /* active low */
+#else
+    (void)r;                             /* no LED on a pin (the lcd2): the screen is the language */
+    (void)g;
+    (void)b;
 #endif
 }
 
@@ -356,9 +360,11 @@ static esp_err_t led_up(void)
     led_strip_config_t strip = {.strip_gpio_num = BOARD_LED_RGB_GPIO, .max_leds = BOARD_LED_COUNT, .led_model = LED_MODEL_WS2812, .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB};
     led_strip_rmt_config_t rmt = {.clk_src = RMT_CLK_SRC_DEFAULT, .resolution_hz = 10000000};
     return led_strip_new_rmt_device(&strip, &rmt, &s_strip);
-#else
+#elif BOARD_LED_MONO_GPIO >= 0
     esp_err_t e = gpio_set_direction(BOARD_LED_MONO_GPIO, GPIO_MODE_OUTPUT);
     return e == ESP_OK ? gpio_set_level(BOARD_LED_MONO_GPIO, 1) : e;
+#else
+    return ESP_OK;
 #endif
 }
 

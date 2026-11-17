@@ -161,7 +161,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put(w, "usb=%s\nsource=%s\nline_gain=%d\n", jur_usb_name(c->usb), jur_src_name(c->source), c->line_gain_db);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
-    put(w, "version=%s\nok\n", JK_VERSION);
+    put(w, "board=%s\nversion=%s\nok\n", s->board, JK_VERSION);
 }
 
 static void put_bridge_stats(const struct jk_stats *t, struct writer *w)

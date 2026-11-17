@@ -30,6 +30,7 @@ net=jank
 ssid=
 pass=none
 mac=02:11:22:33:44:55
+board=xiao
 version=0.1.0
 ok
 ### status

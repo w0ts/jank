@@ -32,6 +32,12 @@ const Stick = (() => {
     if (!h || !(h.bpm > 0) || h.bar === null || h.bar === undefined || !h.quantum) return null;
     return h.bar / 100 + (h.transport === 'stopped' ? 0 : Math.max(0, now - homeAt) / 60000 * h.bpm);
   };
+  // the tracker's mode from its last beat report (b ... <mode> ...: steady, faster, slower; the `beat` answer says speeding_up / slowing_down)
+  const MODE_FRESH_MS = 3000;
+  const trackerMode = (beat, now) => {
+    if (!beat || now - beat.at > MODE_FRESH_MS) return 'steady';
+    return /^(faster|speeding_up)$/.test(beat.mode) ? 'faster' : /^(slower|slowing_down)$/.test(beat.mode) ? 'slower' : 'steady';
+  };
   const foldOf = h => (h && FOLDS[h.fold] ? FOLDS[h.fold] : 1);
 
   function ctx(state, now) {
@@ -42,12 +48,16 @@ const Stick = (() => {
     const level = h && h.level !== null ? h.level : FLOOR_DB;
     const barLead = st ? num(st.bar_lead) : null, barState = st && st.bar ? st.bar : null;
     const net = g.net === 'wifi' ? 1 : 0;
+    // the signal for the lcd2's bars: Wi-Fi client = the router's RSSI (status wifi_rssi), jank = the best peer's (status rssi); 0 = none
+    // heard; null = the stick has not said (no fresh status). Nothing is made up.
+    const wifiMode = !!(h && h.net && h.net.kind === 'wifi');
+    const rssiRaw = st ? num(wifiMode ? st.wifi_rssi : st.rssi) : null, rssi = wifiMode && !h.net.up ? 0 : rssiRaw;
     const wifiBars = h && h.net && h.net.kind === 'wifi' && !h.net.up ? 'none' : st && num(st.rssi) !== null && num(st.rssi) !== 0 ? (num(st.rssi) > -70 ? 'good' : 'weak') : 'unknown';
     return {
-      link: !audio, bpm: audio && h.bpm > 0 ? h.bpm : null, linkBpm: !audio && h && h.bpm > 0 ? h.bpm : null, mode: 'steady',
-      conf: h && h.conf !== null ? h.conf / 100 : 0, confHold: !!(h && h.confHold), th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
+      link: !audio, bpm: audio && h.bpm > 0 ? h.bpm : null, linkBpm: !audio && h && h.bpm > 0 ? h.bpm : null, mode: trackerMode(state.beat, now),
+      conf: h && h.conf !== null ? h.conf / 100 : 0, confKnown: !!h && h.conf !== null, rssi, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
       confStop: g.lowconf !== 'run', levelDb: level, levelMin: h && h.levelMin !== null ? h.levelMin : FLOOR_DB, levelMax: h && h.levelMax !== null ? h.levelMax : FLOOR_DB,
-      silent: level < SILENCE_DB, gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped', playing, running: playing, armed,
+      silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
       peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0,
@@ -165,7 +175,12 @@ const Stick = (() => {
     }
   }
   const releaseAll = (m, now) => { for (const b of Object.keys(m.held)) up(m, b, now); };
-  const framebuffer = (m, now) => { const fb = new Uint8Array(OLED.W * OLED.H); OLED.draw(fb, m.ui, m.getCtx(now), now); return fb; };
+  // ink: an optional Uint8Array(OLED.W * OLED.H) the colour screen (ui/lcd2.js) passes: it gets the lcd2 layout and its ink plane filled
+  const framebuffer = (m, now, ink) => {
+    const fb = new Uint8Array(OLED.W * OLED.H), c = m.getCtx(now);
+    OLED.draw(fb, m.ui, ink ? { ...c, layout: 'lcd2' } : c, now, ink);
+    return fb;
+  };
 
   return { KEY_BTN, KEY_HINT, REPEAT, parseBeat, ctx, leds, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, framebuffer };
 })();

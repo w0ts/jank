@@ -128,6 +128,19 @@ const OLED = (() => {
   const textR = (fb, s, xr, y, sc, v) => text(fb, s, xr - textW(String(s), sc), y, sc, v);
   const textC = (fb, s, y, sc, v) => text(fb, s, Math.round((W - textW(String(s), sc)) / 2), y, sc, v);
 
+  // ---- the INK plane (the colour variant, ui/lcd2.js): draw() can fill a second plane, one byte per pixel, naming WHICH lit pixels
+  // carry information. Ids are meanings, never colours; the screen's renderer maps them. 0 = the neutral default. Only with
+  // ctx.layout === 'lcd2' (then HOME also swaps the confidence bar for a number); the OLED boards pass no plane, draw no ink and
+  // keep their bytes exactly. tag() marks the pixels that are LIT right now inside a box, so it is called after the element is drawn.
+  const INK = { NONE: 0, GOOD: 1, WARN: 2, BAD: 3, DIM: 4, ONE: 5 };       // ONE: the bar's first beat while it is lit (the LED language's bar 1)
+  let inkFb = null, inkOut = null, layoutLcd2 = false;
+  const lcd2 = () => layoutLcd2;
+  function tag(id, x, y, w, h) {
+    if (!inkOut || id === INK.NONE) return;
+    for (let j = Math.max(0, y); j < Math.min(H, y + h); j++) for (let i = Math.max(0, x); i < Math.min(W, x + w); i++) if (inkFb[j * W + i] === 1) inkOut[j * W + i] = id;
+  }
+  const untag = (x, y, w, h) => { if (inkOut) for (let j = Math.max(0, y); j < Math.min(H, y + h); j++) for (let i = Math.max(0, x); i < Math.min(W, x + w); i++) inkOut[j * W + i] = 0; };
+
   const RATES = ['1/4', '1/8', '1/16', '1/32', '24 PPQN'];          // the modular CLK output's division
   const RATES_SHORT = ['1/4', '1/8', '1/16', '1/32', '24P'];
   const DEFAULT_RATE = 2;
@@ -389,12 +402,29 @@ const OLED = (() => {
     }
     if (c.wifi === 'none') for (let i = 0; i < 9; i++) fb[(8 - i) * W + left + i + (m === 0 ? 1 : 0)] ^= 1;
   }
+  // the lcd2 network cluster, right edge xr: the link glyph (joined to a Link session / not), the Link peer count beside it (the
+  // status line's 'P2' moves here), and the signal bars (air quality); 33 wide, room for a two digit count
+  const LCD2_NET_W = 33;
+  const LINK_JOINED_MIN = 1;                                          // Link peers needed to call the stick joined
+  const SIGNAL_GOOD_DBM = -67, SIGNAL_POOR_DBM = -80;                  // good >= -67, fair -80..-68, poor < -80 (-80 is the Wi-Fi page's BAD line)
+  const signalQuality = dbm => (dbm === null || dbm === undefined || dbm === 0 ? 'none' : dbm >= SIGNAL_GOOD_DBM ? 'good' : dbm >= SIGNAL_POOR_DBM ? 'fair' : 'poor');
+  const SIGNAL_INK = { good: INK.GOOD, fair: INK.WARN, poor: INK.BAD, none: INK.DIM }, SIGNAL_BARS = { good: 3, fair: 2, poor: 1, none: 0 };
+  // joined = green; alone = dim in AUDIO mode (a lone leader is normal), red in LINK mode (it has no tempo to follow)
+  const linkInk = c => ((c.peers || 0) >= LINK_JOINED_MIN ? INK.GOOD : c.link ? INK.BAD : INK.DIM);
+  function drawNetIconLcd2(fb, c, xr) {
+    const gx = xr - 32, q = signalQuality(c.rssi), bars = SIGNAL_BARS[q], bx = xr - 7;
+    drawJankGlyph(fb, gx, 0);
+    if ((c.peers || 0) > 0) text(fb, String(c.peers), gx + 12, 0, 1, 1);
+    tag(linkInk(c), gx, 0, 24, 8);
+    for (let i = 0; i < 3; i++) { const h = 2 + 2 * i; if (i < bars) rect(fb, bx + 3 * i, 8 - h, 2, h, 1); else rect(fb, bx + 3 * i, 7, 2, 1, 1); }
+    tag(SIGNAL_INK[q], bx, 0, 8, 8);
+  }
   // the HOME top bar's boxes (x ranges, inclusive; null = not drawn), so that nothing can overlap: the transport icon, in LINK
   // mode the transport option's icon, in AUDIO mode the fold label (X2 /2 ...), the network's name (right-aligned, truncated
   // to what is left), the network icon, the Bluetooth rune, the USB plug, the battery
   function topBar(c) {
     const m = c.net.mode, bleOn = !!(c.ble && (c.ble.phone || c.ble.left != null));
-    const xr = bleOn ? NET_ICON_XR_BLE : NET_ICON_XR, netL = xr - [10, 7, 20][m];
+    const xr = bleOn ? NET_ICON_XR_BLE : NET_ICON_XR, netL = xr - (lcd2() ? LCD2_NET_W : [10, 7, 20][m]);
     const lt = c.link ? LT_ICONS[c.ltMode] : null, fl = !c.link ? foldLabel(c.fold) : '';
     const left = lt ? { l: 12, r: 12 + lt[0].length - 1 } : fl ? { l: 12, r: 12 + textW(fl, 1) - 1 } : null;
     const nameLeft = left ? left.r + 5 : 10;
@@ -404,14 +434,16 @@ const OLED = (() => {
              net: { l: netL, r: xr }, xr, ble: bleOn ? { l: BLE_ICON_X, r: BLE_ICON_X + 4, solid: !!c.ble.phone } : null,
              usb: c.usb ? { l: PLUG_X, r: PLUG_X + USB_ICON[0].length - 1 } : null, batt: c.fitted ? { l: BATT_X, r: BATT_X + 16 } : null };
   }
+  const BATT_BAD_PCT = 15, BATT_WARN_PCT = 30;                       // the battery icon: red under 15 %, amber under 30 %, else green
   function drawPower(fb, c, now) {
     const t = topBar(c);
-    drawNetIcon(fb, c, t.xr);
+    if (lcd2()) drawNetIconLcd2(fb, c, t.xr); else drawNetIcon(fb, c, t.xr);
     if (t.ble && (t.ble.solid || Math.floor(now / ARMED_BLINK_MS) % 2 === 0)) icon(fb, BLE_ICON, t.ble.l, 0);
     if (c.usb) icon(fb, USB_ICON, PLUG_X, 1);                        // a plug on its cable
     if (c.fitted) {
       frame(fb, 107, 0, 15, 7, 1); rect(fb, 122, 2, 2, 3, 1);
       rect(fb, 109, 2, Math.round(clamp(c.batt, 0, 100) / 100 * 11), 3, 1);
+      tag(c.batt < BATT_BAD_PCT ? INK.BAD : c.batt < BATT_WARN_PCT ? INK.WARN : INK.GOOD, 107, 0, 17, 7);
     }
   }
   // the bottom status line: one item at a time, cycling (as on Optimist)
@@ -439,16 +471,16 @@ const OLED = (() => {
     // Wi-Fi line as "P2" when it fits (the user: "the number of peers could also fit in the same status line with wifi"),
     // else it keeps an item of its own in the cycle
     const wifi = wifiItems(c.wifiQ);
-    const peerSeg = c.peers > 0 ? { t: 'P' + c.peers, bad: false } : null;
+    const peerSeg = c.peers > 0 && !lcd2() ? { t: 'P' + c.peers, bad: false, ink: INK.GOOD } : null;
     const fits = segs => segs.reduce((a, g) => a + textW(g.t, 1), 0) + (segs.length - 1) * (adv(' ') + 1) <= W - 4;
     if (peerSeg && wifi.length && fits([peerSeg, ...wifi[0].segs])) wifi[0] = { ...wifi[0], segs: [peerSeg, ...wifi[0].segs], spread: true };
-    else if (peerSeg) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false });
+    else if (peerSeg) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false, ink: INK.GOOD });
     items.push(...wifi);
     if (c.ble && c.ble.phone) items.push({ t: 'PHONE', bad: false });
     if (c.ble && c.ble.left != null && !c.ble.phone) { text(fb, 'BT PAIR ' + mmss(c.ble.left), 2, y, 1, 1); return; }   // the open window: shown alone, its count runs
     if (!items.length) return;
     const it = items[Math.floor(now / STATUS_CYCLE_MS) % items.length];
-    const segs = it.segs || [{ t: it.t, bad: it.bad }];
+    const segs = it.segs || [{ t: it.t, bad: it.bad, ink: it.ink }];
     // spread (the user: "make better use of the space"): the parts fill the whole width, the first flush left, the last
     // flush right, the free pixels shared out as equal gaps
     const ws = segs.map(s => textW(s.t, 1)), free = W - 4 - ws.reduce((a, b) => a + b, 0);
@@ -456,8 +488,8 @@ const OLED = (() => {
     let x = 2;
     segs.forEach((s, i) => {                                           // each part inverted on its own when BAD
       const w = ws[i];
-      if (s.bad) { rect(fb, x - 2, y - 1, w + 4, 9, 1); text(fb, s.t, x, y, 1, 0); }
-      else text(fb, s.t, x, y, 1, 1);
+      if (s.bad) { rect(fb, x - 2, y - 1, w + 4, 9, 1); text(fb, s.t, x, y, 1, 0); tag(INK.BAD, x - 2, y - 1, w + 4, 9); }
+      else { text(fb, s.t, x, y, 1, 1); tag(s.ink || INK.NONE, x, y, w, 7); }
       // spread: gap i gets its share of the free pixels; else the 1 px glyph gap textW drops
       x += w + (gaps ? Math.floor(free * (i + 1) / gaps) - Math.floor(free * i / gaps) : 1 + (it.spread ? adv(' ') : 0));
     });
@@ -467,6 +499,7 @@ const OLED = (() => {
       const x = x0 + i * (w + gap), on = c.beatN != null && ((c.beatN % 4) + 4) % 4 === i;
       if (on) rect(fb, x, y, w, h, 1);
       else frame(fb, x, y, w, h, 1);
+      if (i === 0 && on) tag(INK.ONE, x, y, w, h);                   // amber only while the bar's first beat is the lit one
     }
   }
   // the downbeat estimator under the AUDIO boxes (bar: { state 'off'|'listening'|'locked'|'manual', conf 0..1 } or null):
@@ -476,6 +509,7 @@ const OLED = (() => {
     if (!bar || bar.state === 'off') return;
     if (bar.state === 'manual') { text(fb, 'M', x0, y + h + 3, 1, 1); return; }
     if (bar.state === 'locked') rect(fb, x0, y + h + 1, w, 2, 1);
+    if (lcd2()) return;                                                // the colour layout has no slider-like line: the 1's box and the M say it
     const n = Math.round((4 * (w + gap) - gap) * clamp(bar.conf || 0, 0, 1));          // up to the boxes' width
     if (n > 0) rect(fb, x0, y + h + 4, n, 1, 1);
   }
@@ -489,6 +523,39 @@ const OLED = (() => {
   //     y57  status line, cycling every STATUS_CYCLE_MS: the Link peers (none: empty)
   //   LINK: BPM x4, four wide beat boxes across the width, the same status line at y57
   //   (the mode picks the layout, whatever the source: a line in, USB audio, the XIAO's)
+  // ---- lcd2 HOME (ctx.layout 'lcd2'): no bars. The IN bar is a small number, 'IN -20' (levelInk), the CF bar a NUMBER, 'CF 87', its digits coloured by the value against the stick's stop
+  // threshold c.th: red below it, amber up to 10 points above, green above; grey when the tracker has nothing (no value, or silence).
+  // Right of it: a word for what the number cannot say (GATED red: the outputs are stopped; HOLD grey; COAST amber), and the threshold.
+  const LCD2_IN_Y = 33, CONF_Y = 44, CONF_WARN_MARGIN = 10;
+  const CLIP_PEAK_DB = -1, CLIP_RMS_MAX_DB = -3, QUIET_DB = -50;   // clipping: the last second's peak (or, unreported, the RMS maximum); quiet: under the tracker's -50 dBFS sound level
+  function levelInk(c) {
+    const clip = c.peakDb !== null && c.peakDb !== undefined ? c.peakDb >= CLIP_PEAK_DB : c.levelMax >= CLIP_RMS_MAX_DB;
+    if (clip) return INK.BAD;
+    return c.levelDb < QUIET_DB ? INK.WARN : INK.NONE;
+  }
+  function confInk(c) {
+    if (c.confKnown === false || c.silent) return INK.DIM;
+    const pct = Math.round(c.conf * 100);
+    return pct < c.th ? INK.BAD : pct <= c.th + CONF_WARN_MARGIN ? INK.WARN : INK.GOOD;
+  }
+  // the input level as a number, 'IN -20' (dBFS, rounded): the label neutral, the number coloured by levelInk (red clipping, amber too
+  // quiet, neutral otherwise). No meter, no ticks, no min / max lines: the number moves with the level and the colour says when it matters
+  function drawLevelNumber(fb, c) {
+    const num = String(Math.round(c.levelDb)), x = 3 + textW('IN ', 1) + 1;
+    text(fb, 'IN', 3, LCD2_IN_Y, 1, 1);
+    text(fb, num, x, LCD2_IN_Y, 1, 1);
+    tag(levelInk(c), x, LCD2_IN_Y, textW(num, 1), 7);
+  }
+  function drawConfNumber(fb, c) {
+    const known = c.confKnown !== false, num = known ? String(Math.round(c.conf * 100)) : '--', x = 3 + textW('CF ', 2) + 2;
+    text(fb, 'CF', 3, CONF_Y, 2, 1);
+    text(fb, num, x, CONF_Y, 2, 1);
+    tag(confInk(c), x, CONF_Y, textW(num, 2), 14);
+    const coast = !c.confHold && !!c.running && c.conf * 100 < c.th, rx = 78;
+    const word = c.gated ? ['GATED', INK.BAD] : c.confHold ? ['HOLD', INK.DIM] : coast ? ['COAST', INK.WARN] : null;
+    if (word) { text(fb, word[0], rx, CONF_Y - 1, 1, 1); tag(word[1], rx, CONF_Y - 1, textW(word[0], 1), 7); }
+    text(fb, c.confStop ? 'STOP ' + c.th : 'MIN ' + c.th, rx, CONF_Y + 6, 1, 1);
+  }
   function drawHome(fb, c, now) {
     // the transport only: silence and low confidence are already on the IN and CF bars
     const stopped = !c.running;
@@ -513,11 +580,18 @@ const OLED = (() => {
     text(fb, c.bpm ? c.bpm.toFixed(1) : '---', 2, 9, 3, 1);
     beatBoxes(fb, c, 87, 9, 9, 9, 1);
     barMarks(fb, c.bar, 87, 9, 9, 9, 1);
-    const inLabel = 'IN ' + Math.round(c.levelDb) + 'dB';
-    valueBar(fb, 31, (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, inLabel);
+    if (lcd2()) {                                                          // numbers, not bars: IN and CF (the colour says what a bar's length would)
+      drawLevelNumber(fb, c);
+      drawConfNumber(fb, c);
+      statusLine(fb, c, now, 57);
+      return;
+    }
+    const inLabel = 'IN ' + Math.round(c.levelDb) + 'dB', inY = 31;
+    const inFrac = (c.levelDb - METER_MIN_DB) / -METER_MIN_DB;
+    valueBar(fb, inY, inFrac, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, inLabel);
     for (const db of [c.levelMin, c.levelMax]) {                           // min / max lines: not through the label (a line across a letter reads as another letter)
       const x = 3 + Math.round(121 * clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1));
-      if (x >= 4 && x <= 6 + textW(inLabel, 1)) { xorCol(fb, x, 32, 32); xorCol(fb, x, 41, 41); } else xorCol(fb, x, 32, 41);
+      if (x >= 4 && x <= 6 + textW(inLabel, 1)) { xorCol(fb, x, inY + 1, inY + 1); xorCol(fb, x, inY + 10, inY + 10); } else xorCol(fb, x, inY + 1, inY + 10);
     }
     // CF: hatched, HOLD, while the confidence holds (jank M2k: no evidence; the value shown eases toward the threshold)
     // COAST: the outputs keep running under the threshold (the robust follower holds a tempo through weak patches): hatched too
@@ -624,18 +698,24 @@ const OLED = (() => {
   function pairOverlay(ui, now) { ui.hint = null; ui.overlay = { until: now + PAIR_OVERLAY_MS, title: 'BLUETOOTH PAIR', value: '', live: 'pair' }; }
   function drawOverlays(fb, ui, now, c) {
     if (ui.hint) {                                                   // NO / YES held on HOME: what UP / DOWN will do
-      boxed(fb, 6, 12, 116, 40);
+      boxed(fb, 6, 12, 116, 40); untag(6, 12, 116, 40);
       textC(fb, ui.hint.title, 17, 1, 0); textC(fb, ui.hint.up, 31, 1, 0); textC(fb, ui.hint.down, 42, 1, 0);
       return;
     }
     if (ui.overlay && now < ui.overlay.until) {
-      boxed(fb, 14, 12, 100, 40);
+      boxed(fb, 14, 12, 100, 40); untag(14, 12, 100, 40);
       const v = ui.overlay.live === 'pair' ? mmss(c.ble && c.ble.left != null ? c.ble.left : BLE_WINDOW_S) : ui.overlay.value, sc = [3, 2, 1].find(k => textW(v, k) <= 96) || 1;   // the largest size that fits the box
       textC(fb, ui.overlay.title, 17, 1, 0); textC(fb, v, 38 - Math.round(7 * sc / 2), sc, 0);
     }
   }
 
-  function draw(fb, ui, c, now) {
+  // ink: an optional Uint8Array(W * H), filled only when c.layout === 'lcd2' (see INK); the OLED draws without it
+  function draw(fb, ui, c, now, ink) {
+    inkFb = fb; layoutLcd2 = c.layout === 'lcd2'; inkOut = ink && layoutLcd2 ? ink : null;
+    if (inkOut) inkOut.fill(0);
+    try { drawScreen(fb, ui, c, now); } finally { inkFb = null; inkOut = null; layoutLcd2 = false; }
+  }
+  function drawScreen(fb, ui, c, now) {
     fb.fill(0);
     if (c.boot) { textC(fb, 'BOOT', 14, 4, 1); textC(fb, 'BOOTLOADER', 48, 1, 1); return; }
     if (c.splash) { textC(fb, 'JANK', 8, 3, 1); textC(fb, 'MINI 2.2', 34, 2, 1); textC(fb, 'FW EMU', 54, 1, 1); return; }
@@ -651,8 +731,8 @@ const OLED = (() => {
     else if (ui.screen === 'info') drawInfo(fb, ui, c);
     else if (ui.screen === 'edit') drawEdit(fb, ui);
     drawOverlays(fb, ui, now, c);
-    if (c.saved) { boxed(fb, 30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
+    if (c.saved) { boxed(fb, 30, 22, 68, 22); untag(30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
   }
 
-  return { W, H, create, press, draw, pairOverlay, mmss, BLE_WINDOW_S, DEFAULT_RATE, topBar, foldLabel, autoBarIndex, AUTOBAR_NAMES };
+  return { W, H, INK, create, press, draw, pairOverlay, mmss, BLE_WINDOW_S, DEFAULT_RATE, topBar, foldLabel, autoBarIndex, AUTOBAR_NAMES };
 })();

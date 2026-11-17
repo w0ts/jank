@@ -23,11 +23,19 @@ if [ -n "${PLAYER_HTML:-}" ]; then
     node "$HERE/tests/oled_ref/gen_cases.js" "$PLAYER_HTML" > "$OUT/oled_cases.txt"
     cmp "$OUT/oled_cases.txt" "$HERE/tests/oled_ref/cases.txt" || { echo "oled: tests/oled_ref/cases.txt is not what $PLAYER_HTML draws: make it again"; exit 1; }
 fi
+# the colour layout's references come from ui/oled.js itself: made again here, they must be the ones kept (else: make them again and
+# look at what the C layout does with the change)
+if command -v node >/dev/null; then
+    node "$HERE/tests/oled_ref/gen_cases.js" --ink > "$OUT/oled_cases_ink.txt" 2>/dev/null
+    cmp "$OUT/oled_cases_ink.txt" "$HERE/tests/oled_ref/cases_ink.txt" || { echo "oled: tests/oled_ref/cases_ink.txt is not what ui/oled.js draws: make it again (gen_cases.js --ink)"; exit 1; }
+fi
 "$CC" $FLAGS -ffp-contract=off "$HERE/tests/test_oled.c" $OLED -o "$OUT/test_oled"
-"$OUT/test_oled" "$HERE/tests/oled_ref/cases.txt"
+"$OUT/test_oled" "$HERE/tests/oled_ref/cases.txt" "$HERE/tests/oled_ref/cases_ink.txt"
 "$CC" $FLAGS -ffp-contract=off "$HERE/tests/test_led.c" "$HERE/core/jank_led.c" $OLED $CORE -o "$OUT/test_led"
 "$OUT/test_led"
 "$CC" $FLAGS "$HERE/tests/test_clock.c" "$HERE/core/jank_clock.c" -o "$OUT/test_clock"
+"$CC" $FLAGS "$HERE/tests/test_lcd.c" "$HERE/core/jank_lcd.c" -o "$OUT/test_lcd"
+"$OUT/test_lcd"
 "$CC" $FLAGS "$HERE/tests/test_sysex.c" "$HERE/core/jank_sysex.c" -o "$OUT/test_sysex"
 "$CC" $FLAGS "$HERE/tests/test_net.c" "$HERE/core/jank_net.c" -o "$OUT/test_net"
 "$CC" $FLAGS "$HERE/tests/test_ota.c" "$HERE/core/jank_ota.c" -o "$OUT/test_ota"
@@ -117,6 +125,8 @@ OPT="$FM1BASE/wifi"
 if command -v node >/dev/null; then
     BLEMIDI_VECTORS="$OUT/blemidi_vectors.json" node "$HERE/tests/test_page.js"
     node "$HERE/tests/test_stick.js"
+    node "$HERE/tests/test_lcd2.js"
+    node "$HERE/tests/test_lcd_palette.js"
     node "$HERE/tests/test_player.js"
     node "$HERE/tests/test_tags.js"
     node "$HERE/tests/test_connect.js"

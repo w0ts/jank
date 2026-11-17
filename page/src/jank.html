@@ -994,6 +994,7 @@ setConnected(null, false);
 </script>
 <!--@include ui/oled.js-->
 <!--@include ui/face.js-->
+<!--@include ui/lcd2.js-->
 <!--@include ui/stick.js-->
 <!--@include ui/player.js-->
 <script id="face-ui">
@@ -1039,12 +1040,32 @@ setConnected(null, false);
   };
 
   const paintArms = () => { for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", model.held[b]); };
+  // the screen of the box: the OLED, or the colour LCD of the lcd2 variant (the stick's `get` says board=lcd2; no such key: the OLED);
+  // ?screen=lcd2 shows the variant as a preview, ?scale=2 or ?scale=2.5 picks how its 128 x 64 UI is scaled onto 320 x 240
+  const params = new URLSearchParams(location.search);
+  const scaling = params.get("scale") === "2.5" ? "2.5" : "2";
+  let screen = "";
+  function applyScreen() {
+    const wanted = params.get("screen") === "lcd2" || S.lastGet.board === "lcd2" ? "lcd2" : "2.42";
+    if (wanted === screen) return;
+    screen = wanted;
+    Face.placeScreen(svg, screen);
+    Face.showLeds(svg, screen);
+    el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
+    el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
+  }
   function draw() {
     frame = requestAnimationFrame(draw);
     const now = performance.now(), ctx2d = el("oled").getContext("2d");
+    applyScreen();
     Stick.tick(model, now);
-    Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), Stick.framebuffer(model, now), 100);
-    Stick.leds(snapshot(), now).forEach((css, i) => Face.paintLed(svg, i, css));
+    const ink = screen === "lcd2" ? new Uint8Array(OLED.W * OLED.H) : null, fb = Stick.framebuffer(model, now, ink);
+    if (screen === "lcd2") {
+      Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), fb, ink, scaling);
+    } else {
+      Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), fb, 100);
+      Stick.leds(snapshot(), now).forEach((css, i) => Face.paintLed(svg, i, css));
+    }
     paintArms();
   }
   const pressDown = (b) => { if (model) Stick.down(model, b, performance.now()); };
@@ -1101,7 +1122,7 @@ setConnected(null, false);
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });
 
-  Face.placeScreen(svg, "2.42");
+  applyScreen();
   Face.makeLeds(svg);
   el("face-hint").textContent = Stick.KEY_HINT;
 })();

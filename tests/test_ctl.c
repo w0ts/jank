@@ -31,6 +31,7 @@ static void setup(void)
     CHECK(jk_init(&snap.b, HOST, cfg.group, cfg.filter) == 0);
     snap.usb_up = 1;
     snap.uptime_s = 12;
+    strcpy(snap.board, "lcd2");
 }
 
 static enum jk_ctl_action run(const char *line)
@@ -57,7 +58,9 @@ static void test_get(void)
     CHECK(strstr(out, "group=1\n") && strstr(out, "channel=1\n"));
     CHECK(strstr(out, "name=jank\n") && strstr(out, "filter=link\n"));
     CHECK(strstr(out, "mac=02:11:22:33:44:55\n"));
-    CHECK(strstr(out, "version=" JK_VERSION "\n"));
+    CHECK(strstr(out, "board=lcd2\nversion=" JK_VERSION "\nok\n"));
+    strcpy(snap.board, "xiao");
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "board=xiao\n"));
     CHECK(ends(out, "ok\n"));
 }
 

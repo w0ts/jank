@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The bridge task: one owner for the core's state, frames from the radio and from USB in one queue of fixed slots.
  * A full queue drops the frame: Link's next one is worth more than an old one. */
+#include <stdio.h>
 #include <string.h>
 #include "app.h"
+#include "board.h"
 #include "jank_hold.h"
 #include "esp_log.h"
 #include "esp_random.h"
@@ -424,6 +426,7 @@ void bridge_snapshot(struct jk_snapshot *s)
         s->beat.gated = 0;             /* gated= as it acts: a Start disarmed it (core/jank_hold.h gate_off, M2g) */
     s->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
     s->batt_pct = (int8_t)linein_batt_pct();   /* the cell from the LINE IN's ADC pattern (linein.c); -1: none */
+    snprintf(s->board, sizeof s->board, "%s", BOARD_NAME);
 #if CONFIG_JANK_BLE_MIDI
     s->ble_built = 1;
     ble_midi_state(&s->ble_state, &s->ble_left_s);
