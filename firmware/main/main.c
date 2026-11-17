@@ -133,6 +133,7 @@ void app_main(void)
     memcpy(peer_mac, mac, 6);
     peer_mac[0] ^= 0x04u;                /* (stays unicast, locally administered) */
     ESP_ERROR_CHECK(ctl_start());
+    ESP_ERROR_CHECK(ui_screen_early());  /* the screen's panel on while the radio is still off (the 2.42"'s rule) */
     ESP_ERROR_CHECK(bridge_start(&s_cfg, mac, peer_mac));
     ESP_ERROR_CHECK(ui_start());
 #if CONFIG_JANK_BLE_MIDI

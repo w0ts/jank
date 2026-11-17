@@ -10,6 +10,23 @@ menu "jank"
             depends on IDF_TARGET_ESP32S3
     endchoice
 
+    config JANK_UI_BENCH
+        bool "XIAO UI bench: a 128 x 64 I2C OLED on D4 / D5 and four buttons on D3 / D8 / D9 / D10"
+        depends on JANK_BOARD_XIAO
+        default n
+        help
+            The device's own screen and D-pad on a XIAO, to try the mini 2.2's user interface (main/board.h has the pads):
+            an SSD1309 (or SSD1306) module at 0x3C / 0x3D on SDA D4 = GPIO5, SCL D5 = GPIO6, and buttons to GND:
+            UP D3 = GPIO4, DOWN D8 = GPIO7, YES D9 = GPIO8, NO D10 = GPIO9 (or the BOOT button). Off: the XIAO as it was.
+
+    config JANK_UI_BENCH_SSD1306
+        bool "The bench's module is an SSD1306 (its charge pump switched on)"
+        depends on JANK_UI_BENCH
+        default n
+        help
+            The common 0.96" / 1.3"-class SSD1306 modules make their panel voltage with the controller's own charge pump
+            (command 8D 14); an SSD1309 has none (its module has a boost converter) and the command is not sent to it.
+
     config JANK_BLE_MIDI
         bool "BLE MIDI peripheral for the control line"
         depends on BT_NIMBLE_ENABLED

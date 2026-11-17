@@ -13,6 +13,8 @@ idf_component_register(
     SRCS "main.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c"
          "usb_audio.c" "beat.c"
          "usb_hostlib.c" "usb_uac_host.c" "usbrole.c" "usbport_tusb320.c" "pump.c"
+         "board_i2c.c" "oled.c" "uiscreen.c" "${core}/jank_led.c"
+         "${core}/jank_oled_gfx.c" "${core}/jank_oled_menu.c" "${core}/jank_oled_press.c" "${core}/jank_oled_draw.c" "${core}/jank_oled_qr.c" "${core}/jank_oled_input.c"
          "${core}/jank_usbrole.c" "${core}/jank_tusb320.c" "${core}/jank_uacdesc.c" "${core}/jank_pcm.c" "${core}/jank_midiq.c"
          "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c" "${core}/jank_start.c"
          "${core}/jank_phone.c" "${core}/jank_vdrive.c" "${core}/jank_live.c" "${core}/jank_hold.c" "${core}/jank_fold.c" "${core}/jank_lat.c" "${core}/jank_conf.c"

@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "board_i2c.h"
 #include "jank_tusb320.h"
 #include "jank_usbrole.h"
 #include "usb_host_mode.h"
@@ -20,7 +21,7 @@
 #define PUMP_PREP_MS 10u               /* the README: start the pump, wait ~10 ms */
 
 static const char *TAG = "usbport";
-static i2c_master_bus_handle_t s_bus;
+
 static i2c_master_dev_handle_t s_dev;
 
 /* SLLSEP2D 7.4: a write of the sub-address, a stop, then the read */
@@ -49,19 +50,12 @@ static const struct jt_io IO = {NULL, cc_read, cc_write, cc_delay};
 
 static void vbus_on(int on) { gpio_set_level(BOARD_HOST_EN_GPIO, on ? 1 : 0); }
 
-/* HOST_EN driven low before anything else (R91 holds it low until then); then the I2C bus (shared with the screen later:
- * SCL / SDA, R60 / R61: the integrator moves the bus to whoever owns it) and the chip */
+/* HOST_EN driven low before anything else (R91 holds it low until then); then the chip on the board's I2C bus, shared
+ * with the screen (board_i2c.c: SCL / SDA, R60 / R61) */
 static int open_port(void)
 {
     gpio_config_t out = {.pin_bit_mask = 1ull << BOARD_HOST_EN_GPIO, .mode = GPIO_MODE_OUTPUT};
-    i2c_master_bus_config_t bc = {
-        .i2c_port = -1,
-        .sda_io_num = BOARD_CC_SDA_GPIO,
-        .scl_io_num = BOARD_CC_SCL_GPIO,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
+    i2c_master_bus_handle_t bus = NULL;
     i2c_device_config_t dc = {.dev_addr_length = I2C_ADDR_BIT_LEN_7, .device_address = JT_ADDR, .scl_speed_hz = I2C_HZ};
     gpio_config_t in = {.pin_bit_mask = 1ull << BOARD_CC_INT_GPIO, .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE};
     esp_err_t e;
@@ -71,9 +65,9 @@ static int open_port(void)
     if (e == ESP_OK)
         e = gpio_config(&in);          /* INT_N: open drain, its pull-up (usbrole.c adds the edge interrupt) */
     if (e == ESP_OK)
-        e = i2c_new_master_bus(&bc, &s_bus);
+        e = board_i2c_bus(&bus);
     if (e == ESP_OK)
-        e = i2c_master_bus_add_device(s_bus, &dc, &s_dev);
+        e = i2c_master_bus_add_device(bus, &dc, &s_dev);
     if (e != ESP_OK) {
         ESP_LOGE(TAG, "pins / I2C: %s", esp_err_to_name(e));
         return 0;
