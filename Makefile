@@ -1,6 +1,7 @@
 # jank shortcuts.
 #   make simulator [ARGS="--xiao"]   the live player / emulator page (beat/live/player.py, 127.0.0.1:8791)
-#   make flash [IMAGE=path.bin]       install an image on the running stick: the JANK drive if mounted, else MIDI (ota.py)
+#   make flash [IMAGE=path.bin]       build, then install the new image on the running stick: the JANK drive if mounted, else MIDI
+#                                     (ota.py). With IMAGE=path.bin: install that file, no build.
 #   make build                        build the XIAO firmware (scripts/build.sh xiao)
 # FW names the firmware checkout, BEAT the beat folder; both default to this checkout (main).
 
@@ -8,16 +9,21 @@ FW     ?= .
 BEAT   ?= beat
 PY     ?= $(BEAT)/.venv/bin/python
 ARGS   ?= --xiao
-# default image: the newest build in the scratch folder (scripts/build.sh writes build-<variant>/jank.bin there)
-IMAGE  ?= $(shell ls -t worktrees/jank-scratch/build-*/jank.bin 2>/dev/null | head -1)
+# make flash builds first and installs that fresh image (scripts/build.sh writes build-xiao/jank.bin in the scratch folder);
+# with IMAGE=path.bin it installs that file as it is, no build.
+SCRATCH ?= $(or $(JANK_SCRATCH),$(FW)/worktrees/jank-scratch)
+ifeq ($(origin IMAGE),undefined)
+IMAGE      := $(SCRATCH)/build-xiao/jank.bin
+FLASH_DEPS := build
+endif
 
 .PHONY: simulator flash build
 
 simulator:
 	cd $(BEAT) && .venv/bin/python -m live.player $(ARGS)
 
-flash:
-	@[ -n "$(IMAGE)" ] || { echo "no image found: make flash IMAGE=path.bin"; exit 2; }
+flash: $(FLASH_DEPS)
+	@[ -f "$(IMAGE)" ] || { echo "no image: $(IMAGE) (make flash IMAGE=path.bin)"; exit 2; }
 	FW_DIR=$(abspath $(FW)) PY=$(abspath $(PY)) bash scripts/flash.sh $(abspath $(IMAGE))
 
 build:
