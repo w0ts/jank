@@ -1,0 +1,32 @@
+jank mini 2.2, the digital LINE IN (two passive networks, the difference in firmware): results (linein.py)
+
+gain into a node (one branch of 20 k, the node's 12 k and 2.2 nF):
+     20 Hz: one channel -11.43 dB (0.268), the same on both -5.41 dB (0.537)
+     50 Hz: one channel -11.31 dB (0.272), the same on both -5.29 dB (0.544)
+   1000 Hz: one channel -11.31 dB (0.272), the same on both -5.29 dB (0.544)
+  10000 Hz: one channel -13.24 dB (0.218), the same on both -7.22 dB (0.435)
+  13300 Hz: one channel -14.31 dB (0.193), the same on both -8.29 dB (0.385)
+  20800 Hz: one channel -16.68 dB (0.147), the same on both -10.66 dB (0.293)
+  the input impedance at the tip, 1 kHz: 21.5 k (100 k // ~27.5 k)
+
+levels (ATTEN3 0 .. 2.9 V):
+  node A's centre 1.467 V, 1.433 V to the nearer end of ATTEN3's 0 .. 2.9 V
+  the same signal on tip and ring: the ADC clips at 2.64 V peak = +7.6 dBu
+  one channel (a mono plug: the ring on the sleeve): the ADC clips at 5.27 V peak = +13.6 dBu
+  with 100 mV rms of 50 Hz earth difference: both nodes swing +-0.077 V; the same-signal input then clips at 2.49 V peak (+7.1 dBu)
+  with 1000 mV rms of 50 Hz earth difference: both nodes swing +-0.769 V; the same-signal input then clips at 1.22 V peak (+0.9 dBu)
+
+the analog rejection of an earth difference (A - B against the differential gain):
+     50 Hz: nominal 44.4 dB (the 100 k pull-downs against a 600 ohm source); over 5000 boards: median 42.5 dB, 1 % worst 35.3 dB, worst 33.5 dB
+   1000 Hz: nominal 44.4 dB (the 100 k pull-downs against a 600 ohm source); over 5000 boards: median 43.1 dB, 1 % worst 35.7 dB, worst 33.2 dB
+  10000 Hz: nominal 44.4 dB (the 100 k pull-downs against a 600 ohm source); over 5000 boards: median 34.5 dB, 1 % worst 24.8 dB, worst 23.1 dB
+
+protection:
+  +-10 V square, VBR 18.7 V: the tip reaches +-9.95 V, 0.8 mA from the source; node A -0.49 .. 3.84 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 0.350 mA peak, to GND 0.121 mA peak
+  +-12 V square, VBR 18.7 V: the tip reaches +-11.94 V, 0.9 mA from the source; node A -0.52 .. 3.86 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 0.565 mA peak, to GND 0.225 mA peak
+  +-12 V square, VBR 17.1 V: the tip reaches +-11.94 V, 0.9 mA from the source; node A -0.52 .. 3.86 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 0.565 mA peak, to GND 0.225 mA peak
+  +-12 V square, VBR 20.3 V: the tip reaches +-11.94 V, 0.9 mA from the source; node A -0.52 .. 3.86 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 0.565 mA peak, to GND 0.225 mA peak
+  +-25 V square, VBR 17.1 V: the tip reaches +-18.05 V, 69.5 mA from the source; node A -0.57 .. 3.90 V (ADC 0 .. 2.9 V, pin diodes conduct beyond -0.4 / 3.7 V); pin-diode current: to +3V3 1.274 mA peak, to GND 0.720 mA peak
+  the 100 k pull-down (R36) is all a +-12 V DC sees at the jack (VRWM 15 V: no clamp, ~nA leakage); node A is AC coupled: it sits at the bias for DC
+
+the anti-alias pole: 20 k // 20 k // 12 k = 5.45 k with 2.2 nF: 13.3 kHz; -5.4 dB at 20.8 kHz (the tip's Nyquist at 41.7 kHz per channel); a second matched RC was not added (the ADC's source impedance stays 5.45 k, two more parts per node)

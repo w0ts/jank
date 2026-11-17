@@ -1,0 +1,35 @@
+jank mini 2.2, the CLOCK / RESET outputs from the 5 V aux rail: ngspice results (cv.py; models in its docstring)
+
+levels:
+  V5A 4.839 V (typ), both outputs high into 10k: the outputs 4.360 V (tip to sleeve)
+  V5A 4.839 V (typ), both outputs high into 100k: the outputs 4.787 V (tip to sleeve)
+  V5A 4.718 V (low (boost -2.5 %)), both outputs high into 10k: the outputs 4.251 V (tip to sleeve)
+  V5A 4.718 V (low (boost -2.5 %)), both outputs high into 100k: the outputs 4.667 V (tip to sleeve)
+
+edges:
+  typ: a 100 us pulse into 10 k // 100 pF: high 4.40 V, rise (10-90 %) 216 ns, fall 28.6 us
+  low: a 100 us pulse into 10 k // 100 pF: high 4.29 V, rise (10-90 %) 216 ns, fall 28.6 us
+
+switch-on blip (C89 / C90 2.2 nF):
+  the rail rising in 1 us, the GPIOs floating: CLOCK's peak 813 mV into 100 k
+  the rail rising in 13.8 us, the GPIOs floating: CLOCK's peak 239 mV into 100 k
+  the rail rising in 100 us, the GPIOs floating: CLOCK's peak 73 mV into 100 k
+  the rail rising in 700 us, the GPIOs floating: CLOCK's peak 15 mV into 100 k
+
+a wrong voltage into the outputs (sustained), the rail unloaded:
+  clamp at 4.95 V, +12 V into CLK, CLK low: V5A 5.009 V; CLK's current 6.41 mA (21 mW in each 2 k of 250); U19 sinks 5.8 mA (29 mW of its 300); Q4's VGS 0.00 V
+  clamp at 4.95 V, +12 V into CLK, CLK high: V5A 5.000 V; CLK's current 7.00 mA (24 mW in each 2 k of 250); U19 sinks 4.9 mA (24 mW of its 300); Q4's VGS -5.00 V
+  clamp at 4.95 V, +12 V into BOTH, both low: V5A 5.068 V; CLK's current 6.36 mA (20 mW in each 2 k of 250); U19 sinks 11.5 mA (58 mW of its 300); Q4's VGS 0.00 V
+  clamp at 4.95 V, +12 V into BOTH, both high: V5A 5.070 V; CLK's current 6.93 mA (24 mW in each 2 k of 250); U19 sinks 11.8 mA (60 mW of its 300); Q4's VGS -5.07 V
+  clamp at 4.95 V, -12 V into CLK, CLK high: V5A 4.959 V; CLK's current 16.96 mA (144 mW in each 2 k of 250); U19 sinks 0.9 mA (4 mW of its 300); Q4's VGS -4.96 V
+  clamp at 4.95 V, -12 V into BOTH, both high: V5A 4.958 V; CLK's current 16.96 mA (144 mW in each 2 k of 250); U19 sinks 0.8 mA (4 mW of its 300); Q4's VGS -4.96 V
+  clamp at 4.95 V, -12 V into BOTH, both low: V5A 4.961 V; CLK's current 11.30 mA (64 mW in each 2 k of 250); U19 sinks 1.0 mA (5 mW of its 300); Q4's VGS 0.00 V
+  clamp at 5.05 V, +12 V into CLK, CLK low: V5A 5.108 V; CLK's current 6.32 mA (20 mW in each 2 k of 250); U19 sinks 5.7 mA (29 mW of its 300); Q4's VGS 0.00 V
+  clamp at 5.05 V, +12 V into CLK, CLK high: V5A 5.099 V; CLK's current 6.90 mA (24 mW in each 2 k of 250); U19 sinks 4.8 mA (24 mW of its 300); Q4's VGS -5.10 V
+  clamp at 5.05 V, +12 V into BOTH, both low: V5A 5.165 V; CLK's current 6.26 mA (20 mW in each 2 k of 250); U19 sinks 11.3 mA (58 mW of its 300); Q4's VGS 0.00 V
+  clamp at 5.05 V, +12 V into BOTH, both high: V5A 5.168 V; CLK's current 6.83 mA (23 mW in each 2 k of 250); U19 sinks 11.5 mA (60 mW of its 300); Q4's VGS -5.17 V
+  clamp at 5.05 V, -12 V into CLK, CLK high: V5A 4.959 V; CLK's current 16.96 mA (144 mW in each 2 k of 250); U19 sinks 0.0 mA (0 mW of its 300); Q4's VGS -4.96 V
+  clamp at 5.05 V, -12 V into BOTH, both high: V5A 4.958 V; CLK's current 16.96 mA (144 mW in each 2 k of 250); U19 sinks 0.0 mA (0 mW of its 300); Q4's VGS -4.96 V
+  clamp at 5.05 V, -12 V into BOTH, both low: V5A 4.961 V; CLK's current 11.30 mA (64 mW in each 2 k of 250); U19 sinks 0.0 mA (0 mW of its 300); Q4's VGS 0.00 V
+
+SUMMARY: into 10 k 4.36 V typ / 4.25 V low; into 100 k 4.79 / 4.67 V; V5A in the worst fault 5.168 V (the WS2812B-2020's 5.3 V, the TPS61023's 7 V)

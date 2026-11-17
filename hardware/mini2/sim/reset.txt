@@ -1,0 +1,12 @@
+jank mini 2.2, CHIP_PU (R8 10 k / C7 1 uF): ngspice results (reset.py; its docstring)
+
+power-up, +3V3 rising in 0.1 ms (a cell plugged in (0.1 ms)): +3V3 at 3.0 V at 1.09 ms, CHIP_PU at VIH (2.475 V) at 14.91 ms: 13.8 ms after the supply (Espressif: >= 0.05 ms)
+power-up, +3V3 rising in 1 ms (a USB host (1 ms)): +3V3 at 3.0 V at 1.91 ms, CHIP_PU at VIH (2.475 V) at 15.37 ms: 13.5 ms after the supply (Espressif: >= 0.05 ms)
+power-up, +3V3 rising in 5 ms (a slow host (5 ms)): +3V3 at 3.0 V at 5.55 ms, CHIP_PU at VIH (2.475 V) at 17.47 ms: 11.9 ms after the supply (Espressif: >= 0.05 ms)
+
++3V3 cut for 1 ms: CHIP_PU down to 0.42 V; under VIL (0.825 V) for 2.60 ms (a reset needs >= 0.05 ms)
++3V3 cut for 5 ms: CHIP_PU down to 0.27 V; under VIL (0.825 V) for 7.07 ms (a reset needs >= 0.05 ms)
++3V3 cut for 20 ms: CHIP_PU down to 0.06 V; under VIL (0.825 V) for 22.75 ms (a reset needs >= 0.05 ms)
++3V3 cut for 100 ms: CHIP_PU down to 0.00 V; under VIL (0.825 V) for 102.94 ms (a reset needs >= 0.05 ms)
+
+USB unplugged with a cell fitted (+3V3 dips to 2.9 V for 20 ms, power.py): CHIP_PU stays at 2.95 V or more: no reset (the brown-out detector decides)

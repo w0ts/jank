@@ -1,0 +1,30 @@
+jank mini 2.2, the four MIDI outputs as 5 V current loops: ngspice results (midi.py; generic models: its docstring)
+
+the receiver's current with the FET on (a 0 bit), per connector:
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.2 V: jack 4.95 mA, DIN 4.95 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.2 V + a series diode: jack 4.05 mA, DIN 4.05 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.5 V: jack 4.54 mA, DIN 4.54 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.5 V + a series diode: jack 3.65 mA, DIN 3.65 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.7 V: jack 4.26 mA, DIN 4.26 mA
+  V5M 4.72 V (resistors -1 %, receiver +5 %), LED 1.7 V + a series diode: jack 3.37 mA, DIN 3.37 mA
+  V5M 4.85 V, LED 1.2 V: jack 5.24 mA, DIN 5.24 mA
+  V5M 4.85 V, LED 1.2 V + a series diode: jack 4.32 mA, DIN 4.32 mA
+  V5M 4.85 V, LED 1.5 V: jack 4.82 mA, DIN 4.82 mA
+  V5M 4.85 V, LED 1.5 V + a series diode: jack 3.90 mA, DIN 3.90 mA
+  V5M 4.85 V, LED 1.7 V: jack 4.53 mA, DIN 4.53 mA
+  V5M 4.85 V, LED 1.7 V + a series diode: jack 3.62 mA, DIN 3.62 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.2 V: jack 5.54 mA, DIN 5.54 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.2 V + a series diode: jack 4.58 mA, DIN 4.58 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.5 V: jack 5.10 mA, DIN 5.10 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.5 V + a series diode: jack 4.16 mA, DIN 4.16 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.7 V: jack 4.81 mA, DIN 4.81 mA
+  V5M 4.97 V (resistors +1 %, receiver -5 %), LED 1.7 V + a series diode: jack 3.87 mA, DIN 3.87 mA
+  the FET off (idle, a 1 bit): 0.00 uA
+
+faults (V5M 4.97 V, the resistors -1 %):
+  jack: ring / DIN 4 shorted to GND (a mono plug, a broken cable): 21.4 mA, 53 mW in each of its 2 0805s (125 mW parts)
+  DIN: ring / DIN 4 shorted to GND (a mono plug, a broken cable): 21.4 mA, 53 mW in each of its 2 0805s (125 mW parts)
+  jack: tip shorted to ring with the FET on: 10.7 mA (13 mW in each of the sink's 2 0805s)
+  tip shorted to GND: no current (the sink side is already at GND when the FET is on; off, nothing drives it)
+
+SUMMARY: a receiver gets 3.37 .. 5.54 mA over the corners (MIDI 1.0's 5 V circuit aims at ~5 mA); the GPIOs drive only the FETs' gates

@@ -1,0 +1,36 @@
+jank mini 2.2, U19 (the 5 V clamp) with a series resistor R145: ngspice (clamp.py; models: cv.py)
+
+as it was (R138 51 k / R139 47 k): R145 0.0 ohm, the clamp's threshold 5.11 .. 5.32 V:
+  the boost at its highest (5.03 V), clamp at its lowest 5.11 V: V5A 5.025 V, U19 0.0 mA, 0 mW (its 300), R145 0.0 mW
+  pass-through, VREG 5.1 V, clamp at its lowest 5.11 V: V5A 5.095 V, U19 0.0 mA, 0 mW (its 300), R145 0.0 mW
+  pass-through, VREG 5.2 V, clamp at its lowest 5.11 V: V5A 5.158 V, U19 237.1 mA, 1223 mW (its 300), R145 0.0 mW
+  pass-through, VREG 5.3 V, clamp at its lowest 5.11 V: V5A 5.215 V, U19 521.4 mA, 2719 mW (its 300), R145 0.0 mW
+  clamp 5.11 V, +12 V into BOTH, both low: V5A 5.112 V, U19 11.4 mA (59 mW)
+  clamp 5.11 V, +12 V into BOTH, both high: V5A 5.112 V, U19 11.6 mA (60 mW)
+  clamp 5.32 V, +12 V into BOTH, both low: V5A 5.322 V, U19 10.9 mA (58 mW)
+  clamp 5.32 V, +12 V into BOTH, both high: V5A 5.322 V, U19 11.1 mA (59 mW)
+  worst fault V5A 5.322 V (the WS2812's 5.3 V)
+
+R145 alone: R145 10.0 ohm, the clamp's threshold 5.11 .. 5.32 V:
+  the boost at its highest (5.03 V), clamp at its lowest 5.11 V: V5A 5.025 V, U19 0.0 mA, 0 mW (its 300), R145 0.0 mW
+  pass-through, VREG 5.1 V, clamp at its lowest 5.11 V: V5A 5.095 V, U19 0.0 mA, 0 mW (its 300), R145 0.0 mW
+  pass-through, VREG 5.2 V, clamp at its lowest 5.11 V: V5A 5.193 V, U19 8.1 mA, 42 mW (its 300), R145 0.7 mW
+  pass-through, VREG 5.3 V, clamp at its lowest 5.11 V: V5A 5.291 V, U19 17.7 mA, 91 mW (its 300), R145 3.2 mW
+  clamp 5.11 V, +12 V into BOTH, both low: V5A 5.224 V, U19 11.2 mA (57 mW)
+  clamp 5.11 V, +12 V into BOTH, both high: V5A 5.226 V, U19 11.4 mA (58 mW)
+  clamp 5.32 V, +12 V into BOTH, both low: V5A 5.429 V, U19 10.7 mA (57 mW)
+  clamp 5.32 V, +12 V into BOTH, both high: V5A 5.431 V, U19 10.9 mA (58 mW)
+  worst fault V5A 5.431 V (the WS2812's 5.3 V)
+
+R145 + R138 47 k / R139 47 k (5.0 V +-1 %): R145 10.0 ohm, the clamp's threshold 4.95 .. 5.05 V:
+  the boost at its highest (5.03 V), clamp at its lowest 4.95 V: V5A 5.023 V, U19 7.2 mA, 35 mW (its 300), R145 0.5 mW
+  pass-through, VREG 5.1 V, clamp at its lowest 4.95 V: V5A 5.092 V, U19 13.9 mA, 69 mW (its 300), R145 1.9 mW
+  pass-through, VREG 5.2 V, clamp at its lowest 4.95 V: V5A 5.190 V, U19 23.6 mA, 117 mW (its 300), R145 5.5 mW
+  pass-through, VREG 5.3 V, clamp at its lowest 4.95 V: V5A 5.289 V, U19 33.2 mA, 165 mW (its 300), R145 11.0 mW
+  clamp 4.95 V, +12 V into BOTH, both low: V5A 5.068 V, U19 11.5 mA (57 mW)
+  clamp 4.95 V, +12 V into BOTH, both high: V5A 5.070 V, U19 11.8 mA (58 mW)
+  clamp 5.05 V, +12 V into BOTH, both low: V5A 5.165 V, U19 11.3 mA (57 mW)
+  clamp 5.05 V, +12 V into BOTH, both high: V5A 5.168 V, U19 11.6 mA (58 mW)
+  worst fault V5A 5.168 V (the WS2812's 5.3 V)
+
+SUMMARY: as it was (R138 51 k / R139 47 k): U19 up to 2719 mW, worst-fault V5A 5.322 V; R145 alone: U19 up to 91 mW, worst-fault V5A 5.431 V; R145 + R138 47 k / R139 47 k (5.0 V +-1 %): U19 up to 165 mW, worst-fault V5A 5.168 V
