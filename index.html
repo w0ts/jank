@@ -1242,6 +1242,19 @@ const OLED = (() => {
   const textR = (fb, s, xr, y, sc, v) => text(fb, s, xr - textW(String(s), sc), y, sc, v);
   const textC = (fb, s, y, sc, v) => text(fb, s, Math.round((W - textW(String(s), sc)) / 2), y, sc, v);
 
+  // ---- the INK plane (the colour variant, ui/lcd2.js): draw() can fill a second plane, one byte per pixel, naming WHICH lit pixels
+  // carry information. Ids are meanings, never colours; the screen's renderer maps them. 0 = the neutral default. Only with
+  // ctx.layout === 'lcd2' (then HOME also swaps the confidence bar for a number); the OLED boards pass no plane, draw no ink and
+  // keep their bytes exactly. tag() marks the pixels that are LIT right now inside a box, so it is called after the element is drawn.
+  const INK = { NONE: 0, GOOD: 1, WARN: 2, BAD: 3, DIM: 4, ONE: 5 };       // ONE: the bar's first beat while it is lit (the LED language's bar 1)
+  let inkFb = null, inkOut = null, layoutLcd2 = false;
+  const lcd2 = () => layoutLcd2;
+  function tag(id, x, y, w, h) {
+    if (!inkOut || id === INK.NONE) return;
+    for (let j = Math.max(0, y); j < Math.min(H, y + h); j++) for (let i = Math.max(0, x); i < Math.min(W, x + w); i++) if (inkFb[j * W + i] === 1) inkOut[j * W + i] = id;
+  }
+  const untag = (x, y, w, h) => { if (inkOut) for (let j = Math.max(0, y); j < Math.min(H, y + h); j++) for (let i = Math.max(0, x); i < Math.min(W, x + w); i++) inkOut[j * W + i] = 0; };
+
   const RATES = ['1/4', '1/8', '1/16', '1/32', '24 PPQN'];          // the modular CLK output's division
   const RATES_SHORT = ['1/4', '1/8', '1/16', '1/32', '24P'];
   const DEFAULT_RATE = 2;
@@ -1503,12 +1516,29 @@ const OLED = (() => {
     }
     if (c.wifi === 'none') for (let i = 0; i < 9; i++) fb[(8 - i) * W + left + i + (m === 0 ? 1 : 0)] ^= 1;
   }
+  // the lcd2 network cluster, right edge xr: the link glyph (joined to a Link session / not), the Link peer count beside it (the
+  // status line's 'P2' moves here), and the signal bars (air quality); 33 wide, room for a two digit count
+  const LCD2_NET_W = 33;
+  const LINK_JOINED_MIN = 1;                                          // Link peers needed to call the stick joined
+  const SIGNAL_GOOD_DBM = -67, SIGNAL_POOR_DBM = -80;                  // good >= -67, fair -80..-68, poor < -80 (-80 is the Wi-Fi page's BAD line)
+  const signalQuality = dbm => (dbm === null || dbm === undefined || dbm === 0 ? 'none' : dbm >= SIGNAL_GOOD_DBM ? 'good' : dbm >= SIGNAL_POOR_DBM ? 'fair' : 'poor');
+  const SIGNAL_INK = { good: INK.GOOD, fair: INK.WARN, poor: INK.BAD, none: INK.DIM }, SIGNAL_BARS = { good: 3, fair: 2, poor: 1, none: 0 };
+  // joined = green; alone = dim in AUDIO mode (a lone leader is normal), red in LINK mode (it has no tempo to follow)
+  const linkInk = c => ((c.peers || 0) >= LINK_JOINED_MIN ? INK.GOOD : c.link ? INK.BAD : INK.DIM);
+  function drawNetIconLcd2(fb, c, xr) {
+    const gx = xr - 32, q = signalQuality(c.rssi), bars = SIGNAL_BARS[q], bx = xr - 7;
+    drawJankGlyph(fb, gx, 0);
+    if ((c.peers || 0) > 0) text(fb, String(c.peers), gx + 12, 0, 1, 1);
+    tag(linkInk(c), gx, 0, 24, 8);
+    for (let i = 0; i < 3; i++) { const h = 2 + 2 * i; if (i < bars) rect(fb, bx + 3 * i, 8 - h, 2, h, 1); else rect(fb, bx + 3 * i, 7, 2, 1, 1); }
+    tag(SIGNAL_INK[q], bx, 0, 8, 8);
+  }
   // the HOME top bar's boxes (x ranges, inclusive; null = not drawn), so that nothing can overlap: the transport icon, in LINK
   // mode the transport option's icon, in AUDIO mode the fold label (X2 /2 ...), the network's name (right-aligned, truncated
   // to what is left), the network icon, the Bluetooth rune, the USB plug, the battery
   function topBar(c) {
     const m = c.net.mode, bleOn = !!(c.ble && (c.ble.phone || c.ble.left != null));
-    const xr = bleOn ? NET_ICON_XR_BLE : NET_ICON_XR, netL = xr - [10, 7, 20][m];
+    const xr = bleOn ? NET_ICON_XR_BLE : NET_ICON_XR, netL = xr - (lcd2() ? LCD2_NET_W : [10, 7, 20][m]);
     const lt = c.link ? LT_ICONS[c.ltMode] : null, fl = !c.link ? foldLabel(c.fold) : '';
     const left = lt ? { l: 12, r: 12 + lt[0].length - 1 } : fl ? { l: 12, r: 12 + textW(fl, 1) - 1 } : null;
     const nameLeft = left ? left.r + 5 : 10;
@@ -1518,14 +1548,16 @@ const OLED = (() => {
              net: { l: netL, r: xr }, xr, ble: bleOn ? { l: BLE_ICON_X, r: BLE_ICON_X + 4, solid: !!c.ble.phone } : null,
              usb: c.usb ? { l: PLUG_X, r: PLUG_X + USB_ICON[0].length - 1 } : null, batt: c.fitted ? { l: BATT_X, r: BATT_X + 16 } : null };
   }
+  const BATT_BAD_PCT = 15, BATT_WARN_PCT = 30;                       // the battery icon: red under 15 %, amber under 30 %, else green
   function drawPower(fb, c, now) {
     const t = topBar(c);
-    drawNetIcon(fb, c, t.xr);
+    if (lcd2()) drawNetIconLcd2(fb, c, t.xr); else drawNetIcon(fb, c, t.xr);
     if (t.ble && (t.ble.solid || Math.floor(now / ARMED_BLINK_MS) % 2 === 0)) icon(fb, BLE_ICON, t.ble.l, 0);
     if (c.usb) icon(fb, USB_ICON, PLUG_X, 1);                        // a plug on its cable
     if (c.fitted) {
       frame(fb, 107, 0, 15, 7, 1); rect(fb, 122, 2, 2, 3, 1);
       rect(fb, 109, 2, Math.round(clamp(c.batt, 0, 100) / 100 * 11), 3, 1);
+      tag(c.batt < BATT_BAD_PCT ? INK.BAD : c.batt < BATT_WARN_PCT ? INK.WARN : INK.GOOD, 107, 0, 17, 7);
     }
   }
   // the bottom status line: one item at a time, cycling (as on Optimist)
@@ -1553,16 +1585,16 @@ const OLED = (() => {
     // Wi-Fi line as "P2" when it fits (the user: "the number of peers could also fit in the same status line with wifi"),
     // else it keeps an item of its own in the cycle
     const wifi = wifiItems(c.wifiQ);
-    const peerSeg = c.peers > 0 ? { t: 'P' + c.peers, bad: false } : null;
+    const peerSeg = c.peers > 0 && !lcd2() ? { t: 'P' + c.peers, bad: false, ink: INK.GOOD } : null;
     const fits = segs => segs.reduce((a, g) => a + textW(g.t, 1), 0) + (segs.length - 1) * (adv(' ') + 1) <= W - 4;
     if (peerSeg && wifi.length && fits([peerSeg, ...wifi[0].segs])) wifi[0] = { ...wifi[0], segs: [peerSeg, ...wifi[0].segs], spread: true };
-    else if (peerSeg) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false });
+    else if (peerSeg) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false, ink: INK.GOOD });
     items.push(...wifi);
     if (c.ble && c.ble.phone) items.push({ t: 'PHONE', bad: false });
     if (c.ble && c.ble.left != null && !c.ble.phone) { text(fb, 'BT PAIR ' + mmss(c.ble.left), 2, y, 1, 1); return; }   // the open window: shown alone, its count runs
     if (!items.length) return;
     const it = items[Math.floor(now / STATUS_CYCLE_MS) % items.length];
-    const segs = it.segs || [{ t: it.t, bad: it.bad }];
+    const segs = it.segs || [{ t: it.t, bad: it.bad, ink: it.ink }];
     // spread (the user: "make better use of the space"): the parts fill the whole width, the first flush left, the last
     // flush right, the free pixels shared out as equal gaps
     const ws = segs.map(s => textW(s.t, 1)), free = W - 4 - ws.reduce((a, b) => a + b, 0);
@@ -1570,8 +1602,8 @@ const OLED = (() => {
     let x = 2;
     segs.forEach((s, i) => {                                           // each part inverted on its own when BAD
       const w = ws[i];
-      if (s.bad) { rect(fb, x - 2, y - 1, w + 4, 9, 1); text(fb, s.t, x, y, 1, 0); }
-      else text(fb, s.t, x, y, 1, 1);
+      if (s.bad) { rect(fb, x - 2, y - 1, w + 4, 9, 1); text(fb, s.t, x, y, 1, 0); tag(INK.BAD, x - 2, y - 1, w + 4, 9); }
+      else { text(fb, s.t, x, y, 1, 1); tag(s.ink || INK.NONE, x, y, w, 7); }
       // spread: gap i gets its share of the free pixels; else the 1 px glyph gap textW drops
       x += w + (gaps ? Math.floor(free * (i + 1) / gaps) - Math.floor(free * i / gaps) : 1 + (it.spread ? adv(' ') : 0));
     });
@@ -1581,6 +1613,7 @@ const OLED = (() => {
       const x = x0 + i * (w + gap), on = c.beatN != null && ((c.beatN % 4) + 4) % 4 === i;
       if (on) rect(fb, x, y, w, h, 1);
       else frame(fb, x, y, w, h, 1);
+      if (i === 0 && on) tag(INK.ONE, x, y, w, h);                   // amber only while the bar's first beat is the lit one
     }
   }
   // the downbeat estimator under the AUDIO boxes (bar: { state 'off'|'listening'|'locked'|'manual', conf 0..1 } or null):
@@ -1590,6 +1623,7 @@ const OLED = (() => {
     if (!bar || bar.state === 'off') return;
     if (bar.state === 'manual') { text(fb, 'M', x0, y + h + 3, 1, 1); return; }
     if (bar.state === 'locked') rect(fb, x0, y + h + 1, w, 2, 1);
+    if (lcd2()) return;                                                // the colour layout has no slider-like line: the 1's box and the M say it
     const n = Math.round((4 * (w + gap) - gap) * clamp(bar.conf || 0, 0, 1));          // up to the boxes' width
     if (n > 0) rect(fb, x0, y + h + 4, n, 1, 1);
   }
@@ -1603,6 +1637,39 @@ const OLED = (() => {
   //     y57  status line, cycling every STATUS_CYCLE_MS: the Link peers (none: empty)
   //   LINK: BPM x4, four wide beat boxes across the width, the same status line at y57
   //   (the mode picks the layout, whatever the source: a line in, USB audio, the XIAO's)
+  // ---- lcd2 HOME (ctx.layout 'lcd2'): no bars. The IN bar is a small number, 'IN -20' (levelInk), the CF bar a NUMBER, 'CF 87', its digits coloured by the value against the stick's stop
+  // threshold c.th: red below it, amber up to 10 points above, green above; grey when the tracker has nothing (no value, or silence).
+  // Right of it: a word for what the number cannot say (GATED red: the outputs are stopped; HOLD grey; COAST amber), and the threshold.
+  const LCD2_IN_Y = 33, CONF_Y = 44, CONF_WARN_MARGIN = 10;
+  const CLIP_PEAK_DB = -1, CLIP_RMS_MAX_DB = -3, QUIET_DB = -50;   // clipping: the last second's peak (or, unreported, the RMS maximum); quiet: under the tracker's -50 dBFS sound level
+  function levelInk(c) {
+    const clip = c.peakDb !== null && c.peakDb !== undefined ? c.peakDb >= CLIP_PEAK_DB : c.levelMax >= CLIP_RMS_MAX_DB;
+    if (clip) return INK.BAD;
+    return c.levelDb < QUIET_DB ? INK.WARN : INK.NONE;
+  }
+  function confInk(c) {
+    if (c.confKnown === false || c.silent) return INK.DIM;
+    const pct = Math.round(c.conf * 100);
+    return pct < c.th ? INK.BAD : pct <= c.th + CONF_WARN_MARGIN ? INK.WARN : INK.GOOD;
+  }
+  // the input level as a number, 'IN -20' (dBFS, rounded): the label neutral, the number coloured by levelInk (red clipping, amber too
+  // quiet, neutral otherwise). No meter, no ticks, no min / max lines: the number moves with the level and the colour says when it matters
+  function drawLevelNumber(fb, c) {
+    const num = String(Math.round(c.levelDb)), x = 3 + textW('IN ', 1) + 1;
+    text(fb, 'IN', 3, LCD2_IN_Y, 1, 1);
+    text(fb, num, x, LCD2_IN_Y, 1, 1);
+    tag(levelInk(c), x, LCD2_IN_Y, textW(num, 1), 7);
+  }
+  function drawConfNumber(fb, c) {
+    const known = c.confKnown !== false, num = known ? String(Math.round(c.conf * 100)) : '--', x = 3 + textW('CF ', 2) + 2;
+    text(fb, 'CF', 3, CONF_Y, 2, 1);
+    text(fb, num, x, CONF_Y, 2, 1);
+    tag(confInk(c), x, CONF_Y, textW(num, 2), 14);
+    const coast = !c.confHold && !!c.running && c.conf * 100 < c.th, rx = 78;
+    const word = c.gated ? ['GATED', INK.BAD] : c.confHold ? ['HOLD', INK.DIM] : coast ? ['COAST', INK.WARN] : null;
+    if (word) { text(fb, word[0], rx, CONF_Y - 1, 1, 1); tag(word[1], rx, CONF_Y - 1, textW(word[0], 1), 7); }
+    text(fb, c.confStop ? 'STOP ' + c.th : 'MIN ' + c.th, rx, CONF_Y + 6, 1, 1);
+  }
   function drawHome(fb, c, now) {
     // the transport only: silence and low confidence are already on the IN and CF bars
     const stopped = !c.running;
@@ -1627,11 +1694,18 @@ const OLED = (() => {
     text(fb, c.bpm ? c.bpm.toFixed(1) : '---', 2, 9, 3, 1);
     beatBoxes(fb, c, 87, 9, 9, 9, 1);
     barMarks(fb, c.bar, 87, 9, 9, 9, 1);
-    const inLabel = 'IN ' + Math.round(c.levelDb) + 'dB';
-    valueBar(fb, 31, (c.levelDb - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, inLabel);
+    if (lcd2()) {                                                          // numbers, not bars: IN and CF (the colour says what a bar's length would)
+      drawLevelNumber(fb, c);
+      drawConfNumber(fb, c);
+      statusLine(fb, c, now, 57);
+      return;
+    }
+    const inLabel = 'IN ' + Math.round(c.levelDb) + 'dB', inY = 31;
+    const inFrac = (c.levelDb - METER_MIN_DB) / -METER_MIN_DB;
+    valueBar(fb, inY, inFrac, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, inLabel);
     for (const db of [c.levelMin, c.levelMax]) {                           // min / max lines: not through the label (a line across a letter reads as another letter)
       const x = 3 + Math.round(121 * clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1));
-      if (x >= 4 && x <= 6 + textW(inLabel, 1)) { xorCol(fb, x, 32, 32); xorCol(fb, x, 41, 41); } else xorCol(fb, x, 32, 41);
+      if (x >= 4 && x <= 6 + textW(inLabel, 1)) { xorCol(fb, x, inY + 1, inY + 1); xorCol(fb, x, inY + 10, inY + 10); } else xorCol(fb, x, inY + 1, inY + 10);
     }
     // CF: hatched, HOLD, while the confidence holds (jank M2k: no evidence; the value shown eases toward the threshold)
     // COAST: the outputs keep running under the threshold (the robust follower holds a tempo through weak patches): hatched too
@@ -1738,18 +1812,24 @@ const OLED = (() => {
   function pairOverlay(ui, now) { ui.hint = null; ui.overlay = { until: now + PAIR_OVERLAY_MS, title: 'BLUETOOTH PAIR', value: '', live: 'pair' }; }
   function drawOverlays(fb, ui, now, c) {
     if (ui.hint) {                                                   // NO / YES held on HOME: what UP / DOWN will do
-      boxed(fb, 6, 12, 116, 40);
+      boxed(fb, 6, 12, 116, 40); untag(6, 12, 116, 40);
       textC(fb, ui.hint.title, 17, 1, 0); textC(fb, ui.hint.up, 31, 1, 0); textC(fb, ui.hint.down, 42, 1, 0);
       return;
     }
     if (ui.overlay && now < ui.overlay.until) {
-      boxed(fb, 14, 12, 100, 40);
+      boxed(fb, 14, 12, 100, 40); untag(14, 12, 100, 40);
       const v = ui.overlay.live === 'pair' ? mmss(c.ble && c.ble.left != null ? c.ble.left : BLE_WINDOW_S) : ui.overlay.value, sc = [3, 2, 1].find(k => textW(v, k) <= 96) || 1;   // the largest size that fits the box
       textC(fb, ui.overlay.title, 17, 1, 0); textC(fb, v, 38 - Math.round(7 * sc / 2), sc, 0);
     }
   }
 
-  function draw(fb, ui, c, now) {
+  // ink: an optional Uint8Array(W * H), filled only when c.layout === 'lcd2' (see INK); the OLED draws without it
+  function draw(fb, ui, c, now, ink) {
+    inkFb = fb; layoutLcd2 = c.layout === 'lcd2'; inkOut = ink && layoutLcd2 ? ink : null;
+    if (inkOut) inkOut.fill(0);
+    try { drawScreen(fb, ui, c, now); } finally { inkFb = null; inkOut = null; layoutLcd2 = false; }
+  }
+  function drawScreen(fb, ui, c, now) {
     fb.fill(0);
     if (c.boot) { textC(fb, 'BOOT', 14, 4, 1); textC(fb, 'BOOTLOADER', 48, 1, 1); return; }
     if (c.splash) { textC(fb, 'JANK', 8, 3, 1); textC(fb, 'MINI 2.2', 34, 2, 1); textC(fb, 'FW EMU', 54, 1, 1); return; }
@@ -1765,10 +1845,10 @@ const OLED = (() => {
     else if (ui.screen === 'info') drawInfo(fb, ui, c);
     else if (ui.screen === 'edit') drawEdit(fb, ui);
     drawOverlays(fb, ui, now, c);
-    if (c.saved) { boxed(fb, 30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
+    if (c.saved) { boxed(fb, 30, 22, 68, 22); untag(30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
   }
 
-  return { W, H, create, press, draw, pairOverlay, mmss, BLE_WINDOW_S, DEFAULT_RATE, topBar, foldLabel, autoBarIndex, AUTOBAR_NAMES };
+  return { W, H, INK, create, press, draw, pairOverlay, mmss, BLE_WINDOW_S, DEFAULT_RATE, topBar, foldLabel, autoBarIndex, AUTOBAR_NAMES };
 })();
 </script>
 <script>
@@ -1781,6 +1861,10 @@ const Face = (() => {
   const SCREENS = {
     '1.54': { aw: 35.05, ah: 17.52, cx: 38.0, cy: 30.3, ww: 37.8, wh: 19.7 },
     '2.42': { aw: 55.01, ah: 27.49, cx: 36.0, cy: 19.9, ww: 57.5, wh: 29.5 },
+    // the colour variant (ui/lcd2.js): the Waveshare ESP32-S3-LCD-2, a 2.0 inch 240 x 320 ST7789 in landscape (320 x 240): its active area is
+    // 30.6 x 40.8 mm (the 2.0 inch diagonal of a 3:4 panel: sqrt(40.8^2 + 30.6^2) = 51.0 mm = 2.008 in), the lid window 1.3 mm wider each side.
+    // No RGB LEDs on this variant (leds: false); the D-pad is where it always is, below the window.
+    lcd2: { aw: 40.8, ah: 30.6, cx: 36.0, cy: 21.5, ww: 43.4, wh: 33.2, leds: false },
   };
   // the 4 beat LEDs (board mm): a small hole in the lid over each, and the glow it throws on the lid
   const LED_X = [3.0, 10.5, 18.0, 25.5], LED_Y = 54.6, LED_HOLE_R = 1.2, LED_GLOW_R = 3.2, LED_DARK = '#1c1e20';
@@ -1818,7 +1902,89 @@ const Face = (() => {
     setAttrs(svg.querySelector('#ledGlow' + i), { fill: css || '#000', opacity: css ? '0.55' : '0' });
   }
 
-  return { SCREENS, LED_X, paintFramebuffer, placeScreen, makeLeds, paintLed };
+  // the LED dots of the box drawing are shown for the screens that have LEDs only
+  function showLeds(svg, name) {
+    const on = SCREENS[name].leds !== false;
+    for (const id of ['#ledView', '#seamGlow']) { const el = svg.querySelector(id); if (on) el.removeAttribute('hidden'); else el.setAttribute('hidden', ''); }
+  }
+
+  return { SCREENS, LED_X, paintFramebuffer, placeScreen, showLeds, makeLeds, paintLed };
+})();
+</script>
+<script>
+/* The colour face of the jank variant on the Waveshare ESP32-S3-LCD-2 (2.0 inch 240 x 320 ST7789 used in LANDSCAPE, 320 x 240, no
+   touch, no RGB LEDs). DESIGN PREVIEW: the same 128 x 64 1-bit UI (ui/oled.js) drawn at x2 (256 x 128, centred at (32, 56); the 56 px
+   bands above and below stay black). The screen is NEUTRAL: near-white on near-black, menus and edit screens included (the selected
+   row is the white inverted bar). Colour is for information only: ui/oled.js fills a second plane, `ink` (one byte per source pixel,
+   semantic ids OLED.INK.*, never colours), for the pixels that carry a meaning the white version cannot show; this module maps the ids
+   to the palette below and paints. docs/lcd2-colors.md says what each colour means and what the stick reports for it.
+
+   PALETTE (exact RGB; every text colour passes WCAG AA, 4.5, against the background, tested):
+     bg      (8, 10, 14)       near black
+     neutral (232, 236, 244)   everything without a meaning
+     good    (72, 222, 128)    green: joined, strong, high, charged
+     warn    (255, 176, 32)    amber: fair, near the line, low; also the bar's first beat while it is the lit one (the LED language's bar 1)
+     bad     (255, 104, 92)    red: poor, below the line, clipping, empty
+     dim     (150, 156, 168)   grey: no signal, nothing heard, not reported */
+const Lcd2 = (() => {
+  const W = 320, H = 240, SRC_W = 128, SRC_H = 64;
+  const PALETTE = { bg: [8, 10, 14], neutral: [232, 236, 244], good: [72, 222, 128], warn: [255, 176, 32], bad: [255, 104, 92], dim: [150, 156, 168] };
+  const SCALINGS = { '2': { factor: 2 }, '2.5': { factor: 2.5 } };
+  // ink id (OLED.INK) -> palette key; index = id
+  const INK_PALETTE = ['neutral', 'good', 'warn', 'bad', 'dim', 'warn'];
+  const inkColour = id => PALETTE[INK_PALETTE[id] || 'neutral'];
+
+  // source index -> destination span, along one axis: `n` source pixels scaled by `factor`, centred in `size`; { start, width } each
+  function spans(n, factor, size) {
+    const total = Math.round(n * factor), offset = Math.floor((size - total) / 2);
+    return Array.from({ length: n }, (_, i) => { const a = Math.floor(i * factor), b = Math.floor((i + 1) * factor); return { start: offset + a, width: b - a }; });
+  }
+  function geometry(key) {
+    const s = SCALINGS[key];
+    if (!s) throw new Error('Lcd2: unknown scaling ' + key);
+    const cols = spans(SRC_W, s.factor, W), rows = spans(SRC_H, s.factor, H);
+    const top = rows[0].start, bottom = rows[SRC_H - 1].start + rows[SRC_H - 1].width;
+    return { cols, rows, bands: { top: { y: 0, h: top }, bottom: { y: bottom, h: H - bottom } } };
+  }
+
+  // the RGB of every source pixel: unlit = background, lit = the colour of its ink id (neutral when ink is missing or 0)
+  function pixels(fb, ink) {
+    const out = new Uint8Array(SRC_W * SRC_H * 3);
+    for (let i = 0; i < fb.length; i++) {
+      const col = fb[i] ? inkColour(ink ? ink[i] : 0) : PALETTE.bg;
+      out[3 * i] = col[0]; out[3 * i + 1] = col[1]; out[3 * i + 2] = col[2];
+    }
+    return out;
+  }
+
+  // paints the 320 x 240 canvas: the 1-bit framebuffer scaled, coloured by its ink plane; the bands stay black. img is a W x H ImageData.
+  function paint(ctx2d, img, fb, ink, key) {
+    const g = geometry(key), px = pixels(fb, ink), d = img.data;
+    for (let i = 0; i < W * H; i++) { d[4 * i] = PALETTE.bg[0]; d[4 * i + 1] = PALETTE.bg[1]; d[4 * i + 2] = PALETTE.bg[2]; d[4 * i + 3] = 255; }
+    for (let sy = 0; sy < SRC_H; sy++) {
+      const r = g.rows[sy];
+      for (let sx = 0; sx < SRC_W; sx++) {
+        const cl = g.cols[sx], p = 3 * (sy * SRC_W + sx);
+        for (let dy = r.start; dy < r.start + r.width; dy++) for (let dx = cl.start; dx < cl.start + cl.width; dx++) {
+          const o = 4 * (dy * W + dx);
+          d[o] = px[p]; d[o + 1] = px[p + 1]; d[o + 2] = px[p + 2];
+        }
+      }
+    }
+    ctx2d.putImageData(img, 0, 0);
+  }
+
+  // WCAG 2.x contrast ratio of two RGB colours
+  function luminance(rgb) {
+    const lin = v => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+  }
+  function contrast(a, b) {
+    const la = luminance(a), lb = luminance(b), hi = Math.max(la, lb), lo = Math.min(la, lb);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  return { W, H, PALETTE, INK_PALETTE, SCALINGS, inkColour, spans, geometry, pixels, paint, contrast };
 })();
 </script>
 <script>
@@ -1986,12 +2152,16 @@ const Stick = (() => {
     const level = h && h.level !== null ? h.level : FLOOR_DB;
     const barLead = st ? num(st.bar_lead) : null, barState = st && st.bar ? st.bar : null;
     const net = g.net === 'wifi' ? 1 : 0;
+    // the signal for the lcd2's bars: Wi-Fi client = the router's RSSI (status wifi_rssi), jank = the best peer's (status rssi); 0 = none
+    // heard; null = the stick has not said (no fresh status). Nothing is made up.
+    const wifiMode = !!(h && h.net && h.net.kind === 'wifi');
+    const rssiRaw = st ? num(wifiMode ? st.wifi_rssi : st.rssi) : null, rssi = wifiMode && !h.net.up ? 0 : rssiRaw;
     const wifiBars = h && h.net && h.net.kind === 'wifi' && !h.net.up ? 'none' : st && num(st.rssi) !== null && num(st.rssi) !== 0 ? (num(st.rssi) > -70 ? 'good' : 'weak') : 'unknown';
     return {
       link: !audio, bpm: audio && h.bpm > 0 ? h.bpm : null, linkBpm: !audio && h && h.bpm > 0 ? h.bpm : null, mode: 'steady',
-      conf: h && h.conf !== null ? h.conf / 100 : 0, confHold: !!(h && h.confHold), th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
+      conf: h && h.conf !== null ? h.conf / 100 : 0, confKnown: !!h && h.conf !== null, rssi, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
       confStop: g.lowconf !== 'run', levelDb: level, levelMin: h && h.levelMin !== null ? h.levelMin : FLOOR_DB, levelMax: h && h.levelMax !== null ? h.levelMax : FLOOR_DB,
-      silent: level < SILENCE_DB, gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped', playing, running: playing, armed,
+      silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
       peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0,
@@ -2088,7 +2258,12 @@ const Stick = (() => {
     }
   }
   const releaseAll = (m, now) => { for (const b of Object.keys(m.held)) up(m, b, now); };
-  const framebuffer = (m, now) => { const fb = new Uint8Array(OLED.W * OLED.H); OLED.draw(fb, m.ui, m.getCtx(now), now); return fb; };
+  // ink: an optional Uint8Array(OLED.W * OLED.H) the colour screen (ui/lcd2.js) passes: it gets the lcd2 layout and its ink plane filled
+  const framebuffer = (m, now, ink) => {
+    const fb = new Uint8Array(OLED.W * OLED.H), c = m.getCtx(now);
+    OLED.draw(fb, m.ui, ink ? { ...c, layout: 'lcd2' } : c, now, ink);
+    return fb;
+  };
 
   return { KEY_BTN, KEY_HINT, REPEAT, PHASE, BEAT_DELAY_KEY, BEAT_DELAY_MAX, createPhase, phaseReport, phaseFeed, phaseAt, beatDelayEstimate, parseDelay, ctx, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, framebuffer };
 })();
@@ -2563,15 +2738,32 @@ const Player = (() => {
   };
 
   const paintArms = () => { for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", model.held[b]); };
+  // the screen of the box: the colour landscape LCD (ui/lcd2.js, scaled x2) for every stick, whatever its board; ?screen=oled shows the old
+  // black and white 2.42 in OLED
+  const params = new URLSearchParams(location.search);
+  const LCD2_SCALING = "2";
+  let screen = "";
+  function applyScreen() {
+    const wanted = params.get("screen") === "oled" ? "2.42" : "lcd2";
+    if (wanted === screen) return;
+    screen = wanted;
+    Face.placeScreen(svg, screen);
+    Face.showLeds(svg, screen);
+    el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
+    el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
+  }
   function draw() {
     frame = requestAnimationFrame(draw);
     const now = performance.now(), ctx2d = el("oled").getContext("2d");
+    applyScreen();
     if (S.homeAt !== seenHomeAt) {
       seenHomeAt = S.homeAt;
       phase = Stick.phaseFeed(phase, Stick.phaseReport(S.lastHome), S.homeAt);
     }
     Stick.tick(model, now);
-    Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), Stick.framebuffer(model, now), 100);
+    const ink = screen === "lcd2" ? new Uint8Array(OLED.W * OLED.H) : null, fb = Stick.framebuffer(model, now, ink);
+    if (screen === "lcd2") Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), fb, ink, LCD2_SCALING);
+    else Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), fb, 100);
     paintArms();
   }
   const pressDown = (b) => { if (model) Stick.down(model, b, performance.now()); };
@@ -2630,7 +2822,7 @@ const Player = (() => {
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });
 
-  Face.placeScreen(svg, "2.42");
+  applyScreen();
   // the keys are only a tooltip and a label: no text around the drawing; its viewBox is cropped to the box with its jacks and ports
   svg.setAttribute("viewBox", "-8.5 -6 87 80.5");
   svg.setAttribute("aria-label", Stick.KEY_HINT);
