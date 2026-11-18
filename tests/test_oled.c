@@ -4,10 +4,9 @@
  * setter calls made. This replays each case through jo_press / jo_input_* and jo_draw and wants 0 differing pixels and
  * the same calls.
  *
- * The colour layout (lcd2): tests/oled_ref/cases_ink.txt (gen_ink.js runs ui/oled.js with ctx.layout 'lcd2') holds the 1-bit
- * frame and the ink plane of each case; jo_draw_ink must draw both exactly. And every frame of cases.txt that is not a HOME
- * frame is drawn again with the lcd2 layout on: the same pixels, an empty ink plane (menus, edit, network and setup screens stay
- * neutral, the OLED boards' bytes untouched). Usage: test_oled CASES_TXT [CASES_INK_TXT] */
+ * The lcd2 layout: tests/oled_ref/cases_ink.txt (gen_ink.js runs ui/oled.js with ctx.layout 'lcd2', its own 160 x 120 grid) holds
+ * the 1-bit frame and the ink plane of each case, and the setter calls; jo_press and jo_draw_lcd2 must draw both exactly and make the same
+ * calls. Usage: test_oled CASES_TXT [CASES_INK_TXT] */
 #include "jank_oled.h"
 #include "jank_oled_int.h"
 #include <stdarg.h>
@@ -19,7 +18,6 @@ static int s_fail, s_checks;
 struct stats {
     int cases, frames, bad_frames;
     int ink_frames, ink_bad, ink_lit;     /* ink planes compared pixel by pixel; those with a differing pixel; lit ink pixels seen */
-    int neutral_frames;                   /* non-HOME frames re-drawn with the lcd2 layout */
 };
 #define CHECK(c, ...)                                                    \
     do {                                                                 \
@@ -33,7 +31,7 @@ struct stats {
     } while (0)
 
 static const char *const FIELD_NAMES[JO_F_COUNT] = {"netmode", "inoff", "out0", "out1", "out2", "rate", "threshold", "gain", "ltmode", "bright",
-                                                    "sleep", "group", "lowconf", "insrc", "usbrole", "autobar", "ssid", "pass", "appass", "apname"};
+                                                    "sleep", "group", "lowconf", "insrc", "usbrole", "autobar", "ble", "usbmidi", "beatflash", "ssid", "pass", "appass", "apname"};
 
 /* one case's world, as gen_cases.js's world(): the state the setters change, and the log of calls */
 struct world {
@@ -82,7 +80,10 @@ static void set_field(void *user, enum jo_field f, int v)
     case JO_F_GROUP: c->net.group = (uint8_t)(v + 1); break;
     case JO_F_INSRC: c->in_src = (uint8_t)v; break;
     case JO_F_USBROLE: c->usb_role = (uint8_t)v; break;
-    case JO_F_AUTOBAR: c->auto_bar = v == 1; break;
+    case JO_F_AUTOBAR: c->auto_bar = (uint8_t)v; break;
+    case JO_F_BLE: c->ble_mode = (uint8_t)v; break;
+    case JO_F_USBMIDI: c->usb_midi = (uint8_t)v; break;
+    case JO_F_BEATFLASH: c->beat_flash = (uint8_t)v; break;
     default: break;
     }
     c->setup = c->net.mode == 3;
@@ -215,6 +216,16 @@ static void parse_state(struct jo_ctx *c, const char *key, const char *v)
     else if (!strcmp(key, "silent")) c->silent = (uint8_t)atoi(v);
     else if (!strcmp(key, "gated")) c->gated = (uint8_t)atoi(v);
     else if (!strcmp(key, "confHold")) c->conf_hold = (uint8_t)atoi(v);
+    else if (!strcmp(key, "fold")) {
+        double f = strtod(v, NULL);
+        c->fold_exp = f == 2.0 ? 1 : f == 4.0 ? 2 : f == 0.5 ? -1 : f == 0.25 ? -2 : 0;
+    } else if (!strcmp(key, "bleMode")) c->ble_mode = (uint8_t)atoi(v);
+    else if (!strcmp(key, "blePhone")) c->ble_phone = (uint8_t)atoi(v);
+    else if (!strcmp(key, "bleLeft")) {
+        parse_num(v, &c->has_ble_left, &d);
+        c->ble_left = (int)d;
+    } else if (!strcmp(key, "usbMidi")) c->usb_midi = (uint8_t)atoi(v);
+    else if (!strcmp(key, "beatFlash")) c->beat_flash = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.mode")) n->mode = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.prev")) n->prev = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.group")) n->group = (uint8_t)atoi(v);
@@ -240,21 +251,48 @@ static enum jo_btn btn_of(char ch) { return ch == 'U' ? JO_UP : ch == 'D' ? JO_D
 
 static int hexval(char h) { return h <= '9' ? h - '0' : h - 'a' + 10; }
 
-/* the frame against the emulator's: the differing pixels, and the first one printed */
-static int compare(const uint8_t *fb, const char *hex, const char *name, unsigned long t)
+/* a frame as the reference file has it: hex, or runs "hh:length,..." of one byte (gen_ink.js): the page bytes, -1 when it is not a whole frame */
+static int decode_pages(const char *s, uint8_t *pages, int nbytes)
 {
-    int diff = 0, fx = -1, fy = -1;
-    if (strlen(hex) < 2u * JO_FB_BYTES) {
-        CHECK(0, "%s: short frame", name);
-        return JO_W * JO_H;
+    int n = 0;
+    if (!strchr(s, ':')) {
+        if ((int)strlen(s) < 2 * nbytes)
+            return -1;
+        for (; n < nbytes; n++)
+            pages[n] = (uint8_t)(hexval(s[2 * n]) << 4 | hexval(s[2 * n + 1]));
+        return 0;
     }
-    for (int i = 0; i < JO_FB_BYTES; i++) {
-        uint8_t want = (uint8_t)(hexval(hex[2 * i]) << 4 | hexval(hex[2 * i + 1])), x = want ^ fb[i];
+    while (*s) {
+        char *end;
+        long v = strtol(s, &end, 16), len;
+        if (*end != ':' || v < 0 || v > 255)
+            return -1;
+        len = strtol(end + 1, &end, 10);
+        if (len <= 0 || n + len > nbytes)
+            return -1;
+        memset(pages + n, (int)v, (size_t)len);
+        n += (int)len;
+        s = *end == ',' ? end + 1 : end;
+    }
+    return n == nbytes ? 0 : -1;
+}
+
+/* the frame against the emulator's: the differing pixels, and the first one printed */
+static int compare(const uint8_t *fb, const char *ref, int width, int nbytes, const char *name, unsigned long t)
+{
+    uint8_t want[JO_LCD2_FB_BYTES];
+    int diff = 0, fx = -1, fy = -1;
+    if (decode_pages(ref, want, nbytes) != 0) {
+        CHECK(0, "%s: short frame", name);
+        return width * nbytes / width * 8;
+    }
+    for (int i = 0; i < nbytes; i++) {
+        uint8_t x = want[i] ^ fb[i];
         for (int b = 0; b < 8; b++)
             if (x >> b & 1) {
                 if (!diff) {
-                    fx = i % JO_W;
-                    fy = (i / JO_W) * 8 + b;
+                    fx = i % width;
+                    fy = (i / width) * 8 + b;
                 }
                 diff++;
             }
@@ -273,25 +311,25 @@ static int decode_ink(const char *runs, uint8_t *plane)
         if (*end != ':' || id < 0 || id >= JO_INK_IDS)
             return -1;
         len = strtol(end + 1, &end, 10);
-        if (len <= 0 || n + len > JO_INK_BYTES)
+        if (len <= 0 || n + len > JO_LCD2_INK_BYTES)
             return -1;
         memset(plane + n, (int)id, (size_t)len);
         n += (int)len;
         runs = *end == ',' ? end + 1 : end;
     }
-    return n == JO_INK_BYTES ? 0 : -1;
+    return n == JO_LCD2_INK_BYTES ? 0 : -1;
 }
 
 static int compare_ink(const uint8_t *ink, const uint8_t *want, const char *name, unsigned long t)
 {
     int diff = 0, first = 0;
-    for (int i = 0; i < JO_INK_BYTES; i++)
+    for (int i = 0; i < JO_LCD2_INK_BYTES; i++)
         if (ink[i] != want[i]) {
             if (!diff)
                 first = i;
             diff++;
         }
-    CHECK(diff == 0, "%s at t=%lu: %d ink pixels differ (first at x %d, y %d: C %d, ui/oled.js %d)", name, t, diff, first % JO_W, first / JO_W,
+    CHECK(diff == 0, "%s at t=%lu: %d ink pixels differ (first at x %d, y %d: C %d, ui/oled.js %d)", name, t, diff, first % JO_LCD2_W, first / JO_LCD2_W,
           ink[first], want[first]);
     return diff;
 }
@@ -299,30 +337,18 @@ static int compare_ink(const uint8_t *ink, const uint8_t *want, const char *name
 static int count_lit(const uint8_t *ink)
 {
     int n = 0;
-    for (int i = 0; i < JO_INK_BYTES; i++)
+    for (int i = 0; i < JO_LCD2_INK_BYTES; i++)
         n += ink[i] != 0;
     return n;
 }
 
-static void dump(const uint8_t *fb)
+static void dump(const uint8_t *fb, int width, int height)
 {
-    for (int y = 0; y < JO_H; y++) {
-        for (int x = 0; x < JO_W; x++)
-            fputc(jo_get(fb, x, y) ? '#' : '.', stderr);
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++)
+            fputc((fb[(y >> 3) * width + x] >> (y & 7)) & 1 ? '#' : '.', stderr);
         fputc('\n', stderr);
     }
-}
-
-/* the lcd2 layout on a screen that is not HOME: the OLED's own frame, no ink */
-static void check_neutral(const struct jo_ui *ui, struct jo_ctx c, const uint8_t *oled_fb, const char *name, unsigned long t, struct stats *st)
-{
-    uint8_t fb[JO_FB_BYTES], ink[JO_INK_BYTES];
-    memset(ink, 9, sizeof ink);
-    c.layout_lcd2 = 1;
-    jo_draw_ink(fb, ink, ui, &c, (uint32_t)t);
-    CHECK(!memcmp(fb, oled_fb, sizeof fb), "%s at t=%lu: the lcd2 layout changed a screen that is not HOME", name, t);
-    CHECK(count_lit(ink) == 0, "%s at t=%lu: ink on a screen that is not HOME", name, t);
-    st->neutral_frames++;
 }
 
 static void run_cases(const char *path, struct stats *st)
@@ -336,7 +362,7 @@ static void run_cases(const char *path, struct stats *st)
     struct jo_ops ops = {&w, tempo_step, set_field, set_text, set_hold, link_start_stop, shift_beats};
     struct jo_host host = {&ops, host_ctx};
     int want_log = 0, dumped = 0;
-    uint8_t fb[JO_FB_BYTES], ink[JO_INK_BYTES], want_ink[JO_INK_BYTES];
+    static uint8_t fb[JO_LCD2_FB_BYTES], ink[JO_LCD2_INK_BYTES], want_ink[JO_LCD2_INK_BYTES];
     if (!f) {
         CHECK(0, "cannot open %s", path);
         return;
@@ -378,15 +404,15 @@ static void run_cases(const char *path, struct stats *st)
             }
             jo_input_tick(&in, &ui, (uint32_t)t, &host);
             st->frames++;
-            if (runs) {                       /* an ink case: the frame (unless '-') and the plane */
+            if (runs) {                       /* an lcd2 case: the frame and the plane */
                 CHECK(decode_ink(runs, want_ink) == 0, "%s: bad ink runs", name);
                 memset(ink, 9, sizeof ink);
-                jo_draw_ink(fb, ink, &ui, &w.c, (uint32_t)t);
-                if (strcmp(hex + 1, "-") && compare(fb, hex + 1, name, t)) {
+                jo_draw_lcd2(fb, ink, &ui, &w.c, (uint32_t)t);
+                if (compare(fb, hex + 1, JO_LCD2_W, JO_LCD2_FB_BYTES, name, t)) {
                     st->bad_frames++;
                     if (!dumped++) {
                         fprintf(stderr, "C frame of %s at %lu:\n", name, t);
-                        dump(fb);
+                        dump(fb, JO_LCD2_W, JO_LCD2_H);
                     }
                 }
                 st->ink_frames++;
@@ -395,15 +421,13 @@ static void run_cases(const char *path, struct stats *st)
                 continue;
             }
             jo_draw(fb, &ui, &w.c, (uint32_t)t);
-            if (compare(fb, hex + 1, name, t)) {
+            if (compare(fb, hex + 1, JO_W, JO_FB_BYTES, name, t)) {
                 st->bad_frames++;
                 if (!dumped++) {
                     fprintf(stderr, "C frame of %s at %lu:\n", name, t);
-                    dump(fb);
+                    dump(fb, JO_W, JO_H);
                 }
             }
-            if (ui.screen != JO_HOME || w.c.setup || w.c.boot || w.c.splash)
-                check_neutral(&ui, w.c, fb, name, t, st);
         } else if (sscanf(line, "press %c %lu", &b, &t) == 2) {
             jo_input_tick(&in, &ui, (uint32_t)t, &host);
             jo_press(&ui, btn_of(b), (uint32_t)t, &w.c, &ops);
@@ -455,10 +479,9 @@ int main(int argc, char **argv)
     }
     run_cases(argv[1], &oled);
     CHECK(oled.cases >= 100 && oled.frames >= 380, "only %d cases, %d frames", oled.cases, oled.frames);
-    CHECK(oled.neutral_frames >= 200, "only %d non-HOME frames re-drawn with the lcd2 layout", oled.neutral_frames);
     if (argc > 2) {
         run_cases(argv[2], &colour);
-        CHECK(colour.cases >= 80 && colour.ink_frames >= 80 && colour.ink_lit > 20000, "only %d ink cases, %d planes, %d lit ink pixels", colour.cases,
+        CHECK(colour.cases >= 180 && colour.ink_frames >= 400 && colour.ink_lit > 100000, "only %d ink cases, %d planes, %d lit ink pixels", colour.cases,
               colour.ink_frames, colour.ink_lit);
     }
     if (s_fail) {
@@ -467,8 +490,7 @@ int main(int argc, char **argv)
         return 1;
     }
     printf("test_oled: %d cases, %d frames, 0 differing pixels against the emulator; %d checks\n", oled.cases, oled.frames, s_checks);
-    printf("test_oled: lcd2 layout: %d non-HOME frames of those unchanged with an empty ink plane; %d ink cases, %d frames and %d ink planes (%d pixels "
-           "each, %d lit ink pixels) identical to ui/oled.js\n",
-           oled.neutral_frames, colour.cases, colour.frames, colour.ink_frames, JO_INK_BYTES, colour.ink_lit);
+    printf("test_oled: lcd2 layout (%d x %d): %d cases, %d frames and %d ink planes (%d pixels each, %d lit ink pixels) identical to ui/oled.js\n", JO_LCD2_W,
+           JO_LCD2_H, colour.cases, colour.frames, colour.ink_frames, JO_LCD2_INK_BYTES, colour.ink_lit);
     return 0;
 }

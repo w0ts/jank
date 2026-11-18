@@ -18,7 +18,7 @@ done
 # player.html's code in node; PLAYER_HTML set = make the cases again from it and check they are the ones kept here), and
 # the LED language of a unit without a screen. No contraction into fused multiply-adds: the emulator's numbers are
 # JavaScript's, rounded after each operation.
-OLED="$HERE/core/jank_oled_gfx.c $HERE/core/jank_oled_menu.c $HERE/core/jank_oled_press.c $HERE/core/jank_oled_draw.c $HERE/core/jank_oled_qr.c $HERE/core/jank_oled_input.c"
+OLED="$HERE/core/jank_oled_gfx.c $HERE/core/jank_oled_menu.c $HERE/core/jank_oled_press.c $HERE/core/jank_oled_draw.c $HERE/core/jank_oled_lcd2.c $HERE/core/jank_oled_qr.c $HERE/core/jank_oled_input.c"
 if [ -n "${PLAYER_HTML:-}" ]; then
     node "$HERE/tests/oled_ref/gen_cases.js" "$PLAYER_HTML" > "$OUT/oled_cases.txt"
     cmp "$OUT/oled_cases.txt" "$HERE/tests/oled_ref/cases.txt" || { echo "oled: tests/oled_ref/cases.txt is not what $PLAYER_HTML draws: make it again"; exit 1; }

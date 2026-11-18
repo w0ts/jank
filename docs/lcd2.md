@@ -80,19 +80,22 @@ measured on the panel: the colours as it shows them, its gamma and viewing angle
 
 ## Drawing
 
-Integer scale **2**: the 128 x 64 frame becomes 256 x 128, centred at x 32, y 56 on the 320 x 240 screen; the rest is
-black. Chosen because every UI pixel stays a square. Scale 2.5 would fill 320 x 160 (the
-full width) but needs rows alternately 2 and 3 pixels tall and columns alternately 2 and 3 wide, so strokes would look
-uneven; if a bigger picture is wanted, that is the cost. The scaler is `core/jank_lcd.c` (host-tested,
-`tests/test_lcd.c`).
+The lcd2 layout has its own 160 x 120 grid (ui/oled.js, `ctx.layout 'lcd2'`; C: `core/jank_oled_lcd2.c`, `jo_draw_lcd2`), painted **exactly x2**
+on 320 x 240: no bands, no centring (`core/jank_lcd.c`, host-tested in `tests/test_lcd.c`). The frame is 160 x 120 bits (2.4 KB, page
+layout), the ink plane 160 x 120 bytes (19.2 KB). Colours: the palette in `core/jank_lcd.h` (`JLC_PALETTE`, `JLC_INK_MAP`,
+`JLC_FLASH_FIELD`), checked against `ui/lcd2.js` by `tests/test_lcd_palette.js`, converted to RGB565 once. Nothing is measured on the panel
+(colours as shown, gamma, viewing angle).
 
-Sending: 4 destination rows (2.5 KB) per DMA chunk, two chunk buffers in internal RAM (5 KB), only the frame pages that
-changed (pixels or ink; a page is 16 destination rows; the first frame sends all 240 rows). SPI clock 40 MHz (the
-demo uses 80 MHz; half leaves margin on a board nobody here has measured). The task runs on core 0 at priority 1; the MIDI
-clock's interrupt lives on core 1 (docs/midi.md).
+BEAT FLASH (setting `beat_flash`, 0 BOXES / 1 SCREEN; `get`, `set`, `help`, stored in the `usb1` blob as its 8th byte, older blobs keep 0; the
+lcd2 menu item after DISPLAY): while the screen is HOME with the setting on SCREEN and the transport running, `lcd.c` asks the session for its
+beat (`bridge_beat`) and decides with `jk_flash_at` (core/jank_core.c: the LED's own window, 80 ms, 150 ms for the bar's first beat, at most a
+third of a beat). During a flash the field is the flash colour and every lit pixel near-black. The task sleeps to the next beat and sends the whole
+frame about every 33 ms while a flash lasts (153.6 KB, 31 ms of bus at 40 MHz), otherwise only the changed 16-row strips. SPI clock 40 MHz; the
+task runs on core 0 at priority 1.
 
-Ink planes: four of 8 KB (the UI's, the pending one, the one being sent, the one shown), allocated from PSRAM when there is one, else
-internal RAM (32 KB). Whether they land in PSRAM was not observed (never run); the linked image has 0 bytes of them in .bss.
+RAM (from the linked image): the three frames 3 x 2.4 KB and the DMA chunk buffers 5 KB are internal `.bss` / `.data`; the four ink planes
+(UI, pending, being sent, shown: 76.8 KB) are heap, from PSRAM when the board has it (else internal, where the allocation may fail). Not
+observed: whether they land in PSRAM.
 
 ## UNVERIFIED
 
