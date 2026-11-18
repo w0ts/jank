@@ -36,7 +36,7 @@ XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens
 
 ## v7: what changed (owner review of the live screen)
 
-1. **Big tempo digits**: a bitmap font of its own (`ui/bigfont.js`), 3 candidate styles, default B; `?digits=a|b|c` on the page.
+1. **Big tempo digits**: a bitmap font of its own (`ui/bigfont.js`), 3 candidate styles, default A (the owner's choice); `?digits=a|b|c` on the page.
 2. **Status icons** redrawn 11 px high and right-aligned; `GRP n` and the transport icon on the left.
 3. **`BPM` label removed**; the tempo is left aligned and the area to its right stays empty.
 4. **INPUT is a VU meter** with a colour gradient along the bar, a -50 dBFS notch and a peak-hold tick; smooth or segmented (`?vu=smooth|seg`).
@@ -73,7 +73,7 @@ lies in a gap, and that no two texts of a line touch (the widest signal text `-1
 | spacing | 3 dark columns between two glyphs, none before the first or after the last; nothing else (no kerning) |
 | table | one string per glyph, 35 rows of `#` / `.` joined by `|`; `BigFont.STYLES[style][glyph]` is the array of rows; `BigFont.width(style, text)` and `BigFont.draw(plot, style, text, x, y)` |
 | text | `bpm.toFixed(1)` (`120.0`, `98.4`, `999.9`), or `---` when there is no tempo (three dashes) |
-| select | `ctx.digits` = `'a'`, `'b'` or `'c'`; anything else is the default `BigFont.DEFAULT_STYLE` (`b`) |
+| select | `ctx.digits` = `'a'`, `'b'` or `'c'`; anything else is the default `BigFont.DEFAULT_STYLE` (`a`, the owner's choice) |
 
 | style | look | stroke | widths of `120.0` |
 |---|---|---|---|

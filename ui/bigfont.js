@@ -7,7 +7,7 @@
      B  humanist rounded stroke: 4.6 px strokes (round caps), the ovals and bowls of a rounded sans
      C  bold geometric: 5.8 px strokes, flat cuts at the cell edges, circular bowls */
 const BigFont = (() => {
-  const ROWS = 35, GAP = 3, DEFAULT_STYLE = 'b';
+  const ROWS = 35, GAP = 3, DEFAULT_STYLE = 'a';
   const SRC = {
   // A: rounded 7-segment
   a: {

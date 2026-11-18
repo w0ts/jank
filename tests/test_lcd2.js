@@ -144,7 +144,7 @@ const full = drawn(ctxOf({ ctx: barOn }));
 {
   const STY = BigFont.STYLES, GL = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '.'];
   eq(Object.keys(STY), ['a', 'b', 'c'], 'three candidate styles A, B, C, the default is ' + BigFont.DEFAULT_STYLE);
-  eq(BigFont.DEFAULT_STYLE, 'b', 'the default style is B');
+  eq(BigFont.DEFAULT_STYLE, 'a', 'the default style is A');
   for (const k of Object.keys(STY)) {
     eq(Object.keys(STY[k]).sort(), [...GL].sort(), 'style ' + k + ': the glyphs 0-9, "." and "-", complete');
     for (const ch of GL) {
