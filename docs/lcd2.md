@@ -59,7 +59,7 @@ Source of truth: `hardware/jank-mini-3/parts.py` GPIO. The board routes clean wi
 | In board.h (lcd2) | GPIO |
 |---|---|
 | BTN_UP | 12 |
-| BTN_DOWN | 18 |
+| BTN_DOWN (to GND; GPIO21 has the LCD-2's own 4.7 k pull-up, which a button does not mind) | 21 |
 | BTN_YES | 14 |
 | BTN_NO (`BOARD_BTN_NO2_GPIO`, beside BOOT) | 9 |
 | MIDI TX | 15 |
@@ -74,7 +74,7 @@ Source of truth: `hardware/jank-mini-3/parts.py` GPIO. The board routes clean wi
 | MIDI_TX2 | 11 |
 | CLK out | 13 |
 | HOST_EN (output, idles low) | 17 |
-| LIN_DET (the LCD-2 has a 4.7 k pull-up on it: fine for a detect to GND) | 21 |
+| LIN_DET (line in plug detect; moved off 21: the LCD-2's 4.7 k pull-up overpowered its divider) | 18 |
 | spares | 6, 16, 47, 48 |
 
 The buttons are plain inputs to GND with the internal pull-ups. On the bare Waveshare board nothing is wired to these pins,
