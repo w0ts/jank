@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The front end's cheap stages against their exact references (core/beat/jb_fe.c, built with JB_FE_STAGES): the magnitude stage's
- * sqrt, on its own over the float range and on the frames of a synthetic signal, and the 81-band log-mel features and the
+ * sqrt and the bands' log10, each on its own over the range they see and on the frames of a synthetic signal, and the 81-band log-mel features and the
  * network's activations of the whole pipeline with the cheap stages against the same pipeline with libm's. Exit status: the
  * number of failed checks.
  *
@@ -40,6 +40,22 @@ static void test_sqrt(void)
     printf("fast sqrt: max relative error %.3g over 1e-38 .. 1e15\n", worst);
 }
 
+static void test_log10(void)
+{
+    double worst = 0.0;
+    for (double lx = 0.0; lx <= 5.0; lx += 0.00002) {             /* 1 + x from 1 to 1e5: a full-scale tone's bin is about 1e3 */
+        float v = (float)pow(10.0, lx);
+        worst = fmax(worst, fabs((double)jb_fe_fast_log10(v) - log10((double)v)));
+    }
+    for (int i = 0; i < 2000000; ++i) {                           /* 1 + small x: where 1.0f + s has few bits */
+        float v = 1.0f + (float)i * 1e-7f;
+        worst = fmax(worst, fabs((double)jb_fe_fast_log10(v) - log10((double)v)));
+    }
+    CHECK(jb_fe_fast_log10(1.0f) == 0.0f);
+    CHECK(worst < 6e-7);
+    printf("fast log10: max absolute error %.3g over 1 .. 1e5 (libm's log10f: 2.4e-7 there)\n", worst);
+}
+
 /* ---- the whole pipeline, cheap stages against exact ones ---- */
 static uint32_t s_rng = 99u;
 static float rnd(void)
@@ -74,7 +90,10 @@ static void features(struct jb_fe *fe, int frame, int exact, float *feat)
         jb_fe_stage_split_ref(fe->buf, mag);
     else
         jb_fe_stage_split(fe->buf, mag);
-    jb_fe_stage_bands(fe, mag, feat);
+    if (exact)
+        jb_fe_stage_bands_ref(fe, mag, feat);
+    else
+        jb_fe_stage_bands(fe, mag, feat);
 }
 
 static void test_pipeline(void)
@@ -114,6 +133,7 @@ static void test_pipeline(void)
 int main(void)
 {
     test_sqrt();
+    test_log10();
     test_pipeline();
     printf("%d checks, %d failed\n", checks, fails);
     return fails;

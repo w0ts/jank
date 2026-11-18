@@ -10,6 +10,14 @@
 static float s_win[N2];                /* np.hanning(2048), the first half: it is symmetric */
 static float s_cos[N2], s_sin[N2];     /* exp(-2 pi i k / 2048), k < 1024 */
 static uint8_t s_ready;
+/* The filterbank weights (beat_fb_val, in flash) in internal RAM: the firmware (not the lcd2, which has no RAM to spare) defines
+ * JB_FB_IN_RAM and tables() copies them once; every hop reads all 1428, through the flash cache otherwise. */
+#ifdef JB_FB_IN_RAM
+static float s_fbram[BEAT_FB_NNZ];
+#define FB_VAL s_fbram
+#else
+#define FB_VAL beat_fb_val
+#endif
 static int s_maxbin;                   /* the highest bin any filter reads, plus one */
 
 static void tables(void)
@@ -26,6 +34,9 @@ static void tables(void)
             s_maxbin = beat_fb_start[j] + beat_fb_len[j];
 #ifdef JB_FFT_FAST
     jb_fft_fast_init();
+#endif
+#ifdef JB_FB_IN_RAM
+    memcpy(s_fbram, beat_fb_val, sizeof s_fbram);
 #endif
     s_ready = 1;
 }
@@ -115,8 +126,8 @@ STAGE void jb_fe_stage_window(struct jb_fe *fe)
 }
 
 /* sqrt(x) for x >= 0 with no libm: the integer trick's first guess of 1/sqrt(x) (0x5f375a86), two Newton steps, times x. The
- * relative error is under 4.8e-6 over every normal float (measured, tests/test_fe_approx.c) and sqrt(0) = 0; the software
- * sqrtf was about 100 cycles on the S3 and this is about a third of that. The 1/sqrt estimate of a denormal is finite, so no NaN. */
+ * relative error is under 4.8e-6 over every normal float (measured, tests/test_fe_approx.c) and sqrt(0) = 0; with the software
+ * sqrtf the whole stage took 154 cycles a bin on the S3 (measured, heat prof); with this: not yet measured. The 1/sqrt estimate of a denormal is finite, so no NaN. */
 STAGE_INLINE float jb_fe_fast_sqrt(float x)
 {
     union {
@@ -159,16 +170,41 @@ void jb_fe_stage_split_ref(const float *work, float *mag)
 }
 #endif
 
-/* the filterbank, log10(1 + x) and the positive difference to fe->prev, from the magnitudes; updates fe->prev */
-STAGE void jb_fe_stage_bands(struct jb_fe *fe, const float *mag, float *feat)
+/* log10(v) for v >= 1 (the bands' 1 + x) with no libm: v = 2^e m with m in [sqrt(1/2), sqrt(2)) from the float's bits, log10(m)
+ * = a degree-7 minimax polynomial in m - 1 (fitted to the interval, no constant term: log10(1) = 0 exactly), plus e log10(2).
+ * Absolute error under 6e-7 over 1 .. 1e5 (the front end's range; it grows with the exponent, 1.2e-6 at 1e12; measured,
+ * tests/test_fe_approx.c); filterbank + log10f took 798 cycles a band on the S3 (measured, heat prof); with this: not yet measured. */
+STAGE_INLINE float jb_fe_fast_log10(float v)
 {
-    const float *val = beat_fb_val;
+    union {
+        float f;
+        uint32_t u;
+    } x = {.f = v};
+    const uint32_t t = x.u - 0x3f3504f3u;                     /* 0x3f3504f3: the bits of sqrt(1/2) */
+    const int e = (int)t >> 23;
+    x.u = (t & 0x007fffffu) + 0x3f3504f3u;
+    const float f = x.f - 1.0f;
+    float p = 0.0513661071f;
+    p = p * f - 0.0820902702f;
+    p = p * f + 0.0894849595f;
+    p = p * f - 0.108058283f;
+    p = p * f + 0.144634387f;
+    p = p * f - 0.217155775f;
+    p = p * f + 0.434295892f;
+    return (float)e * 0.301029996f + p * f;
+}
+
+/* the filterbank, log10(1 + x) and the positive difference to fe->prev, from the magnitudes; updates fe->prev. exact: the
+ * flash weights and libm's log10f (the reference), else the RAM weights (JB_FB_IN_RAM) and jb_fe_fast_log10 */
+static inline void bands(struct jb_fe *fe, const float *mag, float *feat, int exact)
+{
+    const float *val = exact ? beat_fb_val : FB_VAL;
     for (int j = 0; j < BEAT_BANDS; ++j) {
         float s = 0.0f;
         for (int i = 0; i < beat_fb_len[j]; ++i)
             s += val[i] * mag[beat_fb_start[j] + i];
         val += beat_fb_len[j];
-        float lg = log10f(1.0f + s);
+        float lg = exact ? log10f(1.0f + s) : jb_fe_fast_log10(1.0f + s);
         float d = fe->have_prev ? lg - fe->prev[j] : 0.0f;
         feat[j] = lg;
         feat[BEAT_BANDS + j] = d > 0.0f ? d : 0.0f;
@@ -176,6 +212,18 @@ STAGE void jb_fe_stage_bands(struct jb_fe *fe, const float *mag, float *feat)
     }
     fe->have_prev = 1;
 }
+
+STAGE void jb_fe_stage_bands(struct jb_fe *fe, const float *mag, float *feat)
+{
+    bands(fe, mag, feat, 0);
+}
+
+#ifdef JB_FE_STAGES
+void jb_fe_stage_bands_ref(struct jb_fe *fe, const float *mag, float *feat)
+{
+    bands(fe, mag, feat, 1);
+}
+#endif
 
 static void frame_features(struct jb_fe *fe, float *feat)
 {
