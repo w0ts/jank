@@ -1,8 +1,8 @@
 ** Drc report for mini2.kicad_pcb **
-** Created on 2026-11-17T16:18:12 **
+** Created on 2026-11-17T18:12:05 **
 ** Report includes: Errors, Warnings, Exclusions **
 
-** Found 37 DRC violations **
+** Found 36 DRC violations **
 [track_dangling]: Track has unconnected end
     Local override; warning
     @(114.6340 mm, 161.4450 mm): Track [V5A] on F.Cu, length 0.1447 mm
@@ -12,9 +12,6 @@
 [track_dangling]: Track has unconnected end
     Local override; warning
     @(150.2792 mm, 158.0694 mm): Track [BTN_UP] on F.Cu, length 0.0486 mm
-[via_dangling]: Via is not connected or connected on only one layer
-    Local override; warning
-    @(151.9498 mm, 139.8143 mm): Via [BAT_P] on F.Cu - B.Cu
 [track_dangling]: Track has unconnected end
     Local override; warning
     @(142.6761 mm, 122.8937 mm): Track [HOST_EN] on F.Cu, length 0.0809 mm

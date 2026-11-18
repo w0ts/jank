@@ -5,6 +5,22 @@
 `case/` the case. Each stage's section supersedes the older ones where they differ (2, 1f, 1e, 1d, then 1c); "mini 2.2
 (stage 1)" and "1b" are superseded (the encoder and the RGB LEDs are gone); everything after them is mini 2's text.
 
+## Signoff3 (2026-11-17): round 3's fixes (`signoff2.py` again, `fatten.py`)
+
+- **R2:** R136 is now 22 k. V5A is 4.79 V nominal, 4.58 .. 4.99 V over tolerances (the 74AHCT04 needs 4.5 V).
+- **R3:** BAT_P / BAT_C / BAT_N widened up to 1 mm where room allows, with up to 3 vias at each layer change.
+- **R4:** C3 is now 22 uF 25 V 0805.
+- **R6:** the MIDI sinks Q10..Q13 are now AO3400A, which turn fully on from a 3.3 V gate.
+- **R8:** the cell divider R10 / R11 is now 1 M / 1 M. The board drains ~9 .. 17 uA while switched off, against ~50 uA
+  before. The cell reading then needs a firmware fix: board.h must read GPIO10, and the correction is affine, not an
+  offset (REVIEW.md section 9).
+- **R10:** R155's pads now sit 1.46 mm from the bottom edge (were 0.31 mm). R156, the same 1 ohm, is in parallel with
+  it (at x 2.2, y 61.5: the only free spot): the bulk's series resistance is now 0.5 ohm, so a stiff USB cable rings VREG
+  to ~5.3 V, not 5.8 V.
+- **After fitting a cell,** or if the board is dead on the cell: plug USB in once. The XB5353A may hold a new cell off
+  until a charger is connected, and also after a short.
+- **For storage, unplug the cell.** Even switched off, the board draws a few uA from it.
+
 ## Sign-off stage 2 (2026-11-17): applied to the routed board (`signoff2.py`)
 
 The stage-1 sign-off (`~/GitHub/jank/worktrees/mini22-review-scratch/REVIEW.md`) and its fixes:
