@@ -27,7 +27,6 @@ function extraState(s) {
   out.push('c autoBar ' + OLED.autoBarIndex(s.autoBar));
   out.push('c fold ' + s.fold);
   out.push('c usbMidi ' + s.usbMidi);
-  out.push('c beatFlash ' + (s.beatFlash ? 1 : 0));
 }
 
 // the runs of the plane: "id:length,id:length,..." in pixel order
@@ -56,7 +55,7 @@ function setters(s, log) {
     else if (f === 'netmode') { if (v === 3) { if (n.mode !== 3) n.prev = n.mode; n.mode = 3; } else n.mode = v; }
     else if (f === 'group') n.group = v + 1; else if (f === 'insrc') s.inSrc = v; else if (f === 'usbrole') s.usbRole = v;
     else if (f === 'autobar') s.autoBar = v; else if (f === 'usbmidi') s.usbMidi = v;
-    else if (f === 'beatflash') s.beatFlash = v; else if (f === 'ssid') n.ssid = v; else if (f === 'pass') n.pass = v;
+    else if (f === 'ssid') n.ssid = v; else if (f === 'pass') n.pass = v;
     else if (f === 'appass') n.appass = v; else if (f === 'apname') n.apName = v;
     else throw new Error('field ' + f);
   };
@@ -72,7 +71,7 @@ function setters(s, log) {
 // one case: a state, then steps ['draw', t] | ['press', btn, t]
 function scenario(name, edit, steps) {
   const s = Object.assign(baseState(), { rssi: -55, peakDb: -12, confKnown: true, silent: false, gated: false, confHold: false, fold: 1,
-                                         usbMidi: 0, beatFlash: 0, beatN: 0 });
+                                         usbMidi: 0, beatN: 0 });
   if (edit) edit(s);
   const log = [], set = setters(s, log);
   const ctx = () => Object.assign({}, s, { layout: 'lcd2', setup: s.net.mode === 3, qr: QR.encode('WIFI:S:' + s.net.setupName + ';T:nopass;;') }, set);
@@ -188,11 +187,11 @@ scenario('saved box', audio({ saved: true }), [draw(0)]);
 scenario('boot', audio({ boot: true }), [draw(0)]);
 scenario('splash', audio({ splash: true }), [draw(0)]);
 
-// ---- MENU: the 11 items with BEAT FLASH after DISPLAY, every row, every value ----
-const down10 = Array(10).fill('down');
+// ---- MENU: the 10 items, every row, every value ----
+const downAll = Array(9).fill('down');
 scenario('menu', null, [['press', 'no', 0], draw(1)]);
-scenario('menu walk', null, [['press', 'no', 0], draw(1), ...walk(down10, 10), ...walk(['down', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up'], 200)]);
-scenario('menu values', audio({ ltMode: 0, autoBar: 0, net: Object.assign(baseState().net, { mode: 1 }), usbRole: 1, usbMidi: 1, rate: 4, fitted: false, beatFlash: 1 }),
+scenario('menu walk', null, [['press', 'no', 0], draw(1), ...walk(downAll, 10), ...walk(['down', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up'], 200)]);
+scenario('menu values', audio({ ltMode: 0, autoBar: 0, net: Object.assign(baseState().net, { mode: 1 }), usbRole: 1, usbMidi: 1, rate: 4, fitted: false }),
          [['press', 'no', 0], draw(1)]);
 scenario('menu values 2', audio({ ltMode: 1, autoBar: 2, net: Object.assign(baseState().net, { mode: 2 }), rate: 0, batt: 7 }),
          [['press', 'no', 0], draw(1)]);
@@ -205,8 +204,6 @@ scenario('sub audio', audio({ gain: -7, th: 35 }), [...presses(['no', 'yes']), d
 scenario('sub audio keep running', audio({ confStop: false, inSrc: 3, gain: 12 }), [...presses(['no', 'yes']), draw(5), ...walk(['down', 'down'], 10)]);
 scenario('sub offsets', audio({ inOff: -100, offs: [50, -1, 0] }), [...presses([...menuItem(6), 'yes']), draw(10), ...walk(['down', 'down', 'down'], 20)]);
 scenario('sub display', audio({ bright: 10, sleep: 3 }), [...presses([...menuItem(8), 'yes']), draw(20), ...walk(['down'], 30)]);
-scenario('edit beat flash', null, [...presses([...menuItem(9), 'yes']), draw(10), ...walk(['up', 'up', 'down', 'down'], 20), ['press', 'yes', 80], draw(81)]);
-scenario('edit beat flash screen cancel', audio({ beatFlash: 1 }), [...presses([...menuItem(9), 'yes']), draw(10), ...walk(['down'], 20), ['press', 'no', 40], draw(41)]);
 scenario('edit usbmidi', null, [...presses([...menuItem(5), 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20), ['press', 'no', 60], draw(61)]);
 scenario('edit autobar', null, [...presses([...menuItem(2), 'yes']), draw(10), ...walk(['up', 'up', 'up', 'down', 'down'], 20), ['press', 'yes', 80], draw(81)]);
 scenario('edit autobar repick', audio({ autoBar: 2 }), [...presses([...menuItem(2), 'yes', 'yes']), draw(10)]);

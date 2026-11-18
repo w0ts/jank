@@ -42,7 +42,7 @@ void jo_icon(uint8_t *fb, const char *const *rows, int n, int x, int y);
 
 /* the menus */
 #define JO_MENU_ITEMS 9
-#define JO_MENU_ITEMS_LCD2 11
+#define JO_MENU_ITEMS_LCD2 10
 #define JO_VISIBLE 6
 #define JO_SETUP 3
 enum jo_item_kind { JO_ITEM_SUB, JO_ITEM_EDIT, JO_ITEM_NET, JO_ITEM_INFO };
@@ -51,7 +51,7 @@ struct jo_item {
     uint8_t kind, ref;                    /* the SUB's index, or the EDIT's field */
 };
 extern const struct jo_item jo_menu[JO_MENU_ITEMS];
-extern const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2];          /* the lcd2 layout's: 11 items, BEAT FLASH after DISPLAY */
+extern const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2];          /* the lcd2 layout's: 10 items */
 
 struct jo_spec {
     const char *title;
@@ -63,7 +63,7 @@ struct jo_spec {
     const char *const (*help)[2];         /* per choice, or one pair for a number */
 };
 const struct jo_spec *jo_spec(enum jo_field f);                       /* the OLED layout's */
-const struct jo_spec *jo_spec_l(enum jo_field f, int lcd2);            /* lcd2: its own AUTO BAR and SOURCE, and USB MIDI CLOCK, BEAT FLASH */
+const struct jo_spec *jo_spec_l(enum jo_field f, int lcd2);            /* lcd2: its own AUTO BAR and SOURCE, and USB MIDI CLOCK */
 int jo_spec_get(enum jo_field f, const struct jo_ctx *c);              /* by c->layout_lcd2 */
 void jo_edit_text(const struct jo_spec *sp, int v, char *out, size_t cap);
 void jo_help_of(const struct jo_spec *sp, int v, const char **h1, const char **h2);
@@ -91,7 +91,6 @@ extern const char *const jo_lt_short[3];
 extern const char *const jo_usb_names[2];
 extern const char *const jo_autobar_short[3];
 extern const char *const jo_off_on_names[2];                           /* ON, OFF: USB MIDI CLOCK */
-extern const char *const jo_beatflash_names[2];
 
 /* shared by the lcd2 layout's screens (jank_oled_lcd2.c) and the OLED's (jank_oled_draw.c) */
 extern const char *const *const jo_lt_icons[3];

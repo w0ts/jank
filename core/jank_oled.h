@@ -43,7 +43,6 @@ enum jo_field {
     JO_F_USBROLE,       /* 0 DEVICE, 1 HOST */
     JO_F_AUTOBAR,       /* 0 OFF, 1 ON (YES on ON again: picked again); the lcd2 layout: 0 OFF, 1 AT START, 2 ALWAYS */
     JO_F_USBMIDI,       /* the lcd2 layout's menu only: USB MIDI CLOCK, 0 ON, 1 OFF */
-    JO_F_BEATFLASH,     /* the lcd2 layout's menu only: 0 BOXES, 1 SCREEN */
     JO_F_EDITS,
     JO_F_SSID = JO_F_EDITS,
     JO_F_PASS,
@@ -137,7 +136,6 @@ struct jo_ctx {
     uint8_t silent, gated, conf_hold;     /* silence on the source; the outputs stopped for low confidence; the confidence holds */
     int8_t fold_exp;                      /* AUDIO's fold, 2^fold_exp: the label X2 X4 /2 /4 on HOME; 0 and anything else: none */
     uint8_t usb_midi;                     /* USB MIDI CLOCK: 0 ON, 1 OFF */
-    uint8_t beat_flash;                   /* BEAT FLASH: 0 BOXES, 1 SCREEN */
 };
 
 struct jo_edit {

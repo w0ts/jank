@@ -12,68 +12,27 @@
      good    (72, 222, 128)    green: joined, strong, high, charged
      warn    (255, 176, 32)    amber: fair, near the line, low; also the bar's first beat (the LED language's bar 1)
      bad     (255, 104, 92)    red: poor, below the line, clipping, empty
-     dim     (150, 156, 168)   grey: no signal, nothing heard, not reported
-   and, only while the BEAT FLASH setting is SCREEN and a beat flashes (see FLASH below), the two flash fields (FLASH_FIELD):
-     beat (214, 255, 226)      white-green: the field of an ordinary beat
-     bar  (255, 176, 32)       amber: the field of the bar's first beat (the LED language's bar 1)
-   During a flash the field is that colour and every lit pixel is near-black (the background colour), whatever its ink. */
+     dim     (150, 156, 168)   grey: no signal, nothing heard, not reported */
 const Lcd2 = (() => {
   const SRC_W = 160, SRC_H = 120, SCALE = 2, W = SRC_W * SCALE, H = SRC_H * SCALE;
   const PALETTE = { bg: [8, 10, 14], neutral: [232, 236, 244], good: [72, 222, 128], warn: [255, 176, 32], bad: [255, 104, 92], dim: [150, 156, 168] };
-  // the field colour of a flash (its own table: PALETTE is the one the firmware's palette is tested against, tests/test_lcd_palette.js)
-  const FLASH_FIELD = { beat: [214, 255, 226], bar: [255, 176, 32] };
   // ink id (OLED.INK) -> palette key; index = id
   const INK_PALETTE = ['neutral', 'good', 'warn', 'bad', 'dim', 'warn'];
   const inkColour = id => PALETTE[INK_PALETTE[id] || 'neutral'];
 
-  // ---- FLASH: the BEAT FLASH setting SCREEN. A port of jk_led_lit (core/jank_core.c): the same window per beat, for the screen instead of the LED.
-  // A beat flashes for FLASH.beatMs (80), the bar's first beat for FLASH.barMs (150), neither longer than a beat / FLASH.capDiv (3), counted
-  // from the beat's start; core/jank_core.h's JK_BEAT_FLASH_MS, JK_BAR_FLASH_MS and JK_FLASH_CAP_DIV are the source (tests/test_lcd2.js reads them).
-  const FLASH = { beatMs: 80, barMs: 150, capDiv: 3 };
-  const UBEAT = 1000000;                                               // micro-beats in a beat, as the C
-  // the window of the beat `beatUb` (micro-beats, may be negative: before the session's beat 0) at `mpb` microseconds per beat:
-  // { at: micro-beats since the beat's start, flash: its length in micro-beats, bar: it is the first beat of a bar of `quantum` }
-  function flashWindow(beatUb, mpb, quantum) {
-    let at = beatUb % UBEAT;
-    if (at < 0) at += UBEAT;
-    const index = ((beatUb - at) / UBEAT) % (quantum || 1);            // floor, then C's remainder (JS keeps the sign too)
-    const bar = index === 0;
-    return { at, bar, flash: Math.min(Math.floor((bar ? FLASH.barMs : FLASH.beatMs) * 1000 * UBEAT / mpb), Math.floor(UBEAT / FLASH.capDiv)) };
-  }
-  // jk_led_lit: 1 when the LED is lit. `rest` is the state without a flash (the C: net == JK_NET_WIFI); no session or no tempo: the rest
-  function ledLit(rest, joined, beatUb, mpb, quantum) {
-    if (!joined || mpb <= 0) return rest ? 1 : 0;
-    const w = flashWindow(beatUb, mpb, quantum);
-    return w.at < w.flash ? (rest ? 0 : 1) : (rest ? 1 : 0);
-  }
-  // the flash now: null (none), 'beat' or 'bar', from the beat position (beats, fractional; null: no session / not playing) and the tempo
-  function flashAt(beatPos, bpm, quantum) {
-    if (beatPos === null || beatPos === undefined || !(bpm > 0)) return null;
-    const mpb = Math.round(60000000 / bpm), beatUb = Math.round(beatPos * UBEAT);
-    if (!ledLit(false, true, beatUb, mpb, quantum)) return null;
-    return flashWindow(beatUb, mpb, quantum).bar ? 'bar' : 'beat';
-  }
-  // the flash of a frame: only on HOME (screen 'home'), with the setting on SCREEN, never on menus, edits, setup, boot or the splash
-  function flashOf(c, screen) {
-    if (!c || !c.beatFlash || screen !== 'home' || c.setup || c.boot || c.splash) return null;
-    return flashAt(c.beatPos, c.beatBpm, c.quantum);
-  }
-
-  // the RGB of every source pixel: unlit = background, lit = the colour of its ink id (neutral when ink is missing or 0). With a flash
-  // ('beat' | 'bar') the field is the flash colour and every lit pixel is near-black.
-  function pixels(fb, ink, flash) {
-    const out = new Uint8Array(SRC_W * SRC_H * 3), field = flash ? FLASH_FIELD[flash] : PALETTE.bg;
+  // the RGB of every source pixel: unlit = background, lit = the colour of its ink id (neutral when ink is missing or 0)
+  function pixels(fb, ink) {
+    const out = new Uint8Array(SRC_W * SRC_H * 3);
     for (let i = 0; i < fb.length; i++) {
-      const col = fb[i] ? (flash ? PALETTE.bg : inkColour(ink ? ink[i] : 0)) : field;
+      const col = fb[i] ? inkColour(ink ? ink[i] : 0) : PALETTE.bg;
       out[3 * i] = col[0]; out[3 * i + 1] = col[1]; out[3 * i + 2] = col[2];
     }
     return out;
   }
 
   // paints the 320 x 240 canvas: source pixel (x, y) is the block (2x, 2y) .. (2x + 1, 2y + 1); the blocks tile the panel. img is a W x H ImageData.
-  // flash: null | 'beat' | 'bar' (see FLASH)
-  function paint(ctx2d, img, fb, ink, flash) {
-    const px = pixels(fb, ink, flash || null), d = img.data;
+  function paint(ctx2d, img, fb, ink) {
+    const px = pixels(fb, ink), d = img.data;
     for (let sy = 0; sy < SRC_H; sy++) for (let sx = 0; sx < SRC_W; sx++) {
       const p = 3 * (sy * SRC_W + sx);
       for (let dy = 0; dy < SCALE; dy++) for (let dx = 0; dx < SCALE; dx++) {
@@ -94,5 +53,5 @@ const Lcd2 = (() => {
     return (hi + 0.05) / (lo + 0.05);
   }
 
-  return { W, H, SRC_W, SRC_H, SCALE, PALETTE, FLASH_FIELD, INK_PALETTE, FLASH, inkColour, flashWindow, ledLit, flashAt, flashOf, pixels, paint, contrast };
+  return { W, H, SRC_W, SRC_H, SCALE, PALETTE, INK_PALETTE, inkColour, pixels, paint, contrast };
 })();
