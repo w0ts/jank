@@ -24,8 +24,19 @@ static void tables(void)
     for (int j = 0; j < BEAT_BANDS; ++j)
         if (beat_fb_start[j] + beat_fb_len[j] > s_maxbin)
             s_maxbin = beat_fb_start[j] + beat_fb_len[j];
+#ifdef JB_FFT_FAST
+    jb_fft_fast_init();
+#endif
     s_ready = 1;
 }
+
+#ifdef JB_FE_STAGES
+int jb_fe_maxbin(void)
+{
+    tables();
+    return s_maxbin;
+}
+#endif
 
 void jb_fe_init(struct jb_fe *fe)
 {
@@ -33,8 +44,9 @@ void jb_fe_init(struct jb_fe *fe)
     memset(fe, 0, sizeof *fe);
 }
 
-/* In-place radix-2 FFT of N2 complex points, interleaved re, im; the input in bit-reversed order is made here. */
-static void fft(float *z)
+/* In-place radix-2 FFT of N2 complex points, interleaved re, im; the input in bit-reversed order is made here. The host's
+ * (and every test's) FFT. The firmware builds with JB_FFT_FAST and runs jb_fft_fast (jb_fe.h) instead: the same transform. */
+void jb_fft_scalar(float *z)
 {
     for (int i = 1, j = 0; i < N2; ++i) {
         int bit = N2 >> 1;
@@ -73,10 +85,36 @@ static void fft(float *z)
     }
 }
 
-/* the magnitudes of bins 0..s_maxbin-1 of the 2048-point real FFT of fe->buf's windowed samples, into mag */
-static void magnitudes(float *work, float *mag)
+#ifdef JB_FFT_FAST
+#define fft jb_fft_fast
+#else
+#define fft jb_fft_scalar
+#endif
+
+/* The frame's stages. With JB_FE_STAGES (the host's stage test, the heat lab's `heat fft`) they are public (jb_fe.h): the lab
+ * runs them one by one on a made-up frame to compare variants; otherwise they are static. */
+#ifdef JB_FE_STAGES
+#define STAGE
+#else
+#define STAGE static
+#endif
+
+/* fe->buf = the windowed frame fe->frame: even samples to re, odd to im (the symmetric window's halves) */
+STAGE void jb_fe_stage_window(struct jb_fe *fe)
 {
-    fft(work);
+    int64_t start = fe->frame * JB_HOP - JB_FRAME / 2;
+    const uint32_t base = (uint32_t)start & (JB_FRAME - 1);    /* (32-bit index arithmetic: the 64-bit adds were library calls) */
+    for (int i = 0; i < JB_FRAME; i += 2) {
+        float w0 = i < N2 ? s_win[i] : s_win[JB_FRAME - 1 - i];
+        float w1 = i + 1 < N2 ? s_win[i + 1] : s_win[JB_FRAME - 2 - i];
+        fe->buf[i] = fe->ring[(base + i) & (JB_FRAME - 1)] * w0;
+        fe->buf[i + 1] = fe->ring[(base + i + 1) & (JB_FRAME - 1)] * w1;
+    }
+}
+
+/* the magnitudes of bins 0..s_maxbin-1 of the 2048-point real FFT, from the 1024-point complex FFT of the packed samples */
+STAGE void jb_fe_stage_split(const float *work, float *mag)
+{
     for (int k = 0; k < s_maxbin; ++k) {
         int kk = k ? N2 - k : 0;                              /* Z[N2 - k], Z[0] for k = 0 */
         float zr = work[2 * k], zi = work[2 * k + 1], cr = work[2 * kk], ci = -work[2 * kk + 1];
@@ -88,20 +126,9 @@ static void magnitudes(float *work, float *mag)
     }
 }
 
-static void frame_features(struct jb_fe *fe, float *feat)
+/* the filterbank, log10(1 + x) and the positive difference to fe->prev, from the magnitudes; updates fe->prev */
+STAGE void jb_fe_stage_bands(struct jb_fe *fe, const float *mag, float *feat)
 {
-    float mag[BEAT_BINS];
-    int64_t start = fe->frame * JB_HOP - JB_FRAME / 2;
-    const uint32_t base = (uint32_t)start & (JB_FRAME - 1);    /* (32-bit index arithmetic: the 64-bit adds were library calls) */
-    for (int i = 0; i < JB_FRAME; i += 2) {                   /* even samples to re, odd to im, windowed (the symmetric window's halves) */
-        float w0 = i < N2 ? s_win[i] : s_win[JB_FRAME - 1 - i];
-        float w1 = i + 1 < N2 ? s_win[i + 1] : s_win[JB_FRAME - 2 - i];
-        fe->buf[i] = fe->ring[(base + i) & (JB_FRAME - 1)] * w0;
-        fe->buf[i + 1] = fe->ring[(base + i + 1) & (JB_FRAME - 1)] * w1;
-    }
-    magnitudes(fe->buf, mag);
-    if (fe->tap)
-        fe->tap(fe->tap_ctx, fe->frame, mag);
     const float *val = beat_fb_val;
     for (int j = 0; j < BEAT_BANDS; ++j) {
         float s = 0.0f;
@@ -115,6 +142,17 @@ static void frame_features(struct jb_fe *fe, float *feat)
         fe->prev[j] = lg;
     }
     fe->have_prev = 1;
+}
+
+static void frame_features(struct jb_fe *fe, float *feat)
+{
+    float mag[BEAT_BINS];
+    jb_fe_stage_window(fe);
+    fft(fe->buf);
+    jb_fe_stage_split(fe->buf, mag);
+    if (fe->tap)
+        fe->tap(fe->tap_ctx, fe->frame, mag);
+    jb_fe_stage_bands(fe, mag, feat);
 }
 
 size_t jb_fe_push(struct jb_fe *fe, const float *x, size_t n, float *feat, int *ready)
