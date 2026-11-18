@@ -254,8 +254,8 @@ void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx
             ui->screen = JO_MENU;
         else if (ui->page == 1) {                     /* ABOUT: scroll when its rows do not all fit */
             int vis = c->layout_lcd2 ? JO_ABOUT_VIS_LCD2 : JO_ABOUT_VIS_OLED;      /* a press moves one page */
-            int max = JO_ABOUT_ROWS - vis;
-            ui->ascroll = (uint8_t)jo_clampi(ui->ascroll - d * vis, 0, max > 0 ? max : 0);
+            int last = (JO_ABOUT_ROWS - 1) / vis * vis;         /* pages start at multiples of vis: no row on two pages */
+            ui->ascroll = (uint8_t)jo_clampi(ui->ascroll - d * vis, 0, last);
         }
         break;
     case JO_EDIT:
