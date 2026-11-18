@@ -11,11 +11,11 @@ const eq = (a, b, what) => { checks++; assert.deepStrictEqual(a, b, what); };
 const ok = (c, what) => { checks++; assert.ok(c, what); };
 const near = (a, b, what) => { checks++; assert.ok(Math.abs(a - b) < 1e-9, what + ': ' + a + ' vs ' + b); };
 
-eq([BOX3.case.w, BOX3.case.h, BOX3.case.r], [100, 79, 3], 'the case is 100 x 79, corner radius 3');
+eq([BOX3.case.w, BOX3.case.h, BOX3.case.r], [100, 81, 3], 'the case is 100 x 81, corner radius 3');
 const s = BOX3.screen, win = Box3.windowRect();
 near(s.w / s.h, 4 / 3, 'the active area is 4:3 like the 320 x 240 canvas');
-eq([s.x, s.x + s.w, s.y, s.y + s.h].map((v) => Math.round(v * 10) / 10), [9.7, 50.5, 24.2, 54.8], 'the active area: x 9.7..50.5, y 24.2..54.8');
-eq([win.x, win.x + win.w, win.y, win.y + win.h].map((v) => Math.round(v * 10) / 10), [8.7, 51.5, 23.2, 55.8], 'the lid window is the active area plus 1 mm each side');
+eq([s.x, s.x + s.w, s.y, s.y + s.h].map((v) => Math.round(v * 10) / 10), [9.7, 50.5, 25.2, 55.8], 'the active area: x 9.7..50.5, y 25.2..55.8');
+eq([win.x, win.x + win.w, win.y, win.y + win.h].map((v) => Math.round(v * 10) / 10), [8.7, 51.5, 24.2, 56.8], 'the lid window is the active area plus 1 mm each side');
 const a = Box3.canvasArea(null), half = Box3.canvasArea(128 / 64);
 eq([a.x, a.y, a.w, a.h], [s.x, s.y, s.w, s.h], 'the colour canvas fills the active area exactly');
 near(half.w / half.h, 2, 'the black and white preview keeps 2:1');
@@ -23,11 +23,11 @@ ok(half.x >= s.x && half.y >= s.y && half.x + half.w <= s.x + s.w + 1e-9 && half
 ok(win.x > 0 && win.y > 0 && win.x + win.w < BOX3.case.w && win.y + win.h < BOX3.case.h, 'the window is inside the case');
 
 const keys = ['up', 'down', 'no', 'yes'], X = BOX3.cross, hh = X.span / 2, aa = X.arm / 2;
-eq([X.cx, X.cy, X.span, X.arm], [67, 39.5, 24, 8], 'the D-pad: a cross centred at (67, 39.5), 24 mm across, arms 8 mm wide');
-eq(keys.map((k) => BOX3.switches[k]), [[67, 31.5], [67, 47.5], [59, 39.5], [75, 39.5]], 'the four switch points');
+eq([X.cx, X.cy, X.span, X.arm], [67, 40.5, 24, 8], 'the D-pad: a cross centred at (67, 40.5), 24 mm across, arms 8 mm wide');
+eq(keys.map((k) => BOX3.switches[k]), [[67, 32.5], [67, 48.5], [59, 40.5], [75, 40.5]], 'the four switch points');
 const pts = Box3.crossPoints();
 eq(pts.length, 12, 'the cap is a plus of twelve corners');
-eq([Math.min(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[1]))], [55, 79, 27.5, 51.5], 'the cross spans x 55..79, y 27.5..51.5');
+eq([Math.min(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[1]))], [55, 79, 28.5, 52.5], 'the cross spans x 55..79, y 28.5..52.5');
 const inCross = (x, y) => (Math.abs(x - X.cx) <= aa && Math.abs(y - X.cy) <= hh) || (Math.abs(y - X.cy) <= aa && Math.abs(x - X.cx) <= hh);
 const rects = {};
 for (const k of keys) {
@@ -43,7 +43,7 @@ for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) {
 }
 const mid = { x: X.cx - aa, y: X.cy - aa, w: X.arm, h: X.arm };
 ok(keys.every((k) => { const q = rects[k]; return q.x + q.w <= mid.x + 1e-9 || mid.x + mid.w <= q.x + 1e-9 || q.y + q.h <= mid.y + 1e-9 || mid.y + mid.h <= q.y + 1e-9; }), 'the centre square is no button');
-eq(BOX3.ports.map((p) => p.id + ':' + p.wall + ':' + p.at), ['midi1:top:33.3', 'midi2:top:46.1', 'din1:top:63.5', 'din2:top:85.6', 'clock:right:29.5', 'reset:right:49.5', 'linein:bottom:73.5', 'usbHost:left:9.6', 'usbOwn:left:39.5', 'usbIn:left:68.5'], 'ten ports, none else');
+eq(BOX3.ports.map((p) => p.id + ':' + p.wall + ':' + p.at), ['midi1:top:33.3', 'midi2:top:46.1', 'din1:top:63.5', 'din2:top:85.6', 'clock:right:30.5', 'reset:right:50.5', 'linein:bottom:73.5', 'usbIn:bottom:9.5', 'usbHost:bottom:21', 'usbOwn:left:40.5'], 'ten ports, none else');
 const c = BOX3.case;
 for (const p of BOX3.ports) {
   const rect = Box3.portRect(p), horizontal = p.wall === 'top' || p.wall === 'bottom';
