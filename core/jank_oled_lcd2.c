@@ -60,15 +60,14 @@
 #define TEXT_H 14                       /* a text row of the small face */
 
 /* 1-bit rows ('#' = lit) at the old 160 x 120 size, drawn doubled: the USB plug (Scale2x, jo_icon2) on its cable 9 x 7 (left of the battery while
- * charging), and the LINK TRANSPORT icons (plain 2 x 2 blocks, jo_icon2p, so the two triangles stay apart): IGNORE a crossed circle, FOLLOW an arrow coming in, FOLLOW+LEAD a double arrow */
+ * charging), and the LINK TRANSPORT icons (plain 2 x 2 blocks, jo_icon2p, so the two triangles stay apart): IGNORE a crossed circle, FOLLOW an arrow coming in, FOLLOW+LEAD (two triangles, drawn natively below) */
 static const char *const PLUG[7] = {"..####...", "..#######", "#########", "######...", "#########", "..#######", "..####..."};
 static const char *const LT_ICON0[11] = {"...#####...", "..##...##..", ".##.....##.", "##.....#.##", "#.....#...#", "#....#....#", "#...#.....#", "##.#.....##",
                                          ".##.....##.", "..##...##..", "...#####..."};
 static const char *const LT_ICON1[11] = {".....#.......", "....##.......", "...###.......", "..####.......", ".############", "#############", ".############",
                                          "..####.......", "...###.......", "....##.......", ".....#......."};
-static const char *const LT_ICON2[11] = {".....#.#.....", "....##.##....", "...###.###...", "..####.####..", ".###########.", "#############", ".###########.",
-                                         "..####.####..", "...###.###...", "....##.##....", ".....#.#....."};
-static const char *const *const LT_ICONS[3] = {LT_ICON0, LT_ICON1, LT_ICON2};
+static const char *const *const LT_ICONS[2] = {LT_ICON0, LT_ICON1};
+static const uint8_t LT_FL_W[22] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1};   /* FOLLOW+LEAD triangle row widths: max(1, round(12 * (1 - |y - 10.5| / 11))) */
 static const uint8_t TRI_W[22] = {1, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 18, 16, 14, 12, 11, 9, 7, 6, 4, 2, 1};   /* the play triangle's row widths (18 x 22) */
 
 static const char *const BAR_WORDS[4] = {NULL, "LISTEN", "LOCKED", "MANUAL"};     /* by enum jo_bar_state: off, listening, locked, manual */
@@ -152,7 +151,12 @@ static void option_icons(uint8_t *fb, const struct jo_ctx *c)
 {
     const char *fl = !c->link ? fold_label(c->fold_exp) : "";
     int w = jo_text_w(fl, 1) + 8;
-    if (c->lt_mode < 3)
+    if (c->lt_mode == 2)                                  /* FOLLOW+LEAD: two 22 row triangles with 6 px between the bases */
+        for (int r = 0; r < 22; r++) {
+            jo_rect(fb, LT_X + 12 - LT_FL_W[r], ICON_Y + r, LT_FL_W[r], 1, 1);
+            jo_rect(fb, LT_X + 18, ICON_Y + r, LT_FL_W[r], 1, 1);
+        }
+    else if (c->lt_mode < 2)
         jo_icon2p(fb, LT_ICONS[c->lt_mode], 11, LT_X, ICON_Y);
     if (!fl[0])
         return;

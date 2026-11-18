@@ -1790,6 +1790,7 @@ const OLED = (() => {
     ['.....#.......', '....##.......', '...###.......', '..####.......', '.############', '#############', '.############', '..####.......', '...###.......', '....##.......', '.....#.......'],
     ['.....#.#.....', '....##.##....', '...###.###...', '..####.####..', '.###########.', '#############', '.###########.', '..####.####..', '...###.###...', '....##.##....', '.....#.#.....'],
   ];
+  const LT_FL_W = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];   // FOLLOW+LEAD triangle row widths: max(1, round(12 * (1 - |y - 10.5| / 11)))
   const TRI_W = [1, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 18, 16, 14, 12, 11, 9, 7, 6, 4, 2, 1];   // the play triangle's row widths (18 x 22)
   function icon2(fb, rows, x, y) { icon(fb, rows2x(rows), x, y); }
   const plain2x = rows => rows.flatMap(r => { const d = [...r].map(ch => ch + ch).join(''); return [d, d]; });   // every pixel an exact 2 x 2 block
@@ -1812,7 +1813,8 @@ const OLED = (() => {
   }
   // the left group after the transport icon: the LINK TRANSPORT icon (both modes) at ltX and, in AUDIO mode when the fold is not 1, the fold label beside it
   function drawOptionLcd2(fb, c) {
-    icon2p(fb, LT_ICONS_L2[c.ltMode], L2.ltX, L2.iconY);
+    if (c.ltMode === 2) LT_FL_W.forEach((w, r) => { rect(fb, L2.ltX + 12 - w, L2.iconY + r, w, 1, 1); rect(fb, L2.ltX + 18, L2.iconY + r, w, 1, 1); });   // FOLLOW+LEAD: two 22 row triangles, 6 px between the bases
+    else icon2p(fb, LT_ICONS_L2[c.ltMode], L2.ltX, L2.iconY);
     const fl = !c.link ? foldLabel(c.fold) : '';
     if (!fl) return;
     const w = textW(fl, 1) + 8;
