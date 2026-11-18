@@ -59,7 +59,7 @@
               NO on an empty text = cancel. Passkeys are masked except at the cursor. Hint: easier: web UI + address
      SETUP    replaces every screen: the device is stopped, the open hotspot jank-setup-XXXX runs; the screen shows its QR code,
               the name and 192.168.4.1. NO asks "LEAVE SETUP?": YES returns to the previous network mode and runs again
-     INFO     read-only (battery: %, charging/discharging, estimated volt)  NO or YES -> MENU
+     INFO     read-only (battery: %, charging/discharging, estimated volt; ABOUT: name, version, repo, uptime, reset, chip temp, CPU, memory, flash, clock lateness, loop times; UP / DOWN scroll)  NO or YES -> MENU
      EDIT     (choices cycle round, numbers stop at their ends) the value drawn inverted (white box, black text). UP/DOWN change it (applied live), YES keeps it and
               returns to where EDIT was opened (MENU or SUB), NO restores the old value and returns.
    ==================================================================================================== */
@@ -214,6 +214,7 @@ const OLED = (() => {
   const MENU = [                                                    // the top-level menu, in order
     { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'USB MIDI CLOCK OUT', edit: 'usbmidi' }, { name: 'OFFSET', sub: 'offsets' },
     { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
+    { name: 'ABOUT', info: 'about' },
   ];
   // sub-menus: a title and the EDITS they list
   const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
@@ -224,7 +225,7 @@ const OLED = (() => {
   const sgn = v => (v > 0 ? '+' : '') + v;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-  const create = () => ({ screen: 'home', cursor: 0, top: 0, ocur: 0, ncur: 0, scur: 0, stop: 0, edit: null, txt: null, leave: false, overlay: null });
+  const create = () => ({ screen: 'home', cursor: 0, top: 0, ocur: 0, ascroll: 0, ncur: 0, scur: 0, stop: 0, edit: null, txt: null, leave: false, overlay: null });
   const editText = (spec, v) => (spec.opts ? spec.opts[v] : (spec.lo < 0 ? sgn(v) : v) + spec.unit);
 
   function startEdit(ui, field, c) {
@@ -309,7 +310,7 @@ const OLED = (() => {
         if (it.net) { ui.screen = 'net'; ui.ncur = 0; }
         else if (it.edit) startEdit(ui, it.edit, c);
         else if (it.sub) { ui.screen = 'sub'; ui.sub = it.sub; ui.ocur = 0; }
-        else { ui.screen = 'info'; ui.page = it.info; }
+        else { ui.screen = 'info'; ui.page = it.info; ui.ascroll = 0; }
       }
     } else if (ui.screen === 'sub') {
       const rows = SUBS[ui.sub].rows;
@@ -342,6 +343,7 @@ const OLED = (() => {
       else if (btn === 'no') ui.screen = 'net';
     } else if (ui.screen === 'info') {
       if (!d) ui.screen = 'menu';
+      else if (ui.page === 'about') ui.ascroll = clamp(ui.ascroll - d, 0, Math.max(0, ABOUT_ROWS - (c.layout === 'lcd2' ? ABOUT_VIS_LCD2 : ABOUT_VIS_OLED)));      // ABOUT: scroll when its rows do not all fit
     } else if (ui.screen === 'edit') {
       if (d) stepEdit(ui, c, d);
       else endEdit(ui, c, btn === 'yes');
@@ -553,7 +555,22 @@ const OLED = (() => {
       text(fb, sp.title, 4, y, 1, v); textR(fb, sp.opts ? (f === 'lowconf' ? (sp.get(c) ? 'STOP' : 'RUN') : sp.opts[sp.get(c)]) : editText(sp, sp.get(c)), W - 4, y, 1, v);
     });
   }
+  // the ABOUT screen: its rows as text, "-" for what is not known (null / undefined in the ctx); the repo is shortened on the OLED, the lcd2 layout adds the PSRAM
+  const ABOUT_ROWS = 13, ABOUT_VIS_OLED = 5, ABOUT_VIS_LCD2 = 8;
+  const known = v => v !== null && v !== undefined;
+  const aboutRows = (c, lcd) => {
+    const num = (label, v, unit) => label + ' ' + (known(v) && v >= 0 ? v + unit : '-');
+    const up = !known(c.uptimeS) || c.uptimeS < 0 ? '-' : c.uptimeS >= 86400 ? Math.floor(c.uptimeS / 86400) + 'd ' + Math.floor(c.uptimeS % 86400 / 3600) + 'h'
+      : Math.floor(c.uptimeS / 3600) + ':' + String(Math.floor(c.uptimeS % 3600 / 60)).padStart(2, '0') + ':' + String(c.uptimeS % 60).padStart(2, '0');
+    const heap = !known(c.heapKb) || c.heapKb < 0 ? '-' : c.heapKb + 'K' + (lcd && known(c.psramKb) && c.psramKb >= 0 ? ' PSRAM ' + c.psramKb + 'K' : '');
+    const flash = !known(c.flashKb) || c.flashKb < 0 ? '-' : Math.trunc(c.flashKb / 1024) + 'M ' + (known(c.appUsedKb) && c.appUsedKb >= 0 && known(c.appKb) && c.appKb >= 0
+      ? (c.appUsedKb / 1024).toFixed(1) + '/' + (c.appKb / 1024).toFixed(1) + 'M' : '-');
+    return ['NAME jank', 'VERSION ' + (known(c.version) ? c.version : '-'), 'REPO ' + (lcd ? 'github.com/w0ts/jank' : 'w0ts/jank'), 'UPTIME ' + up,
+            'RESET ' + (known(c.reset) ? c.reset : '-'), 'TEMP ' + (known(c.tempC) ? c.tempC + ' C' : '-'), num('CPU', c.cpuPct, '%'), 'MEMORY ' + heap,
+            num('MIN HEAP', c.heapMinKb, 'K'), 'FLASH ' + flash, num('CLOCK LATE', c.clkLateUs, ' US'), num('UI LOOP', c.uiLoopUs, ' US'), num('BEAT LOOP', c.beatLoopUs, ' US')];
+  };
   function drawInfo(fb, ui, c) {
+    if (ui.page === 'about') { titleBar(fb, 'ABOUT'); aboutRows(c, false).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_OLED).forEach((r, k) => text(fb, r, 4, 13 + k * 9, 1, 1)); return; }
     titleBar(fb, 'BATTERY');
     const rows = [];
     if (!c.fitted) rows.push('NO CELL FITTED', 'POWER ' + (c.usb ? 'USB' : 'NONE'));
@@ -845,6 +862,7 @@ const OLED = (() => {
     });
   }
   function drawInfoLcd2(fb, ui, c) {
+    if (ui.page === 'about') { titleBarLcd2(fb, 'ABOUT'); aboutRows(c, true).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_LCD2).forEach((r, k) => text(fb, r, 4, 18 + k * 12, 1, 1)); return; }
     titleBarLcd2(fb, 'BATTERY');
     const rows = [];
     if (!c.fitted) rows.push('NO CELL FITTED', 'POWER ' + (c.usb ? 'USB' : 'NONE'));

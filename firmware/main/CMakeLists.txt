@@ -25,7 +25,7 @@ idf_component_register(
          "${link}/link.c"
     INCLUDE_DIRS "." "${core}" "${link}" "${beat}"
     LDFRAGMENTS "linker.lf"
-    PRIV_REQUIRES app_update esp_partition usb esp_wifi esp_event esp_netif nvs_flash esp_driver_gptimer esp_driver_uart esp_driver_gpio esp_driver_mcpwm esp_driver_i2c esp_driver_ledc esp_timer hal soc esp_hw_support esp_system heap esp_adc esp_driver_spi esp_lcd
+    PRIV_REQUIRES app_update esp_partition usb esp_wifi esp_event esp_netif nvs_flash esp_driver_gptimer esp_driver_uart esp_driver_gpio esp_driver_mcpwm esp_driver_i2c esp_driver_ledc esp_timer hal soc esp_hw_support esp_system heap esp_adc esp_driver_tsens spi_flash esp_driver_spi esp_lcd
 )
 # a test build's clock probe at the pin (clkprobe.c): JANK_CLOCK_PROBE=1 scripts/build.sh xiao
 if(DEFINED ENV{JANK_CLOCK_PROBE} AND "$ENV{JANK_CLOCK_PROBE}" STREQUAL "1")

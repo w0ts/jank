@@ -49,6 +49,7 @@ void usb_serial_write(const char *text, size_t n);                 /* the contro
 struct jank_peer;
 esp_err_t beat_start(void);
 void beat_stats(struct jk_beat *out);
+uint32_t beat_loop_max_us(void);                     /* the beat task's longest pass since boot, us */
 uint8_t beat_bar_state(void);
 /* AUDIO mode (the tracker on and its source sounding, core/jank_live.h) and the tracker locked on a steady beat; cheap
  * (the bridge's task asks it at every step) */
@@ -81,6 +82,7 @@ void linein_report(char *out, size_t cap);                   /* the `line` comma
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */
 esp_err_t midi_start(void);
 int64_t midi_now_us(void);
+uint32_t midi_late_max_us(void);                    /* the clock alarm's worst lateness since boot, us */
 int64_t midi_now_us_isr(void);                       /* the same, from an IRAM interrupt with the cache off; -1 before midi_start */
 void midi_set_quantum(uint32_t quantum);
 void midi_publish(const struct jc_map *m);

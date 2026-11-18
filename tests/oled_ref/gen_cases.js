@@ -15,7 +15,7 @@ const QR = new Function(grab(/const QR = \(\(\) => \{[\s\S]*?\n\}\)\(\);\n/) + '
 // the host's buttons: from the HOME combos' comment to the end of btnUp
 const HOST_SRC = grab(/\/\/ HOME combos[\s\S]*?\nfunction btnUp\(b\) \{[\s\S]*?\n\}\n/);
 const W = OLED.W, H = OLED.H;
-const { baseState, dumpState: dumpStateInto, hex: hexOf } = require('./state.js');
+const { baseState, dumpState: dumpStateInto, hex: hexOf, ABOUT_FULL, ABOUT_NONE } = require('./state.js');
 
 const FIELDS = ['netmode', 'inoff', 'out0', 'out1', 'out2', 'rate', 'threshold', 'gain', 'ltmode', 'bright', 'sleep', 'group',
                 'lowconf', 'insrc', 'usbrole', 'autobar', 'ssid', 'pass', 'appass', 'apname'];
@@ -209,6 +209,12 @@ scenario('battery info', null, [...presses(['no', ...down8, 'yes']), draw(20), [
 for (const [b, usb, fitted] of [[100, true, true], [37, false, true], [0, true, true], [64, false, false], [64, true, false], [99, true, true]])
   scenario('battery info ' + b + ' ' + usb + ' ' + fitted, s => { s.batt = b; s.usb = usb; s.fitted = fitted; },
            [...presses(['no', ...down8, 'yes']), draw(20)]);
+
+// ---- ABOUT: the system rows, 5 of 13 on the OLED (UP / DOWN scroll), "-" for what is not known ----
+const down9 = Array(9).fill('down');
+scenario('about', s => Object.assign(s, ABOUT_FULL), [...presses(['no', ...down9, 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down', 'down', 'down', 'down', 'down', 'down', 'down'], 30), ['press', 'up', 400], draw(401), ['press', 'yes', 402], draw(403)]);
+scenario('about unknown', s => Object.assign(s, ABOUT_NONE), [...presses(['no', ...down9, 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down', 'down', 'down', 'down', 'down'], 30)]);
+scenario('about long uptime', s => Object.assign(s, ABOUT_FULL, { uptimeS: 200000, flashKb: 4096, appUsedKb: null, reset: 'PANIC' }), [...presses(['no', ...down9, 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down'], 30)]);
 
 // ---- NETWORK ----
 const toNet = ['no', 'down', 'down', 'down', 'yes'];

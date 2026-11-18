@@ -794,6 +794,9 @@ static void finish_nudge(int8_t halves, int8_t rc)
     portEXIT_CRITICAL(&s_mux);
 }
 
+static volatile uint32_t s_loop_max_us;     /* the longest pass of the task since boot (ABOUT screen) */
+uint32_t beat_loop_max_us(void) { return s_loop_max_us; }
+
 static void beat_task(void *arg)
 {
     int16_t x[JB_HOP];
@@ -838,6 +841,8 @@ static void beat_task(void *arg)
                 jd_stop(&s_down);       /* 30 s without a steady beat: the bar starts over */
         }
         now = esp_timer_get_time();
+        if (now - pass_start > (int64_t)s_loop_max_us)
+            s_loop_max_us = (uint32_t)(now - pass_start);
         if (now - s_win_start >= WINDOW_US) {
             cpu_x10 = (uint32_t)(s_win_busy * 1000 / (now - s_win_start));
             s_rate_us = s_rate_cycles / (uint32_t)CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;      /* (cycles at the CPU's MHz: us) */

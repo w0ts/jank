@@ -11,6 +11,11 @@ static inline double jo_clampd(double v, double lo, double hi) { return v < lo ?
 static inline int jo_clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 /* JavaScript's Number.prototype.toFixed(digits) for |x| < 1e21: the exact value, halves away from zero */
 void jo_fixed(double x, int digits, char *out, size_t cap);
+/* the ABOUT screen: its JO_ABOUT_ROWS rows as text, and how many show at once (JO_ABOUT_VIS_OLED, JO_ABOUT_VIS_LCD2) */
+#define JO_ABOUT_ROWS 13
+#define JO_ABOUT_VIS_OLED 5
+#define JO_ABOUT_VIS_LCD2 8
+void jo_about_rows(const struct jo_ctx *c, char rows[JO_ABOUT_ROWS][40]);
 
 /* The grid the primitives draw on: the OLED's 128 x 64, or the lcd2 layout's 160 x 120 for the one call of jo_draw_lcd2 (the emulator's
  * W and H, set per draw). Both are bit-per-pixel in the page layout, byte (y >> 3) * width + x. */
@@ -41,8 +46,8 @@ void jo_text_c(uint8_t *fb, const char *s, int y, int sc, int v);
 void jo_icon(uint8_t *fb, const char *const *rows, int n, int x, int y);
 
 /* the menus */
-#define JO_MENU_ITEMS 9
-#define JO_MENU_ITEMS_LCD2 10
+#define JO_MENU_ITEMS 10
+#define JO_MENU_ITEMS_LCD2 11
 #define JO_VISIBLE 6
 #define JO_SETUP 3
 enum jo_item_kind { JO_ITEM_SUB, JO_ITEM_EDIT, JO_ITEM_NET, JO_ITEM_INFO };
@@ -51,7 +56,7 @@ struct jo_item {
     uint8_t kind, ref;                    /* the SUB's index, or the EDIT's field */
 };
 extern const struct jo_item jo_menu[JO_MENU_ITEMS];
-extern const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2];          /* the lcd2 layout's: 10 items */
+extern const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2];          /* the lcd2 layout's: 11 items */
 
 struct jo_spec {
     const char *title;

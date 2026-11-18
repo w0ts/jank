@@ -425,10 +425,23 @@ static void sub(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
     }
 }
 
-static void info(uint8_t *fb, const struct jo_ctx *c)
+static void about(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
+{
+    char rows[JO_ABOUT_ROWS][40];
+    title_bar(fb, "ABOUT", NULL);
+    jo_about_rows(c, rows);
+    for (int k = 0; k < JO_ABOUT_VIS_LCD2 && ui->ascroll + k < JO_ABOUT_ROWS; k++)
+        jo_text(fb, rows[ui->ascroll + k], 4, 18 + k * 12, 1, 1);
+}
+
+static void info(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
     char rows[3][40];
     int n;
+    if (ui->page == 1) {
+        about(fb, ui, c);
+        return;
+    }
     title_bar(fb, "BATTERY", NULL);
     if (!c->fitted) {
         snprintf(rows[0], sizeof rows[0], "NO CELL FITTED");
@@ -705,7 +718,7 @@ static void screen(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c, 
         case JO_CONFIRM: confirm(fb, "SETUP", "STOP AND START", "SETUP?"); break;
         case JO_MENU: menu(fb, ui, c); break;
         case JO_SUB: sub(fb, ui, c); break;
-        case JO_INFO: info(fb, c); break;
+        case JO_INFO: info(fb, ui, c); break;
         case JO_EDIT: edit(fb, ui); break;
         default: break;
         }

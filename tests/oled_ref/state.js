@@ -14,6 +14,11 @@ function baseState() {
   };
 }
 
+const ABOUT_KEYS = ['version', 'tempC', 'cpuPct', 'heapKb', 'psramKb', 'flashKb', 'appUsedKb', 'appKb', 'uptimeS', 'heapMinKb', 'reset', 'clkLateUs', 'uiLoopUs', 'beatLoopUs'];
+// what the ABOUT cases show: every number known
+const ABOUT_FULL = { version: '0.1.0', tempC: 41, cpuPct: 37, heapKb: 123, psramKb: 7936, flashKb: 8192, appUsedKb: 1260, appKb: 3072, uptimeS: 3725, heapMinKb: 98, reset: 'POWERON', clkLateUs: 12, uiLoopUs: 4210, beatLoopUs: 8800 };
+const ABOUT_NONE = Object.fromEntries(ABOUT_KEYS.map(k => [k, null]));
+
 function dumpState(out, s) {
   const L = (k, v) => out.push('c ' + k + ' ' + v);
   const num = v => (v === null || v === undefined ? 'null' : String(v));
@@ -22,6 +27,7 @@ function dumpState(out, s) {
   for (const k of ['bpm', 'linkBpm', 'conf', 'th', 'gain', 'levelDb', 'levelMin', 'levelMax', 'beatN', 'peers', 'batt', 'ltMode', 'inSrc',
                    'usbRole', 'inOff', 'rate', 'bright', 'sleep', 'groupPeers'])
     L(k, num(s[k]));
+  if ('cpuPct' in s) L('about', ABOUT_KEYS.map(k => num(s[k])).join(' '));   // the ABOUT screen's numbers (null = unknown); only the cases that show it carry them
   L('wifi', s.wifi);
   L('offs', s.offs.join(' '));
   L('wifiQ', s.wifiQ ? [s.wifiQ.rssi, s.wifiQ.kbps, s.wifiQ.tx, s.wifiQ.retried, s.wifiQ.lost].join(' ') : 'null');
@@ -37,4 +43,4 @@ function hex(fb, W, H) {
   return Buffer.from(pages).toString('hex');
 }
 
-module.exports = { baseState, dumpState, hex };
+module.exports = { baseState, dumpState, hex, ABOUT_FULL, ABOUT_NONE };

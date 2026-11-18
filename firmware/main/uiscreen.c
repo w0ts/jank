@@ -21,7 +21,14 @@
 #include <string.h>
 #include "app.h"
 #include "board.h"
+#include "driver/temperature_sensor.h"
+#include "esp_flash.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
+#include "esp_system.h"
+#include "esp_timer.h"
 #include "jank_oled_int.h"
 #include "jank_usbrole.h"
 #include "nvs.h"
@@ -40,6 +47,9 @@ void app_reboot(void);
 #define METER_EVERY_MS 250u
 #define METER_SPAN 12                   /* 3 s of the meter's steps */
 #define METER_FLOOR_DB (-120.0)
+#define SYS_EVERY_MS 2000u              /* the ABOUT numbers are sampled at most this often */
+#define TEMP_MIN_C (-10)                /* the sensor's measuring range */
+#define TEMP_MAX_C 80
 #define BAR_CONF_FULL 2.0               /* the downbeat estimator's commit level: the line is full here */
 #if CONFIG_JANK_BOARD_MINI22
 #define SPLASH_MODEL "MINI 2.2"
@@ -64,6 +74,8 @@ static uint32_t s_prefs_changed;
 static int s_screen;
 static uint32_t s_start, s_last_frame, s_reboot_at;
 static uint8_t s_want_frame, s_reboot, s_boot;
+static temperature_sensor_handle_t s_tsens;
+static uint8_t s_tsens_ok;
 static struct jo_ui s_ui;
 static struct jo_input s_in;
 static struct jo_ctx s_ctx;
@@ -217,6 +229,79 @@ static void net_ctx(struct jo_ctx *c, const struct jk_cfg *cfg, uint32_t now)
     air_ctx(c, now);
 }
 
+/* ---- the ABOUT screen's system numbers: sampled at most every SYS_EVERY_MS in the ui task (never on the beat, MIDI clock or audio path) ---- */
+struct sys {
+    int temp_c, heap_kb, psram_kb, heap_min_kb, uptime_s, flash_kb, app_used_kb, app_kb;
+    int clk_late_us, ui_loop_us, beat_loop_us;
+};
+static struct sys s_sys = {JO_TEMP_UNKNOWN, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+static uint32_t s_ui_step_max_us;                /* the longest uis_step since boot */
+
+static const char *reset_name(void)
+{
+    static const char *const why[] = {"UNKNOWN", "POWERON", "EXT", "SW", "PANIC", "INT WDT", "TASK WDT", "WDT", "DEEPSLEEP",
+                                      "BROWNOUT", "SDIO", "USB", "JTAG", "EFUSE", "PWR GLITCH", "CPU LOCKUP"};
+    unsigned r = (unsigned)esp_reset_reason();
+    return r < sizeof why / sizeof why[0] ? why[r] : "?";
+}
+
+/* the size of the running app's image in its partition (header, segments, checksum, hash), read once: -1 when it does not parse */
+static int app_used_kb(const esp_partition_t *p)
+{
+    uint8_t h[24];
+    uint32_t ofs = sizeof h, seg[2];
+    if (esp_partition_read(p, 0, h, sizeof h) != ESP_OK || h[0] != 0xE9 || h[1] > 16)
+        return -1;
+    for (int i = 0; i < h[1]; i++) {
+        if (ofs + sizeof seg > p->size || esp_partition_read(p, ofs, seg, sizeof seg) != ESP_OK)
+            return -1;
+        ofs += (uint32_t)sizeof seg + seg[1];
+    }
+    ofs = (ofs + 1u + 15u) & ~15u;
+    if (h[23])
+        ofs += 32u;
+    return ofs <= p->size ? (int)((ofs + 1023u) / 1024u) : -1;
+}
+
+static void sys_once(void)
+{
+    uint32_t flash = 0;
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    temperature_sensor_config_t cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(TEMP_MIN_C, TEMP_MAX_C);
+    if (temperature_sensor_install(&cfg, &s_tsens) == ESP_OK && temperature_sensor_enable(s_tsens) == ESP_OK)
+        s_tsens_ok = 1;
+    else
+        ESP_LOGW(TAG, "chip temperature sensor not available");
+    if (esp_flash_get_size(NULL, &flash) == ESP_OK)
+        s_sys.flash_kb = (int)(flash / 1024u);
+    if (run) {
+        s_sys.app_kb = (int)(run->size / 1024u);
+        s_sys.app_used_kb = app_used_kb(run);
+    }
+}
+
+static void sys_sample(uint32_t now)
+{
+    static uint8_t once;
+    static uint32_t at;
+    float v;
+    if (!once) {
+        once = 1;
+        sys_once();
+    } else if (now - at < SYS_EVERY_MS)
+        return;
+    at = now;
+    if (s_tsens_ok)
+        s_sys.temp_c = temperature_sensor_get_celsius(s_tsens, &v) == ESP_OK ? (int)lroundf(v) : JO_TEMP_UNKNOWN;
+    s_sys.heap_kb = (int)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024u);
+    s_sys.psram_kb = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) ? (int)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024u) : -1;
+    s_sys.heap_min_kb = (int)(esp_get_minimum_free_heap_size() / 1024u);
+    s_sys.uptime_s = (int)(esp_timer_get_time() / 1000000);
+    s_sys.clk_late_us = (int)midi_late_max_us();
+    s_sys.ui_loop_us = (int)s_ui_step_max_us;
+    s_sys.beat_loop_us = (int)beat_loop_max_us();
+}
+
 static const struct jo_ctx *build_ctx(void *user, uint32_t now)
 {
     struct jo_ctx *c = &s_ctx;
@@ -266,6 +351,21 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->usb = (uint8_t)(s_snap.usb_up || s_snap.usb.vbus);
     c->fitted = s_snap.batt_pct >= 0;
     c->batt = s_snap.batt_pct >= 0 ? s_snap.batt_pct : 0;
+    sys_sample(now);
+    c->version = JK_VERSION;
+    c->reset = reset_name();
+    c->temp_c = s_sys.temp_c;
+    c->cpu_pct = b->core0_idle_x10 ? jo_clampi(100 - (b->core0_idle_x10 + 5) / 10, 0, 100) : -1;     /* core 0 (the beat, UI and radio core): what its idle task leaves, as beat.c measures it */
+    c->heap_kb = s_sys.heap_kb;
+    c->psram_kb = s_sys.psram_kb;
+    c->heap_min_kb = s_sys.heap_min_kb;
+    c->uptime_s = s_sys.uptime_s;
+    c->flash_kb = s_sys.flash_kb;
+    c->app_used_kb = s_sys.app_used_kb;
+    c->app_kb = s_sys.app_kb;
+    c->clk_late_us = s_sys.clk_late_us;
+    c->ui_loop_us = s_sys.ui_loop_us;
+    c->beat_loop_us = s_sys.beat_loop_us;
     c->lt_mode = cfg.transport == JK_TRANSPORT_AUTO ? 0 : s_prefs.lead ? 2 : 1;
     c->in_src = cfg.source;
     c->usb_role = cfg.usb;
@@ -460,7 +560,7 @@ void uis_boot_screen(void)
     show_frame(s_fb);
 }
 
-void uis_step(uint32_t now, struct uis_led *led)
+static void step(uint32_t now, struct uis_led *led)
 {
     uint8_t *fb = s_fb;
     const struct jo_ctx *c;
@@ -492,4 +592,15 @@ void uis_step(uint32_t now, struct uis_led *led)
     }
     draw_frame(fb, c, now);
     show_frame(fb);
+}
+
+/* the ui task's step, timed for the ABOUT screen's UI LOOP row */
+void uis_step(uint32_t now, struct uis_led *led)
+{
+    const int64_t t0 = esp_timer_get_time();
+    int64_t us;
+    step(now, led);
+    us = esp_timer_get_time() - t0;
+    if (us > (int64_t)s_ui_step_max_us)
+        s_ui_step_max_us = (uint32_t)us;
 }
