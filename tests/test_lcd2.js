@@ -50,7 +50,7 @@ function oledFixtures() {
   return out;
 }
 if (process.env.LCD2_OLED) { console.log(JSON.stringify(oledFixtures().map(f => sha([f])))); process.exit(0); }
-const GOLDEN = JSON.parse('["92586ffb36b70a7d","12a9465b16c68428","f4f15225710bfde3","175c54f575f5b515","9da040822b6d69fc","4df4155e0ba4841d","2fc384e7b7fbbf3b","d7690151e5ad2b33"]');
+const GOLDEN = JSON.parse('["92586ffb36b70a7d","12a9465b16c68428","f4f15225710bfde3","175c54f575f5b515","9da040822b6d69fc","4df4155e0ba4841d","bb1390d63bcd7cd4","d7690151e5ad2b33"]');
 eq(oledFixtures().map(f => sha([f])), GOLDEN, 'the OLED layout draws the bytes the OLED module drew before the lcd2 layout (8 screens)');
 eq([OLED.W, OLED.H, OLED.size(), OLED.size('oled'), OLED.size('lcd2')], [128, 64, { w: 128, h: 64 }, { w: 128, h: 64 }, { w: 160, h: 120 }], 'sizes: OLED.W / OLED.H stay the OLED\'s; OLED.size(layout) says the grid of a layout');
 {
@@ -288,8 +288,6 @@ eq(idsIn(drawn(ctxOf({ home: { battery: null } })), ...R.batt), [], 'no battery 
   eq(litIn(healthy, 0, L.statusY, 80, 7).length, 0, 'a healthy HOME: only the threshold, right (STOP 70)');
   const run = drawn(ctxOf({}, { get: { threshold: '70', lowconf: 'run' } })), stop = drawn(ctxOf());
   ok(litCols(run, L.statusY, 7).length < litCols(stop, L.statusY, 7).length + 8 && litCols(run, L.statusY, 7)[0] > 100, "'MIN 70' with KEEP RUNNING, 'STOP 70' with STOP, both right-aligned");
-  const bt = drawn(ctxOf({ ctx: { ble: { mode: 0, left: 95, phone: false } } }));
-  ok(litCols(bt, L.statusY, 7).some(x => x < 20), 'the Bluetooth pair window counts down at the left, on its own row');
   const wf = drawn(ctxOf({ ctx: { wifiQ: { rssi: -85, kbps: 24000, tx: 100, retried: 40, lost: 20 } } }));
   eq(idsIn(wf, 0, L.statusY - 1, 120, 9).includes(INK.BAD), true, 'a Wi-Fi line, when the stick reports one, shows its BAD parts inverted in red');
 }
@@ -314,15 +312,15 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   noInk(d, 'MENU');
   eq([d.fb[0], d.fb[LW - 1], d.fb[10 * LW], d.fb[11 * LW]], [1, 1, 1, 0], 'the title bar is 11 rows, the full width');
   const rowBand = k => litIn(d, 0, 13 + 9 * k, d.w, 7).length;
-  eq([rowBand(0), rowBand(1), rowBand(11)].map(n => n > 0), [true, true, true], 'the 12 menu items are rows of 9 px from y 13 (the last at y ' + (13 + 99) + ')');
+  eq([rowBand(0), rowBand(1), rowBand(10)].map(n => n > 0), [true, true, true], 'the 11 menu items are rows of 9 px from y 13 (the last at y ' + (13 + 90) + ')');
   eq([d.fb[(13 - 1) * LW], d.fb[(13 - 1) * LW + LW - 1], d.fb[20 * LW + 2]], [1, 1, 1], 'the selected row (the first) is inverted over the full width');
   eq(litIn(d, 0, 13 + 9 - 1, 1, 9).length, 0, 'the next row is not');
   const lastLit = Math.max(...litRows(d));
-  ok(lastLit >= 13 + 9 * 11 && lastLit < LH, 'the list reaches y ' + lastLit + ' of 119: the grid is used');
-  const dn = withUi(ctxOf(), ['no', ...Array(11).fill('down')], 'lcd2');
+  ok(lastLit >= 13 + 9 * 10 && lastLit < LH, 'the list reaches y ' + lastLit + ' of 119: the grid is used');
+  const dn = withUi(ctxOf(), ['no', ...Array(10).fill('down')], 'lcd2');
   d = drawn(dn.c, { ui: dn.ui });
   noInk(d, 'MENU, last item selected');
-  eq(d.fb[(13 + 99 - 1) * LW + 100], 1, 'the last item (BATTERY) is the selected, inverted row at the bottom');
+  eq(d.fb[(13 + 90 - 1) * LW + 100], 1, 'the last item (BATTERY) is the selected, inverted row at the bottom');
   const sub = withUi(ctxOf(), ['no', 'yes'], 'lcd2');
   d = drawn(sub.c, { ui: sub.ui });
   noInk(d, 'a sub menu (' + sub.ui.screen + ')');
@@ -437,15 +435,15 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
 {
   const keys = n => ['no', ...Array(n).fill('down')];
   const oledM = withUi(ctxOf(), keys(15)), lcdM = withUi(ctxOf(), keys(15), 'lcd2');
-  eq([oledM.ui.cursor, lcdM.ui.cursor], [10, 11], 'the OLED menu has 11 items (the cursor stops at 10), the lcd2 menu 12 (it stops at 11)');
-  const m = withUi(ctxOf(), keys(10), 'lcd2');
+  eq([oledM.ui.cursor, lcdM.ui.cursor], [9, 10], 'the OLED menu has 10 items (the cursor stops at 9), the lcd2 menu 11 (it stops at 10)');
+  const m = withUi(ctxOf(), keys(9), 'lcd2');
   let d = drawn(m.c, { ui: m.ui });
   noInk(d, 'the lcd2 MENU with BEAT FLASH selected');
-  eq([m.ui.cursor, d.fb[(13 + 90 - 1) * LW + 100], d.fb[(13 + 81 - 1) * LW + 100]], [10, 1, 0], 'BEAT FLASH is the 11th row, right after DISPLAY (the 10th) and before BATTERY, the selected row inverted');
-  const on = withUi({ ...ctxOf(), beatFlash: 1 }, keys(10), 'lcd2'), d2 = drawn(on.c, { ui: on.ui });
+  eq([m.ui.cursor, d.fb[(13 + 81 - 1) * LW + 100], d.fb[(13 + 72 - 1) * LW + 100]], [9, 1, 0], 'BEAT FLASH is the 10th row, right after DISPLAY (the 9th) and before BATTERY, the selected row inverted');
+  const on = withUi({ ...ctxOf(), beatFlash: 1 }, keys(9), 'lcd2'), d2 = drawn(on.c, { ui: on.ui });
   ok(!Buffer.from(d2.fb).equals(Buffer.from(d.fb)), 'the row says SCREEN when the setting is on (a different picture from BOXES)');
   // the edit screen
-  const edit = withUi(ctxOf(), [...keys(10), 'yes'], 'lcd2');
+  const edit = withUi(ctxOf(), [...keys(9), 'yes'], 'lcd2');
   eq(edit.ui.screen, 'edit', 'YES on BEAT FLASH opens its edit screen');
   d = drawn(edit.c, { ui: edit.ui }); noInk(d, 'the BEAT FLASH edit screen');
   const boxesPicture = Buffer.from(d.fb), set = [];

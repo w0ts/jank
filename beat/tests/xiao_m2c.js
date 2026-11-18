@@ -1,6 +1,6 @@
 // node xiao_m2c.js PLAYER_HTML: the page against the firmware M2c (fw/integ-2): the fold (UP / DOWN call `fold`, the label, the
 // `home` line's mode token, `status` fold= / fold_manual=), AUTO BAR's three settings (OFF / AT START / ALWAYS, `set autobar`,
-// read back from `get`), and the Bluetooth rune in HOME's top bar (no overlaps)
+// read back from `get`), and HOME's top bar (no overlaps)
 const fs = require('fs');
 const assert = require('assert');
 const html = require('../../tests/load_html.js')(process.argv[2]);
@@ -69,7 +69,7 @@ const W = OLED.W, H_ = OLED.H;
 const calls = [];
 const ctx = (extra = {}) => ({ link: false, lineIn: true, bpm: 124, linkBpm: 124, conf: 0.9, th: 80, levelDb: -20, levelMin: -25, levelMax: -15, running: true, armed: false,
   beatN: 1, beatMs: 0, peers: 0, wifiQ: null, usb: false, fitted: false, batt: 100, ltMode: 2, rate: 2, usbRole: 0, inSrc: 0, net: { mode: 0, group: 1, ssid: '', apName: '' },
-  autoBar: 1, bar: null, ble: { mode: 1, left: null, phone: false }, fold: 1, setField: (f, v) => calls.push([f, v]), tempoStep: () => 0, setHold: () => {}, linkStartStop: () => {}, ...extra });
+  autoBar: 1, bar: null, fold: 1, setField: (f, v) => calls.push([f, v]), tempoStep: () => 0, setHold: () => {}, linkStartStop: () => {}, ...extra });
 const draw = (c, now = 0, ui = OLED.create()) => { const fb = new Uint8Array(W * H_); OLED.draw(fb, ui, c, now); return fb; };
 eq(OLED.AUTOBAR_NAMES, ['OFF', 'AT START', 'ALWAYS']);
 eq([OLED.autoBarIndex(true), OLED.autoBarIndex(false), OLED.autoBarIndex(2), OLED.autoBarIndex(undefined)], [1, 0, 2, 0]);
@@ -113,43 +113,33 @@ for (const k of [2, 4, 0.5, 0.25]) ok(lab(draw(ctx({ fold: k, net: noName }))) >
   ok(a.every((v, i) => v === b[i]), 'LINK mode shows no fold');
 }
 
-// ---- the Bluetooth rune: the top bar's boxes never overlap ----
+// ---- the top bar's boxes never overlap ----
 const nets = [{ mode: 0, group: 9, ssid: '', apName: '' }, { mode: 1, group: 1, ssid: 'A-VERY-LONG-WIFI-NETWORK-NAME-HERE', apName: '' },
               { mode: 2, group: 1, ssid: '', apName: 'JANK-AP-WITH-A-LONG-NAME' }];
-const bles = { off: { mode: 2, left: null, phone: false }, blinking: { mode: 0, left: 90, phone: false }, solid: { mode: 0, left: null, phone: true } };
-const boxes = t => ['tri', 'left', 'nameBox', 'net', 'ble', 'usb', 'batt'].filter(k => t[k]).map(k => [k, t[k].l, t[k].r]);
+const boxes = t => ['tri', 'left', 'nameBox', 'net', 'usb', 'batt'].filter(k => t[k]).map(k => [k, t[k].l, t[k].r]);
 let shown = 0;
-for (const net of nets) for (const [bn, ble] of Object.entries(bles)) for (const usb of [false, true]) for (const fitted of [false, true]) for (const link of [false, true]) for (const fold of [1, 2, 0.25]) {
-  const c = ctx({ net, ble, usb, fitted, link, fold });
-  const t = OLED.topBar(c), bx = boxes(t), tag = [net.mode, bn, usb, fitted, link, fold].join('/');
+for (const net of nets) for (const usb of [false, true]) for (const fitted of [false, true]) for (const link of [false, true]) for (const fold of [1, 2, 0.25]) {
+  const c = ctx({ net, usb, fitted, link, fold });
+  const t = OLED.topBar(c), bx = boxes(t), tag = [net.mode, usb, fitted, link, fold].join('/');
   for (let i = 0; i < bx.length; i++) {
     ok(bx[i][1] >= 0 && bx[i][2] < W && bx[i][1] <= bx[i][2], 'inside the screen: ' + bx[i][0] + ' ' + tag);
     for (let j = i + 1; j < bx.length; j++) ok(bx[i][2] < bx[j][1] || bx[j][2] < bx[i][1], bx[i][0] + ' overlaps ' + bx[j][0] + ' ' + tag);
   }
-  ok(!!t.ble === (bn !== 'off'), 'the rune is there unless BLE is idle: ' + tag);
-  // pixels: the name's ink stays inside its box; the rune's columns hold only the rune (or nothing)
+  // pixels: the name's ink stays inside its box
   for (const now of [0, 400]) {
     const fb = draw(c, now);
     const free = [];
     for (let x = (t.left ? t.left.r : t.tri.r) + 1; x < t.net.l; x++) for (let y = 0; y < 7; y++) if (lit(fb, x, y)) free.push(x);
     ok(free.every(x => t.nameBox && x >= t.nameBox.l && x <= t.nameBox.r), 'the name stays in its box: ' + tag + ' ' + free.join(','));
-    if (t.ble) {
-      const on = bn === 'solid' || Math.floor(now / 400) % 2 === 0;
-      let n = 0;
-      for (let y = 0; y < 7; y++) for (let x = t.ble.l; x <= t.ble.r; x++) n += fb[y * W + x];
-      ok(n === (on ? 15 : 0), 'the rune ' + (on ? 'lit' : 'dark') + ' ' + tag + ' ' + n);
-      shown++;
-    }
+    shown++;
   }
 }
-ok(shown > 0, 'rune states drawn');
+ok(shown > 0, 'top bars drawn');
 {
-  const base = OLED.topBar(ctx({ ble: bles.off }));
-  const wide = OLED.topBar(ctx({ ble: bles.solid }));
-  ok(base.net.r === 86 && wide.net.r < base.net.r && wide.ble.l > wide.net.r, 'the network icon moves left for the rune');
-  const g9 = OLED.topBar(ctx({ ble: bles.solid, net: nets[0] }));
+  const base = OLED.topBar(ctx());
+  ok(base.net.r === 86, 'the network icon ends at 86');
+  const g9 = OLED.topBar(ctx({ net: nets[0] }));
   eq(g9.name, 'GRP 9');                                                             // the longest group name still fits in AUDIO
-  const idle = OLED.topBar(ctx({ ble: bles.off, net: nets[0] }));
-  ok(idle.nameBox.r === 86 - 10 - 3 && g9.nameBox.r === g9.net.l - 3, 'the name stays against the network icon');
+  ok(g9.nameBox.r === 86 - 10 - 3 && g9.nameBox.r === g9.net.l - 3, 'the name stays against the network icon');
 }
 console.log('xiao M2c page helpers: ' + checks + ' checks passed');

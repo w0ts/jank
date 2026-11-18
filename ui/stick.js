@@ -10,14 +10,14 @@ const Stick = (() => {
   const KEY_HINT = 'Keys: Up / Down = UP / DOWN, Left / Esc / Backspace = NO, Right / Enter = YES';
   const REPEAT = { firstMs: 400, everyMs: 120 };
   const FLOOR_DB = -99, SILENCE_DB = -60, TEMPO_RANGE = [20, 999], BAR_CONF_FULL = 2;
-  const FRESH_USB_MS = 1500, FRESH_BLE_MS = 5000, STATUS_FRESH_MS = 5000;
-  const SRC = ['auto', 'line', 'usb', 'link'], BLE = ['pair', 'auto', 'off'], AUTOBAR = ['off', 'start', 'always'], FOLDS = { x2: 2, x4: 4, '/2': 0.5, '/4': 0.25 };
+  const FRESH_HOME_MS = 1500, STATUS_FRESH_MS = 5000;
+  const SRC = ['auto', 'line', 'usb', 'link'], AUTOBAR = ['off', 'start', 'always'], FOLDS = { x2: 2, x4: 4, '/2': 0.5, '/4': 0.25 };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const num = v => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
   const isUpDown = b => b === 'up' || b === 'down';
 
   // ---- what the stick says, as the OLED reads it ----
-  // state: { home (the page's parseHome), homeAt, get ({key: string}), status ({key: string}), statusAt, phase (phaseFeed, optional), delayMs (the display delay), overBle }
+  // state: { home (the page's parseHome), homeAt, get ({key: string}), status ({key: string}), statusAt, phase (phaseFeed, optional), delayMs (the display delay) }
   const fresh = (at, now, maxMs) => at !== undefined && at !== null && now - at <= maxMs;
   const phase = (h, homeAt, now) => {                               // the session's place in the bar (beats), moving at the HOME line's tempo
     if (!h || !(h.bpm > 0) || h.bar === null || h.bar === undefined || !h.quantum) return null;
@@ -57,7 +57,7 @@ const Stick = (() => {
 
   function ctx(state, now) {
     const g = state.get || {}, st = state.status && fresh(state.statusAt, now, STATUS_FRESH_MS) ? state.status : null;
-    const h = state.home && fresh(state.homeAt, now, state.overBle ? FRESH_BLE_MS : FRESH_USB_MS) ? state.home : null;
+    const h = state.home && fresh(state.homeAt, now, FRESH_HOME_MS) ? state.home : null;
     const audio = !!(h && h.audio), delay = state.delayMs || 0, pos = state.phase ? phaseAt(state.phase, now, delay) : phase(h, state.homeAt, now - delay);
     const playing = !!h && h.transport === 'playing', armed = !!h && h.transport === 'armed';
     const level = h && h.level !== null ? h.level : FLOOR_DB;
@@ -85,7 +85,6 @@ const Stick = (() => {
       net: { mode: net, prev: net, group: num(g.group) || 1, ssid: g.ssid || '', pass: g.pass === 'set' ? '********' : '', appass: '', apName: '',
              status: h && h.net && h.net.kind === 'wifi' ? (h.net.up ? 'CONNECTED' : 'LOOKING') : 'NO NETWORK', ip: st && st.link_ip && st.link_ip !== '0.0.0.0' ? st.link_ip : '-',
              apClients: 0, setupName: '', scan: [] },
-      ble: { mode: Math.max(0, BLE.indexOf(g.ble)), left: st && st.ble_state === 'window' ? num(st.ble_left) : null, phone: !!st && st.ble_state === 'connected' },
       inSrc: Math.max(0, SRC.indexOf(g.source)), usbRole: g.usb === 'host' ? 1 : 0, usbMidi: g.usbmidi === 'off' ? 1 : 0,
       autoBar: Math.max(0, AUTOBAR.indexOf(g.autobar)),
       bar: barState ? { state: barState, conf: barLead === null ? 0 : clamp(barLead / BAR_CONF_FULL, 0, 1) } : null,
@@ -104,8 +103,8 @@ const Stick = (() => {
     netmode: 'change the network under Settings (Join, Save and restart): it restarts the stick',
     usbrole: 'the USB role restarts the stick: not changed from here',
   };
-  const WORDS = { insrc: SRC, ble: BLE, autobar: AUTOBAR, lowconf: ['run', 'stop'], usbmidi: ['on', 'off'] };
-  const KEYS = { insrc: 'source', ble: 'ble', autobar: 'autobar', lowconf: 'lowconf', usbmidi: 'usbmidi' };
+  const WORDS = { insrc: SRC, autobar: AUTOBAR, lowconf: ['run', 'stop'], usbmidi: ['on', 'off'] };
+  const KEYS = { insrc: 'source', autobar: 'autobar', lowconf: 'lowconf', usbmidi: 'usbmidi' };
   // an OLED edit (field, value as the OLED holds it) -> { commands: [...] } or { refuse: 'why' }
   function fieldCommands(field, val) {
     if (NO_STICK_SETTING[field]) return refuse(NO_STICK_SETTING[field]);
@@ -116,7 +115,6 @@ const Stick = (() => {
     if (field === 'inoff') return cmds('set lat_trim ' + clamp(Math.round(val), -100, 100));
     if (field === 'ltmode') return val === 1 ? refuse('FOLLOW is not on the control line: pick IGNORE or FOLLOW+LEAD') : cmds('set transport ' + (val === 0 ? 'auto' : 'link'));
     if (field === 'lowconf') return cmds('set lowconf ' + (val === 1 ? 'stop' : 'run'));
-    if (field === 'ble') return val === 0 ? cmds('set ble pair', 'ble pair') : cmds('set ble ' + BLE[val]);
     if (field === 'usbmidi') return cmds('set usbmidi ' + (val === 0 ? 'on' : 'off'));
     if (WORDS[field] && WORDS[field][val] !== undefined) return cmds('set ' + KEYS[field] + ' ' + WORDS[field][val]);
     return refuse('the stick does not take ' + field + ' from here');

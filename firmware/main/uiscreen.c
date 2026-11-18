@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The device's own UI on the firmware (uiscreen.h): core/jank_oled.h's screens and buttons fed from the firmware's state,
  * their setters carried out through the control line's own `set` (jk_ctl_line on a copy of the settings, then
- * app_cfg_set: saved at once while stopped, once stopped while playing), so the device, the control line and the phone
- * page always agree. Everything runs in the ui task (core 0).
+ * app_cfg_set: saved at once while stopped, once stopped while playing), so the device, the control line and the
+ * control page always agree. Everything runs in the ui task (core 0).
  *
  * What the firmware has and what it does not (the screens show both the same way):
  *   AUTO BAR, SOURCE, USB, GROUP, NETWORK JANK / CLIENT (a restart), its SSID and passkey, MIDI OUT 1's offset (`offset`),
@@ -23,7 +23,6 @@
 #include "board.h"
 #include "esp_log.h"
 #include "jank_oled_int.h"
-#include "jank_phone.h"
 #include "jank_usbrole.h"
 #include "nvs.h"
 #include "oled.h"
@@ -233,10 +232,6 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->gated = audio ? b->gated : 0;
     c->conf_hold = audio ? b->conf_hold : 0;
     c->fold_exp = audio ? b->fold_exp : 0;
-    c->ble_mode = cfg.ble == JK_BLE_PAIR ? 0 : cfg.ble == JK_BLE_AUTO ? 1 : 2;      /* PAIR NOW, ON START, OFF: the menu's order */
-    c->ble_phone = s_snap.ble_built && s_snap.ble_state == JPH_CONNECTED;
-    c->has_ble_left = s_snap.ble_built && s_snap.ble_state == JPH_WINDOW;
-    c->ble_left = (int)s_snap.ble_left_s;
     c->usb_midi = cfg.usbmidi ? 0 : 1;                                              /* ON, OFF */
     c->beat_flash = cfg.beat_flash;
     s_quantum = cfg.quantum ? cfg.quantum : 4u;
@@ -329,7 +324,6 @@ static void set_field(void *user, enum jo_field f, int v)
 {
     static const char *const SRC[] = {"auto", "line", "usb", "link"};
     static const char *const AUTOBAR[] = {"off", "start", "always"};
-    static const char *const BLE[] = {"pair", "auto", "off"};         /* the menu's order: PAIR NOW, ON START, OFF */
     (void)user;
     switch (f) {
     case JO_F_NETMODE: set_network(v); break;
@@ -352,13 +346,6 @@ static void set_field(void *user, enum jo_field f, int v)
     case JO_F_INSRC: ctl_set("set source %s", v >= 0 && v < 4 ? SRC[v] : "auto"); break;
     case JO_F_USBROLE: ctl_set("set usb %s", v ? "host" : "device"); break;
     case JO_F_AUTOBAR: ctl_set("set autobar %s", v >= 0 && v < 3 ? AUTOBAR[v] : "off"); break;
-    case JO_F_BLE:                      /* PAIR NOW picked (even when it is the setting already) also opens the pair window */
-        ctl_set("set ble %s", v >= 0 && v < 3 ? BLE[v] : "pair");
-#if CONFIG_JANK_BLE_MIDI
-        if (v == 0)
-            ble_midi_pair();
-#endif
-        break;
     case JO_F_USBMIDI: ctl_set("set usbmidi %s", v ? "off" : "on"); break;
     case JO_F_BEATFLASH: ctl_set("set beat_flash %d", v ? 1 : 0); break;
     default: break;
@@ -424,20 +411,6 @@ void uis_button(enum jo_btn b, int down, uint32_t now)
         jo_input_down(&s_in, &s_ui, b, now, &HOST);
     else
         jo_input_up(&s_in, &s_ui, b, now, &HOST);
-    s_want_frame = 1;
-}
-
-void uis_cancel_no(void)
-{
-    s_in.deferred[JO_NO] = 0;           /* the pair window's third press: its release does nothing */
-    s_in.hint_on = 0;
-    s_ui.hint = -1;
-    s_ui.screen = JO_HOME;
-#if BOARD_LCD
-    jo_pair_overlay(&s_ui, bridge_ms());   /* the box counts the window's seconds down */
-#else
-    say("BLUETOOTH", "PAIR");
-#endif
     s_want_frame = 1;
 }
 

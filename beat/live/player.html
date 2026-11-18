@@ -104,7 +104,6 @@
       <label>Battery <input type="range" id="battlvl" min="0" max="100" value="80"> <b id="battv" class="num">80 %</b></label>
       <label><input type="checkbox" id="linein" checked> line in plugged</label>
       <label><input type="checkbox" id="usbaudio"> USB audio playing</label>
-      <label><input type="checkbox" id="blephone"> phone connected (Bluetooth)</label>
     </div>
   </div>
 
@@ -412,17 +411,16 @@ async function poll() {
    second (extra: its beat_latency, ms) (jank docs/beat.md). Each 'b' goes to the player dated as the XIAO takes the beat
    to be heard: the event's own timeStamp (Chrome: when CoreMIDI got the USB packet) on the epoch clock, minus the lag.
    The control line (F0 7D 'J' 'K' text) reads the XIAO's `beat` numbers every few seconds, its `status` every second
-   (the Link session the device screen shows: tempo, beat, transport, the outputs, Bluetooth) and `get` once (the quantum,
+   (the Link session the device screen shows: tempo, beat, transport, the outputs) and `get` once (the quantum,
    the source), and `home` 4 a second in AUDIO (the IN and CF bars: level, min, max, confidence): reads, they change
    nothing. The device's YES in LINK and AUDIO sends `play` / `stop` by the transport icon (linkStartStop), UP / DOWN in LINK
-   `tempo <bpm>` (tempoStep); the source choice `set source auto|line|usb|link`, the Bluetooth choice `set ble pair|auto|off`
-   and the pair window `ble pair` (YES on PAIR NOW, or the triple NO) go out only on the user's choice on the device
-   screen or its buttons; the Calibrate button sends `set lat_trim` (the AUDIO SHIFT on top of the auto latency, M2h;
+   `tempo <bpm>` (tempoStep); the source choice `set source auto|line|usb|link`
+   goes out only on the user's choice on the device screen or its buttons; the Calibrate button sends `set lat_trim` (the AUDIO SHIFT on top of the auto latency, M2h;
    an older firmware `set beat_latency`), only when pressed. Only asked for when the player runs with --xiao. */
 const XIAO = { asked: false, port: null, out: null, portMsg: 'asking for MIDI access', lastBeatAt: 0, lastLineAt: 0,
                latency: null, text: '', lines: [], answerAt: 0, stats: null, statsAt: 0, status: null, statusAt: 0, statusAskedAt: 0,
                cfg: null, cfgAskedAt: 0, rep: null, repAt: 0, sent: null, err: '', errAt: 0,
-               home: null, homeAt: 0, homeAskedAt: 0, pairAt: 0, srcSynced: false, foldSent: null };
+               home: null, homeAt: 0, homeAskedAt: 0, srcSynced: false, foldSent: null };
 const XIAO_STATUS_FRESH_MS = 5000;       // older `status` numbers than this are not shown (the XIAO unplugged)
 const XIAO_STATUS_MS = 1000;             // `status` (a read) this often: the session's tempo, beat and transport
 const XIAO_PLAY_WAIT_MS = 2500;          // a play / stop the page sent counts until a status answers it, at most this long
@@ -545,25 +543,12 @@ function meterNumbers(isXiao, xm, local) {
   const db = v => (v == null ? XIAO_FLOOR_DB : v);
   return { bar: db(xm.level), lo: db(xm.min), hi: db(xm.max), conf: xm.conf, hold: !!xm.hold };
 }
-/* the Bluetooth pair window and the phone, as HOME shows them: { left: seconds left | null (closed), phone: connected }.
-   --xiao: status ble_state=off|window|connected, ble_left (extrapolated), and a `ble pair` the page sent that no status has
-   answered yet counts as open (the full window) for a moment; local: dev's own window end (ms) and the panel's phone box */
-function bleNow(isXiao, st, statusAt, pairAt, localEnd, localPhone, now) {
-  if (!isXiao) return { left: now < localEnd ? (localEnd - now) / 1000 : null, phone: !!localPhone };
-  const pending = pairAt > statusAt && now - pairAt < XIAO_PLAY_WAIT_MS ? (BLE_WINDOW_S - (now - pairAt) / 1000) : null;
-  if (!st || now - statusAt > XIAO_STATUS_FRESH_MS) return { left: pending, phone: false };
-  if (pending != null) return { left: pending, phone: false };
-  if (st.ble_state === 'connected') return { left: null, phone: true };
-  if (st.ble_state === 'window') return { left: Math.max(0, (st.ble_left || 0) - (now - statusAt) / 1000), phone: false };
-  return { left: null, phone: false };
-}
 /* the XIAO's Link and jank peers, from its last `status` answer (null: none, or too old) */
 function xiaoPeers(now) {
   const st = XIAO.status;
   if (!st || now - XIAO.statusAt > XIAO_STATUS_FRESH_MS) return null;
   return { link: st.link_peers || 0, group: st.peers || 0 };
 }
-const BLE_WINDOW_S = 120;                // the Bluetooth pair window: 2 minutes (OLED.BLE_WINDOW_S: the same)
 const XIAO_FLASH_MS = 120, XIAO_SILENT_MS = 3000, XIAO_STATS_MS = 5000, JX_TEXT_MAX = 30;
 function xiaoReport(data) {
   const head = [0xf0, 0x7d, 0x4a, 0x42, 0x10];
@@ -596,7 +581,7 @@ function beatStats(lines) {
   for (const l of lines) {
     const m = /^([a-z_]+)=(-?[0-9.]+)$/.exec(l.trim());
     if (m) out[m[1]] = Number(m[2]);
-    const w = /^(bar|audio_source|ble_state|outputs|source|autobar|usbmidi|lowconf|follow)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, Bluetooth, the outputs, AUTO BAR's setting, USB MIDI CLOCK, LOW CONFIDENCE, the follower (M2i)
+    const w = /^(bar|audio_source|outputs|source|autobar|usbmidi|lowconf|follow)=([a-z]+)$/.exec(l.trim());   // words: the downbeat estimator's state, the source, the outputs, AUTO BAR's setting, USB MIDI CLOCK, LOW CONFIDENCE, the follower (M2i)
     if (w) out[w[1]] = w[2];
   }
   return out;
@@ -783,15 +768,15 @@ const VIEW_KEY = 'beatEmuView';
 const view = { scr: '1.54' };                     // the user's choice (2026-11-14): 1.54 inch
 try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')); } catch (e) { /* storage blocked: the default */ }
 const dev = { sw: false, boot: false, powerOnAt: 0, held: { up: false, down: false, no: false, yes: false },
-              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, usbMidi: 0, autoBar: 1, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1, bleMode: 1, bleEnd: 0, srcFlash: null,
+              link: false, hold: false, clocks: true, startAsked: false, ltMode: 2, inSrc: 0, usbRole: 0, usbMidi: 0, autoBar: 1, linkBpm: null, th: 80, gain: 0, confStop: true, inOff: 0, offs: [0, 0, 0], bright: 100, sleep: 0, lastInput: 0, woke: {}, rate: OLED.DEFAULT_RATE, foldK: 1, srcFlash: null,
               repeat: {}, combo: false, deferred: {}, armCache: {}, savedUntil: 0,
               net: { mode: 0, prev: 0, group: 1, ssid: 'HomeNet', pass: 'letmein42', appass: 'jankjank', apName: 'jank-a3f9', changedAt: -1e9 } };
 /* remembered in this browser (localStorage; a blocked storage only means nothing is remembered): the test panel
    (Wi-Fi, USB, battery, battery level, line in) and the device's emulator-only settings. The settings the player owns
    (threshold, low confidence, input offset, fold, hold) come back from the player itself. Passwords are not kept. */
 const PANEL_KEY = 'beatEmuPanel', DEV_KEY = 'beatEmuDevice';
-const PANEL_IDS = ['wifi', 'usb', 'bat', 'battlvl', 'linein', 'usbaudio', 'blephone'];
-const DEV_FIELDS = ['ltMode', 'gain', 'bright', 'sleep', 'offs', 'rate', 'inSrc', 'usbRole', 'usbMidi', 'bleMode'];
+const PANEL_IDS = ['wifi', 'usb', 'bat', 'battlvl', 'linein', 'usbaudio'];
+const DEV_FIELDS = ['ltMode', 'gain', 'bright', 'sleep', 'offs', 'rate', 'inSrc', 'usbRole', 'usbMidi'];
 const NET_FIELDS = ['mode', 'group', 'ssid', 'apName'];
 const loadJson = key => { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; } };
 const saveJson = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { /* not remembered */ } };
@@ -905,12 +890,6 @@ function setField(field, val) {
     if (S && S.xiao) xiaoSend('set source ' + SRC_NAMES[val]);      // --xiao: the XIAO's own (its mode follows its sound)
     else syncModeFromPlug();                                        // emu
   }
-  else if (field === 'ble') {                               // PAIR NOW (YES opens the window) / ON START / OFF
-    dev.bleMode = val;
-    if (S && S.xiao) xiaoSend('set ble ' + BLE_NAMES[val]);
-    else if (val === 2) dev.bleEnd = 0;
-    if (val === 0) pairNow(performance.now());
-  }
   else if (field === 'usbrole') dev.usbRole = val;          // emu: DEVICE (to a computer) / HOST (self-powered gear)
   else if (field === 'usbmidi') {                           // ON / OFF; --xiao: the XIAO's `set usbmidi`, read back from `get`
     dev.usbMidi = val;
@@ -926,7 +905,7 @@ function setField(field, val) {
 }
 // low confidence: STOP / START sends the threshold; KEEP RUNNING sends 0 (never gate), the threshold stays for later.
 // --xiao: the XIAO's own settings, the item changed (`set lowconf stop|run`, `set threshold N`), read back from `get`
-const SRC_NAMES = ['auto', 'line', 'usb', 'link'], BLE_NAMES = ['pair', 'auto', 'off'];     // the choices' `set source` / `set ble` words
+const SRC_NAMES = ['auto', 'line', 'usb', 'link'];     // the choices' `set source` words
 function lowConfCommand(item, confStop, th) { return item === 'lowconf' ? 'set lowconf ' + (confStop ? 'stop' : 'run') : 'set threshold ' + th; }
 function sendThreshold(item) {
   hold('th');
@@ -1078,7 +1057,6 @@ function buildCtx(now, beat) {
   const xm = s.xiao && !dev.link ? xiaoMeters(XIAO.home, XIAO.homeAt, XIAO.status, XIAO.statusAt, now) : null;
   const xg = s.xiao && !dev.link ? xiaoGate(XIAO.status, XIAO.statusAt, now) : null;
   const mn = meterNumbers(!!s.xiao, xm, { bar: meter.bar, lo: meter.lo, hi: meter.hi, conf: s.confidence || 0 });
-  const ble = bleNow(!!s.xiao, XIAO.status, XIAO.statusAt, XIAO.pairAt, dev.bleEnd, $('blephone').checked, now);
   const bpm = s.xiao ? (xrep && xrep.bpm > 0 ? xrep.bpm : null) : s.bpm ? s.bpm * dev.foldK : null;     // (--xiao: the report's tempo is the folded one)
   const fold = dev.link ? { k: 1, auto: false } : foldNow(!!s.xiao, XIAO.status, XIAO.statusAt, XIAO.home, XIAO.homeAt, XIAO.foldSent, now, dev.foldK, s.fold_auto);
   return {
@@ -1094,7 +1072,6 @@ function buildCtx(now, beat) {
     beatMs: beat ? beat.ms : 0, usb: $('usb').checked, fitted: $('bat').checked,
     batt: battLevel(), lineIn, bright: dev.bright, sleep: dev.sleep, inOff: dev.inOff, offs: dev.offs, rate: dev.rate, boot: dev.boot, splash: now - dev.powerOnAt < 800,
     net: netCtx(now), wifiQ: wifiQuality(now), groupPeers: $('wifi').value === 'none' ? 0 : xp ? xp.group : 3, setup: dev.net.mode === 3, qr: QR_CODE, saved: now < dev.savedUntil,
-    ble: { mode: dev.bleMode, left: ble.left, phone: ble.phone },
     inSrc: dev.inSrc, usbRole: dev.usbRole, usbMidi: usbMidiNow(), autoBar: dev.autoBar, bar: barNow(s, now),
     tempoStep, setField, setHold, linkStartStop,
   };
@@ -1131,15 +1108,14 @@ function paintLight(r, g) {
 
 /* ---- the 4 beat LEDs (every unit): they say what the screen would (core/jank_led.c, jlg_color), plus the source flash ----
    Values 0..255 as the firmware drives them (low: the LEDs are bright). st: now (ms), flash { until, rgb } (the source
-   flash), pair (a pair window is open, no phone yet), battPct (-1: no gauge), onUsb, joined (in a Link session), running,
+   flash), battPct (-1: no gauge), onUsb, joined (in a Link session), running,
    armed, lowConf (the confidence is under the threshold), barLocked (AUTO BAR locked), barOne (this beat is the bar's 1),
    beatMs (ms since the beat), bpm. */
-const LED = { pairMs: 250, beatMs: 80, barMs: 150, flashCapDiv: 3, breathMs: 4000, breathMax: 12, scale: 40,
-              beat: [0, 30, 0], one: [40, 18, 0], armed: [30, 20, 0], lowConf: [40, 0, 0], batt: [40, 0, 0], pair: [0, 0, 40] };
+const LED = { beatMs: 80, barMs: 150, flashCapDiv: 3, breathMs: 4000, breathMax: 12, scale: 40,
+              beat: [0, 30, 0], one: [40, 18, 0], armed: [30, 20, 0], lowConf: [40, 0, 0], batt: [40, 0, 0] };
 const SRC_FLASH = { ms: 400, usbAudio: [0, 30, 30], link: [20, 0, 40] };      // cyan = USB AUDIO, purple = LINK
 function ledColor(st) {
   if (st.flash && st.now < st.flash.until) return st.flash.rgb;
-  if (st.pair) return st.now % LED.pairMs < LED.pairMs / 2 ? LED.pair : [0, 0, 0];      // blue, 4 a second
   if (!st.onUsb && st.battPct >= 0 && st.battPct < BATT.lowPct && st.now % lowPeriodMs(st.battPct) < BATT.flashMs) return LED.batt;
   if (st.running && st.joined) {
     const mpb = st.bpm > 0 ? 60000 / st.bpm : 0;
@@ -1159,18 +1135,18 @@ function ledColor(st) {
 const ledPaint = rgb => rgb.map(v => Math.round(255 * Math.pow(Math.min(1, v / LED.scale), 0.6)));
 function ledState(now, c, beat) {
   const link = !!beat && beat.from === 'link';
-  return { now, flash: dev.srcFlash, pair: c.ble.left != null && !c.ble.phone, battPct: c.fitted ? c.batt : -1, onUsb: c.usb,
+  return { now, flash: dev.srcFlash, battPct: c.fitted ? c.batt : -1, onUsb: c.usb,
            joined: link && (c.peers > 0 || c.running), running: c.running, armed: c.armed, lowConf: !dev.link && c.gated,
            barLocked: !!c.bar && c.bar.state === 'locked', barOne: !!beat && ((beat.n % 4) + 4) % 4 === 0,
            beatIdx: beat ? ((beat.n % 4) + 4) % 4 : -1,
            beatMs: beat ? beat.ms : 1e9, bpm: beat ? beat.bpm : 0 };
 }
-// the 4 LEDs (board mm): beat n's flash on LED n only; every other state (pair, battery, armed, breathing, the source
+// the 4 LEDs (board mm): beat n's flash on LED n only; every other state (battery, armed, breathing, the source
 // flash) on all four, as the two LEDs showed it before
 const LED_X = Face.LED_X;
 function ledColors(st) {
   const rgb = ledColor(st);
-  const beatFlash = !(st.flash && st.now < st.flash.until) && !st.pair && st.running && st.joined;
+  const beatFlash = !(st.flash && st.now < st.flash.until) && st.running && st.joined;
   return LED_X.map((_, i) => (!beatFlash || i === st.beatIdx ? rgb : [0, 0, 0]));
 }
 Face.makeLeds($('dev'));
@@ -1276,8 +1252,7 @@ function setPower(on) {
 // NO on HOME is the firmware's one button (core/jank_ui.c jb_step), fed with the page's press and release events:
 //   single click  said 350 ms after its release, when no second press came in time: its action (the menu; without a screen
 //                 the source toggle). A second press must start within 350 ms of the first release.
-//   double        said 350 ms after the second release: nothing
-//   triple        said on the third press itself: the Bluetooth pair window (the screenless units' way)
+//   double        said on the second release: nothing
 //   a press held 1.5 s or more is a long press, not a click. NO held with UP / DOWN (the nudges) is a combo: the sequence is
 //   cancelled and nothing is said when NO is released. Off HOME (a menu, an edit) NO acts at once, as before.
 const CLICK = { doubleMs: 350, longMs: 1500 };
@@ -1295,15 +1270,9 @@ function clicker(k, ev, now) {
       k.st = 'down2';
       return null;
     case 'down2':
-      if (ev === 'up') { k.st = 'wait3'; k.tEdge = now; } else if (ev === 'cancel') k.st = 'held';
+      if (ev === 'up') { k.st = 'idle'; return 'double'; }
+      if (ev === 'cancel') k.st = 'held';
       return null;
-    case 'wait3':
-      if (ev === 'cancel') { k.st = 'idle'; return null; }
-      if (ev === 'tick' && now - k.tEdge >= CLICK.doubleMs) { k.st = 'idle'; return 'double'; }
-      if (ev !== 'down') return null;
-      if (now - k.tEdge >= CLICK.doubleMs) { k.st = 'down1'; k.tDown = now; return 'double'; }
-      k.st = 'held';
-      return 'triple';
     case 'held':
       if (ev === 'up') k.st = 'idle';
       return null;
@@ -1313,14 +1282,6 @@ function clicker(k, ev, now) {
   }
 }
 const clickNo = { st: 'idle', tDown: 0, tEdge: 0 };
-// the Bluetooth pair window (2 min): --xiao `ble pair` (the XIAO counts; status ble_state / ble_left say it), local: simulated.
-// OFF in the local simulation: no window (the XIAO decides for itself)
-function pairNow(now) {
-  if (S && S.xiao) { xiaoSend('ble pair'); XIAO.pairAt = now; setTimeout(askStatus, 300); }
-  else if (dev.bleMode === 2) return;
-  else dev.bleEnd = now + BLE_WINDOW_S * 1000;
-  OLED.pairOverlay(ui, now);
-}
 // NO's single click: the menu (screen), or without a screen USB AUDIO <-> LINK with a colour flash
 function noClick(now) {
   if (view.scr === 'none') {
@@ -1333,7 +1294,6 @@ function noClick(now) {
 function noEvent(e, now) {
   if (!powered() || dev.boot || !onHome()) return;
   if (e === 'click') noClick(now);
-  else if (e === 'triple') { dev.combo = true; pairNow(now); }       // (the held third press is no hint, no click)
 }
 const onHome = () => ui.screen === 'home' && dev.net.mode !== 3;
 const NUDGE_MS = 1;

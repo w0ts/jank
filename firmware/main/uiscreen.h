@@ -16,7 +16,6 @@ int uis_open_screen(void);              /* app_main, before the radio: the scree
 int uis_has_screen(void);
 void uis_start(uint32_t now);           /* the ui task's start */
 void uis_button(enum jo_btn b, int down, uint32_t now);
-void uis_cancel_no(void);               /* NO's third press opened a pair window: its release does nothing */
 void uis_boot_screen(void);             /* BOOT / BOOTLOADER, before download mode */
 /* the timers, the frames (10 a second, at once after a button), the deferred save; *led filled at each frame */
 void uis_step(uint32_t now, struct uis_led *led);

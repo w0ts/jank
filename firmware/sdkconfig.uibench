@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # The XIAO UI bench (main/Kconfig.projbuild JANK_UI_BENCH, main/board.h): a 128 x 64 I2C OLED on D4 / D5 and four buttons
 # on D3 / D8 / D9 / D10, to try the mini 2.2's screens on a XIAO. After the board's fragments:
-# JANK_VARIANT=uibench JANK_EXTRA_DEFAULTS="sdkconfig.ble;sdkconfig.uibench" scripts/build.sh xiao
+# JANK_VARIANT=uibench JANK_EXTRA_DEFAULTS=sdkconfig.uibench scripts/build.sh xiao
 # An SSD1306 module instead of an SSD1309 one: add CONFIG_JANK_UI_BENCH_SSD1306=y.
 CONFIG_JANK_UI_BENCH=y

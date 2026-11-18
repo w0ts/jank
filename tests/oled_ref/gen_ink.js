@@ -26,9 +26,6 @@ function extraState(s) {
   for (const k of ['confKnown', 'silent', 'gated', 'confHold']) out.push('c ' + k + ' ' + (s[k] ? 1 : 0));
   out.push('c autoBar ' + OLED.autoBarIndex(s.autoBar));
   out.push('c fold ' + s.fold);
-  out.push('c bleMode ' + s.ble.mode);
-  out.push('c blePhone ' + (s.ble.phone ? 1 : 0));
-  out.push('c bleLeft ' + num(s.ble.left));
   out.push('c usbMidi ' + s.usbMidi);
   out.push('c beatFlash ' + (s.beatFlash ? 1 : 0));
 }
@@ -58,7 +55,7 @@ function setters(s, log) {
     else if (f === 'out2') s.offs[2] = v; else if (f === 'rate') s.rate = v;
     else if (f === 'netmode') { if (v === 3) { if (n.mode !== 3) n.prev = n.mode; n.mode = 3; } else n.mode = v; }
     else if (f === 'group') n.group = v + 1; else if (f === 'insrc') s.inSrc = v; else if (f === 'usbrole') s.usbRole = v;
-    else if (f === 'autobar') s.autoBar = v; else if (f === 'ble') s.ble.mode = v; else if (f === 'usbmidi') s.usbMidi = v;
+    else if (f === 'autobar') s.autoBar = v; else if (f === 'usbmidi') s.usbMidi = v;
     else if (f === 'beatflash') s.beatFlash = v; else if (f === 'ssid') n.ssid = v; else if (f === 'pass') n.pass = v;
     else if (f === 'appass') n.appass = v; else if (f === 'apname') n.apName = v;
     else throw new Error('field ' + f);
@@ -75,7 +72,7 @@ function setters(s, log) {
 // one case: a state, then steps ['draw', t] | ['press', btn, t]
 function scenario(name, edit, steps) {
   const s = Object.assign(baseState(), { rssi: -55, peakDb: -12, confKnown: true, silent: false, gated: false, confHold: false, fold: 1,
-                                         ble: { mode: 0, left: null, phone: false }, usbMidi: 0, beatFlash: 0, beatN: 0 });
+                                         usbMidi: 0, beatFlash: 0, beatN: 0 });
   if (edit) edit(s);
   const log = [], set = setters(s, log);
   const ctx = () => Object.assign({}, s, { layout: 'lcd2', setup: s.net.mode === 3, qr: QR.encode('WIFI:S:' + s.net.setupName + ';T:nopass;;') }, set);
@@ -152,7 +149,7 @@ scenario('bpm zero', audio({ bpm: 0 }), [draw(0)]);
 scenario('link bpm none', link({ linkBpm: null }), [draw(0)]);
 scenario('link bpm 174.96', link({ linkBpm: 174.96 }), [draw(0)]);
 
-// ---- the top bar: transport, fold, link glyph and peers, signal, Bluetooth, plug, battery ----
+// ---- the top bar: transport, fold, link glyph and peers, signal, plug, battery ----
 scenario('stopped', audio({ running: false, beatN: null }), [draw(0)]);
 scenario('armed blink', audio({ running: false, armed: true, beatN: null }), [draw(0), draw(400), draw(799), draw(1200)]);
 for (const f of [2, 4, 0.5, 0.25]) scenario('fold ' + f, audio({ fold: f }), [draw(0)]);
@@ -170,11 +167,6 @@ scenario('client long ssid with fold', audio({ fold: 2, net: Object.assign(baseS
 scenario('client no ssid', audio({ net: Object.assign(baseState().net, { mode: 1, ssid: '' }) }), [draw(0)]);
 scenario('ap name', audio({ net: Object.assign(baseState().net, { mode: 2, apName: 'jank-a3f9' }) }), [draw(0)]);
 scenario('group 9', audio({ net: Object.assign(baseState().net, { group: 9 }) }), [draw(0)]);
-scenario('ble window open', audio({ ble: { mode: 0, left: 75, phone: false } }), [draw(0), draw(400), draw(800)]);
-scenario('ble phone', audio({ ble: { mode: 0, left: null, phone: true } }), [draw(0), draw(400)]);
-scenario('ble window and phone', audio({ ble: { mode: 0, left: 30, phone: true } }), [draw(0)]);
-scenario('ble window gated word wins', audio({ ble: { mode: 0, left: 61, phone: false }, gated: true }), [draw(0)]);
-scenario('link ble window', link({ ble: { mode: 1, left: 5, phone: false } }), [draw(0), draw(400)]);
 
 // ---- the status line: the Wi-Fi quality ----
 scenario('wifiq good', audio({ wifiQ: { rssi: -58, kbps: 24000, tx: 400, retried: 12, lost: 0 } }), [draw(0)]);
@@ -196,13 +188,13 @@ scenario('saved box', audio({ saved: true }), [draw(0)]);
 scenario('boot', audio({ boot: true }), [draw(0)]);
 scenario('splash', audio({ splash: true }), [draw(0)]);
 
-// ---- MENU: the 12 items with BEAT FLASH after DISPLAY, every row, every value ----
-const down11 = Array(11).fill('down');
+// ---- MENU: the 11 items with BEAT FLASH after DISPLAY, every row, every value ----
+const down10 = Array(10).fill('down');
 scenario('menu', null, [['press', 'no', 0], draw(1)]);
-scenario('menu walk', null, [['press', 'no', 0], draw(1), ...walk(down11, 10), ...walk(['down', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up'], 200)]);
-scenario('menu values', audio({ ltMode: 0, autoBar: 0, net: Object.assign(baseState().net, { mode: 1 }), usbRole: 1, ble: { mode: 2, left: null, phone: false }, usbMidi: 1, rate: 4, fitted: false, beatFlash: 1 }),
+scenario('menu walk', null, [['press', 'no', 0], draw(1), ...walk(down10, 10), ...walk(['down', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up'], 200)]);
+scenario('menu values', audio({ ltMode: 0, autoBar: 0, net: Object.assign(baseState().net, { mode: 1 }), usbRole: 1, usbMidi: 1, rate: 4, fitted: false, beatFlash: 1 }),
          [['press', 'no', 0], draw(1)]);
-scenario('menu values 2', audio({ ltMode: 1, autoBar: 2, net: Object.assign(baseState().net, { mode: 2 }), ble: { mode: 1, left: null, phone: false }, rate: 0, batt: 7 }),
+scenario('menu values 2', audio({ ltMode: 1, autoBar: 2, net: Object.assign(baseState().net, { mode: 2 }), rate: 0, batt: 7 }),
          [['press', 'no', 0], draw(1)]);
 scenario('menu back home', null, [['press', 'no', 0], ['press', 'no', 1], draw(2)]);
 
@@ -211,14 +203,11 @@ const toMenu = ['no'];
 const menuItem = i => [...toMenu, ...Array(i).fill('down')];
 scenario('sub audio', audio({ gain: -7, th: 35 }), [...presses(['no', 'yes']), draw(5), ...walk(['down', 'down', 'down', 'down', 'up'], 10)]);
 scenario('sub audio keep running', audio({ confStop: false, inSrc: 3, gain: 12 }), [...presses(['no', 'yes']), draw(5), ...walk(['down', 'down'], 10)]);
-scenario('sub offsets', audio({ inOff: -100, offs: [50, -1, 0] }), [...presses([...menuItem(7), 'yes']), draw(10), ...walk(['down', 'down', 'down'], 20)]);
-scenario('sub display', audio({ bright: 10, sleep: 3 }), [...presses([...menuItem(9), 'yes']), draw(20), ...walk(['down'], 30)]);
-scenario('edit beat flash', null, [...presses([...menuItem(10), 'yes']), draw(10), ...walk(['up', 'up', 'down', 'down'], 20), ['press', 'yes', 80], draw(81)]);
-scenario('edit beat flash screen cancel', audio({ beatFlash: 1 }), [...presses([...menuItem(10), 'yes']), draw(10), ...walk(['down'], 20), ['press', 'no', 40], draw(41)]);
-scenario('edit ble', null, [...presses([...menuItem(5), 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20), ['press', 'yes', 60], draw(61)]);
-scenario('edit ble repick', null, [...presses([...menuItem(5), 'yes', 'yes']), draw(10)]);
-scenario('edit ble cancel', null, [...presses([...menuItem(5), 'yes', 'up', 'no']), draw(10)]);
-scenario('edit usbmidi', null, [...presses([...menuItem(6), 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20), ['press', 'no', 60], draw(61)]);
+scenario('sub offsets', audio({ inOff: -100, offs: [50, -1, 0] }), [...presses([...menuItem(6), 'yes']), draw(10), ...walk(['down', 'down', 'down'], 20)]);
+scenario('sub display', audio({ bright: 10, sleep: 3 }), [...presses([...menuItem(8), 'yes']), draw(20), ...walk(['down'], 30)]);
+scenario('edit beat flash', null, [...presses([...menuItem(9), 'yes']), draw(10), ...walk(['up', 'up', 'down', 'down'], 20), ['press', 'yes', 80], draw(81)]);
+scenario('edit beat flash screen cancel', audio({ beatFlash: 1 }), [...presses([...menuItem(9), 'yes']), draw(10), ...walk(['down'], 20), ['press', 'no', 40], draw(41)]);
+scenario('edit usbmidi', null, [...presses([...menuItem(5), 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20), ['press', 'no', 60], draw(61)]);
 scenario('edit autobar', null, [...presses([...menuItem(2), 'yes']), draw(10), ...walk(['up', 'up', 'up', 'down', 'down'], 20), ['press', 'yes', 80], draw(81)]);
 scenario('edit autobar repick', audio({ autoBar: 2 }), [...presses([...menuItem(2), 'yes', 'yes']), draw(10)]);
 scenario('edit insrc', null, [...presses(['no', 'yes', 'yes']), draw(10), ...walk(['up', 'up', 'up', 'up', 'down'], 20), ['press', 'no', 60], draw(61)]);
@@ -227,12 +216,12 @@ scenario('edit threshold', audio({ th: 95 }), [...presses(['no', 'yes', 'down', 
 scenario('edit lowconf wide', null, [...presses(['no', 'yes', 'down', 'down', 'yes']), draw(10), ...walk(['up', 'up'], 20), ['press', 'yes', 50], draw(51)]);
 scenario('edit ltmode wide', null, [...presses([...menuItem(1), 'yes']), draw(10), ...walk(['up', 'up', 'up', 'down'], 20), ['press', 'yes', 60], draw(61)]);
 scenario('edit usb', null, [...presses([...menuItem(4), 'yes']), draw(10), ...walk(['down', 'down'], 20), ['press', 'yes', 50], draw(51)]);
-scenario('edit rate', audio({ rate: 3 }), [...presses([...menuItem(8), 'yes']), draw(10), ...walk(['up', 'up', 'up', 'down'], 20), ['press', 'no', 60], draw(61)]);
-scenario('edit offsets', audio({ offs: [49, -49, 0], inOff: 99 }), [...presses([...menuItem(7), 'yes', 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20), ['press', 'yes', 50], draw(51)]);
-scenario('edit display', audio({ bright: 90 }), [...presses([...menuItem(9), 'yes', 'yes']), draw(20), ...walk(['up', 'up', 'down', 'down'], 30), ['press', 'no', 80], draw(81)]);
-scenario('battery info', null, [...presses([...menuItem(11), 'yes']), draw(20), ['press', 'up', 21], draw(22), ['press', 'yes', 23], draw(24)]);
+scenario('edit rate', audio({ rate: 3 }), [...presses([...menuItem(7), 'yes']), draw(10), ...walk(['up', 'up', 'up', 'down'], 20), ['press', 'no', 60], draw(61)]);
+scenario('edit offsets', audio({ offs: [49, -49, 0], inOff: 99 }), [...presses([...menuItem(6), 'yes', 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20), ['press', 'yes', 50], draw(51)]);
+scenario('edit display', audio({ bright: 90 }), [...presses([...menuItem(8), 'yes', 'yes']), draw(20), ...walk(['up', 'up', 'down', 'down'], 30), ['press', 'no', 80], draw(81)]);
+scenario('battery info', null, [...presses([...menuItem(10), 'yes']), draw(20), ['press', 'up', 21], draw(22), ['press', 'yes', 23], draw(24)]);
 for (const [b, usb, fitted] of [[100, true, true], [37, false, true], [0, true, true], [64, false, false], [64, true, false], [99, true, true]])
-  scenario('battery info ' + b + ' ' + usb + ' ' + fitted, audio({ batt: b, usb, fitted }), [...presses([...menuItem(11), 'yes']), draw(20)]);
+  scenario('battery info ' + b + ' ' + usb + ' ' + fitted, audio({ batt: b, usb, fitted }), [...presses([...menuItem(10), 'yes']), draw(20)]);
 
 // ---- NETWORK, the scan list, the character editor, SETUP with its QR code ----
 const toNet = [...menuItem(3), 'yes'];

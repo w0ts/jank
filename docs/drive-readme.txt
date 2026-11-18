@@ -12,8 +12,7 @@ gone at the next restart. Files here:
 CONTROL PAGE
 ------------
 Open jank.html in Chrome or Edge, press Connect and pick the MIDI port named
-"jank". Tempo, source, network, offsets and firmware are on that page. A phone
-can use the same page over Bluetooth (docs/ble.md in the repository).
+"jank". Tempo, source, network, offsets and firmware are on that page.
 
 UPDATE THE FIRMWARE
 -------------------

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
-// The control page's logic, with no browser and no jank: the SysEx line, its transports' framing (BLE-MIDI against the C
-// framing's own vectors), the HOME line, the line layer, the iPhone apps' Web MIDI shape. Exit status: non-zero on a failure.
-// Run by tests/run.sh, which writes the C vectors first (BLEMIDI_VECTORS).
+// The control page's logic, with no browser and no jank: the SysEx line, the HOME line, the line layer, the iPhone apps' Web MIDI
+// shape. Exit status: non-zero on a failure. Run by tests/run.sh.
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
@@ -14,9 +13,9 @@ const ui = html.match(/<script id="ui">([\s\S]*?)<\/script>/)[1];
 const box = {};
 vm.createContext(box);
 vm.runInContext(logic, box);
-vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "ui", "ports.js"), "utf8") + "\nthis.jankPortName = jankPortName; this.jankPorts = jankPorts; this.overBluetooth = overBluetooth; this.outputFor = outputFor; this.portNames = portNames;", box);
+vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "ui", "ports.js"), "utf8") + "\nthis.jankPortName = jankPortName; this.jankPorts = jankPorts; this.outputFor = outputFor; this.portNames = portNames;", box);
 // classes and consts are the script's lexical names, not properties of its global: hand them out
-vm.runInContext("this.SysexIn = SysexIn; this.BleMidiIn = BleMidiIn; this.LineClient = LineClient; this.JX_PUSH_HOME = JX_PUSH_HOME;", box);
+vm.runInContext("this.SysexIn = SysexIn; this.LineClient = LineClient;", box);
 new vm.Script(ui);                       // the DOM part at least parses
 
 let checks = 0;
@@ -33,7 +32,8 @@ function ok(c, what) {
 ok(html === expandedTemplate, "page/jank.html is the expansion of page/src/jank.html: run make page");
 ok(!/<!--@include/.test(html), "no include marker left");
 ok(/<script id="face-ui">/.test(html) && /<script id="advanced-ui">/.test(html) && /const Stick = /.test(html) && /const Face = /.test(html), "the face's, Advanced's and the player's scripts are in the page");
-ok(/id="c-midi"[^>]*aria-pressed="false"/.test(html) && /id="c-bluetooth"[^>]*aria-pressed="false"/.test(html), "Connect: MIDI port and Bluetooth, none pressed before a connection");
+ok(/id="c-midi"[^>]*aria-pressed="false"/.test(html), "Connect: the MIDI port button, not pressed before a connection");
+ok(!/bluetooth|gatt|\bble\b|\bble[-_]/i.test(html), "no Bluetooth, BLE or GATT anywhere in the page");
 ok(!/id="c-sim"|>Demo<|>Simulator<|Sim\.|const Sim|sim\.js|\?sim=/.test(html), "no Demo / simulator mode left");
 ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id="c-off"/.test(html), "no Device or Connect heading, no tag, no status text, no Disconnect button");
 ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
@@ -50,8 +50,8 @@ ok(/#ledView, #seamGlow \{ display: none; \}/.test(html) && !/makeLeds|paintLed|
 ok(!/lastBeat|takeBeat|parseBeat/.test(html), "the page keeps no beat-report code any more: only the LEDs used it");
 ok(/Stick\.phaseFeed/.test(faceUi) && /id="bd-num"/.test(html) && /id="bd-slider"/.test(html), "the beat boxes run on the smooth phase, with the display delay row under Advanced");
 ok(!/id="home"|id="h-|id="t-(tempo|set|play|up|down)"|id="n-(beat|ms)/.test(html), "the HOME card is gone");
-for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source", "c-ble", "ble-pair"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the stick's menu has it, the page does not");
-for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "scan", "groups", "ble-close", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
+for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the stick's menu has it, the page does not");
+for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "scan", "groups", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
   ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
 ok(!/id="pl-file"|id="pl-prev"|id="pl-reset"|dragover|type="file" accept/.test(html), "no single-file button, no Previous, no drag and drop");
 ok(/id="pl-folder"[^>]*aria-label="Music folder"[^>]*><svg/.test(html) && /id="pl-then"/.test(html) && /id="pl-help"/.test(html), "the music folder is an icon button, 'then' and the help toggle are there");
@@ -82,13 +82,11 @@ eq(box.sysexToText(new Uint8Array([0xf0, 0x7d, 0x4a, 0x4b, 0x6f, 0xf7])), "o");
 eq(box.sysexToText([0xf0, 0x7d, 0x41, 0x42, 0x6f, 0xf7]), null);
 eq(box.sysexToText([0xf8]), null);
 
-// --- reports: 'J' 'B' <type> ---
-const home = [0xf0, 0x7d, 0x4a, 0x42, 0x11, ..."h 12000 j3 1 275 4 2 0 64 -24 87".split("").map((c) => c.charCodeAt(0)), 0xf7];
-eq(box.pushOf(home), { type: 0x11, text: "h 12000 j3 1 275 4 2 0 64 -24 87" });
-eq(box.pushOf([0xf0, 0x7d, 0x4a, 0x4b, 0x6f, 0xf7]), null);
-eq(box.pushOf([0xf0, 0x7d, 0x4a, 0x42, 0xf7]), null);
+// --- reports: 'J' 'B' <type> are not the control line's answers: the line layer drops them ---
+const report = [0xf0, 0x7d, 0x4a, 0x42, 0x10, ..."b 1 12000 steady 1".split("").map((ch) => ch.charCodeAt(0)), 0xf7];
+eq(box.sysexToText(report), null);
 
-// --- the HOME line, as tests/test_phone.c makes it ---
+// --- the HOME line, as tests/test_home.c makes it ---
 eq(box.parseHome("h 12000 j3 1 275 4 2 0 64 -24 87"),                       // older firmware: no min / max
    { bpm: 120, net: { kind: "jank", group: 3 }, transport: "playing", bar: 275, quantum: 4, link: 2, air: 0, battery: 64, level: -24, conf: 87, confHold: false, confCoast: false,
      levelMin: null, levelMax: null, audio: false, fold: "" });
@@ -116,14 +114,6 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   // the robust follower's coast: "<pct>c" -> a measured value and the coast flag
   const coast = box.parseHome("h 12000 j3 1 0 4 2 0 - -12 61c -15 -9 1");
   eq([coast.conf, coast.confHold, coast.confCoast], [61, false, true]);
-  // Bluetooth from `status`: the window's countdown, a phone, off; over Bluetooth this phone
-  eq(box.bleView({ ble_state: "window", ble_left: "95" }, 0, false), "pairing 1:35");
-  eq(box.bleView({ ble_state: "window", ble_left: "95" }, 5500, false), "pairing 1:30");
-  eq(box.bleView({ ble_state: "window", ble_left: "3" }, 4000, false), "off");
-  eq(box.bleView({ ble_state: "connected" }, 0, false), "phone connected");
-  eq(box.bleView({ ble_state: "off" }, 0, false), "off");
-  eq(box.bleView(null, 0, true), "this phone");
-  eq(box.bleView({}, 0, false), "-");
   // the audio lines of status
   eq(box.audioView({ audio: "1", audio_live: "1", audio_source: "usb", outputs: "armed", peak_db: "-3" }),
      { audio: "sound (AUDIO), usb", outputs: "armed", peak_db: "-3" });
@@ -177,36 +167,6 @@ eq(box.parseHome("b 1 12000 steady 1"), null);
   eq(got, [[0xf0, 0x7d, 0x4a, 0x4b, 0x6f, 0x6b, 0xf7], [0xf0, 0x02, 0xf7]]);   // a status byte ends a message unfinished
 }
 
-// --- BLE-MIDI against the C framing's vectors (tests/test_blemidi.c --vectors) ---
-const vectorsPath = process.env.BLEMIDI_VECTORS;
-if (!vectorsPath || !fs.existsSync(vectorsPath)) {
-  console.error("page: BLEMIDI_VECTORS not set or missing: run tests/run.sh, which writes them from test_blemidi");
-  process.exit(1);
-}
-const vectors = JSON.parse(fs.readFileSync(vectorsPath, "utf8"));
-ok(vectors.send.length >= 20, "send vectors");
-for (const v of vectors.send) eq(box.bleSend(box.textToSysex(v.text), v.cap, v.ms), v.packets);
-{
-  const d = new box.BleMidiIn(), bytes = [];
-  eq(vectors.decode.packets.map((p) => d.decode(p, (b) => bytes.push(b))), vectors.decode.results);
-  eq(bytes, vectors.decode.bytes);
-}
-// round trips at every payload from the minimum, lines of every length, through the decoder and the line layer's pieces
-for (let cap = 3; cap <= 64; cap++)
-  for (const text of ["ok\n", "get\n", "set name " + "n".repeat(23) + "\n", "x".repeat(95) + "\nok\n"]) {
-    const d = new box.BleMidiIn(), s = new box.SysexIn();
-    let back = "";
-    for (const p of box.bleSend(box.textToSysex(text), cap, 0x1abc)) {
-      ok(p.length <= cap, "packet within its payload");
-      const bytes = [];
-      eq(d.decode(p, (b) => bytes.push(b)), 0);
-      s.feed(bytes, (m) => { back += box.sysexToText(m); });
-    }
-    eq(back, text);
-  }
-eq(box.blePack([0x90, 0x3c, 0x40], 0, [], 20), false);
-eq(box.bleSysexPacket([0xf0, 0x80, 0xf7], { at: 0 }, 0, 20), null);
-
 // --- the line layer ---
 function fakeTimers() {
   const t = { next: 1, live: new Map() };
@@ -219,27 +179,24 @@ const tick = () => new Promise((r) => setImmediate(r));
 async function lineTests() {
   const timers = fakeTimers(), written = [];
   const line = new box.LineClient(async (text) => { written.push(text); }, timers);
-  const pushes = [];
-  line.onPush = (p) => pushes.push(p);
   const frames = (text) => box.textToSysex(text).forEach((f) => line.receive(f));
-  // an answer across frames, a push in the middle of it
+  // an answer across frames, a report in the middle of it
   let p = line.send("get");
   await tick();
   eq(written, ["get\n"]);
-  frames("group=3\nname=front of house\nble=pa");
-  line.receive(home);
-  frames("ir\nok\n");
+  frames("group=3\nname=front of house\nfilter=li");
+  line.receive(report);
+  frames("nk\nok\n");
   const a = await p;
-  eq(a.values, { group: "3", name: "front of house", ble: "pair" });
-  eq(pushes.map((x) => x.type), [box.JX_PUSH_HOME]);
+  eq(a.values, { group: "3", name: "front of house", filter: "link" });
   // two commands queue: the second goes out only after the first's answer
-  const p1 = line.send("set ble off"), p2 = line.send("get");
+  const p1 = line.send("set filter all"), p2 = line.send("get");
   await tick();
-  eq(written.slice(1), ["set ble off\n"]);
+  eq(written.slice(1), ["set filter all\n"]);
   frames("ok\n");
   await p1;
   await tick();
-  eq(written.slice(1), ["set ble off\n", "get\n"]);
+  eq(written.slice(1), ["set filter all\n", "get\n"]);
   frames("err bad setting\n");
   await assert.rejects(p2, /err bad setting/);
   checks++;
@@ -267,22 +224,19 @@ async function lineTests() {
 
 // --- Web MIDI ports: Maps (Chrome) and the polyfill's forEach-only objects ---
 {
-  const usb = { id: "1", name: "jank", state: "connected" }, ble = { id: "2", name: "jank 1A2B", state: "connected" };
+  const usb = { id: "1", name: "jank", state: "connected" }, named = { id: "2", name: "jank 1A2B", state: "connected" };
   const other = { id: "3", name: "FM1-E040", state: "connected" }, gone = { id: "4", name: "jank", state: "disconnected" };
-  const polyfill = { forEach(f) { [other, ble, usb, gone].forEach((p, i) => f(p, String(i))); } };
+  const polyfill = { forEach(f) { [other, named, usb, gone].forEach((p, i) => f(p, String(i))); } };
   eq(box.portList(polyfill).map((p) => p.id), ["3", "2", "1"]);
   eq(box.portList(new Map([["a", usb], ["b", gone]])).map((p) => p.id), ["1"]);
   eq(box.portList(undefined), []);
   eq(box.jankPorts(box.portList(polyfill)).map((p) => p.name), ["jank", "jank 1A2B"]);   // USB first
   eq(["jank", "jank 1A2B", "jank (USB)", "jank1A2B", "My jank", "JANK"].map(box.jankPortName), [true, true, true, true, true, true]);
-  eq(["Digitone Audio+MIDI Elektron Digitone II", "FM1-E040", "Jankowski", "jankins", "Bluetooth", "", undefined].map(box.jankPortName), [false, false, false, false, false, false, false]);
+  eq(["Digitone Audio+MIDI Elektron Digitone II", "FM1-E040", "Jankowski", "jankins", "IAC Driver Bus 1", "", undefined].map(box.jankPortName), [false, false, false, false, false, false, false]);
   eq(box.jankPorts([other, { name: "Digitone" }]), []);
   eq(box.portNames([other, usb]) + "|" + box.portNames([]), "FM1-E040, jank|none");
-  eq(box.overBluetooth("jank 1A2B"), true);
-  eq(box.overBluetooth("jank"), false);
-  eq(box.overBluetooth("FM1-E040"), false);
-  eq(box.outputFor(ble, [usb, ble]).id, "2");
-  eq(box.outputFor({ name: "Bluetooth" }, [other, usb]).id, "1");
+  eq(box.outputFor(named, [usb, named]).id, "2");
+  eq(box.outputFor({ name: "IAC Driver Bus 1" }, [other, usb]).id, "1");
   eq(box.outputFor({ name: "x" }, [other]), null);
 }
 
@@ -295,9 +249,6 @@ eq(box.networkCommands("wifi", "", "correct horse", false), null);
 eq(box.networkCommands("wifi", "Home", "short", false), null);
 eq(box.networkCommands("wifi", "Höme", "correct horse", false), null);
 eq(box.networkCommands("wifi", "x".repeat(33), "correct horse", false), null);
-// over Bluetooth: never a password (the jank refuses it there)
-eq(box.networkCommands("wifi", "Home", "correct horse", false, true), null);
-eq(box.networkCommands("wifi", "Home", "", false, true), ["set ssid Home", "set net wifi", "reboot"]);
 eq(box.networkLine({ net: "jank", group: "2" }), "MODE JANK, group 2");
 eq(box.networkLine({ net: "wifi", ssid: "Home" }), "Wi-Fi network Home");
 eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "0" }), "Looking for Home");
@@ -332,8 +283,7 @@ eq(box.setCommand("name", "x\nreboot"), null);
 eq(box.setCommand("name", "café"), null);
 eq(box.setCommand("filter", "all"), "set filter all");
 eq(box.setCommand("filter", "some"), null);
-eq(box.setCommand("ble", "auto"), "set ble auto");
-eq(box.setCommand("ble", "on"), null);
+eq(box.setCommand("ble", "auto"), null);              // gone: the control line has no such setting
 eq(box.setCommand("pass", "secret12"), null);         // not through the settings form
 
 // --- tooltips: every control the user can change says what it changes ---
