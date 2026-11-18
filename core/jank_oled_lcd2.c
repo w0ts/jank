@@ -4,6 +4,7 @@
  * function by function, of ui/oled.js's "LCD2 LAYOUT" section; tests/test_oled.c compares it with that file's own frames and ink planes
  * (tests/oled_ref/cases_ink.txt). The OLED never runs this code. Colour is information only (the ink plane): menus, edit screens and
  * overlays have none. Not touched by the stage that gave the OLED its numbers: the OLED UI's draw is jank_oled_draw.c. */
+#include "jank_bigfont.h"
 #include "jank_oled_int.h"
 #include <stdio.h>
 #include <string.h>
@@ -24,33 +25,48 @@
 
 /* the HOME geometry: ui/oled.js's L2 table */
 #define TOP_H 13
-#define LEFT 14
-#define NAME_RIGHT 66
-#define LINK_X 70
-#define SIGNAL_X 98
-#define PLUG_X 119
+#define ICON_Y 1
+#define ICON_H 11
+#define PLAY_X 2
+#define LT_X 14
+#define FOLD_X 31
+#define NAME_XR 99
+#define NAME_MAX_W 50
+#define LINK_X 103
+#define LINK_W 27
+#define PEERS_X 118
 #define BATT_X 134
-#define BATT_W 21
-#define TEMPO_Y 15
-#define TEMPO_SCALE 5
-#define BPM_X 138
-#define BPM_Y 43
-#define BOX_X 2
-#define BOX_W 36
+#define BATT_W 24
+#define TEMPO_Y 16
+#define LINK_TEMPO_Y 19
 #define BOX_GAP 4
-#define BOX_Y 52
-#define BOX_H 26
-#define LINK_BOX_Y 54
-#define LINK_BOX_H 52
-#define ROW_CF 81
-#define ROW_IN 91
-#define ROW_BAR 101
+#define BOX_Y 55
+#define AUDIO_BOX_W 36
+#define AUDIO_BOX_H 28
+#define ROW_GAP 1
+#define STATE_Y 113
+#define LINK_BOX_SIDE 36
+#define LINK_BOX_Y 73
 #define LABEL_X 2
-#define VALUE_XR 60
+#define VALUE_XR 158
 #define BAR_X 64
-#define BAR_W 94
+#define BAR_W 62
 #define LINE_H 3
-#define STATUS_Y 111
+#define VU_H 5
+
+/* 1-bit rows ('#' = lit): the link glyph (three linked nodes) 13 x 11, the plug drawn inside the battery while charging 9 x 7, and the LINK TRANSPORT
+ * icons: IGNORE a crossed circle, FOLLOW an arrow coming in, FOLLOW+LEAD a double arrow */
+static const char *const LINK_GLYPH[11] = {".....###.....", "....#####....", "....#####....", ".....###.....", "....#...#....", "...#.....#...", ".###.....###.",
+                                           "#####...#####", "#############", "#####...#####", ".###.....###."};
+static const char *const PLUG_IN_BATTERY[7] = {"..####...", "..#######", "#########", "######...", "#########", "..#######", "..####..."};
+static const char *const LT_ICON0[11] = {"...#####...", "..##...##..", ".##.....##.", "##.....#.##", "#.....#...#", "#....#....#", "#...#.....#", "##.#.....##",
+                                         ".##.....##.", "..##...##..", "...#####..."};
+static const char *const LT_ICON1[11] = {".....#.......", "....##.......", "...###.......", "..####.......", ".############", "#############", ".############",
+                                         "..####.......", "...###.......", "....##.......", ".....#......."};
+static const char *const LT_ICON2[11] = {".....#.#.....", "....##.##....", "...###.###...", "..####.####..", ".###########.", "#############", ".###########.",
+                                         "..####.####..", "...###.###...", "....##.##....", ".....#.#....."};
+static const char *const *const LT_ICONS[3] = {LT_ICON0, LT_ICON1, LT_ICON2};
+static const uint8_t TRI_W[11] = {2, 3, 5, 6, 8, 9, 8, 6, 5, 3, 2};          /* the play triangle's row widths (9 x 11) */
 
 static const char *const BAR_WORDS[4] = {NULL, "LISTEN", "LOCKED", "MANUAL"};     /* by enum jo_bar_state: off, listening, locked, manual */
 
@@ -69,12 +85,21 @@ static void bar(uint8_t *fb, int x, int y, int w, double frac)
     jo_rect(fb, x + 1, y + 1, jo_iround((w - 2) * jo_clampd(frac, 0.0, 1.0)), 5, 1);
 }
 
+/* text with its ink: the box is the text's own width and 7 rows */
+static void ink_text(uint8_t *fb, const char *s, int x, int y, int ink)
+{
+    jo_text(fb, s, x, y, 1, 1);
+    tag(ink, x, y, jo_text_w(s, 1), 7);
+}
+
 /* ---- policy: signal quality, link state, battery, level, confidence (colour = information) ---- */
-static int signal_bars(const struct jo_ctx *c)
+enum quality { Q_NONE, Q_POOR, Q_FAIR, Q_GOOD };
+
+static enum quality signal_quality(const struct jo_ctx *c)
 {
     if (!c->has_rssi || c->rssi == 0)
-        return 0;
-    return c->rssi >= SIGNAL_GOOD_DBM ? 3 : c->rssi >= SIGNAL_POOR_DBM ? 2 : 1;
+        return Q_NONE;
+    return c->rssi >= SIGNAL_GOOD_DBM ? Q_GOOD : c->rssi >= SIGNAL_POOR_DBM ? Q_FAIR : Q_POOR;
 }
 
 static int link_ink(const struct jo_ctx *c)
@@ -82,7 +107,9 @@ static int link_ink(const struct jo_ctx *c)
     return c->peers >= LINK_JOINED_MIN ? JO_INK_GOOD : c->link ? JO_INK_BAD : JO_INK_DIM;
 }
 
-static int batt_ink(int pct) { return pct < BATT_BAD_PCT ? JO_INK_BAD : pct < BATT_WARN_PCT ? JO_INK_WARN : JO_INK_GOOD; }
+static int batt_ink(int pct) { return pct < BATT_BAD_PCT ? JO_INK_BAD : pct < BATT_WARN_PCT ? JO_INK_WARN : JO_INK_NONE; }
+
+static int charging(const struct jo_ctx *c) { return c->usb && c->fitted && c->batt < 100; }
 
 static int level_ink(const struct jo_ctx *c)
 {
@@ -106,26 +133,57 @@ static const char *fold_label(int8_t exp)
     return exp == 1 ? "X2" : exp == 2 ? "X4" : exp == -1 ? "/2" : exp == -2 ? "/4" : "";
 }
 
-/* ---- HOME ---- */
-static void top_bar(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
+/* ---- the top bar ---- */
+static void transport_icon(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
 {
-    static const int8_t BARS_INK[4] = {JO_INK_DIM, JO_INK_BAD, JO_INK_WARN, JO_INK_GOOD};
-    int tri = c->running || (c->armed && (now / ARMED_BLINK_MS) % 2 == 0), bars = signal_bars(c), name_left = LEFT;
-    const char *const *lt = c->link && c->lt_mode < 3 ? jo_lt_icons[c->lt_mode] : NULL;
-    const char *fl = !c->link ? fold_label(c->fold_exp) : "";
-    char full[JO_TEXT_MAX + 16], shown[JO_TEXT_MAX + 16];
+    int tri = c->running || (c->armed && (now / ARMED_BLINK_MS) % 2 == 0);
     if (tri)
-        for (int r = 0; r < 9; r++)
-            jo_rect(fb, 2, 2 + r, (16 * ((r < 8 - r ? r : 8 - r) + 1) + 9) / 10, 1, 1);     /* ceil((min(r, 8 - r) + 1) * 1.6) */
+        for (int r = 0; r < 11; r++)
+            jo_rect(fb, PLAY_X, ICON_Y + r, TRI_W[r], 1, 1);
     else if (!c->armed)
-        jo_rect(fb, 2, 3, 7, 7, 1);
-    if (lt) {
-        jo_icon(fb, lt, 7, LEFT, 3);
-        name_left = LEFT + (int)strlen(lt[0]) + 4;
-    } else if (fl[0]) {
-        jo_text(fb, fl, LEFT, 3, 1, 1);
-        name_left = LEFT + jo_text_w(fl, 1) + 4;
-    }
+        jo_rect(fb, PLAY_X, ICON_Y + 1, 9, 9, 1);
+}
+
+/* the LINK TRANSPORT icon (both modes) and, in AUDIO mode when the fold is not 1, the fold label beside it */
+static void option_icons(uint8_t *fb, const struct jo_ctx *c)
+{
+    const char *fl = !c->link ? fold_label(c->fold_exp) : "";
+    int w = jo_text_w(fl, 1) + 4;
+    if (c->lt_mode < 3)
+        jo_icon(fb, LT_ICONS[c->lt_mode], 11, LT_X, ICON_Y);
+    if (!fl[0])
+        return;
+    jo_rect(fb, FOLD_X, ICON_Y, w, ICON_H, 1);
+    jo_px(fb, FOLD_X, ICON_Y, 0);
+    jo_px(fb, FOLD_X + w - 1, ICON_Y, 0);
+    jo_px(fb, FOLD_X, ICON_Y + ICON_H - 1, 0);
+    jo_px(fb, FOLD_X + w - 1, ICON_Y + ICON_H - 1, 0);
+    jo_text(fb, fl, FOLD_X + 2, ICON_Y + 2, 1, 0);
+}
+
+/* the battery: neutral while healthy, amber under BATT_WARN_PCT, red under BATT_BAD_PCT; while charging the plug is XOR-ed inside it (dark over the fill) */
+static void battery(uint8_t *fb, const struct jo_ctx *c)
+{
+    int x = BATT_X;
+    jo_frame(fb, x, ICON_Y, 22, ICON_H, 1);
+    jo_px(fb, x, ICON_Y, 0);
+    jo_px(fb, x + 21, ICON_Y, 0);
+    jo_px(fb, x, ICON_Y + 10, 0);
+    jo_px(fb, x + 21, ICON_Y + 10, 0);
+    jo_rect(fb, x + 22, 4, 2, 5, 1);
+    jo_rect(fb, x + 2, 3, jo_iround(18.0 * jo_clampd(c->batt, 0, 100) / 100.0), 7, 1);
+    if (charging(c))
+        for (int j = 0; j < 7; j++)
+            for (int i = 0; PLUG_IN_BATTERY[j][i]; i++)
+                if (PLUG_IN_BATTERY[j][i] == '#')
+                    jo_xor_px(fb, x + 6 + i, 3 + j);
+    tag(batt_ink(c->batt), x, ICON_Y, BATT_W, ICON_H);
+}
+
+/* GRP n (or the Wi-Fi / own network name), right-aligned to x 98 */
+static void network_name(uint8_t *fb, const struct jo_ctx *c)
+{
+    char full[JO_TEXT_MAX + 16], shown[JO_TEXT_MAX + 16];
     full[0] = 0;
     if (c->net.mode == JO_NET_JANK)
         snprintf(full, sizeof full, "GRP %u", c->net.group);
@@ -133,182 +191,161 @@ static void top_bar(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
         snprintf(full, sizeof full, "%s", c->net.ssid);
     else if (c->net.mode == JO_NET_AP)
         snprintf(full, sizeof full, "%s", c->net.ap_name);
-    if (full[0]) {
-        jo_fit(full, NAME_RIGHT - name_left, shown, sizeof shown);
-        jo_text_r(fb, shown, NAME_RIGHT, 3, 1, 1);
-    }
-    jo_jank_glyph(fb, LINK_X, 2);                                   /* the link glyph, and the Link peers beside it */
+    if (!full[0])
+        return;
+    jo_fit(full, NAME_MAX_W, shown, sizeof shown);
+    if (shown[0])
+        jo_text(fb, shown, NAME_XR - jo_text_w(shown, 1), 3, 1, 1);
+}
+
+static void top_bar(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
+{
+    transport_icon(fb, c, now);
+    option_icons(fb, c);
+    network_name(fb, c);
+    jo_icon(fb, LINK_GLYPH, 11, LINK_X, ICON_Y);                    /* the link glyph, and the Link peers beside it */
     if (c->peers > 0) {
         char n[12];
-        snprintf(n, sizeof n, "%d", c->peers);
-        jo_text(fb, n, LINK_X + 12, 3, 1, 1);
+        snprintf(n, sizeof n, "%d", c->peers < 99 ? c->peers : 99);
+        jo_text(fb, n, PEERS_X, 3, 1, 1);
     }
-    tag(link_ink(c), LINK_X, 0, 24, TOP_H);
-    for (int i = 0; i < 3; i++) {                                   /* the air: three bars, 3 px wide, 3 / 6 / 9 px high */
-        int h = 3 * (i + 1);
-        if (i < bars)
-            jo_rect(fb, SIGNAL_X + 4 * i, 12 - h, 3, h, 1);
-        else
-            jo_rect(fb, SIGNAL_X + 4 * i, 11, 3, 1, 1);
-    }
-    tag(BARS_INK[bars], SIGNAL_X, 0, 11, TOP_H);
-    if (c->usb)
-        jo_icon(fb, jo_usb_icon, 5, PLUG_X, 4);
-    if (c->fitted) {
-        jo_frame(fb, BATT_X, 2, BATT_W, 9, 1);
-        jo_rect(fb, BATT_X + BATT_W, 4, 2, 5, 1);
-        jo_rect(fb, BATT_X + 2, 4, jo_iround(17.0 * jo_clampd(c->batt, 0, 100) / 100.0), 5, 1);
-        tag(batt_ink(c->batt), BATT_X, 2, BATT_W + 2, 9);
-    }
+    tag(link_ink(c), LINK_X, 0, LINK_W, TOP_H);
+    if (c->fitted)
+        battery(fb, c);
 }
 
-/* a small progress row: label, the value right-aligned, and ONE thin line (3 px high, no outline, no track): its length is the value on
- * 94 px. A notch, 1 px wide and 5 px tall, is XOR-ed through the line at tick when it is >= 0 (a gap in the line where it passes, a stub
- * above and below where it does not). The value, the line and the notch carry ink; the label stays neutral. */
-static void progress_row(uint8_t *fb, int y, const char *label, const char *value, double frac, double tick, int has_tick, int ink)
+/* ---- the tempo ---- */
+static void tempo(uint8_t *fb, const struct jo_ctx *c)
 {
-    int vw = jo_text_w(value, 1), n = jo_iround(BAR_W * jo_clampd(frac, 0.0, 1.0));
-    jo_text(fb, label, LABEL_X, y, 1, 1);
-    jo_text(fb, value, VALUE_XR - vw, y, 1, 1);
-    tag(ink, VALUE_XR - vw, y, vw, 7);
-    jo_rect(fb, BAR_X, y + 2, n, LINE_H, 1);
-    tag(ink, BAR_X, y + 2, n, LINE_H);
-    if (has_tick) {
-        int x = BAR_X + jo_iround((BAR_W - 1) * tick);
-        jo_xor_col(fb, x, y + 1, y + 5);
-        tag(ink, x, y + 1, 1, 5);
-    }
+    const struct jbf_font *font = c->link ? &jbf_large : &jbf_normal;
+    int has = c->link ? c->has_link_bpm : c->has_bpm;
+    double bpm = c->link ? c->link_bpm : c->bpm;
+    char s[24];
+    if (has && bpm != 0.0)
+        jo_fixed(bpm, 1, s, sizeof s);
+    else
+        snprintf(s, sizeof s, "---");
+    jbf_draw(font, fb, s, (W - jbf_width(font, s)) / 2, c->link ? LINK_TEMPO_Y : TEMPO_Y);
 }
 
-/* the BAR row: an outlined bar (94 x 5, a 3 px fill inside it), neutral, no tick */
-static void outlined_row(uint8_t *fb, int y, const char *label, const char *value, double frac)
+/* ---- the info rows ---- */
+static int bar_fill_width(double frac) { return jo_iround(BAR_W * jo_clampd(frac, 0.0, 1.0)); }
+static int bar_tick_x(double frac) { return BAR_X + jo_iround((BAR_W - 1) * frac); }
+static double db_frac(double db) { return jo_clampd((db - METER_MIN_DB) / -METER_MIN_DB, 0.0, 1.0); }
+static int vu_ink(int col) { return JO_INK_VU0 + JO_VU_STEPS * col / BAR_W; }
+
+static void row_text(uint8_t *fb, int y, const char *label, const char *value)
 {
     jo_text(fb, label, LABEL_X, y, 1, 1);
     jo_text(fb, value, VALUE_XR - jo_text_w(value, 1), y, 1, 1);
+}
+
+/* the CONFIDENCE row: one thin line (3 px high, no outline, no track) whose length is the value on 62 px, with a notch (1 px wide, 5 tall) XOR-ed
+ * through it at tick; the value, the line and the notch carry ink, the label stays neutral */
+static void line_row(uint8_t *fb, int y, const char *label, const char *value, double frac, double tick, int ink)
+{
+    int n = bar_fill_width(frac), x = bar_tick_x(tick);
+    row_text(fb, y, label, value);
+    tag(ink, VALUE_XR - jo_text_w(value, 1), y, jo_text_w(value, 1), 7);
+    jo_rect(fb, BAR_X, y + 2, n, LINE_H, 1);
+    tag(ink, BAR_X, y + 2, n, LINE_H);
+    jo_xor_col(fb, x, y + 1, y + 5);
+    tag(ink, x, y + 1, 1, 5);
+}
+
+/* the INPUT row: a continuous VU meter 5 px high on 62 px, every column the ramp id of its position on the dBFS scale, and a notch (7 px tall,
+ * XOR-ed) at the tracker's -50 dBFS. The number carries the level rule's ink. */
+static void vu_row(uint8_t *fb, int y, const struct jo_ctx *c)
+{
+    char value[16];
+    int top = y + 1, n = bar_fill_width(db_frac(c->level_db)), vw;
+    snprintf(value, sizeof value, "%ddB", jo_iround(c->level_db));
+    vw = jo_text_w(value, 1);
+    row_text(fb, y, "INPUT", value);
+    tag(level_ink(c), VALUE_XR - vw, y, vw, 7);
+    jo_rect(fb, BAR_X, top, n, VU_H, 1);
+    for (int i = 0; i < n; i++)
+        tag(vu_ink(i), BAR_X + i, top, 1, VU_H);
+    jo_xor_col(fb, bar_tick_x(db_frac(QUIET_DB)), y, y + 6);
+}
+
+/* the BAR row: AUTO BAR's state word and an outlined bar (62 x 5, a 3 px fill inside it), neutral, no tick */
+static void outlined_row(uint8_t *fb, int y, const char *label, const char *value, double frac)
+{
+    jo_text(fb, label, LABEL_X, y, 1, 1);
+    jo_text(fb, value, LABEL_X + 58 - jo_text_w(value, 1), y, 1, 1);
     jo_frame(fb, BAR_X, y + 1, BAR_W, 5, 1);
     jo_rect(fb, BAR_X + 1, y + 2, jo_iround((BAR_W - 2) * jo_clampd(frac, 0.0, 1.0)), 3, 1);
 }
 
 /* the beat indicator (no LEDs): the lit box solid, the others 2 px outlines; the first one is amber only while lit */
-static void beat_boxes(uint8_t *fb, const struct jo_ctx *c, int y, int h)
+static void beat_boxes(uint8_t *fb, const struct jo_ctx *c, int x0, int y, int w, int h, int gap)
 {
     for (int i = 0; i < 4; i++) {
-        int x = BOX_X + i * (BOX_W + BOX_GAP), on = c->has_beat && ((c->beat_n % 4) + 4) % 4 == i;
+        int x = x0 + i * (w + gap), on = c->has_beat && ((c->beat_n % 4) + 4) % 4 == i;
         if (on)
-            jo_rect(fb, x, y, BOX_W, h, 1);
+            jo_rect(fb, x, y, w, h, 1);
         else {
-            jo_frame(fb, x, y, BOX_W, h, 1);
-            jo_frame(fb, x + 1, y + 1, BOX_W - 2, h - 2, 1);
+            jo_frame(fb, x, y, w, h, 1);
+            jo_frame(fb, x + 1, y + 1, w - 2, h - 2, 1);
         }
         if (i == 0 && on)
-            tag(JO_INK_ONE, x, y, BOX_W, h);
+            tag(JO_INK_ONE, x, y, w, h);
     }
 }
 
-/* the Wi-Fi quality as one line, "-58dBm 24M R3% L0%": a BAD part is drawn inverted */
-struct seg {
-    char t[16];
-    uint8_t bad;
-};
+static int box_row_x(int w, int gap) { return (W - (4 * w + 3 * gap)) / 2; }
 
-static int wifi_segs(const struct jo_wifiq *q, struct seg *sg)
+/* the state line (AUDIO only), the first state that applies; nothing while it is simply running */
+static void state_word(uint8_t *fb, const struct jo_ctx *c)
 {
-    int retry = -1, lost = -1;
-    if (!q->rssi) {
-        snprintf(sg[0].t, sizeof sg[0].t, "NO SIGNAL");
-        sg[0].bad = 1;
-        return 1;
-    }
-    if (q->tx) {
-        retry = jo_iround(100.0 * q->retried / q->tx);
-        lost = jo_iround(100.0 * q->lost / q->tx);
-    }
-    snprintf(sg[0].t, sizeof sg[0].t, "%ddBm", q->rssi);
-    snprintf(sg[1].t, sizeof sg[1].t, "%dM", jo_iround(q->kbps / 1000.0));
-    if (retry < 0)
-        snprintf(sg[2].t, sizeof sg[2].t, "R--");
-    else
-        snprintf(sg[2].t, sizeof sg[2].t, "R%d%%", retry);
-    if (lost < 0)
-        snprintf(sg[3].t, sizeof sg[3].t, "L--");
-    else
-        snprintf(sg[3].t, sizeof sg[3].t, "L%d%%", lost);
-    sg[0].bad = sg[1].bad = q->rssi < SIGNAL_POOR_DBM;
-    sg[2].bad = retry >= 30;
-    sg[3].bad = lost >= 10;
-    return 4;
-}
-
-/* the bottom line: the confidence words on the left (AUDIO), else the Wi-Fi line; the threshold on the right */
-static void status_line(uint8_t *fb, const struct jo_ctx *c)
-{
-    int y = STATUS_Y, coast = !c->conf_hold && !c->conf_unknown && c->running && c->conf * 100 < c->th;
+    int coast = !c->conf_hold && !c->conf_unknown && c->running && c->conf * 100 < c->th;
     const char *word = NULL;
-    int ink = JO_INK_NONE;
-    char s[32];
-    if (!c->link) {
-        if (c->gated) {
-            word = "GATED";
-            ink = JO_INK_BAD;
-        } else if (c->conf_hold) {
-            word = "HOLD";
-            ink = JO_INK_DIM;
-        } else if (coast) {
-            word = "COAST";
-            ink = JO_INK_WARN;
-        }
-    }
-    if (word) {
-        jo_text(fb, word, 2, y, 1, 1);
-        tag(ink, 2, y, jo_text_w(word, 1), 7);
-    } else if (c->has_wifiq) {
-        struct seg sg[4];
-        int n = wifi_segs(&c->wifiq, sg), x = 2;
-        for (int i = 0; i < n; i++) {
-            int w = jo_text_w(sg[i].t, 1);
-            if (sg[i].bad) {
-                jo_rect(fb, x - 1, y - 1, w + 2, 9, 1);
-                jo_text(fb, sg[i].t, x, y, 1, 0);
-                tag(JO_INK_BAD, x - 1, y - 1, w + 2, 9);
-            } else
-                jo_text(fb, sg[i].t, x, y, 1, 1);
-            x += w + 6;
-        }
-    }
-    if (!c->link) {
-        snprintf(s, sizeof s, "%s %d", c->conf_stop ? "STOP" : "MIN", c->th);
-        jo_text_r(fb, s, W - 3, y, 1, 1);
-    }
+    int ink = JO_INK_DIM;
+    if (c->gated) {
+        word = "GATED";
+        ink = JO_INK_BAD;
+    } else if (c->conf_hold)
+        word = "HOLD";
+    else if (coast) {
+        word = "COAST";
+        ink = JO_INK_WARN;
+    } else if (!c->running)
+        word = "STOPPED";
+    else if (c->silent)
+        word = "SILENT";
+    if (word)
+        ink_text(fb, word, (W - jo_text_w(word, 1)) / 2, STATE_Y, ink);
+}
+
+/* the info rows (INPUT, CONFIDENCE, BAR when shown), ROW_GAP apart, as one block centred between the bottom of the beat boxes and the state line:
+ * the empty rows above and below differ by at most 1, the odd one goes below. Returns the first row's y. */
+static int rows_top(int with_bar)
+{
+    int n = with_bar ? 3 : 2, block = n * 7 + (n - 1) * ROW_GAP, bottom = BOX_Y + AUDIO_BOX_H;
+    return bottom + (STATE_Y - bottom - block) / 2;
 }
 
 static void home(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
 {
-    char tempo[24], value[16];
-    int has = c->link ? c->has_link_bpm : c->has_bpm;
-    double bpm = c->link ? c->link_bpm : c->bpm;
+    char value[16];
+    int with_bar = c->has_bar && c->bar_state != JO_BAR_OFF && c->bar_state <= JO_BAR_MANUAL, pitch = 7 + ROW_GAP, row = rows_top(with_bar);
     top_bar(fb, c, now);
-    if (has && bpm != 0.0)
-        jo_fixed(bpm, 1, tempo, sizeof tempo);
-    else
-        snprintf(tempo, sizeof tempo, "---");
-    jo_text(fb, tempo, 2, TEMPO_Y, TEMPO_SCALE, 1);
-    jo_text(fb, "BPM", BPM_X, BPM_Y, 1, 1);
+    tempo(fb, c);
     if (c->link) {
-        beat_boxes(fb, c, LINK_BOX_Y, LINK_BOX_H);
-        status_line(fb, c);
+        beat_boxes(fb, c, box_row_x(LINK_BOX_SIDE, BOX_GAP), LINK_BOX_Y, LINK_BOX_SIDE, LINK_BOX_SIDE, BOX_GAP);
         return;
     }
-    beat_boxes(fb, c, BOX_Y, BOX_H);
+    beat_boxes(fb, c, box_row_x(AUDIO_BOX_W, BOX_GAP), BOX_Y, AUDIO_BOX_W, AUDIO_BOX_H, BOX_GAP);
+    vu_row(fb, row, c);
     if (c->conf_unknown)
         snprintf(value, sizeof value, "--");
     else
         snprintf(value, sizeof value, "%d%%", jo_iround(c->conf * 100));
-    progress_row(fb, ROW_CF, "CF", value, c->conf_unknown ? 0.0 : c->conf, c->th / 100.0, 1, conf_ink(c));
-    snprintf(value, sizeof value, "%ddB", jo_iround(c->level_db));
-    progress_row(fb, ROW_IN, "IN", value, (c->level_db - METER_MIN_DB) / -METER_MIN_DB, (QUIET_DB - METER_MIN_DB) / -METER_MIN_DB, 1, level_ink(c));
-    if (c->has_bar && c->bar_state != JO_BAR_OFF && c->bar_state <= JO_BAR_MANUAL)
-        outlined_row(fb, ROW_BAR, "BAR", BAR_WORDS[c->bar_state], c->bar_state == JO_BAR_MANUAL ? 0.0 : c->bar_conf);
-    status_line(fb, c);
+    line_row(fb, row + pitch, "CONFIDENCE", value, c->conf_unknown ? 0.0 : c->conf, c->th / 100.0, conf_ink(c));
+    if (with_bar)
+        outlined_row(fb, row + 2 * pitch, "BAR", BAR_WORDS[c->bar_state], c->bar_state == JO_BAR_MANUAL ? 0.0 : c->bar_conf);
+    state_word(fb, c);
 }
 
 /* ---- the lists: a title bar of 11 px, rows of 9 px from y 13 (12 rows: the whole MENU fits), full width, neutral, the selected row inverted ---- */
@@ -427,6 +464,26 @@ static void edit(uint8_t *fb, const struct jo_ui *ui)
     jo_text_c(fb, h2, 82, 1, 1);
 }
 
+/* the read-only SIGNAL row under the NETWORK rows: the dBm (the best jank peer, or the router in Wi-Fi mode) and a word coloured by its quality */
+static void signal_row(uint8_t *fb, int y, const struct jo_ctx *c)
+{
+    static const char *const WORDS[4] = {"NONE", "POOR", "FAIR", "GOOD"};
+    static const uint8_t INKS[4] = {JO_INK_DIM, JO_INK_BAD, JO_INK_WARN, JO_INK_GOOD};
+    enum quality q = signal_quality(c);
+    int wx = W - 4 - jo_text_w(WORDS[q], 1);
+    char dbm[16];
+    jo_text(fb, "SIGNAL", 4, y, 1, 1);
+    if (!c->has_rssi) {
+        jo_text_r(fb, "-", W - 4, y, 1, 1);
+        return;
+    }
+    ink_text(fb, WORDS[q], wx, y, INKS[q]);
+    if (c->rssi != 0) {
+        snprintf(dbm, sizeof dbm, "%ddBm", c->rssi);
+        jo_text_r(fb, dbm, wx - 6, y, 1, 1);
+    }
+}
+
 static void net(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
     struct jo_net_row rows[4];
@@ -442,6 +499,7 @@ static void net(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
                 if (rows[i].help[k] && rows[i].help[k][0])
                     jo_text(fb, rows[i].help[k], 3, 101 + 9 * k, 1, 1);
     }
+    signal_row(fb, ROW0 + n * PITCH, c);
 }
 
 static void scan(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
