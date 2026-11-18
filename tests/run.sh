@@ -122,6 +122,7 @@ if command -v node >/dev/null; then
     node "$HERE/tests/test_page.js"
     node "$HERE/tests/test_stick.js"
     node "$HERE/tests/test_lcd2.js"
+    node "$HERE/tests/test_box3.js"
     node "$HERE/tests/test_lcd_palette.js"
     node "$HERE/tests/test_player.js"
     node "$HERE/tests/test_tags.js"

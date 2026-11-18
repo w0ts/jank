@@ -43,13 +43,14 @@ ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html),
 ok(/<summary[^>]*>Details<\/summary>/.test(html), "the Details section is still there");
 ok(/id="live" class="hide"/.test(html) && /id="c-advanced-box" class="hide"/.test(html) && /id="player" class="hide"/.test(html) && /id="advanced-extra" class="hide"/.test(html), "the face, the Advanced box, the Player card and the Advanced extra start hidden");
 ok(!/face-hint|The stick has no screen: this is a virtual screen of its state/.test(html), "no key-hint line and no 'no screen' note around the device");
-ok(/#face \.lbl, #face \.brand \{ display: none; \}/.test(html) && !/max-width: 520px/.test(html), "the edge labels and the caption are hidden on this page; the drawing is no longer capped at 520 px");
-ok(/setAttribute\("viewBox", "-8\.5 -6 87 80\.5"\)/.test(html) && /card\.title = Stick\.KEY_HINT/.test(html), "the box is cropped to its jacks and the keys are a tooltip");
+ok(!/class="lbl|class="brand|<text[^>]*class="lbl/.test(html) && !/max-width: 520px/.test(html), "the new drawing has no edge labels and no caption (no text but the keys' marks); the drawing is not capped at 520 px");
+ok(/Box3\.build\(svg\)/.test(html) && !/setAttribute\("viewBox"/.test(html) && /card\.title = Stick\.KEY_HINT/.test(html) && /id="dev"/.test(html) && !/id="ledView"|id="pwr"|class="brand"/.test(html), "the box is drawn by Box3.build from its table (view box from the table), no LEDs, no power switch, the keys are a tooltip");
+ok(/<g id="dpad"><\/g>/.test(html) && /<foreignObject id="oledFO"[^>]*><canvas id="oled" width="320" height="240">/.test(html), "the drawing shell: the D-pad group, the screen canvas of 320 x 240");
 ok(!/pl-test|testStick|Test stick output|createOscillator/.test(html), "no 'Test stick output': no link, no handler, no tone generator");
 ok(/id="pl-out-row" class="note pl-out hide"/.test(html), "the 'stick output' line starts hidden: it shows only when something needs the user");
 ok(/Allow on every visit/.test(html), "the ? help says what 'Allow on every visit' does");
 const faceUi = html.match(/<script id="face-ui">([\s\S]*?)<\/script>/)[1];
-ok(/#ledView, #seamGlow \{ display: none; \}/.test(html) && !/makeLeds|paintLed|Stick\.leds/.test(faceUi), "the control page shows no LED dots and draws none (the Mac simulator still does)");
+ok(!/id="ledView"|id="seamGlow"/.test(html) && !/makeLeds|paintLed|Stick\.leds/.test(faceUi), "the control page shows no LED dots and draws none (the Mac simulator still does)");
 ok(!/lastBeat|takeBeat|parseBeat/.test(html), "the page keeps no beat-report code any more: only the LEDs used it");
 ok(/Stick\.phaseFeed/.test(faceUi) && /id="bd-num"/.test(html) && /id="bd-slider"/.test(html), "the beat boxes run on the smooth phase, with the display delay row under Advanced");
 ok(!/id="home"|id="h-|id="t-(tempo|set|play|up|down)"|id="n-(beat|ms)/.test(html), "the HOME card is gone");
