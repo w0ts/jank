@@ -54,12 +54,15 @@ for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-thresho
 for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "scan", "groups", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
   ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
 ok(!/id="pl-file"|id="pl-prev"|id="pl-reset"|dragover|type="file" accept/.test(html), "no single-file button, no Previous, no drag and drop");
-ok(/id="pl-folder"[^>]*aria-label="Music folder"[^>]*><svg/.test(html) && /id="pl-then"/.test(html) && /id="pl-help"/.test(html), "the music folder is an icon button, 'then' and the help toggle are there");
+ok(/id="pl-folder"[^>]*aria-label="Music folder"[^>]*><svg/.test(html) && /id="pl-then"[^>]*><svg/.test(html) && /id="pl-help"/.test(html), "the music folder and the after-track mode are icon buttons, the help toggle is there");
+ok(/id="pl-play"[^>]*><svg/.test(html) && /id="pl-next"[^>]*><svg/.test(html) && !/>Play<\/button>|>Next<\/button>/.test(html), "Play and Next are icon buttons, no text");
+ok(!/id="pl-pitch-num"/.test(html) && !/<select id="pl-then"/.test(html), "no pitch number box, no 'then' select");
+ok(html.indexOf('id="pl-folder"') > html.indexOf('id="pl-next"') && html.indexOf('id="pl-folder"') < html.indexOf('id="pl-crumbs"'), "the folder button sits in the folder row, before the path, below the toolbar");
 const playerUi = html.match(/<script id="player-ui">([\s\S]*?)<\/script>/)[1];
 ok(!/analyser\.connect/.test(playerUi), "the meter's analyser is only listened to: it feeds no output");
 ok(/id="pl-meter"/.test(html) && /id="pl-status"/.test(html), "the player card shows a level meter and a status line");
 ok(/id="pl-bpm"/.test(html) && /Player\.expectedBpm\(/.test(html), "the player shows the tag BPM times the pitch through Player.expectedBpm");
-ok(/id="pl-monitor" type="checkbox" checked/.test(html), "the monitor check box is on by default");
+ok(/id="pl-monitor"[^>]*aria-pressed="true"/.test(html) && /id="pl-monitor"[^>]*mutes only your speakers/.test(html), "the monitor is an icon toggle, on by default, its tip says it mutes only the speakers");
 ok(/params\.get\("screen"\) === "oled" \? "2\.42" : "lcd2"/.test(html) && !/board === "lcd2"|params\.get\("scale"\)/.test(html), "the face shows the colour lcd2 screen by default for every board; only ?screen=oled gives the 2.42 in OLED; no ?scale= any more");
 ok(!/https?:\/\//.test(html), "the page loads nothing external");
 ok(!/<script[^>]+src=/.test(html) && !/<link/.test(html), "no script or style from elsewhere");
@@ -308,7 +311,7 @@ eq(box.setCommand("pass", "secret12"), null);         // not through the setting
   const tipOf = (id) => (html.match(new RegExp('<[a-z]+ [^>]*id="' + id + '"[^>]*>')) || [""])[0];
   for (const id of ["c-midi", "pl-play", "pl-vol", "bd-slider", "al-on", "net-apply", "bootloader", "scan"]) ok(/\stitle="[^"]+"/.test(tipOf(id)), id + " has a tooltip of its own");
   ok(/action\.title = "Makes the stick join this group/.test(html), "the Join buttons of the group list are built with a tooltip");
-  ok(/Pitch[^"]*tempo the stick tracks/.test(tipOf("pl-pitch")) && /Off mutes only your speakers/.test(html) && /restarts it/.test(tipOf("net-apply")), "the tooltips carry the side effects: pitch moves the tracked tempo, monitor off mutes only the speakers, Save and restart restarts the stick");
+  ok(/Pitch[^"]*tempo the stick tracks/.test(tipOf("pl-pitch")) && /mutes only your speakers/.test(html) && /restarts it/.test(tipOf("net-apply")), "the tooltips carry the side effects: pitch moves the tracked tempo, monitor off mutes only the speakers, Save and restart restarts the stick");
 }
 
 lineTests().then(() => console.log("page: " + checks + " checks passed"), (e) => { console.error(e); process.exit(1); });
