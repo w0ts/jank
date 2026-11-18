@@ -73,6 +73,7 @@ const withoutLinks = html.replace(/<a href="https:\/\/(github\.com\/w0ts\/jank|w
 ok(!/https?:\/\//.test(withoutLinks), "the page loads nothing external");
 ok(/<nav id="home-links" class="hide"/.test(html) && /location\.protocol === "file:"\) \$\("home-links"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub links are hidden unless the page is opened from a file");
 ok(/Audio works better on the GitHub hosted page/.test(html), "the hosted page link's tip says audio works better there");
+ok(/navigator\.mediaSession\.setActionHandler\("nexttrack", \(\) => \{ if \(!el\("pl-next"\)\.disabled\) skip\(\); \}\)/.test(html), "the media key next track does what the Next button does");
 ok(!/<script[^>]+src=/.test(html) && !/<link/.test(html), "no script or style from elsewhere");
 ok(/<title>jank<\/title>/.test(html), "title");
 ok(!/innerHTML/.test(html), "device text goes in through textContent only");

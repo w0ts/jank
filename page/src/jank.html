@@ -1919,6 +1919,8 @@ autoConnect();
   // ---- wiring ----
   el("pl-play").addEventListener("click", togglePlay);
   el("pl-next").addEventListener("click", skip);
+  // the keyboard's media key "next track" does what the Next button does (only while the button is usable)
+  if ("mediaSession" in navigator) navigator.mediaSession.setActionHandler("nexttrack", () => { if (!el("pl-next").disabled) skip(); });
   el("pl-pitch").addEventListener("input", applyPitch);
   el("pl-pitch").addEventListener("dblclick", () => { el("pl-pitch").value = 0; applyPitch(); });
   el("pl-then").addEventListener("click", () => setThen(Player.AFTER_MODES[(Player.AFTER_MODES.indexOf(thenMode()) + 1) % Player.AFTER_MODES.length]));
