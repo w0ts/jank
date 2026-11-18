@@ -6,6 +6,5 @@
 .device .cap { fill:#2c2e31; stroke:#16171a; stroke-width:.4; stroke-linejoin:round; pointer-events:none; }
 .device .armarea { fill:transparent; stroke:none; cursor:pointer; }
 .device .armarea.on { fill:#4b4f54; }
-.device .glyph { fill:#c9ccd0; font-size:3.2px; text-anchor:middle; dominant-baseline:central; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
-.device .glyph.s { font-size:2.5px; }
+.device .glyph { fill:#c9ccd0; text-anchor:middle; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
 .device canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#04060a; }

@@ -68,7 +68,11 @@ ok(/id="pl-meter"/.test(html) && /id="pl-status"/.test(html), "the player card s
 ok(/id="pl-bpm"/.test(html) && /Player\.expectedBpm\(/.test(html), "the player shows the tag BPM times the pitch through Player.expectedBpm");
 ok(/id="pl-monitor"[^>]*aria-pressed="true"/.test(html) && /id="pl-monitor"[^>]*mutes only your speakers/.test(html), "the monitor is an icon toggle, on by default, its tip says it mutes only the speakers");
 ok(/params\.get\("screen"\) === "oled" \? "2\.42" : "lcd2"/.test(html) && !/board === "lcd2"|params\.get\("scale"\)/.test(html), "the face shows the colour lcd2 screen by default for every board; only ?screen=oled gives the 2.42 in OLED; no ?scale= any more");
-ok(!/https?:\/\//.test(html), "the page loads nothing external");
+// the only web addresses in the page are the two links shown when it is opened from the jank's drive (file:); nothing is loaded from them
+const withoutLinks = html.replace(/<a href="https:\/\/(github\.com\/w0ts\/jank|w0ts\.github\.io\/jank\/)" target="_blank"/g, "");
+ok(!/https?:\/\//.test(withoutLinks), "the page loads nothing external");
+ok(/<nav id="home-links" class="hide"/.test(html) && /location\.protocol === "file:"\) \$\("home-links"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub links are hidden unless the page is opened from a file");
+ok(/Audio works better on the GitHub hosted page/.test(html), "the hosted page link's tip says audio works better there");
 ok(!/<script[^>]+src=/.test(html) && !/<link/.test(html), "no script or style from elsewhere");
 ok(/<title>jank<\/title>/.test(html), "title");
 ok(!/innerHTML/.test(html), "device text goes in through textContent only");
