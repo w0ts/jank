@@ -690,6 +690,26 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     eq([shown(c.page, 'c-ports-box'), c.frames()], [true, 0], '(e) shown, and the Digitone untouched');
     c.page.box.disconnected();
 
+    // polled commands that time out: the message once per episode, cleared when answers come again
+    {
+      const q = await connected();
+      const realSend = q.page.box.S.line.send.bind(q.page.box.S.line);
+      let silent = true;
+      q.page.box.S.line.send = (command, ms) => (silent ? Promise.reject(Object.assign(new Error('The jank did not answer'), { noAnswer: true })) : realSend(command, ms));
+      for (const [, tick] of q.page.intervals()) tick();
+      await settle();
+      const first = q.page.el('msg').textContent;
+      q.page.el('msg').textContent = 'marker';
+      for (const [, tick] of q.page.intervals()) tick();
+      await settle();
+      eq([first.startsWith('The jank did not answer ('), q.page.el('msg').textContent], [true, 'marker'], 'a repeated timeout of the polling does not say it again');
+      silent = false;
+      for (const [, tick] of q.page.intervals()) tick();
+      await settle();
+      eq(q.page.el('msg').textContent, '', 'answers again: the message is cleared');
+      q.page.box.disconnected();
+    }
+
     // the error names the port that did not answer
     const wrong = fakeMidi({ get: '' });
     wrong.output.send = () => {};
@@ -699,7 +719,8 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     wp.el('c-midi').click();
     await settle();
     for (let k = 0; k < 2; k++) { for (const [id, fn] of wp.timeouts()) { wp.box.clearTimeout(id); fn(); } await settle(); }
-    eq(wp.el('msg').textContent.startsWith('no answer to get from jank. If the app asks for SysEx, turn it on.'), true, 'no answer to get: names the port, keeps the SysEx hint');
+    eq(wp.el('msg').textContent, 'The jank did not answer (jank). Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port; if the browser asks, allow SysEx for this page.', 'no answer: one plain message naming the port, with the SysEx hint at connect');
+    ok(!/get|home|status/.test(wp.el('msg').textContent.replace('MIDI port','')), 'no command name in the message');
   }
 
   // ---- auto connect: at load, only when the browser already holds the MIDI permission with SysEx ----
