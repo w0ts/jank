@@ -50,7 +50,9 @@ struct jb_fe {
  * an FFT result (bins 0 .. the filterbank's highest, BEAT_BINS floats at most); the 162 features from magnitudes (updates fe->prev). */
 void jb_fe_stage_window(struct jb_fe *fe);
 void jb_fe_stage_split(const float *work, float *mag);
+void jb_fe_stage_split_ref(const float *work, float *mag);     /* the same with libm's sqrtf: the reference */
 void jb_fe_stage_bands(struct jb_fe *fe, const float *mag, float *feat);
+float jb_fe_fast_sqrt(float x);        /* the magnitude stage's sqrt (relative error under 4.8e-6) */
 int jb_fe_maxbin(void);                /* the highest bin any filter reads, plus one */
 #endif
 
