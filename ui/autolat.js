@@ -57,16 +57,3 @@ function clampBeatLatency(ms) { return Math.max(MIN_BEAT_LATENCY_MS, Math.min(MA
 function autoLatPageSuggestion(monitorMs, stickMs) {
   return Number.isFinite(monitorMs) && Number.isFinite(stickMs) ? clampBeatLatency(monitorMs - stickMs) : null;
 }
-/* the one line under Advanced: what was sent, or why nothing was. s: { on, playing (the stick path plays), monitorMs, stickMs, source ('usb'
-   | 'line' | 'none' | null: unknown), current (the stick's auto base, ms or null), sent (ms or null), error, minChangeMs } */
-function autoLatPageLabel(s) {
-  if (!s.on) return 'off: the stick keeps its own value';
-  if (s.error) return 'not sent: ' + s.error;
-  if (s.source !== null && s.source !== 'usb') return 'not sent: the stick\'s audio source is ' + s.source + ', not USB';
-  if (!Number.isFinite(s.stickMs) || !s.playing) return 'stick path unknown (it is measured while the stick path plays)';
-  if (!Number.isFinite(s.monitorMs)) return 'speakers latency unknown';
-  const sug = autoLatPageSuggestion(s.monitorMs, s.stickMs), why = '(speakers ' + s.monitorMs + ' - stick path ' + s.stickMs + ')';
-  if (s.sent !== null && s.sent !== undefined) return 'sent ' + s.sent + ' ms ' + why;
-  if (Number.isFinite(s.current) && Math.abs(sug - s.current) <= (s.minChangeMs ?? AUTOLAT_PAGE.minChangeMs)) return 'within ' + (s.minChangeMs ?? AUTOLAT_PAGE.minChangeMs) + ' ms of the stick\'s ' + s.current + ' ms: nothing sent ' + why;
-  return 'waiting to send ' + sug + ' ms ' + why;
-}

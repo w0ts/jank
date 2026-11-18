@@ -796,11 +796,9 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     let a = await setup('usb');
     await tickAll(a);
     eq(sets(a), [], 'not at load: nothing is sent before the player plays');
-    eq(a.page.el('al-line').textContent.startsWith('auto latency: stick path unknown'), true, 'the line says why: no stick path yet');
     await play(a);
     await tickAll(a);
     eq(sets(a), ['set beat_latency -20'], 'playing through the stick over USB: monitor 30 - stick 50 = -20 ms is sent, once');
-    eq(a.page.el('al-line').textContent, 'auto latency: sent -20 ms (speakers 30 - stick path 50)', 'the line shows what was sent');
     a.page.clock.t += 1000;
     await tickAll(a);
     eq(sets(a).length, 1, 'rate limit: nothing more within 5 s');
@@ -820,7 +818,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await play(line);
     await tickAll(line);
     await tickAll(line);
-    eq([sets(line), line.page.el('al-line').textContent.includes('not USB')], [[], true], 'source is not USB: nothing sent, the line says so');
+    eq(sets(line), [], 'source is not USB: nothing sent');
     line.page.box.disconnected();
 
     const near = await setup('usb');
@@ -828,7 +826,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await play(near);
     await tickAll(near);
     await tickAll(near);
-    eq([sets(near), near.page.el('al-line').textContent.includes('within 3 ms')], [[], true], 'within 3 ms of the stick lat_auto: nothing sent');
+    eq(sets(near), [], 'within 3 ms of the stick lat_auto: nothing sent');
     near.page.box.disconnected();
   }
 

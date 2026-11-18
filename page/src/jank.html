@@ -204,7 +204,6 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <div class="stat"><b id="bd-beat">-</b><span>stick beat_latency, ms (auto + shift)</span></div>
         <div class="row"><button id="bd-estimate" class="quiet" type="button" title="Goes back to the page's own estimate of the delay (monitor - stick path - the stick's beat_latency, to 5 ms) and forgets the value you set. Only this page.">Use the estimate</button></div>
       </div>
-      <p class="note">Positive delays the beat boxes, negative advances them. It changes only what this page draws, never the stick's settings. The estimate is the
       monitor's output latency minus the stick path's minus the stick's own beat_latency (so it is 0 once Auto latency has set that), to 5 ms: the page cannot see the stick's USB audio buffering (the stick's beat_latency covers that), so set the
       rest by ear.</p>
       <h2 style="margin-top:14px">Auto latency</h2>
@@ -212,8 +211,6 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <label class="check"><input id="al-on" type="checkbox" checked title="On: while the player plays through the stick over USB, the page sets the stick's auto latency from the two output paths. Remembered in this browser; off sends nothing."> Auto latency</label>
         <button id="al-resend" class="quiet" type="button" title="Sends the page's auto latency suggestion to the stick again now, ignoring the 3 ms and 5 s limits. Overwrites the stick's auto base; only while playing through the stick over USB.">Re-send</button>
       </div>
-      <p id="al-line" class="note">-</p>
-      <p class="note">While the player plays through the stick and the stick's audio source is USB, the page sends the stick's beat_latency (the auto base,
       <code>set beat_latency</code>) as the monitor's output latency minus the stick path's, when it is more than 3 ms away from the stick's, at most once in 5 s.
       The page cannot see the stick's USB buffering or the capture chain's, so finish by ear with Audio shift (the manual layer, above).</p>
     </section>
@@ -1302,39 +1299,33 @@ autoConnect();
     applyDelay();
   };
   // ---- Auto latency: the stick's beat_latency (its auto base) from the two paths the browser knows; the decision logic is ui/autolat.js's ----
-  const AL = { st: autoLatNew(), on: true, force: false, sent: null, error: "", getAt: -Infinity, advanced: false, last: { monitorMs: null, stickMs: null, playing: false } };
+  const AL = { st: autoLatNew(), on: true, force: false, sent: null, getAt: -Infinity, advanced: false, last: { monitorMs: null, stickMs: null, playing: false } };
   const readAutoOn = () => { try { return localStorage.getItem("jank.autolat") !== "0"; } catch (e) { return true; } };
   const writeAutoOn = (on) => { try { localStorage.setItem("jank.autolat", on ? "1" : "0"); } catch (e) { /* not remembered */ } };
   const statusFresh = () => (S.lastStatus && performance.now() - S.statusAt < 5000 && S.statusAt > AL.getAt ? S.lastStatus : null);
   const autoSource = () => { const st = S.lastStatus && performance.now() - S.statusAt < 5000 ? S.lastStatus : null; return st && st.audio_source ? st.audio_source : null; };
   const currentAuto = () => { const v = statusFresh() && statusFresh().lat_auto !== undefined ? statusFresh() : S.lastGet; return v.lat_auto !== undefined && Number.isFinite(Number(v.lat_auto)) ? Number(v.lat_auto) : null; };
   const beatLatencyNow = () => { const v = statusFresh() && statusFresh().beat_latency !== undefined ? statusFresh() : S.lastGet; return v.beat_latency !== undefined ? Number(v.beat_latency) : null; };
-  const paintAuto = () => {
-    el("al-line").textContent = "auto latency: " + autoLatPageLabel({ on: AL.on, error: AL.error, playing: AL.last.playing, monitorMs: AL.last.monitorMs, stickMs: AL.last.stickMs, source: autoSource(), current: currentAuto(), sent: AL.sent });
-  };
   async function sendAuto(ms) {
     try {
       await send("set beat_latency " + ms);
       AL.sent = ms;
-      AL.error = "";
       AL.getAt = performance.now();
       showSettings(await send("get"));
     } catch (e) {
-      AL.error = e.message;
       say(e.message, true);
     }
-    paintAuto();
   }
   function autoLatencyTick(l) {
     AL.last = l;
     const sug = autoLatPageSuggestion(l.monitorMs, l.stickMs), current = currentAuto();
     const ready = AL.advanced && AL.on && S.kind === "midi" && l.playing && autoSource() === "usb" && sug !== null;
     const within = current !== null && sug !== null && Math.abs(sug - current) <= AUTOLAT_PAGE.minChangeMs && !AL.force;
-    if (!ready || within) { paintAuto(); return; }
+    if (!ready || within) return;
     if (AL.force) { AL.st = autoLatStep(AL.st, { type: "reconnect" }).st; AL.force = false; }
     const r = autoLatStep(AL.st, { type: "tick", sug, usb: true, now: performance.now() }, AUTOLAT_PAGE);
     AL.st = r.st;
-    if (r.send === null) { paintAuto(); return; }
+    if (r.send === null) return;
     sendAuto(r.send);
   }
   AL.on = readAutoOn();
@@ -1344,14 +1335,11 @@ autoConnect();
     writeAutoOn(AL.on);
     AL.st = autoLatNew();
     AL.sent = null;
-    AL.error = "";
-    paintAuto();
   });
-  el("al-resend").addEventListener("click", () => { AL.force = true; AL.error = ""; AL.sent = null; autoLatencyTick(AL.last); });
+  el("al-resend").addEventListener("click", () => { AL.force = true; AL.sent = null; autoLatencyTick(AL.last); });
   document.addEventListener("jank-advanced", (e) => {
     AL.advanced = e.detail.visible;
-    if (!e.detail.visible) Object.assign(AL, { st: autoLatNew(), sent: null, error: "", force: false });
-    paintAuto();
+    if (!e.detail.visible) Object.assign(AL, { st: autoLatNew(), sent: null, force: false });
   });
   document.addEventListener("jank-latency", (e) => {
     const l = e.detail;
