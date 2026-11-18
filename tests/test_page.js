@@ -208,7 +208,7 @@ async function lineTests() {
   p = line.send("status");
   await tick();
   timers.fire();
-  await assert.rejects(p, /no answer to status/);
+  await assert.rejects(p, /The jank did not answer/);
   checks++;
   p = line.send("home");
   await tick();

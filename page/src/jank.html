@@ -404,6 +404,7 @@ function isEnd(line) {
 
 /* The control line over any transport: write(text) puts text on it (as frames), receive(message) takes each whole SysEx that
    comes back. One command at a time; its answer is the lines up to ok or err. */
+const NO_ANSWER = "The jank did not answer";
 class LineClient {
   constructor(write, timers) {
     this.write = write;
@@ -426,7 +427,7 @@ class LineClient {
   send(command, waitMs) {
     const run = () => new Promise((resolve, reject) => {
       const p = { lines: [] };
-      const timer = this.timers.set(() => { if (this.pending === p) this.pending = null; reject(new Error("no answer to " + command)); }, waitMs || 2000);
+      const timer = this.timers.set(() => { if (this.pending === p) this.pending = null; reject(Object.assign(new Error(NO_ANSWER), { noAnswer: true })); }, waitMs || 2000);
       p.end = (end) => {
         this.timers.clear(timer);
         this.pending = null;
@@ -648,20 +649,38 @@ async function session(command, done) {
 }
 
 /* HOME and the details by polling */
+/* the one message for a command that got no answer: the port, what to try. Polled commands repeat every few hundred ms: it is shown once
+   per episode and cleared when an answer comes again */
+function noAnswerText(withSysex) {
+  return NO_ANSWER + (S.portName ? " (" + S.portName + ")" : "") + ". Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port" + (withSysex ? "; if the browser asks, allow SysEx for this page." : ".");
+}
+function pollFailed(e) {
+  if (!e.noAnswer) { say(e.message, true); return; }
+  if (S.noAnswerShown) return;
+  S.noAnswerShown = true;
+  say(noAnswerText(false), true);
+}
+function pollAnswered() {
+  if (!S.noAnswerShown) return;
+  S.noAnswerShown = false;
+  say("");
+}
 async function pollHome() {
   if (!S.line) return;
   try {
     takeHome((await send("home")).values.home);
+    pollAnswered();
   } catch (e) {
-    say(e.message, true);
+    pollFailed(e);
   }
 }
 async function pollStatus() {
   if (!S.line) return;
   try {
     showStatus(await send("status"));
+    pollAnswered();
   } catch (e) {
-    say(e.message, true);
+    pollFailed(e);
   }
 }
 
@@ -720,6 +739,7 @@ function disconnected(text) {
   S.line = null;
   S.drop = null;
   S.lastHome = null;
+  S.noAnswerShown = false;
   setConnected(null);
   showGroups(S.lastScans);
   if (text) say(text, true);
@@ -728,6 +748,8 @@ function disconnected(text) {
 async function started(line, kind, drop, portName) {
   S.line = line;
   S.drop = drop;
+  S.portName = portName;
+  S.noAnswerShown = false;
   setConnected(kind);
   try {
     let got;
@@ -736,8 +758,7 @@ async function started(line, kind, drop, portName) {
     say("");
     await pollHome();
   } catch (e) {
-    const named = portName ? e.message.replace(/^(no answer to \S+)/, "$1 from " + portName) : e.message;
-    disconnected(named + ". If the app asks for SysEx, turn it on.");
+    disconnected(e.noAnswer ? noAnswerText(true) : e.message);
     return;
   }
   S.timers.push(setInterval(pollHome, HOME_EVERY_MS));
