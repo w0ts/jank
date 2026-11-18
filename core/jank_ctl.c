@@ -149,6 +149,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%s%d.%02d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_10us < 0 ? "-" : "", abs(c->offset_10us) / 100, abs(c->offset_10us) % 100);
     char src[16];
+    put(w, "lead=%s\n", on_off(s->lead));
     put(w, "beat=%s\n", on_off(c->beat));
     put_lat(c, w);
     put(w, "beat_latency_src=%s\nautobar=%s\n", jla_name(&c->lat_key, src), autobar_name(c->autobar));
@@ -587,6 +588,21 @@ int jk_ctl_tempo(const char *line, int32_t *mpb)
     return 0;
 }
 
+int jk_ctl_lead(const char *line, int *on)
+{
+    char buf[32], *s = trim(line, buf, sizeof buf);
+    if (!s || strncmp(s, "set lead ", 9))
+        return -1;
+    s += 9;
+    if (!strcmp(s, "on"))
+        *on = 1;
+    else if (!strcmp(s, "off"))
+        *on = 0;
+    else
+        return -1;
+    return 0;
+}
+
 int jk_ctl_fold(const char *line, int *dir)
 {
     char buf[32], *s = trim(line, buf, sizeof buf);
@@ -664,6 +680,15 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         cmd_about(snap, &w);
     else if (!strcmp(s, "beat"))
         cmd_beat(cfg, &snap->beat, &w);
+    else if (!strncmp(s, "set lead", 8) && (!s[8] || s[8] == ' ')) {
+        int on;
+        if (jk_ctl_lead(s, &on)) {
+            put(&w, "err bad setting\n");
+            return JK_CTL_NONE;
+        }
+        put(&w, "ok\n");
+        return JK_CTL_LEAD;
+    }
     else if (!strncmp(s, "set ", 4))
         return cmd_set(s + 4, cfg, &w);
     else if (!strcmp(s, "scan"))
@@ -697,7 +722,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         else
             put(&w, "err home line too long\n");
     } else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|lead|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;
