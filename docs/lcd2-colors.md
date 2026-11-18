@@ -225,16 +225,16 @@ only ink on the screen. The OLED layout's NETWORK screen is unchanged.
 The cursor logic in `OLED.press` still scrolls as if 6 menu rows were visible (`ui.top`); the lcd2 draw ignores `ui.top` and keeps the
 cursor in view by itself (all 10 menu items fit; the scan list centres on the selection), so no state is shared between the layouts.
 
-## What the C side will need later (not written)
+## The C side (built, never run on the board)
 
-1. `jo_draw` / `jo_draw_ink`: the 160 x 120 layout with the table `OLED.LCD2` above, the icons (`LINK_GLYPH`, `LT_ICONS_L2`, `TRI_W`, `PLUG_IN_BATTERY` in `ui/oled.js`; no signal
-   bars any more), the battery with the plug inside (`charging`), the top bar slots above, the tempo with `ui/bigfont.js` (two fonts: NORMAL 12 glyphs x 35 rows of 26 or 5 bits and 10 small digits x 23 rows of 17 bits, LARGE 12 x 47 rows of 35 or 7 bits and 10 x 31 rows of 23 bits; the rule "a digit right after
-   the `.` is the small one", `left = floor((160 - width) / 2)`), the CONFIDENCE line, the continuous VU meter, the two AUDIO stacks (with and without the BAR row), the LINK square boxes, the state word (`stateWordLcd2`: the order and the colours above; centred; nothing while running), and
-   the NETWORK screen's `SIGNAL` row (`drawSignalRowLcd2`: word and dBm, quality thresholds as before).
-2. `jank_lcd.c`: the palette gets the 32 ramp colours (`Lcd2.VU_RAMP`) and the ink ids 6..37 (`OLED.VU`); `tests/test_lcd_palette.js` then compares them too.
-3. `tests/oled_ref/gen_ink.js` writes the 160 x 120 cases (it hands 128 x 64 buffers today and throws); the C replay `test_oled.c` follows. New cases: the tempo texts
-   (`120.0` `146.1` `88.8` `98.4` `---`), the VU at -90 / -60 / -45 / -30 / -12 / 0 dB, CONFIDENCE at 0 / 50 / 100 %, the five state words, the battery with and without the plug and at the colour edges, the LINK tempo texts and boxes, the NETWORK screen with signal -55 / -68 / -81 / 0 / unknown.
-4. Firmware wishes (unchanged): a charging flag, Wi-Fi retry / loss shares, a "joining" Link state, `rssi` / `peak_db` on the HOME line.
+- `core/jank_oled_lcd2.c` (`jo_draw_lcd2`) is a port of the lcd2 section of `ui/oled.js` with the same constants and integer arithmetic; `core/jank_bigfont.[ch]`
+  draw the tempo from `core/jank_bigfont_tables.c`, which `scripts/gen_bigfont.js` writes from `ui/bigfont.js` (`tests/run.sh` checks the file is current).
+- The ink plane is still one byte per pixel (160 x 120 = 19200 bytes); ids 0..37 (`JO_INK_VU0` 6, `JO_VU_STEPS` 32). `core/jank_lcd.h` holds the palette
+  and the 32 ramp colours; `tests/test_lcd_palette.js` compares them with `ui/lcd2.js`.
+- Parity: `tests/oled_ref/cases_ink.txt` (`node tests/oled_ref/gen_cases.js --ink`, made by `ui/oled.js` itself) holds the frame and the ink plane of every case;
+  `tests/test_oled.c` reproduces both pixel for pixel and the OLED's 385 frames stay as they were.
+- Firmware wishes (unchanged): a charging flag (the C uses the same inference as the BATTERY screen), Wi-Fi retry / loss shares, a "joining" Link state,
+  `rssi` / `peak_db` on the HOME line.
 
 ## Tests in this stage
 
@@ -244,6 +244,3 @@ digits (both tables complete, sizes, the tempo texts `120.0` `98.4` `88.8` `146.
 the baseline); the four beat boxes on every beat in both layouts; the CONFIDENCE rule and line lengths at 0 / 50 / 100 %; the VU meter (continuous columns, the id of every column, the notch);
 the BAR row; the icons and the top bar without signal bars; the five state words (centred) and their order, no PLAYING; the NETWORK screen's SIGNAL row for known and unknown values; LINK layout; no ink in
 menus, edit, info, setup and overlays; the OLED layout equal to the golden hashes of before the lcd2 layout (8 screens).
-
-`tests/run.sh` **fails on purpose at its lcd2 ink regeneration step**: `node tests/oled_ref/gen_cases.js --ink` (`gen_ink.js`) hands 128 x 64 buffers to the
-lcd2 layout, which refuses them, and `cases_ink.txt` and the C `jo_draw_ink` are still the older design. That is the C parity for the next round.
