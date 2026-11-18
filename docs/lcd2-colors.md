@@ -164,17 +164,17 @@ The LARGE `120.0` is 302 columns, inside the 312 between the 4 px margins. The d
 | number | right-aligned to x 315; neutral, red when the peak reaches -1 dBFS (or, unreported, the RMS maximum -3), amber under -50 dBFS (too quiet to track) |
 
 **Ramp**: 32 ink ids (6..37), exact RGB, `Lcd2.VU_RAMP`. They colour a bar, not text: only visibility is needed (every step is at least 6.6 : 1 on the background, #ff6058 the lowest at 6.67),
-and neighbouring steps differ by at most 16 per channel, so a bar shows no banding. Linear in RGB between the anchors: steps 0..10 green (72, 222, 128), step 20 lime
-(176, 230, 64), step 26 amber (255, 176, 32), step 31 red (255, 96, 88), each channel rounded:
+and neighbouring steps differ by at most 16 per channel (so a bar shows no banding), except the last three, the amber to red leg, where the green channel falls 27 per step.
+The colour follows how a level feels (step s starts at -90 + 2.8125 s dBFS): green through step 16 (-42 dBFS), lime ("chill") at step 23 (-25 dBFS), amber ("hot", a party level)
+at step 28 (-11 dBFS), red only at the last step 31 (-3 dBFS). Linear in RGB between the anchors: steps 0..16 green (72, 222, 128), step 23 lime (176, 230, 64),
+step 28 amber (255, 176, 32), step 31 red (255, 96, 88), each channel rounded:
 
 | step | RGB | step | RGB | step | RGB | step | RGB |
 |---|---|---|---|---|---|---|---|
-| 0..10 | 72, 222, 128 | 11 | 82, 223, 122 | 12 | 93, 224, 115 | 13 | 103, 224, 109 |
-| 14 | 114, 225, 102 | 15 | 124, 226, 96 | 16 | 134, 227, 90 | 17 | 145, 228, 83 |
-| 18 | 155, 228, 77 | 19 | 166, 229, 70 | 20 | 176, 230, 64 | 21 | 189, 221, 59 |
-| 22 | 202, 212, 53 | 23 | 216, 203, 48 | 24 | 229, 194, 43 | 25 | 242, 185, 37 |
-| 26 | 255, 176, 32 | 27 | 255, 160, 43 | 28 | 255, 144, 54 | 29 | 255, 128, 66 |
-| 30 | 255, 112, 77 | 31 | 255, 96, 88 | | | | |
+| 0..16 | 72, 222, 128 | 17 | 87, 223, 119 | 18 | 102, 224, 110 | 19 | 117, 225, 101 |
+| 20 | 131, 227, 91 | 21 | 146, 228, 82 | 22 | 161, 229, 73 | 23 | 176, 230, 64 |
+| 24 | 192, 219, 58 | 25 | 208, 208, 51 | 26 | 223, 198, 45 | 27 | 239, 187, 38 |
+| 28 | 255, 176, 32 | 29 | 255, 149, 51 | 30 | 255, 123, 69 | 31 | 255, 96, 88 |
 
 ### The CONFIDENCE line
 

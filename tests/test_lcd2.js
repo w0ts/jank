@@ -298,9 +298,9 @@ for (const [i, rgb] of Lcd2.VU_RAMP.entries()) {
   ok(rgb.length === 3 && rgb.every(v => Number.isInteger(v) && v >= 0 && v <= 255), 'ramp step ' + i + ': exact 8-bit RGB ' + rgb);
   ok(Lcd2.contrast(rgb, P.bg) >= 6.5, 'ramp step ' + i + ' reads on the background (' + Lcd2.contrast(rgb, P.bg).toFixed(2) + ' : 1, bars need visibility, not AA text)');
   eq(Lcd2.inkColour(OLED.VU.ink0 + i), rgb, 'ink id ' + (OLED.VU.ink0 + i) + ' is ramp step ' + i);
-  if (i > 0) ok(rgb.every((v, k) => Math.abs(v - Lcd2.VU_RAMP[i - 1][k]) <= 16), 'ramp step ' + i + ' differs from the one before by at most 16 per channel (no visible banding)');
+  if (i > 0) ok(rgb.every((v, k) => Math.abs(v - Lcd2.VU_RAMP[i - 1][k]) <= (i >= 29 ? 27 : 16)), 'ramp step ' + i + ' differs from the one before by at most 16 per channel (no visible banding; the amber to red leg, steps 29..31, at most 27)');
 }
-eq([Lcd2.VU_RAMP[0], Lcd2.VU_RAMP[10], Lcd2.VU_RAMP[20], Lcd2.VU_RAMP[26], Lcd2.VU_RAMP[31]], [P.good, P.good, [176, 230, 64], P.warn, [255, 96, 88]], 'the ramp: green up to step 10, lime at 20, amber at 26, red at 31');
+eq([Lcd2.VU_RAMP[0], Lcd2.VU_RAMP[16], Lcd2.VU_RAMP[17], Lcd2.VU_RAMP[23], Lcd2.VU_RAMP[28], Lcd2.VU_RAMP[31]], [P.good, P.good, [87, 223, 119], [176, 230, 64], P.warn, [255, 96, 88]], 'the ramp: green up to step 16 (-42 dBFS), lime at 23 (-25), amber at 28 (-11), red at 31 (-3)');
 eq(Lcd2.inkColour(OLED.VU.ink0 + 32), P.neutral, 'an id past the ramp is neutral');
 eq(levelIds(levelCase(-20, -12)), [[], []], 'a good level: the number is neutral');
 eq(levelIds(levelCase(-20, -0.5)), [[INK.BAD], []], 'the last second peaked at -0.5 dBFS: the number is red (clipping)');
