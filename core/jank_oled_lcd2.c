@@ -448,11 +448,13 @@ static void sub(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 
 static void about(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
-    char rows[JO_ABOUT_ROWS][40];
+    struct jo_about_row rows[JO_ABOUT_ROWS];
     title_bar(fb, "ABOUT", NULL);
     jo_about_rows(c, rows);
-    for (int k = 0; k < JO_ABOUT_VIS_LCD2 && ui->ascroll + k < JO_ABOUT_ROWS; k++)
-        jo_text(fb, rows[ui->ascroll + k], 8, 36 + k * 24, 1, 1);
+    for (int k = 0; k < JO_ABOUT_VIS_LCD2 && ui->ascroll + k < JO_ABOUT_ROWS; k++) {
+        jo_text(fb, rows[ui->ascroll + k].label, 8, 36 + k * 24, 1, 1);
+        jo_text_r(fb, rows[ui->ascroll + k].val, W - 8, 36 + k * 24, 1, 1);
+    }
 }
 
 static void info(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)

@@ -177,7 +177,7 @@ struct jo_ui {
     uint8_t cursor, top, ocur, ncur, scur, stop;
     uint8_t sub;                          /* the SUB shown: 0 AUDIO, 1 OFFSET, 2 DISPLAY */
     uint8_t page;                         /* the INFO shown: 0 BATTERY, 1 ABOUT */
-    uint8_t ascroll;                      /* ABOUT: the first row shown (the OLED shows 5 of its 7) */
+    uint8_t ascroll;                      /* ABOUT: the first row shown (a press moves one page: 5 rows on the OLED, 8 on lcd2) */
     uint8_t leave;                        /* SETUP's "LEAVE SETUP?" */
     int8_t hint;                          /* -1 none, JO_NO / JO_YES: the held button's hint on HOME */
     struct jo_edit edit;

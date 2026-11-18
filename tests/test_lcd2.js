@@ -488,13 +488,15 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   const aboutUi = { ...OLED.create(), screen: 'info', page: 'about' };
   const about = { tempC: 41, cpuPct: 37, heapKb: 123, psramKb: 7936, flashKb: 8192, appUsedKb: 1260, appKb: 3072, uptimeS: 3725, heapMinKb: 98, reset: 'POWERON', version: '0.1.0', clkLateUs: 12, uiLoopUs: 4210, beatLoopUs: 8800 };
   d = drawn({ ...batt, ...about }, { ui: aboutUi }); noInk(d, 'the ABOUT info screen');
-  ok(isText(d, 'NAME jank', 8, 36, null) && isText(d, 'REPO github.com/w0ts/jank', 8, 36 + 48, null) && isText(d, 'TEMP 41 C', 8, 36 + 120, null) && isText(d, 'MEMORY 123K PSRAM 7936K', 8, 36 + 168, null), '... its rows from y 36, 24 px apart (8 of 13 show)');
+  const ab = (d, label, val, y) => isText(d, label, 8, y, null) && isText(d, val, 312 - textW(val), y, null);      // a label at the left, its value right aligned to x 312 (the list rows' margin)
+  ok(ab(d, 'NAME', 'jank', 36) && ab(d, 'REPO', 'github.com/w0ts/jank', 36 + 48) && ab(d, 'TEMP', '41 C', 36 + 120) && ab(d, 'MEMORY', '123K PSRAM 7936K', 36 + 168), '... its rows from y 36, 24 px apart (8 of 13 show), the label at x 8 and the value right aligned to x 312');
+  ok(8 + textW('MEMORY') + 12 < 312 - textW('123K PSRAM 7936K') && 8 + textW('REPO') + 12 < 312 - textW('github.com/w0ts/jank'), '... label and value never overlap (the widest pairs, MEMORY and REPO)');
   d = drawn({ ...batt, ...about }, { ui: { ...aboutUi, ascroll: 5 } });
-  ok(isText(d, 'FLASH 8M 1.2/3.0M', 8, 36 + 96, null) && isText(d, 'BEAT LOOP 8800 US', 8, 36 + 168, null), '... scrolled by 5: the last row at the bottom');
+  ok(ab(d, 'FLASH', '8M 1.2/3.0M', 36 + 96) && ab(d, 'BEAT LOOP', '8800 US', 36 + 168), '... scrolled by 5: the last row at the bottom');
   d = drawn({ ...batt, ...Object.fromEntries(Object.keys(about).map(k => [k, null])) }, { ui: aboutUi });
-  ok(isText(d, 'VERSION -', 8, 60, null) && isText(d, 'TEMP -', 8, 36 + 120, null), '... "-" for what is not known');
+  ok(ab(d, 'VERSION', '-', 60) && ab(d, 'TEMP', '-', 36 + 120), '... "-" for what is not known');
   const sc = (k, c) => { const u = { ...OLED.create(), screen: 'info', page: 'about' }; for (const b of k) OLED.press(u, b, 0, c); return u.ascroll; };
-  eq([sc(['down', 'down', 'down', 'down', 'down', 'down', 'up'], { ...batt, layout: 'lcd2' }), sc(['down', 'down', 'down', 'down', 'down', 'down', 'down', 'down', 'up'], batt), sc(['up'], batt)], [4, 7, 0], 'ABOUT: DOWN / UP scroll, stopped at the ends (5 on lcd2, 8 on the OLED)');
+  eq([sc(['down'], { ...batt, layout: 'lcd2' }), sc(['down', 'up'], { ...batt, layout: 'lcd2' }), sc(['down', 'down'], batt), sc(['down', 'down', 'up'], batt), sc(['up'], batt)], [5, 0, 8, 3, 0], 'ABOUT: DOWN / UP move one page (8 rows on lcd2, 5 on the OLED), the last page overlaps the one before, stopped at the ends');
   for (const screen of ['netinfo', 'confirm']) { d = drawn(batt, { ui: { ...OLED.create(), screen, ncur: 0 } }); noInk(d, 'the ' + screen + ' screen'); }
   // the NETWORK screen: its rows (TYPE, GROUP, PEERS) and the read-only SIGNAL row under them, the only ink on the screen is the quality word
   const netD = rssi => drawn({ ...batt, rssi }, { ui: { ...OLED.create(), screen: 'net', ncur: 0 } });
