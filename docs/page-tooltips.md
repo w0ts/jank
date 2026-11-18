@@ -2,7 +2,7 @@
 
 Every control the user can change has a `title` (the face's D-pad also an aria-label). `tests/test_page.js` checks the generated page for a title, an aria-label or a titled ancestor on every button, select, input, textarea, summary and focusable element, and that no tooltip is empty or over 240 characters; `tests/test_connect.js` checks the run-time built ones (folder rows, breadcrumbs, D-pad). A label that holds its control carries the title for both. No exceptions, except the player card's `tabindex=-1` (a programmatic focus target, not a control).
 
-Persistence statements come from `core/jank_core.h` (`JK_CFG_STORED`: what is above `beat` is stored; beat, follower, skip, graded are back at their defaults at every start) and `docs/firmware.md` (a changed setting is saved once stopped; unplugging while it is pending loses it). The page shows 'Saved on the jank.' after any `set`, also for the settings that are not stored; the tooltips say which are not.
+Persistence statements come from `core/jank_core.h` (`JK_CFG_STORED`: what is above `beat` is stored; beat, follower, skip, graded are back at their defaults (graded: On) at every start) and `docs/firmware.md` (a changed setting is saved once stopped; unplugging while it is pending loses it). The page shows 'Saved on the jank.' after any `set`, also for the settings that are not stored; the tooltips say which are not.
 
 | Control | Tooltip | Source of the claim |
 |---|---|---|
@@ -34,7 +34,7 @@ Persistence statements come from `core/jank_core.h` (`JK_CFG_STORED`: what is ab
 | Beat follow | Whether the stick's beat tracker steers the Link session's tempo and beat. Changes the stick now; not kept after a restart (back to on). | core/jank_core.h (beat: after the stored line, not stored; default on) |
 | Follower | Which beat follower the stick runs: tuned or robust (an A/B variant). Changes the stick now; not kept after a restart (back to tuned). | core/jank_ctl.c comment (not stored) |
 | Skip | Skip mode of the robust follower: Off, ACT or PAT. Changes the stick now; not kept after a restart (back to Off). | core/jank_ctl.c comment (on the robust follower; not stored) |
-| Graded confidence | Shows the graded confidence on the stick (display only; needs the robust follower). Not kept after a restart (back to Off). | core/jank_ctl.c comment (display only, needs robust; not stored) |
+| Graded confidence | On: the confidence shown on the jank moves with how well the beats fit (display only; the stop and start decisions keep using the gate's own value). Off: the gate's value is shown. Not kept after a restart (back to On). | core/jank_ctl.c comment (both followers, display only, not stored, on at every start) |
 | Spectral rate | Lets a pitch move read from the spectrum steer the beat follower; Off uses the beats alone. Changes the stick; kept after a restart. | core/jank_core.h (rate: stored since M2i; 0.4 % CPU) |
 | Audio shift, ms | Shifts when the stick puts its beat out, -600 to 600 ms, on top of the auto latency (+ is later). Kept per audio source on the stick. Fine-tune by ear. | docs/firmware.md AUDIO SHIFT (lat_trim, per source, stored); core/jank_ctl.c range |
 | Auto latency, ms | The auto base of the audio source the stick hears now, -300 to 300 ms. The page's Auto latency overwrites it; Audio shift adds on top. Kept per source on the stick. | docs/firmware.md beat_latency per audio source (stored); core/jank_ctl.c range |

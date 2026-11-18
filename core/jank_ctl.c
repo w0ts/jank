@@ -28,6 +28,7 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->lowconf = JCF_STOP;             /* the emulator's default: STOP / START at 80 % (player.py DEFAULT_MIN_CONFIDENCE) */
     c->threshold = JCF_THRESHOLD_DEFAULT;
     c->rate = 1;                       /* the spectral rate on (M2i) */
+    c->graded = 1;                     /* the graded confidence is the one shown (core/beat/jb_graded.h), on both followers */
     jla_init(&c->lat);                 /* (lat_key: the computer, which beat_latency_ms above is) */
     strcpy(c->name, "jank");
 }
@@ -244,6 +245,7 @@ static void put_audio(const struct jk_cfg *c, const struct jk_snapshot *s, struc
         jfo_name(t->fold_exp), t->fold_manual);
     put(w, "rms_db=%d\nrms_min_db=%d\nrms_max_db=%d\npeak_db=%d\n", t->level_db, t->level_min_db, t->level_max_db, t->peak_db);
     put_conf(c, t, w);
+    put(w, "conf_gate=%u\n", t->conf_graded ? t->conf_gate_pct : t->conf_pct);   /* the gate's own value (conf is the graded one while graded=on) */
     put_follow(c, t, w, 0);
 }
 
@@ -480,7 +482,7 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
             }
         return -1;
     }
-    if (!strcmp(key, "graded"))            /* the shown confidence graded (core/beat/jb_graded.h): display only; not stored */
+    if (!strcmp(key, "graded"))            /* the shown confidence graded (core/beat/jb_graded.h), both followers: display only; not stored, on at every start */
         return parse_on_off(val, &c->graded);
     if (!strcmp(key, "rate"))              /* the advanced beat follow's spectral rate (core/beat/jb_rate.h) */
         return parse_on_off(val, &c->rate);

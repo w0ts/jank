@@ -87,6 +87,9 @@ static struct jrb_store *s_robust_store;   /* its activation ring (8 KB, PSRAM);
 static uint8_t s_follower;             /* the one running: 0 tuned (M2j, today's code path), 1 robust */
 static struct jb_skip s_skip;          /* SKIP (core/beat/jb_skip.h): off with the tuned follower; ACT / PAT on the robust one */
 static uint8_t s_skip_mode;            /* enum jsk_mode running */
+static struct jg_tuned s_gtuned;       /* the tuned follower's graded confidence (jb_graded.h jg_tuned_step) */
+static uint8_t s_conf_graded;          /* the shown confidence at the last step is the graded one (the gate value is s_conf_gate_pct) */
+static uint8_t s_conf_gate_pct;        /* the gate's confidence at the last step, percent: what STOP / START, COAST, the LED and the notch judge */
 static uint8_t s_graded, s_coast;      /* the shown confidence is the graded one (display only); the outputs run under the threshold */
 static int s_last_jumps;               /* the follower's jumps at the last confidence step (a jump since is `jumped`) */
 static uint32_t s_conf_cycles;         /* follow_conf's work this second ... */
@@ -334,8 +337,7 @@ static void on_frame(void *ctx, const struct jb_frame *f)
     {
         PROF_BEGIN;
         jw_act(&s_weak, f->index, f->act);
-        if (s_follower)
-            jrb_act(&s_robust, f->index, f->act);
+        jrb_act(&s_robust, f->index, f->act);   /* (the robust follower's agreement and the tuned follower's graded tempo part read it) */
         PROF_END(P_ACT);
     }
     if (f->beat) {
@@ -395,6 +397,7 @@ static void restart_tracker(void)
     jsk_set_mode(&s_skip, s_follower ? (enum jsk_mode)s_skip_mode : JSK_OFF);
     s_robust.sk = jsk_on(&s_skip) ? &s_skip : NULL;
     jb_dbn_set_prior(&s_b.dbn, NULL);
+    jg_tuned_reset(&s_gtuned);
     if (s_follower)
         jrb_attach(&s_robust, &s_follow, &s_weak);  /* the lock and jump gate (tuned: none, today's follower bit for bit) */
     s_last_jumps = 0;
@@ -563,6 +566,8 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.peak_db = s_peak_db;
     b.act_pct = s_act_pct;
     b.conf_pct = s_conf_pct;
+    b.conf_gate_pct = s_conf_gate_pct;
+    b.conf_graded = s_conf_graded;
     b.conf_hold = s_conf_hold;
     b.gated = s_gated;
     b.silent = s_conf.silent;
@@ -670,6 +675,12 @@ static void follow_conf(const struct jk_cfg *cfg)
     } else {
         s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
         s_coast = 0;
+        if (s_graded && s_audio_live && !s_conf.silent) {
+            /* the tuned follower's graded confidence (jb_graded.h) is shown instead; the gate above is unchanged */
+            conf_shown = jg_tuned_step(&s_gtuned, &s_robust, &s_b.dbn, jw_seen(&s_weak), s_weak.n_seen, s_conf.line, s_conf.lines,
+                                       has, period, now);
+            use_graded = 1;
+        }
     }
     if (use_graded) {
         s_conf_shown = conf_shown;      /* a measurement: no HOLD easing */
@@ -682,6 +693,8 @@ static void follow_conf(const struct jk_cfg *cfg)
     }
     s_conf_at = now;
     s_conf_pct = jcf_pct(s_conf_shown);
+    s_conf_gate_pct = jcf_pct(conf);
+    s_conf_graded = (uint8_t)use_graded;
     s_conf_open = (uint8_t)!jcf_gate(1, conf, JCF_STOP, cfg->threshold);   /* (a closed gate's test: open at threshold + 5) */
     if (weak_picked && !s_gated && cfg->lowconf == JCF_STOP && strict < (double)cfg->threshold / 100.0)
         s_weak_holds++;
@@ -916,7 +929,7 @@ static void beat_task(void *arg)
                 s_skip_mode = want_skip;
                 restart_tracker();
             }
-            s_graded = (uint8_t)(want && cfg.graded);
+            s_graded = (uint8_t)(cfg.graded && s_robust_store && s_weak_store);   /* both followers: the graded value is shown */
         }
         {
             uint32_t c0 = esp_cpu_get_cycle_count();

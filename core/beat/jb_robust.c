@@ -140,6 +140,17 @@ void jrb_tempo_prior(const struct jb_dbn *d, double mem_bpm, double width, doubl
     }
 }
 
+/* the comb's tempo agreement of the activation's last JRB_AGREE_SPAN frames with the period (s): the first part of refresh (the
+ * tuned follower's graded confidence, jb_graded.h, takes it too); 0 with no ring or too little activation */
+double jrb_tempo_agreement(const struct jb_robust *r, double now, double period)
+{
+    struct jc_curve c;
+    if (!jrb_on(r))
+        return 0.0;
+    return jc_curve(&c, r->st->x, r->st->ring, JRB_ACT_RING, r->act_n, (int64_t)floor(now * JC_FPS + 1e-9), JRB_AGREE_SPAN)
+               ? jc_tempo_agreement(&c, period * JC_FPS) : 0.0;
+}
+
 /* Agreement._refresh */
 static void refresh(struct jb_robust *r, struct jb_dbn *dbn, const struct jrb_in *in)
 {
@@ -149,9 +160,7 @@ static void refresh(struct jb_robust *r, struct jb_dbn *dbn, const struct jrb_in
     }
     const double period = in->period, now = in->now;
     const int64_t end = (int64_t)floor(now * JC_FPS + 1e-9);
-    struct jc_curve c;
-    r->v_tempo = jc_curve(&c, r->st->x, r->st->ring, JRB_ACT_RING, r->act_n, end, JRB_AGREE_SPAN)
-                     ? jc_tempo_agreement(&c, period * JC_FPS) : 0.0;
+    r->v_tempo = jrb_tempo_agreement(r, now, period);
     double ls[JCF_LINES];
     int n = 0;
     for (size_t i = 0; i < in->n_lines && n < JCF_LINES; i++)

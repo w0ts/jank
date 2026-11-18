@@ -361,6 +361,8 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->silent = audio ? b->silent : 0;
     c->gated = audio ? b->gated : 0;
     c->conf_hold = audio ? b->conf_hold : 0;
+    c->conf_graded = audio ? b->conf_graded : 0;                                  /* the shown value is graded: the gate's own is what COAST, the colour and the LED judge */
+    c->conf_gate = c->conf_graded ? b->conf_gate_pct / 100.0 : c->conf;
     c->fold_exp = audio ? b->fold_exp : 0;
     c->usb_midi = cfg.usbmidi ? 0 : 1;                                              /* ON, OFF */
     c->th = s_prefs.th;
@@ -600,7 +602,7 @@ static void step(uint32_t now, struct uis_led *led)
     led->armed = c->armed;
     led->running = c->running;
     led->joined = s_snap.mpb > 0;
-    led->low_conf = !c->link && c->conf * 100.0 < c->th;
+    led->low_conf = !c->link && (c->conf_graded ? c->conf_gate : c->conf) * 100.0 < c->th;
     led->bar_locked = !c->link && c->bar_state == JO_BAR_LOCKED;
     led->batt_pct = s_snap.batt_pct;
     led->on_usb = c->usb;

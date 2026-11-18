@@ -147,6 +147,9 @@ struct jo_ctx {
     double peak_db;                       /* the input's peak over the last second, dBFS */
     uint8_t conf_unknown;                 /* the tracker has no confidence to give: "--", grey */
     uint8_t silent, gated, conf_hold;     /* silence on the source; the outputs stopped for low confidence; the confidence holds */
+    uint8_t conf_graded;                  /* `conf` is the graded value (core/beat/jb_graded.h), not the gate's: the CONFIDENCE notch (the stop threshold) is not drawn and the
+                                             colour, COAST and the LED judge conf_gate instead */
+    double conf_gate;                     /* the gate's own confidence, 0..1 (read with conf_graded) */
     int8_t fold_exp;                      /* AUDIO's fold, 2^fold_exp: the label X2 X4 /2 /4 on HOME; 0 and anything else: none */
     uint8_t usb_midi;                     /* USB MIDI CLOCK: 0 ON, 1 OFF */
 };

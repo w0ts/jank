@@ -109,6 +109,9 @@ int jrb_gate(void *ctx, int kind, double now, double period);
  * gate's state, in and out. */
 void jrb_tick(struct jb_robust *r, struct jb_dbn *dbn, const struct jrb_in *in, uint8_t *gated, struct jrb_out *out);
 
+/* the comb's tempo agreement now (the ring's last JRB_AGREE_SPAN frames against period, s): 0 with no ring or too little activation */
+double jrb_tempo_agreement(const struct jb_robust *r, double now, double period);
+
 /* the pieces, for the tests */
 int jrb_related(double bpm, double mem_bpm, double tol);                 /* robust.related */
 int jrb_consistent(const double *beats, int n_all, double period, int n); /* robust.consistent */

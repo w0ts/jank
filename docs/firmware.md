@@ -166,6 +166,13 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   at 80 %), as the player. `status` and `beat`: `conf=`, `act=`, `gated=0|1`, `silent=0|1`, `threshold=`, `lowconf=`;
   `get`: `lowconf=`, `threshold=`; the transport icon (`outputs=`) is `stopped` while gated, `armed` once the gate opens
   until the bar line. The HOME line's `conf` is the new confidence.
+  **The confidence SHOWN is graded** (`set graded on|off`, default on, not stored: on again at every start; both followers; `get`
+  and `status` say `graded=`): the CONFIDENCE bar, HOME's and `status`'s `conf` are the graded value (docs/beat.md "The graded
+  confidence") instead of the gate's, which is about 100 % whenever the follower is locked and 0 % when not. The gate itself is
+  unchanged: STOP / START, the threshold, `gated`, `outputs`, the LED's low-confidence blink, the state word's COAST and the
+  CONFIDENCE colour judge the gate's own value, `status` `conf_gate=` (equal to `conf` while `graded=off`). With `graded=off`
+  the gate's value is shown, as before. The CONFIDENCE notch (the stop threshold) is not drawn while the graded value is
+  shown: the threshold applies to the gate's value, not to the number beside it.
 - **FOLD and AUTO RANGE** (`core/jank_fold.h`, the Python player's fold): `fold x2|/2|1` in AUDIO mode (`err link mode`
   otherwise) answers `fold=<1|2|4|0.5|0.25>`; `status` says `fold=` and `fold_manual=`; the HOME line's last field is
   `x2 x4 /2 /4` while folded. Link, the MIDI clock and the beat reports get the tracked tempo times the fold. x2 keeps
