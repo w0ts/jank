@@ -10,6 +10,7 @@ peer=on
 transport=link
 quantum=4
 offset=0.00
+lead=on
 beat=on
 beat_latency=25
 lat_auto=25

@@ -78,7 +78,8 @@ const Stick = (() => {
       rssiMin: st ? num(st.rssi_min) : null, rssiMax: st ? num(st.rssi_max) : null, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
       confStop: g.lowconf !== 'run', levelDb: level, levelMin: h && h.levelMin !== null ? h.levelMin : FLOOR_DB, levelMax: h && h.levelMax !== null ? h.levelMax : FLOOR_DB,
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
-      ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
+      ltMode: g.transport === 'auto' ? 0 : g.lead === 'off' ? 1 : 2,   // as the firmware's menu: auto -> IGNORE, else FOLLOW+LEAD when lead (a jank with no `lead` key: always FOLLOW+LEAD, as before)
+       xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
       peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0, tempC: num(ab.temp_c) === null || num(ab.temp_c) === -999 ? null : num(ab.temp_c), cpuPct: abNum('cpu_pct'), cpu1Pct: abNum('cpu1_pct'), heapKb: abNum('heap_kb'), psramKb: abNum('psram_kb'), heapMinKb: abNum('heap_min_kb'),
       uptimeS: abNum('uptime_s'), flashKb: abNum('flash_kb'), appUsedKb: abNum('app_used_kb'), appKb: abNum('app_part_kb'), reset: ab.reset ? ab.reset : null, version: g.version ? g.version : null,
@@ -108,14 +109,18 @@ const Stick = (() => {
   };
   const WORDS = { insrc: SRC, autobar: AUTOBAR, lowconf: ['run', 'stop'], usbmidi: ['on', 'off'] };
   const KEYS = { insrc: 'source', autobar: 'autobar', lowconf: 'lowconf', usbmidi: 'usbmidi' };
-  // an OLED edit (field, value as the OLED holds it) -> { commands: [...] } or { refuse: 'why' }
-  function fieldCommands(field, val) {
+  // an OLED edit (field, value as the OLED holds it) -> { commands: [...] } or { refuse: 'why' }. hasLead: the jank's `get` has the `lead` key (default yes);
+  // an older firmware has not: FOLLOW+LEAD is then `set transport link` only, and FOLLOW is refused
+  function fieldCommands(field, val, hasLead = true) {
     if (NO_STICK_SETTING[field]) return refuse(NO_STICK_SETTING[field]);
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));
     if (field === 'group') return cmds('set group ' + (val + 1));
     if (field === 'gain') return cmds('set line_gain ' + clamp(Math.round(val), -12, 12));
     if (field === 'inoff') return cmds('set lat_trim ' + clamp(Math.round(val), -100, 100));
-    if (field === 'ltmode') return val === 1 ? refuse('FOLLOW is not on the control line: pick IGNORE or FOLLOW+LEAD') : cmds('set transport ' + (val === 0 ? 'auto' : 'link'));
+    if (field === 'ltmode') {
+      if (!hasLead) return val === 1 ? refuse('FOLLOW is not on the control line: pick IGNORE or FOLLOW+LEAD') : cmds('set transport ' + (val === 0 ? 'auto' : 'link'));
+      return val === 0 ? cmds('set transport auto') : cmds('set transport link', 'set lead ' + (val === 2 ? 'on' : 'off'));
+    }
     if (field === 'lowconf') return cmds('set lowconf ' + (val === 1 ? 'stop' : 'run'));
     if (field === 'usbmidi') return cmds('set usbmidi ' + (val === 0 ? 'on' : 'off'));
     if (WORDS[field] && WORDS[field][val] !== undefined) return cmds('set ' + KEYS[field] + ' ' + WORDS[field][val]);
