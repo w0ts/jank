@@ -47,6 +47,7 @@ void jo_text_c(uint8_t *fb, const char *s, int y, int sc, int v);
 void jo_icon(uint8_t *fb, const char *const *rows, int n, int x, int y);
 /* the same rows doubled with Scale2x (2 x the width and height), lit pixels only */
 void jo_icon2(uint8_t *fb, const char *const *rows, int n, int x, int y);
+void jo_icon2p(uint8_t *fb, const char *const *rows, int n, int x, int y);   /* plain 2 x 2 blocks, no Scale2x */
 
 /* the menus */
 #define JO_MENU_ITEMS 10
