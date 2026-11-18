@@ -283,13 +283,12 @@ int jk_led_bar_one(int64_t beat_ub, uint32_t quantum)
     return index == 0;                 /* (C's remainder keeps the sign: -1 stays -1, only multiples of quantum give 0) */
 }
 
-int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum)
+int jk_flash_at(int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum)
 {
     const int64_t beat = 1000000;
-    int rest = net == JK_NET_WIFI;
     int64_t at, index, flash;
     if (!joined || mpb <= 0)
-        return rest;
+        return JK_FLASH_NONE;
     at = beat_ub % beat;
     if (at < 0)
         at += beat;
@@ -299,5 +298,11 @@ int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t 
     flash = (int64_t)(index == 0 ? JK_BAR_FLASH_MS : JK_BEAT_FLASH_MS) * 1000 * beat / mpb;
     if (flash > beat / JK_FLASH_CAP_DIV)
         flash = beat / JK_FLASH_CAP_DIV;
-    return at < flash ? !rest : rest;
+    return at < flash ? (index == 0 ? JK_FLASH_BAR : JK_FLASH_BEAT) : JK_FLASH_NONE;
+}
+
+int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum)
+{
+    int rest = net == JK_NET_WIFI;
+    return jk_flash_at(joined, beat_ub, mpb, quantum) != JK_FLASH_NONE ? !rest : rest;
 }

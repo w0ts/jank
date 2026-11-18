@@ -10,7 +10,7 @@ endif()
 # the screen: the I2C OLED, or the lcd2's SPI colour panel behind the same interface (oled.h). PRIV_REQUIRES cannot depend on
 # the sdkconfig (it is read before it is loaded): esp_lcd and esp_driver_spi are listed for every board and linked only where used.
 if(CONFIG_JANK_BOARD_LCD2)
-    set(screen_srcs "lcd.c" "${core}/jank_lcd.c")
+    set(screen_srcs "lcd.c" "${core}/jank_lcd.c" "${core}/jank_oled_lcd2.c")
 else()
     set(screen_srcs "oled.c")
 endif()
