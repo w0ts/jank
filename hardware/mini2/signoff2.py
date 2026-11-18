@@ -9,6 +9,11 @@ board in place, not by a new Freerouting run (the routed board carries review fi
       J1_* keep-outs) the grid router finds no way: CC2's pad (B5) is boxed in by VUSB's track (B4A9) and UDP's
       via below it, and the pair's A6 / B6 crossover needs a via between 0.5 mm-pitch escapes (a 0.6 mm via does not
       fit). Two layers and this receptacle leave them where they are (tented, as review 2 accepted).
+Signoff3 (round 3, worktrees/mini22-round3-scratch/REVIEW3.md), the same way: C3 0603 -> 0805 (R4) replaced in place,
+R155 moved 1.6 mm in from the edge (R10) and R156 beside it (R155 // R156 = 0.5 ohm, Henri's), up to 3 vias at each layer change of BAT_P / BAT_C / BAT_N (R3: stitch_vias;
+fatten.py widens their copper); R136, Q10..Q13 and R10 / R11 are value / part changes only (parts.py).
+Run it ONCE on the board it starts from (signoff3: tag mini2.2-signoff2's mini2.kicad_pcb), then fatten.py: a second
+pass on its own output re-trims and adds stitching vias where fatten.py's wider copper changed the room.
 What it does: every part of parts.py on the board with its nets (a new part from lib/chip.pretty at its floorplan.json
 place); every track or via that KiCad's DRC then finds in a short or a clearance error ripped, and the VBUS run under
 U2; the open pairs joined by route.py's grid router (repair.build: every pad, track and via an obstacle), with the
@@ -40,7 +45,7 @@ U2_LOOPS = (15.8, 42.6, 21.0, 50.1)        # (U2, C3, C5, L4: no track on the bo
 J1_SHELL = (31.3, 0.0, 40.7, 6.75)         # (J1's body above its pad row: no new track on top under it)
 J1_VIAS = (31.3, 0.0, 40.7, 8.2)           # (no new via centre here: its ring stays past the pad row's end, y 7.9)
 WIDTH = dict(repair.WIDTH, GND=(0.3, "mid"), VLED=(0.3, "mid"), VREG_B=(0.5, "pwr"))
-RIP_VIAS_NEAR = ("C97", "C103", "C104", "R155")    # (no via in or within 0.2 mm of a new part's pads, its own net's too)
+RIP_VIAS_NEAR = ("C97", "C103", "C104", "R155", "R156", "C3")    # (no via in or within 0.2 mm of a new part's pads, its own net's too)
 DRAWN = [   # (net, layer, x0, y0, x1, y1, width): LED2's GND pad -> C97's -> where the GND via was (ripped: C97's pad);
     #  the pour joins it to the via at (14.41, 53.86)
     ("GND", pcbnew.F_Cu, 11.36, 54.05, 13.0, 54.37, 0.3), ("GND", pcbnew.F_Cu, 13.0, 54.37, 13.71, 54.26, 0.3),
@@ -70,11 +75,26 @@ def netinfo(board, name):
 
 
 def sync_parts(board):
-    """parts.py's nets on every pad; a part missing from the board added at its floorplan.json place"""
+    """parts.py's nets on every pad; a part missing from the board added at its floorplan.json place; a part whose
+    footprint changed (signoff3: C3 0603 -> 0805) replaced there; a part whose floorplan.json place differs from the
+    board's moved to it (signoff3: R155); the values as parts.py's"""
     fps = {f.GetReference(): f for f in board.GetFootprints()}
     added, renet = [], []
     for ref, _k, value, fp, _lcsc, pins in P.PARTS:
         f = fps.get(ref)
+        if f is not None and f.GetFPID().GetLibItemName().wx_str() != P.FP[fp]:
+            remove(board, f)
+            added.append(f"{ref} (new footprint {P.FP[fp]})")
+            f = None
+        if f is not None and ref in FLOOR and not f.IsFlipped():
+            x, y, rot = FLOOR[ref]
+            bx, by = xy(f.GetPosition())
+            if abs(bx - x) > 0.005 or abs(by - y) > 0.005 or abs((f.GetOrientationDegrees() - rot) % 360) > 0.1:
+                f.SetPosition(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)))
+                f.SetOrientationDegrees(rot)
+                added.append(f"{ref} (moved to {x}, {y}, {rot})")
+        if f is not None and f.GetValue() != value:
+            f.SetValue(value)
         if f is None:
             f = pcbnew.FootprintLoad(LIB, P.FP[fp])
             f.SetFPID(pcbnew.LIB_ID("chip", P.FP[fp]))
@@ -199,6 +219,18 @@ def keepouts(R):
     R.block((0, 1), J1_VIAS, ("via",))
 
 
+def near_new_pads(R, board, gap=0.2):
+    """no via centre where its ring would come within gap of a new / moved part's pad (signoff3 review F2: the join
+    router put a via 0.08 mm from R156's pad)"""
+    rr = route.VIA_D / 2 + gap
+    for f in board.GetFootprints():
+        if f.GetReference() in RIP_VIAS_NEAR:
+            for p in f.Pads():
+                b = p.GetBoundingBox()
+                R.block((0, 1), (TO(b.GetLeft()) - OX - rr, TO(b.GetTop()) - OY - rr, TO(b.GetRight()) - OX + rr,
+                                 TO(b.GetBottom()) - OY + rr), classes=("via",))
+
+
 def join(board, path):
     pairs = open_pairs(path) + [(n, [a, b]) for n, a, b in PAIRS]
     print(f"signoff2: {len(pairs)} open pairs: {', '.join(n for n, _ in pairs)}")
@@ -206,6 +238,7 @@ def join(board, path):
     for k, f in repair.KINDS.items():
         routers[k] = repair.build(board, f)
         keepouts(routers[k])
+        near_new_pads(routers[k], board)
     left = []
     for net, (a, b) in pairs:
         width, cls = WIDTH.get(net, (0.2, "sig"))
@@ -306,6 +339,56 @@ def trim(board, t):
     return True
 
 
+HAND = ("J2", "J3", "J5", "J6", "J7", "J8", "J9", "J10B", "J11", "J13", "J14")   # (check_board.py's list)
+STITCH = ("BAT_P", "BAT_C", "BAT_N")      # (signoff3, round 3 R3: 2 .. 3 vias at each layer change of the cell's path)
+
+
+def free_for(R, cls, net, x, y):
+    ix, iy = int(round(x / route.GRID)), int(round(y / route.GRID))
+    if not (0 <= ix < R.nx and 0 <= iy < R.ny):
+        return False
+    n, i = R.nid(net), iy * R.nx + ix
+    return all(R.mask[cls][L][i] in (0, n) for L in (0, 1))
+
+
+def stitch_vias(board, nets=STITCH, want=3, width=0.4):
+    """beside each via of these nets, more vias of its net (0.9 .. 1.1 mm away, joined to it by a short track on both
+    layers) until it has want within 1.6 mm; only where the grid (repair.build: every pad, track, via, iron room, drill
+    spacing) is free on both layers for the via and the joins"""
+    R = repair.build(board)
+    keepouts(R)
+    near_new_pads(R, board)
+    for f in board.GetFootprints():            # (check_board's hand-soldered parts: no via in their iron's room, SMD lands too)
+        if f.GetReference() in HAND:
+            for p in f.Pads():
+                px, py = xy(p.GetPosition())
+                rr = max(TO(p.GetSize().x), TO(p.GetSize().y)) / 2 + 0.8 + route.VIA_D / 2
+                R.block((0, 1), (px - rr, py - rr, px + rr, py + rr), classes=("via",))
+    have = [(v.GetNetname(), xy(v.GetPosition())) for v in board.GetTracks() if v.GetClass() == "PCB_VIA" and v.GetNetname() in nets]
+    added = {}
+    for net, (vx, vy) in list(have):
+        need = want - sum(1 for n, (x, y) in have if n == net and math.hypot(x - vx, y - vy) < 1.6)
+        for r in (0.9, 1.0, 1.1):
+            for k in range(16):
+                if need <= 0:
+                    break
+                a = 2 * math.pi * k / 16
+                cx, cy = round(vx + r * math.cos(a), 3), round(vy + r * math.sin(a), 3)
+                pts = [(vx + (cx - vx) * j / 20, vy + (cy - vy) * j / 20) for j in range(21)]
+                if not free_for(R, "via", net, cx, cy) or not all(free_for(R, "mid", net, x, y) for x, y in pts):
+                    continue
+                segs = [(L, vx, vy, cx, cy) for L in (0, 1)]
+                repair.add(board, net, segs, [(cx, cy)], width)
+                for L, x0, y0, x1, y1 in segs:
+                    R.seg(L, net, (x0, y0, x1, y1), width)
+                R.circle((0, 1), net, cx, cy, route.VIA_D / 2 + route.VIA_EXTRA)
+                R.drill(cx, cy, route.VIA_DRILL)
+                have.append((net, (cx, cy)))
+                added[net] = added.get(net, 0) + 1
+                need -= 1
+    return added
+
+
 def main():
     path = sys.argv[1]
     before = dangling(path)
@@ -335,6 +418,7 @@ def main():
     board = pcbnew.LoadBoard(path)
     left = join(board, path)
     print(f"signoff2: {prune(board, path, before)} stubs / vias left hanging by the rips removed")
+    print(f"signoff2: stitching vias added on the cell's path: {stitch_vias(board)}")
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     board.Save(path)
     print(f"signoff2: not joined: {left}; {repair.unconnected(board)} connections open (KiCad's count)")

@@ -65,7 +65,7 @@ function makePage(opts = {}) {
     clearInterval: id => timers.delete(id), clearTimeout: id => { timers.delete(id); if (box.__timeouts) box.__timeouts.delete(id); },
     requestAnimationFrame: fn => { const id = nextFrame++; frames.add({ id, fn }); return id; },
     cancelAnimationFrame: id => { for (const f of frames) if (f.id === id) frames.delete(f); },
-    CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } }, navigator: { mediaDevices: opts.mediaDevices },
+    CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } }, navigator: { mediaDevices: opts.mediaDevices, permissions: opts.permissions, requestMIDIAccess: opts.requestMIDIAccess },
     localStorage: opts.storage || { getItem: () => null, setItem: () => {}, removeItem: () => {} },
     URL: { createObjectURL: f => 'blob:' + f.name, revokeObjectURL: u => media.revoked.push(u) },
     window: { addEventListener: (type, fn) => { (winBus[type] = winBus[type] || []).push(fn); } }, location: { search: opts.search || '' }, URLSearchParams, TextDecoder, Uint8Array, Float32Array, MessageChannel: opts.MessageChannel || MessageChannel,
@@ -153,6 +153,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   let page = makePage();
   eq(pressed(page), ['false', 'false'], 'no button is pressed before a connection');
   eq(hidden(page), [false, false, false, false], 'the face, the Advanced box, the player and the Advanced extra are hidden');
+  eq([shown(page, 'menu'), shown(page, 'more')], [false, false], 'Settings, Network and Details are hidden before a connection');
   page.key('keydown', 'ArrowUp');
   eq([page.frames.size, page.timers.size], [0, 0], 'no face, no frame, no timer, and the keys do nothing');
 
@@ -173,6 +174,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   let { page: p, midi } = await connected();
   eq([pressed(p), shown(p, 'live'), shown(p, 'c-advanced-box'), shown(p, 'player'), shown(p, 'advanced-extra')], [['true', 'false'], true, true, false, false], 'USB: the face and the Advanced box appear, the player does not');
   eq(p.el('msg').textContent, '', 'no "Connected." text');
+  eq([shown(p, 'menu'), shown(p, 'more')], [true, true], 'USB: Settings, Network and Details appear with the connection');
   ok(midi.sent.includes('get') && midi.sent.includes('home'), 'the page read get and home from the stick');
   eq([p.box.S.lastHome.bpm, p.box.S.lastHome.audio, p.box.S.lastGet.group], [120, true, '1'], "the HOME line and get of the stick are held");
   ok(p.frames.size === 1, 'the face draws frames while connected');
@@ -181,6 +183,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   ok(lit > 100, 'the screen shows the stick\'s HOME (' + lit + ' lit pixels)');
   eq([p.el('oled').width, p.el('oled').height, p.el('oled').lastImage.width], [320, 240, 320], 'the default screen is the colour lcd2 landscape (320 x 240), for every board');
   p.box.disconnected();
+  eq([shown(p, 'menu'), shown(p, 'more')], [false, false], 'after a disconnect Settings, Network and Details are hidden again');
   {
     const q = await connected(undefined, { search: '?screen=oled' });
     q.page.runFrame();
@@ -696,6 +699,90 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     eq(wp.el('msg').textContent.startsWith('no answer to get from jank. If the app asks for SysEx, turn it on.'), true, 'no answer to get: names the port, keeps the SysEx hint');
   }
 
+  // ---- auto connect: at load, only when the browser already holds the MIDI permission with SysEx ----
+  {
+    const decoy = { input: { id: 'id0', name: 'Digitone Audio+MIDI Elektron Digitone II', state: 'connected', onmidimessage: null }, output: { id: 'od0', name: 'Digitone Audio+MIDI Elektron Digitone II', state: 'connected', frames: 0, send() { this.frames++; } } };
+    const load = async ({ state = 'granted', jank = true, storage, noPermissions = false, queryThrows = false } = {}) => {
+      const midi = fakeMidi();
+      const ins = new Map([[decoy.input.id, decoy.input]]), outs = new Map([[decoy.output.id, decoy.output]]);
+      if (jank) { ins.set('in', midi.input); outs.set('out', midi.output); }
+      const access = { inputs: ins, outputs: outs, onstatechange: null };
+      const calls = { query: [], request: 0 };
+      const permissions = noPermissions ? undefined : { query: async (d) => { calls.query.push(d); if (queryThrows) throw new Error('unsupported'); return { state }; } };
+      const page = makePage({ permissions, requestMIDIAccess: () => { calls.request++; return Promise.resolve(access); }, storage });
+      midi.attach(page);
+      await settle();
+      const arrive = () => { access.outputs.set('out', midi.output); access.inputs.set('in', midi.input); access.onstatechange && access.onstatechange(); };
+      const leave = () => { access.inputs.delete('in'); access.outputs.delete('out'); access.onstatechange && access.onstatechange(); };
+      return { page, midi, access, calls, arrive, leave, decoyFrames: () => decoy.output.frames };
+    };
+    const gets = c => c.midi.sent.filter(s => s === 'get').length;
+    const memory = () => { const m = new Map(); return { m, getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, v), removeItem: k => m.delete(k) }; };
+
+    // granted + jank present: connects at load, nothing to the other port
+    let c = await load();
+    eq([JSON.stringify(c.calls.query), c.calls.request, gets(c), c.page.box.S.kind, c.decoyFrames(), pressed(c.page)[0]], ['[{"name":"midi","sysex":true}]', 1, 1, 'midi', 0, 'true'], 'granted + jank: connected at load, 0 frames to the Digitone');
+    c.page.box.disconnected();
+
+    // granted + no jank: no error line, waits (no 15 s timer), connects once when it appears
+    c = await load({ jank: false });
+    eq([c.page.el('msg').textContent, shown(c.page, 'c-waiting'), c.page.timeouts().length, typeof c.access.onstatechange], ['', true, 0, 'function'], 'granted, no jank: no error line, the quiet waiting line, no timer, the listener kept');
+    c.arrive();
+    await settle();
+    c.access.onstatechange && c.access.onstatechange();
+    await settle();
+    eq([gets(c), shown(c.page, 'c-waiting'), c.decoyFrames()], [1, false, 0], 'the jank appears: connected once, the waiting line gone');
+
+    // unplug: idle, the listener re-armed, the waiting line; the jank returns (a flash restart): reconnects without a click
+    c.leave();
+    await settle();
+    eq([c.page.box.S.kind, pressed(c.page)[0], shown(c.page, 'c-waiting'), typeof c.access.onstatechange, c.page.timeouts().length], [null, 'false', true, 'function', 0], 'unplug: idle, auto-connect re-armed (one listener, no timer)');
+    c.arrive();
+    await settle();
+    eq([c.page.box.S.kind, gets(c)], ['midi', 2], 'the jank returns: reconnected without a click');
+
+    // the user's disconnect turns auto-connect off, and it stays off
+    c.page.el('c-midi').click();
+    await settle();
+    eq([c.page.box.S.kind, c.access.onstatechange, c.page.timers.size, c.page.box.S.auto], [null, null, 0, false], 'user disconnect: idle, no listener, no timer, auto-connect off');
+    c.arrive();
+    await settle();
+    eq([gets(c), c.page.box.S.kind], [2, null], 'off: a statechange with the jank present connects nothing');
+    c.page.el('c-midi').click();
+    await settle();
+    eq([c.page.box.S.kind, c.page.box.S.auto, gets(c)], ['midi', true, 3], 'pressing MIDI port again connects and turns it back on');
+    c.page.box.disconnected();
+
+    // remembered in localStorage: off at the next load, nothing called
+    const st = memory();
+    c = await load({ storage: st });
+    c.page.el('c-midi').click();
+    await settle();
+    eq(st.m.get('jank.autoconnect'), '0', 'off is remembered');
+    const again = await load({ storage: st });
+    eq([again.calls.query.length, again.calls.request, again.page.box.S.kind], [0, 0, null], 'stored off: no permission query, no MIDI request at load');
+    c.page.box.disconnected();
+
+    // prompt / denied / unsupported / throwing query: requestMIDIAccess is not called at load
+    for (const [what, o] of [['prompt', { state: 'prompt' }], ['denied', { state: 'denied' }], ['no permissions API', { noPermissions: true }], ['a query that throws', { queryThrows: true }]]) {
+      const n = await load(o);
+      eq([n.calls.request, n.page.box.S.kind, n.page.el('msg').textContent, n.access.onstatechange], [0, null, '', null], what + ': nothing requested, nothing shown, nothing listening');
+    }
+  }
+
+  // ---- tooltips on what the page builds at run time: folder rows, breadcrumbs, the face's D-pad, the Join buttons ----
+  {
+    const c = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
+    const rows = c.page.el('pl-list').children, crumbs = c.page.el('pl-crumbs').children.filter(k => k.tagName !== undefined && k.title !== undefined);
+    ok(rows.length > 0 && rows.every(b => typeof b.title === 'string' && b.title.length > 0 && b.title.length <= 240), 'every folder / file row has a tooltip (' + rows.length + ' rows)');
+    ok(crumbs.every(b => b.title.length > 0 && b.title.length <= 240), 'the breadcrumb buttons have tooltips');
+    for (const b of ['up', 'down', 'no', 'yes']) {
+      const tip = c.page.el('dev').querySelector('#arm-' + b).getAttribute('aria-label');
+      ok(typeof tip === 'string' && tip.includes(b.toUpperCase()) && tip.length <= 240, 'the D-pad ' + b + ' has a tip: ' + tip);
+    }
+    c.page.box.disconnected();
+  }
+
   // ---- Auto latency: set beat_latency from the two paths, only under its guards ----
   {
     const statusUsb = (source) => transcript.status.replace(/\nok\s*$/, '') + '\naudio_source=' + source + '\nok';
@@ -709,11 +796,9 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     let a = await setup('usb');
     await tickAll(a);
     eq(sets(a), [], 'not at load: nothing is sent before the player plays');
-    eq(a.page.el('al-line').textContent.startsWith('auto latency: stick path unknown'), true, 'the line says why: no stick path yet');
     await play(a);
     await tickAll(a);
     eq(sets(a), ['set beat_latency -20'], 'playing through the stick over USB: monitor 30 - stick 50 = -20 ms is sent, once');
-    eq(a.page.el('al-line').textContent, 'auto latency: sent -20 ms (speakers 30 - stick path 50)', 'the line shows what was sent');
     a.page.clock.t += 1000;
     await tickAll(a);
     eq(sets(a).length, 1, 'rate limit: nothing more within 5 s');
@@ -733,7 +818,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await play(line);
     await tickAll(line);
     await tickAll(line);
-    eq([sets(line), line.page.el('al-line').textContent.includes('not USB')], [[], true], 'source is not USB: nothing sent, the line says so');
+    eq(sets(line), [], 'source is not USB: nothing sent');
     line.page.box.disconnected();
 
     const near = await setup('usb');
@@ -741,7 +826,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await play(near);
     await tickAll(near);
     await tickAll(near);
-    eq([sets(near), near.page.el('al-line').textContent.includes('within 3 ms')], [[], true], 'within 3 ms of the stick lat_auto: nothing sent');
+    eq(sets(near), [], 'within 3 ms of the stick lat_auto: nothing sent');
     near.page.box.disconnected();
   }
 

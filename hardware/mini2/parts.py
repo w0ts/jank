@@ -65,9 +65,9 @@ GPIO = {   # firmware's board.h (README "The GPIO map"): function -> (GPIO, modu
     "BOOT": (0, "27"),          # SW1 NO / BOOT to GND, R16 pull-up (strapping: low at reset = download mode)
     "LINE_IN": (9, "17"),       # ADC1_CH8: the digital LINE IN's node A (tip + ring)
     "LINE_SENSE": (8, "12"),    # ADC1_CH7: node B (the sleeve's matched copy)
-    "VBAT_ADC": (10, "18"),     # ADC1_CH9: the cell through R10 / R11 100 k / 100 k, C8 at the pin
+    "VBAT_ADC": (10, "18"),     # ADC1_CH9: the cell through R10 / R11 1 M / 1 M, C8 at the pin
     "BTN_DOWN": (4, "4"), "BTN_YES": (5, "5"), "BTN_UP": (18, "11"),   # inputs, the internal pull-ups
-    "MIDI_TX2": (42, "35"),      # UART2 TX, inverted: MIDI OUT 2's 2N7002s (Q12 / Q13), R125 pull-down
+    "MIDI_TX2": (42, "35"),      # UART2 TX, inverted: MIDI OUT 2's AO3400As (Q12 / Q13), R125 pull-down
     "CLK_IO": (36, "29"),        # CLOCK out, active high, R71 100 k pull-down
     "RST_IO": (21, "23"),       # RESET out, active high, R77 100 k pull-down
     "CC_INT": (13, "21"),       # U17 TUSB320LI's INT_N, open drain: the internal pull-up (battery order)
@@ -76,7 +76,7 @@ GPIO = {   # firmware's board.h (README "The GPIO map"): function -> (GPIO, modu
     "VBUS_SENSE": (14, "22"),   # VBUS through R88 22 k / R89 33 k: 5 V -> 3.0 V; high = USB present
     "LIN_DET": (48, "25"),      # J7's ring switch, R38 1 M up; low = no plug
     "LED_DATA": (38, "31"),     # the two WS2812B-2020s, chained, through R40 22 ohm (RMT)
-    "MIDI_TX": (37, "30"),      # UART1 TX, inverted: MIDI OUT 1's 2N7002s (Q10 / Q11), R124 pull-down
+    "MIDI_TX": (37, "30"),      # UART1 TX, inverted: MIDI OUT 1's AO3400As (Q10 / Q11), R124 pull-down
     # the 5 V aux boost's enable (2026-11-15, the user's: the firmware turns the 5 V loads off at the cell's cutoff and
     #  in sleep). GPIO41 (MTDI): no pull and no power-up glitch; R131 100 k up to +3V3 keeps the rail ON while the pin
     #  floats (reset, boot, erased or dead firmware); JP10 (a closed jumper) joins the pin to EN: cut it and the rail is
@@ -109,6 +109,7 @@ PARTS = [
       "A6": "UDP", "B6": "UDP", "A7": "UDN", "B7": "UDN"}),
     # (22 ohm in series on D+ / D- by the chip: the edges and ringing on the 22 mm tracks, Espressif's checklist)
     # (ESD on D+ / D- right at the USB-C, before the 22 ohm: the user's ruling 2026-11-12; VBUS only its clamp reference)
+    # (now the Hongjiacheng SRV05-4, C7420376: 5 the rail, 2 GND, I/O 1 / 3 / 4 / 6, the same functions as below)
     # (stage 1e: SRV05-4-P-T7, ProTek, a preferred part (no fee) instead of the USBLC6-2SC6. ProTek's datasheet (05150.R16):
     #  1 I/O1, 2 GND, 3 I/O2, 4 I/O3, 5 REF, 6 I/O4: D+ on I/O1 + I/O4, D- on I/O2 + I/O3, REF on VBUS, the USBLC6's own
     #  pin functions (1 / 6 D+, 3 / 4 D-, 2 GND, 5 VBUS). JLC's footprint is the same SOT-23-6 pattern turned 90: placed at
@@ -146,8 +147,8 @@ PARTS = [
     #      low, ID unused. VBUS_DET through R94 (one 910 k since the buffer try; was 2 x 470 k = 940 k; TI asks 855 .. 920 k: its 2.95 .. 3.80 V VBUS
     #      threshold moves to 3.06 .. 3.94 V) from the connector's VBUS
     #      ESCAPE HATCH (the user's rule: device mode and charging must work with every host part dead, misplaced or
-    #      removed): U17 sits behind five fitted 0 ohm 0402 links, JP3 / JP4 (CC1 / CC2), JP5 / JP6 (SDA / SCL),
-    #      JP7 (its VDD). Lift the five with an iron and U17 is out of the circuit (its other pads: GND, VBUS_DET through
+    #      removed): U17 sits behind five closed solder jumpers (SJ2C copper bridges), JP3 / JP4 (CC1 / CC2), JP5 / JP6 (SDA / SCL),
+    #      JP7 (its VDD). Cut the five with a knife and U17 is out of the circuit (its other pads: GND, VBUS_DET through
     #      940 k, INT_N on a GPIO input); then fit 5.1 k 0603s on R3 / R4's lands (the usb order's Rd, DNP here): a plain
     #      sink. Unpowered, U17 itself presents Rd (SLLSEP2D 7.3.3)
     ("U17", "tusb", "TUSB320LIRWBR", "x2qfn12", "C2836598",
@@ -219,7 +220,10 @@ PARTS = [
     ("R144", "R", "0 DNP", "r0402", "", {"1": "V3_MODE", "2": "+3V3"}),
     ("U2B", "ldo5", "LDO 3.3 DNP", "sot235", "", {"1": "VREG", "2": "GND", "3": "VREG", "5": "+3V3"}),
     #      (D15, the TLV757P's reverse-current Schottky, gone with it: the TPS63802 has a true shutdown)
-    ("C3", "C", "10u", "c0603", "C19702", {"1": "VREG", "2": "GND"}),
+    # (signoff3, round 3 R4: C3 22 uF 25 V X5R 0805 (Samsung CL21A226MAQNNNE, C45783, Basic) in the 10 uF 0603's place:
+    #  ~11 .. 13 uF at 5 V (ASSUMED DC-bias retention) against TI's CI >= 4 uF effective (SLVSEU9D 8.3); no room for a second
+    #  cap at U2's pins)
+    ("C3", "C", "22u", "c0805", "C45783", {"1": "VREG", "2": "GND"}),
     ("C5", "C", "22u", "c0603", "C59461", {"1": "+3V3", "2": "GND"}),
     #      the power path ("battery"). Review pass 1 / the sim pass: Q1 (an AO3401A with its gate on VBUS, R50 10 k down)
     #      left a ~25 ms gap at the USB unplug (it conducts only once VBUS has drained below the cell: +3V3 2.69 V on a
@@ -263,12 +267,17 @@ PARTS = [
     #      (buffer try, the user's: bottom right above SW3, VERTICAL B2B as before: the side-entry plug hit the UP post and the cells)
     ("J8", "ph2", "PH2.0 cell 1", "ph2", "C131337", {"1": "BAT_C", "2": "BAT_N"}),
     ("J9", "ph2", "PH2.0 cell 2", "ph2", "C131337", {"1": "BAT_C", "2": "BAT_N"}),
-    #      the cell's level: 100 k / 100 k + 100 nF on GPIO10 (ADC1_CH9). R10 ("battery" only) from the cell's +; R11 and C8
-    #      in both orders: in "usb" GPIO4 is held at 0 V (not floating), which also tells the firmware which board it runs
+    #      the cell's level: 1 M / 1 M + 100 nF on GPIO10 (ADC1_CH9). R10 ("battery" only) from the cell's +; R11 and C8
+    #      in both orders: in "usb" GPIO10 is held at 0 V (not floating), which also tells the firmware which board it runs
     #      on. Review pass 1 / the sim pass: with 1 M / 1 M (500 k) the ADC's sampling cap, shared with LINE_IN at 41.7 kHz,
     #      pulled the reading 30 .. 131 mV low (up to 0.64 V); 100 k / 100 k (50 k) cuts it 10 x for 21 uA from the cell
-    ("R10", "R", "100k", "r0402", "C25741", {"1": "BAT_P", "2": "VBAT_ADC"}),
-    ("R11", "R", "100k", "r0402", "C25741", {"1": "VBAT_ADC", "2": "GND"}),
+    #      (signoff3, round 3 R8: back to 1 M / 1 M, for the drain while switched off: ~25 uA divider + back-power into the
+    #      unpowered S3 -> ~6 uA (the board's whole off drain ~9 .. 17 uA with the XB5353A, TP4054, D3). The shared
+    #      sampling cap's error comes back, affine in the cell: V = (Vcell/2 + k Vline) / (1 + k), k = 500 k x Cs x 41.7 kHz;
+    #      the firmware must take k from the boot one-shot read (an offset over-reads an empty cell by up to ~0.2 V), or re-read
+    #      by one-shot now and then; worktrees/mini22-review-scratch/REVIEW.md section 9)
+    ("R10", "R", "1M", "r0402", "C26083", {"1": "BAT_P", "2": "VBAT_ADC"}),
+    ("R11", "R", "1M", "r0402", "C26083", {"1": "VBAT_ADC", "2": "GND"}),
     ("C8", "C", "100n", "c0402", "C1525", {"1": "VBAT_ADC", "2": "GND"}),
     # ---- the module (2026-11-15, the user's): Espressif ESP32-S3-WROOM-1U-N8R2 (C3013944: 8 MB quad flash, 2 MB quad
     #      PSRAM, a u.FL for the lid's FPC antenna). Its datasheet (WROOM-1 / WROOM-1U v1.8): 41 pins (Table 3-1; pin 41
@@ -312,8 +321,8 @@ PARTS = [
     #      they replace the red 0603 + green 0805, R40 / R41 1 k and their twins). WorldSemi WS2812B-2020-V6 (2.0 x 2.0;
     #      its sheet: VDD 3.3 .. 5.3 V, VIH 0.55 x VDD, 1 uA quiescent, 12 mA a colour; pins 1 DO, 2 GND, 3 DI, 4 VDD, as
     #      JLC's symbol). VDD from VREG (after the switch): 3.4 .. 3.5 V on a cell at the 3.6 V cutoff, ~4.6 .. 4.9 V on
-    #      USB, so VIH is 2.7 V at most and GPIO33's 3.3 V drives DI with no level shifter (a 74LVC1G125 on VREG would not:
-    #      TI gives VIH 0.7 x VCC at 4.5 .. 5.5 V and nothing between 3.6 and 4.5 V). R40 33 ohm in the data line at
+    #      USB, so VIH is 2.7 V at most and GPIO38's 3.3 V drives DI with no level shifter (a 74LVC1G125 on VREG would not:
+    #      TI gives VIH 0.7 x VCC at 4.5 .. 5.5 V and nothing between 3.6 and 4.5 V). R40 22 ohm in the data line at
     #      the GPIO, 100 nF at each LED (its sheet's Cn). Both orders. LED4's DO is left open (four since 2026-11-15). VLED: VREG through R98
     #      4.7 ohm with C98 10 uF (the user's: a filter against the hot-plug ring, the LEDs' 5.3 V); sim (the sim-pass2
     #      hot-plug decks, a 5.5 V source, 0.7 .. 1 uH): the usb order's VREG peaks 5.37 V, VLED 5.00 V with the filter
@@ -342,10 +351,10 @@ PARTS = [
     ("C98", "C", "10u", "c0603", "C19702", {"1": "VLED", "2": "GND"}),
     #      ESCAPE HATCHES: R98 is VLED's cut (lift it: the RGB LEDs unpowered). The plain-LED fallback, right under the
     #      window: lift LED1 and solder a 0603 LED across its pads 3 (DI: the anode) and 2 (GND: the cathode), 1.72 mm
-    #      apart, and swap R40 (33 ohm) for 1 k: GPIO33 drives it, active high
+    #      apart, and swap R40 (22 ohm) for 1 k: GPIO38 drives it, active high
     # ---- MIDI OUT 1 and MIDI OUT 2 (2026-11-15, the user's: a true 5 V current loop, MIDI 1.0's 5 V circuit, from the
     #      5 V aux rail through JP8 (V5M, the MIDI group's closed jumper). Every connector its own loop (stage 1f): ring /
-    #      DIN 4 = the source from V5M through 220 ohm 1206, tip / DIN 5 = the sink through 220 ohm 1206 to a 2N7002's drain;
+    #      DIN 4 = the source from V5M through 220 ohm 1206, tip / DIN 5 = the sink through 220 ohm 1206 to an AO3400A's drain (a 2N7002 before signoff3);
     #      the FET's gate on the UART TX (MIDI_TX GPIO37: OUT 1's jack and DIN; MIDI_TX2 GPIO42: OUT 2's), its source GND.
     #      The firmware inverts the TX (uart_set_line_inverse(UART_SIGNAL_TXD_INV)): idle low = the FET off = no current;
     #      R124 / R125 100 k hold the gates low while the GPIOs float. The GPIOs carry no loop current. The FETs are open-
@@ -363,10 +372,12 @@ PARTS = [
     #      1206 for the ring-to-GND fault: 22.8 mA, 115 mW), was 2 x 470 ohm 0805 in parallel.)
     ("R14", "R", "220", "r1206", "C17957", {"1": "V5M", "2": "MO_R"}),
     ("R15", "R", "220", "r1206", "C17957", {"1": "MO_K", "2": "MO_T"}),
-    ("Q10", "nfet", "2N7002", "tvs2", "C8545", {"1": "MIDI_TX", "2": "GND", "3": "MO_K"}),
+    # (signoff3, round 3 R6: the sinks AO3400A (C20917, Basic; AOS: 1 G, 2 S, 3 D as the 2N7002; VGS(th) 0.65 .. 1.45 V,
+    #  RDS(on) < 48 mohm at VGS 2.5 V) for the 2N7002 (Vth up to 2.5 V, RDS(on) given only at 5 V): full current from a 3.3 V gate)
+    ("Q10", "nfet", "AO3400A", "tvs2", "C20917", {"1": "MIDI_TX", "2": "GND", "3": "MO_K"}),
     ("R54", "R", "220", "r1206", "C17957", {"1": "V5M", "2": "MD_R"}),
     ("R55", "R", "220", "r1206", "C17957", {"1": "MD_K", "2": "MD_T"}),
-    ("Q11", "nfet", "2N7002", "tvs2", "C8545", {"1": "MIDI_TX", "2": "GND", "3": "MD_K"}),
+    ("Q11", "nfet", "AO3400A", "tvs2", "C20917", {"1": "MIDI_TX", "2": "GND", "3": "MD_K"}),
     ("R124", "R", "100k", "r0402", "C25741", {"1": "MIDI_TX", "2": "GND"}),
     ("R126", "R", "0 DNP", "r0402", "", {"1": "MO_K", "2": "MIDI_TX"}),
     ("R127", "R", "0 DNP", "r0402", "", {"1": "MD_K", "2": "MIDI_TX"}),
@@ -375,14 +386,14 @@ PARTS = [
     ("J6", "din", "MIDI OUT 2 DIN", "din", "C2939346", {"4": "MD2_R", "2": "MD2_T", "3": "GND", "6": "GND", "7": "GND"}),
     ("R21", "R", "220", "r1206", "C17957", {"1": "V5M", "2": "MO2_R"}),
     ("R20", "R", "220", "r1206", "C17957", {"1": "MO2_K", "2": "MO2_T"}),
-    ("Q12", "nfet", "2N7002", "tvs2", "C8545", {"1": "MIDI_TX2", "2": "GND", "3": "MO2_K"}),
+    ("Q12", "nfet", "AO3400A", "tvs2", "C20917", {"1": "MIDI_TX2", "2": "GND", "3": "MO2_K"}),
     ("R56", "R", "220", "r1206", "C17957", {"1": "V5M", "2": "MD2_R"}),
     ("R57", "R", "220", "r1206", "C17957", {"1": "MD2_K", "2": "MD2_T"}),
-    ("Q13", "nfet", "2N7002", "tvs2", "C8545", {"1": "MIDI_TX2", "2": "GND", "3": "MD2_K"}),
+    ("Q13", "nfet", "AO3400A", "tvs2", "C20917", {"1": "MIDI_TX2", "2": "GND", "3": "MD2_K"}),
     ("R125", "R", "100k", "r0402", "C25741", {"1": "MIDI_TX2", "2": "GND"}),
     ("R128", "R", "0 DNP", "r0402", "", {"1": "MO2_K", "2": "MIDI_TX2"}),
     ("R129", "R", "0 DNP", "r0402", "", {"1": "MD2_K", "2": "MIDI_TX2"}),
-    #      review pass 1 (M7): ESD on the MIDI connectors' lines, one SRV05-4 (the USB's part, C85364: no new type) per
+    #      review pass 1 (M7): ESD on the MIDI connectors' lines, one SRV05-4 (the USB's part, now Hongjiacheng C7420376: no new type) per
     #      output, its four I/O on that output's jack tip / ring and DIN 5 / 4, REF on +3V3 (pins 1 I/O1, 2 GND, 3 I/O2,
     #      4 I/O3, 5 REF, 6 I/O4), between the connectors' pads and their resistors
     #      (2026-11-15: their REF on V5M: the lines now idle at 5 V, a REF on +3V3 would feed it through the clamp diodes)
@@ -434,8 +445,8 @@ PARTS = [
 #      VOUT, true disconnect when off, COUT 4 .. 1000 uF effective, L 0.37 .. 2.9 uH, TJ -40 .. 125 C; DRL pins 1 FB, 2 EN,
 #      3 VIN, 4 GND, 5 SW, 6 VOUT) from VREG (after the power switch: off = off) -> V5A: the RGB LEDs (R98), the MIDI loops
 #      (JP8), CLOCK / RESET (JP9) and the host signal (JP13), each through its own closed jumper (cut it to cut that
-#      group). L5 the same 0.47 uH as L4 (one type). R134 1 M / R135 100 k + R154 20 k + R136 20 k: 0.595 x (1 + 1000 / 140) = 4.85 V (was 18 k: 4.91 V)
-#      (4.79 .. 5.03 V with VREF's +-2.5 %: kept under the clamp).
+#      group). L5 the same 0.47 uH as L4 (one type). R134 1 M / R135 100 k + R154 20 k + R136 22 k: 0.595 x (1 + 1000 / 142) = 4.79 V (signoff3; 20 k: 4.85 V, 18 k: 4.91 V)
+#      (4.58 .. 4.99 V with VREF 580 .. 610 mV and 1 % parts: under the clamp's 4.93 V low corner on most boards).
 #      EN (2026-11-15, the user's): GPIO41 (V5_EN_IO) through JP10 (0 ohm), R131 100 k up to +3V3: ON unless the
 #      firmware drives it low (EN high > 1.2 V, low < 0.42 V: SLVSF14B). ESCAPE HATCH: cut JP10 and the rail is on
 #      for good (dead firmware or a bad pin). Device mode and charging never depend on it.
@@ -456,9 +467,10 @@ AUX5 = [
     ("C100", "C", "10u 25V", "c0805", "C15850", {"1": "V5A", "2": "GND"}),
     ("C101", "C", "10u 25V", "c0805", "C15850", {"1": "V5A", "2": "GND"}),
     ("R134", "R", "1M", "r0402", "C26083", {"1": "V5A", "2": "V5_FB"}),
-    ("R135", "R", "100k", "r0402", "C25741", {"1": "V5_FB", "2": "V5_FBM"}),   # (chain list 4: 100 k + R154 20 k = 120 k, + R136 20 k)
+    ("R135", "R", "100k", "r0402", "C25741", {"1": "V5_FB", "2": "V5_FBM"}),   # (chain list 4: 100 k + R154 20 k = 120 k, + R136 22 k)
     ("R154", "R", "20k", "r0402", "C25765", {"1": "V5_FBM", "2": "V5_FBL"}),
-    ("R136", "R", "20k", "r0402", "C25765", {"1": "V5_FBL", "2": "GND"}),   # (experiment A: 4.85 V, was 18 k: 4.91 V)
+    ("R136", "R", "22k", "r0402", "C25768", {"1": "V5_FBL", "2": "GND"}),   # (signoff3, round 3 R2: 4.79 V nominal, 4.58 .. 4.99 V
+    #  with VREF 580 .. 610 mV and 1 % parts: under the clamp's lowest threshold (4.93 V: Vref 2.475 V, 1 % parts, Iref) on most boards, above the 74AHCT04's 4.5 V. Was 20 k: 4.85 V)
     ("R131", "R", "100k", "r0402", "C25741", {"1": "+3V3", "2": "V5_EN"}),     # (2026-11-15: EN's pull-up: ON by default)
     ("JP10", "sj2", "V5 EN link", "sj2c", "", {"1": "V5_EN", "2": "V5_EN_IO"}),
     ("U19", "shunt", "CJ431", "det", "C3113", {"1": "V5_CL", "2": "V5_CK", "3": "GND"}),
@@ -528,7 +540,7 @@ LCSC = {
     #  D = tip, B = the switch; the user's ruling 2026-11-12: stronger, JLC solders it)
     "C18185602": "SHOU HAN PJ-320A-4P DIP, 3.5 mm jack, through hole, 6.2 mm wide (stage 2: the CLOCK / RESET outputs; DNP: "
                  "bottom side, the user solders it; bought with the order)",
-    "C8545": "2N7002, N-MOSFET 60 V 115 mA, SOT-23 (Basic)",
+    "C8545": "2N7002, N-MOSFET 60 V 115 mA, SOT-23 (Basic)", "C20917": "AOS AO3400A, N-MOSFET 30 V 5.7 A, 48 mohm at 2.5 V, SOT-23 (Basic; the MIDI sinks)",
     "C15850": "10 uF 25 V X5R 0805 (Basic; the CV rail)",
     "C2500": "Nexperia BAV99, two switching diodes in series 100 V 215 mA, SOT-23 (Basic)",
     "C17944": "2 k 1% 1206, 0.25 W (Basic)",
@@ -543,7 +555,7 @@ LCSC = {
     "C23186": "5.1 k 1% 0603", "C25092": "22 ohm 5% 0402",
     "C22859": "10 ohm 1% 0603", "C17168": "0 ohm 0402", "C25744": "10 k 1% 0402",
     "C59461": "22 uF 6.3 V X5R 0603", "C19702": "10 uF 10 V X5R 0603",
-    "C1525": "100 nF 16 V X7R 0402", "C25271": "1 ohm 1% 0805 (Basic; R155, the VREG bulk's series R)", "C15525": "10 uF 6.3 V X5R 0402 (Basic; C104, U18's input)", "C12530": "2.2 uF 6.3 V X5R 0402", "C15195": "10 nF 50 V X7R 0402",
+    "C1525": "100 nF 16 V X7R 0402", "C25271": "1 ohm 1% 0805 (Basic; R155 // R156, the VREG bulk's series 0.5 ohm)", "C15525": "10 uF 6.3 V X5R 0402 (Basic; C104, U18's input)", "C12530": "2.2 uF 6.3 V X5R 0402", "C15195": "10 nF 50 V X7R 0402",
     "C52923": "1 uF 25 V X5R 0402", "C32949": "10 pF 50 V C0G 0402",
     # mini 2, LINE IN
     "C7972": "TI LMV321IDBVR, op-amp, rail-to-rail output, 1 MHz, 130 uA, 2.7..5.5 V, SOT-23-5 (a preferred Extended part)",
@@ -561,7 +573,7 @@ LCSC = {
                 "(both orders since review pass 2)",
     "C8678": "SS34, Schottky 40 V 3 A, SMA (Basic; D9 since review pass 2)",
     "C7171": "Kyocera AVX TAJA106K016RNJ, 10 uF 16 V tantalum, 3 ohm ESR, case A 3216 (Basic; VBUS's damping, C27 / C91)",
-    "C22790": "12 k 1% 0603 (Basic)", "C25768": "22 k 1% 0402 (Basic)", "C25779": "33 k 1% 0402 (Basic)",
+    "C22790": "12 k 1% 0603 (Basic)", "C25768": "22 k 1% 0402 (Basic)", "C45783": "22 uF 25 V X5R 0805 (Basic; C3, U2's input)", "C25779": "33 k 1% 0402 (Basic)",
     "C2869734": "TI LM66100DCKR, ideal diode, 1.5 A, 79 .. 91 mohm, 1.5 .. 5.5 V, SC-70-6 (the cell -> VSYS path)",
     "C16133": "Kyocera AVX TAJB107K006RNJ, 100 uF 6.3 V tantalum, case B 3528 (Basic; +3V3 bulk, battery order)",
     "C1538": "4.7 nF 50 V X7R 0402 (Basic)", "C25086": "1 ohm 1% 0402 (preferred: no fee)",
@@ -606,6 +618,10 @@ SPARES = [
     ("C72", "C", "100u", "c1206", "C15008", {"1": "VREG_B", "2": "GND"}),
     ("C92", "C", "100u", "c1206", "C15008", {"1": "VREG_B", "2": "GND"}),
     ("R155", "R", "1", "r0805", "C25271", {"1": "VREG", "2": "VREG_B"}),
+    # (signoff3, Henri's "R155 2x1": R156, the same 1 ohm 0805, in parallel: 0.5 ohm. Round 3's stiff corner (5.5 V, 1 uH,
+    #  50 mohm cable, derated ceramics) rang VREG to 5.77 V with 1 ohm (5.85 V with C3 22 uF); 0.5 ohm damps it to ~5.25 V.
+    #  No Basic sub-ohm part at JLC; each resistor takes half the pulse)
+    ("R156", "R", "1", "r0805", "C25271", {"1": "VREG", "2": "VREG_B"}),
     # (J10B: the 2.42" module's lead (its header is down its left side, over J5's DIN), on the screen's four nets;
     #  review pass 2: dropped, then kept by the user's call (pads only, no part, no cost: through hole). J10 takes the
     #  1.54"; the 1.3" is dropped (the user's, 2026-11-15))
@@ -616,7 +632,7 @@ SPARES = [
     ("C83", "C", "DNP", "c0603", "", {"1": "BTN_YES", "2": "GND"}),
 ]
 PARTS += SPARES
-DNP |= {p[0] for p in SPARES if p[0] not in ("C72", "C92", "R155")} | {"R144", "U2B", "R126", "R127", "R128", "R129", "R123"}
+DNP |= {p[0] for p in SPARES if p[0] not in ("C72", "C92", "R155", "R156")} | {"R144", "U2B", "R126", "R127", "R128", "R129", "R123"}
 
 # ---- the twins (stage 2, the user's standing rule, as hardware/sd-board's in the optimist repo): every resistor whose
 #      value may need changing after the boards arrive gets a bare hand-solder pad pair in parallel (1.4 x 2.0 mm pads
