@@ -111,6 +111,10 @@ fi
 
 # The front end's cheap stages (fast sqrt, ...) against their exact references: JB_FE_STAGES makes the stages public.
 "$CC" $FLAGS -std=c11 -DJB_FE_STAGES -I"$HERE/core/beat" "$HERE/tests/test_fe_approx.c" "$HERE/core/beat/jb_fe.c" "$HERE/core/beat/jb_lstm.c" "$HERE/core/beat/beat_model.c" -lm -o "$OUT/test_fe_approx"
+
+# The two-stage FFT kernel the firmware runs (core/beat/jb_fft_r22.c) against the scalar FFT and a double DFT.
+"$CC" $FLAGS -std=c11 -I"$HERE/core/beat" "$HERE/tests/test_fft_r22.c" "$HERE/core/beat/jb_fft_r22.c" "$HERE/core/beat/jb_fe.c" "$HERE/core/beat/beat_model.c" -lm -o "$OUT/test_fft_r22"
+"$OUT/test_fft_r22"
 "$OUT/test_fe_approx"
 
 # AUTO BAR: the downbeat estimator against beat-listener's live/downbeat.py (golden vectors, tests/down_ref).
