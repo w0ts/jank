@@ -29,6 +29,11 @@ idf_component_register(
 )
 # the beat front end's FFT: esp-dsp's S3 assembly kernel (fft_dsp.c) instead of core/beat's scalar one (the host tests keep that one)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE JB_FFT_FAST=1)
+# the filterbank's 1428 weights (5.7 KB) copied into internal RAM once instead of read from flash every hop; not on the lcd2,
+# which has 7 KB of static RAM left (jb_fe.c)
+if(NOT CONFIG_JANK_BOARD_LCD2)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE JB_FB_IN_RAM=1)
+endif()
 # a test build's clock probe at the pin (clkprobe.c): JANK_CLOCK_PROBE=1 scripts/build.sh xiao
 if(DEFINED ENV{JANK_CLOCK_PROBE} AND "$ENV{JANK_CLOCK_PROBE}" STREQUAL "1")
     target_compile_definitions(${COMPONENT_LIB} PRIVATE JANK_CLOCK_PROBE=1)
