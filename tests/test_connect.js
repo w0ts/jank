@@ -153,6 +153,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   let page = makePage();
   eq(pressed(page), ['false', 'false'], 'no button is pressed before a connection');
   eq(hidden(page), [false, false, false, false], 'the face, the Advanced box, the player and the Advanced extra are hidden');
+  eq([shown(page, 'menu'), shown(page, 'more')], [false, false], 'Settings, Network and Details are hidden before a connection');
   page.key('keydown', 'ArrowUp');
   eq([page.frames.size, page.timers.size], [0, 0], 'no face, no frame, no timer, and the keys do nothing');
 
@@ -173,6 +174,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   let { page: p, midi } = await connected();
   eq([pressed(p), shown(p, 'live'), shown(p, 'c-advanced-box'), shown(p, 'player'), shown(p, 'advanced-extra')], [['true', 'false'], true, true, false, false], 'USB: the face and the Advanced box appear, the player does not');
   eq(p.el('msg').textContent, '', 'no "Connected." text');
+  eq([shown(p, 'menu'), shown(p, 'more')], [true, true], 'USB: Settings, Network and Details appear with the connection');
   ok(midi.sent.includes('get') && midi.sent.includes('home'), 'the page read get and home from the stick');
   eq([p.box.S.lastHome.bpm, p.box.S.lastHome.audio, p.box.S.lastGet.group], [120, true, '1'], "the HOME line and get of the stick are held");
   ok(p.frames.size === 1, 'the face draws frames while connected');
@@ -181,6 +183,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   ok(lit > 100, 'the screen shows the stick\'s HOME (' + lit + ' lit pixels)');
   eq([p.el('oled').width, p.el('oled').height, p.el('oled').lastImage.width], [320, 240, 320], 'the default screen is the colour lcd2 landscape (320 x 240), for every board');
   p.box.disconnected();
+  eq([shown(p, 'menu'), shown(p, 'more')], [false, false], 'after a disconnect Settings, Network and Details are hidden again');
   {
     const q = await connected(undefined, { search: '?screen=oled' });
     q.page.runFrame();
