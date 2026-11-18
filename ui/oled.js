@@ -567,7 +567,7 @@ const OLED = (() => {
     });
   }
   // the ABOUT screen: its rows as { label, val } (label left, value right aligned), "-" for what is not known (null / undefined in the ctx); the repo is shortened on the OLED, the lcd2 layout adds the PSRAM
-  const ABOUT_ROWS = 13, ABOUT_VIS_OLED = 5, ABOUT_VIS_LCD2 = 8;
+  const ABOUT_ROWS = 12, ABOUT_VIS_OLED = 5, ABOUT_VIS_LCD2 = 8;
   const known = v => v !== null && v !== undefined;
   const aboutRows = (c, lcd) => {
     const num = (label, v, unit) => ({ label, val: known(v) && v >= 0 ? v + unit : '-' });
@@ -576,9 +576,9 @@ const OLED = (() => {
     const heap = !known(c.heapKb) || c.heapKb < 0 ? '-' : c.heapKb + 'K' + (lcd && known(c.psramKb) && c.psramKb >= 0 ? ' PSRAM ' + c.psramKb + 'K' : '');
     const flash = !known(c.flashKb) || c.flashKb < 0 ? '-' : Math.trunc(c.flashKb / 1024) + 'M ' + (known(c.appUsedKb) && c.appUsedKb >= 0 && known(c.appKb) && c.appKb >= 0
       ? (c.appUsedKb / 1024).toFixed(1) + '/' + (c.appKb / 1024).toFixed(1) + 'M' : '-');
-    return [{ label: 'NAME', val: 'jank' }, { label: 'VERSION', val: known(c.version) ? c.version : '-' }, { label: 'REPO', val: lcd ? 'github.com/w0ts/jank' : 'w0ts/jank' },
+    return [{ label: 'VERSION', val: known(c.version) ? c.version : '-' }, { label: 'REPO', val: lcd ? 'github.com/w0ts/jank' : 'w0ts/jank' },
             { label: 'UPTIME', val: up }, { label: 'RESET', val: known(c.reset) ? c.reset : '-' }, { label: 'TEMP', val: known(c.tempC) ? c.tempC + ' C' : '-' },
-            num('CPU', c.cpuPct, '%'), { label: 'MEMORY', val: heap }, num('MIN HEAP', c.heapMinKb, 'K'), { label: 'FLASH', val: flash },
+            { label: 'CPU', val: (known(c.cpuPct) && c.cpuPct >= 0 ? c.cpuPct : '-') + '/' + (known(c.cpu1Pct) && c.cpu1Pct >= 0 ? c.cpu1Pct : '-') + '%' }, { label: 'MEMORY', val: heap }, num('MIN HEAP', c.heapMinKb, 'K'), { label: 'FLASH', val: flash },
             num('CLOCK LATE', c.clkLateUs, ' US'), num('UI LOOP', c.uiLoopUs, ' US'), num('BEAT LOOP', c.beatLoopUs, ' US')];
   };
   function drawInfo(fb, ui, c) {
