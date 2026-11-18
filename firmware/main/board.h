@@ -114,7 +114,7 @@
  * board is ordered). The board has no LED on a GPIO (its two LEDs are the charger's and the 3V3 rail's).
  * The mini 3's other pins have no firmware use yet and stay undefined here: GPIO2 V5_EN (5 V aux boost enable, idles
  * low), 4 RST out, 7 LINE_SENSE (ADC1), 8 LINE_IN (ADC1), 10 VBUS_SENSE (ADC1), 11 MIDI_TX2, 13 CLK out, 17 HOST_EN
- * (idles low), 21 LIN_DET (the LCD-2's 4.7 k pull-up is on it); spares 6, 16, 47, 48. */
+ * (idles low), 18 LIN_DET (line in plug detect; GPIO21 has the LCD-2's own 4.7 k pull-up, so it carries a button, not a detect); spares 6, 16, 47, 48. */
 #define BOARD_NAME "lcd2"
 #define BOARD_LCD 1
 #define BOARD_LCD_MOSI_GPIO 38
@@ -133,7 +133,7 @@
 #define BOARD_I2C_SDA_GPIO (-1)
 #define BOARD_I2C_SCL_GPIO (-1)
 #define BOARD_BTN_UP_GPIO 12
-#define BOARD_BTN_DOWN_GPIO 18
+#define BOARD_BTN_DOWN_GPIO 21
 #define BOARD_BTN_YES_GPIO 14
 #define BOARD_BTN_NO2_GPIO 9                      /* a second NO, beside BOOT (BTN_NO of the mini 3) */
 #define BOARD_OLED 0
