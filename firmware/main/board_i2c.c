@@ -7,9 +7,11 @@
 #include "board.h"
 #include "esp_log.h"
 
+#if BOARD_I2C_SDA_GPIO >= 0 && BOARD_I2C_SCL_GPIO >= 0
 static i2c_master_bus_handle_t s_bus;
 static esp_err_t s_err = ESP_ERR_INVALID_STATE;
 static int s_tried;
+#endif
 
 esp_err_t board_i2c_bus(i2c_master_bus_handle_t *out)
 {
