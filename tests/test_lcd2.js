@@ -12,7 +12,7 @@ const crypto = require('crypto');
 
 const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 const oledSrc = process.env.LCD2_OLED ? fs.readFileSync(process.env.LCD2_OLED, 'utf8') : read('ui/oled.js');
-const { OLED, Lcd2, Stick } = new Function(oledSrc + read('ui/lcd2.js') + read('ui/stick.js') + '; return { OLED, Lcd2, Stick };')();
+const { OLED, Lcd2, Stick, BigFont } = new Function(read('ui/bigfont.js') + oledSrc + read('ui/lcd2.js') + read('ui/stick.js') + '; return { OLED, Lcd2, Stick, BigFont };')();
 let checks = 0;
 const eq = (a, b, what) => { checks++; assert.deepStrictEqual(a, b, what); };
 const ok = (c, what) => { checks++; assert.ok(c, what); };
@@ -26,9 +26,9 @@ function ctxOf(over = {}, { get = { threshold: '70', lowconf: 'stop' }, status =
   return { ...c, beatN: 0, ...(over.ctx || {}) };
 }
 // draws on the layout's own grid; returns { fb, ink, w, h }
-function drawn(c, { ink = true, layout = true, ui = null } = {}) {
+function drawn(c, { ink = true, layout = true, ui = null, look = {} } = {}) {
   const size = layout ? { w: 160, h: 120 } : { w: 128, h: 64 }, fb = new Uint8Array(size.w * size.h), plane = new Uint8Array(size.w * size.h);
-  OLED.draw(fb, ui || OLED.create(), layout ? { ...c, layout: 'lcd2' } : c, NOW, ink ? plane : undefined);
+  OLED.draw(fb, ui || OLED.create(), layout ? { ...c, ...look, layout: 'lcd2' } : c, NOW, ink ? plane : undefined);
   return { fb, ink: plane, w: size.w, h: size.h };
 }
 const sha = fbs => crypto.createHash('sha256').update(Buffer.concat(fbs.map(f => Buffer.from(f)))).digest('hex').slice(0, 16);
@@ -103,47 +103,86 @@ const px = (img, x, y) => [...img.data.slice(4 * (y * 320 + x), 4 * (y * 320 + x
   }
 }
 
-// ---- the HOME rows (AUDIO), one table: every element's box, and nothing in the gaps ----
+// ---- helpers that read the pixels: the 5 x 7 font is parsed from ui/oled.js's own table, so a text is checked pixel by pixel ----
 const L = OLED.LCD2;
+const FONT = {};
+for (const m of oledSrc.matchAll(/'(.)': '([.#|]{41})'/g)) FONT[m[1]] = m[2].split('|');
+const adv = ch => ('.:,'.includes(ch) ? 3 : ch === ' ' ? 4 : 6);
+const textW = s => Math.max(0, [...s].reduce((w, ch) => w + adv(ch), 0) - 1);
+const textPoints = s => { const pts = []; let cx = 0; for (const ch of s) { const off = '.:,'.includes(ch) ? 1 : 0; FONT[ch].forEach((row, r) => [...row].forEach((v, c) => { if (v === '#') pts.push([cx + c - off, r]); })); cx += adv(ch); } return pts; };
 const litIn = (d, x, y, w, h) => { const out = []; for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (d.fb[j * d.w + i]) out.push(d.ink[j * d.w + i]); return out; };
-const idsIn = (d, x, y, w, h) => [...new Set(litIn(d, x, y, w, h))].sort();
+const idsIn = (d, x, y, w, h) => [...new Set(litIn(d, x, y, w, h))].sort((a, b) => a - b);
 const litRows = (d, x0 = 0, x1 = d.w) => { const rows = new Set(); for (let j = 0; j < d.h; j++) for (let i = x0; i < x1; i++) if (d.fb[j * d.w + i]) rows.add(j); return rows; };
 const litCols = (d, y, h) => { const cols = []; for (let i = 0; i < d.w; i++) for (let j = y; j < y + h; j++) if (d.fb[j * d.w + i]) { cols.push(i); break; } return cols; };
-const BANDS = [['top bar', 0, 12], ['tempo', L.tempoY, L.tempoY + 7 * L.tempoScale - 1], ['beat boxes', L.boxY, L.boxY + L.boxH - 1], ['CF', L.rowCF, L.rowCF + 6], ['IN', L.rowIN, L.rowIN + 6], ['BAR', L.rowBAR, L.rowBAR + 6], ['status', L.statusY, L.statusY + 6]];
+// the text s with its top left at (x, y): exactly its pixels are lit in its box (7 rows), and its ink is `ink` (null: not checked)
+function isText(d, s, x, y, ink) {
+  const want = new Set(textPoints(s).map(([i, j]) => (y + j) * d.w + x + i)), w = textW(s);
+  for (let j = y; j < y + 7; j++) for (let i = x; i < x + w; i++) if ((d.fb[j * d.w + i] === 1) !== want.has(j * d.w + i)) return false;
+  return ink === null || [...want].every(k => d.ink[k] === ink);
+}
+const rightText = (s, xr = 158) => xr - textW(s);
+
+// ---- the labels, the rows: one table, every element's box, and nothing in the gaps ----
+const BANDS = [['top bar', 0, 12], ['tempo', L.tempoY, L.tempoY + BigFont.ROWS - 1], ['beat boxes', L.boxY, L.boxY + L.boxH - 1], ['CONFIDENCE', L.rowCF, L.rowCF + 6], ['INPUT', L.rowIN, L.rowIN + 6], ['BAR', L.rowBAR, L.rowBAR + 6], ['stats 1', L.stats1Y, L.stats1Y + 6], ['stats 2', L.stats2Y, L.stats2Y + 6]];
 for (let i = 1; i < BANDS.length; i++) ok(BANDS[i][1] > BANDS[i - 1][2], BANDS[i][0] + ' starts below ' + BANDS[i - 1][0] + ' (' + BANDS[i][1] + ' > ' + BANDS[i - 1][2] + '): the rows do not overlap');
-ok(BANDS[BANDS.length - 1][2] < LH, 'the last row is on the grid');
-eq([L.tempoY + 7 * L.tempoScale - 1, L.boxY + L.boxH - 1, 2 + 4 * L.boxW + 3 * L.boxGap], [49, 77, 158], 'tempo ends at y 49, the boxes at y 77 and x 157 (4 x 36 + 3 x 4 from x 2)');
-ok(L.boxY - (L.tempoY + 7 * L.tempoScale) >= 1 && L.rowCF - (L.boxY + L.boxH) >= 2 && L.linkBoxY - (L.tempoY + 7 * L.tempoScale) >= 1 && L.statusY - (L.linkBoxY + L.linkBoxH) >= 2, 'the boxes keep a gap to the tempo above and to the CF row (AUDIO) or status line (LINK) below');
+eq([L.tempoY + BigFont.ROWS - 1, L.boxY + L.boxH - 1, L.linkBoxY + L.linkBoxH - 1, BANDS[BANDS.length - 1][2], 2 + 4 * L.boxW + 3 * L.boxGap], [49, 76, 101, 118, 158], 'tempo ends at y 49, the boxes at y 76 (LINK: 101), the stats at y 118 (of 119), the boxes at x 157');
+ok(L.boxY - (L.tempoY + BigFont.ROWS) >= 1 && L.rowCF - (L.boxY + L.boxH) >= 2 && L.linkBoxY - (L.tempoY + BigFont.ROWS) >= 1 && L.stats1Y - (L.linkBoxY + L.linkBoxH) >= 2, 'the boxes keep a gap to the tempo above and to the CONFIDENCE row (AUDIO) or the stats (LINK) below');
 const barOn = { bar: { state: 'locked', conf: 0.5 } };
 const full = drawn(ctxOf({ ctx: barOn }));
 {
   const rows = litRows(full), inBand = j => BANDS.some(([, a, b]) => j >= a && j <= b);
   ok([...rows].every(inBand), 'every lit pixel of a full HOME lies inside a row of the table (none in the gaps): rows ' + [...rows].filter(j => !inBand(j)).join());
-  const tempoRows = litRows(full, 2, 133);
-  ok([...tempoRows].filter(j => j >= BANDS[1][1] && j <= BANDS[1][2]).length === 35, 'the tempo (scale 5) fills its 35 rows');
-  const widthOf = (d, y0, y1) => { let lo = d.w, hi = -1; for (let j = y0; j <= y1; j++) for (let i = 0; i < L.bpmX - 2; i++) if (d.fb[j * d.w + i]) { lo = Math.min(lo, i); hi = Math.max(hi, i); } return [lo, hi]; };
-  const [lo, hi] = widthOf(drawn(ctxOf({ home: { bpm: 123.4 } })), 15, 49);
-  ok(lo >= 2 && hi <= 131 && hi - lo >= 100, 'the tempo 123.4 spans x ' + lo + '..' + hi + ' of 2..131');
-  eq(widthOf(drawn(ctxOf({ home: { bpm: 999.9 } })), 15, 49)[1] <= 131, true, 'the widest tempo (999.9) still fits left of the BPM label');
-  ok(litIn(full, L.bpmX, L.bpmY, 17, 7).length > 20, "the 'BPM' label sits right of the tempo");
+  const tempoRows = litRows(full, L.tempoX, 160);
+  ok([...tempoRows].filter(j => j >= BANDS[1][1] && j <= BANDS[1][2]).length === 35, 'the tempo fills its 35 rows');
+  eq([isText(full, 'CONFIDENCE', L.labelX, L.rowCF, null), isText(full, 'INPUT', L.labelX, L.rowIN, null), isText(full, 'BAR', L.labelX, L.rowBAR, null), isText(full, 'LOCKED', L.labelX + 58 - textW('LOCKED'), L.rowBAR, null)], [true, true, true, true], 'the labels are the words CONFIDENCE, INPUT, BAR with AUTO BAR\'s state, in the 10 character label column (x 2..60)');
+  ok(textW('CONFIDENCE') === 59 && L.barX >= 2 + 59 + 2, 'the longest label is 59 px (x 2..60) and the bars start at x ' + L.barX);
+  eq(litIn(full, 126, L.rowCF, 3, 7).length + litIn(full, 126, L.rowIN, 3, 7).length, 0, 'between a bar (ends x 125) and its value (from x 129 at the widest) there is nothing');
+  eq(litIn(full, 125, L.tempoY, 35, BigFont.ROWS).length, 0, 'no BPM label: the area right of "120.0" (x 125..159) is empty');
 }
 
-// healthy: ink only inside the top bar's link / signal / battery, the first beat box, the CF number, bar and tick (no IN, BAR, status ink)
-const R = { link: [L.linkX, 0, 24, 13], signal: [L.signalX, 0, 11, 13], batt: [L.battX, 2, L.battW + 2, 9], beat1: [L.boxX, L.boxY, L.boxW, L.boxH],
-            cfValue: [L.valueXR - 23, L.rowCF, 23, 7], cfBar: [L.barX, L.rowCF, L.barW, 7], inValue: [L.valueXR - 29, L.rowIN, 29, 7], inBar: [L.barX, L.rowIN, L.barW, 7] };
+// ---- the big tempo digits ----
+{
+  const STY = BigFont.STYLES, GL = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '.'];
+  eq(Object.keys(STY), ['a', 'b', 'c'], 'three candidate styles A, B, C, the default is ' + BigFont.DEFAULT_STYLE);
+  eq(BigFont.DEFAULT_STYLE, 'b', 'the default style is B');
+  for (const k of Object.keys(STY)) {
+    eq(Object.keys(STY[k]).sort(), [...GL].sort(), 'style ' + k + ': the glyphs 0-9, "." and "-", complete');
+    for (const ch of GL) {
+      const g = STY[k][ch], w = g[0].length;
+      ok(g.length === BigFont.ROWS && g.every(r => r.length === w && /^[.#]+$/.test(r)) && g.some(r => r.includes('#')), k + ' "' + ch + '": ' + BigFont.ROWS + ' rows of equal width, bits only, not empty');
+      if (ch !== '.') eq(w, 26, k + ' "' + ch + '": 26 columns wide, the same as every digit');
+    }
+    eq([STY[k]['.'][0].length, STY[k]['.'].findIndex(r => r.includes('#'))], [{ a: 5, b: 6, c: 7 }[k], 35 - { a: 5, b: 6, c: 7 }[k]], k + ': the point is a ' + STY[k]['.'][0].length + ' px dot on the bottom rows');
+    for (const ch of ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']) ok(STY[k][ch].slice(0, 3).some(r => r.includes('#')) && STY[k][ch].slice(-3).some(r => r.includes('#')), k + ' "' + ch + '": uses the top and the bottom of the cell');
+    for (const s of ['120.0', '146.1', '88.8', '999.9', '---']) ok(BigFont.width(k, s) <= 156, k + ': "' + s + '" is ' + BigFont.width(k, s) + ' px wide, fits the 156 px between the margins');
+  }
+  eq(['a', 'b', 'c'].map(k => BigFont.width(k, '120.0')), [4 * 26 + 5 + 4 * 3, 4 * 26 + 6 + 4 * 3, 4 * 26 + 7 + 4 * 3], '"120.0" is 4 digits + the point + 4 gaps of 3: 121 / 122 / 123 px');
+  for (const k of ['a', 'b', 'c']) for (const [s, bpm] of [['120.0', 120], ['146.1', 146.1], ['88.8', 88.8], ['---', null]]) {
+    const d = drawn(ctxOf({ home: { bpm } }, {}), { look: { digits: k } }), want = new Set();
+    BigFont.draw((x, y) => want.add(y * 160 + x), k, s, L.tempoX, L.tempoY);
+    let same = true; for (let j = L.tempoY; j < L.tempoY + 35; j++) for (let i = 0; i < 160; i++) if ((d.fb[j * 160 + i] === 1) !== want.has(j * 160 + i)) same = false;
+    ok(same, 'style ' + k + ': the tempo "' + s + '" is drawn exactly as the table says at x ' + L.tempoX + ', y ' + L.tempoY);
+  }
+  eq(sha([drawn(ctxOf(), { look: { digits: 'zz' } }).fb]), sha([drawn(ctxOf()).fb]), 'an unknown style name draws the default');
+  ok(sha([drawn(ctxOf(), { look: { digits: 'a' } }).fb]) !== sha([drawn(ctxOf(), { look: { digits: 'c' } }).fb]), 'the style switch changes the tempo');
+}
+
+// healthy: ink only inside the top bar's link / signal / battery, the first beat box, the CONFIDENCE number and line, the VU bar, the stats
+const R = { link: [L.linkX, 0, L.linkW, 13], signal: [L.signalX, 0, L.signalW, 13], batt: [L.battX, 1, L.battW, 11], beat1: [L.boxX, L.boxY, L.boxW, L.boxH],
+            cfValue: [158 - 23, L.rowCF, 23, 7], cfBar: [L.barX, L.rowCF, L.barW, 7], inValue: [158 - 29, L.rowIN, 29, 7], inBar: [L.barX, L.rowIN, L.barW, 7],
+            peers: [2, L.stats1Y, 50, 7], dot: [L.sigDotX, L.stats1Y + 1, 5, 5], battText: [100, L.stats2Y, 58, 7] };
 const insideAny = (boxes, x, y) => boxes.some(([bx, by, bw, bh]) => x >= bx && x < bx + bw && y >= by && y < by + bh);
 const outsideInk = (d, boxes) => { let n = 0; for (let i = 0; i < d.ink.length; i++) if (d.ink[i] !== 0 && !insideAny(boxes, i % d.w, Math.floor(i / d.w))) n++; return n; };
 const healthy = drawn(ctxOf());
 ok(healthy.ink.every((v, i) => v === 0 || healthy.fb[i] === 1), 'ink only on lit pixels');
-eq(outsideInk(healthy, [R.link, R.signal, R.batt, R.beat1, R.cfValue, R.cfBar]), 0, 'a healthy HOME: ink only in the link glyph, signal bars, battery, the lit first beat, and the CF value, bar and tick');
+eq(outsideInk(healthy, [R.link, R.signal, R.batt, R.beat1, R.cfValue, R.cfBar, R.inBar, R.peers, R.dot, R.battText]), 0, 'a healthy HOME: ink only in the link glyph, signal bars, battery, the lit first beat, the CONFIDENCE number and line, the VU bar, and the PEERS, signal dot and BATT items');
 eq(idsIn(healthy, ...R.link), [INK.GOOD], 'joined (2 Link peers): the link glyph and its count are green');
 eq(idsIn(healthy, ...R.signal), [INK.GOOD], '-55 dBm: the signal bars are green');
 eq(idsIn(healthy, ...R.batt), [INK.GOOD], '80 %: the battery is green');
 eq(idsIn(healthy, ...R.beat1), [INK.ONE], 'the first beat box, lit, carries the bar-1 id');
 eq([1, 2, 3].map(i => idsIn(healthy, L.boxX + i * (L.boxW + L.boxGap), L.boxY, L.boxW, L.boxH)), [[0], [0], [0]], 'the other boxes are neutral');
-eq(idsIn(healthy, ...R.cfValue), [INK.GOOD], 'CF 90 against 70: the value is green');
+eq(idsIn(healthy, ...R.cfValue), [INK.GOOD], 'CONFIDENCE 90 against 70: the value is green');
 eq(idsIn(healthy, ...R.inValue), [0], 'an input at -20 dB: the number is neutral');
-eq(idsIn(healthy, ...R.inBar), [0], '... and its bar, fill and tick');
 
 // the first beat is amber only while it is the lit one
 {
@@ -151,7 +190,7 @@ eq(idsIn(healthy, ...R.inBar), [0], '... and its bar, fill and tick');
   eq([idsIn(on, ...R.beat1), idsIn(off, ...R.beat1), idsIn(none, ...R.beat1)], [[INK.ONE], [0], [0]], 'beat 4 is the bar\'s first again (amber); beat 2 and no beat: the first box is a neutral frame');
   const box = (d, i) => litIn(d, L.boxX + i * (L.boxW + L.boxGap), L.boxY, L.boxW, L.boxH).length;
   const outline = (w, h) => w * h - (w - 4) * (h - 4);
-  eq([box(on, 0), box(on, 1), box(off, 1), box(off, 0)], [L.boxW * L.boxH, outline(L.boxW, L.boxH), L.boxW * L.boxH, outline(L.boxW, L.boxH)], 'the lit box is solid (36 x 26), the others are 2 px outlines');
+  eq([box(on, 0), box(on, 1), box(off, 1), box(off, 0)], [L.boxW * L.boxH, outline(L.boxW, L.boxH), L.boxW * L.boxH, outline(L.boxW, L.boxH)], 'the lit box is solid (36 x 25), the others are 2 px outlines');
 }
 
 // the four boxes, every beat, both layouts: exact rectangles, solid when lit, 2 px outline when not, even gaps, amber only for a lit first box
@@ -179,30 +218,30 @@ for (const [mode, over, y, h] of [['AUDIO', {}, L.boxY, L.boxH], ['LINK', { home
   eq([gapLit, litIn(d, 0, y, L.boxX, h).length, litIn(d, L.boxX + 4 * L.boxW + 3 * L.boxGap, y, d.w - (L.boxX + 4 * L.boxW + 3 * L.boxGap), h).length], [0, 0, 0], mode + ': the three 4 px gaps and the 2 px margins are dark');
 }
 
-// ---- confidence: the value, the bar's fill and the tick all carry the id of the rule ----
+// ---- confidence: the value, the line and the notch all carry the id of the rule ----
 const confCase = (conf, extra = {}, get) => drawn(ctxOf({ home: { conf }, ...extra }, get ? { get } : undefined));
 const TICK = L.barX + Math.round((L.barW - 1) * 0.7);                             // the stop threshold 70 %
 for (const [conf, id, why] of [[60, INK.BAD, 'below'], [69, INK.BAD, 'below'], [70, INK.WARN, 'at'], [75, INK.WARN, 'within 10 above'], [80, INK.WARN, '10 above'], [81, INK.GOOD, 'over 10 above'], [87, INK.GOOD, 'above'], [100, INK.GOOD, 'full']]) {
   const d = confCase(conf);
   const bar = idsIn(d, L.barX, L.rowCF, L.barW, 7).filter(v => v !== 0), val = idsIn(d, ...R.cfValue);
-  eq([val, bar], [[id], [id]], 'CF ' + conf + ' against 70 (' + why + '): the value and the bar are the same colour id (' + id + ')');
+  eq([val, bar], [[id], [id]], 'CONFIDENCE ' + conf + ' against 70 (' + why + '): the value and the line are the same colour id (' + id + ')');
 }
+eq(isText(confCase(87), '87%', rightText('87%'), L.rowCF, INK.GOOD), true, 'the value "87%" is right-aligned to x 157');
 eq(idsIn(confCase(75, {}, { threshold: '50', lowconf: 'stop' }), ...R.cfValue), [INK.GOOD], 'the threshold is the stick\'s: 75 against 50 is green');
 eq(idsIn(confCase(75, {}, { threshold: '90', lowconf: 'run' }), ...R.cfValue), [INK.BAD], '... against 90 red, also with KEEP RUNNING');
-eq(idsIn(confCase(30, { ctx: { silent: true } }), ...R.cfValue), [INK.DIM], 'silence: the CF number is grey, not red (nothing to track)');
+eq(idsIn(confCase(30, { ctx: { silent: true } }), ...R.cfValue), [INK.DIM], 'silence: the number is grey, not red (nothing to track)');
 eq(idsIn(drawn(ctxOf({ home: { conf: null } })), ...R.cfValue), [INK.DIM], 'no confidence reported: the dashes are grey');
 eq(idsIn(drawn(ctxOf({}, { status: null })), ...R.cfValue), [INK.GOOD], 'no status line: the confidence comes from the HOME line and is still green');
-// the CF line: ONE thin line (3 rows, y + 2..y + 4), its length the value on 94 px; fill length at 0, 50 and 100 %, counted on its middle row away from the notch
-for (const [conf, n] of [[0, 0], [50, 47], [100, 94]]) {
+// the line: ONE thin line (3 rows, y + 2..y + 4), its length the value on 62 px; counted on its middle row away from the notch
+for (const [conf, n] of [[0, 0], [50, 31], [100, 62]]) {
   const d = confCase(conf), row = L.rowCF + 3, inLine = n > TICK - L.barX;
   let lit = 0; for (let x = L.barX; x < L.barX + L.barW; x++) if (x !== TICK && d.fb[row * d.w + x]) lit++;
-  eq(lit, n - (inLine ? 1 : 0), 'CF ' + conf + ' %: the line is ' + n + ' px of 94' + (inLine ? ' (one is the notch\'s column)' : ''));
-  eq([d.fb[row * d.w + L.barX], d.fb[row * d.w + L.barX + L.barW - 1], d.fb[row * d.w + L.barX - 1]], [n > 0 ? 1 : 0, n === 94 ? 1 : 0, 0], '... it starts at x ' + L.barX + ' and ends at its value, nothing beyond');
+  eq(lit, n - (inLine ? 1 : 0), 'CONFIDENCE ' + conf + ' %: the line is ' + n + ' px of 62' + (inLine ? ' (one is the notch\'s column)' : ''));
+  eq([d.fb[row * d.w + L.barX], d.fb[row * d.w + L.barX + L.barW - 1], d.fb[row * d.w + L.barX - 1]], [n > 0 ? 1 : 0, n === 62 ? 1 : 0, 0], '... it starts at x ' + L.barX + ' and ends at its value, nothing beyond');
 }
 {
   const d = confCase(50), lineRows = [0, 1, 2, 3, 4, 5, 6].map(k => { let c = 0; for (let x = L.barX; x < L.barX + L.barW; x++) if (x !== TICK && d.fb[(L.rowCF + k) * d.w + x]) c++; return c; });
-  eq(lineRows, [0, 0, 47, 47, 47, 0, 0], 'CF 50 %: the line is exactly 3 rows (y + 2..y + 4): no outline above or below, no track, nothing in the rest of the row');
-  eq([d.fb[(L.rowCF + 3) * d.w + L.barX + 80], d.fb[(L.rowCF + 1) * d.w + L.barX + 80], d.fb[(L.rowCF + 5) * d.w + L.barX + 93]], [0, 0, 0], '... the unfilled remainder is plain background (no baseline)');
+  eq(lineRows, [0, 0, 31, 31, 31, 0, 0], 'CONFIDENCE 50 %: the line is exactly 3 rows (y + 2..y + 4): no outline, no track');
 }
 {
   const d = confCase(100), x = TICK;
@@ -214,29 +253,59 @@ for (const [conf, n] of [[0, 0], [50, 47], [100, 94]]) {
   ok(t2.fb[(L.rowCF + 1) * t2.w + x2] === 1 && t2.ink[(L.rowCF + 1) * t2.w + x2] === INK.GOOD, 'the notch follows the stick\'s threshold (30 %: x ' + x2 + ')');
 }
 
-// ---- input level: number and bar; red clipping, amber too quiet, nothing else coloured ----
-const levelCase = (levelDb, peakDb, max) => drawn(ctxOf({ home: { level: levelDb, levelMax: max === undefined ? levelDb : max }, ctx: { peakDb } }));
-const levelIds = d => [idsIn(d, ...R.inValue).filter(v => v !== 0), idsIn(d, L.barX, L.rowIN + 2, L.barW, 3).filter(v => v !== 0)];
-eq(levelIds(levelCase(-20, -12)), [[], []], 'a good level: number, fill and tick are neutral');
-eq(levelIds(levelCase(-20, -0.5)), [[INK.BAD], [INK.BAD]], 'the last second peaked at -0.5 dBFS: number and fill red (clipping)');
-eq(levelIds(levelCase(-20, -1)), [[INK.BAD], [INK.BAD]], '... -1 dBFS is the edge');
+// ---- the INPUT VU meter: the ramp, the fill, the colour of every column, the notch, the peak tick ----
+const VUB = L.barX, VT = L.rowIN + 1;                                              // the bar's x and first row (5 rows)
+const IN_NOTCH = Math.round((L.barW - 1) * 40 / 90);                               // -50 dBFS on a -90..0 scale: column 27 of the bar
+const levelCase = (levelDb, peakDb, max, look = {}) => drawn(ctxOf({ home: { level: levelDb, levelMax: max === undefined ? levelDb : max }, ctx: { peakDb } }), { look });
+const levelIds = (d, look) => [idsIn(d, ...R.inValue).filter(v => v !== 0), idsIn(d, L.barX, L.rowIN + 1, L.barW, 5).filter(v => v < OLED.VU.ink0 && v !== 0)];
+const colId = i => OLED.VU.ink0 + Math.floor(OLED.VU.steps * i / L.barW);
+eq([OLED.VU, Lcd2.VU_RAMP.length], [{ ink0: 6, steps: 16 }, 16], 'the VU ramp: 16 ink ids from 6 (ids 6..21), after the 6 fixed ones');
+for (const [i, rgb] of Lcd2.VU_RAMP.entries()) {
+  ok(rgb.length === 3 && rgb.every(v => Number.isInteger(v) && v >= 0 && v <= 255), 'ramp step ' + i + ': exact 8-bit RGB ' + rgb);
+  ok(Lcd2.contrast(rgb, P.bg) >= 6.5, 'ramp step ' + i + ' reads on the background (' + Lcd2.contrast(rgb, P.bg).toFixed(2) + ' : 1, bars need visibility, not AA text)');
+  eq(Lcd2.inkColour(OLED.VU.ink0 + i), rgb, 'ink id ' + (OLED.VU.ink0 + i) + ' is ramp step ' + i);
+}
+eq([Lcd2.VU_RAMP[0], Lcd2.VU_RAMP[7], Lcd2.VU_RAMP[10], Lcd2.VU_RAMP[13], Lcd2.VU_RAMP[15]], [P.good, P.good, [176, 230, 64], P.warn, [255, 96, 88]], 'the ramp: green up to -45 dBFS, lime near -30, amber near -14, red at the end');
+eq(Lcd2.inkColour(OLED.VU.ink0 + 16), P.neutral, 'an id past the ramp is neutral');
+eq(levelIds(levelCase(-20, -12)), [[], []], 'a good level: the number is neutral');
+eq(levelIds(levelCase(-20, -0.5)), [[INK.BAD], []], 'the last second peaked at -0.5 dBFS: the number is red (clipping)');
+eq(levelIds(levelCase(-20, -1)), [[INK.BAD], []], '... -1 dBFS is the edge');
 eq(levelIds(levelCase(-20, -1.5)), [[], []], '... -1.5 is not clipping');
 eq(levelIds(levelCase(-20, null, -2))[0], [INK.BAD], 'peak not reported: an RMS maximum over -3 dB counts');
 eq(levelIds(levelCase(-20, null, -10))[0], [], '... under it, neutral');
-eq(levelIds(levelCase(-55, -40)), [[INK.WARN], [INK.WARN]], 'under the tracker\'s -50 dBFS sound level: amber (too quiet to track)');
-eq(levelIds(levelCase(-50, -40)), [[], []], '... -50 itself is enough');
-{
-  const IN_TICK = L.barX + Math.round((L.barW - 1) * (40 / 90));                  // -50 dBFS on a -90..0 line
-  for (const [db, n] of [[-90, 0], [-45, 47], [0, 94]]) {
-    const d = levelCase(db, -12, db), row = L.rowIN + 3, inLine = n > IN_TICK - L.barX;
-    let lit = 0; for (let x = L.barX; x < L.barX + L.barW; x++) if (x !== IN_TICK && d.fb[row * d.w + x]) lit++;
-    eq(lit, n - (inLine ? 1 : 0), 'IN ' + db + ' dB: the line is ' + n + ' px of 94 (-90 dB is empty, 0 dB full)');
+eq(levelIds(levelCase(-55, -40))[0], [INK.WARN], 'under the tracker\'s -50 dBFS sound level: the number is amber (too quiet to track)');
+eq(levelIds(levelCase(-50, -40))[0], [], '... -50 itself is enough');
+eq(isText(levelCase(-20, -12), '-20dB', rightText('-20dB'), L.rowIN, null), true, 'the number "-20dB" is right-aligned to x 157');
+for (const segments of [false, true]) {
+  const look = { vuSegments: segments }, name = segments ? 'segments' : 'smooth';
+  const col = (db, peak = null) => { const d = levelCase(db, peak, db, look), row = VT + 2, cols = []; for (let x = 0; x < L.barW; x++) if (d.fb[row * d.w + VUB + x]) cols.push(x); return { d, cols }; };
+  const notch = segments ? 3 * Math.round((IN_NOTCH - 2) / 3) + 2 : IN_NOTCH;
+  const expected = n => (segments ? Array.from({ length: n }, (_, k) => [3 * k, 3 * k + 1]).flat() : Array.from({ length: n }, (_, i) => i));
+  const frac = db => (db + 90) / 90, lens = db => (segments ? Math.round(21 * frac(db)) : Math.round(62 * frac(db)));
+  for (const db of [-90, -60, -45, -30, -12, 0]) {
+    const { d, cols } = col(db), want = expected(lens(db)).filter(x => x !== notch).concat(expected(lens(db)).includes(notch) ? [] : [notch]).sort((a, b) => a - b);
+    eq(cols, want, name + ' ' + db + ' dB: ' + lens(db) + (segments ? ' segments (2 on, 1 off)' : ' columns') + ' lit on the bar\'s middle row, the notch column XOR-ed (x ' + (VUB + notch) + ')');
+    eq(cols.filter(x => x !== notch).every(x => d.ink[(VT + 2) * d.w + VUB + x] === colId(segments ? 3 * Math.floor(x / 3) : x)), true, name + ' ' + db + ' dB: every lit column has its ramp id (the id of its position on the dBFS scale' + (segments ? ', per segment' : '') + ')');
   }
-  const d = levelCase(-20, -12);
-  eq([d.fb[(L.rowIN + 1) * d.w + IN_TICK], d.fb[(L.rowIN + 5) * d.w + IN_TICK], d.ink[(L.rowIN + 1) * d.w + IN_TICK], d.fb[L.rowIN * d.w + IN_TICK]], [1, 1, 0, 0], 'the IN line has a neutral 5 px notch at -50 dBFS (x ' + IN_TICK + '), the tracker\'s sound level');
-  const c = levelCase(-55, -40), rows = [0, 1, 2, 3, 4, 5, 6].map(k => { let n = 0; for (let x = L.barX; x < L.barX + L.barW; x++) if (x !== IN_TICK && c.fb[(L.rowIN + k) * c.w + x]) n++; return n; });
-  eq(rows, [0, 0, 37, 37, 37, 0, 0], 'IN -55 dB: a 3 row line of round(94 x 35 / 90) = 37 px, nothing else in the row');
+  eq([0, 1, 2, 3, 4, 5, 6].map(k => levelCase(-45, null, -45, look).fb[(L.rowIN + k) * 160 + VUB]), [0, 1, 1, 1, 1, 1, 0], name + ': the bar is 5 rows high (y + 1..y + 5), no outline, no track');
+  const d0 = col(-90).d;
+  eq([0, 1, 2, 3, 4, 5, 6].map(k => d0.fb[(L.rowIN + k) * 160 + VUB + notch]), [1, 1, 1, 1, 1, 1, 1], name + ': the -50 dBFS notch is a 7 px column at bar column ' + notch + ' (even over an empty bar)');
+  const d1 = col(-20).d;
+  eq([0, 1, 2, 3, 4, 5, 6].map(k => d1.fb[(L.rowIN + k) * 160 + VUB + notch]), segments ? [1, 1, 1, 1, 1, 1, 1] : [1, 0, 0, 0, 0, 0, 1], name + ': through a lit bar the notch ' + (segments ? 'fills its gap column' : 'cuts a gap and leaves a stub above and below'));
+  eq(idsIn(d0, VUB + notch, L.rowIN, 1, 7), [0], name + ': the notch is neutral');
+  // peak tick: 1 px, the ramp id of its column, only when a dark column separates it from the bar's end
+  const pk = db => Math.round(61 * (db + 90) / 90);
+  const withPeak = col(-45, -12).d;
+  eq([litIn(withPeak, VUB + pk(-12), VT, 1, 5).length, idsIn(withPeak, VUB + pk(-12), VT, 1, 5)], [5, [colId(pk(-12))]], name + ': a peak of -12 dBFS over a level of -45: a 1 px tick, 5 rows, at column ' + pk(-12) + ', in its column\'s ramp colour');
+  eq(litIn(withPeak, VUB + pk(-12) + 1, VT, 1, 5).length + litIn(withPeak, VUB + pk(-12) - 1, VT, 1, 5).length, 0, name + ': ... with dark columns on both sides');
+  const merged = col(-12, -12).d;
+  eq(litIn(merged, VUB + pk(-12) + 1, VT, 1, 5).length, 0, name + ': a peak at the bar\'s own end draws nothing more');
+  eq(litIn(col(-45, null).d, VUB + 40, VT, 1, 5).length, 0, name + ': no peak reported: no tick');
+  eq(sha([col(-45, -60).d.fb]), sha([col(-45, null).d.fb]), name + ': a peak under the level (stale) draws no tick');
 }
+eq(levelIds(levelCase(-20, -12, -20, { vuSegments: true }))[0], [], 'segments mode: the number rule is the same');
+ok(sha([levelCase(-30, -12, -30, { vuSegments: true }).fb]) !== sha([levelCase(-30, -12, -30, { vuSegments: false }).fb]), 'the vuSegments switch changes the meter');
+eq(sha([levelCase(-30, -12).fb]), sha([levelCase(-30, -12, undefined, { vuSegments: true }).fb]), 'the default meter is the segmented one');
 
 // ---- the BAR row: AUTO BAR's state and confidence, neutral, only with AUTO BAR on ----
 {
@@ -245,61 +314,92 @@ eq(levelIds(levelCase(-50, -40)), [[], []], '... -50 itself is enough');
   const lock = drawn(ctxOf({ ctx: { bar: { state: 'locked', conf: 0.5 } } })), lis = drawn(ctxOf({ ctx: { bar: { state: 'listening', conf: 1 } } })), man = drawn(ctxOf({ ctx: { bar: { state: 'manual', conf: 0.9 } } }));
   ok(rowLit(lock) > 100 && rowLit(lis) > rowLit(lock) && rowLit(man) > 0, 'LOCKED, LISTEN, MANUAL draw the row; the fill grows with the confidence');
   eq([lock, lis, man].map(d => idsIn(d, 0, L.rowBAR, d.w, 7)), [[0], [0], [0]], 'the BAR row is neutral');
+  eq([isText(lis, 'LISTEN', 2 + 58 - textW('LISTEN'), L.rowBAR, null), isText(man, 'MANUAL', 2 + 58 - textW('MANUAL'), L.rowBAR, null)], [true, true], 'the state words LISTEN and MANUAL end at x 59');
   let lit = 0; const row = L.rowBAR + 3; for (let x = L.barX + 1; x < L.barX + L.barW - 1; x++) if (lock.fb[row * lock.w + x]) lit++;
-  eq([lit, lock.fb[(L.rowBAR + 1) * lock.w + L.barX + 40], lock.fb[(L.rowBAR + 5) * lock.w + L.barX + 40]], [46, 1, 1], 'BAR 0.5: the BAR row keeps its outlined bar (a frame above and below), 46 px of 92 filled');
+  eq([lit, lock.fb[(L.rowBAR + 1) * lock.w + L.barX + 40], lock.fb[(L.rowBAR + 5) * lock.w + L.barX + 40]], [30, 1, 1], 'BAR 0.5: the BAR row keeps its outlined bar (a frame above and below, 62 x 5), 30 px of 60 filled');
 }
 
-// ---- the top bar: link, signal, battery (bigger, same rules) ----
+// ---- the top bar: icons 11 high, the status icons right-aligned ----
+{
+  const cols = d => litCols(d, 0, 13), xs = d => (c => [c[0], c[c.length - 1]])(cols(d).filter(x => x >= L.linkX));
+  const d = drawn(ctxOf({ home: { battery: 80 } }));
+  eq(xs(d)[1], 157, 'the right group ends at x 157 (the battery\'s nub), two columns from the edge');
+  eq([L.linkX + L.linkW <= L.signalX, L.signalX + L.signalW <= L.plugX, L.plugX + 13 <= L.battX, L.battX + L.battW], [true, true, true, 158], 'the right group: link, signal, USB plug, battery follow each other from the right edge without overlap');
+  const rows = [...litRows(d, L.linkX, 160)].filter(j => j < 13); eq([Math.min(...rows), Math.max(...rows)], [1, 11], 'the right group\'s icons are 11 rows high (y 1..11)');
+  const pl = [...litRows(d, 2, 11)].filter(j => j < 13);
+  eq([Math.min(...pl), Math.max(...pl)], [1, 11], 'the transport icon (play triangle) is 11 rows high');
+  ok(isText(d, 'GRP 1', L.optX, 3, null), 'GRP n sits on the left, after the transport icon (no fold, no LINK option in AUDIO at fold 1)');
+  const stop = drawn(ctxOf({ ctx: { running: false, armed: false } }));
+  eq([litIn(stop, 2, 2, 9, 9).length, litIn(stop, 2, 1, 9, 1).length, litIn(stop, 2, 11, 9, 1).length], [81, 0, 0], 'stopped: a 9 x 9 square at x 2..10, y 2..10');
+  const play = drawn(ctxOf({ ctx: { running: true } })); eq([litIn(play, 2, 1, 9, 11).length, litIn(play, 2, 6, 9, 1).length, litIn(play, 2, 1, 9, 1).length], [2 + 3 + 5 + 6 + 8 + 9 + 8 + 6 + 5 + 3 + 2, 9, 2], 'running: the play triangle, 9 wide at its middle row, 2 at its tips');
+  const fold = drawn(ctxOf({ home: { fold: '2' }, ctx: { fold: 2 } })); ok(litIn(fold, L.optX, 1, 15, 11).length > 100 && isText(fold, 'GRP 1', L.optX + 15 + 4, 3, null), 'the fold label X2 is an inverted 15 x 11 box, GRP n after it');
+  for (const [mode, w] of [[0, 11], [1, 13], [2, 13]]) { const k = drawn(ctxOf({ home: { audio: false, link: 1 }, ctx: { ltMode: mode } })); ok(litIn(k, L.optX, 1, w, 11).length > 20 && litIn(k, L.optX + w, 1, 4, 11).length === 0, 'LINK option icon ' + mode + ' is ' + w + ' x 11 at x ' + L.optX); }
+}
 eq(idsIn(drawn(ctxOf({ home: { link: 0 } })), ...R.link), [INK.DIM], 'AUDIO mode, no Link peer: dim (a lone leader is normal)');
 eq(idsIn(drawn(ctxOf({ home: { link: 0, audio: false } })), ...R.link), [INK.BAD], 'LINK mode, no session peer: red (nothing to follow)');
 eq(idsIn(drawn(ctxOf({ home: { link: 1, audio: false } })), ...R.link), [INK.GOOD], 'LINK mode, one peer: green');
 {
   const two = drawn(ctxOf({ home: { link: 2 } })), none = drawn(ctxOf({ home: { link: 0 } }));
-  ok(litIn(two, L.linkX + 12, 3, 12, 7).length > 0 && litIn(none, L.linkX + 12, 3, 12, 7).length === 0, 'the Link peer count is drawn beside the glyph only when there are peers');
+  ok(isText(two, '2', L.peersX, 3, INK.GOOD) && litIn(none, L.peersX, 3, 12, 7).length === 0, 'the Link peer count is drawn beside the glyph only when there are peers');
 }
 const barsOf = (rssi, over = {}) => { const d = drawn(ctxOf({ ctx: { rssi }, ...over })); return [idsIn(d, ...R.signal), litIn(d, ...R.signal).length]; };
-eq(barsOf(-55), [[INK.GOOD], 3 * 3 + 6 * 3 + 9 * 3 - 0], '-55 dBm: three bars (3 x 3, 6 x 3, 9 x 3 px), green');
-eq(barsOf(-67), [[INK.GOOD], 54], '-67 dBm: the good edge');
-eq(barsOf(-68), [[INK.WARN], 3 * 3 + 6 * 3 + 3], '-68 dBm: two bars and a stub, amber (fair)');
-eq(barsOf(-80), [[INK.WARN], 30], '-80 dBm: the fair edge');
-eq(barsOf(-81), [[INK.BAD], 9 + 3 + 3], '-81 dBm: one bar and two stubs, red (poor)');
-eq(barsOf(0), [[INK.DIM], 9], 'none heard (0): three stubs, grey');
-eq(barsOf(null), [[INK.DIM], 9], 'not reported (null): the same grey stubs');
+eq(barsOf(-55), [[INK.GOOD], 4 * (4 + 7 + 11)], '-55 dBm: three bars (4 px wide; 4, 7, 11 high), green');
+eq(barsOf(-67), [[INK.GOOD], 88], '-67 dBm: the good edge');
+eq(barsOf(-68), [[INK.WARN], 4 * (4 + 7 + 1)], '-68 dBm: two bars and a stub, amber (fair)');
+eq(barsOf(-80), [[INK.WARN], 48], '-80 dBm: the fair edge');
+eq(barsOf(-81), [[INK.BAD], 4 * (4 + 1 + 1)], '-81 dBm: one bar and two stubs, red (poor)');
+eq(barsOf(0), [[INK.DIM], 12], 'none heard (0): three stubs, grey');
+eq(barsOf(null), [[INK.DIM], 12], 'not reported (null): the same grey stubs');
 const battId = pct => idsIn(drawn(ctxOf({ home: { battery: pct } })), ...R.batt);
 eq([battId(100), battId(30), battId(29), battId(15), battId(14), battId(0)], [[INK.GOOD], [INK.GOOD], [INK.WARN], [INK.WARN], [INK.BAD], [INK.BAD]], 'battery: green from 30 %, amber 15..29, red under 15');
 eq(idsIn(drawn(ctxOf({ home: { battery: null } })), ...R.batt), [], 'no battery fitted: no icon, no ink');
 {
-  const fillOf = pct => { const d = drawn(ctxOf({ home: { battery: pct } })); let n = 0; for (let x = L.battX + 2; x < L.battX + L.battW - 2; x++) if (d.fb[6 * d.w + x]) n++; return n; };
-  eq([fillOf(0), fillOf(50), fillOf(100)], [0, 9, 17], 'the battery icon\'s fill: 0, 9 and 17 px of 17');
+  const fillOf = pct => { const d = drawn(ctxOf({ home: { battery: pct } })); let n = 0; for (let x = L.battX + 2; x < L.battX + 20; x++) if (d.fb[6 * d.w + x]) n++; return n; };
+  eq([fillOf(0), fillOf(50), fillOf(100)], [0, 9, 18], 'the battery icon\'s fill: 0, 9 and 18 px of 18');
+  const d = drawn(ctxOf({ home: { battery: 100 } }));
+  eq([d.fb[1 * d.w + L.battX], d.fb[1 * d.w + L.battX + 1], d.fb[6 * d.w + L.battX + 22], d.fb[4 * d.w + L.battX + 23], d.fb[3 * d.w + L.battX + 23]], [0, 1, 1, 1, 0], 'the battery: a 22 x 11 body with chamfered corners and a 2 x 5 nub');
 }
 
-// ---- the status line: words on the left, the threshold on the right, no overlap ----
+// ---- the stats rows: PEERS, signal, NET, BATT; words replace PEERS; STOP < 70 / MIN 70 on the right ----
 {
-  const cols = d => litCols(d, L.statusY, 7), words = { gated: { ctx: { gated: true } }, hold: { home: { confHold: true } }, coast: { home: { conf: 50 }, ctx: { running: true } } };
-  eq(idsIn(drawn(ctxOf(words.gated)), 2, L.statusY, 40, 7), [INK.BAD], 'GATED (outputs stopped for low confidence): red');
-  eq(idsIn(drawn(ctxOf(words.hold)), 2, L.statusY, 40, 7), [INK.DIM], 'HOLD: grey');
-  eq(idsIn(drawn(ctxOf(words.coast)), 2, L.statusY, 40, 7), [INK.WARN], 'COAST (running under the threshold): amber');
-  for (const [name, o] of Object.entries(words)) {
-    const d = drawn(ctxOf(o)), left = cols(d).filter(x => x < 80), right = cols(d).filter(x => x >= 80);
-    ok(left.length > 10 && right.length > 20 && Math.max(...left) + 4 < Math.min(...right), name + ': the word (x ' + left[0] + '..' + Math.max(...left) + ') and the threshold text (x ' + right[0] + '..' + Math.max(...right) + ') do not touch');
-    eq(idsIn(d, 80, L.statusY, 80, 7), [0], name + ': the threshold text is neutral');
+  const words = { gated: { ctx: { gated: true } }, hold: { home: { confHold: true } }, coast: { home: { conf: 50 }, ctx: { running: true } } };
+  const one = { GATED: 'gated', HOLD: 'hold', COAST: 'coast' }, ink = { GATED: INK.BAD, HOLD: INK.DIM, COAST: INK.WARN };
+  for (const [word, key] of Object.entries(one)) {
+    const d = drawn(ctxOf(words[key]));
+    eq([isText(d, word, 2, L.stats1Y, ink[word]), litIn(d, 2, L.stats1Y, 50, 7).length === textPoints(word).length], [true, true], word + ' replaces PEERS on the left of line 1, in its colour');
+    const sig = isText(d, '-55dBm', L.sigTextX, L.stats1Y, null), thr = isText(d, 'STOP < 70', rightText('STOP < 70'), L.stats1Y, 0);
+    eq([sig, thr], [true, true], word + ': the signal and STOP < 70 stay');
   }
-  eq(litIn(healthy, 0, L.statusY, 80, 7).length, 0, 'a healthy HOME: only the threshold, right (STOP 70)');
-  const run = drawn(ctxOf({}, { get: { threshold: '70', lowconf: 'run' } })), stop = drawn(ctxOf());
-  ok(litCols(run, L.statusY, 7).length < litCols(stop, L.statusY, 7).length + 8 && litCols(run, L.statusY, 7)[0] > 100, "'MIN 70' with KEEP RUNNING, 'STOP 70' with STOP, both right-aligned");
-  const wf = drawn(ctxOf({ ctx: { wifiQ: { rssi: -85, kbps: 24000, tx: 100, retried: 40, lost: 20 } } }));
-  eq(idsIn(wf, 0, L.statusY - 1, 120, 9).includes(INK.BAD), true, 'a Wi-Fi line, when the stick reports one, shows its BAD parts inverted in red');
+  eq(isText(healthy, 'PEERS 2', 2, L.stats1Y, INK.GOOD), true, 'line 1 left: PEERS 2, green (joined)');
+  eq(isText(drawn(ctxOf({ home: { link: 0 } })), 'PEERS 0', 2, L.stats1Y, INK.DIM), true, 'alone in AUDIO mode: PEERS 0 in grey');
+  eq(isText(drawn(ctxOf({ home: { link: 0, audio: false } })), 'PEERS 0', 2, L.stats1Y, INK.BAD), true, 'alone in LINK mode: PEERS 0 in red');
+  const unknown = drawn({ ...Stick.ctx({ home: null, get: {}, status: null }, NOW), tempoStep() {}, setField() {}, setHold() {}, linkStartStop() {} });
+  eq([isText(unknown, 'PEERS -', 2, L.stats1Y, INK.DIM), isText(unknown, '-', L.sigTextX, L.stats1Y, null), isText(unknown, 'BATT -', rightText('BATT -'), L.stats2Y, null), isText(unknown, 'NET JANK G1', 2, L.stats2Y, null)], [true, true, true, true], 'nothing reported: PEERS -, signal -, BATT - (never an invented value)');
+  eq(idsIn(unknown, ...R.dot), [INK.DIM], 'an unknown signal: a grey dot');
+  const dotOf = rssi => drawn(ctxOf({ ctx: { rssi } }));
+  eq([-55, -75, -88, 0, null].map(r => idsIn(dotOf(r), ...R.dot)), [[INK.GOOD], [INK.WARN], [INK.BAD], [INK.DIM], [INK.DIM]], 'the signal dot has the signal bars\' colour rule: green, amber, red, grey, grey');
+  eq(litIn(dotOf(-55), ...R.dot).length, 21, 'the dot is 5 x 5 with its corners cut (21 px)');
+  eq([isText(dotOf(0), 'NONE', L.sigTextX, L.stats1Y, null), isText(dotOf(-100), '-100dBm', L.sigTextX, L.stats1Y, null)], [true, true], 'signal text: "NONE" when nothing is heard, else the dBm');
+  eq(isText(healthy, 'STOP < 70', rightText('STOP < 70'), L.stats1Y, 0), true, 'line 1 right: STOP < 70 (the stick\'s threshold, the outputs stop below it), neutral, ends at x 157');
+  eq(isText(drawn(ctxOf({}, { get: { threshold: '70', lowconf: 'run' } })), 'MIN 70', rightText('MIN 70'), L.stats1Y, 0), true, 'with KEEP RUNNING: MIN 70');
+  eq(isText(drawn(ctxOf({}, { get: { threshold: '100', lowconf: 'stop' }, status: { rssi: '-100' } })), 'STOP < 100', rightText('STOP < 100'), L.stats1Y, 0) && textW('-100dBm') + L.sigTextX < rightText('STOP < 100'), true, 'the widest signal and threshold texts do not touch');
+  eq([isText(healthy, 'NET JANK G1', 2, L.stats2Y, 0), isText(healthy, 'BATT 80%', rightText('BATT 80%'), L.stats2Y, INK.GOOD)], [true, true], 'line 2: NET JANK G1 (the jank group) on the left, BATT 80% (coloured like the icon) on the right');
+  eq([[12, INK.BAD], [29, INK.WARN], [100, INK.GOOD]].map(([b, id]) => isText(drawn(ctxOf({ home: { battery: b } })), 'BATT ' + b + '%', rightText('BATT ' + b + '%'), L.stats2Y, id)), [true, true, true], 'BATT in the battery\'s colours');
+  const wifi = (ssid, extra = {}) => drawn({ ...ctxOf(), net: { ...ctxOf().net, mode: 1, ssid, ...extra } });
+  eq([isText(wifi('home-wifi'), 'NET home-wifi', 2, L.stats2Y, null), isText(wifi('a-very-long-network-name'), 'NET a-very-long-', 2, L.stats2Y, null), isText(wifi(''), 'NET -', 2, L.stats2Y, null)], [true, true, true], 'Wi-Fi mode: NET and the network name, cut at 16 characters, "-" when it has none');
+  ok(2 + textW('NET a-very-long-') < rightText('BATT 100%'), 'the longest NET text ends before the widest BATT text starts');
+  const link = drawn(ctxOf({ home: { audio: false, link: 1 } }));
+  eq([litIn(link, 98, L.stats1Y, 60, 7).filter(v => v !== INK.DIM && v !== INK.GOOD && v !== INK.WARN && v !== INK.BAD).length > 0, isText(link, 'PEERS 1', 2, L.stats1Y, INK.GOOD), isText(link, 'NET JANK G1', 2, L.stats2Y, null)], [false, true, true], 'LINK mode: the same stats, without the threshold text');
 }
 
-// ---- the LINK layout: the same top bar, tempo, big boxes, no audio bars ----
+// ---- the LINK layout: the same top bar, tempo, big boxes and stats, no audio rows ----
 {
   const link = drawn(ctxOf({ home: { audio: false, link: 1, bpm: 98.4 } }));
-  eq([litIn(link, 0, L.linkBoxY + L.linkBoxH, link.w, L.statusY - L.linkBoxY - L.linkBoxH).length, outsideInk(link, [R.link, R.signal, R.batt, [L.boxX, L.linkBoxY, L.boxW, L.linkBoxH]])], [0, 0], 'LINK HOME: nothing between the boxes and the status line (no CF, IN or BAR rows), no stray ink');
-  eq(idsIn(link, L.boxX, L.linkBoxY, L.boxW, L.linkBoxH), [INK.ONE], 'LINK HOME: the first box (36 x 52), lit, is the bar 1');
+  eq([litIn(link, 0, L.linkBoxY + L.linkBoxH, link.w, L.stats1Y - L.linkBoxY - L.linkBoxH).length, outsideInk(link, [R.link, R.signal, R.batt, [L.boxX, L.linkBoxY, L.boxW, L.linkBoxH], R.peers, R.dot, R.battText])], [0, 0], 'LINK HOME: nothing between the boxes and the stats (no CONFIDENCE, INPUT or BAR rows), no stray ink');
+  eq(idsIn(link, L.boxX, L.linkBoxY, L.boxW, L.linkBoxH), [INK.ONE], 'LINK HOME: the first box (36 x 48), lit, is the bar 1');
   eq(litIn(link, L.boxX + 2 * (L.boxW + L.boxGap), L.linkBoxY, L.boxW, L.linkBoxH).length, L.boxW * L.linkBoxH - (L.boxW - 4) * (L.linkBoxH - 4), 'the others are 2 px outlines of the same size');
   eq(litIn(link, L.boxX + 3 * (L.boxW + L.boxGap) + L.boxW - 1, L.linkBoxY, 1, L.linkBoxH).length, L.linkBoxH, 'the fourth box ends at x 157');
-  ok(litRows(link, 2, 133).has(L.tempoY) && litRows(link, 2, 133).has(L.tempoY + 34), 'the tempo is the same size as in AUDIO');
-  eq(litIn(link, 0, L.statusY, link.w, 7).length, 0, 'no STOP / MIN text in LINK mode');
+  ok(litRows(link, 2, 160).has(L.tempoY) && litRows(link, 2, 160).has(L.tempoY + 34), 'the tempo is the same size as in AUDIO');
 }
 
 // ---- menus, edit, info, net, text, confirm, setup: neutral, the whole grid, no ink ----
@@ -353,14 +453,14 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   const hov = { ...OLED.create(), overlay: { until: NOW + 1000, title: 'DOUBLE', value: '240.0' } };
   let d = drawn(ctxOf(), { ui: hov });
   const rowsLit = j => { let lo = -1, hi = -1; for (let i = 0; i < LW; i++) if (d.fb[j * LW + i]) { if (lo < 0) lo = i; hi = i; } return [lo, hi]; };
-  eq(rowsLit(79), [15, 144], 'the overlay box is 130 px wide, centred (15 px each side)');
+  eq(rowsLit(77), [15, 144], 'the overlay box is 130 px wide, centred (15 px each side)');
   eq(idsIn(d, 15, 30, 130, 60), [0], 'no ink under the overlay box');
   ok(litIn(d, 20, 50, 120, 30).length > 100, 'its value is big (scale 4 for 240.0)');
   d = drawn({ ...ctxOf(), saved: true });
   eq([idsIn(d, 35, 42, 90, 34), (() => { const r = [-1, -1]; for (let i = 0; i < LW; i++) if (d.fb[50 * LW + i]) { if (r[0] < 0) r[0] = i; r[1] = i; } return r; })()], [[0], [35, 124]], 'the SAVED box is centred (35 px each side) and carries no ink');
   const hint = { ...OLED.create(), hint: { title: 'PHASE', up: 'UP: +1/2', down: 'DOWN: -1/2' } };
   d = drawn(ctxOf(), { ui: hint });
-  eq([rowsLit(79), idsIn(d, 15, 30, 130, 60)], [[15, 144], [0]], 'the NO / YES hint box is centred on the grid too');
+  eq([rowsLit(77), idsIn(d, 15, 30, 130, 60)], [[15, 144], [0]], 'the NO / YES hint box is centred on the grid too');
 }
 
 // ---- BEAT FLASH is gone: the menu is one list of 10 items on both layouts, the control line refuses it, ui/lcd2.js has no flash members ----
@@ -376,7 +476,7 @@ const fed = (homeOver, status, get = {}) => Stick.ctx({ home: { ...home, ...home
 eq([fed({}, { rssi: '-58' }).rssi, fed({}, { rssi: '0' }).rssi, fed({}, null).rssi, fed({}, {}).rssi], [-58, 0, null, null], 'jank mode: the best peer\'s rssi (status rssi), 0 = none, no status = not reported');
 eq([fed({ net: { kind: 'wifi', up: true } }, { rssi: '-30', wifi_rssi: '-72' }).rssi, fed({ net: { kind: 'wifi', up: false } }, { wifi_rssi: '-72' }).rssi], [-72, 0], 'Wi-Fi client: the router\'s rssi (status wifi_rssi), 0 while not joined');
 eq([fed({}, { peak_db: '-3' }).peakDb, fed({}, {}).peakDb, fed({ conf: 80 }, null).confKnown, fed({ conf: null }, null).confKnown], [-3, null, true, false], 'peak_db and the confidence come as reported, else null / unknown');
-eq(fed({ link: 3 }, null).peers, 3, 'the Link peer count is the HOME line\'s');
+eq([fed({ link: 3 }, null).peers, Stick.ctx({ home: null, get: {}, status: null }, NOW).peers], [3, null], 'the Link peer count is the HOME line\'s, null (unknown) without one');
 {
   const c = fed({}, { rssi: '-58' }), model = Stick.create(() => ({ ...c, tempoStep: () => null, setField() {}, setHold() {}, linkStartStop() {} }), () => {});
   const lcd = Stick.screen(model, NOW, 'lcd2'), oled = Stick.screen(model, NOW);

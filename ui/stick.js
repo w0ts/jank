@@ -75,7 +75,7 @@ const Stick = (() => {
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
-      peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0,
+      peers: h ? h.link : null, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0,
       lineIn: g.source === 'line' || (!!st && st.audio_source === 'line'), bright: 100, sleep: 0, inOff: num(g.lat_trim) || 0, offs: [0, 0, 0], rate: 2,
       boot: false, splash: false, wifi: wifiBars, wifiQ: null, groupPeers: h ? h.air : 0, setup: false, saved: false,
       net: { mode: net, prev: net, group: num(g.group) || 1, ssid: g.ssid || '', pass: g.pass === 'set' ? '********' : '', appass: '', apName: '',
@@ -169,10 +169,11 @@ const Stick = (() => {
   const releaseAll = (m, now) => { for (const b of Object.keys(m.held)) up(m, b, now); };
   // the screen of a layout: { fb, ink, w, h }. 'oled' (default): the 128 x 64 frame buffer, no ink. 'lcd2': the colour screen's own grid
   // (OLED.size('lcd2'), 160 x 120) with its ink plane (ui/lcd2.js paints them). Buffers are made here, so a caller never guesses a size.
-  function screen(m, now, layout) {
+  // look: the lcd2 layout's dev switches { digits: 'a'|'b'|'c' (ui/bigfont.js), vuSegments: boolean }, merged into the ctx.
+  function screen(m, now, layout, look) {
     const lcd = layout === 'lcd2', size = OLED.size(layout), fb = new Uint8Array(size.w * size.h), ink = lcd ? new Uint8Array(size.w * size.h) : null;
     const c = m.getCtx(now);
-    OLED.draw(fb, m.ui, lcd ? { ...c, layout } : c, now, ink);
+    OLED.draw(fb, m.ui, lcd ? { ...c, ...look, layout } : c, now, ink);
     return { fb, ink, w: size.w, h: size.h };
   }
   const framebuffer = (m, now) => screen(m, now, 'oled').fb;                 // the OLED's 128 x 64
