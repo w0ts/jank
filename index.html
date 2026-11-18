@@ -1254,7 +1254,7 @@ const OLED = (() => {
     if (ui.screen === 'home') {
       if (d) {
         const v = c.tempoStep(d);                                  // link: +/-1 BPM; audio: x2 or /2 (--xiao: `fold x2` / `fold /2`)
-        ui.overlay = { until: now + OVERLAY_MS, title: c.link ? 'LINK TEMPO' : (d > 0 ? 'DOUBLE' : 'HALF'), value: v == null ? '---' : v.toFixed(1) };
+        if (!c.link) ui.overlay = { until: now + OVERLAY_MS, title: d > 0 ? 'DOUBLE' : 'HALF', value: v == null ? '---' : v.toFixed(1) };   // a Link step shows on the big tempo itself
       } else if (btn === 'yes') {                                   // Stop / Start the outputs; the transport icon shows it
         if (c.link || c.xiao) c.linkStartStop(!(c.running || c.armed));     // LINK: the clocks, and the session in FOLLOW+LEAD; --xiao: play / stop
         else c.setHold(c.running || c.armed);                        // AUDIO: follows the icon: running/armed -> Stop (hold), stopped -> Start
