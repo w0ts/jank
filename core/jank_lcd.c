@@ -21,7 +21,14 @@ static const uint8_t INK_COLOUR[] = {
 #undef X
 };
 
-_Static_assert(sizeof INK_COLOUR == JO_INK_IDS, "one palette colour for each ink id");
+static const uint8_t VU_RGB[][3] = {
+#define X(r, g, b) {r, g, b},
+    JLC_VU_RAMP(X)
+#undef X
+};
+
+_Static_assert(sizeof INK_COLOUR == JO_INK_VU0, "one palette colour for each ink id below the VU ramp");
+_Static_assert(sizeof VU_RGB / sizeof VU_RGB[0] == JO_VU_STEPS, "one ramp colour for each VU step");
 _Static_assert(JLC_W == JO_LCD2_W * JLC_SCALE && JLC_H == JO_LCD2_H * JLC_SCALE, "the frame fills the panel exactly");
 
 uint16_t jlc_rgb565(uint8_t r, uint8_t g, uint8_t b) { return (uint16_t)((r & 0xF8u) << 8 | (g & 0xFCu) << 3 | b >> 3); }
@@ -33,8 +40,10 @@ static uint16_t colour565(enum colour c, int swap) { return swapped(jlc_rgb565(R
 void jlc_palette(struct jlc_pal *pal, int swap_bytes)
 {
     pal->bg = colour565(COLOUR_bg, swap_bytes);
-    for (size_t i = 0; i < JO_INK_IDS; i++)
+    for (size_t i = 0; i < JO_INK_VU0; i++)
         pal->ink[i] = colour565(INK_COLOUR[i], swap_bytes);
+    for (size_t i = 0; i < JO_VU_STEPS; i++)
+        pal->ink[JO_INK_VU0 + i] = swapped(jlc_rgb565(VU_RGB[i][0], VU_RGB[i][1], VU_RGB[i][2]), swap_bytes);
 }
 
 void jlc_row(const uint8_t fb[JO_LCD2_FB_BYTES], const uint8_t *ink, const struct jlc_pal *pal, unsigned y, uint16_t row[JLC_W])

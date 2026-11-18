@@ -93,8 +93,5 @@ extern const char *const jo_autobar_short[3];
 extern const char *const jo_off_on_names[2];                           /* ON, OFF: USB MIDI CLOCK */
 
 /* shared by the lcd2 layout's screens (jank_oled_lcd2.c) and the OLED's (jank_oled_draw.c) */
-extern const char *const *const jo_lt_icons[3];
-extern const char *const jo_usb_icon[5];
-void jo_jank_glyph(uint8_t *fb, int x, int y);
 void jo_fit(const char *s, int w, char *out, size_t cap);
 #endif

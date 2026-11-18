@@ -13,7 +13,7 @@ const assert = require('assert');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'page', 'jank.html'), 'utf8');
-const lib = ['ui/oled.js', 'ui/face.js', 'ui/box3.js', 'ui/lcd2.js', 'ui/ports.js', 'ui/autolat.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Box3 = Box3; this.BOX3 = BOX3; this.Stick = Stick; this.Player = Player;';
+const lib = ['ui/bigfont.js', 'ui/oled.js', 'ui/face.js', 'ui/box3.js', 'ui/lcd2.js', 'ui/ports.js', 'ui/autolat.js', 'ui/stick.js', 'ui/player.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') + '\nthis.OLED = OLED; this.Face = Face; this.Box3 = Box3; this.BOX3 = BOX3; this.Stick = Stick; this.Player = Player;';
 const script = id => html.match(new RegExp('<script id="' + id + '">([\\s\\S]*?)</script>'))[1];
 const transcript = {};
 for (const block of fs.readFileSync(path.join(root, 'tests', 'stick_ref', 'transcript.txt'), 'utf8').split('### ').slice(1)) {

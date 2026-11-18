@@ -18,7 +18,7 @@ done
 # player.html's code in node; PLAYER_HTML set = make the cases again from it and check they are the ones kept here), and
 # the LED language of a unit without a screen. No contraction into fused multiply-adds: the emulator's numbers are
 # JavaScript's, rounded after each operation.
-OLED="$HERE/core/jank_oled_gfx.c $HERE/core/jank_oled_menu.c $HERE/core/jank_oled_press.c $HERE/core/jank_oled_draw.c $HERE/core/jank_oled_lcd2.c $HERE/core/jank_oled_qr.c $HERE/core/jank_oled_input.c"
+OLED="$HERE/core/jank_oled_gfx.c $HERE/core/jank_oled_menu.c $HERE/core/jank_oled_press.c $HERE/core/jank_oled_draw.c $HERE/core/jank_oled_lcd2.c $HERE/core/jank_bigfont.c $HERE/core/jank_bigfont_tables.c $HERE/core/jank_oled_qr.c $HERE/core/jank_oled_input.c"
 if [ -n "${PLAYER_HTML:-}" ]; then
     node "$HERE/tests/oled_ref/gen_cases.js" "$PLAYER_HTML" > "$OUT/oled_cases.txt"
     cmp "$OUT/oled_cases.txt" "$HERE/tests/oled_ref/cases.txt" || { echo "oled: tests/oled_ref/cases.txt is not what $PLAYER_HTML draws: make it again"; exit 1; }
@@ -26,6 +26,8 @@ fi
 # the colour layout's references come from ui/oled.js itself: made again here, they must be the ones kept (else: make them again and
 # look at what the C layout does with the change)
 if command -v node >/dev/null; then
+    node "$HERE/scripts/gen_bigfont.js" > "$OUT/jank_bigfont_tables.c"
+    cmp "$OUT/jank_bigfont_tables.c" "$HERE/core/jank_bigfont_tables.c" || { echo "core/jank_bigfont_tables.c is not what ui/bigfont.js says: node scripts/gen_bigfont.js > core/jank_bigfont_tables.c"; exit 1; }
     node "$HERE/tests/oled_ref/gen_cases.js" --ink > "$OUT/oled_cases_ink.txt" 2>/dev/null
     cmp "$OUT/oled_cases_ink.txt" "$HERE/tests/oled_ref/cases_ink.txt" || { echo "oled: tests/oled_ref/cases_ink.txt is not what ui/oled.js draws: make it again (gen_cases.js --ink)"; exit 1; }
 fi
