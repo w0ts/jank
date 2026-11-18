@@ -395,7 +395,7 @@ const OLED = (() => {
   const LINK_JOINED_MIN = 1;                                          // Link peers needed to call the stick joined
   const SIGNAL_GOOD_DBM = -67, SIGNAL_POOR_DBM = -80;                  // good >= -67, fair -80..-68, poor < -80 (-80 is the Wi-Fi page's BAD line)
   const signalQuality = dbm => (dbm === null || dbm === undefined || dbm === 0 ? 'none' : dbm >= SIGNAL_GOOD_DBM ? 'good' : dbm >= SIGNAL_POOR_DBM ? 'fair' : 'poor');
-  const SIGNAL_INK = { good: INK.GOOD, fair: INK.WARN, poor: INK.BAD, none: INK.DIM }, SIGNAL_BARS = { good: 3, fair: 2, poor: 1, none: 0 };
+  const SIGNAL_INK = { good: INK.GOOD, fair: INK.WARN, poor: INK.BAD, none: INK.DIM };
   // joined = green; alone = dim in AUDIO mode (a lone leader is normal), red in LINK mode (it has no tempo to follow)
   const linkInk = c => ((c.peers || 0) >= LINK_JOINED_MIN ? INK.GOOD : c.link ? INK.BAD : INK.DIM);
   // the HOME top bar's boxes (x ranges, inclusive; null = not drawn), so that nothing can overlap: the transport icon, in LINK
@@ -645,13 +645,13 @@ const OLED = (() => {
   // (INK, see tag()); menus and edit screens have none.
   //
   //   HOME (AUDIO)  y 1..11    top bar: transport icon, fold label / LINK option icon, GRP n (left); link glyph + peers, signal bars, USB plug, battery (right)
-  //                 y 15..49   the TEMPO in the big digits (35 rows), left aligned, x 2
-  //                 y 52..76   four big beat boxes, 36 x 25, gap 4, the beat indicator; lit = solid, unlit = 2 px outline; the first is amber only while lit
-  //                 y 79       CONFIDENCE  [line, notch at the stop threshold] 87%   number and line coloured by the threshold rule
-  //                 y 87       INPUT [VU meter, notch at the tracker's -50 dBFS] -20dB   continuous gradient bar; the number red clipping, amber too quiet
-  //                 y 95       BAR  LOCKED [outlined bar]                     AUTO BAR state and its confidence, neutral; only with AUTO BAR on
-  //                 y 111      the word GATED / HOLD / COAST when one applies, else empty (y 118, 119 empty)
-  //   HOME (LINK)   the same top bar and tempo; the beat boxes 36 x 48 at y 54..101; no audio rows, no word
+  //                 y 15..49   the TEMPO in the big digits (35 rows; the digit after the dot is 23 rows), centred on the 160 columns
+  //                 y 52..82   four big beat boxes, 36 x 31, gap 4, the beat indicator; lit = solid, unlit = 2 px outline; the first is amber only while lit
+  //                 y 85       CONFIDENCE  [line, notch at the stop threshold] 87%   number and line coloured by the threshold rule
+  //                 y 94       INPUT [VU meter, notch at the tracker's -50 dBFS] -20dB   continuous gradient bar; the number red clipping, amber too quiet
+  //                 y 103      BAR  LOCKED [outlined bar]                     AUTO BAR state and its confidence, neutral; only with AUTO BAR on
+  //                 y 112      the state word: GATED / HOLD / COAST / STOPPED / SILENT / PLAYING
+  //   HOME (LINK)   the same top bar and tempo; the beat boxes 36 x 65 at y 54..118; no audio rows, no state word
   //   lists         title bar 11 px, 12 rows of 9 px from y 13; sub menus and info 12 px rows; edit: the value at scale 2
   const SIZES = { oled: { w: OLED_W, h: OLED_H }, lcd2: { w: 160, h: 120 } };
   const sizeOf = layout => (layout === 'lcd2' ? SIZES.lcd2 : SIZES.oled);
@@ -673,11 +673,11 @@ const OLED = (() => {
 
   // the HOME geometry: one table, the tests read it
   const L2 = {
-    topH: 13, iconY: 1, iconH: 11, playX: 2, optX: 14, nameRight: 67, linkX: 70, linkW: 27, peersX: 85, signalX: 98, signalW: 14, plugX: 117, battX: 134, battW: 24,
-    tempoX: 2, tempoY: 15,
-    boxX: 2, boxW: 36, boxGap: 4, boxY: 52, boxH: 25, linkBoxY: 54, linkBoxH: 48, boxBorder: 2,
-    rowCF: 79, rowIN: 87, rowBAR: 95, labelX: 2, valueXR: 158, barX: 64, barW: 62, lineH: 3, vuH: 5,
-    wordY: 111,
+    topH: 13, iconY: 1, iconH: 11, playX: 2, optX: 14, nameRight: 67, linkX: 85, linkW: 27, peersX: 100, plugX: 117, battX: 134, battW: 24,
+    tempoY: 15,
+    boxX: 2, boxW: 36, boxGap: 4, boxY: 52, boxH: 31, linkBoxY: 54, linkBoxH: 65, boxBorder: 2,
+    rowCF: 85, rowIN: 94, rowBAR: 103, labelX: 2, valueXR: 158, barX: 64, barW: 62, lineH: 3, vuH: 5,
+    stateY: 112,
   };
   const barFillWidth = frac => Math.round(L2.barW * clamp(frac, 0, 1));          // the line's length: the value on 62 px
   const barTickX = tickFrac => L2.barX + Math.round((L2.barW - 1) * tickFrac);
@@ -694,7 +694,6 @@ const OLED = (() => {
     ['.....#.#.....', '....##.##....', '...###.###...', '..####.####..', '.###########.', '#############', '.###########.', '..####.####..', '...###.###...', '....##.##....', '.....#.#.....'],
   ];
   const TRI_W = [2, 3, 5, 6, 8, 9, 8, 6, 5, 3, 2];                  // the play triangle's row widths (9 x 11)
-  const SIGNAL_H = [4, 7, 11];
 
   function drawTransportLcd2(fb, c, now) {
     const tri = c.running || (c.armed && Math.floor(now / ARMED_BLINK_MS) % 2 === 0);
@@ -712,11 +711,6 @@ const OLED = (() => {
     text(fb, fl, L2.optX + 2, L2.iconY + 2, 1, 0);
     return L2.optX + w + 4;
   }
-  function drawSignalLcd2(fb, rssi) {
-    const q = signalQuality(rssi), bars = SIGNAL_BARS[q];            // the air: three bars, 4 px wide, 4 / 7 / 11 px high, a 1 px stub for a missing one
-    SIGNAL_H.forEach((h, i) => { const x = L2.signalX + 5 * i; if (i < bars) rect(fb, x, 12 - h, 4, h, 1); else rect(fb, x, 11, 4, 1, 1); });
-    tag(SIGNAL_INK[q], L2.signalX, 0, L2.signalW, L2.topH);
-  }
   function drawBatteryLcd2(fb, pct) {
     const x = L2.battX;
     frame(fb, x, L2.iconY, 22, L2.iconH, 1);
@@ -733,13 +727,13 @@ const OLED = (() => {
     icon(fb, LINK_GLYPH, L2.linkX, L2.iconY);                           // the link glyph, and the Link peers beside it
     if ((c.peers || 0) > 0) text(fb, String(Math.min(c.peers, 99)), L2.peersX, 3, 1, 1);
     tag(linkInk(c), L2.linkX, 0, L2.linkW, L2.topH);
-    drawSignalLcd2(fb, c.rssi);
     if (c.usb) icon(fb, USB_PLUG, L2.plugX, L2.iconY);
     if (c.fitted) drawBatteryLcd2(fb, c.batt);
   }
   function drawTempoLcd2(fb, c) {
     const bpm = c.link ? c.linkBpm : c.bpm;
-    BigFont.draw((x, y) => px(fb, x, y, 1), bpm ? bpm.toFixed(1) : '---', L2.tempoX, L2.tempoY);
+    const s = bpm ? bpm.toFixed(1) : '---';
+    BigFont.draw((x, y) => px(fb, x, y, 1), s, Math.floor((W - BigFont.width(s)) / 2), L2.tempoY);
   }
 
   function rowText(fb, y, label, value) {
@@ -785,11 +779,19 @@ const OLED = (() => {
   }
   const BAR_WORDS = { locked: 'LOCKED', listening: 'LISTEN', manual: 'MANUAL' };
   const inkText = (fb, s, x, y, ink) => { text(fb, s, x, y, 1, 1); tag(ink, x, y, textW(s, 1), 7); };
-  // the bottom row: the word for the confidence state, left aligned (AUDIO only); nothing otherwise
-  function drawWordLcd2(fb, c) {
+  // the state line (AUDIO only, always filled), the first state that applies: GATED (the outputs stopped for low confidence), HOLD (the confidence
+  // holds), COAST (running under the threshold), STOPPED (not running), SILENT (running, nothing heard), else PLAYING
+  function stateWordLcd2(c) {
     const coast = !c.confHold && c.confKnown !== false && !!c.running && c.conf * 100 < c.th;
-    const word = c.gated ? ['GATED', INK.BAD] : c.confHold ? ['HOLD', INK.DIM] : coast ? ['COAST', INK.WARN] : null;
-    if (word) inkText(fb, word[0], 2, L2.wordY, word[1]);
+    if (c.gated) return ['GATED', INK.BAD];
+    if (c.confHold) return ['HOLD', INK.DIM];
+    if (coast) return ['COAST', INK.WARN];
+    if (!c.running) return ['STOPPED', INK.DIM];
+    return c.silent ? ['SILENT', INK.DIM] : ['PLAYING', INK.NONE];
+  }
+  function drawStateLcd2(fb, c) {
+    const [word, ink] = stateWordLcd2(c);
+    inkText(fb, word, 2, L2.stateY, ink);
   }
   function drawHomeLcd2(fb, c, now) {
     drawTopBarLcd2(fb, c, now);
@@ -800,7 +802,7 @@ const OLED = (() => {
     lineRow(fb, L2.rowCF, 'CONFIDENCE', known ? Math.round(c.conf * 100) + '%' : '--', known ? c.conf : 0, c.th / 100, confInk(c));
     vuRow(fb, L2.rowIN, c);
     if (c.bar && BAR_WORDS[c.bar.state]) outlinedRow(fb, L2.rowBAR, 'BAR', BAR_WORDS[c.bar.state], c.bar.state === 'manual' ? 0 : c.bar.conf || 0);
-    drawWordLcd2(fb, c);
+    drawStateLcd2(fb, c);
   }
 
   // ---- the lists: a title bar of 11 px, rows of 9 px from y 13 (12 rows: the whole MENU fits), full width, neutral, the selected row inverted
@@ -847,6 +849,15 @@ const OLED = (() => {
     const [h1, h2] = helpOf(sp, e.val);
     textC(fb, h1, 70, 1, 1); textC(fb, h2, 82, 1, 1);
   }
+  // the read-only SIGNAL row under the NETWORK rows: the dBm (the best jank peer, or the router in Wi-Fi mode) and a word coloured like the bars were
+  const SIGNAL_WORD = { good: 'GOOD', fair: 'FAIR', poor: 'POOR', none: 'NONE' };
+  function drawSignalRowLcd2(fb, y, rssi) {
+    text(fb, 'SIGNAL', 4, y, 1, 1);
+    if (rssi === null || rssi === undefined) { textR(fb, '-', W - 4, y, 1, 1); return; }
+    const q = signalQuality(rssi), word = SIGNAL_WORD[q], wx = W - 4 - textW(word, 1);
+    inkText(fb, word, wx, y, SIGNAL_INK[q]);
+    if (rssi !== 0) textR(fb, rssi + 'dBm', wx - 6, y, 1, 1);
+  }
   function drawNetLcd2(fb, ui, c) {
     titleBarLcd2(fb, 'NETWORK');
     netRows(c).forEach((r, i) => {
@@ -854,6 +865,7 @@ const OLED = (() => {
       listRowLcd2(fb, y, 9, sel, r.name, fit(r.val, W - 8 - 6 - textW(r.name, 1)));
       if (sel) r.help.forEach((l, k) => { if (l) text(fb, l, 3, 101 + 9 * k, 1, 1); });
     });
+    drawSignalRowLcd2(fb, L2_ROW0 + netRows(c).length * L2_PITCH, c.rssi);
   }
   function drawScanLcd2(fb, ui, c) {
     const list = c.net.scan, rows = L2_ROWS - 1;

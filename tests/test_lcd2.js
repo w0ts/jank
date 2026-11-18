@@ -123,21 +123,21 @@ function isText(d, s, x, y, ink) {
 const rightText = (s, xr = 158) => xr - textW(s);
 
 // ---- the labels, the rows: one table, every element's box, and nothing in the gaps ----
-const BANDS = [['top bar', 0, 12], ['tempo', L.tempoY, L.tempoY + BigFont.ROWS - 1], ['beat boxes', L.boxY, L.boxY + L.boxH - 1], ['CONFIDENCE', L.rowCF, L.rowCF + 6], ['INPUT', L.rowIN, L.rowIN + 6], ['BAR', L.rowBAR, L.rowBAR + 6], ['word', L.wordY, L.wordY + 6]];
+const BANDS = [['top bar', 0, 12], ['tempo', L.tempoY, L.tempoY + BigFont.ROWS - 1], ['beat boxes', L.boxY, L.boxY + L.boxH - 1], ['CONFIDENCE', L.rowCF, L.rowCF + 6], ['INPUT', L.rowIN, L.rowIN + 6], ['BAR', L.rowBAR, L.rowBAR + 6], ['state', L.stateY, L.stateY + 6]];
 for (let i = 1; i < BANDS.length; i++) ok(BANDS[i][1] > BANDS[i - 1][2], BANDS[i][0] + ' starts below ' + BANDS[i - 1][0] + ' (' + BANDS[i][1] + ' > ' + BANDS[i - 1][2] + '): the rows do not overlap');
-eq([L.tempoY + BigFont.ROWS - 1, L.boxY + L.boxH - 1, L.linkBoxY + L.linkBoxH - 1, BANDS[BANDS.length - 1][2], 2 + 4 * L.boxW + 3 * L.boxGap], [49, 76, 101, 117, 158], 'tempo ends at y 49, the boxes at y 76 (LINK: 101), the word row at y 117 (rows 118 and 119 are empty), the boxes at x 157');
-ok(L.boxY - (L.tempoY + BigFont.ROWS) >= 1 && L.rowCF - (L.boxY + L.boxH) >= 2 && L.linkBoxY - (L.tempoY + BigFont.ROWS) >= 1 && L.wordY - (L.linkBoxY + L.linkBoxH) >= 2, 'the boxes keep a gap to the tempo above and to the CONFIDENCE row (AUDIO) or the word row (LINK) below');
+eq([L.tempoY + BigFont.ROWS - 1, L.boxY + L.boxH - 1, L.linkBoxY + L.linkBoxH - 1, BANDS[BANDS.length - 1][2], 2 + 4 * L.boxW + 3 * L.boxGap], [49, 82, 118, 118, 158], 'tempo ends at y 49, the boxes at y 82 (LINK: 118), the state line at y 118 (only row 119 is empty), the boxes at x 157');
+ok(L.boxY - (L.tempoY + BigFont.ROWS) >= 1 && L.rowCF - (L.boxY + L.boxH) >= 2 && L.linkBoxY - (L.tempoY + BigFont.ROWS) >= 1 && L.rowIN - (L.rowCF + 7) >= 2 && L.rowBAR - (L.rowIN + 7) >= 2 && L.stateY - (L.rowBAR + 7) >= 2, 'the boxes keep a gap to the tempo above and to the CONFIDENCE row below; the three rows and the state line are 2 px apart');
 const barOn = { bar: { state: 'locked', conf: 0.5 } };
 const full = drawn(ctxOf({ ctx: barOn }));
 {
   const rows = litRows(full), inBand = j => BANDS.some(([, a, b]) => j >= a && j <= b);
   ok([...rows].every(inBand), 'every lit pixel of a full HOME lies inside a row of the table (none in the gaps): rows ' + [...rows].filter(j => !inBand(j)).join());
-  const tempoRows = litRows(full, L.tempoX, 160);
+  const tempoRows = litRows(full, 0, 160);
   ok([...tempoRows].filter(j => j >= BANDS[1][1] && j <= BANDS[1][2]).length === 35, 'the tempo fills its 35 rows');
   eq([isText(full, 'CONFIDENCE', L.labelX, L.rowCF, null), isText(full, 'INPUT', L.labelX, L.rowIN, null), isText(full, 'BAR', L.labelX, L.rowBAR, null), isText(full, 'LOCKED', L.labelX + 58 - textW('LOCKED'), L.rowBAR, null)], [true, true, true, true], 'the labels are the words CONFIDENCE, INPUT, BAR with AUTO BAR\'s state, in the 10 character label column (x 2..60)');
   ok(textW('CONFIDENCE') === 59 && L.barX >= 2 + 59 + 2, 'the longest label is 59 px (x 2..60) and the bars start at x ' + L.barX);
   eq(litIn(full, 126, L.rowCF, 3, 7).length + litIn(full, 126, L.rowIN, 3, 7).length, 0, 'between a bar (ends x 125) and its value (from x 129 at the widest) there is nothing');
-  eq(litIn(full, 125, L.tempoY, 35, BigFont.ROWS).length, 0, 'no BPM label: the area right of "120.0" (x 125..159) is empty');
+  eq([litIn(full, 0, L.tempoY, 24, BigFont.ROWS).length, litIn(full, 136, L.tempoY, 24, BigFont.ROWS).length], [0, 0], 'no BPM label: "120.0" is centred, x 24..135, nothing right of it');
 }
 
 // ---- the big tempo digits ----
@@ -152,25 +152,39 @@ const full = drawn(ctxOf({ ctx: barOn }));
   eq([BigFont.GLYPHS['.'][0].length, BigFont.GLYPHS['.'].findIndex(r => r.includes('#'))], [5, 30], 'the point is a 5 px dot on the bottom 5 rows');
   for (const ch of GL.slice(0, 10)) ok(BigFont.GLYPHS[ch].slice(0, 3).some(r => r.includes('#')) && BigFont.GLYPHS[ch].slice(-3).some(r => r.includes('#')), '"' + ch + '": uses the top and the bottom of the cell');
   for (const s of ['120.0', '146.1', '88.8', '999.9', '---']) ok(BigFont.width(s) <= 156, '"' + s + '" is ' + BigFont.width(s) + ' px wide, fits the 156 px between the margins');
-  eq(BigFont.width('120.0'), 4 * 26 + 5 + 4 * 3, '"120.0" is 4 digits + the point + 4 gaps of 3: 121 px');
-  for (const [s, bpm] of [['120.0', 120], ['146.1', 146.1], ['88.8', 88.8], ['---', null]]) {
-    const d = drawn(ctxOf({ home: { bpm } }, {})), want = new Set();
-    BigFont.draw((x, y) => want.add(y * 160 + x), s, L.tempoX, L.tempoY);
+  eq(BigFont.width('120.0'), 3 * 26 + 5 + 17 + 4 * 3, '"120.0" is 3 big digits + the point + 1 small digit + 4 gaps of 3: 112 px');
+  const SM = BigFont.SMALL;
+  eq(Object.keys(SM).sort(), GL.slice(0, 10).sort(), 'the small digits 0-9, complete');
+  for (const ch of GL.slice(0, 10)) ok(SM[ch].length === 23 && SM[ch].every(r => r.length === 17 && /^[.#]+$/.test(r)) && SM[ch][0].includes('#') && SM[ch][22].includes('#'), 'small "' + ch + '": 23 rows of 17 bits, uses the top and the bottom of its cell');
+  eq([BigFont.SMALL_ROWS, 35 * 2 / 3, 26 * 2 / 3], [23, 23.333333333333332, 17.333333333333332], 'the small digits are 2/3 of the big ones: 23 x 17 of 35 x 26');
+  eq(SM['8'].map(r => r.indexOf('#')).filter(i => i >= 0).length === 23 && SM['0'][3] === '###...........###' && SM['0'][0] === '.###############.', true, 'small 0: 3 px strokes, 1 px chamfers');
+  const tempoWant = (s, x0) => { const w = new Set(); BigFont.draw((x, y) => w.add(y * 160 + x), s, x0, L.tempoY); return w; };
+  for (const [s, bpm, left] of [['120.0', 120, 24], ['98.4', 98.4, 38], ['88.8', 88.8, 38], ['146.1', 146.1, 24], ['---', null, 38], ['999.9', 999.9, 24]]) {
+    eq([BigFont.width(s), Math.floor((160 - BigFont.width(s)) / 2)], [{ 24: 112, 38: s === '---' ? 84 : 83 }[left], left], '"' + s + '": ' + BigFont.width(s) + ' px wide, left = floor((160 - width) / 2) = ' + left);
+    const d = drawn(ctxOf({ home: { bpm } }, {})), want = tempoWant(s, left);
     let same = true; for (let j = L.tempoY; j < L.tempoY + 35; j++) for (let i = 0; i < 160; i++) if ((d.fb[j * 160 + i] === 1) !== want.has(j * 160 + i)) same = false;
-    ok(same, 'the tempo "' + s + '" is drawn exactly as the table says at x ' + L.tempoX + ', y ' + L.tempoY);
+    ok(same, 'the tempo "' + s + '" is drawn exactly as the tables say, centred, AUDIO');
+    const k = drawn(ctxOf({ home: { audio: false, link: 1, bpm } }, {}));
+    let samek = true; for (let j = L.tempoY; j < L.tempoY + 35; j++) for (let i = 0; i < 160; i++) if ((k.fb[j * 160 + i] === 1) !== want.has(j * 160 + i)) samek = false;
+    ok(samek, 'the tempo "' + s + '" is the same in the LINK layout');
   }
+  { const d = drawn(ctxOf({ home: { bpm: 88.8 } }), {}); let lo = 160, hi = -1; for (let j = L.tempoY; j < L.tempoY + 35; j++) for (let i = 0; i < 160; i++) if (d.fb[j * 160 + i]) { lo = Math.min(lo, i); hi = Math.max(hi, i); }
+    eq([lo, hi, 159 - hi], [38, 120, 39], '88.8: lit from x 38 to 120, 38 columns free on the left and 39 on the right (centred; an odd width leaves the spare column on the right)'); }
+  { const d = drawn(ctxOf({ home: { bpm: 120 } }), {}), x0 = 24, smallX = x0 + 26 * 3 + 5 + 4 * 3 - 0;
+    const lit = (x, y) => d.fb[y * 160 + x];
+    let top = 99, bot = -1; for (let j = L.tempoY; j < L.tempoY + 35; j++) for (let i = smallX; i < smallX + 17; i++) if (lit(i, j)) { top = Math.min(top, j); bot = Math.max(bot, j); }
+    eq([top, bot], [L.tempoY + 12, L.tempoY + 34], 'the digit after the dot is 23 rows, on the big digits\' baseline (rows 27..49), the dot unchanged'); }
 }
 
-// healthy: ink only inside the top bar's link / signal / battery, the first beat box, the CONFIDENCE number and line and the VU bar
-const R = { link: [L.linkX, 0, L.linkW, 13], signal: [L.signalX, 0, L.signalW, 13], batt: [L.battX, 1, L.battW, 11], beat1: [L.boxX, L.boxY, L.boxW, L.boxH],
+// healthy: ink only inside the top bar's link / battery, the first beat box, the CONFIDENCE number and line and the VU bar
+const R = { link: [L.linkX, 0, L.linkW, 13], batt: [L.battX, 1, L.battW, 11], beat1: [L.boxX, L.boxY, L.boxW, L.boxH],
             cfValue: [158 - 23, L.rowCF, 23, 7], cfBar: [L.barX, L.rowCF, L.barW, 7], inValue: [158 - 29, L.rowIN, 29, 7], inBar: [L.barX, L.rowIN, L.barW, 7] };
 const insideAny = (boxes, x, y) => boxes.some(([bx, by, bw, bh]) => x >= bx && x < bx + bw && y >= by && y < by + bh);
 const outsideInk = (d, boxes) => { let n = 0; for (let i = 0; i < d.ink.length; i++) if (d.ink[i] !== 0 && !insideAny(boxes, i % d.w, Math.floor(i / d.w))) n++; return n; };
 const healthy = drawn(ctxOf());
 ok(healthy.ink.every((v, i) => v === 0 || healthy.fb[i] === 1), 'ink only on lit pixels');
-eq(outsideInk(healthy, [R.link, R.signal, R.batt, R.beat1, R.cfValue, R.cfBar, R.inBar]), 0, 'a healthy HOME: ink only in the link glyph, signal bars, battery, the lit first beat, the CONFIDENCE number and line, and the VU bar');
+eq(outsideInk(healthy, [R.link, R.batt, R.beat1, R.cfValue, R.cfBar, R.inBar, [2, L.stateY, 60, 7]]), 0, 'a healthy HOME: ink only in the link glyph, battery, the lit first beat, the CONFIDENCE number and line, and the VU bar');
 eq(idsIn(healthy, ...R.link), [INK.GOOD], 'joined (2 Link peers): the link glyph and its count are green');
-eq(idsIn(healthy, ...R.signal), [INK.GOOD], '-55 dBm: the signal bars are green');
 eq(idsIn(healthy, ...R.batt), [INK.GOOD], '80 %: the battery is green');
 eq(idsIn(healthy, ...R.beat1), [INK.ONE], 'the first beat box, lit, carries the bar-1 id');
 eq([1, 2, 3].map(i => idsIn(healthy, L.boxX + i * (L.boxW + L.boxGap), L.boxY, L.boxW, L.boxH)), [[0], [0], [0]], 'the other boxes are neutral');
@@ -183,7 +197,7 @@ eq(idsIn(healthy, ...R.inValue), [0], 'an input at -20 dB: the number is neutral
   eq([idsIn(on, ...R.beat1), idsIn(off, ...R.beat1), idsIn(none, ...R.beat1)], [[INK.ONE], [0], [0]], 'beat 4 is the bar\'s first again (amber); beat 2 and no beat: the first box is a neutral frame');
   const box = (d, i) => litIn(d, L.boxX + i * (L.boxW + L.boxGap), L.boxY, L.boxW, L.boxH).length;
   const outline = (w, h) => w * h - (w - 4) * (h - 4);
-  eq([box(on, 0), box(on, 1), box(off, 1), box(off, 0)], [L.boxW * L.boxH, outline(L.boxW, L.boxH), L.boxW * L.boxH, outline(L.boxW, L.boxH)], 'the lit box is solid (36 x 25), the others are 2 px outlines');
+  eq([box(on, 0), box(on, 1), box(off, 1), box(off, 0)], [L.boxW * L.boxH, outline(L.boxW, L.boxH), L.boxW * L.boxH, outline(L.boxW, L.boxH)], 'the lit box is solid (36 x 31), the others are 2 px outlines');
 }
 
 // the four boxes, every beat, both layouts: exact rectangles, solid when lit, 2 px outline when not, even gaps, amber only for a lit first box
@@ -302,7 +316,7 @@ eq(isText(levelCase(-20, -12), '-20dB', rightText('-20dB'), L.rowIN, null), true
   const cols = d => litCols(d, 0, 13), xs = d => (c => [c[0], c[c.length - 1]])(cols(d).filter(x => x >= L.linkX));
   const d = drawn(ctxOf({ home: { battery: 80 } }));
   eq(xs(d)[1], 157, 'the right group ends at x 157 (the battery\'s nub), two columns from the edge');
-  eq([L.linkX + L.linkW <= L.signalX, L.signalX + L.signalW <= L.plugX, L.plugX + 13 <= L.battX, L.battX + L.battW], [true, true, true, 158], 'the right group: link, signal, USB plug, battery follow each other from the right edge without overlap');
+  eq([L.linkX + L.linkW <= L.plugX, L.plugX + 13 <= L.battX, L.battX + L.battW], [true, true, 158], 'the right group: link + peers, USB plug, battery follow each other from the right edge without overlap (no signal bars)');
   const rows = [...litRows(d, L.linkX, 160)].filter(j => j < 13); eq([Math.min(...rows), Math.max(...rows)], [1, 11], 'the right group\'s icons are 11 rows high (y 1..11)');
   const pl = [...litRows(d, 2, 11)].filter(j => j < 13);
   eq([Math.min(...pl), Math.max(...pl)], [1, 11], 'the transport icon (play triangle) is 11 rows high');
@@ -320,14 +334,7 @@ eq(idsIn(drawn(ctxOf({ home: { link: 1, audio: false } })), ...R.link), [INK.GOO
   const two = drawn(ctxOf({ home: { link: 2 } })), none = drawn(ctxOf({ home: { link: 0 } }));
   ok(isText(two, '2', L.peersX, 3, INK.GOOD) && litIn(none, L.peersX, 3, 12, 7).length === 0, 'the Link peer count is drawn beside the glyph only when there are peers');
 }
-const barsOf = (rssi, over = {}) => { const d = drawn(ctxOf({ ctx: { rssi }, ...over })); return [idsIn(d, ...R.signal), litIn(d, ...R.signal).length]; };
-eq(barsOf(-55), [[INK.GOOD], 4 * (4 + 7 + 11)], '-55 dBm: three bars (4 px wide; 4, 7, 11 high), green');
-eq(barsOf(-67), [[INK.GOOD], 88], '-67 dBm: the good edge');
-eq(barsOf(-68), [[INK.WARN], 4 * (4 + 7 + 1)], '-68 dBm: two bars and a stub, amber (fair)');
-eq(barsOf(-80), [[INK.WARN], 48], '-80 dBm: the fair edge');
-eq(barsOf(-81), [[INK.BAD], 4 * (4 + 1 + 1)], '-81 dBm: one bar and two stubs, red (poor)');
-eq(barsOf(0), [[INK.DIM], 12], 'none heard (0): three stubs, grey');
-eq(barsOf(null), [[INK.DIM], 12], 'not reported (null): the same grey stubs');
+eq(litCols(healthy, 0, 13).filter(x => x >= 68).every(x => (x >= L.linkX && x < L.linkX + L.linkW) || (x >= L.plugX && x < L.plugX + 13) || (x >= L.battX && x < L.battX + L.battW)), true, 'no signal bars in the top bar: right of the name only the link group, the USB plug and the battery are lit');
 const battId = pct => idsIn(drawn(ctxOf({ home: { battery: pct } })), ...R.batt);
 eq([battId(100), battId(30), battId(29), battId(15), battId(14), battId(0)], [[INK.GOOD], [INK.GOOD], [INK.WARN], [INK.WARN], [INK.BAD], [INK.BAD]], 'battery: green from 30 %, amber 15..29, red under 15');
 eq(idsIn(drawn(ctxOf({ home: { battery: null } })), ...R.batt), [], 'no battery fitted: no icon, no ink');
@@ -338,22 +345,24 @@ eq(idsIn(drawn(ctxOf({ home: { battery: null } })), ...R.batt), [], 'no battery 
   eq([d.fb[1 * d.w + L.battX], d.fb[1 * d.w + L.battX + 1], d.fb[6 * d.w + L.battX + 22], d.fb[4 * d.w + L.battX + 23], d.fb[3 * d.w + L.battX + 23]], [0, 1, 1, 1, 0], 'the battery: a 22 x 11 body with chamfered corners and a 2 x 5 nub');
 }
 
-// ---- the bottom row: only the word GATED / HOLD / COAST, left aligned; nothing else ----
+// ---- the state line (AUDIO): always one word, the first state that applies ----
 {
-  const words = { GATED: [{ ctx: { gated: true } }, INK.BAD], HOLD: [{ home: { confHold: true } }, INK.DIM], COAST: [{ home: { conf: 50 }, ctx: { running: true } }, INK.WARN] };
-  for (const [word, [over, ink]] of Object.entries(words)) {
+  const states = [['GATED', { ctx: { gated: true } }, INK.BAD], ['HOLD', { home: { confHold: true } }, INK.DIM], ['COAST', { home: { conf: 50 }, ctx: { running: true } }, INK.WARN],
+                  ['STOPPED', { ctx: { running: false } }, INK.DIM], ['SILENT', { ctx: { running: true, silent: true } }, INK.DIM], ['PLAYING', { ctx: { running: true } }, 0]];
+  for (const [word, over, ink] of states) {
     const d = drawn(ctxOf(over));
-    eq([isText(d, word, 2, L.wordY, ink), litIn(d, 0, L.wordY, d.w, 7).length === textPoints(word).length], [true, true], word + ': the only thing on the bottom row, at x 2, in its colour');
+    eq([isText(d, word, 2, L.stateY, ink), litIn(d, 0, L.stateY, d.w, 7).length === textPoints(word).length, litIn(d, 0, 119, d.w, 1).length], [true, true, 0], word + ': the only thing on the state line, at x 2, in its colour; row 119 empty');
   }
-  eq([litIn(healthy, 0, L.wordY, healthy.w, 9).length, litIn(healthy, 0, 118, healthy.w, 2).length], [0, 0], 'a healthy HOME: the bottom rows are empty (y 111..119)');
-  eq(litIn(drawn(ctxOf({ ctx: { gated: true } })), 0, 118, 160, 2).length, 0, 'rows 118 and 119 are always empty');
+  const first = (over, word) => isText(drawn(ctxOf(over)), word, 2, L.stateY, null);
+  eq([first({ ctx: { gated: true, confHold: true, running: true, silent: true } }, 'GATED'), first({ home: { confHold: true }, ctx: { running: false } }, 'HOLD'), first({ home: { conf: 50 }, ctx: { running: true, silent: true } }, 'COAST'), first({ ctx: { running: false, silent: true } }, 'STOPPED'), first({ ctx: { running: true, silent: true } }, 'SILENT')], [true, true, true, true, true], 'the order: GATED, HOLD, COAST, STOPPED, SILENT, PLAYING');
+  eq(isText(healthy, 'PLAYING', 2, L.stateY, null), true, 'a healthy HOME (transport playing) says PLAYING');
 }
 
 // ---- the LINK layout: the same top bar and tempo, big boxes, no audio rows, no word ----
 {
   const link = drawn(ctxOf({ home: { audio: false, link: 1, bpm: 98.4 } }));
-  eq([litIn(link, 0, L.linkBoxY + L.linkBoxH, link.w, link.h - L.linkBoxY - L.linkBoxH).length, outsideInk(link, [R.link, R.signal, R.batt, [L.boxX, L.linkBoxY, L.boxW, L.linkBoxH]])], [0, 0], 'LINK HOME: nothing under the boxes (no CONFIDENCE, INPUT or BAR rows, no word), no stray ink');
-  eq(idsIn(link, L.boxX, L.linkBoxY, L.boxW, L.linkBoxH), [INK.ONE], 'LINK HOME: the first box (36 x 48), lit, is the bar 1');
+  eq([litIn(link, 0, L.linkBoxY + L.linkBoxH, link.w, link.h - L.linkBoxY - L.linkBoxH).length, outsideInk(link, [R.link, R.batt, [L.boxX, L.linkBoxY, L.boxW, L.linkBoxH]])], [0, 0], 'LINK HOME: nothing under the boxes (no CONFIDENCE, INPUT or BAR rows, no state line), no stray ink');
+  eq(idsIn(link, L.boxX, L.linkBoxY, L.boxW, L.linkBoxH), [INK.ONE], 'LINK HOME: the first box (36 x 65), lit, is the bar 1');
   eq(litIn(link, L.boxX + 2 * (L.boxW + L.boxGap), L.linkBoxY, L.boxW, L.linkBoxH).length, L.boxW * L.linkBoxH - (L.boxW - 4) * (L.linkBoxH - 4), 'the others are 2 px outlines of the same size');
   eq(litIn(link, L.boxX + 3 * (L.boxW + L.boxGap) + L.boxW - 1, L.linkBoxY, 1, L.linkBoxH).length, L.linkBoxH, 'the fourth box ends at x 157');
   ok(litRows(link, 2, 160).has(L.tempoY) && litRows(link, 2, 160).has(L.tempoY + 34), 'the tempo is the same size as in AUDIO');
@@ -392,7 +401,17 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   const infoUi = { ...OLED.create(), screen: 'info', page: 'battery' };
   d = drawn(batt, { ui: infoUi }); noInk(d, 'the BATTERY info screen');
   ok(litIn(d, 4, 92, 152, 7).length > 100, '... with its level bar across the width');
-  for (const screen of ['net', 'netinfo', 'confirm']) { d = drawn(batt, { ui: { ...OLED.create(), screen, ncur: 0 } }); noInk(d, 'the ' + screen + ' screen'); }
+  for (const screen of ['netinfo', 'confirm']) { d = drawn(batt, { ui: { ...OLED.create(), screen, ncur: 0 } }); noInk(d, 'the ' + screen + ' screen'); }
+  // the NETWORK screen: its rows (TYPE, GROUP, PEERS) and the read-only SIGNAL row under them, the only ink on the screen is the quality word
+  const netD = rssi => drawn({ ...batt, rssi }, { ui: { ...OLED.create(), screen: 'net', ncur: 0 } });
+  const SY = 13 + 3 * 9;                                             // the SIGNAL row follows the 3 rows of the JANK mode
+  for (const [rssi, dbm, word, id] of [[-55, '-55dBm', 'GOOD', INK.GOOD], [-67, '-67dBm', 'GOOD', INK.GOOD], [-68, '-68dBm', 'FAIR', INK.WARN], [-80, '-80dBm', 'FAIR', INK.WARN], [-81, '-81dBm', 'POOR', INK.BAD], [0, null, 'NONE', INK.DIM]]) {
+    const n = netD(rssi), wx = 156 - textW(word);
+    eq([isText(n, 'SIGNAL', 4, SY, null), isText(n, word, wx, SY, id), dbm === null || isText(n, dbm, wx - 6 - textW(dbm), SY, 0)], [true, true, true], 'NETWORK, signal ' + rssi + ': SIGNAL ' + (dbm || '') + ' ' + word + ' (' + id + ')');
+    eq(outsideInk(n, [[wx, SY, textW(word), 7]]), 0, '... the word is the only ink on the screen');
+  }
+  { const n = netD(null); eq([isText(n, 'SIGNAL', 4, SY, null), isText(n, '-', 156 - textW('-'), SY, 0), n.ink.every(v => v === 0)], [true, true, true], 'NETWORK, signal unknown: SIGNAL and "-", no ink'); }
+  eq([litIn(netD(-55), 0, SY + 8, 160, 8).length, litIn(drawn({ ...batt, rssi: -55 }, { ui: { ...OLED.create(), screen: 'net', ncur: 1 } }), 0, SY - 1, 160, 1).length], [0, 0], 'the SIGNAL row is never selected (not inverted) and keeps its place');
   d = drawn({ ...batt, net: { ...batt.net, scan: [{ name: 'home-wifi', bars: 3 }, { name: 'cafe', bars: 1 }, { name: 'x', bars: 2 }] } }, { ui: { ...OLED.create(), screen: 'scan', scur: 1, stop: 0 } }); noInk(d, 'the scan list');
   d = drawn(batt, { ui: { ...OLED.create(), screen: 'text', txt: { field: 'pass', text: 'secret', pos: 2, mask: true } } }); noInk(d, 'the text editor');
   const setupC = { ...batt, setup: true, qr, net: { ...batt.net, setupName: 'jank-setup-1234' } };
@@ -410,14 +429,14 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   const hov = { ...OLED.create(), overlay: { until: NOW + 1000, title: 'DOUBLE', value: '240.0' } };
   let d = drawn(ctxOf(), { ui: hov });
   const rowsLit = j => { let lo = -1, hi = -1; for (let i = 0; i < LW; i++) if (d.fb[j * LW + i]) { if (lo < 0) lo = i; hi = i; } return [lo, hi]; };
-  eq(rowsLit(77), [15, 144], 'the overlay box is 130 px wide, centred (15 px each side)');
+  eq(rowsLit(83), [15, 144], 'the overlay box is 130 px wide, centred (15 px each side)');
   eq(idsIn(d, 15, 30, 130, 60), [0], 'no ink under the overlay box');
   ok(litIn(d, 20, 50, 120, 30).length > 100, 'its value is big (scale 4 for 240.0)');
   d = drawn({ ...ctxOf(), saved: true });
   eq([idsIn(d, 35, 42, 90, 34), (() => { const r = [-1, -1]; for (let i = 0; i < LW; i++) if (d.fb[50 * LW + i]) { if (r[0] < 0) r[0] = i; r[1] = i; } return r; })()], [[0], [35, 124]], 'the SAVED box is centred (35 px each side) and carries no ink');
   const hint = { ...OLED.create(), hint: { title: 'PHASE', up: 'UP: +1/2', down: 'DOWN: -1/2' } };
   d = drawn(ctxOf(), { ui: hint });
-  eq([rowsLit(77), idsIn(d, 15, 30, 130, 60)], [[15, 144], [0]], 'the NO / YES hint box is centred on the grid too');
+  eq([rowsLit(83), idsIn(d, 15, 30, 130, 60)], [[15, 144], [0]], 'the NO / YES hint box is centred on the grid too');
 }
 
 // ---- BEAT FLASH is gone: the menu is one list of 10 items on both layouts, the control line refuses it, ui/lcd2.js has no flash members ----
