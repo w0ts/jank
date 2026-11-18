@@ -2,7 +2,7 @@
 # Publishes the control page to https://w0ts.github.io/jank/ : the gh-pages branch holds only pages, built with git plumbing,
 # so no local branch, no worktree and no push of main. A secure (https) origin lets Chrome keep the microphone / output
 # permission and gives the page Web MIDI, which a file:// copy cannot remember.
-#   scripts/publish_page.sh [--dry-run]                 page/jank.html as COMMITTED on HEAD -> the root (index.html)
+#   scripts/publish_page.sh [--dry-run] [--from REF]    page/jank.html as COMMITTED on HEAD (or on REF) -> the root (index.html)
 #   scripts/publish_page.sh [--dry-run] --preview NAME REF
 #                                                       page/jank.html of branch/commit REF -> /NAME/ (a preview next to
 #                                                       the main page, e.g. https://w0ts.github.io/jank/lcd2/)
@@ -17,6 +17,7 @@ REF=HEAD
 while [ $# -gt 0 ]; do
     case "$1" in
         --dry-run) DRY=1; shift ;;
+        --from) REF="${2:?--from REF}"; shift 2 ;;
         --preview) PREVIEW="${2:?--preview NAME REF}"; REF="${3:?--preview NAME REF}"; shift 3 ;;
         *) echo "usage: scripts/publish_page.sh [--dry-run] [--preview NAME REF]"; exit 2 ;;
     esac
