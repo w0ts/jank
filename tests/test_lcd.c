@@ -150,10 +150,35 @@ static void test_ink_picks_the_pixels_own_id(void)
             CHECK(row[x] == T[i].want && row[x + 1] == T[i].want && row[x - 1] == BG && row[x + 2] == BG);
         }
     }
-    set_px(40, 31, 6);                    /* an id past the table */
+    set_px(40, 31, JO_INK_IDS);           /* an id past the table */
     set_px(41, 31, 255);
     jlc_row(fb, ink, &pal, 62, row);
     CHECK(row[80] == NEUTRAL && row[82] == NEUTRAL);
+}
+
+/* the VU ramp: ids 6 .. 37, RGB565 worked out by hand from ui/lcd2.js VU_RAMP (steps 0, 11, 20, 26 and 31), and the first id past it is neutral */
+static void test_vu_ramp(void)
+{
+    static const struct {
+        unsigned step;
+        uint16_t want;
+    } T[] = {{0, 0x4EF0u}, {10, 0x4EF0u}, {11, 0x56EFu}, {20, 0xB728u}, {26, 0xFD84u}, {31, 0xFB0Bu}};
+    struct jlc_pal swapped;
+    CHECK(JO_INK_VU0 == 6 && JO_VU_STEPS == 32 && JO_INK_IDS == 38);
+    for (unsigned i = 0; i < sizeof T / sizeof T[0]; i++)
+        CHECK(pal.ink[JO_INK_VU0 + T[i].step] == T[i].want);
+    jlc_palette(&swapped, 1);
+    CHECK(swapped.ink[JO_INK_VU0 + 11] == 0xEF56u && swapped.ink[JO_INK_VU0 + 31] == 0x0BFBu);
+    for (unsigned i = 1; i < JO_VU_STEPS; i++)
+        CHECK(pal.ink[JO_INK_VU0 + i] != BG && pal.ink[JO_INK_VU0 + i] != NEUTRAL);
+    clear();
+    for (unsigned i = 0; i < JO_VU_STEPS; i++)
+        set_px(i, 10, (uint8_t)(JO_INK_VU0 + i));
+    set_px(40, 10, JO_INK_IDS);
+    jlc_row(fb, ink, &pal, 20, row);
+    for (unsigned i = 0; i < JO_VU_STEPS; i++)
+        CHECK(row[2 * i] == pal.ink[JO_INK_VU0 + i] && row[2 * i + 1] == row[2 * i]);
+    CHECK(row[80] == NEUTRAL);
 }
 
 static void test_ink_on_unlit_pixels_is_ignored_and_no_plane_is_neutral(void)
@@ -188,6 +213,7 @@ int main(void)
     test_corners_and_edges();
     test_page_layout_and_bit_order();
     test_ink_picks_the_pixels_own_id();
+    test_vu_ramp();
     test_ink_on_unlit_pixels_is_ignored_and_no_plane_is_neutral();
     test_swapped_palette_row();
     printf("lcd: %d checks, %d failed\n", checks, fails);

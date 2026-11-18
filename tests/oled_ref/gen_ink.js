@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { baseState, dumpState, hex } = require('./state.js');
 const root = path.join(__dirname, '..', '..');
-const src = fs.readFileSync(path.join(root, 'ui', 'oled.js'), 'utf8');
+const src = fs.readFileSync(path.join(root, 'ui', 'bigfont.js'), 'utf8') + fs.readFileSync(path.join(root, 'ui', 'oled.js'), 'utf8');
 const OLED = new Function(src + '; return OLED;')();
 const player = fs.readFileSync(path.join(root, 'beat', 'live', 'player.html'), 'utf8');
 const QR = new Function(player.match(/const QR = \(\(\) => \{[\s\S]*?\n\}\)\(\);\n/)[0] + '; return QR;')();
@@ -120,7 +120,7 @@ scenario('cf gated beats hold', audio({ gated: true, confHold: true, conf: 0.5 }
 scenario('cf coast unknown conf', audio({ confKnown: false, conf: 0.2, running: true }), [draw(0)]);
 
 // ---- the input level line: the notch at -50 dBFS, clipping, too quiet ----
-for (const db of [-90, -70, -50, -45, -20, -3, 0]) scenario('in ' + db, audio({ levelDb: db, levelMin: db - 5, levelMax: db + 2, peakDb: -20 }), [draw(0)]);
+for (const db of [-90, -75, -60, -50, -45, -30, -20, -12, -3, 0]) scenario('in ' + db, audio({ levelDb: db, levelMin: db - 5, levelMax: db + 2, peakDb: -20 }), [draw(0)]);
 scenario('in above 0', audio({ levelDb: 6, levelMax: 6, peakDb: -20 }), [draw(0)]);
 scenario('in below -90', audio({ levelDb: -120, levelMin: -120, levelMax: -120, peakDb: -99 }), [draw(0)]);
 for (const pk of [-0.5, -1, -1.5]) scenario('peak ' + pk, audio({ peakDb: pk }), [draw(0)]);
@@ -141,12 +141,29 @@ for (const state of ['off', 'listening', 'locked', 'manual'])
 scenario('bar none', audio({ bar: null }), [draw(0)]);
 scenario('bar conf above 1', audio({ bar: { state: 'locked', conf: 1.4 } }), [draw(0)]);
 
-// ---- the tempo ----
-for (const b of [120, 99.95, 999.9, 5, 0.04, 87.5]) scenario('bpm ' + b, audio({ bpm: b }), [draw(0)]);
+// ---- the tempo: the big digits, centred, the small digit after the dot; both layouts ----
+for (const b of [120, 98.4, 88.8, 146.1, 133.3, 99.95, 999.9, 5, 0.04, 87.5, 100, 111.1]) {
+  scenario('bpm ' + b, audio({ bpm: b }), [draw(0)]);
+  scenario('link bpm ' + b, link({ linkBpm: b }), [draw(0)]);
+}
 scenario('bpm none', audio({ bpm: null }), [draw(0)]);
 scenario('bpm zero', audio({ bpm: 0 }), [draw(0)]);
 scenario('link bpm none', link({ linkBpm: null }), [draw(0)]);
 scenario('link bpm 174.96', link({ linkBpm: 174.96 }), [draw(0)]);
+
+// ---- the state word (AUDIO): each word, and the order they win in ----
+scenario('state running', audio({ conf: 0.9 }), [draw(0)]);
+scenario('state gated', audio({ gated: true, conf: 0.4 }), [draw(0)]);
+scenario('state hold', audio({ confHold: true, conf: 0.55 }), [draw(0)]);
+scenario('state coast', audio({ conf: 0.5, running: true }), [draw(0)]);
+scenario('state stopped', audio({ running: false, beatN: null }), [draw(0)]);
+scenario('state silent', audio({ silent: true, conf: 0.9 }), [draw(0)]);
+scenario('state gated beats hold', audio({ gated: true, confHold: true, conf: 0.5 }), [draw(0)]);
+scenario('state hold beats coast', audio({ confHold: true, conf: 0.2 }), [draw(0)]);
+scenario('state coast beats silent', audio({ silent: true, conf: 0.2 }), [draw(0)]);
+scenario('state stopped beats silent', audio({ silent: true, running: false, conf: 0.9 }), [draw(0)]);
+scenario('state coast unknown conf', audio({ confKnown: false, conf: 0.2, running: true }), [draw(0)]);
+scenario('state armed', audio({ running: false, armed: true, beatN: null }), [draw(0), draw(400)]);
 
 // ---- the top bar: transport, fold, link glyph and peers, signal, plug, battery ----
 scenario('stopped', audio({ running: false, beatN: null }), [draw(0)]);
@@ -156,9 +173,12 @@ for (const p of [0, 1, 2, 12]) {
   scenario('audio peers ' + p, audio({ peers: p }), [draw(0)]);
   scenario('link peers ' + p, link({ peers: p }), [draw(0)]);
 }
-for (const r of [null, 0, -55, -67, -68, -80, -81, -95]) scenario('signal ' + r, audio({ rssi: r }), [draw(0)]);
-for (const b of [0, 12, 14, 15, 20, 29, 30, 80, 100]) scenario('battery ' + b, audio({ batt: b }), [draw(0)]);
+for (const b of [0, 12, 14, 15, 20, 29, 30, 50, 80, 99, 100]) {
+  scenario('battery ' + b + ' charging', audio({ batt: b }), [draw(0)]);
+  scenario('battery ' + b + ' on cell', audio({ batt: b, usb: false }), [draw(0)]);
+}
 scenario('no battery no usb', audio({ fitted: false, usb: false }), [draw(0)]);
+for (const lt of [0, 1, 2]) scenario('audio lt ' + lt, audio({ ltMode: lt, fold: 2 }), [draw(0)]);
 for (const lt of [0, 1, 2]) scenario('link lt ' + lt, link({ ltMode: lt, net: Object.assign(baseState().net, { mode: 1, ssid: 'Studio WiFi' }) }), [draw(0)]);
 scenario('client ssid', audio({ net: Object.assign(baseState().net, { mode: 1, ssid: 'HomeNet' }) }), [draw(0)]);
 scenario('client long ssid', audio({ net: Object.assign(baseState().net, { mode: 1, ssid: 'A Very Long Network Name Indeed' }) }), [draw(0)]);
@@ -166,16 +186,6 @@ scenario('client long ssid with fold', audio({ fold: 2, net: Object.assign(baseS
 scenario('client no ssid', audio({ net: Object.assign(baseState().net, { mode: 1, ssid: '' }) }), [draw(0)]);
 scenario('ap name', audio({ net: Object.assign(baseState().net, { mode: 2, apName: 'jank-a3f9' }) }), [draw(0)]);
 scenario('group 9', audio({ net: Object.assign(baseState().net, { group: 9 }) }), [draw(0)]);
-
-// ---- the status line: the Wi-Fi quality ----
-scenario('wifiq good', audio({ wifiQ: { rssi: -58, kbps: 24000, tx: 400, retried: 12, lost: 0 } }), [draw(0)]);
-scenario('wifiq bad all', audio({ wifiQ: { rssi: -85, kbps: 1000, tx: 400, retried: 160, lost: 48 } }), [draw(0)]);
-scenario('wifiq no signal', audio({ wifiQ: { rssi: 0, kbps: 0, tx: 0, retried: 0, lost: 0 } }), [draw(0)]);
-scenario('wifiq no counts', audio({ wifiQ: { rssi: -60, kbps: 1000, tx: 0, retried: 0, lost: 0 } }), [draw(0)]);
-scenario('wifiq edges', audio({ wifiQ: { rssi: -80, kbps: 54000, tx: 100, retried: 30, lost: 9 } }), [draw(0)]);
-scenario('wifiq widest', audio({ wifiQ: { rssi: -100, kbps: 72000, tx: 100, retried: 99, lost: 99 } }), [draw(0)]);
-scenario('link wifiq', link({ wifiQ: { rssi: -72, kbps: 1000, tx: 100, retried: 5, lost: 1 } }), [draw(0)]);
-scenario('wifiq with stop text', audio({ wifiQ: { rssi: -58, kbps: 1000, tx: 0, retried: 0, lost: 0 }, th: 100 }), [draw(0)]);
 
 // ---- overlays, boxes, boot, splash ----
 scenario('overlay double', audio({ bpm: 87.5 }), [['press', 'up', 0], draw(1), draw(999), draw(1200)]);
@@ -244,9 +254,15 @@ scenario('text apname long', audio({ net: Object.assign(baseState().net, { mode:
          [...presses([...toNet, 'down', 'yes']), draw(12), ...walk(Array(30).fill('yes'), 20), ...walk(['up', 'up', 'down'], 400), ['press', 'down', 600], draw(601)]);
 scenario('text appass delete all', audio({ net: Object.assign(baseState().net, { mode: 2, appass: 'ab' }) }),
          [...presses([...toNet, 'down', 'down', 'yes']), draw(13), ...walk(['no', 'no'], 20), ['press', 'no', 50], draw(51)]);
+// ---- the NETWORK screen's SIGNAL row: the jank's peer in JANK mode, the router in Wi-Fi mode; known, unknown and none ----
+for (const r of [null, 0, -55, -67, -68, -80, -81, -95, 5]) {
+  scenario('net signal jank ' + r, audio({ rssi: r }), [...presses(toNet), draw(10)]);
+  scenario('net signal client ' + r, audio({ rssi: r, net: Object.assign(baseState().net, { mode: 1 }) }), [...presses(toNet), draw(10), ...walk(['down', 'down'], 20)]);
+}
+scenario('net signal ap', audio({ rssi: -70, net: Object.assign(baseState().net, { mode: 2 }) }), [...presses(toNet), draw(10)]);
 scenario('netinfo client', audio({ net: Object.assign(baseState().net, { mode: 1 }) }), [...presses([...toNet, 'down', 'down', 'down', 'yes']), draw(20)]);
 scenario('netinfo ap', audio({ net: Object.assign(baseState().net, { mode: 2 }) }), [...presses([...toNet, 'down', 'down', 'down', 'yes']), draw(20)]);
 
-process.stdout.write('# generated by tests/oled_ref/gen_ink.js from ui/oled.js sha1 ' + require('crypto').createHash('sha1').update(src).digest('hex') +
+process.stdout.write('# generated by tests/oled_ref/gen_ink.js from ui/bigfont.js + ui/oled.js sha1 ' + require('crypto').createHash('sha1').update(src).digest('hex') +
                      ': ' + ncase + ' cases, ' + nframes + ' frames, ' + ninkpx + ' ink pixels\n' + out.join('\n') + '\n');
 process.stderr.write(ncase + ' cases, ' + nframes + ' frames, ' + ninkpx + ' ink pixels\n');

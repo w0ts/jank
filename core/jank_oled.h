@@ -191,7 +191,9 @@ void jo_draw(uint8_t fb[JO_FB_BYTES], const struct jo_ui *ui, const struct jo_ct
 #define JO_LCD2_H 120
 #define JO_LCD2_FB_BYTES (JO_LCD2_W * JO_LCD2_H / 8)
 #define JO_LCD2_INK_BYTES (JO_LCD2_W * JO_LCD2_H)
-enum jo_ink { JO_INK_NONE = 0, JO_INK_GOOD, JO_INK_WARN, JO_INK_BAD, JO_INK_DIM, JO_INK_ONE, JO_INK_IDS };
+/* ids 6 .. 37 are the VU meter's ramp (ui/oled.js OLED.VU: JO_VU_STEPS ids from JO_INK_VU0, green quiet to red hot) */
+#define JO_VU_STEPS 32
+enum jo_ink { JO_INK_NONE = 0, JO_INK_GOOD, JO_INK_WARN, JO_INK_BAD, JO_INK_DIM, JO_INK_ONE, JO_INK_VU0, JO_INK_IDS = JO_INK_VU0 + JO_VU_STEPS };
 void jo_draw_lcd2(uint8_t fb[JO_LCD2_FB_BYTES], uint8_t ink[JO_LCD2_INK_BYTES], const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now);
 /* one overlay box for 1 s (the emulator's showOverlay): drops the hint */
 void jo_show_overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value);

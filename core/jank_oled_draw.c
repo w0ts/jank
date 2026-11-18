@@ -14,10 +14,8 @@
 static const char *const LT_ICON0[] = {"..###..", ".#...##", "#...#.#", "#..#..#", "#.#...#", "##...#.", "..###.."};
 static const char *const LT_ICON1[] = {"...#.....", "..##.....", ".#######.", "########.", ".#######.", "..##.....", "...#....."};
 static const char *const LT_ICON2[] = {".........", "..#...#..", ".##...##.", "#########", ".##...##.", "..#...#..", "........."};
-const char *const *const jo_lt_icons[3] = {LT_ICON0, LT_ICON1, LT_ICON2};
-#define LT_ICONS jo_lt_icons
-const char *const jo_usb_icon[5] = {".....####..", ".....######", "#########..", ".....######", ".....####.."};
-#define USB_ICON jo_usb_icon
+static const char *const *const LT_ICONS[3] = {LT_ICON0, LT_ICON1, LT_ICON2};
+static const char *const USB_ICON[] = {".....####..", ".....######", "#########..", ".....######", ".....####.."};
 
 struct hint {
     const char *title, *up, *down;
@@ -71,7 +69,7 @@ static void value_bar(uint8_t *fb, int y, double frac, double tick_frac, const c
 }
 
 /* the placeholder jank glyph, 11 x 8: three linked dots */
-void jo_jank_glyph(uint8_t *fb, int x, int y)
+static void jank_glyph(uint8_t *fb, int x, int y)
 {
     static const int8_t R[3][4] = {{0, 5, 3, 3}, {4, 0, 3, 3}, {8, 5, 3, 3}};
     static const int8_t P[9][2] = {{3, 4}, {3, 3}, {7, 3}, {7, 4}, {3, 6}, {4, 6}, {5, 6}, {6, 6}, {7, 6}};
@@ -86,7 +84,7 @@ static void net_icon(uint8_t *fb, const struct jo_ctx *c, int xr)
 {
     int m = c->net.mode, bars = c->wifi == JO_WIFI_GOOD ? 3 : c->wifi == JO_WIFI_WEAK ? 1 : 0, left = xr - 10;
     if (m == JO_NET_JANK)
-        jo_jank_glyph(fb, xr - 10, 0);
+        jank_glyph(fb, xr - 10, 0);
     else {
         int bx = m == JO_NET_AP ? xr - 20 : xr - 7;
         for (int i = 0; i < 3; i++) {
