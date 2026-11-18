@@ -45,8 +45,8 @@ ok(combo.indexOf('if (dev.link) return;') < combo.indexOf('xiaoSend'), 'LINK mod
 ok(!/autoLatApply/.test(combo), 'M2h: the AUDIO SHIFT never turns Auto latency off');
 
 // ---- USB MIDI CLOCK in the menu ----
-ok(/usbmidi: \{ title: 'USB MIDI CLOCK', opts: \['ON', 'OFF'\]/.test(html), 'the menu edit, ON / OFF');
-ok(/\{ name: 'USB MIDI CLOCK', edit: 'usbmidi' \}/.test(html), 'in the menu');
+ok(/usbmidi: \{ title: 'USB MIDI CLOCK OUT', opts: \['ON', 'OFF'\]/.test(html), 'the menu edit, ON / OFF');
+ok(/\{ name: 'USB MIDI CLOCK OUT', edit: 'usbmidi' \}/.test(html), 'in the menu');
 ok(/xiaoSend\('set usbmidi ' \+ \(val === 0 \? 'on' : 'off'\)\)/.test(html), '--xiao: set usbmidi');
 const help = html.match(/usbmidi: \{[^\n]*\n\s*help: (\[\[.*\]\]) \},/);
 ok(help, 'two-line help');

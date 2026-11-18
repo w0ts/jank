@@ -11,7 +11,7 @@ const char *const jo_net_short[4] = {"JANK", "CLIENT", "AP", "SETUP"};
 #define LATER "+ LATER  - EARLIER"
 static const char *const SLEEP_NAMES[] = {"NEVER", "30 S", "1 MIN", "5 MIN"};
 static const char *const LT_MODES[] = {"IGNORE", "FOLLOW", "FOLLOW+LEAD"};
-const char *const jo_lt_short[3] = {"IGNORE", "FOLLOW", "LEAD"};
+const char *const jo_lt_short[3] = {"IGNORE", "FOLLOW", "BOTH"};
 static const char *const GROUPS[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
 static const char *const LOWCONF[] = {"KEEP RUNNING", "STOP / START"};
 static const char *const INSRC[] = {"AUTO", "LINE IN", "USB AUDIO"};
@@ -80,7 +80,7 @@ static const struct jo_spec SPECS[JO_F_EDITS] = {
 static const struct jo_spec SPECS_LCD2[JO_F_EDITS] = {
     [JO_F_INSRC] = {"SOURCE", OPTS(INSRC_LCD2), 0, 0, 0, "", 1, 0, H_INSRC_LCD2},
     [JO_F_AUTOBAR] = {"AUTO BAR", OPTS(AUTOBAR_LCD2), 0, 0, 0, "", 0, 1, H_AUTOBAR_LCD2},
-    [JO_F_USBMIDI] = {"USB MIDI CLOCK", OPTS(jo_off_on_names), 0, 0, 0, "", 1, 0, H_USBMIDI},
+    [JO_F_USBMIDI] = {"USB MIDI CLOCK OUT", OPTS(jo_off_on_names), 0, 0, 0, "", 1, 0, H_USBMIDI},
     [JO_F_BEATFLASH] = {"BEAT FLASH", OPTS(jo_beatflash_names), 0, 0, 0, "", 1, 0, H_BEATFLASH},
 };
 
@@ -151,7 +151,7 @@ const struct jo_item jo_menu[JO_MENU_ITEMS] = {
 const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2] = {
     {"AUDIO", JO_ITEM_SUB, 0}, {"LINK TRANSPORT", JO_ITEM_EDIT, JO_F_LTMODE}, {"AUTO BAR", JO_ITEM_EDIT, JO_F_AUTOBAR},
     {"NETWORK", JO_ITEM_NET, 0}, {"USB", JO_ITEM_EDIT, JO_F_USBROLE},
-    {"USB MIDI CLOCK", JO_ITEM_EDIT, JO_F_USBMIDI}, {"OFFSET", JO_ITEM_SUB, 1}, {"CLK RATE", JO_ITEM_EDIT, JO_F_RATE},
+    {"USB MIDI CLOCK OUT", JO_ITEM_EDIT, JO_F_USBMIDI}, {"OFFSET", JO_ITEM_SUB, 1}, {"CLK RATE", JO_ITEM_EDIT, JO_F_RATE},
     {"DISPLAY", JO_ITEM_SUB, 2}, {"BEAT FLASH", JO_ITEM_EDIT, JO_F_BEATFLASH}, {"BATTERY", JO_ITEM_INFO, 0},
 };
 

@@ -50,7 +50,7 @@ function oledFixtures() {
   return out;
 }
 if (process.env.LCD2_OLED) { console.log(JSON.stringify(oledFixtures().map(f => sha([f])))); process.exit(0); }
-const GOLDEN = JSON.parse('["92586ffb36b70a7d","12a9465b16c68428","f4f15225710bfde3","175c54f575f5b515","9da040822b6d69fc","4df4155e0ba4841d","bb1390d63bcd7cd4","d7690151e5ad2b33"]');
+const GOLDEN = JSON.parse('["92586ffb36b70a7d","12a9465b16c68428","f4f15225710bfde3","175c54f575f5b515","9da040822b6d69fc","4df4155e0ba4841d","7fd977781a04b3ad","d7690151e5ad2b33"]');
 eq(oledFixtures().map(f => sha([f])), GOLDEN, 'the OLED layout draws the bytes the OLED module drew before the lcd2 layout (8 screens)');
 eq([OLED.W, OLED.H, OLED.size(), OLED.size('oled'), OLED.size('lcd2')], [128, 64, { w: 128, h: 64 }, { w: 128, h: 64 }, { w: 160, h: 120 }], 'sizes: OLED.W / OLED.H stay the OLED\'s; OLED.size(layout) says the grid of a layout');
 {

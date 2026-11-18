@@ -193,7 +193,7 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   `BEAT_NUDGE_*` says why a nudge was refused, the overlay: "NUDGE BEAT +1/2", "MAX 3 BEATS", "NO BEAT YET"). YES held +
   UP/DOWN: `app_cfg_get`, `jk_nudge_ms(&cfg, +1 / -1)`, `app_cfg_set` when it returns 1 (overlay "AUDIO IN +3 MS" from
   `cfg.beat_latency_ms`). Both are AUDIO mode only (`beat_state`'s audio), as the control line refuses them in LINK mode.
-  The menu's USB MIDI CLOCK edits `cfg.usbmidi` (ON / OFF).
+  The menu's USB MIDI CLOCK OUT edits `cfg.usbmidi` (ON / OFF).
 - **AUDIO > SOURCE** `set source auto|line|usb|link`: AUTO = the line in when a plug is in, else USB audio; LINK = USB
   audio ignored (LINK mode), a plug in the line in still wins. A unit with no screen toggles AUTO <-> LINK with a single
   NO (`jur_src_toggle`, branch fw/ui wires the button).
