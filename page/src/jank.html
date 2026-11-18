@@ -18,6 +18,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 14px; }
 .stat b { display: block; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat.wide { grid-column: span 2; }
 .stat span { color: var(--dim); font-size: 12px; }
 label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--dim); }
 select, input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; width: 100%; min-height: 40px; }
@@ -252,7 +253,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <div class="grid">
         <div class="stat"><b id="s-rssi">-</b><span>best signal, dBm</span></div>
         <div class="stat"><b id="s-channel">-</b><span>channel</span></div>
-        <div class="stat"><b id="s-link_ip">-</b><span>Link address</span></div>
+        <div class="stat wide"><b id="s-link_ip">-</b><span>Link address</span></div>
         <div class="stat"><b id="s-midi_ticks">-</b><span>MIDI clocks sent</span></div>
         <div class="stat"><b id="s-midi_resync">-</b><span>clock jumps</span></div>
         <div class="stat"><b id="s-audio">-</b><span>audio heard</span></div>
