@@ -22,8 +22,6 @@ static int fails, checks;
 #define WARN 0xFD84u
 #define BAD 0xFB4Bu
 #define DIM 0x94F5u
-#define FIELD_BEAT 0xD7FCu
-#define FIELD_BAR 0xFD84u
 
 static uint8_t fb[JO_LCD2_FB_BYTES], ink[JO_LCD2_INK_BYTES];
 static uint16_t row[JLC_W];
@@ -65,13 +63,10 @@ static void test_palette_values(void)
     jlc_palette(&swapped, 1);
     CHECK(pal.bg == BG && pal.ink[JO_INK_NONE] == NEUTRAL && pal.ink[JO_INK_GOOD] == GOOD && pal.ink[JO_INK_WARN] == WARN);
     CHECK(pal.ink[JO_INK_BAD] == BAD && pal.ink[JO_INK_DIM] == DIM && pal.ink[JO_INK_ONE] == WARN);
-    CHECK(pal.field[JLC_FLASH_NONE] == BG && pal.field[JLC_FLASH_BEAT] == FIELD_BEAT && pal.field[JLC_FLASH_BAR] == FIELD_BAR);
     CHECK(swapped.bg == 0x4108u && swapped.ink[JO_INK_NONE] == 0x7EEFu && swapped.ink[JO_INK_GOOD] == 0xF04Eu && swapped.ink[JO_INK_BAD] == 0x4BFBu);
-    CHECK(swapped.field[JLC_FLASH_BEAT] == 0xFCD7u && swapped.field[JLC_FLASH_BAR] == 0x84FDu && swapped.field[JLC_FLASH_NONE] == 0x4108u);
     CHECK(jlc_rgb565(255, 255, 255) == 0xFFFFu && jlc_rgb565(0, 0, 0) == 0 && jlc_rgb565(255, 0, 0) == 0xF800u && jlc_rgb565(0, 255, 0) == 0x07E0u &&
           jlc_rgb565(0, 0, 255) == 0x001Fu);
     CHECK(pal.bg != pal.ink[JO_INK_NONE] && pal.ink[JO_INK_GOOD] != pal.ink[JO_INK_WARN] && pal.ink[JO_INK_WARN] != pal.ink[JO_INK_BAD]);
-    CHECK(pal.field[JLC_FLASH_BEAT] != pal.field[JLC_FLASH_BAR] && pal.field[JLC_FLASH_BEAT] != pal.bg);
 }
 
 static void test_blank_frame_is_background_on_every_row(void)
@@ -79,7 +74,7 @@ static void test_blank_frame_is_background_on_every_row(void)
     clear();
     for (unsigned y = 0; y < JLC_H; y++) {
         memset(row, 0xAA, sizeof row);
-        jlc_row(fb, ink, &pal, JLC_FLASH_NONE, y, row);
+        jlc_row(fb, ink, &pal, y, row);
         CHECK(lit() == 0 && row[0] == BG && row[JLC_W - 1] == BG);
     }
 }
@@ -89,7 +84,7 @@ static void test_full_frame_covers_the_whole_panel(void)
     memset(fb, 0xFF, sizeof fb);
     memset(ink, 0, sizeof ink);
     for (unsigned y = 0; y < JLC_H; y++) {
-        jlc_row(fb, ink, &pal, JLC_FLASH_NONE, y, row);
+        jlc_row(fb, ink, &pal, y, row);
         CHECK(count(NEUTRAL) == JLC_W);              /* no bands, no centring */
     }
 }
@@ -99,7 +94,7 @@ static void test_one_pixel_is_a_square(void)
     clear();
     set_px(5, 10, JO_INK_GOOD);          /* frame (5, 10) -> columns 10, 11; rows 20, 21 */
     for (unsigned y = 0; y < JLC_H; y++) {
-        jlc_row(fb, ink, &pal, JLC_FLASH_NONE, y, row);
+        jlc_row(fb, ink, &pal, y, row);
         if (y == 20 || y == 21) {
             CHECK(lit() == 2 && row[10] == GOOD && row[11] == GOOD && row[9] == BG && row[12] == BG);
         } else {
@@ -116,7 +111,7 @@ static void test_corners_and_edges(void)
     set_px(0, 119, 0);
     set_px(159, 119, 0);
     for (unsigned y = 0; y < JLC_H; y++) {
-        jlc_row(fb, ink, &pal, JLC_FLASH_NONE, y, row);
+        jlc_row(fb, ink, &pal, y, row);
         if (y < 2 || y >= 238) {
             CHECK(lit() == 4 && row[0] == NEUTRAL && row[1] == NEUTRAL && row[318] == NEUTRAL && row[319] == NEUTRAL);
         } else {
@@ -130,7 +125,7 @@ static void test_page_layout_and_bit_order(void)
     clear();
     fb[3 * JO_LCD2_W + 7] = 0x81;        /* page 3: frame rows 24 and 31 at x = 7 -> rows 48, 49 and 62, 63; columns 14, 15 */
     for (unsigned y = 0; y < JLC_H; y++) {
-        jlc_row(fb, NULL, &pal, JLC_FLASH_NONE, y, row);
+        jlc_row(fb, NULL, &pal, y, row);
         int on = y == 48 || y == 49 || y == 62 || y == 63;
         CHECK(lit() == (on ? 2u : 0u) && (!on || (row[14] == NEUTRAL && row[15] == NEUTRAL)));
     }
@@ -148,7 +143,7 @@ static void test_ink_picks_the_pixels_own_id(void)
     for (unsigned i = 0; i < 6; i++)
         set_px(10 + 3 * i, 31, T[i].id);    /* page 3, bit 7: frame row 31 -> rows 62, 63 */
     for (unsigned y = 62; y <= 63; y++) {
-        jlc_row(fb, ink, &pal, JLC_FLASH_NONE, y, row);
+        jlc_row(fb, ink, &pal, y, row);
         CHECK(lit() == 12);
         for (unsigned i = 0; i < 6; i++) {
             unsigned x = (10 + 3 * i) * 2;
@@ -157,7 +152,7 @@ static void test_ink_picks_the_pixels_own_id(void)
     }
     set_px(40, 31, 6);                    /* an id past the table */
     set_px(41, 31, 255);
-    jlc_row(fb, ink, &pal, JLC_FLASH_NONE, 62, row);
+    jlc_row(fb, ink, &pal, 62, row);
     CHECK(row[80] == NEUTRAL && row[82] == NEUTRAL);
 }
 
@@ -166,35 +161,10 @@ static void test_ink_on_unlit_pixels_is_ignored_and_no_plane_is_neutral(void)
     clear();
     ink[10 * JO_LCD2_W + 5] = JO_INK_BAD;      /* an id on a pixel that is not lit: the background */
     set_px(6, 10, JO_INK_GOOD);
-    jlc_row(fb, ink, &pal, JLC_FLASH_NONE, 20, row);
+    jlc_row(fb, ink, &pal, 20, row);
     CHECK(lit() == 2 && row[12] == GOOD && row[13] == GOOD && row[10] == BG && row[11] == BG);
-    jlc_row(fb, NULL, &pal, JLC_FLASH_NONE, 20, row);
+    jlc_row(fb, NULL, &pal, 20, row);
     CHECK(lit() == 2 && row[12] == NEUTRAL && row[13] == NEUTRAL && row[10] == BG);
-}
-
-/* a flash: the field turns to the flash colour and every lit pixel to near-black, whatever its ink; the geometry stays */
-static void test_flash_swaps_field_and_text(void)
-{
-    clear();
-    set_px(5, 10, JO_INK_BAD);
-    set_px(6, 10, JO_INK_ONE);
-    set_px(7, 10, JO_INK_NONE);
-    for (int f = JLC_FLASH_BEAT; f <= JLC_FLASH_BAR; f++) {
-        uint16_t field = f == JLC_FLASH_BEAT ? FIELD_BEAT : FIELD_BAR;
-        jlc_row(fb, ink, &pal, f, 20, row);
-        CHECK(count(BG) == 6 && count(field) == JLC_W - 6);
-        for (unsigned x = 10; x < 16; x++)
-            CHECK(row[x] == BG);
-        CHECK(row[9] == field && row[16] == field && row[0] == field && row[JLC_W - 1] == field);
-        jlc_row(fb, ink, &pal, f, 22, row);                    /* a row with nothing lit: all field */
-        CHECK(count(field) == JLC_W);
-    }
-    jlc_row(fb, NULL, &pal, JLC_FLASH_BAR, 20, row);          /* no plane: the same */
-    CHECK(count(BG) == 6);
-    jlc_row(fb, ink, &pal, 7, 20, row);                        /* a flash that is not one: the plain frame */
-    CHECK(row[10] == BAD && row[12] == WARN && row[14] == NEUTRAL && row[9] == BG);
-    jlc_row(fb, ink, &pal, JLC_FLASH_NONE, 20, row);
-    CHECK(row[10] == BAD && row[9] == BG);
 }
 
 static void test_swapped_palette_row(void)
@@ -203,10 +173,8 @@ static void test_swapped_palette_row(void)
     jlc_palette(&swapped, 1);
     clear();
     set_px(0, 0, JO_INK_WARN);
-    jlc_row(fb, ink, &swapped, JLC_FLASH_NONE, 0, row);
+    jlc_row(fb, ink, &swapped, 0, row);
     CHECK(row[0] == 0x84FDu && row[2] == 0x4108u && row[319] == 0x4108u);
-    jlc_row(fb, ink, &swapped, JLC_FLASH_BEAT, 0, row);
-    CHECK(row[0] == 0x4108u && row[2] == 0xFCD7u);
 }
 
 int main(void)
@@ -221,7 +189,6 @@ int main(void)
     test_page_layout_and_bit_order();
     test_ink_picks_the_pixels_own_id();
     test_ink_on_unlit_pixels_is_ignored_and_no_plane_is_neutral();
-    test_flash_swaps_field_and_text();
     test_swapped_palette_row();
     printf("lcd: %d checks, %d failed\n", checks, fails);
     return fails;

@@ -17,10 +17,9 @@ static const char *const LOWCONF[] = {"KEEP RUNNING", "STOP / START"};
 static const char *const INSRC[] = {"AUTO", "LINE IN", "USB AUDIO"};
 const char *const jo_usb_names[2] = {"DEVICE", "HOST"};
 static const char *const OFF_ON[] = {"OFF", "ON"};
-/* the lcd2 layout's own lists (ui/oled.js EDITS: AUTO BAR and SOURCE have more choices there, and USB MIDI CLOCK, BEAT FLASH) */
+/* the lcd2 layout's own lists (ui/oled.js EDITS: AUTO BAR and SOURCE have more choices there, and USB MIDI CLOCK) */
 const char *const jo_off_on_names[2] = {"ON", "OFF"};
 const char *const jo_autobar_short[3] = {"OFF", "START", "ALWAYS"};
-const char *const jo_beatflash_names[2] = {"BOXES", "SCREEN"};
 static const char *const INSRC_LCD2[] = {"AUTO", "LINE IN", "USB AUDIO", "LINK"};
 static const char *const AUTOBAR_LCD2[] = {"OFF", "AT START", "ALWAYS"};
 
@@ -53,7 +52,6 @@ static const char *const H_INSRC_LCD2[][2] = {{"LINE IN IF PLUGGED", "ELSE USB A
                                               {"USB AUDIO IGNORED", "LINE STILL WINS"}};
 static const char *const H_AUTOBAR_LCD2[][2] = {{"THE BAR 1 STAYS", "WHERE IT IS"}, {"1 PLACED AT A START", "NEVER WHILE PLAYING"}, {"MOVES THE 1 ALSO", "WHILE PLAYING"}};
 static const char *const H_USBMIDI[][2] = {{"CLOCK ALSO OVER USB", "TO COMPUTER OR GEAR"}, {"CLOCK ON MIDI OUTS", "ONLY, NOT OVER USB"}};
-static const char *const H_BEATFLASH[][2] = {{"ONLY THE BOXES", "SHOW THE BEAT"}, {"WHOLE SCREEN FLASHES", "FIRST BEAT: AMBER"}};
 
 #define OPTS(a) (a), (uint8_t)(sizeof(a) / sizeof((a)[0]))
 /* by enum jo_field: title, choices or lo / hi / step / unit, live, repick, help */
@@ -76,12 +74,11 @@ static const struct jo_spec SPECS[JO_F_EDITS] = {
     [JO_F_AUTOBAR] = {"AUTO BAR", OPTS(OFF_ON), 0, 0, 0, "", 0, 1, H_AUTOBAR},
 };
 
-/* the lcd2 layout's choices that differ from the OLED's, and the two it adds */
+/* the lcd2 layout's choices that differ from the OLED's, and the one it adds */
 static const struct jo_spec SPECS_LCD2[JO_F_EDITS] = {
     [JO_F_INSRC] = {"SOURCE", OPTS(INSRC_LCD2), 0, 0, 0, "", 1, 0, H_INSRC_LCD2},
     [JO_F_AUTOBAR] = {"AUTO BAR", OPTS(AUTOBAR_LCD2), 0, 0, 0, "", 0, 1, H_AUTOBAR_LCD2},
     [JO_F_USBMIDI] = {"USB MIDI CLOCK OUT", OPTS(jo_off_on_names), 0, 0, 0, "", 1, 0, H_USBMIDI},
-    [JO_F_BEATFLASH] = {"BEAT FLASH", OPTS(jo_beatflash_names), 0, 0, 0, "", 1, 0, H_BEATFLASH},
 };
 
 const struct jo_spec *jo_spec_l(enum jo_field f, int lcd2)
@@ -115,7 +112,6 @@ int jo_spec_get(enum jo_field f, const struct jo_ctx *c)
     case JO_F_USBROLE: return c->usb_role;
     case JO_F_AUTOBAR: return c->layout_lcd2 ? c->auto_bar : c->auto_bar ? 1 : 0;
     case JO_F_USBMIDI: return c->usb_midi;
-    case JO_F_BEATFLASH: return c->beat_flash ? 1 : 0;
     default: return 0;
     }
 }
@@ -152,7 +148,7 @@ const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2] = {
     {"AUDIO", JO_ITEM_SUB, 0}, {"LINK TRANSPORT", JO_ITEM_EDIT, JO_F_LTMODE}, {"AUTO BAR", JO_ITEM_EDIT, JO_F_AUTOBAR},
     {"NETWORK", JO_ITEM_NET, 0}, {"USB", JO_ITEM_EDIT, JO_F_USBROLE},
     {"USB MIDI CLOCK OUT", JO_ITEM_EDIT, JO_F_USBMIDI}, {"OFFSET", JO_ITEM_SUB, 1}, {"CLK RATE", JO_ITEM_EDIT, JO_F_RATE},
-    {"DISPLAY", JO_ITEM_SUB, 2}, {"BEAT FLASH", JO_ITEM_EDIT, JO_F_BEATFLASH}, {"BATTERY", JO_ITEM_INFO, 0},
+    {"DISPLAY", JO_ITEM_SUB, 2}, {"BATTERY", JO_ITEM_INFO, 0},
 };
 
 const struct jo_sub jo_subs[3] = {

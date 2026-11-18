@@ -47,7 +47,7 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b)
 {
     return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source || a->autobar != b->autobar
-           || a->usbmidi != b->usbmidi || a->lowconf != b->lowconf || a->threshold != b->threshold || a->rate != b->rate || a->beat_flash != b->beat_flash
+           || a->usbmidi != b->usbmidi || a->lowconf != b->lowconf || a->threshold != b->threshold || a->rate != b->rate
            || !jla_same(&a->lat, &b->lat);
 }
 
@@ -155,7 +155,6 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put(w, "usbmidi=%s\n", on_off(c->usbmidi));
     put(w, "lowconf=%s\nthreshold=%u\nrate=%s\nfollower=%s\nskip=%s\ngraded=%s\n", lowconf_name(c->lowconf), c->threshold, on_off(c->rate),
         c->follower ? "robust" : "tuned", SKIP_NAME[c->skip < 3u ? c->skip : 0u], on_off(c->graded));
-    put(w, "beat_flash=%u\n", (unsigned)c->beat_flash);
     put(w, "usb=%s\nsource=%s\nline_gain=%d\n", jur_usb_name(c->usb), jur_src_name(c->source), c->line_gain_db);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
@@ -464,8 +463,6 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
             c->autobar_picks++;
         return 0;
     }
-    if (!strcmp(key, "beat_flash"))        /* the lcd2 screen: 0 BOXES, 1 the whole screen flashes on the beat */
-        return parse_pair(val, "0", "1", &c->beat_flash);
     if (!strcmp(key, "usb"))
         return jur_usb_parse(val, &c->usb);
     if (!strcmp(key, "source"))
@@ -665,7 +662,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         else
             put(&w, "err home line too long\n");
     } else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|beat_flash|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;
