@@ -8,3 +8,5 @@ dependencies:
     rules:
       - if: "target == esp32s3"
   espressif/led_strip: "~3.1.1"
+  # the S3 assembly FFT of the beat front end (main/fft_dsp.c); an exact release
+  espressif/esp-dsp: "1.7.1"
