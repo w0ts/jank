@@ -47,23 +47,12 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .device .lid { fill:#8d9094; stroke:#5d6064; stroke-width:.5; }
 .device .lidshade { fill:none; stroke:#a9acb0; stroke-width:.4; }
 .device .port { fill:#16171a; stroke:#4a4d50; stroke-width:.35; }
-.device .pending { fill:none; stroke:#7a7d80; stroke-width:.35; stroke-dasharray:.9 .7; }
-.device .plug { fill:#d8b14a; stroke:#8a6d1c; stroke-width:.25; }
-.device .lbl { fill:#4a4d50; font-size:2.3px; text-anchor:middle; font-family:-apple-system, system-ui, sans-serif; }
-.device .lbl.l { text-anchor:start; } .device .lbl.r { text-anchor:end; }
-.device .lbl.pend { fill:#7a7d80; font-style:italic; font-size:1.4px; }
-.device .brand { fill:#4a4d50; font-size:3px; text-anchor:middle; font-family:-apple-system, system-ui, sans-serif; letter-spacing:.1px; }
-.device .win { fill:#202225; stroke:#5d6064; stroke-width:.4; }
-.device .frost { fill:#34373b; opacity:.9; }
-.device .led { mix-blend-mode:screen; }
-.device .bezel { fill:#0b0c0d; stroke:#5d6064; stroke-width:.4; }
-.device .btnarm { fill:#2c2e31; stroke:#16171a; stroke-width:.3; cursor:pointer; }
-.device .btnarm.on { fill:#4b4f54; }
-.device .glyph { fill:#c9ccd0; font-size:3.2px; text-anchor:middle; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
+.device .bezel { fill:#0b0c0d; stroke:#5d6064; stroke-width:.2; }
+.device .cap { fill:#2c2e31; stroke:#16171a; stroke-width:.4; stroke-linejoin:round; pointer-events:none; }
+.device .armarea { fill:transparent; stroke:none; cursor:pointer; }
+.device .armarea.on { fill:#4b4f54; }
+.device .glyph { fill:#c9ccd0; font-size:3.2px; text-anchor:middle; dominant-baseline:central; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
 .device .glyph.s { font-size:2.5px; }
-.device .toggle { cursor:pointer; }
-.device .slot { fill:#16171a; stroke:#4a4d50; stroke-width:.3; }
-.device .lever { fill:#d6d8db; stroke:#6d7074; stroke-width:.3; }
 .device canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#04060a; }
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
@@ -116,11 +105,11 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .check input { width: auto; min-height: 0; }
 #c-advanced-box { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
 #c-advanced-box input { width: auto; min-height: 0; }
-#connect .buttons button { color: var(--ink); background: transparent; border: 1px solid var(--line); }
-#connect .buttons button[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-/* units have no RGB LEDs any more: the box drawing's LED group is not shown on this page (the Mac simulator still draws it) */
-#ledView, #seamGlow { display: none; }
-#face .lbl, #face .brand { display: none; }
+#connect-slot { margin: 4px 0 12px; }
+.dev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.dev-bar #c-ports-box { margin: 0; }
+#dev-bar #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
+#dev-bar #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 #face-box svg { width: 100%; height: auto; }
 </style>
 </head>
@@ -131,71 +120,32 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
   </header>
   <p id="msg"></p>
 
-  <section id="connect">
-    <div class="buttons">
-      <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected disconnects and turns that off.">MIDI port (USB, iPhone app)</button>
-      <label id="c-advanced-box" class="hide" title="Shows the player and the advanced tuning and details on this page. Changes only this page (remembered in this browser); nothing is sent to the stick."><input id="c-advanced" type="checkbox"> Advanced</label>
-    </div>
+  <div id="connect-slot">
+    <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected disconnects and turns that off.">MIDI port (USB, iPhone app)</button>
     <p id="c-waiting" class="note hide" style="margin:8px 0 0">waiting for the jank...</p>
-    <label id="c-ports-box" class="hide" style="margin-top:10px" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
-  </section>
+  </div>
 
   <div id="live" class="hide">
     <div class="live-row">
       <section id="face" class="device">
+        <div id="dev-bar" class="dev-bar">
+          <label id="c-advanced-box" class="hide" title="Shows the player and the advanced tuning and details on this page. Changes only this page (remembered in this browser); nothing is sent to the stick."><input id="c-advanced" type="checkbox"> Advanced</label>
+          <label id="c-ports-box" class="hide" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
+        </div>
         <div id="face-box">
-<svg id="dev" viewBox="-22 -13 116 89" tabindex="0" aria-label="jank mini 2.2, top view, 1 unit = 1 mm">
+<svg id="dev" viewBox="0 0 100 79" tabindex="0" aria-label="jank mini 3, top view, 1 unit = 1 mm">
   <defs>
-    <filter id="seam" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="1.3"/></filter>
     <linearGradient id="lidg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9da1"/><stop offset="1" stop-color="#83868a"/></linearGradient>
   </defs>
-  <!-- all coordinates are board millimetres: the board is 0..72 x 0..72, the case 75.6 x 75.6 outside (-1.8 .. 73.8) -->
-  <g id="jacks">
-    <rect x="15.1" y="-5" width="5" height="3.2" rx="1" class="port"/>
-    <g id="linePlug" visibility="hidden"><rect x="16.8" y="-13" width="1.6" height="7" rx=".5" class="plug"/><rect x="16.3" y="-7.2" width="2.6" height="1.8" class="plug"/></g>
-    <rect x="31.6" y="-4.4" width="9" height="2.6" rx="1.2" class="port"/>
-    <rect x="46.1" y="-5" width="4.4" height="3.2" rx="1" class="port"/>
-    <rect x="52.7" y="-5" width="4.4" height="3.2" rx="1" class="port"/>
-    <rect x="-5.2" y="4" width="3.4" height="4.8" rx="1.1" class="port"/>
-    <rect x="73.8" y="4" width="3.4" height="4.8" rx="1.1" class="port"/>
-    <rect x="-5.4" y="16" width="3.6" height="13" rx="1.4" class="port"/>
-    <rect x="73.8" y="16" width="3.6" height="13" rx="1.4" class="port"/>
-  </g>
-  <rect x="-1.8" y="-1.8" width="75.6" height="75.6" rx="4.5" fill="url(#lidg)" class="lid"/>
-  <rect x="-.6" y="-.6" width="73.2" height="73.2" rx="3.6" class="lidshade"/>
-  <!-- faint glow of the board's LEDs through the lid seam on the left wall -->
-  <ellipse id="seamGlow" cx="-1.4" cy="40" rx=".8" ry="5" filter="url(#seam)" opacity="0" fill="#000"/>
-  <!-- edge labels -->
-  <text x="17.6" y="2.6" class="lbl">LINE IN</text><text x="36.1" y="2.6" class="lbl">USB-C</text>
-  <text x="48.3" y="2.6" class="lbl">CLK</text><text x="54.9" y="2.6" class="lbl">RST</text>
-  <text x="-6.5" y="7.2" class="lbl r">MIDI OUT 1</text><text x="-6.5" y="23.3" class="lbl r">DIN 1</text>
-  <text x="78.4" y="7.2" class="lbl l">MIDI OUT 2</text><text x="78.4" y="23.3" class="lbl l">DIN 2</text>
-  <!-- power toggle on the left wall (J11 at (5.0, 49.5), axis y 54.5) -->
-  <g id="pwr" class="toggle">
-    <rect x="-5.9" y="48" width="4.4" height="9" rx="1" class="slot"/>
-    <rect id="lever" x="-7.3" y="49.2" width="4.8" height="3.6" rx="1" class="lever"/>
-    <rect x="-10" y="44" width="10" height="17" fill="transparent"/>
-  </g>
-  <text x="-3" y="46.4" class="lbl r">ON</text><text x="-3" y="60" class="lbl r">OFF</text>
-  <!-- the OLED: lid window and active area at the chosen module's size and place (SCREENS below), same 128 x 64 pixels -->
+  <!-- the shell only: every position and size is set from the BOX3 table in ui/box3.js (Box3.build) -->
+  <g id="ports"></g>
+  <rect id="lid" x="0" y="0" width="1" height="1" fill="url(#lidg)" class="lid"/>
+  <rect id="lidshade" x="0" y="0" width="1" height="1" class="lidshade"/>
   <g id="oledView">
     <rect id="oledBezel" class="bezel" rx="1.6" x="0" y="0" width="1" height="1"/>
-    <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="128" height="64"></canvas></foreignObject>
+    <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="320" height="240"></canvas></foreignObject>
   </g>
-  <!-- the 4 beat LEDs on every unit (the board's row, 2026-11-15: LED1..LED4 at x 3.0 / 10.5 / 18.0 / 25.5, y 54.6,
-       below both screens): a small hole in the lid over each; beat n lights LED n (the LED language of core/jank_led.h) -->
-  <g id="ledView">
-    <g id="ledGlows"></g><g id="ledHoles"></g>
-  </g>
-  <!-- D-pad at the bottom right: cross centre (61.5, 62.2), button pads 6.5 mm from the centre, arms 6 mm wide -->
-  <g id="dpad">
-    <g id="arm-up" data-b="up"><rect x="58.5" y="52.7" width="6" height="9.5" rx="1" class="btnarm"/><text x="61.5" y="56.7" class="glyph">&#9650;</text></g>
-    <g id="arm-down" data-b="down"><rect x="58.5" y="62.2" width="6" height="9.5" rx="1" class="btnarm"/><text x="61.5" y="69.8" class="glyph">&#9660;</text></g>
-    <g id="arm-no" data-b="no"><rect x="52" y="59.2" width="9.5" height="6" rx="1" class="btnarm"/><text x="55" y="63.2" class="glyph s">NO</text></g>
-    <g id="arm-yes" data-b="yes"><rect x="61.5" y="59.2" width="9.5" height="6" rx="1" class="btnarm"/><text x="68" y="63.2" class="glyph s">YES</text></g>
-    <rect x="58.5" y="59.2" width="6" height="6" class="btnarm" style="pointer-events:none"/>
-  </g>
-  <text x="22" y="69" class="brand">jank mini 2.2</text>
+  <g id="dpad"></g>
 </svg>
         </div>
       </section>
@@ -477,6 +427,7 @@ function isEnd(line) {
 
 /* The control line over any transport: write(text) puts text on it (as frames), receive(message) takes each whole SysEx that
    comes back. One command at a time; its answer is the lines up to ok or err. */
+const NO_ANSWER = "The jank did not answer";
 class LineClient {
   constructor(write, timers) {
     this.write = write;
@@ -499,7 +450,7 @@ class LineClient {
   send(command, waitMs) {
     const run = () => new Promise((resolve, reject) => {
       const p = { lines: [] };
-      const timer = this.timers.set(() => { if (this.pending === p) this.pending = null; reject(new Error("no answer to " + command)); }, waitMs || 2000);
+      const timer = this.timers.set(() => { if (this.pending === p) this.pending = null; reject(Object.assign(new Error(NO_ANSWER), { noAnswer: true })); }, waitMs || 2000);
       p.end = (end) => {
         this.timers.clear(timer);
         this.pending = null;
@@ -721,20 +672,38 @@ async function session(command, done) {
 }
 
 /* HOME and the details by polling */
+/* the one message for a command that got no answer: the port, what to try. Polled commands repeat every few hundred ms: it is shown once
+   per episode and cleared when an answer comes again */
+function noAnswerText(withSysex) {
+  return NO_ANSWER + (S.portName ? " (" + S.portName + ")" : "") + ". Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port" + (withSysex ? "; if the browser asks, allow SysEx for this page." : ".");
+}
+function pollFailed(e) {
+  if (!e.noAnswer) { say(e.message, true); return; }
+  if (S.noAnswerShown) return;
+  S.noAnswerShown = true;
+  say(noAnswerText(false), true);
+}
+function pollAnswered() {
+  if (!S.noAnswerShown) return;
+  S.noAnswerShown = false;
+  say("");
+}
 async function pollHome() {
   if (!S.line) return;
   try {
     takeHome((await send("home")).values.home);
+    pollAnswered();
   } catch (e) {
-    say(e.message, true);
+    pollFailed(e);
   }
 }
 async function pollStatus() {
   if (!S.line) return;
   try {
     showStatus(await send("status"));
+    pollAnswered();
   } catch (e) {
-    say(e.message, true);
+    pollFailed(e);
   }
 }
 
@@ -773,9 +742,15 @@ async function autoConnect() {
   if (!S.line && !S.waiting) connectMidi(true);
 }
 
+/* the connect button lives under the title when nothing is connected and in the device card's top row while connected */
+function placeConnect(kind) {
+  $(kind ? "dev-bar" : "connect-slot").prepend($("c-midi"));
+}
+
 function setConnected(kind) {
   S.kind = kind;
   $("c-midi").setAttribute("aria-pressed", String(kind === "midi"));
+  placeConnect(kind);
   $("live").classList.toggle("hide", !kind);
   paintAdvanced();
   document.dispatchEvent(new CustomEvent("jank-connection", { detail: { kind } }));
@@ -793,6 +768,7 @@ function disconnected(text) {
   S.line = null;
   S.drop = null;
   S.lastHome = null;
+  S.noAnswerShown = false;
   setConnected(null);
   showGroups(S.lastScans);
   if (text) say(text, true);
@@ -801,6 +777,8 @@ function disconnected(text) {
 async function started(line, kind, drop, portName) {
   S.line = line;
   S.drop = drop;
+  S.portName = portName;
+  S.noAnswerShown = false;
   setConnected(kind);
   try {
     let got;
@@ -809,8 +787,7 @@ async function started(line, kind, drop, portName) {
     say("");
     await pollHome();
   } catch (e) {
-    const named = portName ? e.message.replace(/^(no answer to \S+)/, "$1 from " + portName) : e.message;
-    disconnected(named + ". If the app asks for SysEx, turn it on.");
+    disconnected(e.noAnswer ? noAnswerText(true) : e.message);
     return;
   }
   S.timers.push(setInterval(pollHome, HOME_EVERY_MS));
@@ -2106,6 +2083,96 @@ const Face = (() => {
 })();
 </script>
 <script>
+/* The device drawing of the control page: jank-mini-3 seen from the top (the lid). Every number lives in the BOX3 table below, in mm, case
+   coordinates (origin top left, x right, y down); Box3.build(svg) draws the shell of ui/box3.svg.html from it and nothing else holds a
+   position. Positions may still move by +-2 mm: change them here. No text on the device but the keys' own marks. Builds with the DOM only. */
+const BOX3 = {
+  case: { w: 100, h: 79, r: 3 },
+  // the Waveshare LCD-2 in landscape: the active area, and the lid window one mm bigger on each side; the 320 x 240 canvas fills the active area
+  screen: { x: 9.7, y: 24.2, w: 40.8, h: 30.6, windowMargin: 1 },
+  // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
+  cross: { cx: 67.0, cy: 39.5, span: 24, arm: 8 },
+  switches: { up: [67.0, 31.5], down: [67.0, 47.5], no: [59.0, 39.5], yes: [75.0, 39.5] },
+  keyMarks: { up: '▲', down: '▼', no: 'NO', yes: 'YES' },
+  // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
+  ports: [
+    { id: 'midi1', wall: 'top', at: 33.3, kind: 'trs' }, { id: 'midi2', wall: 'top', at: 46.1, kind: 'trs' },
+    { id: 'din1', wall: 'top', at: 63.5, kind: 'din' }, { id: 'din2', wall: 'top', at: 85.6, kind: 'din' },
+    { id: 'clock', wall: 'right', at: 29.5, kind: 'trs' }, { id: 'reset', wall: 'right', at: 49.5, kind: 'trs' },
+    { id: 'linein', wall: 'bottom', at: 73.5, kind: 'trs' },
+    { id: 'usbHost', wall: 'left', at: 9.6, kind: 'usbc' }, { id: 'usbOwn', wall: 'left', at: 39.5, kind: 'usbc' }, { id: 'usbIn', wall: 'left', at: 68.5, kind: 'usbc' },
+  ],
+  // connector sizes: length along the wall, depth out of the wall (3.5 mm jack ~6, 5-pin DIN ~15, USB-C 9 x 3.2)
+  kinds: { trs: { len: 6, depth: 3.2 }, din: { len: 15, depth: 3.2 }, usbc: { len: 9, depth: 3.2 } },
+  margin: 1.5,
+};
+
+const Box3 = (() => {
+  const windowRect = (s = BOX3.screen) => ({ x: s.x - s.windowMargin, y: s.y - s.windowMargin, w: s.w + 2 * s.windowMargin, h: s.h + 2 * s.windowMargin });
+  // a port's opening as a rectangle outside its wall (the stub the drawing shows)
+  function portRect(p) {
+    const k = BOX3.kinds[p.kind], c = BOX3.case, horizontal = p.wall === 'top' || p.wall === 'bottom';
+    const w = horizontal ? k.len : k.depth, h = horizontal ? k.depth : k.len;
+    const x = p.wall === 'left' ? -k.depth : p.wall === 'right' ? c.w : p.at - w / 2;
+    const y = p.wall === 'top' ? -k.depth : p.wall === 'bottom' ? c.h : p.at - h / 2;
+    return { x, y, w, h };
+  }
+  // a button's click area: the arm's end square (arm x arm mm) centred on its switch; the cross' centre square is no button
+  function armRect(name) {
+    const a = BOX3.cross.arm, [x, y] = BOX3.switches[name];
+    return { x: x - a / 2, y: y - a / 2, w: a, h: a };
+  }
+  // the cap's outline: a plus, twelve corners
+  function crossPoints() {
+    const { cx, cy, span, arm } = BOX3.cross, h = span / 2, a = arm / 2;
+    return [[cx - a, cy - h], [cx + a, cy - h], [cx + a, cy - a], [cx + h, cy - a], [cx + h, cy + a], [cx + a, cy + a], [cx + a, cy + h], [cx - a, cy + h], [cx - a, cy + a], [cx - h, cy + a], [cx - h, cy - a], [cx - a, cy - a]];
+  }
+  // the view box: the case and the port stubs, with a small margin
+  function viewBox() {
+    const rects = BOX3.ports.map(portRect);
+    const x0 = Math.min(0, ...rects.map((r) => r.x)) - BOX3.margin, y0 = Math.min(0, ...rects.map((r) => r.y)) - BOX3.margin;
+    const x1 = Math.max(BOX3.case.w, ...rects.map((r) => r.x + r.w)) + BOX3.margin, y1 = Math.max(BOX3.case.h, ...rects.map((r) => r.y + r.h)) + BOX3.margin;
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  // the screen's canvas area: the whole active area, or (the black and white preview) its largest centred part with the canvas' proportions
+  function canvasArea(aspect) {
+    const s = BOX3.screen;
+    if (!aspect || Math.abs(aspect - s.w / s.h) < 1e-9) return { x: s.x, y: s.y, w: s.w, h: s.h };
+    const h = Math.min(s.h, s.w / aspect), w = h * aspect;
+    return { x: s.x + (s.w - w) / 2, y: s.y + (s.h - h) / 2, w, h };
+  }
+  const setAttrs = (el, attrs) => { for (const key in attrs) el.setAttribute(key, String(attrs[key])); };
+  const make = (svg, tag, attrs) => { const e = document.createElementNS(svg.namespaceURI, tag); setAttrs(e, attrs); return e; };
+  const mm = (v) => Math.round(v * 100) / 100;
+
+  function placeScreen(svg, aspect) {
+    const win = windowRect(), area = canvasArea(aspect);
+    setAttrs(svg.querySelector('#oledBezel'), { x: mm(win.x), y: mm(win.y), width: mm(win.w), height: mm(win.h) });
+    setAttrs(svg.querySelector('#oledFO'), { x: mm(area.x), y: mm(area.y), width: mm(area.w), height: mm(area.h) });
+  }
+  function build(svg) {
+    const c = BOX3.case, v = viewBox();
+    setAttrs(svg, { viewBox: [v.x, v.y, v.w, v.h].map(mm).join(' ') });
+    setAttrs(svg.querySelector('#lid'), { x: 0, y: 0, width: c.w, height: c.h, rx: c.r });
+    setAttrs(svg.querySelector('#lidshade'), { x: 1, y: 1, width: c.w - 2, height: c.h - 2, rx: Math.max(0, c.r - 1) });
+    svg.querySelector('#ports').replaceChildren(...BOX3.ports.map((p) => {
+      const r = portRect(p);
+      return make(svg, 'rect', { id: 'port-' + p.id, x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1, class: 'port' });
+    }));
+    const cap = make(svg, 'path', { id: 'cap', d: 'M' + crossPoints().map(([x, y]) => mm(x) + ' ' + mm(y)).join('L') + 'Z', class: 'cap' });
+    svg.querySelector('#dpad').replaceChildren(cap, ...['up', 'down', 'no', 'yes'].map((name) => {
+      const [x, y] = BOX3.switches[name], r = armRect(name), g = make(svg, 'g', { id: 'arm-' + name, 'data-b': name });
+      const wide = name === 'no' || name === 'yes';
+      const mark = make(svg, 'text', { x, y: y + (wide ? 0.9 : 1.1), class: wide ? 'glyph s' : 'glyph' });
+      mark.textContent = BOX3.keyMarks[name];
+      g.append(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }), mark);
+      return g;
+    }));
+  }
+  return { build, placeScreen, windowRect, portRect, viewBox, canvasArea, armRect, crossPoints };
+})();
+</script>
+<script>
 /* The colour face of the jank variant on the Waveshare ESP32-S3-LCD-2 (2.0 inch 240 x 320 ST7789 used in LANDSCAPE, 320 x 240, no
    touch, no RGB LEDs). DESIGN PREVIEW. The lcd2 layout of ui/oled.js has its own logical grid of 160 x 120 pixels (4:3, the same as the
    panel and the lid window): it is painted EXACTLY x2, each source pixel a square block of 2 x 2 on the 320 x 240 panel. No bands, no
@@ -2916,8 +2983,7 @@ const Player = (() => {
     const wanted = params.get("screen") === "oled" ? "2.42" : "lcd2";
     if (wanted === screen) return;
     screen = wanted;
-    Face.placeScreen(svg, screen);
-    Face.showLeds(svg, screen);
+    Box3.placeScreen(svg, screen === "lcd2" ? null : OLED.W / OLED.H);
     el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
     el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
   }
@@ -2992,9 +3058,9 @@ const Player = (() => {
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });
 
+  // the drawing is built from the BOX3 table (ui/box3.js): its viewBox is the case with its port stubs; the keys are only a tooltip and a label
+  Box3.build(svg);
   applyScreen();
-  // the keys are only a tooltip and a label: no text around the drawing; its viewBox is cropped to the box with its jacks and ports
-  svg.setAttribute("viewBox", "-8.5 -6 87 80.5");
   svg.setAttribute("aria-label", Stick.KEY_HINT);
   for (const b of ARMS) {
     const arm = svg.querySelector("#arm-" + b), tip = document.createElementNS(svg.namespaceURI, "title");
