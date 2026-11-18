@@ -395,6 +395,8 @@ const OLED = (() => {
   const LINK_JOINED_MIN = 1;                                          // Link peers needed to call the stick joined
   const SIGNAL_GOOD_DBM = -67, SIGNAL_POOR_DBM = -80;                  // good >= -67, fair -80..-68, poor < -80 (-80 is the Wi-Fi page's BAD line)
   const signalQuality = dbm => (dbm === null || dbm === undefined || dbm === 0 ? 'none' : dbm >= SIGNAL_GOOD_DBM ? 'good' : dbm >= SIGNAL_POOR_DBM ? 'fair' : 'poor');
+  const LOST_BAD_PCT = 10, LOST_WARN_PCT = 3, RETRY_BAD_PCT = 30;       // the air rows of the lcd2 NETWORK screen (MODE JANK): LOST red from 10 %, amber from 3 %; RX RETRY red from 30 % (the old Wi-Fi page's lines)
+  const lostInk = p => (p >= LOST_BAD_PCT ? INK.BAD : p >= LOST_WARN_PCT ? INK.WARN : INK.GOOD);
   const SIGNAL_INK = { good: INK.GOOD, fair: INK.WARN, poor: INK.BAD, none: INK.DIM };
   // joined = green; alone = dim in AUDIO mode (a lone leader is normal), red in LINK mode (it has no tempo to follow)
   const linkInk = c => ((c.peers || 0) >= LINK_JOINED_MIN ? INK.GOOD : c.link ? INK.BAD : INK.DIM);
@@ -871,6 +873,19 @@ const OLED = (() => {
     inkText(fb, word, wx, y, SIGNAL_INK[q]);
     if (rssi !== 0) textR(fb, rssi + 'dBm', wx - 6, y, 1, 1);
   }
+  // the read-only air rows of MODE JANK under SIGNAL, from the peers' frames of the last 10 s window: LOST % (sequence numbers missing), LEVEL (weakest / strongest
+  // frame), RX RETRY % (the peers' own retries seen here, not this device's). null / no level: '-'
+  function drawAirRowsLcd2(fb, y, c) {
+    const known = p => p !== null && p !== undefined, pct = p => p + '%';
+    const level = c.rssiMin && c.rssiMax ? c.rssiMin + '/' + c.rssiMax + ' dBm' : '-';
+    text(fb, 'LOST', 4, y, 1, 1);
+    if (known(c.airLost)) inkText(fb, pct(c.airLost), W - 4 - textW(pct(c.airLost), 1), y, lostInk(c.airLost)); else textR(fb, '-', W - 4, y, 1, 1);
+    text(fb, 'LEVEL', 4, y + L2_PITCH, 1, 1);
+    textR(fb, level, W - 4, y + L2_PITCH, 1, 1);
+    text(fb, 'RX RETRY', 4, y + 2 * L2_PITCH, 1, 1);
+    if (known(c.airRetry)) inkText(fb, pct(c.airRetry), W - 4 - textW(pct(c.airRetry), 1), y + 2 * L2_PITCH, c.airRetry >= RETRY_BAD_PCT ? INK.BAD : INK.NONE);
+    else textR(fb, '-', W - 4, y + 2 * L2_PITCH, 1, 1);
+  }
   function drawNetLcd2(fb, ui, c) {
     titleBarLcd2(fb, 'NETWORK');
     netRows(c).forEach((r, i) => {
@@ -879,6 +894,7 @@ const OLED = (() => {
       if (sel) r.help.forEach((l, k) => { if (l) text(fb, l, 3, 101 + 9 * k, 1, 1); });
     });
     drawSignalRowLcd2(fb, L2_ROW0 + netRows(c).length * L2_PITCH, c.rssi);
+    if (c.net.mode === 0) drawAirRowsLcd2(fb, L2_ROW0 + (netRows(c).length + 1) * L2_PITCH, c);
   }
   function drawScanLcd2(fb, ui, c) {
     const list = c.net.scan, rows = L2_ROWS - 1;

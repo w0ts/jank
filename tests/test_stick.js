@@ -78,6 +78,15 @@ const st = Stick.ctx(state({ status: { ...status, gated: '1', bar: 'locked', bar
 eq([st.gated, st.bar, st.net.ip], [true, { state: 'locked', conf: 0.5 }, '10.0.0.5'], 'status: the gate, the bar estimator, the address');
 eq(Stick.ctx(state({ status: { ...status, gated: '1' }, statusAt: 0 }), 9000).gated, false, 'a status older than 5 s is not used');
 
+// ---- the peers' air from `status`: the window's loss and retry, the weakest and strongest frame ----
+eq([status.air_lost_pct, status.air_retry_pct, status.rssi_min, status.rssi_max], ['-1', '-1', '0', '0'], 'the status transcript has the air keys, unknown');
+const air = Stick.ctx(state({ status: { ...status, air_lost_pct: '3', air_retry_pct: '0', rssi_min: '-78', rssi_max: '-52' }, statusAt: 1000 }), 1500);
+eq([air.airLost, air.airRetry, air.rssiMin, air.rssiMax], [3, 0, -78, -52], 'status: loss 3 %, retry 0 % (a known zero), level -78 / -52');
+const airNone = Stick.ctx(state({ status, statusAt: 1000 }), 1500);
+eq([airNone.airLost, airNone.airRetry, airNone.rssiMin, airNone.rssiMax], [null, null, 0, 0], 'status -1: percentages unknown, no level');
+const airOld = Stick.ctx(state({ status: { ...status, air_lost_pct: '3' }, statusAt: 0 }), 9000);
+eq([airOld.airLost, airOld.airRetry, airOld.rssiMin, airOld.rssiMax], [null, null, null, null], 'no fresh status: all unknown');
+
 // ---- held by the user, or stopped by the silence / the gate (the status says which) ----
 {
   const stopped = home('h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1');

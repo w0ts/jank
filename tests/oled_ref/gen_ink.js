@@ -23,6 +23,7 @@ function extraState(s) {
   out.push('c layout 1');
   out.push('c rssi ' + num(s.rssi));
   out.push('c peakDb ' + num(s.peakDb));
+  for (const k of ['airLost', 'airRetry', 'rssiMin', 'rssiMax']) out.push('c ' + k + ' ' + num(s[k]));
   for (const k of ['confKnown', 'silent', 'gated', 'confHold']) out.push('c ' + k + ' ' + (s[k] ? 1 : 0));
   out.push('c autoBar ' + OLED.autoBarIndex(s.autoBar));
   out.push('c fold ' + s.fold);
@@ -70,7 +71,7 @@ function setters(s, log) {
 
 // one case: a state, then steps ['draw', t] | ['press', btn, t]
 function scenario(name, edit, steps) {
-  const s = Object.assign(baseState(), { rssi: -55, peakDb: -12, confKnown: true, silent: false, gated: false, confHold: false, fold: 1,
+  const s = Object.assign(baseState(), { rssi: -55, airLost: null, airRetry: null, rssiMin: 0, rssiMax: 0, peakDb: -12, confKnown: true, silent: false, gated: false, confHold: false, fold: 1,
                                          usbMidi: 0, beatN: 0 });
   if (edit) edit(s);
   const log = [], set = setters(s, log);
@@ -259,6 +260,17 @@ for (const r of [null, 0, -55, -67, -68, -80, -81, -95, 5]) {
   scenario('net signal jank ' + r, audio({ rssi: r }), [...presses(toNet), draw(10)]);
   scenario('net signal client ' + r, audio({ rssi: r, net: Object.assign(baseState().net, { mode: 1 }) }), [...presses(toNet), draw(10), ...walk(['down', 'down'], 20)]);
 }
+// ---- the air rows under SIGNAL (MODE JANK only): LOST, LEVEL, RX RETRY; known, unknown, the colour thresholds, and no rows in the other modes ----
+const air = (lost, retry, lo, hi) => ({ airLost: lost, airRetry: retry, rssiMin: lo, rssiMax: hi });
+scenario('net air unknown', audio(air(null, null, 0, 0)), [...presses(toNet), draw(10)]);
+scenario('net air known', audio(air(3, 0, -78, -52)), [...presses(toNet), draw(10), ...walk(['down', 'down'], 20)]);
+for (const p of [0, 2, 3, 9, 10, 50, 100]) scenario('net air lost ' + p, audio(air(p, 1, -90, -40)), [...presses(toNet), draw(10)]);
+for (const p of [0, 1, 29, 30, 100]) scenario('net air retry ' + p, audio(air(1, p, -90, -40)), [...presses(toNet), draw(10)]);
+scenario('net air only lost known', audio(air(4, null, 0, 0)), [...presses(toNet), draw(10)]);
+scenario('net air only retry known', audio(air(null, 31, -66, -66)), [...presses(toNet), draw(10)]);
+scenario('net air widest level', audio(air(12, 35, -100, -1)), [...presses(toNet), draw(10)]);
+scenario('net air client none', audio(Object.assign(air(20, 40, -80, -50), { net: Object.assign(baseState().net, { mode: 1 }) })), [...presses(toNet), draw(10)]);
+scenario('net air ap none', audio(Object.assign(air(20, 40, -80, -50), { net: Object.assign(baseState().net, { mode: 2 }) })), [...presses(toNet), draw(10)]);
 scenario('net signal ap', audio({ rssi: -70, net: Object.assign(baseState().net, { mode: 2 }) }), [...presses(toNet), draw(10)]);
 scenario('netinfo client', audio({ net: Object.assign(baseState().net, { mode: 1 }) }), [...presses([...toNet, 'down', 'down', 'down', 'yes']), draw(20)]);
 scenario('netinfo ap', audio({ net: Object.assign(baseState().net, { mode: 2 }) }), [...presses([...toNet, 'down', 'down', 'down', 'yes']), draw(20)]);

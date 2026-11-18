@@ -199,8 +199,15 @@ static void test_status(void)
     CHECK(strstr(out, "air_in=7\n") && strstr(out, "usb_in=3\n") && strstr(out, "tx_fail=2\n"));
     CHECK(strstr(out, "peers=1\n") && strstr(out, "rssi=-44\n"));
     CHECK(strstr(out, "lat_air_max_us=900\n"));
+    CHECK(strstr(out, "air_lost_pct=-1\nair_retry_pct=-1\nrssi_min=0\nrssi_max=0\n"));   /* no window completed yet */
     CHECK(strstr(out, "peer=8c:aa:bb:cc:dd:ee,-44,100,5\n"));
     CHECK(ends(out, "ok\n"));
+    /* the last completed window of the peers' frames: 3 of 40 lost, 6 of 40 retried */
+    snap.b.win.on = 1;
+    snap.b.win.done = (struct jk_win){.heard = 37, .missed = 3, .dup = 3, .retry = 6, .rssi_min = -78, .rssi_max = -52};
+    CHECK(run("status") == JK_CTL_NONE);
+    CHECK(strstr(out, "peers=1\nrssi=-44\nair_lost_pct=8\nair_retry_pct=15\nrssi_min=-78\nrssi_max=-52\nwifi=0\n"));
+    CHECK(strstr(out, "peer=8c:aa:bb:cc:dd:ee,-44,100,5\n"));        /* the peer line keeps its fields */
     /* a unit gone is not listed */
     snap.b.peer[0].t_heard = 0;
     CHECK(jk_ctl_line("status", &cfg, &snap, 10000, out, sizeof out) == JK_CTL_NONE);

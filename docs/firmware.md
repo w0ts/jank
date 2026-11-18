@@ -72,6 +72,22 @@ its own in either mode (`core/jank_peer.h` jp_solo; LINK mode since M2l, as a lo
 120 BPM, stopped until the user's Start, which starts it on its next bar line with the MIDI clock, whatever LINK TRANSPORT
 while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on its bar line once the tracker locks.
 
+- **Air statistics** (MODE JANK; `status` keys `air_lost_pct`, `air_retry_pct`, `rssi_min`, `rssi_max`; the NETWORK screen's `LOST`, `RX RETRY`
+  and `LEVEL` rows). Every frame of a peer carries the sender's 12-bit sequence number (802.11 sequence control), so what the peers' frames
+  say about the air is counted when they arrive (`core/jank_core.c` `note_peer`, all peers together, over a tumbling 10 s window; the last
+  completed window is the one shown, nothing until the first one completes). In the window:
+  *heard* = peer frames counted; a copy of a frame already counted (Retry bit set and the same number as that peer's last) is a *duplicate*
+  and is not heard again; *missed* = the sequence numbers a peer skipped between two counted frames, `((seq - last) & 0xFFF) - 1`, a gap above
+  2000 counted as 0 (the peer restarted, or was away: the count starts again); *retried* = frames with the Retry bit set, the duplicates too;
+  the level = the weakest and the strongest rssi over the counted frames.
+  `air_lost_pct` = round(100 x missed / (missed + heard)); `air_retry_pct` = round(100 x retried / (heard + duplicates)); each is `-1`
+  (not known) with fewer than 10 frames in its base, and while no window has completed or no peer was heard in it. `rssi_min` / `rssi_max`
+  are `0` for none, like `rssi`. The per-peer `peer=` line is unchanged.
+  Limits: *RX RETRY is the peers' retries as received here, not this device's own*: a group-addressed frame is never acknowledged, so a sender
+  cannot know it was retried and the radio gives no per-frame retry count; there is no number for this device's own sends. A loss is a frame
+  the peer numbered and this device did not receive (or did not decode), so a unicast to another device that was heard counts as heard, and a
+  peer table that is full (`JK_PEERS`) leaves the units beyond it out of every number. Joined to a router (Wi-Fi client) nothing of this exists:
+  the keys read -1 / 0 and the screen shows SIGNAL only (the router's rssi, `wifi_rssi`).
 - **`play` starts on the next bar line** (`quantum` beats). The start goes out 150 ms before that bar, as "playing from
   bar B" (Link's isPlaying, beats B, time stamp now), so every peer starts on B: Live and LinkHut read B, the FM-1 and the
   stick's own MIDI clock start on the next bar line they have not sent yet (`core/jank_start.h`). The session playing

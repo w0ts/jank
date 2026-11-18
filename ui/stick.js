@@ -67,10 +67,13 @@ const Stick = (() => {
     // heard; null = the stick has not said (no fresh status). Nothing is made up.
     const wifiMode = !!(h && h.net && h.net.kind === 'wifi');
     const rssiRaw = st ? num(wifiMode ? st.wifi_rssi : st.rssi) : null, rssi = wifiMode && !h.net.up ? 0 : rssiRaw;
+    // the peers' air over the last 10 s window (status air_*, rssi_min / rssi_max): null = not known (no fresh status, or the firmware's -1); a level of 0 = none
+    const pctOf = v => (num(v) === null || num(v) < 0 ? null : num(v));
     const wifiBars = h && h.net && h.net.kind === 'wifi' && !h.net.up ? 'none' : st && num(st.rssi) !== null && num(st.rssi) !== 0 ? (num(st.rssi) > -70 ? 'good' : 'weak') : 'unknown';
     return {
       link: !audio, bpm: audio && h.bpm > 0 ? h.bpm : null, linkBpm: !audio && h && h.bpm > 0 ? h.bpm : null, mode: 'steady',
-      conf: h && h.conf !== null ? h.conf / 100 : 0, confKnown: !!h && h.conf !== null, rssi, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
+      conf: h && h.conf !== null ? h.conf / 100 : 0, confKnown: !!h && h.conf !== null, rssi, airLost: st ? pctOf(st.air_lost_pct) : null, airRetry: st ? pctOf(st.air_retry_pct) : null,
+      rssiMin: st ? num(st.rssi_min) : null, rssiMax: st ? num(st.rssi_max) : null, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
       confStop: g.lowconf !== 'run', levelDb: level, levelMin: h && h.levelMin !== null ? h.levelMin : FLOOR_DB, levelMax: h && h.levelMax !== null ? h.levelMax : FLOOR_DB,
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
