@@ -369,6 +369,7 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->reset = reset_name();
     c->temp_c = s_sys.temp_c;
     c->cpu_pct = jk_cpu_pct(b->core0_idle_x10);     /* core 0 (the beat, UI and radio core): what its idle task leaves, as beat.c measures it */
+    c->cpu1_pct = jk_cpu1_pct(b->core1_busy_x10, b->core1_ok);   /* core 1: the MIDI clock interrupt's share (midi.c) */
     c->heap_kb = s_sys.heap_kb;
     c->psram_kb = s_sys.psram_kb;
     c->heap_min_kb = s_sys.heap_min_kb;

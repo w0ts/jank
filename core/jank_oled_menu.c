@@ -209,6 +209,18 @@ static void about_num(struct jo_about_row *r, const char *label, int v, const ch
         snprintf(r->val, sizeof r->val, "-");
 }
 
+/* CPU: "core 0 / core 1 %", "-" for a core not known (57/3%, 57/-%, -/-%) */
+static void about_cpu(struct jo_about_row *r, int c0, int c1)
+{
+    char a[12] = "-", b[12] = "-";
+    if (c0 >= 0)
+        snprintf(a, sizeof a, "%d", c0);
+    if (c1 >= 0)
+        snprintf(b, sizeof b, "%d", c1);
+    snprintf(r->label, sizeof r->label, "CPU");
+    snprintf(r->val, sizeof r->val, "%s/%s%%", a, b);
+}
+
 static void about_txt(struct jo_about_row *r, const char *label, const char *val)
 {
     snprintf(r->label, sizeof r->label, "%s", label);
@@ -243,7 +255,7 @@ void jo_about_rows(const struct jo_ctx *c, struct jo_about_row rows[JO_ABOUT_ROW
     about_txt(&rows[3], "UPTIME", up);
     about_txt(&rows[4], "RESET", c->reset ? c->reset : "-");
     about_txt(&rows[5], "TEMP", t);
-    about_num(&rows[6], "CPU", c->cpu_pct, "%");
+    about_cpu(&rows[6], c->cpu_pct, c->cpu1_pct);
     about_txt(&rows[7], "MEMORY", mem);
     about_num(&rows[8], "MIN HEAP", c->heap_min_kb, "K");
     about_txt(&rows[9], "FLASH", fl);
