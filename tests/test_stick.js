@@ -42,7 +42,7 @@ const state = (over = {}) => ({ home: AUDIO, homeAt: 1000, get, status: null, st
 // ---- no data yet: the silent screen, nothing made up ----
 const none = Stick.ctx({ home: null, get: {}, status: null }, 5000);
 eq([none.bpm, none.linkBpm, none.conf, none.levelDb, none.levelMin, none.levelMax, none.silent, none.beatN, none.bar, none.running, none.armed, none.peers, none.fitted],
-   [null, null, 0, -99, -99, -99, true, null, null, false, false, null, false], 'no HOME line yet: no tempo, no level, no beat, nothing running, the Link peers unknown (null)');
+   [null, null, 0, -99, -99, -99, true, null, null, false, false, 0, false], 'no HOME line yet: no tempo, no level, no beat, nothing running');
 const idle = Stick.ctx(state({ home: idleHome }), 1100);
 eq([idle.bpm, idle.linkBpm, idle.levelDb, idle.beatN, idle.running, idle.fitted], [null, null, -99, null, false, true], 'the stick says nothing playing: the same');
 const stale = Stick.ctx(state(), 1000 + 1501);

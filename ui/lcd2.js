@@ -13,16 +13,18 @@
      warn    (255, 176, 32)    amber: fair, near the line, low; also the bar's first beat (the LED language's bar 1)
      bad     (255, 104, 92)    red: poor, below the line, clipping, empty
      dim     (150, 156, 168)   grey: no signal, nothing heard, not reported
-   VU RAMP: 16 more ink ids (OLED.VU: ids 6..21), the input meter's gradient from green (quiet) through lime and amber to red (hot). They
+   VU RAMP: 32 more ink ids (OLED.VU: ids 6..37), the input meter's continuous gradient from green (quiet) through lime and amber to red (hot). They
    colour bars only (the numbers beside them use the ids above), so they need to be visible, not AA text: every step is at least 6.6 : 1
-   on the background. */
+   on the background, and neighbouring steps differ by at most 16 per channel (no visible banding). */
 const Lcd2 = (() => {
   const SRC_W = 160, SRC_H = 120, SCALE = 2, W = SRC_W * SCALE, H = SRC_H * SCALE;
   const PALETTE = { bg: [8, 10, 14], neutral: [232, 236, 244], good: [72, 222, 128], warn: [255, 176, 32], bad: [255, 104, 92], dim: [150, 156, 168] };
   // ink id (OLED.INK) -> palette key; index = id
   const INK_PALETTE = ['neutral', 'good', 'warn', 'bad', 'dim', 'warn'];
   const VU_RAMP = [[72, 222, 128], [72, 222, 128], [72, 222, 128], [72, 222, 128], [72, 222, 128], [72, 222, 128], [72, 222, 128], [72, 222, 128],
-                   [107, 225, 107], [141, 227, 85], [176, 230, 64], [202, 212, 53], [229, 194, 43], [255, 176, 32], [255, 136, 60], [255, 96, 88]];
+                   [72, 222, 128], [72, 222, 128], [72, 222, 128], [82, 223, 122], [93, 224, 115], [103, 224, 109], [114, 225, 102], [124, 226, 96],
+                   [134, 227, 90], [145, 228, 83], [155, 228, 77], [166, 229, 70], [176, 230, 64], [189, 221, 59], [202, 212, 53], [216, 203, 48],
+                   [229, 194, 43], [242, 185, 37], [255, 176, 32], [255, 160, 43], [255, 144, 54], [255, 128, 66], [255, 112, 77], [255, 96, 88]];
   const inkColour = id => (id >= OLED.VU.ink0 && id < OLED.VU.ink0 + VU_RAMP.length ? VU_RAMP[id - OLED.VU.ink0] : PALETTE[INK_PALETTE[id] || 'neutral']);
 
   // the RGB of every source pixel: unlit = background, lit = the colour of its ink id (neutral when ink is missing or 0)
