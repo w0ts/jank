@@ -717,7 +717,7 @@ const OLED = (() => {
   const dbFrac = db => clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1);
   const vuInk = col => VU.ink0 + Math.floor(VU.steps * col / L2.barW);
 
-  // 1-bit rows ('#' = lit), at the old 160 x 120 size: they are drawn doubled with Scale2x (icon2). The USB plug on its cable 9 x 7 (drawn left of the
+  // 1-bit rows ('#' = lit), at the old 160 x 120 size: they are drawn doubled: the plug with Scale2x (icon2), the LINK TRANSPORT icons plain 2 x 2 (icon2p). The USB plug on its cable 9 x 7 (drawn left of the
   // battery while charging), and the LINK TRANSPORT option icons: IGNORE = a crossed circle (own start only), FOLLOW = an arrow coming in, FOLLOW+LEAD = a double arrow
   const PLUG = ['..####...', '..#######', '#########', '######...', '#########', '..#######', '..####...'];
   const LT_ICONS_L2 = [
@@ -727,6 +727,8 @@ const OLED = (() => {
   ];
   const TRI_W = [1, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 18, 16, 14, 12, 11, 9, 7, 6, 4, 2, 1];   // the play triangle's row widths (18 x 22)
   function icon2(fb, rows, x, y) { icon(fb, rows2x(rows), x, y); }
+  const plain2x = rows => rows.flatMap(r => { const d = [...r].map(ch => ch + ch).join(''); return [d, d]; });   // every pixel an exact 2 x 2 block
+  const icon2p = (fb, rows, x, y) => icon(fb, plain2x(rows), x, y);
   // the chain (the Optimist's link icon, 19 x 14): two rounded links with 2 px strokes, the second down and right of the first
   function drawChain(fb, x, y) {
     for (let k = 0; k < 2; k++) {
@@ -745,7 +747,7 @@ const OLED = (() => {
   }
   // the left group after the transport icon: the LINK TRANSPORT icon (both modes) at ltX and, in AUDIO mode when the fold is not 1, the fold label beside it
   function drawOptionLcd2(fb, c) {
-    icon2(fb, LT_ICONS_L2[c.ltMode], L2.ltX, L2.iconY);
+    icon2p(fb, LT_ICONS_L2[c.ltMode], L2.ltX, L2.iconY);
     const fl = !c.link ? foldLabel(c.fold) : '';
     if (!fl) return;
     const w = textW(fl, 1) + 8;

@@ -59,8 +59,8 @@
 #define VU_H 10
 #define TEXT_H 14                       /* a text row of the small face */
 
-/* 1-bit rows ('#' = lit) at the old 160 x 120 size, drawn doubled with Scale2x (jo_icon2): the USB plug on its cable 9 x 7 (left of the battery while
- * charging), and the LINK TRANSPORT icons: IGNORE a crossed circle, FOLLOW an arrow coming in, FOLLOW+LEAD a double arrow */
+/* 1-bit rows ('#' = lit) at the old 160 x 120 size, drawn doubled: the USB plug (Scale2x, jo_icon2) on its cable 9 x 7 (left of the battery while
+ * charging), and the LINK TRANSPORT icons (plain 2 x 2 blocks, jo_icon2p, so the two triangles stay apart): IGNORE a crossed circle, FOLLOW an arrow coming in, FOLLOW+LEAD a double arrow */
 static const char *const PLUG[7] = {"..####...", "..#######", "#########", "######...", "#########", "..#######", "..####..."};
 static const char *const LT_ICON0[11] = {"...#####...", "..##...##..", ".##.....##.", "##.....#.##", "#.....#...#", "#....#....#", "#...#.....#", "##.#.....##",
                                          ".##.....##.", "..##...##..", "...#####..."};
@@ -153,7 +153,7 @@ static void option_icons(uint8_t *fb, const struct jo_ctx *c)
     const char *fl = !c->link ? fold_label(c->fold_exp) : "";
     int w = jo_text_w(fl, 1) + 8;
     if (c->lt_mode < 3)
-        jo_icon2(fb, LT_ICONS[c->lt_mode], 11, LT_X, ICON_Y);
+        jo_icon2p(fb, LT_ICONS[c->lt_mode], 11, LT_X, ICON_Y);
     if (!fl[0])
         return;
     jo_rect(fb, FOLD_X, ICON_Y, w, ICON_H, 1);
