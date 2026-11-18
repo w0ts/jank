@@ -14,7 +14,7 @@ const BOX3 = {
     { id: 'midi1', wall: 'top', at: 33.3, kind: 'trs' }, { id: 'midi2', wall: 'top', at: 46.1, kind: 'trs' },
     { id: 'din1', wall: 'top', at: 63.5, kind: 'din' }, { id: 'din2', wall: 'top', at: 85.6, kind: 'din' },
     { id: 'clock', wall: 'right', at: 30.5, kind: 'trs' }, { id: 'reset', wall: 'right', at: 50.5, kind: 'trs' },
-    { id: 'linein', wall: 'bottom', at: 73.5, kind: 'trs' },
+    { id: 'linein', wall: 'bottom', at: 33.5, kind: 'trs' },
     { id: 'usbIn', wall: 'bottom', at: 9.5, kind: 'usbc' }, { id: 'usbHost', wall: 'bottom', at: 21.0, kind: 'usbc' }, { id: 'usbOwn', wall: 'left', at: 40.5, kind: 'usbc' },
   ],
   // connector sizes: length along the wall, depth out of the wall (3.5 mm jack ~6, 5-pin DIN ~15, USB-C 9 x 3.2)
