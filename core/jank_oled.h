@@ -115,6 +115,16 @@ struct jo_ctx {
     struct jo_wifiq wifiq;
     uint8_t usb, fitted;                  /* USB power plugged; a cell fitted */
     int batt;                             /* percent */
+    /* the ABOUT screen: -1 (JO_UNKNOWN) = not known, temp_c JO_TEMP_UNKNOWN, version NULL */
+    const char *version;                  /* the firmware version, e.g. "0.1.0" */
+    int temp_c;                           /* the chip's temperature, whole degrees C */
+    int cpu_pct;                          /* CPU load over the last sample, % (both cores together) */
+    int heap_kb, psram_kb;                /* free internal heap; free PSRAM (-1 on a board without) */
+    int flash_kb, app_used_kb, app_kb;    /* the flash chip; the running app image; its partition */
+    int uptime_s, heap_min_kb;            /* seconds since boot; the least free internal heap since boot */
+    const char *reset;                    /* why the chip last reset, upper case ("POWERON", "PANIC"), NULL unknown */
+    int clk_late_us;                      /* the MIDI clock alarm's worst lateness since boot */
+    int ui_loop_us, beat_loop_us;         /* the longest pass of the UI task / the beat task since boot */
     uint8_t lt_mode, in_src, usb_role, auto_bar;
     uint8_t has_bar, bar_state;           /* the downbeat estimator, enum jo_bar_state */
     double bar_conf;
@@ -159,10 +169,15 @@ struct jo_overlay {
     char value[16];
 };
 
+#define JO_TEMP_UNKNOWN (-999)
+#define JO_UNKNOWN (-1)
+
 struct jo_ui {
     uint8_t screen;                       /* enum jo_screen */
     uint8_t cursor, top, ocur, ncur, scur, stop;
     uint8_t sub;                          /* the SUB shown: 0 AUDIO, 1 OFFSET, 2 DISPLAY */
+    uint8_t page;                         /* the INFO shown: 0 BATTERY, 1 ABOUT */
+    uint8_t ascroll;                      /* ABOUT: the first row shown (the OLED shows 5 of its 7) */
     uint8_t leave;                        /* SETUP's "LEAVE SETUP?" */
     int8_t hint;                          /* -1 none, JO_NO / JO_YES: the held button's hint on HOME */
     struct jo_edit edit;

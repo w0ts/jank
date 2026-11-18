@@ -225,10 +225,11 @@ mode the screen is unchanged (SIGNAL only: there is no peer traffic to measure).
 | screen | geometry |
 |---|---|
 | title bar | 11 rows, full width, text at y 2 |
-| MENU | 10 rows of 9 px from y 13 (the 10 items of the lcd2 menu all fit: no scrolling; row k at y 13 + 9k, last at y 94; the OLED menu has 9), value right-aligned at x 156, selected row inverted over the full width |
+| MENU | 11 rows of 9 px from y 13 (the 11 items of the lcd2 menu all fit: no scrolling; row k at y 13 + 9k, last at y 103; the OLED menu has 10), value right-aligned at x 156, selected row inverted over the full width |
 | sub menu (AUDIO, OFFSET, DISPLAY) | rows of 12 px from y 16 |
 | edit | the value at font scale 2 in an inverted box centred on 160 (scale 1 if it would not fit), the two help lines at y 70 and 82 |
 | info (BATTERY) | text rows of 12 px from y 18, the level bar 152 px wide at y 92 |
+| info (ABOUT) | NAME, VERSION, REPO, UPTIME, RESET, TEMP, CPU, MEMORY (+ PSRAM), MIN HEAP, FLASH, CLOCK LATE, UI LOOP, BEAT LOOP: rows of 12 px from y 18, 8 shown of 13, UP / DOWN scroll (the OLED shows 5 at 9 px from y 13); `-` when not known; no bar, no ink |
 | NETWORK / scan list | rows of 9 px like the menu (scan: 11 rows, the selected one kept near the middle, signal bars at x 144), the selected row's help at y 101 and 110 |
 | text editor | 25 character cells of 6 px from x 5, the help lines at y 46, 58, 70 |
 | confirm | two lines centred at y 34 and 46, `YES      NO` at scale 2 at y 84 |
@@ -237,7 +238,7 @@ mode the screen is unchanged (SIGNAL only: there is no peer traffic to measure).
 | BOOT / splash | `BOOT` at scale 5; `JANK` at scale 5 and `MINI 2.2` at scale 3 |
 
 The cursor logic in `OLED.press` still scrolls as if 6 menu rows were visible (`ui.top`); the lcd2 draw ignores `ui.top` and keeps the
-cursor in view by itself (all 10 menu items fit; the scan list centres on the selection), so no state is shared between the layouts.
+cursor in view by itself (all 11 menu items fit; the scan list centres on the selection), so no state is shared between the layouts.
 
 ## The C side (built, never run on the board)
 

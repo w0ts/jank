@@ -142,6 +142,7 @@ const struct jo_item jo_menu[JO_MENU_ITEMS] = {
     {"AUDIO", JO_ITEM_SUB, 0}, {"LINK TRANSPORT", JO_ITEM_EDIT, JO_F_LTMODE}, {"AUTO BAR", JO_ITEM_EDIT, JO_F_AUTOBAR},
     {"NETWORK", JO_ITEM_NET, 0}, {"USB", JO_ITEM_EDIT, JO_F_USBROLE}, {"OFFSET", JO_ITEM_SUB, 1},
     {"CLK RATE", JO_ITEM_EDIT, JO_F_RATE}, {"DISPLAY", JO_ITEM_SUB, 2}, {"BATTERY", JO_ITEM_INFO, 0},
+    {"ABOUT", JO_ITEM_INFO, 1},
 };
 
 const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2] = {
@@ -149,6 +150,7 @@ const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2] = {
     {"NETWORK", JO_ITEM_NET, 0}, {"USB", JO_ITEM_EDIT, JO_F_USBROLE},
     {"USB MIDI CLOCK OUT", JO_ITEM_EDIT, JO_F_USBMIDI}, {"OFFSET", JO_ITEM_SUB, 1}, {"CLK RATE", JO_ITEM_EDIT, JO_F_RATE},
     {"DISPLAY", JO_ITEM_SUB, 2}, {"BATTERY", JO_ITEM_INFO, 0},
+    {"ABOUT", JO_ITEM_INFO, 1},
 };
 
 const struct jo_sub jo_subs[3] = {
@@ -193,4 +195,51 @@ int jo_net_rows(const struct jo_ctx *c, struct jo_net_row rows[4])
     rows[3] = (struct jo_net_row){"STATUS", "", JO_ACT_STATUS, {"ADDRESS AND", "CONNECTED CLIENTS"}};
     snprintf(rows[3].val, sizeof rows[3].val, "%d CLIENTS", n->ap_clients);
     return 4;
+}
+
+/* the ABOUT rows, one string each, "-" for what is not known: NAME, VERSION, REPO, UPTIME, RESET, TEMP, CPU, MEMORY, MIN HEAP, FLASH,
+ * CLOCK LATE, UI LOOP, BEAT LOOP. The repo is shortened on the OLED (21 characters across); the lcd2 layout adds the PSRAM to MEMORY */
+static void about_num(char *out, const char *label, int v, const char *unit)
+{
+    if (v >= 0)
+        snprintf(out, 40, "%s %d%s", label, v, unit);
+    else
+        snprintf(out, 40, "%s -", label);
+}
+
+void jo_about_rows(const struct jo_ctx *c, char rows[JO_ABOUT_ROWS][40])
+{
+    char a[16], b[16], up[24] = "-", t[24] = "-", mem[40] = "-", fl[64] = "-";
+    if (c->uptime_s >= 86400)
+        snprintf(up, sizeof up, "%dd %dh", c->uptime_s / 86400, c->uptime_s % 86400 / 3600);
+    else if (c->uptime_s >= 0)
+        snprintf(up, sizeof up, "%d:%02d:%02d", c->uptime_s / 3600, c->uptime_s % 3600 / 60, c->uptime_s % 60);
+    if (c->temp_c != JO_TEMP_UNKNOWN)
+        snprintf(t, sizeof t, "%d C", c->temp_c);
+    if (c->heap_kb >= 0) {
+        snprintf(mem, sizeof mem, "%dK", c->heap_kb);
+        if (c->layout_lcd2 && c->psram_kb >= 0)
+            snprintf(mem, sizeof mem, "%dK PSRAM %dK", c->heap_kb, c->psram_kb);
+    }
+    if (c->flash_kb >= 0) {
+        snprintf(fl, sizeof fl, "%dM -", c->flash_kb / 1024);
+        if (c->app_used_kb >= 0 && c->app_kb >= 0) {
+            jo_fixed(c->app_used_kb / 1024.0, 1, a, sizeof a);
+            jo_fixed(c->app_kb / 1024.0, 1, b, sizeof b);
+            snprintf(fl, sizeof fl, "%dM %s/%sM", c->flash_kb / 1024, a, b);
+        }
+    }
+    snprintf(rows[0], 40, "NAME jank");
+    snprintf(rows[1], 40, "VERSION %s", c->version ? c->version : "-");
+    snprintf(rows[2], 40, "REPO %s", c->layout_lcd2 ? "github.com/w0ts/jank" : "w0ts/jank");
+    snprintf(rows[3], 40, "UPTIME %s", up);
+    snprintf(rows[4], 40, "RESET %s", c->reset ? c->reset : "-");
+    snprintf(rows[5], 40, "TEMP %s", t);
+    about_num(rows[6], "CPU", c->cpu_pct, "%");
+    snprintf(rows[7], 40, "MEMORY %s", mem);
+    about_num(rows[8], "MIN HEAP", c->heap_min_kb, "K");
+    snprintf(rows[9], 40, "FLASH %s", fl);
+    about_num(rows[10], "CLOCK LATE", c->clk_late_us, " US");
+    about_num(rows[11], "UI LOOP", c->ui_loop_us, " US");
+    about_num(rows[12], "BEAT LOOP", c->beat_loop_us, " US");
 }

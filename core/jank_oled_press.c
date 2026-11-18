@@ -164,8 +164,11 @@ static void press_menu(struct jo_ui *ui, enum jo_btn b, int d, const struct jo_c
             ui->screen = JO_SUB;
             ui->sub = it->ref;
             ui->ocur = 0;
-        } else
+        } else {
             ui->screen = JO_INFO;
+            ui->page = it->ref;
+            ui->ascroll = 0;
+        }
     }
 }
 
@@ -249,6 +252,10 @@ void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx
     case JO_INFO:
         if (!d)
             ui->screen = JO_MENU;
+        else if (ui->page == 1) {                     /* ABOUT: scroll when its rows do not all fit */
+            int max = JO_ABOUT_ROWS - (c->layout_lcd2 ? JO_ABOUT_VIS_LCD2 : JO_ABOUT_VIS_OLED);
+            ui->ascroll = (uint8_t)jo_clampi(ui->ascroll - d, 0, max > 0 ? max : 0);
+        }
         break;
     case JO_EDIT:
         if (d)

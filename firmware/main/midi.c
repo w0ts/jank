@@ -37,6 +37,7 @@ static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static DRAM_ATTR struct jc_map s_map;
 static DRAM_ATTR struct jc_ticker s_tick;
 static uint8_t s_running;
+static DRAM_ATTR volatile uint32_t s_late_max_us;   /* the alarm's worst lateness since boot (ABOUT screen): one compare and store per tick */
 #ifdef BOARD_BENCH_CLK_GPIO
 static DRAM_ATTR uint8_t s_bench_clk;   /* the CLK pin's level: it changes on every F8 */
 static DRAM_ATTR uint8_t s_bench_rst;   /* the RST pin is high: low again at the next clock */
@@ -82,6 +83,9 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
     int64_t now = (int64_t)ev->count_value;
     bool woken = false;
     (void)ctx;
+    const uint64_t late = (uint64_t)now - ev->alarm_value;     /* (an early count wraps to a huge value: ignored) */
+    if (late > s_late_max_us && late < 1000000u)
+        s_late_max_us = (uint32_t)late;
     portENTER_CRITICAL_ISR(&s_mux);
     jc_step(&s_tick, &s_map, now, &f);
     portEXIT_CRITICAL_ISR(&s_mux);
@@ -279,6 +283,8 @@ int midi_is_playing(void)
     portEXIT_CRITICAL(&s_mux);
     return r;
 }
+
+uint32_t midi_late_max_us(void) { return s_late_max_us; }
 
 void midi_stats(uint32_t *ticks, uint32_t *resyncs)
 {

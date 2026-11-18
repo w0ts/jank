@@ -6,7 +6,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { baseState, dumpState, hex } = require('./state.js');
+const { baseState, dumpState, hex, ABOUT_FULL, ABOUT_NONE } = require('./state.js');
 const root = path.join(__dirname, '..', '..');
 const src = fs.readFileSync(path.join(root, 'ui', 'bigfont.js'), 'utf8') + fs.readFileSync(path.join(root, 'ui', 'oled.js'), 'utf8');
 const OLED = new Function(src + '; return OLED;')();
@@ -198,8 +198,8 @@ scenario('saved box', audio({ saved: true }), [draw(0)]);
 scenario('boot', audio({ boot: true }), [draw(0)]);
 scenario('splash', audio({ splash: true }), [draw(0)]);
 
-// ---- MENU: the 10 items, every row, every value ----
-const downAll = Array(9).fill('down');
+// ---- MENU: the 11 items, every row, every value ----
+const downAll = Array(10).fill('down');
 scenario('menu', null, [['press', 'no', 0], draw(1)]);
 scenario('menu walk', null, [['press', 'no', 0], draw(1), ...walk(downAll, 10), ...walk(['down', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up', 'up'], 200)]);
 scenario('menu values', audio({ ltMode: 0, autoBar: 0, net: Object.assign(baseState().net, { mode: 1 }), usbRole: 1, usbMidi: 1, rate: 4, fitted: false }),
@@ -227,9 +227,14 @@ scenario('edit usb', null, [...presses([...menuItem(4), 'yes']), draw(10), ...wa
 scenario('edit rate', audio({ rate: 3 }), [...presses([...menuItem(7), 'yes']), draw(10), ...walk(['up', 'up', 'up', 'down'], 20), ['press', 'no', 60], draw(61)]);
 scenario('edit offsets', audio({ offs: [49, -49, 0], inOff: 99 }), [...presses([...menuItem(6), 'yes', 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20), ['press', 'yes', 50], draw(51)]);
 scenario('edit display', audio({ bright: 90 }), [...presses([...menuItem(8), 'yes', 'yes']), draw(20), ...walk(['up', 'up', 'down', 'down'], 30), ['press', 'no', 80], draw(81)]);
-scenario('battery info', null, [...presses([...menuItem(10), 'yes']), draw(20), ['press', 'up', 21], draw(22), ['press', 'yes', 23], draw(24)]);
+scenario('battery info', null, [...presses([...menuItem(9), 'yes']), draw(20), ['press', 'up', 21], draw(22), ['press', 'yes', 23], draw(24)]);
 for (const [b, usb, fitted] of [[100, true, true], [37, false, true], [0, true, true], [64, false, false], [64, true, false], [99, true, true]])
-  scenario('battery info ' + b + ' ' + usb + ' ' + fitted, audio({ batt: b, usb, fitted }), [...presses([...menuItem(10), 'yes']), draw(20)]);
+  scenario('battery info ' + b + ' ' + usb + ' ' + fitted, audio({ batt: b, usb, fitted }), [...presses([...menuItem(9), 'yes']), draw(20)]);
+
+// ---- ABOUT: the system rows, 8 of 13 on the colour layout (UP / DOWN scroll), "-" for what is not known ----
+scenario('about', audio(ABOUT_FULL), [...presses([...menuItem(10), 'yes']), draw(20), ...walk(Array(7).fill('down'), 30), ['press', 'up', 400], draw(401), ['press', 'yes', 402], draw(403)]);
+scenario('about unknown', audio(ABOUT_NONE), [...presses([...menuItem(10), 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down', 'down', 'down'], 30)]);
+scenario('about long uptime', audio({ ...ABOUT_FULL, uptimeS: 200000, flashKb: 4096, appUsedKb: null, reset: 'PANIC' }), [...presses([...menuItem(10), 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down'], 30)]);
 
 // ---- NETWORK, the scan list, the character editor, SETUP with its QR code ----
 const toNet = [...menuItem(3), 'yes'];

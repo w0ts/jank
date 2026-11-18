@@ -50,7 +50,7 @@ function oledFixtures() {
   return out;
 }
 if (process.env.LCD2_OLED) { console.log(JSON.stringify(oledFixtures().map(f => sha([f])))); process.exit(0); }
-const GOLDEN = JSON.parse('["92586ffb36b70a7d","12a9465b16c68428","f4f15225710bfde3","175c54f575f5b515","9da040822b6d69fc","4df4155e0ba4841d","7fd977781a04b3ad","d7690151e5ad2b33"]');
+const GOLDEN = JSON.parse('["92586ffb36b70a7d","12a9465b16c68428","f4f15225710bfde3","175c54f575f5b515","9da040822b6d69fc","4df4155e0ba4841d","6d33155d4e1c772f","d7690151e5ad2b33"]');
 eq(oledFixtures().map(f => sha([f])), GOLDEN, 'the OLED layout draws the bytes the OLED module drew before the lcd2 layout (8 screens)');
 eq([OLED.W, OLED.H, OLED.size(), OLED.size('oled'), OLED.size('lcd2')], [128, 64, { w: 128, h: 64 }, { w: 128, h: 64 }, { w: 160, h: 120 }], 'sizes: OLED.W / OLED.H stay the OLED\'s; OLED.size(layout) says the grid of a layout');
 {
@@ -457,15 +457,15 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   noInk(d, 'MENU');
   eq([d.fb[0], d.fb[LW - 1], d.fb[10 * LW], d.fb[11 * LW]], [1, 1, 1, 0], 'the title bar is 11 rows, the full width');
   const rowBand = k => litIn(d, 0, 13 + 9 * k, d.w, 7).length;
-  eq([rowBand(0), rowBand(1), rowBand(9)].map(n => n > 0), [true, true, true], 'the 10 menu items are rows of 9 px from y 13 (the last at y ' + (13 + 81) + ')');
+  eq([rowBand(0), rowBand(1), rowBand(10)].map(n => n > 0), [true, true, true], 'the 11 menu items are rows of 9 px from y 13 (the last at y ' + (13 + 90) + ')');
   eq([d.fb[(13 - 1) * LW], d.fb[(13 - 1) * LW + LW - 1], d.fb[20 * LW + 2]], [1, 1, 1], 'the selected row (the first) is inverted over the full width');
   eq(litIn(d, 0, 13 + 9 - 1, 1, 9).length, 0, 'the next row is not');
   const lastLit = Math.max(...litRows(d));
-  ok(lastLit >= 13 + 9 * 9 && lastLit < LH, 'the list reaches y ' + lastLit + ' of 119: the grid is used');
-  const dn = withUi(ctxOf(), ['no', ...Array(9).fill('down')], 'lcd2');
+  ok(lastLit >= 13 + 9 * 10 && lastLit < LH, 'the list reaches y ' + lastLit + ' of 119: the grid is used');
+  const dn = withUi(ctxOf(), ['no', ...Array(10).fill('down')], 'lcd2');
   d = drawn(dn.c, { ui: dn.ui });
   noInk(d, 'MENU, last item selected');
-  eq(d.fb[(13 + 81 - 1) * LW + 100], 1, 'the last item (BATTERY) is the selected, inverted row at the bottom');
+  eq(d.fb[(13 + 90 - 1) * LW + 100], 1, 'the last item (ABOUT) is the selected, inverted row at the bottom');
   const sub = withUi(ctxOf(), ['no', 'yes'], 'lcd2');
   d = drawn(sub.c, { ui: sub.ui });
   noInk(d, 'a sub menu (' + sub.ui.screen + ')');
@@ -481,6 +481,16 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   const infoUi = { ...OLED.create(), screen: 'info', page: 'battery' };
   d = drawn(batt, { ui: infoUi }); noInk(d, 'the BATTERY info screen');
   ok(litIn(d, 4, 92, 152, 7).length > 100, '... with its level bar across the width');
+  const aboutUi = { ...OLED.create(), screen: 'info', page: 'about' };
+  const about = { tempC: 41, cpuPct: 37, heapKb: 123, psramKb: 7936, flashKb: 8192, appUsedKb: 1260, appKb: 3072, uptimeS: 3725, heapMinKb: 98, reset: 'POWERON', version: '0.1.0', clkLateUs: 12, uiLoopUs: 4210, beatLoopUs: 8800 };
+  d = drawn({ ...batt, ...about }, { ui: aboutUi }); noInk(d, 'the ABOUT info screen');
+  ok(isText(d, 'NAME jank', 4, 18, null) && isText(d, 'REPO github.com/w0ts/jank', 4, 18 + 24, null) && isText(d, 'TEMP 41 C', 4, 18 + 60, null) && isText(d, 'MEMORY 123K PSRAM 7936K', 4, 18 + 84, null), '... its rows from y 18, 12 px apart (8 of 13 show)');
+  d = drawn({ ...batt, ...about }, { ui: { ...aboutUi, ascroll: 5 } });
+  ok(isText(d, 'FLASH 8M 1.2/3.0M', 4, 18 + 48, null) && isText(d, 'BEAT LOOP 8800 US', 4, 18 + 84, null), '... scrolled by 5: the last row at the bottom');
+  d = drawn({ ...batt, ...Object.fromEntries(Object.keys(about).map(k => [k, null])) }, { ui: aboutUi });
+  ok(isText(d, 'VERSION -', 4, 30, null) && isText(d, 'TEMP -', 4, 18 + 60, null), '... "-" for what is not known');
+  const sc = (k, c) => { const u = { ...OLED.create(), screen: 'info', page: 'about' }; for (const b of k) OLED.press(u, b, 0, c); return u.ascroll; };
+  eq([sc(['down', 'down', 'down', 'down', 'down', 'down', 'up'], { ...batt, layout: 'lcd2' }), sc(['down', 'down', 'down', 'down', 'down', 'down', 'down', 'down', 'up'], batt), sc(['up'], batt)], [4, 7, 0], 'ABOUT: DOWN / UP scroll, stopped at the ends (5 on lcd2, 8 on the OLED)');
   for (const screen of ['netinfo', 'confirm']) { d = drawn(batt, { ui: { ...OLED.create(), screen, ncur: 0 } }); noInk(d, 'the ' + screen + ' screen'); }
   // the NETWORK screen: its rows (TYPE, GROUP, PEERS) and the read-only SIGNAL row under them, the only ink on the screen is the quality word
   const netD = rssi => drawn({ ...batt, rssi }, { ui: { ...OLED.create(), screen: 'net', ncur: 0 } });
@@ -540,11 +550,11 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   eq([rowsLit(52), idsIn(d, 15, 30, 130, 60)], [[15, 144], [0]], 'the NO / YES hint box is centred on the grid too');
 }
 
-// ---- BEAT FLASH is gone: the menu is one list of 10 items on both layouts, the control line refuses it, ui/lcd2.js has no flash members ----
+// ---- BEAT FLASH is gone: the menu is one list of 11 items on both layouts, the control line refuses it, ui/lcd2.js has no flash members ----
 {
   const keys = n => ['no', ...Array(n).fill('down')];
   const oledM = withUi(ctxOf(), keys(15)), lcdM = withUi(ctxOf(), keys(15), 'lcd2');
-  eq([oledM.ui.cursor, lcdM.ui.cursor], [9, 9], 'the OLED and the lcd2 menu have 10 items (the cursor stops at 9)');
+  eq([oledM.ui.cursor, lcdM.ui.cursor], [10, 10], 'the OLED and the lcd2 menu have 11 items (the cursor stops at 10)');
   eq([Stick.fieldCommands('beatflash', 1), Object.keys(Lcd2).filter(k => /flash|ledlit/i.test(k))], [{ refuse: 'the stick does not take beatflash from here' }, []], 'BEAT FLASH is gone: the control line refuses it, ui/lcd2.js has no flash members');
 }
 
