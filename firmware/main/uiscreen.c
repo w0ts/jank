@@ -303,6 +303,14 @@ static void sys_sample(uint32_t now)
     s_sys.beat_loop_us = (int)beat_loop_max_us();
 }
 
+/* the sampler's numbers for the control line's `about` (ctl.c, the control task): the same values the ABOUT screen shows, no second sampling */
+void uis_sys(struct jk_sys *out)
+{
+    *out = (struct jk_sys){1, s_sys.temp_c, s_sys.heap_kb, s_sys.psram_kb, s_sys.heap_min_kb, s_sys.uptime_s, s_sys.flash_kb, s_sys.app_used_kb,
+                           s_sys.app_kb, s_sys.clk_late_us, s_sys.ui_loop_us, s_sys.beat_loop_us, ""};
+    snprintf(out->reset, sizeof out->reset, "%s", reset_name());
+}
+
 static const struct jo_ctx *build_ctx(void *user, uint32_t now)
 {
     struct jo_ctx *c = &s_ctx;
@@ -356,7 +364,7 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->version = JK_VERSION;
     c->reset = reset_name();
     c->temp_c = s_sys.temp_c;
-    c->cpu_pct = b->core0_idle_x10 ? jo_clampi(100 - (b->core0_idle_x10 + 5) / 10, 0, 100) : -1;     /* core 0 (the beat, UI and radio core): what its idle task leaves, as beat.c measures it */
+    c->cpu_pct = jk_cpu_pct(b->core0_idle_x10);     /* core 0 (the beat, UI and radio core): what its idle task leaves, as beat.c measures it */
     c->heap_kb = s_sys.heap_kb;
     c->psram_kb = s_sys.psram_kb;
     c->heap_min_kb = s_sys.heap_min_kb;

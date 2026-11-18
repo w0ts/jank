@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/message_buffer.h"
 #include "freertos/task.h"
+#include "uiscreen.h"
 #include "usb_host_mode.h"
 
 #define CTL_LINE_MAX 256u                /* an update chunk is a line of about 190 (core/jank_ota.h) */
@@ -141,6 +142,7 @@ static void run_line(const char *line)
     app_cfg_get(&cfg);
     bridge_snapshot(&s_snap);
     usbrole_snapshot(&s_snap.usb);
+    uis_sys(&s_snap.sys);
     a = jk_ctl_line(line, &cfg, &s_snap, bridge_ms(), s_out, sizeof s_out);
     if (a == JK_CTL_CFG_CHANGED)
         app_cfg_set(&cfg);

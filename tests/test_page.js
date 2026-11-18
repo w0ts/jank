@@ -318,4 +318,9 @@ eq(box.setCommand("pass", "secret12"), null);         // not through the setting
   ok(/Pitch[^"]*tempo the stick tracks/.test(tipOf("pl-pitch")) && /mutes only your speakers/.test(html) && /restarts it/.test(tipOf("net-apply")), "the tooltips carry the side effects: pitch moves the tracked tempo, monitor off mutes only the speakers, Save and restart restarts the stick");
 }
 
+// the ABOUT screen's numbers: `about` is asked only from the draw loop while that screen is open (no timer of its own), at most every 1.5 s, one at a time
+ok(/if \(Stick\.aboutOpen\(model\)\) pollAbout\(\);/.test(html) && !/setInterval\(pollAbout/.test(html), "about is polled only while the ABOUT screen is shown");
+ok(/send\("about"\)/.test(html) && (html.match(/send\("about"\)/g) || []).length === 1 && /S\.aboutBusy \|\| S\.aboutOff \|\| now - S\.aboutTried < ABOUT_EVERY_MS/.test(html), "one about request at a time, spaced by ABOUT_EVERY_MS, off for a jank without it");
+ok(/about: S\.lastAbout, aboutAt: S\.aboutAt/.test(html), "the face's state carries the about reply");
+
 lineTests().then(() => console.log("page: " + checks + " checks passed"), (e) => { console.error(e); process.exit(1); });

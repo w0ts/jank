@@ -1,4 +1,5 @@
 # Replies of the firmware's own control line (core/jank_ctl.c, jk_ctl_line, default settings, one run on the host; the `### <command>` lines name the command).
+# `### about`: the same harness with a made-up sampler state (snap.sys = 41 C, 123K heap, 3725 s up, POWERON, core 0 idle 63 %).
 # Regenerate: a harness like tests/test_ctl.c's run() printing each reply. Home lines of a playing session: tests/test_home.c.
 ### get
 group=1
@@ -110,6 +111,21 @@ usb_role=device
 usb_cc=nochip
 line_plugged=0
 audio_source=none
+ok
+### about
+uptime_s=3725
+reset=POWERON
+temp_c=41
+cpu_pct=37
+heap_kb=123
+heap_min_kb=98
+psram_kb=7936
+flash_kb=8192
+app_used_kb=1260
+app_part_kb=3072
+clock_late_us=12
+ui_loop_us=4210
+beat_loop_us=8800
 ok
 ### home
 home=h 0 j1 0 - 4 0 0 0 - - - - 0

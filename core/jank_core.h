@@ -320,6 +320,19 @@ struct jk_usb {
     uint32_t audio_packets, audio_errors, midi_dropped;
 };
 
+/* the ABOUT screen's system numbers (firmware/main/uiscreen.c's sampler: the one source, the screen and the `about` reply read the same
+ * values), with the unknowns the screen uses: -1 (JK_SYS_UNKNOWN), temp_c JK_TEMP_UNKNOWN, reset "" */
+#define JK_SYS_UNKNOWN (-1)
+#define JK_TEMP_UNKNOWN (-999)
+struct jk_sys {
+    uint8_t known;                    /* 0: the sampler has not filled this (every number is then unknown) */
+    int32_t temp_c, heap_kb, psram_kb, heap_min_kb, uptime_s, flash_kb, app_used_kb, app_kb;
+    int32_t clk_late_us, ui_loop_us, beat_loop_us;
+    char reset[12];                   /* why the chip last reset, upper case ("POWERON", "PWR GLITCH"); "": unknown */
+};
+/* core 0's CPU load %, from its idle task's share in x10 percent (jk_beat core0_idle_x10; 0: not measured -> -1) */
+int jk_cpu_pct(uint32_t core0_idle_x10);
+
 struct jk_snapshot {
     uint8_t usb_up;
     uint32_t uptime_s;
@@ -349,6 +362,7 @@ struct jk_snapshot {
     int8_t batt_pct;                  /* -1: no battery gauge */
     char board[12];                   /* the board the firmware is built for ("xiao", "lcd2"): `get` says it so the page picks the screen */
     struct jk_usb usb;
+    struct jk_sys sys;                /* for `about` (ctl.c fills it from the ui task's sampler) */
     struct jk_bridge b;
 };
 
