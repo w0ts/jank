@@ -174,7 +174,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   let { page: p, midi } = await connected();
   eq([pressed(p), shown(p, 'live'), shown(p, 'c-advanced-box'), shown(p, 'player'), shown(p, 'advanced-extra')], [['true'], true, true, false, false], 'USB: the face and the Advanced box appear, the player does not');
   eq(p.el('msg').textContent, '', 'no "Connected." text');
-  eq([p.el('dev').querySelector('#dpad').children.length, p.el('dev').querySelector('#ports').children.length, p.el('dev').getAttribute('viewBox').split(' ').length], [4, 10, 4], 'the drawing is built from the table: four round keys, ten ports, a view box');
+  eq([p.el('dev').querySelector('#dpad').children.length, p.el('dev').querySelector('#ports').children.length, p.el('dev').getAttribute('viewBox').split(' ').length], [5, 10, 4], 'the drawing is built from the table: the cap and four arms, ten ports, a view box');
   eq(p.el('dev').querySelector('#oledFO').getAttribute('width'), '40.8', 'the screen canvas fills the active area (40.8 mm wide)');
   eq(p.el('c-midi').parentId, 'dev-bar', 'connected: the connect button moves into the device card\'s top row');
   p.box.disconnected();
