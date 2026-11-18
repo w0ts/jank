@@ -885,6 +885,7 @@ setConnected(null);
 S.auto = storedAutoConnect();
 autoConnect();
 </script>
+<!--@include ui/bigfont.js-->
 <!--@include ui/oled.js-->
 <!--@include ui/face.js-->
 <!--@include ui/lcd2.js-->
@@ -945,6 +946,8 @@ autoConnect();
   // the screen of the box: the colour landscape LCD (ui/lcd2.js: its own 160 x 120 grid, painted x2) for every stick, whatever its board; ?screen=oled shows the old
   // black and white 2.42 in OLED
   const params = new URLSearchParams(location.search);
+  // dev switches of the colour screen, for the owner to compare: ?digits=a|b|c (the big tempo digits, ui/bigfont.js) and ?vu=smooth|seg (the input meter)
+  const look = { digits: params.get("digits") || undefined, vuSegments: params.get("vu") === "smooth" ? false : params.get("vu") === "seg" ? true : undefined };
   let screen = "";
   function applyScreen() {
     const wanted = params.get("screen") === "oled" ? "2.42" : "lcd2";
@@ -965,7 +968,7 @@ autoConnect();
     }
     Stick.tick(model, now);
     if (screen === "lcd2") {
-      const lcd = Stick.screen(model, now, "lcd2");
+      const lcd = Stick.screen(model, now, "lcd2", look);
       Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), lcd.fb, lcd.ink);
     } else Face.paintFramebuffer(ctx2d, ctx2d.createImageData(OLED.W, OLED.H), Stick.framebuffer(model, now), 100);
     paintArms();

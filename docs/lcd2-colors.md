@@ -1,4 +1,4 @@
-# jank on the Waveshare ESP32-S3-LCD-2: the colour screen on its own 160 x 120 grid (design preview, v4)
+# jank on the Waveshare ESP32-S3-LCD-2: the colour screen on its own 160 x 120 grid (design preview, v7)
 
 The variant uses a 2.0 inch 240 x 320 ST7789 colour LCD **in landscape** (320 x 240), no touch, no RGB LEDs. The owner said the screen
 was not used fully (the 128 x 64 UI doubled is 256 x 128 with black bands and small text) and asked for more visual feedback, small
@@ -7,21 +7,20 @@ scales, painted **exactly x2** on 320 x 240: no bands, no centring, every pixel 
 area (40.8 x 30.6 mm) are 4:3 too, so a source pixel is a 0.255 mm square. The OLED boards keep 128 x 64 and are bit-identical.
 
 Colour is information only: the screen is neutral (near-white on near-black, menus and edit screens included) and a colour appears only
-on an element that says something the white version cannot. Screens: `lcd2v4-states.png` (12 situations), `lcd2v4-home.png` (the control
-page), `lcd2v4-menus.png` (menus, sub menu, edit, info, overlay).
+on an element that says something the white version cannot. 
 
 ## How a caller learns the size
 
 `OLED.size(layout)` returns `{ w, h }`: `OLED.size()` / `'oled'` = 128 x 64, `'lcd2'` = 160 x 120 (`OLED.SIZES`). `OLED.W` and `OLED.H` stay
 the OLED's. `OLED.draw(fb, ui, ctx, now, ink)` keeps its signature: with `ctx.layout === 'lcd2'` `fb` (and `ink`) must be 160 * 120 bytes
 (else it throws), any other layout 128 * 64. The grid is a module variable set for the duration of one `draw()` and restored after.
-`Stick.screen(model, now, layout)` makes the buffers itself and returns `{ fb, ink, w, h }`; `Stick.framebuffer(model, now)` is the OLED's
+`Stick.screen(model, now, layout, look)` makes the buffers itself and returns `{ fb, ink, w, h }`; `Stick.framebuffer(model, now)` is the OLED's
 128 x 64 as before. `Lcd2.paint(ctx2d, img, fb, ink)` paints a 160 x 120 frame as 320 x 240.
 
 ## The ink plane (unchanged idea)
 
 `ink` is a `Uint8Array(160 * 120)`; 0 = neutral. Ids (`OLED.INK`, meanings not colours): `GOOD` 1, `WARN` 2, `BAD` 3, `DIM` 4, `ONE` 5 (the
-bar's first beat while lit). **No id was added.** Only lit pixels carry ink (`draw()` clears ink under unlit pixels, e.g. where a tick is
+bar's first beat while lit). The ids 6..21 (`OLED.VU = { ink0: 6, steps: 16 }`, not members of `OLED.INK`) are the VU meter's ramp; see below. Only lit pixels carry ink (`draw()` clears ink under unlit pixels, e.g. where a tick is
 XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens and overlays: no ink at all.
 
 ## The palette (exact RGB, WCAG AA against the background, tested; unchanged)
@@ -35,59 +34,125 @@ XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens
 | bad | 255, 104, 92 | #ff685c | 7.0 | poor, below the line, clipping, empty |
 | dim | 150, 156, 168 | #969ca8 | 7.2 | nothing there / not reported |
 
+## v7: what changed (owner review of the live screen)
+
+1. **Big tempo digits**: a bitmap font of its own (`ui/bigfont.js`), 3 candidate styles, default B; `?digits=a|b|c` on the page.
+2. **Status icons** redrawn 11 px high and right-aligned; `GRP n` and the transport icon on the left.
+3. **`BPM` label removed**; the tempo is left aligned and the area to its right stays empty.
+4. **INPUT is a VU meter** with a colour gradient along the bar, a -50 dBFS notch and a peak-hold tick; smooth or segmented (`?vu=smooth|seg`).
+5. **Labels in full words**: `CONFIDENCE`, `INPUT`, `BAR` + its state (the 10 character label column, x 2..60).
+6. **Two stats rows at the bottom**: PEERS, signal (dot + dBm), NET, BATT, and `STOP < 70` / `MIN 70`.
+
+Screens: `lcd2v7-states.png`, `lcd2v7-digits.png`, `lcd2v7-vu.png`, `lcd2v7-home.png`.
+
 ## HOME (AUDIO) on 160 x 120: the row table (`OLED.LCD2` holds the numbers)
 
 | y | height | element | content and colour |
 |---|---|---|---|
-| 0..12 | 13 | top bar | x 2 transport icon (triangle 9 high, square 7, blinks while armed); x 14 fold label or LINK option icon; `GRP n` / SSID right-aligned to x 66; x 70 link glyph + Link peer count; x 98 signal bars (3 bars 3 px wide, 3 / 6 / 9 high); x 119 USB plug; x 134 battery icon 21 x 9 with nub |
-| 15..49 | 35 | TEMPO | font scale 5 (digits 25 x 35, `120.0` is 130 px wide, x 2..131; the widest, 999.9, also fits); `BPM` at x 138, y 43..49 |
-| 52..77 | 26 | beat boxes | four boxes 36 x 26 (they were 36 x 18), gap 4, margins 2, from x 2 to x 157: the beat indicator now that there are no LEDs; the lit one is a solid fill, the others 2 px outlines; the first is amber only while it is the lit one |
-| 81..87 | 7 | `CF  92%` + line | label x 2; value right-aligned to x 60; one thin line from x 64 (3 px high, rows 83..85, its length the value on 94 px), a notch at the stop threshold (rows 82..86) |
-| 91..97 | 7 | `IN -18dB` + line | the same columns and line; notch at the tracker's -50 dBFS sound level |
-| 101..107 | 7 | `BAR LOCKED` + outlined bar | AUTO BAR's state word and its confidence, in v4's outlined bar (94 x 5, 3 px fill); only with AUTO BAR on (the row stays empty otherwise: the rows never move) |
-| 111..117 | 7 | status line | left: `GATED` / `HOLD` / `COAST`, else the Wi-Fi line; right-aligned: `STOP 70` or `MIN 70` |
+| 1..11 | 11 | top bar | left: transport icon x 2..10 (play triangle 9 x 11, row widths 2 3 5 6 8 9 8 6 5 3 2; stop = square 9 x 9 at y 2..10; blinks while armed), then at x 14 the fold label (`X2` `X4` `/2` `/4`: an inverted box, text + 4 wide, 11 high, corners cut) or the LINK option icon (IGNORE 11 x 11, FOLLOW and FOLLOW+LEAD 13 x 11), then `GRP n` / the SSID (text y 3, cut to x 67). Right group, fixed slots: link glyph 13 x 11 at x 70 + the peer count (x 85, max 99); signal bars at x 98 (3 bars 4 wide, pitch 5, 4 / 7 / 11 high, a missing bar is a 1 px stub); USB plug 13 x 11 at x 117; battery at x 134 (22 x 11 body, corners cut, nub 2 x 5, fill 18 x 7 = round(18 x pct)), the last lit column is x 157 |
+| 15..49 | 35 | TEMPO | big digits, x 2, `120.0` is 122 px wide (style B); the widest (`999.9`) is 122..123; the area right of it is empty |
+| 52..76 | 25 | beat boxes | four boxes 36 x 25 (they were 26: the stats need two lines), gap 4, margins 2; lit = solid, unlit = 2 px outline; the first is amber only while lit |
+| 79..85 | 7 | `CONFIDENCE` + line + value | label x 2; one 3 px line (rows 81..83) from x 64, its length round(62 x value); notch (rows 80..84) at the stop threshold; the value right-aligned to x 157 |
+| 87..93 | 7 | `INPUT` + VU meter + value | label x 2; the VU meter 62 x 5 from x 64 (rows 88..92), notch rows 87..93; the number right-aligned to x 157 |
+| 95..101 | 7 | `BAR` + state + outlined bar | `BAR` at x 2, the state word right-aligned to x 59; outlined bar 62 x 5 at x 64 (rows 96..100), fill round(60 x conf); only with AUTO BAR on |
+| 104..110 | 7 | stats line 1 | left `PEERS n` or the word `GATED` / `HOLD` / `COAST`; signal dot 5 x 5 at x 52 (rows 105..109) and the signal text at x 60; right-aligned to x 157 `STOP < 70` or `MIN 70` |
+| 112..118 | 7 | stats line 2 | left `NET JANK G1` / `NET <Wi-Fi name>` (the whole text cut at 16 characters), right-aligned to x 157 `BATT 64%` |
 
-Every element has its own row, with gaps of 2 to 5 px between rows (the meter rows moved from a 12 px to a 10 px pitch to give the boxes their height); the test checks that no lit pixel lies in a gap, that the rows are in
-increasing order, and that the status word and the threshold text on row 111 do not touch (the v3 overlap of GATED / COAST over STOP 70 is
-gone because the words moved to the left of the same row).
+Rows have gaps of 1 to 3 px (the three audio rows have a pitch of 8: a gap of 1). Row 119 stays dark. The test checks the order, that no lit pixel
+lies in a gap, and that no two texts of a line touch (the widest signal text `-100dBm` ends before the widest threshold text `STOP < 100`).
 
-**LINK layout**: the same top bar, tempo and status line (no STOP / MIN text, no words); the beat boxes are 36 x 52 (they were 36 x 36) at y 54..105, the same 2 px outlines and solid lit fill; no audio rows. Boxes are drawn on HOME only; no other screen shows them.
+**LINK layout**: the same top bar, tempo and stats rows (no `STOP` / `MIN` text, no words); the beat boxes are 36 x 48 at y 54..101; no audio rows.
 
-### The CF and IN meters: one thin line
+### The big digits (`ui/bigfont.js`: the tables ARE the font)
 
-A row is: label (neutral), the value (coloured), and **one line**: 3 px high (rows y + 2..y + 4 of the 7 px row), no outline, no separate
-track. Its **length is the value on 94 px: line = round(94 x value)** from x 64; the unfilled remainder is plain background. **I chose no
-dotted baseline**: with the value written beside it and the notch marking the one line that matters, the end of the line reads without
-one (the screenshots show it). A **notch**, 1 px wide and 5 px tall (rows y + 1..y + 5), is XOR-ed through the line at
-`barX + round(93 x tickFraction)`: a gap in the line where it passes the notch, a 5 px stub (one above, one below the line's rows) where it does not.
+| item | value |
+|---|---|
+| glyphs | `0`..`9`, `-` and `.` |
+| height | 35 rows (y 15..49) |
+| width | `0`..`9` and `-`: 26 columns each. `.`: A 5, B 6, C 7 columns, on the bottom rows (A rows 30..34, B 29..34, C 28..34) |
+| spacing | 3 dark columns between two glyphs, none before the first or after the last; nothing else (no kerning) |
+| table | one string per glyph, 35 rows of `#` / `.` joined by `|`; `BigFont.STYLES[style][glyph]` is the array of rows; `BigFont.width(style, text)` and `BigFont.draw(plot, style, text, x, y)` |
+| text | `bpm.toFixed(1)` (`120.0`, `98.4`, `999.9`), or `---` when there is no tempo (three dashes) |
+| select | `ctx.digits` = `'a'`, `'b'` or `'c'`; anything else is the default `BigFont.DEFAULT_STYLE` (`b`) |
+
+| style | look | stroke | widths of `120.0` |
+|---|---|---|---|
+| A | rounded 7-segment: square skeleton, outer corners cut by 2 px, the `1` is only the right bar | 5 px | 121 px |
+| B (default) | humanist rounded stroke: round caps, ovals and bowls | 4.6 px | 122 px |
+| C | bold geometric: circular bowls, flat cuts at the cell edges | 5.8 px | 123 px |
+
+All three were made from skeletons (lines, arcs, curves) rasterised at pixel centres: a pixel is lit when its centre is within half the stroke of the
+skeleton, so the stroke is even everywhere and curves have no 1 px steps beyond what 1 bit allows. Pick with `lcd2v7-digits.png`.
+
+### The VU meter
+
+| item | rule |
+|---|---|
+| scale | -90..0 dBFS over 62 px (as the old line, narrower: the value moved right of the bar to make room for the full-word labels) |
+| smooth | `n = round(62 x (dB + 90) / 90)` lit columns from x 64, 5 rows high (y + 1..y + 5) |
+| segments | 21 segments, 2 px on and 1 px off (segment k covers columns 3k and 3k + 1, so the last one ends at column 61); `round(21 x (dB + 90) / 90)` lit |
+| colour | column i (segment: its first column) has the ink id `6 + floor(16 x i / 62)` (`OLED.VU = { ink0: 6, steps: 16 }`); the id is the position on the dBFS scale, so the bar's end tells how hot the signal is |
+| notch | -50 dBFS, 7 rows (y..y + 6), XOR-ed through the bar at column `round(61 x 40 / 90) = 27` (segments: the nearest gap column, 26); neutral |
+| peak tick | the last second's peak (`ctx.peakDb`): 1 px wide, 5 rows, in the ramp colour of its column `round(61 x (peak + 90) / 90)`; drawn only when at least one dark column separates it from the bar's end (else it would only lengthen the bar) and a peak is reported |
+| number | right-aligned to x 157; neutral, red when the peak reaches -1 dBFS (or, unreported, the RMS maximum -3), amber under -50 dBFS (too quiet to track) |
+| default | segments (`VU_SEGMENTS_DEFAULT`; `ctx.vuSegments` and `?vu=smooth|seg`) |
+
+**Ramp** (exact RGB; they colour bars, not text: only visibility is needed, every step is at least 6.6 : 1 on the background):
+
+| step | ids | RGB | hex | contrast on bg | dBFS range |
+|---|---|---|---|---|---|
+| 0..7 | 6..13 | 72, 222, 128 | #48de80 | 11.35 | -90 .. -45 |
+| 8 | 14 | 107, 225, 107 | #6be16b | 11.89 | -45 .. -39 |
+| 9 | 15 | 141, 227, 85 | #8de355 | 12.50 | -39 .. -34 |
+| 10 | 16 | 176, 230, 64 | #b0e640 | 13.43 | -34 .. -28 |
+| 11 | 17 | 202, 212, 53 | #cad435 | 12.24 | -28 .. -22 |
+| 12 | 18 | 229, 194, 43 | #e5c22b | 11.40 | -22 .. -17 |
+| 13 | 19 | 255, 176, 32 | #ffb020 | 10.83 | -17 .. -11 |
+| 14 | 20 | 255, 136, 60 | #ff883c | 8.34 | -11 .. -6 |
+| 15 | 21 | 255, 96, 88 | #ff6058 | 6.67 | -6 .. 0 |
+
+The ramp is linear in RGB between green (step 7), lime (step 10), amber (step 13) and red (step 15); the numbers on the table are what the firmware stores.
+
+### The CONFIDENCE line (as before, narrower)
+
+One line 3 px high (rows y + 2..y + 4), no outline, no track; its **length is the value on 62 px: line = round(62 x value)** from x 64; the notch (1 px
+wide, 5 tall, rows y + 1..y + 5) is XOR-ed at `64 + round(61 x threshold)`: a gap where the line passes, a stub above and below where it does not.
 Value, line and notch carry the same ink id.
 
-| line | fraction | notch | colour of value, line and notch |
-|---|---|---|---|
-| CF | confidence 0..1 (0 / 50 / 100 % = 0 / 47 / 94 px) | the stick's stop threshold `th` (70 % = x 129) | red below `th`; amber from `th` up to `th` + 10 points; green above; grey when the stick reports no value (`--`, no line) or there is silence |
-| IN | (dBFS + 90) / 90 (-90 / -45 / 0 dB = 0 / 47 / 94 px) | -50 dBFS (x 105): the tracker's sound level | neutral; red when the last second's peak reaches -1 dBFS (or, if `peak_db` is not reported, the RMS maximum reaches -3 dB); amber under -50 dBFS (too quiet to track) |
+| value | rule |
+|---|---|
+| confidence | red below the stick's threshold; amber from it up to +10 points; green above; grey when the stick reports no value (`--`, no line) or there is silence |
 
-The BAR row keeps v4's outlined bar (94 x 5, a 3 px fill inside it, so the fill is round(92 x confidence), neutral, no tick): AUTO BAR's
-confidence is the only meter left with a frame. It sits under two frameless lines and is a little heavier, but it appears only with AUTO
-BAR on and I found no clash worth changing; if the owner wants it uniform, it is one function (`outlinedRow` to `progressRow`).
+The BAR row keeps the outlined bar (now 62 x 5, a 3 px fill inside it: round(60 x confidence), neutral, no tick). The value moved from the left of the bar to the
+right of it because `CONFIDENCE` (59 px) fills the label column: `CONFIDENCE`, bar, `90%`.
 
-**Position inside the bar**: not drawn as a bar (my choice, easy to add). The face's beat position is an extrapolation (`Stick.ctx` runs the
-HOME line's phase forward with `phaseAt`, then floors it to the whole beat `beatN`), so a position bar would show the same estimate as the
-four boxes, only smoother, and `ctx` does not expose the fractional position today (it would need one more field, e.g. `barPos`). The BAR
-row shows what the stick reports about the bar that the boxes do not: AUTO BAR's state and confidence.
+### The stats rows
 
-## What the stick reports for each coloured item (unchanged)
+| item | text and colour | reported by the stick |
+|---|---|---|
+| `PEERS n` | the Link peers (HOME line `link`, shown up to 99), the link glyph's colour rule (joined green; alone grey in AUDIO mode, red in LINK mode); `PEERS -` in grey before any HOME line | yes |
+| `GATED` / `HOLD` / `COAST` | take the place of `PEERS n` in AUDIO mode, red / grey / amber as before | `gated`, `hold`, coast: yes |
+| signal | a 5 x 5 dot (corners cut) in the signal bars' colour and the text `-55dBm`; `NONE` when nothing is heard (0), `-` when not reported (grey dot) | `rssi` (best jank peer) / `wifi_rssi` (Wi-Fi client): yes |
+| `STOP < 70` / `MIN 70` | the stick's threshold; STOP when LOW CONFIDENCE stops the outputs below it, MIN when it only marks; neutral; AUDIO only | `threshold`, `lowconf`: yes |
+| `NET ...` | `JANK G1` (the jank group) or the Wi-Fi network name; `-` when the name is empty; the whole `NET ...` text is cut at 16 characters | `group` (read back with `get`; shows 1 until `get` has answered), `ssid`: yes |
+| `BATT 64%` | the battery colour rule; `BATT -` when no cell is reported | `battery`: yes |
+
+The old Wi-Fi quality line (rate, retries, losses: `ctx.wifiQ`) is gone from this layout: the stick does not report it. Not reported and never invented:
+charging, retries, joining.
+
+## What the stick reports for each coloured item
 
 | element | colour rule | reported today |
 |---|---|---|
-| CF value, bar, tick | the rule above | HOME `conf`, `get` threshold and lowconf: yes |
+| CONFIDENCE value, line, notch | the rule above | HOME `conf`, `get` threshold and lowconf: yes |
 | words `GATED` red, `HOLD` grey, `COAST` amber | outputs stopped for low confidence / holding / running under the threshold | status `gated=1`, HOME hold / coast suffix: yes |
-| link glyph + count | joined (>= 1 Link peer) green; alone: grey in AUDIO mode, red in LINK mode | HOME `link` (Link peers): yes. "Searching" is not reported |
-| signal bars | >= -67 dBm green (3 bars), -80..-68 amber (2), < -80 red (1), none or not reported grey stubs | status `rssi` (best jank peer, 0 = none) or `wifi_rssi`: yes. Retry / loss shares: no |
-| battery | green from 30 %, amber 15..29, red under 15 | HOME `battery` percent: yes. **Charging: not reported** (no mark drawn) |
-| IN | rule above | HOME `level`, status `peak_db`: yes |
+| link glyph, PEERS | joined (>= 1 Link peer) green; alone: grey in AUDIO mode, red in LINK mode | HOME `link` (Link peers): yes. "Searching" is not reported |
+| signal bars, dot | >= -67 dBm green (3 bars), -80..-68 amber (2), < -80 red (1), none or not reported grey stubs | status `rssi` or `wifi_rssi`: yes. Retry / loss shares: no |
+| battery, BATT | green from 30 %, amber 15..29, red under 15 | HOME `battery` percent: yes. **Charging: not reported** |
+| INPUT number | rule above | HOME `level`, status `peak_db`: yes |
+| VU bar | the ramp (position on the dBFS scale) | the same |
 | first beat | amber while it is the lit box | Link bar phase: yes |
-| BAR row | neutral | status `bar`, `bar_lead` (via `Stick.ctx` `bar`): yes, when AUTO BAR is on |
+| BAR row | neutral | status `bar`, `bar_lead`: yes, when AUTO BAR is on |
 
 ## The other screens on the bigger grid (neutral, the selected row inverted, no ink)
 
@@ -110,31 +175,35 @@ cursor in view by itself (all 10 menu items fit; the scan list centres on the se
 
 ## Recommendation
 
-Keep: the tempo as the biggest element, the CF and IN lines with their notches, the beat boxes with the amber first one, the top bar. The BAR
-row is a candidate to cut if the owner never turns AUTO BAR on (the space then stays empty). `MIN 70` / `STOP 70` is useful but could be
-cut to the colour alone.
+- Digits: style **B** (default): the even, round stroke reads as a clean display face at 2 x 2 pixel blocks; A is the most "instrument" but its `1` leaves a hole at
+  the left and the 5 px strokes crowd the `8`; C is the most legible from a distance but its counters in `6 8 9` get small.
+- VU meter: **segments** (default): a lit segment count reads as a meter at a glance, the gradient steps line up with the segments, and the notch fits in a gap
+  column; the smooth ramp is nicer as a gradient but looks like the old line made thicker.
+- The BAR row is a candidate to cut if the owner never turns AUTO BAR on (the space then stays empty).
 
 ## What the C side will need later (not written)
 
-1. `jo_draw` / `jo_draw_ink` get a layout size: 160 x 120 frame buffer and ink plane (19200 bytes each; the OLED path keeps 1024 / 8192), the
-   `LCD2` row table above, and the lcd2 screens (lists, edit, info, setup, overlays) as `ui/oled.js` draws them. `jank_lcd.c` paints the 160 x
-   120 frame x2 with the palette.
-2. `tests/oled_ref/gen_ink.js` writes planes of 128 x 64 (`W = OLED.W`) and the C `test_oled.c` replays them: both must move to the 160 x 120
-   grid (the generator throws today, see below), and new cases cover the lines at 0 / 50 / 100 %, the notch, the words, the lists and the overlays.
-3. Ctx fields as before: `rssi`, `peakDb`, `confKnown`, `peers`, `layout`, plus `bar` for the BAR row.
-4. Firmware wishes (unchanged): a charging flag, Wi-Fi retry / loss shares, a "joining" Link state, `rssi` / `peak_db` on the HOME line.
+1. `jo_draw` / `jo_draw_ink`: the 160 x 120 layout with the table `OLED.LCD2` above, the new icons (`LINK_GLYPH`, `USB_PLUG`, `SIGNAL_DOT`,
+   `LT_ICONS_L2`, `TRI_W`, `SIGNAL_H` in `ui/oled.js`), the battery, `drawTempoLcd2` with `ui/bigfont.js`'s tables (3 styles x 12 glyphs x 35 rows
+   of 26 / 5..7 bits; the C default is style B, the selector can stay a constant), the lines, the VU meter (smooth and segmented: pick the
+   recommended one and port only it, or both with a constant), the stats rows. The 5 x 7 font got one new glyph, `<` (`'...#.|..#..|.#...|#....|.#...|..#..|...#.'`).
+2. `jank_lcd.c`: the palette gets the 16 ramp colours (`Lcd2.VU_RAMP`), the ink ids 6..21 (`OLED.VU`); `tests/test_lcd_palette.js` then compares them too.
+3. `tests/oled_ref/gen_ink.js` writes the 160 x 120 cases (it hands 128 x 64 buffers today and throws); the C replay `test_oled.c` follows. New cases:
+   the five tempo texts (`120.0` `146.1` `88.8` `98.4` `---`), VU at -90 / -60 / -45 / -30 / -12 / 0 dB with and without a peak (both modes), CONFIDENCE at
+   0 / 50 / 100 %, every stats text (known and unknown values, long Wi-Fi name, words), the LINK option icons and the fold label.
+4. Ctx fields: `rssi`, `peakDb`, `confKnown`, `peers` (null = unknown, shows `-`), `layout`, `bar`, `net.group` / `net.ssid`, and the dev switches `digits` and `vuSegments`.
+5. Firmware wishes (unchanged): a charging flag, Wi-Fi retry / loss shares, a "joining" Link state, `rssi` / `peak_db` on the HOME line.
 
 ## Tests in this stage
 
-`tests/test_lcd2.js` (193 checks): palette AA; sizes and the throw on a wrong buffer; the exact x2 (a full frame covers all 320 x 240, an empty one
-none, six single source pixels each become exactly their 2 x 2 block in their ink colour); the four boxes on every beat in both layouts (exact rectangles, solid lit box, 2 px outline and dark inside for the rest, even 4 px gaps and dark margins, amber only for a lit first box, gaps to the rows above and below); the row table (rows increasing, no lit pixel in
-a gap, tempo 35 rows, the widest tempo fits); ink only in the allowed boxes; the CF rule at 60, 69, 70, 75, 80, 81, 87, 100 for value, line
-and notch; line lengths at 0 / 50 / 100 % (exactly 3 rows, no outline, no track) and the notch position (also following the stick's threshold); IN clip / quiet edges and lengths; the BAR
-row (still outlined); link, signal, battery; the status words and the threshold text; the LINK layout; no ink in menus, sub menus, edit, info, net, scan,
-text, confirm, setup and overlays; overlays and SAVED centred; the OLED layout equal to golden hashes made by the OLED module from before the
-lcd2 layout (8 screens) and unaffected after an lcd2 draw.
+`tests/test_lcd2.js` (444 checks): the palette (AA) and the ramp (16 exact RGB, each at least 6.5 : 1, the id mapping); sizes and the exact x2; the row table (order,
+no lit pixel in a gap, the text of every label, value and stats item checked pixel by pixel against the 5 x 7 font parsed from `ui/oled.js`); the big
+digits (the three tables complete, 35 rows, equal widths, the tempo texts drawn exactly as the tables say, the style switch, every width fits 156 px);
+the four beat boxes on every beat in both layouts; the CONFIDENCE rule and line lengths at 0 / 50 / 100 %; the VU meter in both modes at -90 / -60 / -45 /
+-30 / -12 / 0 dB (fill lengths, the id of every column, the notch, the peak tick and when it is hidden); the BAR row; the icons (play, stop, fold box, the LINK option
+icons, link, signal, battery fill and shape); the stats rows (words, PEERS in the three colours, unknown values, signal text and dot colours, STOP / MIN, NET and BATT,
+a long Wi-Fi name); LINK layout; no ink in menus, edit, info, setup and overlays; the OLED layout equal to the golden hashes of before the lcd2 layout (8 screens).
 
-`tests/run.sh` **fails on purpose at its first lcd2 step**: it regenerates the ink references with `node tests/oled_ref/gen_cases.js --ink`
-(`gen_ink.js`), which hands 128 x 64 buffers to the lcd2 layout, and `OLED.draw` now refuses them (`needs a 160 x 120 frame buffer`). That
-is the C parity for the lcd2 ink cases (`cases_ink.txt` and the C `jo_draw_ink`, both still the 128 x 64 design); it stops the script before
-`test_oled.c` and everything after it. Everything after that step was run without it and passes (see the report).
+`tests/run.sh` **fails on purpose at its lcd2 ink regeneration step**: `node tests/oled_ref/gen_cases.js --ink` (`gen_ink.js`) hands 128 x 64 buffers to the
+lcd2 layout, which refuses them, and `cases_ink.txt` and the C `jo_draw_ink` are still the older design. That is the C parity for the next round. Everything else
+was run without that step and passes (see the report).
