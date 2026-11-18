@@ -96,6 +96,10 @@ fi
 # confidence and the coast against beat-listener's studies/follow-robust (golden vectors, tests/robust_ref, scripts/robust_golden.py);
 # and SKIP (jb_skip.c: ACT / PAT) with the graded shown confidence (jb_graded.c) against its skip configs (tests/skip_ref, robust_golden.py --skip-out).
 "$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_robust.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_follow.c" "$HERE/core/beat/jb_weak.c" "$HERE/core/beat/jb_mode.c" "$HERE/core/beat/jb_dbn.c" "$HERE/core/beat/jb_comb.c" "$HERE/core/beat/jb_robust.c" "$HERE/core/beat/jb_skip.c" "$HERE/core/beat/jb_graded.c" -lm -o "$OUT/test_robust"
+# The tuned follower's graded confidence (jb_graded.h jg_tuned_step): the parts on synthetic beats, and the tuned chain replayed on the real activations
+# (tests/beat_ref) and the synthetic tracks (tests/robust_ref) with and without it: the gate and the follower decide exactly the same.
+"$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_graded.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_follow.c" "$HERE/core/beat/jb_weak.c" "$HERE/core/beat/jb_mode.c" "$HERE/core/beat/jb_dbn.c" "$HERE/core/beat/jb_comb.c" "$HERE/core/beat/jb_robust.c" "$HERE/core/beat/jb_skip.c" "$HERE/core/beat/jb_graded.c" -lm -o "$OUT/test_graded"
+"$OUT/test_graded" "$HERE/tests/beat_ref" "$HERE/tests/robust_ref"
 "$OUT/test_robust" "$HERE/tests/robust_ref" "$HERE/tests/skip_ref"
 "$OUT/test_fold"
 "$OUT/test_live"

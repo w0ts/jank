@@ -171,8 +171,8 @@ struct jk_cfg {
     uint8_t follower;                 /* M2m A/B: 0 (default) the tuned follower (tuned-l16, M2j), 1 the robust one (all-d-f60,
                                          core/beat/jb_robust.h). Not stored: 0 again at every start */
     uint8_t skip;                     /* SKIP (core/beat/jb_skip.h, on the robust follower): 0 off, 1 ACT, 2 PAT. Not stored */
-    uint8_t graded;                   /* the shown confidence is the graded one (core/beat/jb_graded.h): display only; 0 off, 1 on.
-                                         Not stored. Both need follower robust */
+    uint8_t graded;                   /* the shown confidence is the graded one (core/beat/jb_graded.h, both followers): display only;
+                                         0 off, 1 on (the default). Not stored: 1 again at every start. The gate never uses it */
     /* Stored apart from the blob above (store.c, key "usb1"), so the blob stays 130: USB host mode (core/jank_usbrole.h)
      * and AUTO BAR */
     uint8_t autobar;                  /* enum jk_autobar: the downbeat estimator puts the session's bar on the music's 1 */
@@ -241,8 +241,12 @@ struct jk_beat {
                                          rms_db; the emulator's level_fast_db) */
     int16_t level_min_db, level_max_db;   /* the lowest and highest of those values over the last 3 s */
     int16_t peak_db;                  /* the input's peak over the last second, dBFS, -99 .. 0 (silence: -99) */
-    uint8_t conf_pct;                 /* the confidence: how well the last 8 s of tracked beats fit the published grid, percent
-                                         (core/jank_conf.h, the player's live/confidence.py); 0 in silence */
+    uint8_t conf_pct;                 /* the confidence SHOWN, percent: the graded value (core/beat/jb_graded.h) when conf_graded, else how
+                                         well the last 8 s of tracked beats fit the published grid (core/jank_conf.h, the player's
+                                         live/confidence.py); 0 in silence */
+    uint8_t conf_gate_pct;            /* the gate's own confidence, percent (what STOP / START, COAST, the LED and the notch judge); only
+                                         read with conf_graded */
+    uint8_t conf_graded;              /* conf_pct is the graded value, not the gate's */
     uint8_t act_pct;                  /* the network's beat activation peak over the last second, percent (M2d's conf=) */
     uint8_t conf_hold;                /* M2k: the confidence holds (no evidence): conf_pct is the shown value, easing toward
                                          the threshold (jank_conf.h jcf_show_step); the gate keeps the held one */

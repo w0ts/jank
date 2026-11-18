@@ -85,3 +85,24 @@ double jg_graded(double soft, double jit, double tempo, double dbn)
     double g = (soft + jit + tempo + dbn) / 4.0;
     return g < 0.0 ? 0.0 : g > 1.0 ? 1.0 : g;
 }
+
+void jg_tuned_reset(struct jg_tuned *g)
+{
+    *g = (struct jg_tuned){0};
+}
+
+double jg_tuned_step(struct jg_tuned *g, const struct jb_robust *r, const struct jb_dbn *dbn, const double *seen, size_t n_seen,
+                     const double *lines, size_t n_lines, int has_grid, double period, double now)
+{
+    if (!has_grid || !(period > 0.0) || !seen) {
+        g->next_t = 0.0;
+        g->value = 0.0;
+        return 0.0;
+    }
+    if (now >= g->next_t || now < g->next_t - 2.0 * JG_EVERY_S) {   /* (a stream time that went back: the tracker restarted) */
+        g->next_t = now + JG_EVERY_S;
+        g->value = jg_graded(jg_soft_f(seen, n_seen, lines, n_lines, period, now), jg_jitter(seen, n_seen),
+                             jrb_tempo_agreement(r, now, period), (double)jb_dbn_mass_near(dbn, 60.0 / period, JRB_DBN_NEAR));
+    }
+    return g->value;
+}

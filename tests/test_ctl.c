@@ -316,7 +316,7 @@ static void test_cfg_name(void)
 static void test_beat_flash_gone(void)
 {
     setup();
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "graded=off\nusb=") && !strstr(out, "beat_flash"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "graded=on\nusb=") && !strstr(out, "beat_flash"));
     CHECK(run("set beat_flash 1") == JK_CTL_NONE && strstr(out, "err ") == out);
     CHECK(run("help") == JK_CTL_NONE && !strstr(out, "beat_flash"));
 }
@@ -673,6 +673,11 @@ static void test_lowconf(void)
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=1\ncoast=1\nact=91\n"));
     snap.beat.coast = 0;
     snap.beat.conf_hold = 0;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nlowconf=run\nconf_gate=62\n"));   /* not graded: the gate's value is the shown one */
+    snap.beat.conf_graded = 1;                                        /* the graded value is shown: the gate's own is conf_gate */
+    snap.beat.conf_gate_pct = 91;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\n") && strstr(out, "\nlowconf=run\nconf_gate=91\n"));
+    snap.beat.conf_graded = 0;
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=run\nthreshold=70\n"));
     snap.beat.silent = 1;
     CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\ncoast=0\nact=91\ngated=1\nsilent=1\nthreshold=70\nlowconf=run\nmode="));
@@ -699,8 +704,8 @@ static void test_follow(void)
         CHECK(run("set follower fast") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.follower == 1);
         CHECK(run("set follower tuned") == JK_CTL_CFG_CHANGED && cfg.follower == 0);
     }
-    /* SKIP and the graded confidence, on the robust follower: set skip off|act|pat, set graded on|off; not stored */
-    CHECK(cfg.skip == 0 && cfg.graded == 0 && run("get") == JK_CTL_NONE && strstr(out, "\nskip=off\ngraded=off\n"));
+    /* SKIP (robust follower) and the graded confidence (both followers, on by default): set skip off|act|pat, set graded on|off; not stored */
+    CHECK(cfg.skip == 0 && cfg.graded == 1 && run("get") == JK_CTL_NONE && strstr(out, "\nskip=off\ngraded=on\n"));
     {
         struct jk_cfg was = cfg;
         CHECK(run("set skip pat") == JK_CTL_CFG_CHANGED && cfg.skip == 2 && !jk_cfg_stored_differs(&was, &cfg));
@@ -708,10 +713,10 @@ static void test_follow(void)
         CHECK(run("set skip act") == JK_CTL_CFG_CHANGED && cfg.skip == 1);
         CHECK(run("set skip fast") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.skip == 1);
         CHECK(run("set skip off") == JK_CTL_CFG_CHANGED && cfg.skip == 0);
-        CHECK(run("set graded on") == JK_CTL_CFG_CHANGED && cfg.graded == 1 && !jk_cfg_stored_differs(&was, &cfg));
-        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\ngraded=on\n"));
-        CHECK(run("set graded maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.graded == 1);
-        CHECK(run("set graded off") == JK_CTL_CFG_CHANGED && cfg.graded == 0);
+        CHECK(run("set graded off") == JK_CTL_CFG_CHANGED && cfg.graded == 0 && !jk_cfg_stored_differs(&was, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\ngraded=off\n"));
+        CHECK(run("set graded maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.graded == 0);
+        CHECK(run("set graded on") == JK_CTL_CFG_CHANGED && cfg.graded == 1);
     }
     CHECK(run("help") == JK_CTL_NONE && strstr(out, "|follower|skip|graded|burn|"));
     CHECK(run("set rate maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.rate == 0);
