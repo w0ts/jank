@@ -74,7 +74,6 @@ static struct jk_snapshot s_snap;
 #define FRAME_BYTES JO_FB_BYTES
 #endif
 static uint8_t s_fb[FRAME_BYTES];       /* the frame drawn (the driver keeps its own copy) */
-static uint32_t s_quantum = 4;          /* the bar's beats, for the screen's beat flash */
 static char s_ap_name[JO_SSID_MAX + 1] = "jank", s_ap_pass[JO_TEXT_MAX + 1] = "";
 
 struct meter_step {
@@ -233,8 +232,6 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->conf_hold = audio ? b->conf_hold : 0;
     c->fold_exp = audio ? b->fold_exp : 0;
     c->usb_midi = cfg.usbmidi ? 0 : 1;                                              /* ON, OFF */
-    c->beat_flash = cfg.beat_flash;
-    s_quantum = cfg.quantum ? cfg.quantum : 4u;
     c->th = s_prefs.th;
     c->gain = s_prefs.gain;
     c->conf_stop = s_prefs.conf_stop;
@@ -347,7 +344,6 @@ static void set_field(void *user, enum jo_field f, int v)
     case JO_F_USBROLE: ctl_set("set usb %s", v ? "host" : "device"); break;
     case JO_F_AUTOBAR: ctl_set("set autobar %s", v >= 0 && v < 3 ? AUTOBAR[v] : "off"); break;
     case JO_F_USBMIDI: ctl_set("set usbmidi %s", v ? "off" : "on"); break;
-    case JO_F_BEATFLASH: ctl_set("set beat_flash %d", v ? 1 : 0); break;
     default: break;
     }
 }
@@ -432,13 +428,11 @@ static void dark_frame(uint8_t *fb)
 #endif
 }
 
-/* flash_ok: the colour screen may flash this frame on the beat (the BEAT FLASH setting SCREEN, HOME, the transport running; never a dark frame) */
-static void show_frame(const uint8_t *fb, int flash_ok)
+static void show_frame(const uint8_t *fb)
 {
 #if BOARD_LCD
-    lcd_show(fb, flash_ok, s_quantum);
+    lcd_show(fb);
 #else
-    (void)flash_ok;
     oled_show(fb, uis_contrast());
 #endif
 }
@@ -449,7 +443,7 @@ void uis_boot_screen(void)
     if (!s_screen)
         return;
     draw_frame(s_fb, build_ctx(NULL, bridge_ms()), bridge_ms());
-    show_frame(s_fb, 0);
+    show_frame(s_fb);
 }
 
 void uis_step(uint32_t now, struct uis_led *led)
@@ -479,9 +473,9 @@ void uis_step(uint32_t now, struct uis_led *led)
         return;
     if (jo_asleep(&s_in, c, now)) {
         dark_frame(fb);                   /* SCREEN OFF: a dark frame; the panel stays on (the 2.42"'s power rule) */
-        show_frame(fb, 0);
+        show_frame(fb);
         return;
     }
     draw_frame(fb, c, now);
-    show_frame(fb, c->beat_flash && s_ui.screen == JO_HOME && !c->setup && !c->boot && !c->splash && c->has_beat);
+    show_frame(fb);
 }

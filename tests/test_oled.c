@@ -31,7 +31,7 @@ struct stats {
     } while (0)
 
 static const char *const FIELD_NAMES[JO_F_COUNT] = {"netmode", "inoff", "out0", "out1", "out2", "rate", "threshold", "gain", "ltmode", "bright",
-                                                    "sleep", "group", "lowconf", "insrc", "usbrole", "autobar", "usbmidi", "beatflash", "ssid", "pass", "appass", "apname"};
+                                                    "sleep", "group", "lowconf", "insrc", "usbrole", "autobar", "usbmidi", "ssid", "pass", "appass", "apname"};
 
 /* one case's world, as gen_cases.js's world(): the state the setters change, and the log of calls */
 struct world {
@@ -82,7 +82,6 @@ static void set_field(void *user, enum jo_field f, int v)
     case JO_F_USBROLE: c->usb_role = (uint8_t)v; break;
     case JO_F_AUTOBAR: c->auto_bar = (uint8_t)v; break;
     case JO_F_USBMIDI: c->usb_midi = (uint8_t)v; break;
-    case JO_F_BEATFLASH: c->beat_flash = (uint8_t)v; break;
     default: break;
     }
     c->setup = c->net.mode == 3;
@@ -219,7 +218,6 @@ static void parse_state(struct jo_ctx *c, const char *key, const char *v)
         double f = strtod(v, NULL);
         c->fold_exp = f == 2.0 ? 1 : f == 4.0 ? 2 : f == 0.5 ? -1 : f == 0.25 ? -2 : 0;
     } else if (!strcmp(key, "usbMidi")) c->usb_midi = (uint8_t)atoi(v);
-    else if (!strcmp(key, "beatFlash")) c->beat_flash = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.mode")) n->mode = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.prev")) n->prev = (uint8_t)atoi(v);
     else if (!strcmp(key, "net.group")) n->group = (uint8_t)atoi(v);
@@ -475,7 +473,7 @@ int main(int argc, char **argv)
     CHECK(oled.cases >= 100 && oled.frames >= 380, "only %d cases, %d frames", oled.cases, oled.frames);
     if (argc > 2) {
         run_cases(argv[2], &colour);
-        CHECK(colour.cases >= 180 && colour.ink_frames >= 390 && colour.ink_lit > 100000, "only %d ink cases, %d planes, %d lit ink pixels", colour.cases,
+        CHECK(colour.cases >= 180 && colour.ink_frames >= 380 && colour.ink_lit > 100000, "only %d ink cases, %d planes, %d lit ink pixels", colour.cases,
               colour.ink_frames, colour.ink_lit);
     }
     if (s_fail) {

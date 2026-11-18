@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The lcd2's colour screen (lcd.c): the Waveshare ESP32-S3-LCD-2's 240 x 320 ST7789 on SPI, landscape. It takes the lcd2 layout's 160 x 120
- * frame and its ink plane (core/jank_oled.h, jo_draw_lcd2), paints them exactly x2 in the palette of core/jank_lcd.h and, with the BEAT FLASH
- * setting on SCREEN, flashes the whole screen on the beat (the same window as the LED: core/jank_core.h jk_flash_at). */
+ * frame and its ink plane (core/jank_oled.h, jo_draw_lcd2), paints them exactly x2 in the palette of core/jank_lcd.h. */
 #ifndef LCD_H
 #define LCD_H
 #include <stdint.h>
@@ -16,11 +15,8 @@ int lcd_found(void);
 uint8_t *lcd_ink(void);
 /* the driver task (core 0, the lowest priority above idle); nothing without a screen */
 esp_err_t lcd_start(void);
-/* hand a frame over: fb and the plane lcd_ink() holds are copied; the task sends it. flash_ok: this frame may flash on the beat (HOME, the
- * setting on SCREEN, the transport running); the task then looks at the session's beat itself (bridge_beat) about 30 times a second and
- * flashes the whole frame inside the beat's window of a bar of `quantum` beats */
-void lcd_show(const uint8_t fb[JO_LCD2_FB_BYTES], int flash_ok, uint32_t quantum);
-/* send a frame now, on the caller's task: only the frame pages that differ from the panel's (pixels or ink); the first frame, a flash and
- * the frame after a flash in full. flash: enum jlc_flash */
-esp_err_t lcd_present(const uint8_t fb[JO_LCD2_FB_BYTES], const uint8_t ink[JO_LCD2_INK_BYTES], int flash);
+/* hand a frame over: fb and the plane lcd_ink() holds are copied; the task sends it */
+void lcd_show(const uint8_t fb[JO_LCD2_FB_BYTES]);
+/* send a frame now, on the caller's task: only the frame pages that differ from the panel's (pixels or ink); the first frame in full */
+esp_err_t lcd_present(const uint8_t fb[JO_LCD2_FB_BYTES], const uint8_t ink[JO_LCD2_INK_BYTES]);
 #endif
