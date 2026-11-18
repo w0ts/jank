@@ -11,6 +11,7 @@
 #include "driver/gptimer.h"
 #include "driver/uart.h"
 #include "esp_attr.h"
+#include "esp_cpu.h"
 #include "esp_log.h"
 #include "esp_rom_gpio.h"
 #include "freertos/FreeRTOS.h"
@@ -70,6 +71,10 @@ static esp_err_t bench_pins_up(void)
 }
 #endif
 
+/* core 1's load: the cycles spent in on_alarm, summed (one writer, the interrupt; read from core 0 as a running count) */
+static volatile uint32_t s_busy_cyc;
+uint32_t midi_busy_cycles(void) { return s_busy_cyc; }
+
 static void IRAM_ATTR arm(gptimer_handle_t timer, int64_t at, int64_t now)
 {
     gptimer_alarm_config_t a = {.alarm_count = (uint64_t)(at > now + ALARM_MARGIN_US ? at : now + ALARM_MARGIN_US)};
@@ -79,6 +84,7 @@ static void IRAM_ATTR arm(gptimer_handle_t timer, int64_t at, int64_t now)
 static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event_data_t *ev, void *ctx)
 {
     struct jc_fire f;
+    const uint32_t c_in = esp_cpu_get_cycle_count();
     int64_t now = (int64_t)ev->count_value;
     bool woken = false;
     (void)ctx;
@@ -98,6 +104,7 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
 #endif
     woken = usb_midi_isr(f.bytes, f.n);
     arm(timer, f.next - CLK_LEAD_US, now);
+    s_busy_cyc += esp_cpu_get_cycle_count() - c_in;     /* core 1's load: this interrupt's cycles (two counter reads and an add) */
     return woken;
 }
 

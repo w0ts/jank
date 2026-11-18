@@ -90,14 +90,14 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   the keys read -1 / 0 and the screen shows SIGNAL only (the router's rssi, `wifi_rssi`).
 - **`about`** (the ABOUT menu screen's numbers, for the page's simulation of that screen). One `key=value` line each, then `ok`:
   `uptime_s` (seconds since boot), `reset` (why the chip last reset, upper case: `POWERON`, `PANIC`, `INT WDT`, ...), `temp_c` (chip temperature, whole
-  degrees), `cpu_pct` (core 0's load: 100 minus its idle task's share, `beat` `core0_idle_x10`), `heap_kb` (free internal heap), `heap_min_kb` (the
+  degrees), `cpu_pct` (core 0's load: 100 minus its idle task's share, `beat` `core0_idle_x10`), `cpu1_pct` (core 1's load: the MIDI clock interrupt's share of the cycles, `beat` `core1_busy_x10`, counted in `midi.c`'s `on_alarm`; the FreeRTOS tick and other interrupts on core 1 are not in it; `-1` before the first second), `heap_kb` (free internal heap), `heap_min_kb` (the
   least free since boot), `psram_kb` (free PSRAM, `-1` on a board without), `flash_kb` (the flash chip), `app_used_kb` (the running app image),
   `app_part_kb` (its partition), `clock_late_us` (the MIDI clock alarm's worst lateness since boot), `ui_loop_us` and `beat_loop_us` (the longest pass
   of the UI task / the beat task since boot). The firmware's own sampler (`firmware/main/uiscreen.c`, at most every 2 s in the ui task, never on the beat, clock
   or audio path) fills them; the screen and `about` read the same values, nothing is sampled for the reply (`uis_sys`). Unknown: `-1`, `temp_c=-999`,
   `reset=` empty (the screen's own unknowns; the page shows `-`). The name and version are not in it (`get` has `version=`). It is a second reply because
   `status` has no room for it: the answer buffer is `JK_CTL_OUT_MAX` = 2040 bytes (under usb.c's 2048; the SysEx layer chunks any length into 30-character
-  frames), the longest `status` is 1894 bytes (`tests/test_ctl.c` prints it) and `about` is up to 262. The page asks for `about` only while its simulated
+  frames), the longest `status` is 1894 bytes (`tests/test_ctl.c` prints it) and `about` is up to 273. The page asks for `about` only while its simulated
   screen shows ABOUT (every 1.5 s, one at a time), so its other polling is unchanged; a jank without the command answers `err unknown command`, and the
   page then leaves the screen's values as `-`.
 - **`play` starts on the next bar line** (`quantum` beats). The start goes out 150 ms before that bar, as "playing from

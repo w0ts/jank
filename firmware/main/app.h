@@ -83,6 +83,7 @@ void linein_report(char *out, size_t cap);                   /* the `line` comma
 esp_err_t midi_start(void);
 int64_t midi_now_us(void);
 uint32_t midi_late_max_us(void);                    /* the clock alarm's worst lateness since boot, us */
+uint32_t midi_busy_cycles(void);                   /* running count of CPU cycles spent in the MIDI clock interrupt (core 1), wraps at 2^32 */
 int64_t midi_now_us_isr(void);                       /* the same, from an IRAM interrupt with the cache off; -1 before midi_start */
 void midi_set_quantum(uint32_t quantum);
 void midi_publish(const struct jc_map *m);

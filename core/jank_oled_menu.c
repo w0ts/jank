@@ -197,7 +197,7 @@ int jo_net_rows(const struct jo_ctx *c, struct jo_net_row rows[4])
     return 4;
 }
 
-/* the ABOUT rows, a label (left) and its value (right aligned by the screens), "-" for what is not known: NAME, VERSION, REPO, UPTIME, RESET,
+/* the ABOUT rows, a label (left) and its value (right aligned by the screens), "-" for what is not known: VERSION, REPO, UPTIME, RESET,
  * TEMP, CPU, MEMORY, MIN HEAP, FLASH, CLOCK LATE, UI LOOP, BEAT LOOP. The repo is shortened on the OLED (21 characters across); the lcd2 layout
  * adds the PSRAM to MEMORY */
 static void about_num(struct jo_about_row *r, const char *label, int v, const char *unit)
@@ -207,6 +207,18 @@ static void about_num(struct jo_about_row *r, const char *label, int v, const ch
         snprintf(r->val, sizeof r->val, "%d%s", v, unit);
     else
         snprintf(r->val, sizeof r->val, "-");
+}
+
+/* CPU: "core 0 / core 1 %", "-" for a core not known (57/3%, 57/-%, -/-%) */
+static void about_cpu(struct jo_about_row *r, int c0, int c1)
+{
+    char a[12] = "-", b[12] = "-";
+    if (c0 >= 0)
+        snprintf(a, sizeof a, "%d", c0);
+    if (c1 >= 0)
+        snprintf(b, sizeof b, "%d", c1);
+    snprintf(r->label, sizeof r->label, "CPU");
+    snprintf(r->val, sizeof r->val, "%s/%s%%", a, b);
 }
 
 static void about_txt(struct jo_about_row *r, const char *label, const char *val)
@@ -237,17 +249,16 @@ void jo_about_rows(const struct jo_ctx *c, struct jo_about_row rows[JO_ABOUT_ROW
             snprintf(fl, sizeof fl, "%dM %s/%sM", c->flash_kb / 1024, a, b);
         }
     }
-    about_txt(&rows[0], "NAME", "jank");
-    about_txt(&rows[1], "VERSION", c->version ? c->version : "-");
-    about_txt(&rows[2], "REPO", c->layout_lcd2 ? "github.com/w0ts/jank" : "w0ts/jank");
-    about_txt(&rows[3], "UPTIME", up);
-    about_txt(&rows[4], "RESET", c->reset ? c->reset : "-");
-    about_txt(&rows[5], "TEMP", t);
-    about_num(&rows[6], "CPU", c->cpu_pct, "%");
-    about_txt(&rows[7], "MEMORY", mem);
-    about_num(&rows[8], "MIN HEAP", c->heap_min_kb, "K");
-    about_txt(&rows[9], "FLASH", fl);
-    about_num(&rows[10], "CLOCK LATE", c->clk_late_us, " US");
-    about_num(&rows[11], "UI LOOP", c->ui_loop_us, " US");
-    about_num(&rows[12], "BEAT LOOP", c->beat_loop_us, " US");
+    about_txt(&rows[0], "VERSION", c->version ? c->version : "-");
+    about_txt(&rows[1], "REPO", c->layout_lcd2 ? "github.com/w0ts/jank" : "w0ts/jank");
+    about_txt(&rows[2], "UPTIME", up);
+    about_txt(&rows[3], "RESET", c->reset ? c->reset : "-");
+    about_txt(&rows[4], "TEMP", t);
+    about_cpu(&rows[5], c->cpu_pct, c->cpu1_pct);
+    about_txt(&rows[6], "MEMORY", mem);
+    about_num(&rows[7], "MIN HEAP", c->heap_min_kb, "K");
+    about_txt(&rows[8], "FLASH", fl);
+    about_num(&rows[9], "CLOCK LATE", c->clk_late_us, " US");
+    about_num(&rows[10], "UI LOOP", c->ui_loop_us, " US");
+    about_num(&rows[11], "BEAT LOOP", c->beat_loop_us, " US");
 }
