@@ -105,7 +105,7 @@ const OLED = (() => {
     'y': '.....|#...#|#...#|.####|....#|....#|.###.', 'z': '.....|.....|#####|...#.|..#..|.#...|#####',
     '_': '.....|.....|.....|.....|.....|.....|#####', '!': '..#..|..#..|..#..|..#..|..#..|.....|..#..',
     '@': '.###.|#...#|#.###|#.#.#|#.###|#....|.###.', '#': '.#.#.|#####|.#.#.|.#.#.|.#.#.|#####|.#.#.',
-    '*': '.....|#.#.#|.###.|#####|.###.|#.#.#|.....', '<': '...#.|..#..|.#...|#....|.#...|..#..|...#.',
+    '*': '.....|#.#.#|.###.|#####|.###.|#.#.#|.....'
   };
   const FONT = {};
   for (const k of Object.keys(FONT_SRC)) FONT[k] = FONT_SRC[k].split('|');
@@ -648,11 +648,10 @@ const OLED = (() => {
   //                 y 15..49   the TEMPO in the big digits (35 rows), left aligned, x 2
   //                 y 52..76   four big beat boxes, 36 x 25, gap 4, the beat indicator; lit = solid, unlit = 2 px outline; the first is amber only while lit
   //                 y 79       CONFIDENCE  [line, notch at the stop threshold] 87%   number and line coloured by the threshold rule
-  //                 y 87       INPUT [VU meter, notch at the tracker's -50 dBFS, peak tick] -20dB   gradient along the bar; the number red clipping, amber too quiet
+  //                 y 87       INPUT [VU meter, notch at the tracker's -50 dBFS] -20dB   continuous gradient bar; the number red clipping, amber too quiet
   //                 y 95       BAR  LOCKED [outlined bar]                     AUTO BAR state and its confidence, neutral; only with AUTO BAR on
-  //                 y 104      stats 1: PEERS n or GATED / HOLD / COAST, signal dot + dBm, STOP < 70 / MIN 70
-  //                 y 112      stats 2: NET name, BATT n %
-  //   HOME (LINK)   the same top bar, tempo and stats; the beat boxes 36 x 48 at y 54..101; no audio rows
+  //                 y 111      the word GATED / HOLD / COAST when one applies, else empty (y 118, 119 empty)
+  //   HOME (LINK)   the same top bar and tempo; the beat boxes 36 x 48 at y 54..101; no audio rows, no word
   //   lists         title bar 11 px, 12 rows of 9 px from y 13; sub menus and info 12 px rows; edit: the value at scale 2
   const SIZES = { oled: { w: OLED_W, h: OLED_H }, lcd2: { w: 160, h: 120 } };
   const sizeOf = layout => (layout === 'lcd2' ? SIZES.lcd2 : SIZES.oled);
@@ -669,18 +668,17 @@ const OLED = (() => {
     return pct < c.th ? INK.BAD : pct <= c.th + CONF_WARN_MARGIN ? INK.WARN : INK.GOOD;
   }
   const battInk = pct => (pct < BATT_BAD_PCT ? INK.BAD : pct < BATT_WARN_PCT ? INK.WARN : INK.GOOD);
-  // the VU meter's colour ramp: VU.steps ink ids from VU.ink0 up (ui/lcd2.js has their RGB); a bar column i of barW has the id ink0 + floor(steps * i / barW)
-  const VU = { ink0: 6, steps: 16 };
+  // the VU meter's colour ramp: VU.steps ink ids from VU.ink0 up (ui/lcd2.js has their RGB); a bar column i of barW has the id ink0 + floor(steps * i / barW), so the bar is a continuous gradient
+  const VU = { ink0: 6, steps: 32 };
 
   // the HOME geometry: one table, the tests read it
   const L2 = {
     topH: 13, iconY: 1, iconH: 11, playX: 2, optX: 14, nameRight: 67, linkX: 70, linkW: 27, peersX: 85, signalX: 98, signalW: 14, plugX: 117, battX: 134, battW: 24,
     tempoX: 2, tempoY: 15,
     boxX: 2, boxW: 36, boxGap: 4, boxY: 52, boxH: 25, linkBoxY: 54, linkBoxH: 48, boxBorder: 2,
-    rowCF: 79, rowIN: 87, rowBAR: 95, labelX: 2, valueXR: 158, barX: 64, barW: 62, lineH: 3, vuH: 5, segPitch: 3, segOn: 2, segCount: 21,
-    stats1Y: 104, stats2Y: 112, sigDotX: 52, sigTextX: 60,
+    rowCF: 79, rowIN: 87, rowBAR: 95, labelX: 2, valueXR: 158, barX: 64, barW: 62, lineH: 3, vuH: 5,
+    wordY: 111,
   };
-  const VU_SEGMENTS_DEFAULT = true;                                  // ctx.vuSegments overrides (?vu=smooth|seg on the control page)
   const barFillWidth = frac => Math.round(L2.barW * clamp(frac, 0, 1));          // the line's length: the value on 62 px
   const barTickX = tickFrac => L2.barX + Math.round((L2.barW - 1) * tickFrac);
   const dbFrac = db => clamp((db - METER_MIN_DB) / -METER_MIN_DB, 0, 1);
@@ -690,7 +688,6 @@ const OLED = (() => {
   // and the LINK option icons: IGNORE = a crossed circle (own start only), FOLLOW = an arrow coming in, FOLLOW+LEAD = a double arrow
   const LINK_GLYPH = ['.....###.....', '....#####....', '....#####....', '.....###.....', '....#...#....', '...#.....#...', '.###.....###.', '#####...#####', '#############', '#####...#####', '.###.....###.'];
   const USB_PLUG = ['....######...', '....######...', '....#########', '....#########', '##########...', '##########...', '##########...', '....#########', '....#########', '....######...', '....######...'];
-  const SIGNAL_DOT = ['.###.', '#####', '#####', '#####', '.###.'];
   const LT_ICONS_L2 = [
     ['...#####...', '..##...##..', '.##.....##.', '##.....#.##', '#.....#...#', '#....#....#', '#...#.....#', '##.#.....##', '.##.....##.', '..##...##..', '...#####...'],
     ['.....#.......', '....##.......', '...###.......', '..####.......', '.############', '#############', '.############', '..####.......', '...###.......', '....##.......', '.....#.......'],
@@ -742,7 +739,7 @@ const OLED = (() => {
   }
   function drawTempoLcd2(fb, c) {
     const bpm = c.link ? c.linkBpm : c.bpm;
-    BigFont.draw((x, y) => px(fb, x, y, 1), c.digits, bpm ? bpm.toFixed(1) : '---', L2.tempoX, L2.tempoY);
+    BigFont.draw((x, y) => px(fb, x, y, 1), bpm ? bpm.toFixed(1) : '---', L2.tempoX, L2.tempoY);
   }
 
   function rowText(fb, y, label, value) {
@@ -760,30 +757,15 @@ const OLED = (() => {
     tag(ink, L2.barX, y + 2, n, L2.lineH);
     const x = barTickX(tickFrac); xorCol(fb, x, y + 1, y + 5); tag(ink, x, y + 1, 1, 5);
   }
-  // the INPUT row: a VU meter 5 px high on 62 px. Smooth: round(62 x level) columns. Segments: 21 of 2 px on, 1 px off, round(21 x level) lit.
-  // Every column (segment: its first column) has the ramp id of its position on the dBFS scale. A notch (7 px tall, XOR-ed; in segments mode
-  // on the nearest gap column) marks the tracker's -50 dBFS; the last second's peak is a 1 px tick in its column's ramp colour, drawn only
-  // when at least one dark column separates it from the bar's end. The number carries the level rule's ink.
-  function vuRow(fb, y, c, segments) {
-    const value = Math.round(c.levelDb) + 'dB', top = y + 1, frac = dbFrac(c.levelDb);
+  // the INPUT row: a continuous VU meter 5 px high on 62 px: round(62 x level) columns, no segments and no gaps. Every column has the ramp id of its
+  // position on the dBFS scale (green quiet, red hot). A notch (7 px tall, XOR-ed) marks the tracker's -50 dBFS. The number carries the level rule's ink.
+  function vuRow(fb, y, c) {
+    const value = Math.round(c.levelDb) + 'dB', top = y + 1, n = barFillWidth(dbFrac(c.levelDb));
     rowText(fb, y, 'INPUT', value);
     tag(levelInk(c), L2.valueXR - textW(value, 1), y, textW(value, 1), 7);
-    let end;
-    if (segments) {
-      const lit = Math.round(L2.segCount * frac);
-      for (let k = 0; k < lit; k++) { const x = L2.barX + L2.segPitch * k; rect(fb, x, top, L2.segOn, L2.vuH, 1); tag(vuInk(L2.segPitch * k), x, top, L2.segOn, L2.vuH); }
-      end = lit > 0 ? L2.segPitch * (lit - 1) + L2.segOn - 1 : -1;
-    } else {
-      const n = barFillWidth(frac);
-      rect(fb, L2.barX, top, n, L2.vuH, 1);
-      for (let i = 0; i < n; i++) tag(vuInk(i), L2.barX + i, top, 1, L2.vuH);
-      end = n - 1;
-    }
-    const notch = barTickX(dbFrac(QUIET_DB)) - L2.barX;
-    xorCol(fb, L2.barX + (segments ? L2.segPitch * Math.round((notch - 2) / L2.segPitch) + 2 : notch), y, y + 6);
-    if (c.peakDb === null || c.peakDb === undefined) return;
-    const pk = Math.round((L2.barW - 1) * dbFrac(c.peakDb));
-    if (pk > end + 1) { rect(fb, L2.barX + pk, top, 1, L2.vuH, 1); tag(vuInk(pk), L2.barX + pk, top, 1, L2.vuH); }
+    rect(fb, L2.barX, top, n, L2.vuH, 1);
+    for (let i = 0; i < n; i++) tag(vuInk(i), L2.barX + i, top, 1, L2.vuH);
+    xorCol(fb, barTickX(dbFrac(QUIET_DB)), y, y + 6);
   }
   // the BAR row: the label and AUTO BAR's state (the 10 character label column), an outlined bar (62 x 5, a 3 px fill inside, so the fill is
   // round(60 x confidence)); neutral, no tick
@@ -803,35 +785,22 @@ const OLED = (() => {
   }
   const BAR_WORDS = { locked: 'LOCKED', listening: 'LISTEN', manual: 'MANUAL' };
   const inkText = (fb, s, x, y, ink) => { text(fb, s, x, y, 1, 1); tag(ink, x, y, textW(s, 1), 7); };
-  const signalText = rssi => (rssi === null || rssi === undefined ? '-' : rssi === 0 ? 'NONE' : rssi + 'dBm');
-  const netName = c => [c.net.group != null ? 'JANK G' + c.net.group : '', c.net.ssid, c.net.apName][c.net.mode] || '-';
-  // the stats rows. Line 1: PEERS n (the Link peers; GATED / HOLD / COAST take its place when they apply, AUDIO only), a dot in the signal's
-  // colour and the signal in dBm (the best jank peer, or the router in Wi-Fi mode), STOP < 70 / MIN 70 on the right (AUDIO only). Line 2:
-  // NET and its name (the jank group or the Wi-Fi network), BATT n % on the right. A value the stick does not report is '-'.
-  function drawStatsLcd2(fb, c) {
-    const y1 = L2.stats1Y, y2 = L2.stats2Y, coast = !c.confHold && c.confKnown !== false && !!c.running && c.conf * 100 < c.th;
-    const word = c.link ? null : c.gated ? ['GATED', INK.BAD] : c.confHold ? ['HOLD', INK.DIM] : coast ? ['COAST', INK.WARN] : null;
-    if (word) inkText(fb, word[0], 2, y1, word[1]);
-    else if (c.peers === null || c.peers === undefined) inkText(fb, 'PEERS -', 2, y1, INK.DIM);
-    else inkText(fb, 'PEERS ' + Math.min(c.peers, 99), 2, y1, linkInk(c));
-    icon(fb, SIGNAL_DOT, L2.sigDotX, y1 + 1);
-    tag(SIGNAL_INK[signalQuality(c.rssi)], L2.sigDotX, y1 + 1, 5, 5);
-    text(fb, signalText(c.rssi), L2.sigTextX, y1, 1, 1);
-    if (!c.link) textR(fb, c.confStop ? 'STOP < ' + c.th : 'MIN ' + c.th, L2.valueXR, y1, 1, 1);
-    text(fb, fit('NET ' + netName(c), 98), 2, y2, 1, 1);
-    if (c.fitted) inkText(fb, 'BATT ' + c.batt + '%', L2.valueXR - textW('BATT ' + c.batt + '%', 1), y2, battInk(c.batt));
-    else textR(fb, 'BATT -', L2.valueXR, y2, 1, 1);
+  // the bottom row: the word for the confidence state, left aligned (AUDIO only); nothing otherwise
+  function drawWordLcd2(fb, c) {
+    const coast = !c.confHold && c.confKnown !== false && !!c.running && c.conf * 100 < c.th;
+    const word = c.gated ? ['GATED', INK.BAD] : c.confHold ? ['HOLD', INK.DIM] : coast ? ['COAST', INK.WARN] : null;
+    if (word) inkText(fb, word[0], 2, L2.wordY, word[1]);
   }
   function drawHomeLcd2(fb, c, now) {
     drawTopBarLcd2(fb, c, now);
     drawTempoLcd2(fb, c);
-    if (c.link) { beatBoxesLcd2(fb, c, L2.linkBoxY, L2.linkBoxH); drawStatsLcd2(fb, c); return; }
+    if (c.link) { beatBoxesLcd2(fb, c, L2.linkBoxY, L2.linkBoxH); return; }
     beatBoxesLcd2(fb, c, L2.boxY, L2.boxH);
     const known = c.confKnown !== false;
     lineRow(fb, L2.rowCF, 'CONFIDENCE', known ? Math.round(c.conf * 100) + '%' : '--', known ? c.conf : 0, c.th / 100, confInk(c));
-    vuRow(fb, L2.rowIN, c, c.vuSegments === undefined ? VU_SEGMENTS_DEFAULT : c.vuSegments);
+    vuRow(fb, L2.rowIN, c);
     if (c.bar && BAR_WORDS[c.bar.state]) outlinedRow(fb, L2.rowBAR, 'BAR', BAR_WORDS[c.bar.state], c.bar.state === 'manual' ? 0 : c.bar.conf || 0);
-    drawStatsLcd2(fb, c);
+    drawWordLcd2(fb, c);
   }
 
   // ---- the lists: a title bar of 11 px, rows of 9 px from y 13 (12 rows: the whole MENU fits), full width, neutral, the selected row inverted
