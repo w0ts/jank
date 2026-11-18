@@ -1397,7 +1397,7 @@ const OLED = (() => {
       else if (btn === 'no') ui.screen = 'net';
     } else if (ui.screen === 'info') {
       if (!d) ui.screen = 'menu';
-      else if (ui.page === 'about') { const vis = c.layout === 'lcd2' ? ABOUT_VIS_LCD2 : ABOUT_VIS_OLED; ui.ascroll = clamp(ui.ascroll - d * vis, 0, Math.max(0, ABOUT_ROWS - vis)); }      // ABOUT: a press moves one page, clamped
+      else if (ui.page === 'about') { const vis = c.layout === 'lcd2' ? ABOUT_VIS_LCD2 : ABOUT_VIS_OLED; ui.ascroll = clamp(ui.ascroll - d * vis, 0, Math.floor((ABOUT_ROWS - 1) / vis) * vis); }      // ABOUT: a press moves one page (starts are multiples of vis, no row on two pages), clamped
     } else if (ui.screen === 'edit') {
       if (d) stepEdit(ui, c, d);
       else endEdit(ui, c, btn === 'yes');
