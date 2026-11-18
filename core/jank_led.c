@@ -31,8 +31,6 @@ static uint8_t breath(uint32_t now_ms)
 
 int jlg_color(const struct jlg_state *s, uint8_t rgb[3])
 {
-    if (s->pair_window)
-        return jl_pair_lit(s->now_ms, rgb);
     if (!s->on_usb && s->batt_pct >= 0 && s->batt_pct < JLG_BATT_LOW_PCT &&
         s->now_ms % jlg_batt_period_ms(s->batt_pct) < JLG_BATT_FLASH_MS)
         return put(rgb, JLG_BATT_RGB);

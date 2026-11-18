@@ -75,11 +75,6 @@ static void test_language(void)
     s.batt_pct = 50;
     s.now_ms = 10;
     CHECK(!jlg_color(&s, c), "a full cell: no warning");
-    s.pair_window = 1;
-    s.now_ms = 0;
-    CHECK(jlg_color(&s, c) && same(c, 0, 0, 40), "pair window: blue first");
-    s.now_ms = JL_PAIR_MS / 2u;
-    CHECK(!jlg_color(&s, c), "pair window: blinks");
     CHECK(jlg_batt_period_ms(30) == JLG_BATT_SLOW_MS && jlg_batt_period_ms(5) == JLG_BATT_FAST_MS && jlg_batt_period_ms(0) == JLG_BATT_FAST_MS &&
               jlg_batt_period_ms(99) == JLG_BATT_SLOW_MS, "battery periods");
 }

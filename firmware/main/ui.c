@@ -1,16 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The button, the LED and the group scan.
  * Click: stopped by the user's layer (power-on, a Stop: core/jank_hold.h): the user's Start (bridge_play, as `play`), the
- * only Start a unit with no screen and no computer has; started: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air. Three
- * clicks: a phone's pair window (BLE builds; the LED blinks blue 4 times a second until a phone connects or it closes).
+ * only Start a unit with no screen and no computer has; started: resync (jc_resync: stop now, start on the next bar line). Double click: to the next GROUP heard on the air.
  * Held 1.5 s and let go: MODE JANK <-> the Wi-Fi network, a restart.
  * Held 10 s: download mode, for flashing. The LED: the session's beat, inverted on the Wi-Fi network; with AUTO BAR
  * locked the bar's 1 flashes amber.
  *
  * Boards with the D-pad (board.h BOARD_BTN_*: the mini 2.2, the XIAO's UI bench): UP, DOWN, YES and NO (the button above)
  * drive the screens and menus of uiscreen.c / core/jank_oled.h, polled here every 5 ms and debounced (JB_DEBOUNCE_MS),
- * no interrupt. With a screen, NO is the menus' NO; three NO presses still open the pair window (the third one's release
- * then does nothing) and 10 s still means download mode; the click, double click and long hold are the menus' business.
+ * no interrupt. With a screen, NO is the menus' NO and 10 s still means download mode; the click, double click and long hold are the menus' business.
  * Without a screen, NO keeps all of the above, and UP / DOWN / YES act as on HOME. The RGB LEDs speak the LED language
  * (core/jank_led.h); the XIAO's one plain LED keeps the beat as before. */
 #include <string.h>
@@ -88,18 +86,11 @@ static void led_step(uint32_t now)
         return;
     }
     s_event = JL_NONE;
-#if CONFIG_JANK_BLE_MIDI
-    if (ble_midi_advertising()) {      /* a pair window, no phone yet: a fast blue blink instead of the beat */
-        jl_pair_lit(now, c);
-        led_show(c[0], c[1], c[2]);
-        return;
-    }
-#endif
     app_cfg_get(&cfg);
     joined = bridge_beat(&beat, &mpb);
 #if BOARD_LED_RGB_GPIO >= 0
     {
-        struct jlg_state s = {now, 0, s_led.batt_pct, s_led.on_usb, (uint8_t)joined, s_led.running, s_led.armed, s_led.low_conf,
+        struct jlg_state s = {now, s_led.batt_pct, s_led.on_usb, (uint8_t)joined, s_led.running, s_led.armed, s_led.low_conf,
                               s_led.bar_locked, beat, mpb, cfg.quantum};
         if (!s_led.valid)
             s.batt_pct = -1;
@@ -240,20 +231,12 @@ esp_err_t ui_scan_table(struct js_table *out)
 static void on_button(enum jb_event e)
 {
     if (uis_has_screen()) {              /* the click, double click and long hold are the menus' (GROUP, NETWORK) */
-        if (e == JB_TRIPLE) {
-#if CONFIG_JANK_BLE_MIDI
-            if (ble_midi_pair() == 0) {
-                uis_cancel_no();
-                return;
-            }
-#endif
-        } else if (e == JB_DOWNLOAD) {
-            uis_boot_screen();
-            vTaskDelay(pdMS_TO_TICKS(100));   /* the frame goes out first */
-            app_bootloader();
+        if (e != JB_DOWNLOAD)
             return;
-        } else
-            return;
+        uis_boot_screen();
+        vTaskDelay(pdMS_TO_TICKS(100));   /* the frame goes out first */
+        app_bootloader();
+        return;
     }
     switch (e) {
     case JB_CLICK:
@@ -264,17 +247,6 @@ static void on_button(enum jb_event e)
         break;
     case JB_DOUBLE:
         scan_groups();
-        break;
-    case JB_TRIPLE:                      /* the phone's pair window; refused (setting off, or no Bluetooth): red pulses */
-#if CONFIG_JANK_BLE_MIDI
-        if (ble_midi_pair() == 0)
-            break;
-#endif
-        {
-            struct jk_cfg cfg;
-            app_cfg_get(&cfg);
-            led_event(JL_NO_GROUP, cfg.group);
-        }
         break;
     case JB_LONG:
         switch_network();

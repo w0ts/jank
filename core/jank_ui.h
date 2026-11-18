@@ -13,8 +13,7 @@
 enum jb_event {
     JB_NONE = 0,
     JB_CLICK,                          /* said JB_DOUBLE_MS after the release, once no second press came */
-    JB_DOUBLE,                         /* said JB_DOUBLE_MS after the second release, once no third press came */
-    JB_TRIPLE,                         /* said on the third press: the phone's pair window (jank_phone.h) */
+    JB_DOUBLE,                         /* said on the second release */
     JB_LONG,
     JB_DOWNLOAD
 };
@@ -87,15 +86,11 @@ enum jl_event {
     JL_NO_GROUP,                       /* red, 3 long pulses: none other found, stayed */
     JL_SRC_AUDIO,                      /* cyan, one JL_SRC_MS flash: a screenless unit's NO chose USB AUDIO (jur_src_toggle) */
     JL_SRC_LINK                        /* purple, one JL_SRC_MS flash: ... chose LINK. Neither is any other pattern's colour
-                                          (blue pair, red, green beat, amber 1, yellow armed, magenta scan, white joined) */
+                                          (red, green beat, amber 1, yellow armed, magenta scan, white joined) */
 };
 #define JL_FLASH_MS 240u               /* one JL_JOINED flash, on and off */
 #define JL_PULSE_MS 600u               /* one JL_NO_GROUP pulse, on and off */
 #define JL_SRC_MS 400u                 /* the source's flash on a screenless unit's NO */
-#define JL_PAIR_MS 250u                /* the pair window's blink, on and off: 4 a second, unlike any beat's flash */
-
-/* while a phone's pair window is open (no phone yet): 1 lit, rgb its colour (blue). t_ms: any running clock */
-int jl_pair_lit(uint32_t t_ms, uint8_t rgb[3]);
 
 /* 1 while the pattern runs, *r *g *b its colour now. t_ms is the time since the event */
 int jl_pattern(enum jl_event e, uint32_t group, uint32_t t_ms, uint8_t rgb[3]);

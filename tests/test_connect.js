@@ -128,7 +128,7 @@ function fakeMidi(replies = {}) {
   return { input, output, access, sent, text, attach: p => { page = p; } };
 }
 const shown = (page, id) => !page.el(id).classList.contains('hide');
-const pressed = page => ['c-midi', 'c-bluetooth'].map(id => page.el(id).getAttribute('aria-pressed'));
+const pressed = page => ['c-midi'].map(id => page.el(id).getAttribute('aria-pressed'));
 const settle = async (n = 12) => { for (let i = 0; i < n; i++) await new Promise(resolve => setImmediate(resolve)); };
 let checks = 0;
 const errors = [];
@@ -151,7 +151,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
 (async () => {
   // ---- before any connection ----
   let page = makePage();
-  eq(pressed(page), ['false', 'false'], 'no button is pressed before a connection');
+  eq(pressed(page), ['false'], 'no button is pressed before a connection');
   eq(hidden(page), [false, false, false, false], 'the face, the Advanced box, the player and the Advanced extra are hidden');
   eq([shown(page, 'menu'), shown(page, 'more')], [false, false], 'Settings, Network and Details are hidden before a connection');
   page.key('keydown', 'ArrowUp');
@@ -162,17 +162,17 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   page.box.navigator.requestMIDIAccess = () => Promise.reject(new Error('nope'));
   page.el('c-midi').click();
   await settle();
-  eq([pressed(page), hidden(page), page.el('msg').textContent, page.el('msg').classList.contains('bad')], [['false', 'false'], [false, false, false, false], 'nope', true], 'a failed connect: nothing shown, the reason shown');
+  eq([pressed(page), hidden(page), page.el('msg').textContent, page.el('msg').classList.contains('bad')], [['false'], [false, false, false, false], 'nope', true], 'a failed connect: nothing shown, the reason shown');
   page = makePage();
   page.box.navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map(), outputs: new Map() });
   page.el('c-midi').click();
   await settle();
   assert.match(page.el('msg').textContent, /No MIDI port/); checks++;
-  eq(pressed(page), ['false', 'false'], 'no port: nothing pressed');
+  eq(pressed(page), ['false'], 'no port: nothing pressed');
 
   // ---- connected over USB: the face shows the stick's live state ----
   let { page: p, midi } = await connected();
-  eq([pressed(p), shown(p, 'live'), shown(p, 'c-advanced-box'), shown(p, 'player'), shown(p, 'advanced-extra')], [['true', 'false'], true, true, false, false], 'USB: the face and the Advanced box appear, the player does not');
+  eq([pressed(p), shown(p, 'live'), shown(p, 'c-advanced-box'), shown(p, 'player'), shown(p, 'advanced-extra')], [['true'], true, true, false, false], 'USB: the face and the Advanced box appear, the player does not');
   eq(p.el('msg').textContent, '', 'no "Connected." text');
   eq([shown(p, 'menu'), shown(p, 'more')], [true, true], 'USB: Settings, Network and Details appear with the connection');
   ok(midi.sent.includes('get') && midi.sent.includes('home'), 'the page read get and home from the stick');
@@ -194,7 +194,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   p.runFrame();
   for (const [, tick] of p.intervals()) tick();
   await settle();
-  ok(midi.sent.includes('status'), 'status is polled (every 1.5 s) for the gate, the bar and the Bluetooth window, with no details open');
+  ok(midi.sent.includes('status'), 'status is polled (every 1.5 s) for the gate and the bar, with no details open');
 
   // ---- the face's buttons send the stick's commands ----
   const before = midi.sent.length;
@@ -242,7 +242,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   ok(p.timers.size > 0 && p.frames.size === 1, 'timers and a frame run while connected');
   midi.access.inputs.delete('in');
   midi.access.onstatechange();
-  eq([pressed(p), hidden(p), p.timers.size, p.frames.size, midi.input.onmidimessage, p.box.S.line], [['false', 'false'], [false, false, false, false], 0, 0, null, null], 'the port went away: face gone, nothing pressed, no timer, no frame, the input released');
+  eq([pressed(p), hidden(p), p.timers.size, p.frames.size, midi.input.onmidimessage, p.box.S.line], [['false'], [false, false, false, false], 0, 0, null, null], 'the port went away: face gone, nothing pressed, no timer, no frame, the input released');
   eq(p.el('msg').textContent, "The jank's MIDI port went away.", 'and it says so');
   const afterGone = midi.sent.length;
   tap(p, 'ArrowUp');
@@ -251,7 +251,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // ---- pressing the active button again leaves it ----
   ({ page: p, midi } = await connected());
   p.el('c-midi').click();
-  eq([pressed(p), hidden(p), p.timers.size, p.frames.size], [['false', 'false'], [false, false, false, false], 0, 0], 'the active button pressed again: disconnected, all gone');
+  eq([pressed(p), hidden(p), p.timers.size, p.frames.size], [['false'], [false, false, false, false], 0, 0], 'the active button pressed again: disconnected, all gone');
 
   // ---- Advanced over USB: the player and the extra info, diag polled every 2 s ----
   ({ page: p, midi } = await connected());
@@ -643,8 +643,8 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     // (a) Digitone + FM1 only: nothing attached, nothing sent, the error names the ports, the buttons stay usable
     let c = await open(['Digitone Audio+MIDI Elektron Digitone II', 'FM1-E040'], false);
     eq([c.frames(), c.midi.sent.length, c.page.box.S.line], [0, 0, null], '(a) no jank port: no byte sent to any port, nothing attached');
-    eq(c.page.el('msg').textContent, "No MIDI port named jank. Plug it in (USB), or connect it in the app's Bluetooth MIDI settings. MIDI ports I see: Digitone Audio+MIDI Elektron Digitone II, FM1-E040", '(a) the line names what the browser sees');
-    eq([c.page.el('msg').classList.contains('bad'), shown(c.page, 'c-ports-box'), shown(c.page, 'live'), pressed(c.page), c.page.el('c-midi').disabled, c.page.el('c-bluetooth').disabled], [true, false, false, ['false', 'false'], false, false], '(a) an error, no chooser, no face, both connection buttons usable');
+    eq(c.page.el('msg').textContent, "No MIDI port named jank. Plug it in (USB). MIDI ports I see: Digitone Audio+MIDI Elektron Digitone II, FM1-E040", '(a) the line names what the browser sees');
+    eq([c.page.el('msg').classList.contains('bad'), shown(c.page, 'c-ports-box'), shown(c.page, 'live'), pressed(c.page), c.page.el('c-midi').disabled], [true, false, false, ['false'], false], '(a) an error, no chooser, no face, the connection button usable');
     eq(c.page.timeouts().length, 1, '(a) one wait timer (the 15 s) is running');
     c.page.box.disconnected();
     eq([c.page.timers.size, c.access.onstatechange], [0, null], '(a) a disconnect releases the wait: no timer, no listener');
@@ -681,9 +681,9 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     eq([c.midi.sent.length, c.frames()], [0, 0], '(d) a jank plugged in after that connects nothing by itself');
     c.page.box.disconnected();
 
-    // (e) USB + Bluetooth jank: the chooser lists those two, never the Digitone
-    c = await open(['Digitone Audio+MIDI Elektron Digitone II'], true, ['jank 1A2B']);
-    eq(c.page.el('c-ports').children.map(o => o.text), ['jank', 'jank 1A2B'], '(e) the chooser: USB first, then Bluetooth, no other device');
+    // (e) two janks: the chooser lists those two, never the Digitone
+    c = await open(['Digitone Audio+MIDI Elektron Digitone II'], true, ['jank 2']);
+    eq(c.page.el('c-ports').children.map(o => o.text), ['jank', 'jank 2'], '(e) the chooser: the plain name first, no other device');
     eq([shown(c.page, 'c-ports-box'), c.frames()], [true, 0], '(e) shown, and the Digitone untouched');
     c.page.box.disconnected();
 
@@ -940,17 +940,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     eq([g.page.el('pl-note').textContent, g.page.el('pl-play').disabled], ['The folder "Music" cannot be opened (A requested file or directory could not be found): press the folder button to choose it again.', true], 'a folder that is gone: said in one line, Play disabled');
     g.page.box.disconnected();
   }
-
-  // ---- over Bluetooth: the face, no Advanced ----
-  page = makePage();
-  vm.runInContext('setConnected("ble", true)', page.box);
-  eq([pressed(page), shown(page, 'live'), shown(page, 'c-advanced-box'), shown(page, 'player')], [['false', 'true'], true, false, false], 'Bluetooth: the face shows, no Advanced box, no player');
-  page.el('c-advanced').checked = true;
-  page.el('c-advanced').fire('change', {});
-  eq(shown(page, 'player'), false, 'Bluetooth: a ticked Advanced still shows no player');
-  eq(page.frames.size, 1, 'the face draws while connected over Bluetooth too');
-  page.box.disconnected();
-  eq([hidden(page), page.frames.size, page.timers.size, pressed(page)], [[false, false, false, false], 0, 0, ['false', 'false']], 'Bluetooth gone: everything hidden, nothing running');
 
   eq(errors.map(e => String((e && e.stack) || e)), [], 'no error thrown anywhere');
   console.log('connect: ' + checks + ' checks passed');

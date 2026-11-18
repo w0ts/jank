@@ -1,5 +1,5 @@
 # Replies of the firmware's own control line (core/jank_ctl.c, jk_ctl_line, default settings, one run on the host; the `### <command>` lines name the command).
-# Regenerate: a harness like tests/test_ctl.c's run() printing each reply. Home lines of a playing session: tests/test_phone.c.
+# Regenerate: a harness like tests/test_ctl.c's run() printing each reply. Home lines of a playing session: tests/test_home.c.
 ### get
 group=1
 channel=1
@@ -22,7 +22,6 @@ rate=on
 follower=tuned
 skip=off
 graded=off
-ble=pair
 beat_flash=0
 usb=device
 source=auto

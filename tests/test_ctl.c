@@ -283,7 +283,7 @@ static void test_beat_flash(void)
     struct jk_cfg before;
     setup();
     CHECK(cfg.beat_flash == 0);
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "ble=pair\nbeat_flash=0\n"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "rate=on\nfollower=tuned\nskip=off\ngraded=off\nbeat_flash=0\n") && !strstr(out, "ble"));
     before = cfg;
     CHECK(run("set beat_flash 1") == JK_CTL_CFG_CHANGED && cfg.beat_flash == 1 && jk_cfg_stored_differs(&before, &cfg));
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "beat_flash=1\n"));
@@ -462,9 +462,6 @@ static void test_save(void)
     b.autobar = JK_AUTOBAR_ALWAYS;                      /* stored apart ("usb1"), as SOURCE */
     CHECK(jk_cfg_stored_differs(&a, &b));
     b = a;
-    b.ble = JK_BLE_AUTO;                                /* the release blob's pad byte: stored */
-    CHECK(jk_cfg_stored_differs(&a, &b));
-    b = a;
     b.source = JUR_SRC_USB;                             /* stored apart ("usb1") */
     CHECK(jk_cfg_stored_differs(&a, &b));
     b = a;
@@ -596,13 +593,10 @@ static void test_status_size(void)
         snap.b.peer[i].t_heard = 999;
         snap.b.peer[i].frames = 4000000000u;
     }
-    /* the merged build's other status lines at their longest: AUTO BAR and Bluetooth */
+    /* the merged build's other status lines at their longest: AUTO BAR */
     snap.beat.bar = 3;
     snap.beat.bar_phi = -128;
     snap.beat.bar_lead_x100 = -2147483647;
-    snap.ble_built = 1;
-    snap.ble_state = 2;
-    snap.ble_left_s = 4294967295u;
     snap.usb.audio_packets = snap.usb.audio_errors = snap.usb.midi_dropped = 4294967295u;
     snap.midi_ticks = snap.midi_resync = 4294967295u;
     snap.beat.audio = snap.beat.audio_live = snap.hold = 1;           /* the audio lines at their longest */
@@ -625,7 +619,7 @@ static void test_status_size(void)
     cfg.beat_latency_ms = JK_BEAT_LATENCY_MIN_MS;
     CHECK(jk_ctl_line("status", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest status: %zu bytes\n", strlen(big));
-    CHECK(strstr(big, "bar=manual\n") && strstr(big, "ble_state=connected\n") && strstr(big, "usb_role=host\n"));
+    CHECK(strstr(big, "bar=manual\n") && strstr(big, "usb_role=host\n"));
     CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
     /* `beat` with every counter at its largest (M2m added the robust follower's: it must still fit the answer buffer) */
     memset(&snap.beat, 0xFF, sizeof snap.beat);
@@ -723,7 +717,7 @@ static void test_follow(void)
     snap.beat.follow = 1;                                             /* lock */
     snap.beat.rate_x10000 = 9700;
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nfollow=lock\n") && strstr(out, "\nrate_ratio=0.9700\n"));
-    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|follower|skip|graded|burn|ble|"));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|follower|skip|graded|burn|beat_flash|") && !strstr(out, "ble"));
 }
 
 int main(void)

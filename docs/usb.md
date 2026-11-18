@@ -55,7 +55,7 @@ itself with `esp_ota_mark_app_valid_cancel_rollback()`. It does that (`main/ota.
 configured the USB device, has spoken on the MIDI control line (`scripts/ota.py`'s `get` after an update, or the page's
 Connect), the control task has gone round once after that, and the image has run 20 s. Not confirmed within 120 s: it
 restarts into the old image. So after a drive update, open the page and press Connect within two minutes (any line from
-the computer on the control line does it; a line from a phone over Bluetooth does not). A crash or a power cut before that
+the computer on the control line does it). A crash or a power cut before that
 puts the old image back. A start as USB host does not confirm it either: `ota.c` restarts into the old image after 120 s,
 so confirm a new image from a computer before setting `usb host`. The confirm itself writes flash: while the session plays it waits until it
 stops, and once its conditions are met the 120 s deadline no longer applies.
@@ -114,7 +114,7 @@ Where the role comes from (`core/jank_usbrole.c`, host-tested):
 `set source auto|line|usb` (AUDIO > SOURCE, stored, default `auto`): AUTO hears the line in when a plug is in, else USB
 audio when a stream is open (the computer's in device mode, the hosted device's in host mode). The line in goes to the
 tracker on boards with one (docs/linein.md; the XIAO only with its bench option). Host mode has no network adapter, drive or USB control
-line; a phone over Bluetooth (docs/ble.md) still gets the control page's lines, `status` among them.
+line.
 
 jank does not switch power to the device. On a bare XIAO the 5V pin is the USB-C socket's VBUS with nothing between
 them (v1.2 schematic), so 5 V on that pin powers the device, or a powered hub does. The XIAO presents 5.1 k on both CC

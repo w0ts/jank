@@ -2,7 +2,7 @@
 # Builds in the scratch folder from a copy, so managed_components, sdkconfig and build/ never appear in the checkout.
 # Usage: scripts/build.sh [xiao|lcd2]   (the Seeed XIAO ESP32-S3; the Waveshare ESP32-S3-LCD-2, docs/lcd2.md)
 # JANK_VARIANT names the build (build-<variant>, sdkconfig.<variant>; default the board), JANK_EXTRA_DEFAULTS adds
-# sdkconfig fragments from firmware/, ';'-separated, after the board's (e.g. JANK_EXTRA_DEFAULTS=sdkconfig.ble).
+# sdkconfig fragments from firmware/, ';'-separated, after the board's (e.g. JANK_EXTRA_DEFAULTS=sdkconfig.mini22).
 set -eu
 BOARD="${1:-xiao}"
 case "$BOARD" in xiao | lcd2) ;; *) echo "unknown board $BOARD: xiao lcd2"; exit 2 ;; esac
