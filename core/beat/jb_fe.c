@@ -106,11 +106,10 @@ void jb_fft_scalar(float *z)
  * runs them one by one on a made-up frame to compare variants; otherwise they are static. */
 #ifdef JB_FE_STAGES
 #define STAGE
-#define STAGE_INLINE
 #else
 #define STAGE static
-#define STAGE_INLINE static inline
 #endif
+#define INLINE static inline __attribute__((always_inline))     /* (-Os would not: the exact/cheap switches must fold away) */
 
 /* fe->buf = the windowed frame fe->frame: even samples to re, odd to im (the symmetric window's halves) */
 STAGE void jb_fe_stage_window(struct jb_fe *fe)
@@ -128,7 +127,7 @@ STAGE void jb_fe_stage_window(struct jb_fe *fe)
 /* sqrt(x) for x >= 0 with no libm: the integer trick's first guess of 1/sqrt(x) (0x5f375a86), two Newton steps, times x. The
  * relative error is under 4.8e-6 over every normal float (measured, tests/test_fe_approx.c) and sqrt(0) = 0; with the software
  * sqrtf the whole stage took 154 cycles a bin on the S3 (measured, heat prof); with this: not yet measured. The 1/sqrt estimate of a denormal is finite, so no NaN. */
-STAGE_INLINE float jb_fe_fast_sqrt(float x)
+INLINE float fast_sqrt(float x)
 {
     union {
         float f;
@@ -144,7 +143,7 @@ STAGE_INLINE float jb_fe_fast_sqrt(float x)
 
 /* the magnitudes of bins 0..s_maxbin-1 of the 2048-point real FFT, from the 1024-point complex FFT of the packed samples;
  * exact: sqrtf (the reference the stage test compares with), else fast_sqrt */
-static inline void split(const float *work, float *mag, int exact)
+INLINE void split(const float *work, float *mag, int exact)
 {
     for (int k = 0; k < s_maxbin; ++k) {
         int kk = k ? N2 - k : 0;                              /* Z[N2 - k], Z[0] for k = 0 */
@@ -154,7 +153,7 @@ static inline void split(const float *work, float *mag, int exact)
         float orr = di, oi = -dr;                             /* divided by i */
         float xr = er + s_cos[k] * orr - s_sin[k] * oi, xi = ei + s_cos[k] * oi + s_sin[k] * orr;
         float q = xr * xr + xi * xi;
-        mag[k] = exact ? sqrtf(q) : jb_fe_fast_sqrt(q);
+        mag[k] = exact ? sqrtf(q) : fast_sqrt(q);
     }
 }
 
@@ -174,7 +173,7 @@ void jb_fe_stage_split_ref(const float *work, float *mag)
  * = a degree-7 minimax polynomial in m - 1 (fitted to the interval, no constant term: log10(1) = 0 exactly), plus e log10(2).
  * Absolute error under 6e-7 over 1 .. 1e5 (the front end's range; it grows with the exponent, 1.2e-6 at 1e12; measured,
  * tests/test_fe_approx.c); filterbank + log10f took 798 cycles a band on the S3 (measured, heat prof); with this: not yet measured. */
-STAGE_INLINE float jb_fe_fast_log10(float v)
+INLINE float fast_log10(float v)
 {
     union {
         float f;
@@ -196,7 +195,7 @@ STAGE_INLINE float jb_fe_fast_log10(float v)
 
 /* the filterbank, log10(1 + x) and the positive difference to fe->prev, from the magnitudes; updates fe->prev. exact: the
  * flash weights and libm's log10f (the reference), else the RAM weights (JB_FB_IN_RAM) and jb_fe_fast_log10 */
-static inline void bands(struct jb_fe *fe, const float *mag, float *feat, int exact)
+INLINE void bands(struct jb_fe *fe, const float *mag, float *feat, int exact)
 {
     const float *val = exact ? beat_fb_val : FB_VAL;
     for (int j = 0; j < BEAT_BANDS; ++j) {
@@ -204,7 +203,7 @@ static inline void bands(struct jb_fe *fe, const float *mag, float *feat, int ex
         for (int i = 0; i < beat_fb_len[j]; ++i)
             s += val[i] * mag[beat_fb_start[j] + i];
         val += beat_fb_len[j];
-        float lg = exact ? log10f(1.0f + s) : jb_fe_fast_log10(1.0f + s);
+        float lg = exact ? log10f(1.0f + s) : fast_log10(1.0f + s);
         float d = fe->have_prev ? lg - fe->prev[j] : 0.0f;
         feat[j] = lg;
         feat[BEAT_BANDS + j] = d > 0.0f ? d : 0.0f;
@@ -222,6 +221,23 @@ STAGE void jb_fe_stage_bands(struct jb_fe *fe, const float *mag, float *feat)
 void jb_fe_stage_bands_ref(struct jb_fe *fe, const float *mag, float *feat)
 {
     bands(fe, mag, feat, 1);
+}
+#endif
+
+#ifdef JB_FE_STAGES
+float jb_fe_fast_sqrt(float x)
+{
+    return fast_sqrt(x);
+}
+
+float jb_fe_fast_log10(float v)
+{
+    return fast_log10(v);
+}
+
+const float *jb_fe_fb_values(void)
+{
+    return FB_VAL;
 }
 #endif
 

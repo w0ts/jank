@@ -55,6 +55,7 @@ void jb_fe_stage_bands(struct jb_fe *fe, const float *mag, float *feat);
 void jb_fe_stage_bands_ref(struct jb_fe *fe, const float *mag, float *feat);   /* the same with the flash weights and libm's log10f */
 float jb_fe_fast_log10(float v);       /* the bands' log10 for v >= 1 (absolute error under 6e-7 up to 1e5) */
 float jb_fe_fast_sqrt(float x);        /* the magnitude stage's sqrt (relative error under 4.8e-6) */
+const float *jb_fe_fb_values(void);    /* the weights the cheap bands stage reads (RAM copy or flash) */
 int jb_fe_maxbin(void);                /* the highest bin any filter reads, plus one */
 #endif
 
