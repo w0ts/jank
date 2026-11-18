@@ -341,7 +341,7 @@ eq(isText(levelCase(-20, -12), '-20dB', rightText('-20dB'), NB.rowIN, null), tru
 }
 
 // ---- the top bar: icons 22 high. Left: transport icon x 4, LINK TRANSPORT icon x 28, fold label x 62. Right: GRP n, chain + peers, the plug (charging), battery ----
-const LT_W = [22, 26, 26];
+const LT_W = [22, 26, 30];
 const grpAt = text => L.nameXR - textW(text);
 {
   const d = drawn(ctxOf({ home: { battery: 80 }, ctx: { usb: false } }));
@@ -354,7 +354,7 @@ const grpAt = text => L.nameXR - textW(text);
   eq([Math.min(...pl), Math.max(...pl)], [2, 23], 'the transport icon (play triangle) is 22 rows high');
   const ch = [...litRows(d, L.linkX, L.linkX + 19)].filter(j => j < 26);
   eq([Math.min(...ch), Math.max(...ch), litCols(d, 0, 26).filter(x => x >= L.linkX && x < L.linkX + L.linkW).length > 19], [6, 19, true], 'the chain is 14 rows high, centred in the bar (y 6..19), 19 wide (the Optimist\'s icon)');
-  eq([isText(d, 'GRP 1', grpAt('GRP 1'), 6, null), litIn(d, 56, 0, grpAt('GRP 1') - 57, 26).length, litIn(d, L.nameXR, 0, L.linkX - L.nameXR, 26).length], [true, 0, 0], 'GRP n sits next to the chain (right-aligned to x 186, 8 px before it); the middle of the bar is free (x 56..' + (grpAt('GRP 1') - 1) + ')');
+  eq([isText(d, 'GRP 1', grpAt('GRP 1'), 6, null), litIn(d, 58, 0, grpAt('GRP 1') - 59, 26).length, litIn(d, L.nameXR, 0, L.linkX - L.nameXR, 26).length], [true, 0, 0], 'GRP n sits next to the chain (right-aligned to x 186, 8 px before it); the middle of the bar is free (x 58..' + (grpAt('GRP 1') - 1) + ')');
   eq(litIn(d, 22, 0, 6, 26).length, 0, 'nothing between the transport icon and the LINK icon (x 22..27)');
   const stop = drawn(ctxOf({ ctx: { running: false, armed: false } }));
   eq([litIn(stop, 4, 4, 18, 18).length, litIn(stop, 4, 2, 18, 2).length, litIn(stop, 4, 22, 18, 2).length], [324, 0, 0], 'stopped: an 18 x 18 square at x 4..21, y 4..21');
@@ -373,13 +373,23 @@ const grpAt = text => L.nameXR - textW(text);
       ['.....#.......', '....##.......', '...###.......', '..####.......', '.############', '#############', '.############', '..####.......', '...###.......', '....##.......', '.....#.......'],
       ['.....#.#.....', '....##.##....', '...###.###...', '..####.####..', '.###########.', '#############', '.###########.', '..####.####..', '...###.###...', '....##.##....', '.....#.#.....'],
     ];
-    for (const mode of [0, 1, 2]) {
+    for (const mode of [0, 1]) {
       const d = drawn(ctxOf({ ctx: { ltMode: mode } })); let same = true;
       for (let j = 0; j < 22; j++) for (let i = 0; i < 2 * OLD[mode][0].length; i++) if (d.fb[(L.iconY + j) * 320 + L.ltX + i] !== (OLD[mode][j >> 1][i >> 1] === '#' ? 1 : 0)) same = false;
       ok(same, 'LINK TRANSPORT icon ' + mode + ' is its small bitmap in exact 2 x 2 blocks');
     }
-    const d2 = drawn(ctxOf({ ctx: { ltMode: 2 } }));
-    eq([11, 12, 13, 14].map(i => d2.fb[(L.iconY + 7) * 320 + L.ltX + i]), [1, 0, 0, 1], 'FOLLOW+LEAD: the gap between the two triangles stays open');
+    const d2 = drawn(ctxOf({ ctx: { ltMode: 2 } })); const gap = [], widths = [], expect = []; let split = true;
+    for (let j = 0; j < 22; j++) {
+      const lit = x => d2.fb[(L.iconY + j) * 320 + L.ltX + x] === 1;
+      for (let x = 12; x <= 17; x++) gap.push(lit(x) ? 1 : 0);
+      let l = 0, r = 0; for (let x = 0; x < 12; x++) l += lit(x) ? 1 : 0; for (let x = 18; x < 30; x++) r += lit(x) ? 1 : 0;
+      for (let x = 12 - l; x < 12; x++) if (!lit(x)) split = false;
+      for (let x = 18; x < 18 + r; x++) if (!lit(x)) split = false;
+      widths.push([l, r]); const w = Math.max(1, Math.round(12 * (1 - Math.abs(j - 10.5) / 11))); expect.push([w, w]);
+    }
+    eq(gap.reduce((a, b) => a + b, 0), 0, 'FOLLOW+LEAD: the gap x 12..17 is unlit on all 22 rows');
+    eq(widths, expect, 'FOLLOW+LEAD: per row both triangles are max(1, round(12 * (1 - |y - 10.5| / 11))) wide');
+    ok(split, 'FOLLOW+LEAD: the left triangle ends at x 11 and the right starts at x 18, each a solid run');
   }
   const fold = drawn(ctxOf({ home: { fold: '2' }, ctx: { fold: 2 } }));
   ok(litIn(fold, L.foldX, 2, 31, 22).length > 400 && litIn(fold, L.foldX + 31, 2, 4, 22).length === 0 && litIn(fold, L.ltX, 2, 26, 22).length > 80, 'the fold label X2 is an inverted 31 x 22 box at x 62, next to the LINK icon');
