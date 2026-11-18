@@ -122,9 +122,19 @@ static void prefs_save(void)
         ESP_LOGE(TAG, "screen settings not saved: %s", esp_err_to_name(e));
 }
 
+static volatile int8_t s_lead_req = -1;   /* a `set lead` the ui task has not applied yet: 0 / 1, -1 none */
+
 /* the flash rule of the settings (jank_core.h jk_save_due): not while playing; and once the edits have settled (JK_PREFS_SETTLE_MS) */
 static void prefs_step(uint32_t now)
 {
+    int8_t req = s_lead_req;
+    if (req >= 0) {                      /* `set lead` from the control task: applied here, so the ui task alone changes the preferences */
+        s_lead_req = -1;
+        if (s_prefs.lead != (uint8_t)req) {
+            s_prefs.lead = (uint8_t)req;
+            jk_prefs_changed(&s_prefs_save, now);
+        }
+    }
     if (jk_prefs_due(&s_prefs_save, now, bridge_is_playing(), 0))
         prefs_save();
 }
@@ -309,7 +319,20 @@ void uis_sys(struct jk_sys *out)
 
 /* the sampler's own step, called every loop by the ui task whether or not it keeps a screen's state (UI_STATE in ui.c is false on the plain
  * XIAO, where uis_step never runs: the control line's `about` would answer all unknowns). Rate-limited inside; the same task as build_ctx's call */
-void uis_sys_step(uint32_t now) { sys_sample(now); }
+void uis_sys_step(uint32_t now)
+{
+    sys_sample(now);
+    prefs_step(now);                     /* (where uis_step never runs, a control line change is saved here, by the same 400 ms rule) */
+}
+
+/* FOLLOW+LEAD (1) or FOLLOW (0), the menu's own preference (s_prefs.lead, the 'ui1' blob): the control line's `get lead=` / `set lead` (control task) */
+int uis_lead_get(void)
+{
+    int8_t req = s_lead_req;
+    return req >= 0 ? req : s_prefs.lead;
+}
+
+void uis_lead_set(int on) { s_lead_req = on ? 1 : 0; }
 
 static const struct jo_ctx *build_ctx(void *user, uint32_t now)
 {

@@ -32,6 +32,7 @@ static void setup(void)
     snap.usb_up = 1;
     snap.uptime_s = 12;
     strcpy(snap.board, "lcd2");
+    snap.lead = 1;                        /* the menu's default: FOLLOW+LEAD */
 }
 
 static enum jk_ctl_action run(const char *line)
@@ -111,6 +112,36 @@ static void test_set_music(void)
     CHECK(run("get") == JK_CTL_NONE);
     CHECK(strstr(out, "peer=on\n") && !strstr(out, "\nmidi=") && strstr(out, "transport=auto\n"));   /* (usbmidi= is M2d's) */
     CHECK(strstr(out, "quantum=8\n") && strstr(out, "offset=0.00\n"));
+}
+
+/* LINK TRANSPORT's third choice: `lead` is the menu's own preference (the firmware keeps it in uiscreen.c): get reads snap.lead, `set lead` is an
+ * action that leaves cfg alone and carries the value (jk_ctl_lead) */
+static void test_lead(void)
+{
+    struct jk_cfg before;
+    int on = -1;
+    static char big[4096];
+    setup();
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "transport=link\nquantum=4\noffset=0.00\nlead=on\nbeat=on\n"));
+    snap.lead = 0;
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlead=off\n"));
+    before = cfg;
+    CHECK(run("set lead on") == JK_CTL_LEAD && !strcmp(out, "ok\n") && !jk_ctl_lead("set lead on", &on) && on == 1);
+    CHECK(run("set lead off") == JK_CTL_LEAD && !strcmp(out, "ok\n") && !jk_ctl_lead("  set lead off \r\n", &on) && on == 0);
+    CHECK(!memcmp(&cfg, &before, sizeof cfg));
+    CHECK(run("set lead") == JK_CTL_NONE && !strcmp(out, "err bad setting\n"));
+    CHECK(run("set lead maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n"));
+    CHECK(run("set lead 1") == JK_CTL_NONE && run("set lead ON") == JK_CTL_NONE && run("set leadx on") == JK_CTL_NONE);
+    CHECK(jk_ctl_lead("set lead maybe", &on) && jk_ctl_lead("set transport link", &on) && jk_ctl_lead("get", &on));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|transport|lead|quantum|"));
+    snap.lead = 1;
+    memset(snap.board, 'x', 11);
+    cfg.name[0] = 0;
+    memset(cfg.name, 'n', JK_NAME_MAX);
+    memset(cfg.ssid, 's', JK_SSID_MAX);
+    CHECK(jk_ctl_line("get", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
+    printf("longest get: %zu bytes (limit %u)\n", strlen(big), (unsigned)JK_CTL_OUT_MAX);
+    CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
 }
 
 static void test_network_settings(void)
@@ -756,6 +787,7 @@ int main(void)
     test_usb();
     test_status_size();
     test_about();
+    test_lead();
     test_save();
     test_intr_summary();
     printf("ctl: %d checks, %d failed\n", checks, fails);

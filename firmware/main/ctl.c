@@ -143,9 +143,15 @@ static void run_line(const char *line)
     bridge_snapshot(&s_snap);
     usbrole_snapshot(&s_snap.usb);
     uis_sys(&s_snap.sys);
+    s_snap.lead = (uint8_t)uis_lead_get();
     a = jk_ctl_line(line, &cfg, &s_snap, bridge_ms(), s_out, sizeof s_out);
     if (a == JK_CTL_CFG_CHANGED)
         app_cfg_set(&cfg);
+    if (a == JK_CTL_LEAD) {
+        int on;
+        if (!jk_ctl_lead(line, &on))
+            uis_lead_set(on);
+    }
     if (a == JK_CTL_SCAN) {
         run_scan();
         return;

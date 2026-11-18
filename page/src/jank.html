@@ -984,7 +984,7 @@ autoConnect();
   const context = (now) => ({
     ...Stick.ctx(snapshot(), now),
     setField(name, value) {
-      const r = Stick.fieldCommands(name, value);
+      const r = Stick.fieldCommands(name, value, !S.lastGet || S.lastGet.lead !== undefined);
       if (r.refuse) { say("Not from here: " + r.refuse + ".", true); return; }
       refresh(r.commands).then(readBack, fail);
     },
