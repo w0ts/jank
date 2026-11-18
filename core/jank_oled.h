@@ -41,7 +41,10 @@ enum jo_field {
     JO_F_LOWCONF,       /* 0 KEEP RUNNING, 1 STOP / START */
     JO_F_INSRC,         /* AUDIO > SOURCE: 0 AUTO, 1 LINE IN, 2 USB AUDIO */
     JO_F_USBROLE,       /* 0 DEVICE, 1 HOST */
-    JO_F_AUTOBAR,       /* 0 OFF, 1 ON (YES on ON again: picked again) */
+    JO_F_AUTOBAR,       /* 0 OFF, 1 ON (YES on ON again: picked again); the lcd2 layout: 0 OFF, 1 AT START, 2 ALWAYS */
+    JO_F_BLE,           /* the lcd2 layout's menu only: BLUETOOTH, 0 PAIR NOW, 1 ON START, 2 OFF (YES on PAIR NOW opens the window) */
+    JO_F_USBMIDI,       /* the lcd2 layout's menu only: USB MIDI CLOCK, 0 ON, 1 OFF */
+    JO_F_BEATFLASH,     /* the lcd2 layout's menu only: 0 BOXES, 1 SCREEN */
     JO_F_EDITS,
     JO_F_SSID = JO_F_EDITS,
     JO_F_PASS,
@@ -56,7 +59,7 @@ enum jo_net_mode { JO_NET_JANK = 0, JO_NET_CLIENT, JO_NET_AP, JO_NET_SETUP };
 
 #define JO_TEXT_MAX 63                    /* the character editor's longest text */
 #define JO_SSID_MAX 32
-#define JO_SCAN_MAX 8
+#define JO_SCAN_MAX 16
 #define JO_QR_MAX 37                      /* version 5 */
 
 struct jo_qr {
@@ -124,15 +127,21 @@ struct jo_ctx {
     int group_peers;
     const struct jo_qr *qr;               /* SETUP's hotspot code */
     const char *splash_model, *splash_fw; /* the splash's two lower lines ("MINI 2.2", "FW EMU" in the emulator) */
-    /* the colour layout (the lcd2: ui/oled.js's ctx.layout === 'lcd2'): HOME shows the confidence as a number, the Link peers
-     * and the signal beside the glyph, and fills the ink plane. The fields below feed it; has_* 0 = unreported (grey, never made up) */
-    uint8_t layout_lcd2;
+    /* the lcd2 layout (ctx.layout 'lcd2' of ui/oled.js: its own 160 x 120 grid, jo_draw_lcd2). The fields below feed it; has_* 0 =
+     * unreported (grey, never made up). The OLED layout reads none of them. */
+    uint8_t layout_lcd2;                  /* jo_press picks the lcd2 menu and edit specs; jo_draw_lcd2 draws this layout */
     uint8_t has_rssi;
     int rssi;                             /* dBm of the best peer (jank) or the router (Wi-Fi client); 0: none heard */
     uint8_t has_peak;
     double peak_db;                       /* the input's peak over the last second, dBFS */
     uint8_t conf_unknown;                 /* the tracker has no confidence to give: "--", grey */
     uint8_t silent, gated, conf_hold;     /* silence on the source; the outputs stopped for low confidence; the confidence holds */
+    int8_t fold_exp;                      /* AUDIO's fold, 2^fold_exp: the label X2 X4 /2 /4 on HOME; 0 and anything else: none */
+    uint8_t ble_mode;                     /* BLUETOOTH setting: 0 PAIR NOW, 1 ON START, 2 OFF */
+    uint8_t ble_phone, has_ble_left;      /* a phone is connected; the pair window is open */
+    int ble_left;                         /* seconds of the pair window left */
+    uint8_t usb_midi;                     /* USB MIDI CLOCK: 0 ON, 1 OFF */
+    uint8_t beat_flash;                   /* BEAT FLASH: 0 BOXES, 1 SCREEN */
 };
 
 struct jo_edit {
@@ -151,6 +160,7 @@ struct jo_overlay {
     uint32_t until;                       /* ms */
     char title[24];
     char value[16];
+    uint8_t live;                         /* the lcd2 layout shows the pair window's seconds left instead of value (jo_pair_overlay) */
 };
 
 struct jo_ui {
@@ -180,12 +190,18 @@ void jo_ui_init(struct jo_ui *ui);
 void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx *c, const struct jo_ops *ops);
 void jo_draw(uint8_t fb[JO_FB_BYTES], const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now);
 
-/* The ink plane (ui/oled.js OLED.INK): one byte per pixel, y * JO_W + x, naming which LIT pixels carry information. The ids are
- * meanings, never colours (core/jank_lcd.h maps them). jo_draw_ink fills it only with c->layout_lcd2 (else it stays all 0 and the
- * frame is jo_draw's, bit for bit); ink NULL draws the same frame without a plane. */
+/* The lcd2 layout (ui/oled.js with ctx.layout 'lcd2'): its own grid of 160 x 120 pixels, painted exactly x2 on the 320 x 240 panel. fb is
+ * 160 x 120 bits in the same page layout (byte (y >> 3) * 160 + x, bit y & 7), JO_LCD2_FB_BYTES; ink (or NULL) one byte per pixel,
+ * y * 160 + x, JO_LCD2_INK_BYTES, naming which LIT pixels carry information (OLED.INK; the ids are meanings, never colours: core/jank_lcd.h
+ * maps them). Menus, edit, info, network, setup screens and overlays have no ink. The OLED draws with jo_draw above, never with this. */
+#define JO_LCD2_W 160
+#define JO_LCD2_H 120
+#define JO_LCD2_FB_BYTES (JO_LCD2_W * JO_LCD2_H / 8)
+#define JO_LCD2_INK_BYTES (JO_LCD2_W * JO_LCD2_H)
 enum jo_ink { JO_INK_NONE = 0, JO_INK_GOOD, JO_INK_WARN, JO_INK_BAD, JO_INK_DIM, JO_INK_ONE, JO_INK_IDS };
-#define JO_INK_BYTES (JO_W * JO_H)
-void jo_draw_ink(uint8_t fb[JO_FB_BYTES], uint8_t ink[JO_INK_BYTES], const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now);
+void jo_draw_lcd2(uint8_t fb[JO_LCD2_FB_BYTES], uint8_t ink[JO_LCD2_INK_BYTES], const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now);
+/* the triple NO's Bluetooth pair window: a box with its countdown (ctx ble_left; the OLED draws the text "PAIR") */
+void jo_pair_overlay(struct jo_ui *ui, uint32_t now);
 /* one overlay box for 1 s (the emulator's showOverlay): drops the hint */
 void jo_show_overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value);
 

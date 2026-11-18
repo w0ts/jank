@@ -18,18 +18,27 @@ void jo_ui_init(struct jo_ui *ui)
 static void overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value)
 {
     ui->overlay.on = 1;
+    ui->overlay.live = 0;
     ui->overlay.until = now + JO_OVERLAY_MS;
     snprintf(ui->overlay.title, sizeof ui->overlay.title, "%s", title);
     snprintf(ui->overlay.value, sizeof ui->overlay.value, "%s", value);
 }
 
-void jo_show_overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value)
+#define JO_PAIR_OVERLAY_MS 3000u
+void jo_pair_overlay(struct jo_ui *ui, uint32_t now)
 {
     ui->hint = -1;
     ui->overlay.on = 1;
-    ui->overlay.until = now + JO_OVERLAY_MS;
-    snprintf(ui->overlay.title, sizeof ui->overlay.title, "%s", title);
-    snprintf(ui->overlay.value, sizeof ui->overlay.value, "%s", value);
+    ui->overlay.live = 1;
+    ui->overlay.until = now + JO_PAIR_OVERLAY_MS;
+    snprintf(ui->overlay.title, sizeof ui->overlay.title, "BLUETOOTH PAIR");
+    ui->overlay.value[0] = 0;
+}
+
+void jo_show_overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value)
+{
+    ui->hint = -1;
+    overlay(ui, now, title, value);
 }
 
 static void set_field(const struct jo_ops *ops, enum jo_field f, int v)
@@ -46,10 +55,10 @@ static void start_edit(struct jo_ui *ui, enum jo_field f, const struct jo_ctx *c
 }
 
 /* choices cycle round; numbers stop at their ends */
-static void step_edit(struct jo_ui *ui, int d, const struct jo_ops *ops)
+static void step_edit(struct jo_ui *ui, int d, int lcd2, const struct jo_ops *ops)
 {
     struct jo_edit *e = &ui->edit;
-    const struct jo_spec *sp = jo_spec(e->field);
+    const struct jo_spec *sp = jo_spec_l(e->field, lcd2);
     if (sp->opts)
         e->val = (e->val + d + sp->nopts) % sp->nopts;
     else
@@ -58,10 +67,10 @@ static void step_edit(struct jo_ui *ui, int d, const struct jo_ops *ops)
         set_field(ops, e->field, e->val);
 }
 
-static void end_edit(struct jo_ui *ui, int keep, const struct jo_ops *ops)
+static void end_edit(struct jo_ui *ui, int keep, int lcd2, const struct jo_ops *ops)
 {
     struct jo_edit e = ui->edit;
-    const struct jo_spec *sp = jo_spec(e.field);
+    const struct jo_spec *sp = jo_spec_l(e.field, lcd2);
     ui->screen = e.ret;
     if (!sp->live) {                                /* applied only when confirmed (repick: also unchanged) */
         if (keep && (e.val != e.orig || sp->repick)) {
@@ -148,13 +157,15 @@ static void press_home(struct jo_ui *ui, enum jo_btn b, int d, uint32_t now, con
 
 static void press_menu(struct jo_ui *ui, enum jo_btn b, int d, const struct jo_ctx *c)
 {
+    const struct jo_item *menu = c->layout_lcd2 ? jo_menu_lcd2 : jo_menu;
+    int n = c->layout_lcd2 ? JO_MENU_ITEMS_LCD2 : JO_MENU_ITEMS;
     if (d) {
-        ui->cursor = (uint8_t)jo_clampi(ui->cursor - d, 0, JO_MENU_ITEMS - 1);
+        ui->cursor = (uint8_t)jo_clampi(ui->cursor - d, 0, n - 1);
         ui->top = (uint8_t)jo_clampi(ui->top, ui->cursor - JO_VISIBLE + 1, ui->cursor);
     } else if (b == JO_NO)
         ui->screen = JO_HOME;
     else {
-        const struct jo_item *it = &jo_menu[ui->cursor];
+        const struct jo_item *it = &menu[ui->cursor];
         if (it->kind == JO_ITEM_NET) {
             ui->screen = JO_NET;
             ui->ncur = 0;
@@ -252,9 +263,9 @@ void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx
         break;
     case JO_EDIT:
         if (d)
-            step_edit(ui, d, ops);
+            step_edit(ui, d, c->layout_lcd2, ops);
         else
-            end_edit(ui, b == JO_YES, ops);
+            end_edit(ui, b == JO_YES, c->layout_lcd2, ops);
         break;
     default: break;
     }
