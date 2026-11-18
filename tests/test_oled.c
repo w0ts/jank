@@ -4,7 +4,7 @@
  * setter calls made. This replays each case through jo_press / jo_input_* and jo_draw and wants 0 differing pixels and
  * the same calls.
  *
- * The lcd2 layout: tests/oled_ref/cases_ink.txt (gen_ink.js runs ui/oled.js with ctx.layout 'lcd2', its own 160 x 120 grid) holds
+ * The lcd2 layout: tests/oled_ref/cases_ink.txt (gen_ink.js runs ui/oled.js with ctx.layout 'lcd2', its own 320 x 240 grid) holds
  * the 1-bit frame and the ink plane of each case, and the setter calls; jo_press and jo_draw_lcd2 must draw both exactly and make the same
  * calls. Usage: test_oled CASES_TXT [CASES_INK_TXT] */
 #include "jank_oled.h"

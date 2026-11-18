@@ -27,8 +27,9 @@ static const struct hint HINTS[2] = {{"NUDGE BEAT", "UP: 1/2 BEAT EARLY", "DOWN:
 void jo_fit(const char *s, int w, char *out, size_t cap)
 {
     size_t n = strlen(s);
-    if ((int)n * 6 > w)
-        n = w > 0 ? (size_t)(w / 6) : 0;
+    int cw = jo_fine ? 12 : 6;                      /* a character's advance on the grid being drawn */
+    if ((int)n * cw > w)
+        n = w > 0 ? (size_t)(w / cw) : 0;
     if (n >= cap)
         n = cap - 1;
     memcpy(out, s, n);

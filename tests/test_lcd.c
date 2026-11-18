@@ -51,9 +51,9 @@ static unsigned lit(void) { return JLC_W - count(BG); }
 
 static void test_geometry(void)
 {
-    CHECK(JLC_W == 320 && JLC_H == 240 && JLC_SCALE == 2 && JO_LCD2_W * JLC_SCALE == JLC_W && JO_LCD2_H * JLC_SCALE == JLC_H);
-    CHECK(JO_LCD2_FB_BYTES == 2400 && JO_LCD2_INK_BYTES == 19200 && JLC_PAGES == 15);
-    CHECK(jlc_page_y(0) == 0 && jlc_page_y(14) == 224 && jlc_page_rows() == 16 && jlc_page_y(15) == JLC_H);
+    CHECK(JLC_W == 320 && JLC_H == 240 && JO_LCD2_W == JLC_W && JO_LCD2_H == JLC_H);
+    CHECK(JO_LCD2_FB_BYTES == 9600 && JO_LCD2_INK_BYTES == 76800 && JLC_PAGES == 30);
+    CHECK(jlc_page_y(0) == 0 && jlc_page_y(29) == 232 && jlc_page_rows() == 8 && jlc_page_y(30) == JLC_H);
 }
 
 static void test_palette_values(void)
@@ -89,14 +89,14 @@ static void test_full_frame_covers_the_whole_panel(void)
     }
 }
 
-static void test_one_pixel_is_a_square(void)
+static void test_one_pixel_is_one_pixel(void)
 {
     clear();
-    set_px(5, 10, JO_INK_GOOD);          /* frame (5, 10) -> columns 10, 11; rows 20, 21 */
+    set_px(5, 10, JO_INK_GOOD);          /* frame (5, 10) -> column 5, row 10, nothing else */
     for (unsigned y = 0; y < JLC_H; y++) {
         jlc_row(fb, ink, &pal, y, row);
-        if (y == 20 || y == 21) {
-            CHECK(lit() == 2 && row[10] == GOOD && row[11] == GOOD && row[9] == BG && row[12] == BG);
+        if (y == 10) {
+            CHECK(lit() == 1 && row[5] == GOOD && row[4] == BG && row[6] == BG);
         } else {
             CHECK(lit() == 0);
         }
@@ -107,13 +107,13 @@ static void test_corners_and_edges(void)
 {
     clear();
     set_px(0, 0, 0);
-    set_px(159, 0, 0);
-    set_px(0, 119, 0);
-    set_px(159, 119, 0);
+    set_px(319, 0, 0);
+    set_px(0, 239, 0);
+    set_px(319, 239, 0);
     for (unsigned y = 0; y < JLC_H; y++) {
         jlc_row(fb, ink, &pal, y, row);
-        if (y < 2 || y >= 238) {
-            CHECK(lit() == 4 && row[0] == NEUTRAL && row[1] == NEUTRAL && row[318] == NEUTRAL && row[319] == NEUTRAL);
+        if (y == 0 || y == 239) {
+            CHECK(lit() == 2 && row[0] == NEUTRAL && row[319] == NEUTRAL);
         } else {
             CHECK(lit() == 0);
         }
@@ -123,16 +123,16 @@ static void test_corners_and_edges(void)
 static void test_page_layout_and_bit_order(void)
 {
     clear();
-    fb[3 * JO_LCD2_W + 7] = 0x81;        /* page 3: frame rows 24 and 31 at x = 7 -> rows 48, 49 and 62, 63; columns 14, 15 */
+    fb[3 * JO_LCD2_W + 7] = 0x81;        /* page 3: frame rows 24 and 31 at x = 7 */
     for (unsigned y = 0; y < JLC_H; y++) {
         jlc_row(fb, NULL, &pal, y, row);
-        int on = y == 48 || y == 49 || y == 62 || y == 63;
-        CHECK(lit() == (on ? 2u : 0u) && (!on || (row[14] == NEUTRAL && row[15] == NEUTRAL)));
+        int on = y == 24 || y == 31;
+        CHECK(lit() == (on ? 1u : 0u) && (!on || row[7] == NEUTRAL));
     }
-    CHECK(jlc_page_y(3) == 48 && jlc_page_y(3) + jlc_page_rows() - 1 == 63);
+    CHECK(jlc_page_y(3) == 24 && jlc_page_y(3) + jlc_page_rows() - 1 == 31);
 }
 
-/* the ink plane is indexed y * 160 + x, not by the page layout */
+/* the ink plane is indexed y * 320 + x, not by the page layout */
 static void test_ink_picks_the_pixels_own_id(void)
 {
     static const struct {
@@ -141,19 +141,19 @@ static void test_ink_picks_the_pixels_own_id(void)
     } T[] = {{JO_INK_NONE, NEUTRAL}, {JO_INK_GOOD, GOOD}, {JO_INK_WARN, WARN}, {JO_INK_BAD, BAD}, {JO_INK_DIM, DIM}, {JO_INK_ONE, WARN}};
     clear();
     for (unsigned i = 0; i < 6; i++)
-        set_px(10 + 3 * i, 31, T[i].id);    /* page 3, bit 7: frame row 31 -> rows 62, 63 */
-    for (unsigned y = 62; y <= 63; y++) {
+        set_px(10 + 3 * i, 31, T[i].id);    /* page 3, bit 7: frame row 31 */
+    for (unsigned y = 31; y <= 31; y++) {
         jlc_row(fb, ink, &pal, y, row);
-        CHECK(lit() == 12);
+        CHECK(lit() == 6);
         for (unsigned i = 0; i < 6; i++) {
-            unsigned x = (10 + 3 * i) * 2;
-            CHECK(row[x] == T[i].want && row[x + 1] == T[i].want && row[x - 1] == BG && row[x + 2] == BG);
+            unsigned x = 10 + 3 * i;
+            CHECK(row[x] == T[i].want && row[x - 1] == BG && row[x + 1] == BG);
         }
     }
     set_px(40, 31, JO_INK_IDS);           /* an id past the table */
     set_px(41, 31, 255);
-    jlc_row(fb, ink, &pal, 62, row);
-    CHECK(row[80] == NEUTRAL && row[82] == NEUTRAL);
+    jlc_row(fb, ink, &pal, 31, row);
+    CHECK(row[40] == NEUTRAL && row[41] == NEUTRAL);
 }
 
 /* the VU ramp: ids 6 .. 37, RGB565 worked out by hand from ui/lcd2.js VU_RAMP (steps 0, 11, 20, 26 and 31), and the first id past it is neutral */
@@ -175,10 +175,10 @@ static void test_vu_ramp(void)
     for (unsigned i = 0; i < JO_VU_STEPS; i++)
         set_px(i, 10, (uint8_t)(JO_INK_VU0 + i));
     set_px(40, 10, JO_INK_IDS);
-    jlc_row(fb, ink, &pal, 20, row);
+    jlc_row(fb, ink, &pal, 10, row);
     for (unsigned i = 0; i < JO_VU_STEPS; i++)
-        CHECK(row[2 * i] == pal.ink[JO_INK_VU0 + i] && row[2 * i + 1] == row[2 * i]);
-    CHECK(row[80] == NEUTRAL);
+        CHECK(row[i] == pal.ink[JO_INK_VU0 + i]);
+    CHECK(row[40] == NEUTRAL);
 }
 
 static void test_ink_on_unlit_pixels_is_ignored_and_no_plane_is_neutral(void)
@@ -186,10 +186,10 @@ static void test_ink_on_unlit_pixels_is_ignored_and_no_plane_is_neutral(void)
     clear();
     ink[10 * JO_LCD2_W + 5] = JO_INK_BAD;      /* an id on a pixel that is not lit: the background */
     set_px(6, 10, JO_INK_GOOD);
-    jlc_row(fb, ink, &pal, 20, row);
-    CHECK(lit() == 2 && row[12] == GOOD && row[13] == GOOD && row[10] == BG && row[11] == BG);
-    jlc_row(fb, NULL, &pal, 20, row);
-    CHECK(lit() == 2 && row[12] == NEUTRAL && row[13] == NEUTRAL && row[10] == BG);
+    jlc_row(fb, ink, &pal, 10, row);
+    CHECK(lit() == 1 && row[6] == GOOD && row[5] == BG);
+    jlc_row(fb, NULL, &pal, 10, row);
+    CHECK(lit() == 1 && row[6] == NEUTRAL && row[5] == BG);
 }
 
 static void test_swapped_palette_row(void)
@@ -199,7 +199,7 @@ static void test_swapped_palette_row(void)
     clear();
     set_px(0, 0, JO_INK_WARN);
     jlc_row(fb, ink, &swapped, 0, row);
-    CHECK(row[0] == 0x84FDu && row[2] == 0x4108u && row[319] == 0x4108u);
+    CHECK(row[0] == 0x84FDu && row[1] == 0x4108u && row[319] == 0x4108u);
 }
 
 int main(void)
@@ -209,7 +209,7 @@ int main(void)
     test_palette_values();
     test_blank_frame_is_background_on_every_row();
     test_full_frame_covers_the_whole_panel();
-    test_one_pixel_is_a_square();
+    test_one_pixel_is_one_pixel();
     test_corners_and_edges();
     test_page_layout_and_bit_order();
     test_ink_picks_the_pixels_own_id();

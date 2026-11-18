@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The lcd2 layout's frame (jank_oled.h, jo_draw_lcd2: 160 x 120, 1 bit per pixel, and its ink plane) on the 320 x 240 panel as RGB565 rows:
- * exactly x2, every source pixel a square of 2 x 2, no centring, no bands. Unlit = the background, lit = the colour of its ink id (neutral
+/* The lcd2 layout's frame (jank_oled.h, jo_draw_lcd2: 320 x 240, 1 bit per pixel, and its ink plane) on the 320 x 240 panel as RGB565 rows:
+ * one frame pixel per panel pixel, no centring, no bands. Unlit = the background, lit = the colour of its ink id (neutral
  * where there is no ink). */
 #ifndef JANK_LCD_H
 #define JANK_LCD_H
@@ -9,7 +9,6 @@
 
 #define JLC_W 320
 #define JLC_H 240
-#define JLC_SCALE 2
 #define JLC_PAGES (JO_LCD2_H / 8)
 
 /* The palette, exact 8-bit RGB: ui/lcd2.js's PALETTE and VU_RAMP (tests/test_lcd_palette.js reads these tables and compares them with it).

@@ -1,26 +1,28 @@
-# jank on the Waveshare ESP32-S3-LCD-2: the colour screen on its own 160 x 120 grid (design preview, v13)
+# jank on the Waveshare ESP32-S3-LCD-2: the colour screen at its own 320 x 240 pixels (v14)
 
-The variant uses a 2.0 inch 240 x 320 ST7789 colour LCD **in landscape** (320 x 240), no touch, no RGB LEDs. The owner said the screen
-was not used fully (the 128 x 64 UI doubled is 256 x 128 with black bands and small text) and asked for more visual feedback, small
-progress bars. So the lcd2 layout has **its own logical grid of 160 x 120 pixels (4:3)**, the same 5 x 7 font and primitives at integer
-scales, painted **exactly x2** on 320 x 240: no bands, no centring, every pixel square. The lid window (43.4 x 33.2 mm) and the active
-area (40.8 x 30.6 mm) are 4:3 too, so a source pixel is a 0.255 mm square. The OLED boards keep 128 x 64 and are bit-identical.
+The variant uses a 2.0 inch 240 x 320 ST7789 colour LCD **in landscape** (320 x 240), no touch, no RGB LEDs. Until v13 the lcd2 layout had its
+own 160 x 120 grid painted as 2 x 2 blocks. **From v14 (owner, 2026-11-18) it is drawn at the panel's true 320 x 240 pixels**: one frame pixel is
+one panel pixel, no scaling anywhere. The small text is the old 5 x 7 face doubled and rounded (so every position of the old grid simply doubles),
+the tempo digits and the icons are redrawn at 1 px detail. The lid window (43.4 x 33.2 mm) and the active area (40.8 x 30.6 mm) are 4:3 too, so a
+pixel is a 0.1275 mm square. The OLED boards keep 128 x 64 and are bit-identical (`tests/oled_ref/cases.txt` is untouched).
+
+All coordinates below are on the **320 x 240 grid**.
 
 Colour is information only: the screen is neutral (near-white on near-black, menus and edit screens included) and a colour appears only
-on an element that says something the white version cannot. 
+on an element that says something the white version cannot.
 
 ## How a caller learns the size
 
-`OLED.size(layout)` returns `{ w, h }`: `OLED.size()` / `'oled'` = 128 x 64, `'lcd2'` = 160 x 120 (`OLED.SIZES`). `OLED.W` and `OLED.H` stay
-the OLED's. `OLED.draw(fb, ui, ctx, now, ink)` keeps its signature: with `ctx.layout === 'lcd2'` `fb` (and `ink`) must be 160 * 120 bytes
+`OLED.size(layout)` returns `{ w, h }`: `OLED.size()` / `'oled'` = 128 x 64, `'lcd2'` = 320 x 240 (`OLED.SIZES`). `OLED.W` and `OLED.H` stay
+the OLED's. `OLED.draw(fb, ui, ctx, now, ink)` keeps its signature: with `ctx.layout === 'lcd2'` `fb` (and `ink`) must be 320 * 240 bytes
 (else it throws), any other layout 128 * 64. The grid is a module variable set for the duration of one `draw()` and restored after.
 `Stick.screen(model, now, layout)` makes the buffers itself and returns `{ fb, ink, w, h }`; `Stick.framebuffer(model, now)` is the OLED's
-128 x 64 as before. `Lcd2.paint(ctx2d, img, fb, ink)` paints a 160 x 120 frame as 320 x 240.
+128 x 64 as before. `Lcd2.paint(ctx2d, img, fb, ink)` paints a 320 x 240 frame 1:1 (`Lcd2.SRC_W` 320, `Lcd2.SCALE` 1).
 
 ## The ink plane (unchanged idea)
 
-`ink` is a `Uint8Array(160 * 120)`; 0 = neutral. Ids (`OLED.INK`, meanings not colours): `GOOD` 1, `WARN` 2, `BAD` 3, `DIM` 4, `ONE` 5 (the
-bar's first beat while lit). The ids 6..21 (`OLED.VU = { ink0: 6, steps: 16 }`, not members of `OLED.INK`) are the VU meter's ramp; see below. Only lit pixels carry ink (`draw()` clears ink under unlit pixels, e.g. where a tick is
+`ink` is a `Uint8Array(320 * 240)`; 0 = neutral. Ids (`OLED.INK`, meanings not colours): `GOOD` 1, `WARN` 2, `BAD` 3, `DIM` 4, `ONE` 5 (the
+bar's first beat while lit). The ids 6..37 (`OLED.VU = { ink0: 6, steps: 32 }`, not members of `OLED.INK`) are the VU meter's ramp; see below. Only lit pixels carry ink (`draw()` clears ink under unlit pixels, e.g. where a notch is
 XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens and overlays: no ink at all.
 
 ## The palette (exact RGB, WCAG AA against the background, tested; unchanged)
@@ -34,79 +36,83 @@ XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens
 | bad | 255, 104, 92 | #ff685c | 7.0 | poor, below the line, clipping, empty |
 | dim | 150, 156, 168 | #969ca8 | 7.2 | nothing there / not reported |
 
-## v13: what changed (owner review of v12)
+## v14: what changed (owner, 2026-11-18)
 
-1. **AUDIO beat boxes are spaced like LINK's**: 36 wide, 4 px gaps, x 2..157 (28 high: true 36 x 36 squares are 7 rows short with the BAR row, see below).
-2. **The info rows are tight and centred**: 1 row apart, the whole block centred vertically between the boxes and the state line (the odd row goes below).
-3. The padding between the tempo and the boxes stays 4 (equal to the lit margin above the tempo, which is 4 / 4 as measured in v12); the 3 rows under the boxes are the 3 px minimum.
+1. **True 320 x 240 drawing.** The small text is "font A, smooth 10 x 14": every pixel of the 5 x 7 face doubled, the diagonal steps rounded with Scale2x (`BigFont.scale2x`),
+   2 px strokes, a fixed 12 px advance (the glyph sits 1 px into its cell), 14 px rows. A narrow `.` `:` `,` advances 6, a space 8. `textW(s)` = the advances minus 1 per scale step.
+   Text at "scale k" (the BOOT / splash / edit / overlay / SAVED texts) is this face magnified k times.
+2. **Big tempo digits regenerated at 1 px detail** (style A, rounded): NORMAL 52 x 70, LARGE 70 x 94 (below).
+3. **Frames, bars, boxes, icons at 1 px detail**: frame lines 1 px, the unlit beat boxes 2 px (half of the 4 px the old doubling would give), VU / CONFIDENCE / BAR outlines 1 px; the icons
+   (play / stop, LINK TRANSPORT, battery, plug) are Scale2x of the old small bitmaps or drawn directly; the link glyph is the Optimist's chain.
+4. **The plug moved out of the battery**: a separate 18 x 14 plug glyph immediately left of the battery, only while charging. The battery stays a plain battery with its fill.
+5. **The link glyph is the chain** of the Optimist's `hs_chain` (19 x 14, two rounded links with 2 px strokes, the second down and right of the first), same ink as before.
 
-(v12: the LINK tempo margins 7 / 7 measured on lit pixels. v11: the AUDIO boxes as squares, paddings. v10: INPUT above CONFIDENCE, the centred state word, the LARGE LINK digits, the top bar changes.)
+(v13: the AUDIO boxes spaced like LINK's, tight centred info rows. v12: the LINK tempo margins. v11: paddings. v10: INPUT above CONFIDENCE, the centred state word, the LARGE LINK digits.)
 
 ## The margins around the tempo (measured on lit pixels)
 
-Above = the first lit row of the digits minus the last lit row of the top bar (y 11) minus 1; below = the first lit row of the squares minus the last lit row of the digits minus 1. The test draws
-frames and measures: for every numeric text (`120.0`, `98.4`, `88.8`, `146.1`, `133.3`, `999.9`) AUDIO has 4 above (digits y 16..50) and 4 below (squares at y 55), and LINK has 7 above and 7 below (digits y 19..65,
-squares at y 73). Every digit uses the first and the last row of its cell, so the digit cell extent is the lit extent. `---` lights only the 5 (AUDIO) or 8 (LINK) dash rows in the middle of the cell: AUDIO 19 above and 19 below, LINK 26 above and
-27 below (an 8 row dash cannot be exactly in the middle of 47 rows).
+Above = the first lit row of the digits minus the last lit row of the top bar (y 23) minus 1; below = the first lit row of the squares minus the last lit row of the digits minus 1. The test draws
+frames and measures: for every numeric text (`120.0`, `98.4`, `88.8`, `146.1`, `133.3`, `999.9`) AUDIO has 8 above (digits y 32..101) and 8 below (squares at y 110), and LINK has 14 above and 14 below (digits y 38..131,
+squares at y 146). Every digit uses the first and the last row of its cell, so the digit cell extent is the lit extent. `---` lights only the dash rows in the middle of the cell: AUDIO 37 above and 38 below, LINK 53 above and
+54 below.
 
-## The top bar (y 1..11, both modes; `OLED.LCD2` holds the numbers)
+## The top bar (y 2..23, both modes; `OLED.LCD2` holds the numbers)
 
-Every item is a fixed slot, nothing moves when a value changes; items are 11 rows high (text at y 3).
+Every item is a fixed slot, nothing moves when a value changes; icons are 22 rows high (y 2..23), text at y 6.
 
 | group | item | x range | notes |
 |---|---|---|---|
-| left | transport icon | 2..10 | play triangle 9 x 11 (blinks while armed) or stop square 9 x 9 |
-| left | LINK TRANSPORT icon | 14..24 (IGNORE, 11 wide) / 14..26 (FOLLOW, BOTH, 13 wide) | **both modes** (`ctx.ltMode`): IGNORE = crossed circle, FOLLOW = arrow in, BOTH = double arrow |
-| left | fold label | 31..45 | AUDIO mode only, when the fold is not 1 (`X2` `X4` `/2` `/4`: an inverted 15 x 11 box); sits next to the LINK icon |
-| right | `GRP n` (or the Wi-Fi / own network name) | right-aligned to x 98 (`GRP 1` is x 70..98; cut to 8 characters) | in AUDIO and LINK mode, directly before the link glyph |
-| right | link glyph + peer count | glyph 103..115, count from x 118 (up to 2 digits, slot 103..129) | colour: joined green, alone grey (AUDIO) / red (LINK) |
-| right | battery | 134..157 (22 x 11 body with corners cut, nub 2 x 5, fill 18 x 7 = round(18 x pct)) | neutral while healthy; amber under 30 % (`BATT_WARN_PCT`), red under 15 % (`BATT_BAD_PCT`); while charging the 9 x 7 plug (`PLUG_IN_BATTERY`) is XOR-ed into its middle (dark over the fill) |
+| left | transport icon | 4..21 | play triangle 18 x 22 (blinks while armed) or stop square 18 x 18 (y 4..21) |
+| left | LINK TRANSPORT icon | 28..49 (IGNORE, 22 wide) / 28..53 (FOLLOW, BOTH, 26 wide) | **both modes** (`ctx.ltMode`): IGNORE = crossed circle, FOLLOW = arrow in, BOTH = double arrow (the old 11 x 11 / 13 x 11 bitmaps with Scale2x) |
+| left | fold label | 62..92 | AUDIO mode only, when the fold is not 1 (`X2` `X4` `/2` `/4`: an inverted 31 x 22 box with its corners cut); sits next to the LINK icon |
+| right | `GRP n` (or the Wi-Fi / own network name) | right-aligned to x 187 (`GRP 1` is x 128..186; cut to 7 characters, 90 px) | in AUDIO and LINK mode, directly before the chain |
+| right | chain + peer count | chain 195..213 (19 x 14, y 6..19), count from x 220 (up to 2 digits; slot 195..243) | colour: joined green, alone grey (AUDIO) / red (LINK) |
+| right | plug | 246..263 (18 x 14, y 6..19) | **only while charging**; neutral (no ink of its own) |
+| right | battery | 268..315 (44 x 22 body with a 1 px outline and its corners cut, nub 4 x 10 at x 312..315, fill 38 x 16 = round(38 x pct) inside) | neutral while healthy; amber under 30 % (`BATT_WARN_PCT`), red under 15 % (`BATT_BAD_PCT`) |
 
-Gaps: 4 px between GRP n and the link glyph (x 99..102) and between the link slot and the battery (x 130..133). Free width: x 46..69 (24 px) between the left group (with the fold label) and
-`GRP n`; without a fold label (or in LINK mode) x 27..69 (43 px, 45 after the IGNORE icon). Right edge: the nub ends at x 157.
+Gaps: 8 px between GRP n and the chain (x 187..194), 2 between the chain slot and the plug (x 244..245), 4 between the plug and the battery (x 264..267). Free width without a fold label: x 54..127 between the LINK
+icon and `GRP 1`; with one x 93..127. Right edge: the nub ends at x 315 (4 px margin). The plug slot is always reserved, so nothing moves when charging starts or stops.
 
 **Charging** is not reported by the jank; the lcd2 layout uses exactly the inference of the BATTERY info screen (`CHARGING`): `usb` and a cell fitted and under 100 %
 (`charging(c)` in `ui/oled.js`); at 100 % with USB the info screen says FULL and no plug is drawn. `Stick.ctx` sets `usb` to true always, so on the page this reads as charging whenever the
-battery is under 100 %; on a unit running from the cell it would be wrong until the firmware reports USB power. With no cell fitted nothing is drawn (there is no plug icon of its own any more).
+battery is under 100 %; on a unit running from the cell it would be wrong until the firmware reports USB power. With no cell fitted nothing is drawn.
 
-## HOME (AUDIO) on 160 x 120: the row table
+## HOME (AUDIO) on 320 x 240: the row table
 
-The four beat boxes are 36 wide with 4 px gaps, spanning x 2..157, at the same x positions as LINK's boxes (x 2, 42, 82, 122); they are 28 high (`OLED.LCD2.audioBox = { w: 36, h: 28, gap: 4 }`). The info rows
-(INPUT, CONFIDENCE, BAR when shown) are 1 row apart (`rowGap`) and form one block, centred vertically between the bottom of the boxes (y 82) and the state line (y 113): the empty rows above and below the block
-differ by at most 1, the odd one goes below. The BAR row exists only with AUTO BAR on (a state of `locked`, `listening` or `manual`). The state line keeps its reserved row (y 113..119) in both.
+The four beat boxes are 72 wide with 8 px gaps, spanning x 4..315, at the same x positions as LINK's boxes (x 4, 84, 164, 244); they are 56 high (`OLED.LCD2.audioBox = { w: 72, h: 56, gap: 8 }`). The info rows
+(INPUT, CONFIDENCE, BAR when shown) are 2 rows apart (`rowGap`) and form one block, centred vertically between the bottom of the boxes (y 165) and the state line (y 226): the empty rows above and below the block
+differ by at most 1, the odd one goes below. The BAR row exists only with AUTO BAR on (a state of `locked`, `listening` or `manual`). The state line keeps its reserved row (y 226..239) in both.
 
 | y | height | element (with the BAR row) | empty rows before it |
 |---|---|---|---|
-| 1..11 | 11 | top bar | |
-| 16..50 | 35 | TEMPO (NORMAL digits, centred; the digit after the dot 23 rows, y 28..50) | 4 (y 12..15) |
-| 55..82 | 28 | four beat boxes 36 x 28, gap 4, x 2..157 (lit = solid, unlit = 2 px outline; the first amber only while lit) | 4 (y 51..54) |
-| 86..92 | 7 | `INPUT` + VU meter (rows 87..91, notch rows 86..92) + number | 3 (y 83..85) |
-| 94..100 | 7 | `CONFIDENCE` + line (rows 96..98, notch rows 95..99) + value | 1 |
-| 102..108 | 7 | `BAR` + state word + outlined bar (rows 103..107) | 1 |
-| 113..119 | 7 | state word, centred, AUDIO only (reserved, empty while running) | 4 (y 109..112) |
+| 2..23 | 22 | top bar | |
+| 32..101 | 70 | TEMPO (NORMAL digits, centred; the digit after the dot 46 rows, y 56..101) | 8 (y 24..31) |
+| 110..165 | 56 | four beat boxes 72 x 56, gap 8, x 4..315 (lit = solid, unlit = 2 px outline; the first amber only while lit) | 8 (y 102..109) |
+| 173..186 | 14 | `INPUT` + VU meter (rows 175..184, notch rows 173..186) + number | 7 (y 166..172) |
+| 189..202 | 14 | `CONFIDENCE` + line (rows 193..198, notch rows 191..200) + value | 2 |
+| 205..218 | 14 | `BAR` + state word + outlined bar (frame rows 207..216) | 2 |
+| 226..239 | 14 | state word, centred, AUDIO only (reserved, empty while running) | 7 (y 219..225) |
 
 | y | height | element (without the BAR row) | empty rows before it |
 |---|---|---|---|
-| 16..50 | 35 | TEMPO | 4 |
-| 55..82 | 28 | four beat boxes (the same place) | 4 |
-| 90..96 | 7 | `INPUT` | 7 (y 83..89) |
-| 98..104 | 7 | `CONFIDENCE` | 1 |
-| 113..119 | 7 | state word | 8 (y 105..112) |
+| 32..101 | 70 | TEMPO | 8 |
+| 110..165 | 56 | four beat boxes (the same place) | 8 |
+| 181..194 | 14 | `INPUT` | 15 (y 166..180) |
+| 197..210 | 14 | `CONFIDENCE` | 2 |
+| 226..239 | 14 | state word | 15 (y 211..225) |
 
-**Why 36 x 28 and not 36 x 36.** True 36 x 36 squares do not fit with the BAR row. From the tempo's end (y 50) to row 119 there are 69 rows. The squares (36), the block of three info rows (3 x 7 + 2 = 23), the
-state line (7), the 4 empty rows between the tempo and the squares, and at least 3 empty rows under the squares and 3 above the state line (so the block is centred with the 3 px minimum) need
-4 + 36 + 3 + 23 + 3 + 7 = 76 rows: **7 rows missing** (6 with 3 px under the tempo as well). Without the BAR row (block of 15) it would fit. The largest height that fits with the BAR row is 28 (4 + 28 + 3 + 23 + 3 + 7 = 68, one
-spare row goes to the centring), so the default is **A: boxes 36 wide x 28 high, not square**. The alternative **B** keeps true squares: the largest side is 28 as well, spread over the full width with equal gaps
-(4 x 28 + 3 x 14 = 154, x 3..156). The boxes are the same size and place with and without the BAR row. The state line is not given back to the stack while it is empty: anything that grew into it would have to
-jump back when a word appears.
+**Why 72 x 56 and not 72 x 72.** True 72 x 72 squares do not fit with the BAR row. From the tempo's end (y 101) to row 239 there are 138 rows. The squares (72), the block of three info rows (3 x 14 + 4 = 46), the
+state line (14), the 8 empty rows between the tempo and the squares, and at least 7 empty rows under the squares and 7 above the state line need
+8 + 72 + 7 + 46 + 7 + 14 = 154 rows: **16 rows missing**. Without the BAR row (block of 30) it would fit. The largest height that fits with the BAR row is 56, so the default is **A: boxes 72 wide x 56 high, not square**.
+The alternative **B** keeps true squares: the largest side is 56 as well, spread over the full width with equal gaps (4 x 56 + 3 x 28 = 308, x 6..313). The boxes are the same size and place with and without
+the BAR row. The state line is not given back to the stack while it is empty: anything that grew into it would have to jump back when a word appears. (The owner has not chosen A or B.)
 
-**LINK layout**: the top bar above; the tempo in the LARGE digits (47 rows, y 19..65), centred; four SQUARE beat boxes 36 x 36 with 4 px gaps, a row of 156 px centred (x 2..157), at y 73..108 (11 empty
-rows under them); the first amber only while lit; no audio rows, no state line. The boxes are as large as the width allows with 4 px gaps (4 x 36 + 3 x 4 = 156). The tempo has 7 empty rows above
-(y 12..18) and 7 below (y 66..72).
+**LINK layout**: the top bar above; the tempo in the LARGE digits (94 rows, y 38..131), centred; four SQUARE beat boxes 72 x 72 with 8 px gaps, a row of 312 px centred (x 4..315), at y 146..217 (22 empty
+rows under them); the first amber only while lit; no audio rows, no state line. The tempo has 14 empty rows above (y 24..37) and 14 below (y 132..145).
 
 ### The state word (AUDIO only)
 
-At most one word, centred (`left = floor((160 - width) / 2)`), the first that applies (ctx fields `gated`, `confHold`, `confKnown`, `conf`, `th`, `running`, `silent`):
+At most one word, centred (`left = floor((320 - width) / 2)`), the first that applies (ctx fields `gated`, `confHold`, `confKnown`, `conf`, `th`, `running`, `silent`):
 
 | word | when | colour |
 |---|---|---|
@@ -117,49 +123,48 @@ At most one word, centred (`left = floor((160 - width) / 2)`), the first that ap
 | `SILENT` | running, and nothing is heard (`silent`: level under -60 dBFS or the jank says so) | grey |
 | (nothing) | otherwise: running with sound and confidence | |
 
-### The big digits (`ui/bigfont.js`: the tables ARE the fonts)
+### The big digits (`ui/bigfont.js`)
 
 Two fonts, one face (rounded 7-segment). `BigFont.NORMAL` is for AUDIO, `BigFont.LARGE` for LINK; each has `GLYPHS`, `SMALL`, `ROWS`, `SMALL_ROWS`, `GAP`, `width(text)` and
-`draw(plot, text, x, y)`.
+`draw(plot, text, x, y)`. The tables are built when the file loads (the construction below); `scripts/gen_bigfont.js` writes the same rows as const tables for the firmware.
 
 | | NORMAL (AUDIO) | LARGE (LINK) |
 |---|---|---|
-| big digit `0`..`9`, `-` | 26 x 35, 5 px strokes, corners cut 2 px | 35 x 47, 7 px strokes, corners cut 3 px |
-| point | 5 x 5, bottom rows 30..34 | 7 x 7, bottom rows 40..46 |
-| small digit (after the point, 2/3 size, bottom-aligned) | 17 x 23, 3 px strokes, 1 px cuts | 23 x 31, 5 px strokes, 2 px cuts |
-| gap between glyphs | 3 | 4 |
-| `120.0` / `98.4` / `---` | 112 / 83 / 84 px | 151 / 112 / 113 px |
-| rows | y 16..50 | y 19..65 |
+| big digit `0`..`9`, `-` | 52 x 70, 10 px strokes, rounded corners | 70 x 94, 14 px strokes, rounded corners |
+| point | 10 x 10, a rounded square, bottom rows 60..69 | 14 x 14, bottom rows 80..93 |
+| small digit (after the point, about 2/3 size, bottom-aligned) | 34 x 46, 6 px strokes | 46 x 62, 10 px strokes |
+| gap between glyphs | 6 | 8 |
+| `120.0` / `98.4` / `---` | 224 / 166 / 168 px | 302 / 224 / 226 px |
+| rows | y 32..101 | y 38..131 |
 
 The text is `bpm.toFixed(1)` (`120.0`, `98.4`, `999.9`): big digits, the point, then the small digit; or `---` (three big dashes) when there is no tempo. The whole text is centred:
-`left = floor((160 - width) / 2)` (24 and 38 for NORMAL, 4 and 24 for LARGE; an odd width leaves the spare column on the right).
+`left = floor((320 - width) / 2)` (48 and 77 for NORMAL, 9 and 48 for LARGE).
 
-**Derivation** (all four tables, pure data in the file): each digit is made from the seven segments a-g (1 = b c, 7 = a b c, ...) as lines on a square skeleton one stroke-radius inside the
+**Derivation**: each digit is made from the seven segments a-g (1 = b c, 7 = a b c, ...) as lines on a square skeleton one stroke-radius inside the
 cell (x R and W - R, y R, (H - 1) / 2 and H - R). A pixel is lit when its centre is within R (half the stroke) of a line of the digit, in the metric `max(|dx|, |dy|, K (|dx| + |dy|))`;
-the last term cuts the corners at the end of a line (the pixels with |dx| + |dy| > R / K).
+the last term cuts the corners at the end of a line (the pixels with |dx| + |dy| > R / K). The v14 tables are the old ones at twice the size and twice R: the generator reproduced the old 160 x 120 LARGE tables exactly.
 
 | table | cell W x H | R | K |
 |---|---|---|---|
-| NORMAL big | 26 x 35 | 2.5 | 0.9 |
-| NORMAL small | 17 x 23 | 1.5 | 0.9 |
-| LARGE big | 35 x 47 | 3.5 | 0.9 |
-| LARGE small | 23 x 31 | 2.5 | 0.9 |
+| NORMAL big | 52 x 70 | 5 | 0.9 |
+| NORMAL small | 34 x 46 | 3 | 0.9 |
+| LARGE big | 70 x 94 | 7 | 0.9 |
+| LARGE small | 46 x 62 | 5 | 0.9 |
 
-The LARGE size was picked as the largest odd height (odd so that a 7 px stroke is centred and the counters are equal) whose `120.0` with the small digit fits the 156 columns between the margins:
-47 x 35 digits (35 x 1.34 of 26 x 35), small digit 2/3 of it (47 x 2/3 = 31.3, 35 x 2/3 = 23.3), gap 4: 3 x 35 + 7 + 23 + 4 x 4 = 151. The dots are set by hand (an octagon: 5 x 5 with 1 px cuts; 7 x 7 with 2 px cuts).
+The LARGE `120.0` is 302 columns, inside the 312 between the 4 px margins. The dot is a square of the same metric (R = half its side) on the bottom rows.
 
 ### The VU meter
 
 | item | rule |
 |---|---|
-| scale | -90..0 dBFS over 62 px |
-| bar | `n = round(62 x (dB + 90) / 90)` lit columns from x 64, 5 rows high (y + 1..y + 5), continuous: no gaps, no segments |
-| colour | column i has the ink id `6 + floor(32 x i / 62)` (`OLED.VU = { ink0: 6, steps: 32 }`); the id is the position on the dBFS scale, so the bar's end tells how hot the signal is |
-| notch | -50 dBFS, 7 rows (y..y + 6), XOR-ed through the bar at column `round(61 x 40 / 90) = 27`; neutral |
-| number | right-aligned to x 157; neutral, red when the peak reaches -1 dBFS (or, unreported, the RMS maximum -3), amber under -50 dBFS (too quiet to track) |
+| scale | -90..0 dBFS over 124 px |
+| bar | `n = round(124 x (dB + 90) / 90)` lit columns from x 128, 10 rows high (y + 2..y + 11), continuous: no gaps, no segments |
+| colour | column i has the ink id `6 + floor(32 x i / 124)` (`OLED.VU = { ink0: 6, steps: 32 }`); the id is the position on the dBFS scale, so the bar's end tells how hot the signal is |
+| notch | -50 dBFS, 14 rows (y..y + 13), 2 px wide, XOR-ed through the bar at column `round(122 x 40 / 90) = 54` (and 55); neutral |
+| number | right-aligned to x 315; neutral, red when the peak reaches -1 dBFS (or, unreported, the RMS maximum -3), amber under -50 dBFS (too quiet to track) |
 
 **Ramp**: 32 ink ids (6..37), exact RGB, `Lcd2.VU_RAMP`. They colour a bar, not text: only visibility is needed (every step is at least 6.6 : 1 on the background, #ff6058 the lowest at 6.67),
-and neighbouring steps differ by at most 16 per channel, so a bar at x2 shows no banding. Linear in RGB between the anchors: steps 0..10 green (72, 222, 128), step 20 lime
+and neighbouring steps differ by at most 16 per channel, so a bar shows no banding. Linear in RGB between the anchors: steps 0..10 green (72, 222, 128), step 20 lime
 (176, 230, 64), step 26 amber (255, 176, 32), step 31 red (255, 96, 88), each channel rounded:
 
 | step | RGB | step | RGB | step | RGB | step | RGB |
@@ -171,30 +176,30 @@ and neighbouring steps differ by at most 16 per channel, so a bar at x2 shows no
 | 26 | 255, 176, 32 | 27 | 255, 160, 43 | 28 | 255, 144, 54 | 29 | 255, 128, 66 |
 | 30 | 255, 112, 77 | 31 | 255, 96, 88 | | | | |
 
-### The CONFIDENCE line (as before, narrower)
+### The CONFIDENCE line
 
-One line 3 px high (rows y + 2..y + 4), no outline, no track; its **length is the value on 62 px: line = round(62 x value)** from x 64; the notch (1 px
-wide, 5 tall, rows y + 1..y + 5) is XOR-ed at `64 + round(61 x threshold)`: a gap where the line passes, a stub above and below where it does not.
+One line 6 px high (rows y + 4..y + 9), no outline, no track; its **length is the value on 124 px: line = round(124 x value)** from x 128; the notch (2 px
+wide, 10 tall, rows y + 2..y + 11) is XOR-ed at `128 + round(122 x threshold)`: a gap where the line passes, a stub above and below where it does not.
 Value, line and notch carry the same ink id.
 
 | value | rule |
 |---|---|
 | confidence | red below the jank's threshold; amber from it up to +10 points; green above; grey when the jank reports no value (`--`, no line) or there is silence |
 
-The BAR row keeps the outlined bar (now 62 x 5, a 3 px fill inside it: round(60 x confidence), neutral, no tick). The value moved from the left of the bar to the
-right of it because `CONFIDENCE` (59 px) fills the label column: `CONFIDENCE`, bar, `90%`.
+The BAR row keeps the outlined bar (124 x 10, a 1 px outline, the fill inside it: round(122 x confidence), neutral, no tick). The value is at the right end of the row
+because `CONFIDENCE` (119 px, x 4..122) fills the label column: `CONFIDENCE`, bar, `90%`.
 
 ### The NETWORK screen's SIGNAL row
 
-A read-only row under the screen's rows (TYPE, GROUP, PEERS in JANK mode: y 40; TYPE and 3 more in the Wi-Fi modes: y 49; that is 13 + 9 x the number of rows), label x 4, never inverted, never selectable, no new menu item:
-`SIGNAL` on the left; on the right the dBm and a word, right-aligned to x 155: `-55dBm GOOD`. The dBm is the best jank peer's (`rssi`), or the router's in Wi-Fi mode (`wifi_rssi`).
+A read-only row under the screen's rows (TYPE, GROUP, PEERS in JANK mode: y 80; TYPE and 3 more in the Wi-Fi modes: y 98; that is 26 + 18 x the number of rows), label x 8, never inverted, never selectable, no new menu item:
+`SIGNAL` on the left; on the right the dBm and a word, right-aligned to x 311: `-55dBm GOOD`. The dBm is the best jank peer's (`rssi`), or the router's in Wi-Fi mode (`wifi_rssi`).
 The word is coloured by the rule the bars had: `GOOD` green (>= -67 dBm), `FAIR` amber (-80..-68), `POOR` red (< -80), `NONE` grey (nothing heard, 0: no dBm shown); `-`
 alone when the jank does not report it. The `NETWORK` screen's existing `STATUS` row is a connection state, not a signal, so it was not used. The word is the
 only ink on the SIGNAL row. The OLED layout's NETWORK screen is unchanged.
 
 ### The NETWORK screen's air rows (MODE JANK only)
 
-Three more read-only rows after SIGNAL (y 49, 58, 67; the selected row's help stays at y 101 and 110), label x 4, value right-aligned to x 155. In Wi-Fi client and own-network
+Three more read-only rows after SIGNAL (y 98, 116, 134; the selected row's help stays at y 202 and 220), label x 8, value right-aligned to x 311. In Wi-Fi client and own-network
 mode the screen is unchanged (SIGNAL only: there is no peer traffic to measure). The numbers are those of the last completed 10 s window of the peers' frames (`docs/firmware.md`, "Air statistics").
 
 | row | value | ink |
@@ -211,30 +216,31 @@ mode the screen is unchanged (SIGNAL only: there is no peer traffic to measure).
 |---|---|---|
 | CONFIDENCE value, line, notch | the rule above | HOME `conf`, `get` threshold and lowconf: yes |
 | state word | `GATED` red, `HOLD` / `STOPPED` / `SILENT` grey, `COAST` amber, empty while running | status `gated=1`, HOME hold / coast suffix: yes |
-| link glyph + peers | joined (>= 1 Link peer) green; alone: grey in AUDIO mode, red in LINK mode | HOME `link` (Link peers): yes. "Searching" is not reported |
+| chain + peers | joined (>= 1 Link peer) green; alone: grey in AUDIO mode, red in LINK mode | HOME `link` (Link peers): yes. "Searching" is not reported |
 | SIGNAL row (NETWORK screen) | >= -67 dBm green GOOD, -80..-68 amber FAIR, < -80 red POOR, none grey NONE, not reported `-` | status `rssi` or `wifi_rssi`: yes. Retry / loss shares: no (see the air rows) |
 | LOST / LEVEL / RX RETRY rows (NETWORK screen, MODE JANK) | LOST green / amber from 3 % / red from 10 %; RX RETRY red from 30 %; LEVEL neutral; not known `-` | status `air_lost_pct`, `air_retry_pct` (-1: not known), `rssi_min`, `rssi_max` (0: none): yes |
-| battery (+ plug inside while charging) | neutral from 30 %, amber 15..29, red under 15 | HOME `battery` percent: yes. **Charging: not reported**, inferred as the BATTERY screen does (`usb`, cell fitted, under 100 %) |
+| battery | neutral from 30 %, amber 15..29, red under 15 | HOME `battery` percent: yes |
+| plug (left of the battery, while charging) | neutral | **Charging: not reported**, inferred as the BATTERY screen does (`usb`, cell fitted, under 100 %) |
 | INPUT number | rule above | HOME `level`, status `peak_db`: yes |
 | VU bar | the ramp (position on the dBFS scale) | the same |
 | first beat | amber while it is the lit box | Link bar phase: yes |
 | BAR row | neutral | status `bar`, `bar_lead`: yes, when AUTO BAR is on |
 
-## The other screens on the bigger grid (neutral, the selected row inverted, no ink)
+## The other screens on the 320 x 240 grid (neutral, the selected row inverted, no ink)
 
 | screen | geometry |
 |---|---|
-| title bar | 11 rows, full width, text at y 2 |
-| MENU | 11 rows of 9 px from y 13 (the 11 items of the lcd2 menu all fit: no scrolling; row k at y 13 + 9k, last at y 103; the OLED menu has 10), value right-aligned at x 156, selected row inverted over the full width |
-| sub menu (AUDIO, OFFSET, DISPLAY) | rows of 12 px from y 16 |
-| edit | the value at font scale 2 in an inverted box centred on 160 (scale 1 if it would not fit), the two help lines at y 70 and 82 |
-| info (BATTERY) | text rows of 12 px from y 18, the level bar 152 px wide at y 92 |
-| info (ABOUT) | NAME, VERSION, REPO, UPTIME, RESET, TEMP, CPU, MEMORY (+ PSRAM), MIN HEAP, FLASH, CLOCK LATE, UI LOOP, BEAT LOOP: rows of 12 px from y 18, 8 shown of 13, UP / DOWN scroll (the OLED shows 5 at 9 px from y 13); `-` when not known; no bar, no ink |
-| NETWORK / scan list | rows of 9 px like the menu (scan: 11 rows, the selected one kept near the middle, signal bars at x 144), the selected row's help at y 101 and 110 |
-| text editor | 25 character cells of 6 px from x 5, the help lines at y 46, 58, 70 |
-| confirm | two lines centred at y 34 and 46, `YES      NO` at scale 2 at y 84 |
-| SETUP (QR) | the QR box on the left at module size 4, 3 or 2 (the largest that fits 118 rows and leaves 66 px for the text: 25 modules at 3 px = 81 px box); text right of it |
-| overlays | one box 130 x 60 at (15, 30), centred; the value at the largest scale of 4, 3, 2, 1 that fits; the NO / YES hint uses it too; SAVED: 90 x 34 at (35, 42), text scale 2 |
+| title bar | 22 rows, full width, text at x 6, y 4 |
+| MENU | 11 rows of 18 px from y 26 (the 11 items of the lcd2 menu all fit: no scrolling; row k at y 26 + 18k, last at y 206; the OLED menu has 10), text at x 8, value right-aligned at x 311, selected row inverted over the full width (y - 2, 18 rows) |
+| sub menu (AUDIO, OFFSET, DISPLAY) | rows of 24 px from y 36 (the selected bar 22 rows) |
+| edit | the value at font scale 2 in an inverted box centred on 320 (16 px padding; scale 1 if it would not fit), the two help lines at y 140 and 164 |
+| info (BATTERY) | text rows of 24 px from y 36, the level bar 304 px wide x 14 at y 184 (1 px outline) |
+| info (ABOUT) | NAME, VERSION, REPO, UPTIME, RESET, TEMP, CPU, MEMORY (+ PSRAM), MIN HEAP, FLASH, CLOCK LATE, UI LOOP, BEAT LOOP: rows of 24 px from y 36, 8 shown of 13, UP / DOWN scroll (the OLED shows 5 at 9 px from y 13); `-` when not known; no bar, no ink |
+| NETWORK / scan list | rows of 18 px like the menu (scan: 11 rows, the selected one kept near the middle, signal bars of 6 px at x 288, 296, 304, heights 4 / 8 / 12), the selected row's help at y 202 and 220 |
+| text editor | 25 character cells of 12 px from x 10, the help lines at y 92, 116, 140 |
+| confirm | two lines centred at y 68 and 92, `YES      NO` at scale 2 at y 168 |
+| SETUP (QR) | the QR box on the left at module size 8, 6 or 4 (the largest that fits 238 rows and leaves 119 px for the text: 25 modules at 6 px = 162 px box); text right of it |
+| overlays | one box 260 x 120 at (30, 60), centred, with a 1 px dark line inside (4 px in); the value at the largest scale of 4, 3, 2, 1 that fits; the NO / YES hint uses it too; SAVED: 180 x 68 at (70, 84), text scale 2 |
 | BOOT / splash | `BOOT` at scale 5; `JANK` at scale 5 and `MINI 2.2` at scale 3 |
 
 The cursor logic in `OLED.press` still scrolls as if 6 menu rows were visible (`ui.top`); the lcd2 draw ignores `ui.top` and keeps the
@@ -242,20 +248,20 @@ cursor in view by itself (all 11 menu items fit; the scan list centres on the se
 
 ## The C side (built, never run on the board)
 
-- `core/jank_oled_lcd2.c` (`jo_draw_lcd2`) is a port of the lcd2 section of `ui/oled.js` with the same constants and integer arithmetic; `core/jank_bigfont.[ch]`
-  draw the tempo from `core/jank_bigfont_tables.c`, which `scripts/gen_bigfont.js` writes from `ui/bigfont.js` (`tests/run.sh` checks the file is current).
-- The ink plane is still one byte per pixel (160 x 120 = 19200 bytes); ids 0..37 (`JO_INK_VU0` 6, `JO_VU_STEPS` 32). `core/jank_lcd.h` holds the palette
+- `core/jank_oled_lcd2.c` (`jo_draw_lcd2`) is a port of the lcd2 section of `ui/oled.js` with the same constants and integer arithmetic. The small text and the icons are Scale2x of the 5 x 7 face and of small bitmaps,
+  made in `core/jank_oled_gfx.c` at draw time (`jo_fine`, `jo_icon2`): no table. `core/jank_bigfont.[ch]` draw the tempo from `core/jank_bigfont_tables.c` (about 22 KB of const bytes, a row of `ceil(width / 8)`
+  bytes), which `scripts/gen_bigfont.js` writes from `ui/bigfont.js` (`tests/run.sh` checks the file is current).
+- The frame is 320 x 240 bits (9.6 KB, page layout: byte `(y >> 3) * 320 + x`); the ink plane is one byte per pixel (320 x 240 = 76800 bytes); ids 0..37 (`JO_INK_VU0` 6, `JO_VU_STEPS` 32). `core/jank_lcd.h` holds the palette
   and the 32 ramp colours; `tests/test_lcd_palette.js` compares them with `ui/lcd2.js`.
 - Parity: `tests/oled_ref/cases_ink.txt` (`node tests/oled_ref/gen_cases.js --ink`, made by `ui/oled.js` itself) holds the frame and the ink plane of every case;
-  `tests/test_oled.c` reproduces both pixel for pixel and the OLED's 385 frames stay as they were.
+  `tests/test_oled.c` reproduces both pixel for pixel and the OLED's 412 frames stay as they were.
 - Firmware wishes (unchanged): a charging flag (the C uses the same inference as the BATTERY screen), Wi-Fi retry / loss shares, a "joining" Link state,
   `rssi` / `peak_db` on the HOME line.
 
 ## Tests in this stage
 
-`tests/test_lcd2.js` (510 checks): the palette (AA) and the ramp (32 exact RGB, each at least 6.5 : 1, neighbours within 16 per channel, the id mapping); sizes and the exact
-x2; the row table (order, no lit pixel in a gap, the text of every label and value checked pixel by pixel against the 5 x 7 font parsed from `ui/oled.js`); the big and the small
+`tests/test_lcd2.js` (536 checks): the palette (AA) and the ramp (32 exact RGB, each at least 6.5 : 1, neighbours within 16 per channel, the id mapping); sizes and the 1:1 paint; the row table (order, no lit pixel in a gap, the text of every label and value checked pixel by pixel against the 5 x 7 font parsed from `ui/oled.js` and doubled with `BigFont.scale2x`); the big and the small
 digits (both tables complete, sizes, the tempo texts `120.0` `98.4` `88.8` `146.1` `---` `999.9` drawn exactly as the tables say, centred, in AUDIO and LINK, the small digit on
 the baseline); the four beat boxes on every beat in both layouts; the CONFIDENCE rule and line lengths at 0 / 50 / 100 %; the VU meter (continuous columns, the id of every column, the notch);
-the BAR row; the icons and the top bar without signal bars; the five state words (centred) and their order, no PLAYING; the NETWORK screen's SIGNAL row for known and unknown values; LINK layout; no ink in
+the BAR row; the icons, the chain and the top bar; the plug beside the battery (only while charging, the battery unchanged); the five state words (centred) and their order, no PLAYING; the NETWORK screen's SIGNAL row for known and unknown values; LINK layout; no ink in
 menus, edit, info, setup and overlays; the OLED layout equal to the golden hashes of before the lcd2 layout (8 screens).

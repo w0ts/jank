@@ -17,9 +17,10 @@ void jo_fixed(double x, int digits, char *out, size_t cap);
 #define JO_ABOUT_VIS_LCD2 8
 void jo_about_rows(const struct jo_ctx *c, char rows[JO_ABOUT_ROWS][40]);
 
-/* The grid the primitives draw on: the OLED's 128 x 64, or the lcd2 layout's 160 x 120 for the one call of jo_draw_lcd2 (the emulator's
- * W and H, set per draw). Both are bit-per-pixel in the page layout, byte (y >> 3) * width + x. */
-extern int jo_gw, jo_gh;
+/* The grid the primitives draw on: the OLED's 128 x 64, or the lcd2 layout's 320 x 240 for the one call of jo_draw_lcd2 (the emulator's
+ * W and H, set per draw). Both are bit-per-pixel in the page layout, byte (y >> 3) * width + x. jo_fine is set with the lcd2 grid: the text is the
+ * 5 x 7 face doubled with Scale2x (10 x 14, 12 px advance) and jo_icon2 draws an icon doubled the same way. */
+extern int jo_gw, jo_gh, jo_fine;
 
 /* the pixels: v 1 lit, 0 dark; outside the screen: nothing */
 void jo_px(uint8_t *fb, int x, int y, int v);
@@ -37,13 +38,15 @@ void jo_tag(int id, int x, int y, int w, int h);
 void jo_untag(int x, int y, int w, int h);
 void jo_ink_lit_only(void);               /* the ink only on lit pixels (a tick XOR-ed through a fill unlights some) */
 
-/* the 5 x 7 font, scaled by sc: narrow . : , (3 px), space 4 px, the rest 6 px */
+/* the 5 x 7 font, scaled by sc: narrow . : , (3 px), space 4 px, the rest 6 px (jo_fine: 6, 8 and 12 px) */
 int jo_text_w(const char *s, int sc);
 void jo_text(uint8_t *fb, const char *s, int x, int y, int sc, int v);
 void jo_text_r(uint8_t *fb, const char *s, int xr, int y, int sc, int v);
 void jo_text_c(uint8_t *fb, const char *s, int y, int sc, int v);
 /* rows of '#' / '.' as an icon at x, y: lit pixels only */
 void jo_icon(uint8_t *fb, const char *const *rows, int n, int x, int y);
+/* the same rows doubled with Scale2x (2 x the width and height), lit pixels only */
+void jo_icon2(uint8_t *fb, const char *const *rows, int n, int x, int y);
 
 /* the menus */
 #define JO_MENU_ITEMS 10

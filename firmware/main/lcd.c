@@ -5,11 +5,13 @@
  *
  * Traffic: the frame is sent in chunks of 4 destination rows (2.5 KB) from two buffers, so the SPI's DMA sends one while
  * the next is filled: the task runs the rows' expansion, the DMA moves the bytes. Only the frame pages that changed (the
- * pixels or their ink) are sent (a page is 16 destination rows). The task is core 0, the lowest priority above idle: the MIDI
+ * pixels or their ink) are sent (a page is 8 destination rows, one frame row each: the frame is 320 x 240, painted 1:1). The task is core 0, the lowest priority above idle: the MIDI
  * clock's interrupt on core 1 (docs/midi.md) is not in its way.
  *
- * RAM: the four ink planes (the UI's, the pending one, the one being sent, the one shown: 19.2 KB each) are allocated from PSRAM
- * when the board has it (the lcd2's 8 MB); the chunk buffers (5 KB) and the three frames (2.4 KB each) are internal. */
+ * RAM: the four ink planes (the UI's, the pending one, the one being sent, the one shown: 76.8 KB each) and the four 1-bit frames
+ * (the UI's, pending, being sent, shown: 9.6 KB each) are ONE block from PSRAM (the lcd2's 8 MB; the internal RAM has no room for
+ * them, there is no fallback and the screen then does not start). Nothing in PSRAM is ever given to the DMA: only the chunk buffers
+ * (5 KB, internal) are. The block is zeroed. */
 #include "lcd.h"
 #include <string.h>
 #include "board.h"
@@ -51,10 +53,10 @@ static unsigned s_next_buf;
 static SemaphoreHandle_t s_lock;
 static TaskHandle_t s_task;
 static struct jlc_pal s_pal;
-static uint8_t *s_planes;               /* PLANES ink planes in one block */
+static uint8_t *s_mem;                  /* PLANES ink planes and PLANES frames in one PSRAM block */
 static uint8_t *s_ui_ink, *s_pend_ink, *s_work_ink, *s_shown_ink;
-static uint8_t s_pend_fb[JO_LCD2_FB_BYTES], s_work_fb[JO_LCD2_FB_BYTES], s_shown_fb[JO_LCD2_FB_BYTES];
-static uint8_t *s_pend = s_pend_fb, *s_work = s_work_fb;   /* swapped, not copied, when the task takes the pending frame */
+static uint8_t *s_ui_fb, *s_shown_fb;
+static uint8_t *s_pend, *s_work;        /* swapped, not copied, when the task takes the pending frame */
 static uint8_t s_valid;                 /* s_shown_* is what the panel holds */
 static uint8_t s_pend_new;              /* a frame is waiting in s_pend */
 
@@ -154,21 +156,25 @@ static esp_err_t backlight_on(void)
 
 static int planes_up(void)
 {
-    s_planes = heap_caps_calloc(PLANES, JO_LCD2_INK_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!s_planes)
-        s_planes = heap_caps_calloc(PLANES, JO_LCD2_INK_BYTES, MALLOC_CAP_8BIT);   /* no PSRAM: internal RAM, 77 KB (the allocation may fail) */
-    if (!s_planes)
+    const size_t planes = (size_t)PLANES * JO_LCD2_INK_BYTES, frames = (size_t)PLANES * JO_LCD2_FB_BYTES;
+    s_mem = heap_caps_calloc(1, planes + frames, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_mem) {
+        ESP_LOGE(TAG, "no PSRAM for the frames (%u bytes)", (unsigned)(planes + frames));
         return 0;
-    s_ui_ink = s_planes;
-    s_pend_ink = s_planes + JO_LCD2_INK_BYTES;
-    s_work_ink = s_planes + 2u * JO_LCD2_INK_BYTES;
-    s_shown_ink = s_planes + 3u * JO_LCD2_INK_BYTES;
+    }
+    s_ui_ink = s_mem;
+    s_pend_ink = s_mem + JO_LCD2_INK_BYTES;
+    s_work_ink = s_mem + 2u * JO_LCD2_INK_BYTES;
+    s_shown_ink = s_mem + 3u * JO_LCD2_INK_BYTES;
+    s_ui_fb = s_mem + planes;
+    s_pend = s_ui_fb + JO_LCD2_FB_BYTES;
+    s_work = s_ui_fb + 2u * JO_LCD2_FB_BYTES;
+    s_shown_fb = s_ui_fb + 3u * JO_LCD2_FB_BYTES;
     return 1;
 }
 
 int lcd_open(void)
 {
-    static const uint8_t BLANK[JO_LCD2_FB_BYTES];
     esp_err_t e;
     s_free = xSemaphoreCreateCounting(2, 2);
     if (!s_free || !planes_up())
@@ -176,7 +182,7 @@ int lcd_open(void)
     jlc_palette(&s_pal, 1);               /* the panel takes the high byte first */
     e = panel_up();
     if (e == ESP_OK)
-        e = lcd_present(BLANK, s_ui_ink);
+        e = lcd_present(s_ui_fb, s_ui_ink);            /* the block is zeroed: a blank frame */
     if (e == ESP_OK)
         e = esp_lcd_panel_disp_on_off(s_panel, true);
     if (e == ESP_OK)
@@ -184,8 +190,8 @@ int lcd_open(void)
     if (e != ESP_OK) {
         ESP_LOGE(TAG, "screen does not start: %s", esp_err_to_name(e));
         s_panel = NULL;
-        heap_caps_free(s_planes);
-        s_planes = s_ui_ink = NULL;
+        heap_caps_free(s_mem);
+        s_mem = s_ui_fb = s_ui_ink = NULL;
         return 0;
     }
     return 1;
@@ -194,6 +200,8 @@ int lcd_open(void)
 int lcd_found(void) { return s_panel != NULL; }
 
 uint8_t *lcd_ink(void) { return s_ui_ink; }
+
+uint8_t *lcd_frame(void) { return s_ui_fb; }
 
 void lcd_show(const uint8_t fb[JO_LCD2_FB_BYTES])
 {

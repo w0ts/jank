@@ -82,10 +82,11 @@ static struct jo_ctx s_ctx;
 static struct jk_snapshot s_snap;
 #if BOARD_LCD
 #define FRAME_BYTES JO_LCD2_FB_BYTES
+#define s_fb lcd_frame()                /* the frame drawn: 9.6 KB, in PSRAM with the driver's frames and ink planes (lcd.c) */
 #else
 #define FRAME_BYTES JO_FB_BYTES
-#endif
 static uint8_t s_fb[FRAME_BYTES];       /* the frame drawn (the driver keeps its own copy) */
+#endif
 static char s_ap_name[JO_SSID_MAX + 1] = "jank", s_ap_pass[JO_TEXT_MAX + 1] = "";
 
 struct meter_step {

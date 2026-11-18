@@ -34,10 +34,13 @@ static void draw_glyph(const struct jbf_font *f, uint8_t *fb, const char *s, int
 {
     int small = is_small(s, i), g = glyph_of(s[i]), w = glyph_width(f, s, i), rows = small ? f->small_rows : f->rows;
     int dy = small ? f->rows - f->small_rows : 0;
+    int rb = (w + 7) / 8;
+    int big_rb = (f->width + 7) / 8;                        /* every glyph but the '.' has the font's width; the '.' is the last */
+    const uint8_t *base = small ? f->small + (size_t)g * (size_t)f->small_rows * (size_t)rb : f->big + (size_t)g * (size_t)f->rows * (size_t)big_rb;
     for (int r = 0; r < rows; r++) {
-        uint64_t bits = small ? f->small[g * f->small_rows + r] : f->big[g * f->rows + r];
+        const uint8_t *bits = base + (size_t)r * (size_t)rb;
         for (int c = 0; c < w; c++)
-            if (bits >> (w - 1 - c) & 1u)
+            if (bits[c >> 3] >> (7 - (c & 7)) & 1u)
                 jo_px(fb, x + c, y + dy + r, 1);
     }
 }
