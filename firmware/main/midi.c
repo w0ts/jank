@@ -27,8 +27,7 @@
 #define ALARM_MARGIN_US 10            /* an alarm has to be ahead of the counter or it never fires */
 /* the alarm goes this early: from the alarm to the start bit on the pad takes 2.3 us (interrupt entry ~2.0 us, the UART
  * 0.3 us; clkprobe.c, measured 2026-11-09 on the XIAO, 160 MHz, sd 0.18 us): the start bit then lands on the tick.
- * The beat builds run at 240 MHz (sdkconfig.beat): interrupt entry is shorter there, so this lead is to be measured again
- * (a JANK_CLOCK_PROBE build, `probe`; the timing audit's fix 5) before it is trusted to the microsecond. */
+ * The beat builds run at 160 MHz again (sdkconfig.beat, 2026-11-18), the clock this lead was measured at. */
 #define CLK_LEAD_US 2
 
 static const char *TAG = "midi";

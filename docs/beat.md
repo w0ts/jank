@@ -15,8 +15,8 @@ JANK_SCRATCH=$PWD/../usbaudio-scratch JANK_JOBS=3 scripts/build.sh xiao
 ```
 
 The app image is `$JANK_SCRATCH/build-xiao/jank.bin`. The build makes `third_party/esp_tinyusb` from the registry's 3.0.0
-with `third_party/esp_tinyusb-uac2.patch` (the audio class on) and sets the CPU to 240 MHz (`firmware/sdkconfig.beat`;
-the release runs 160). It installs over a stick running fw/ota with `python scripts/ota.py <jank.bin>` (app only: the
+with `third_party/esp_tinyusb-uac2.patch` (the audio class on) and sets the CPU to 160 MHz (`firmware/sdkconfig.beat`;
+it was 240 MHz until 2026-11-18, before the front end got cheaper). It installs over a stick running fw/ota with `python scripts/ota.py <jank.bin>` (app only: the
 bootloader and the partition table stay). Settings in NVS are kept; `beat` is not stored and starts on; `autobar` (AT
 START by default) and, since M2d, `beat_latency` per audio source (the computer's 25 by default) are stored.
 
