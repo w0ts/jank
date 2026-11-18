@@ -296,6 +296,24 @@ static void put_air(const struct jk_bridge *b, uint32_t now_ms, struct writer *w
     put(w, "air_lost_pct=%d\nair_retry_pct=%d\nrssi_min=%d\nrssi_max=%d\n", a.lost_pct, a.retry_pct, a.rssi_min, a.rssi_max);
 }
 
+int jk_cpu_pct(uint32_t core0_idle_x10)
+{
+    int v = 100 - (int)((core0_idle_x10 + 5u) / 10u);
+    return core0_idle_x10 ? v < 0 ? 0 : v > 100 ? 100 : v : JK_SYS_UNKNOWN;
+}
+
+/* `about`: the ABOUT screen's numbers, one key each, the screen's own unknowns (-1; temp_c -999; reset empty). A second reply, not
+ * part of `status`: with these the longest status would pass JK_CTL_OUT_MAX (tests/test_ctl.c) */
+static void cmd_about(const struct jk_snapshot *s, struct writer *w)
+{
+    struct jk_sys x = s->sys;
+    if (!x.known)
+        x = (struct jk_sys){0, JK_TEMP_UNKNOWN, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, ""};
+    put(w, "uptime_s=%d\nreset=%s\ntemp_c=%d\ncpu_pct=%d\n", (int)x.uptime_s, x.reset, (int)x.temp_c, jk_cpu_pct(s->beat.core0_idle_x10));
+    put(w, "heap_kb=%d\nheap_min_kb=%d\npsram_kb=%d\nflash_kb=%d\napp_used_kb=%d\napp_part_kb=%d\n", (int)x.heap_kb, (int)x.heap_min_kb, (int)x.psram_kb, (int)x.flash_kb, (int)x.app_used_kb, (int)x.app_kb);
+    put(w, "clock_late_us=%d\nui_loop_us=%d\nbeat_loop_us=%d\nok\n", (int)x.clk_late_us, (int)x.ui_loop_us, (int)x.beat_loop_us);
+}
+
 static void cmd_status(const struct jk_cfg *c, const struct jk_snapshot *s, uint32_t now_ms, struct writer *w)
 {
     const struct jk_bridge *b = &s->b;
@@ -636,6 +654,8 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         cmd_get(cfg, snap, &w);
     else if (!strcmp(s, "status"))
         cmd_status(cfg, snap, now_ms, &w);
+    else if (!strcmp(s, "about"))
+        cmd_about(snap, &w);
     else if (!strcmp(s, "beat"))
         cmd_beat(cfg, &snap->beat, &w);
     else if (!strncmp(s, "set ", 4))
@@ -671,7 +691,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         else
             put(&w, "err home line too long\n");
     } else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

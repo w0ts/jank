@@ -531,8 +531,8 @@ const $ = (id) => document.getElementById(id);
 /* the settings that have a control on the page: the stick's own menu edits the rest (the face) */
 const SETTINGS = ["name", "beat", "follower", "skip", "graded", "rate", "lat_trim", "beat_latency", "filter", "peer", "quantum", "offset"];
 const JANK_WAIT_MS = 15000;
-const HOME_EVERY_MS = 300, STATUS_EVERY_MS = 1500;
-const S = { line: null, kind: null, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastScans: [], timers: [],
+const HOME_EVERY_MS = 300, STATUS_EVERY_MS = 1500, ABOUT_EVERY_MS = 1500;
+const S = { line: null, kind: null, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastAbout: null, aboutAt: -Infinity, aboutTried: -Infinity, aboutBusy: false, aboutOff: false, lastScans: [], timers: [],
             lastStatus: null, statusAt: 0, waiting: null, auto: true };
 
 function say(text, bad) {
@@ -688,6 +688,24 @@ async function pollStatus() {
   }
 }
 
+/* the ABOUT screen's numbers (`about`): asked only while the face shows that screen (the draw loop calls this), never polled otherwise */
+async function pollAbout() {
+  const now = performance.now();
+  if (!S.line || S.aboutBusy || S.aboutOff || now - S.aboutTried < ABOUT_EVERY_MS) return;
+  S.aboutBusy = true;
+  S.aboutTried = now;
+  try {
+    S.lastAbout = (await send("about")).values;
+    S.aboutAt = performance.now();
+    pollAnswered();
+  } catch (e) {
+    if (e.message === "err unknown command") S.aboutOff = true;     /* a jank without `about`: the screen keeps its dashes, nothing is asked again */
+    else pollFailed(e);
+  } finally {
+    S.aboutBusy = false;
+  }
+}
+
 /* Advanced: a check box shown only over USB MIDI; it shows the Player card (and the room for the extra info of the next stage) */
 function paintAdvanced() {
   const visible = S.kind === "midi" && $("c-advanced").checked;
@@ -749,6 +767,8 @@ function disconnected(text) {
   S.line = null;
   S.drop = null;
   S.lastHome = null;
+  S.lastAbout = null;
+  S.aboutOff = false;
   S.noAnswerShown = false;
   setConnected(null);
   showGroups(S.lastScans);
@@ -941,7 +961,7 @@ autoConnect();
   const storedDelay = () => { try { return Stick.parseDelay(localStorage.getItem(Stick.BEAT_DELAY_KEY)); } catch (e) { return null; } };
   const beatDelay = { ms: storedDelay() === null ? 0 : storedDelay() };
   document.addEventListener("jank-beat-delay", (e) => { beatDelay.ms = e.detail.ms; });
-  const snapshot = () => ({ home: S.lastHome, homeAt: S.homeAt, get: S.lastGet, status: S.lastStatus, statusAt: S.statusAt, phase, delayMs: beatDelay.ms });
+  const snapshot = () => ({ home: S.lastHome, homeAt: S.homeAt, get: S.lastGet, status: S.lastStatus, statusAt: S.statusAt, about: S.lastAbout, aboutAt: S.aboutAt, phase, delayMs: beatDelay.ms });
   const refresh = (commands) => commands.reduce((done, command) => done.then(() => send(command)), Promise.resolve());
   const fail = (e) => say(e.message, true);
 
@@ -1012,6 +1032,7 @@ autoConnect();
       phase = Stick.phaseFeed(phase, Stick.phaseReport(S.lastHome), S.homeAt);
     }
     Stick.tick(model, now);
+    if (Stick.aboutOpen(model)) pollAbout();
     if (screen === "lcd2") {
       const lcd = Stick.screen(model, now, "lcd2");
       Lcd2.paint(ctx2d, ctx2d.createImageData(Lcd2.W, Lcd2.H), lcd.fb, lcd.ink);

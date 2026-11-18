@@ -10,14 +10,14 @@ const Stick = (() => {
   const KEY_HINT = 'Keys: Up / Down = UP / DOWN, Left / Esc / Backspace = NO, Right / Enter = YES';
   const REPEAT = { firstMs: 400, everyMs: 120 };
   const FLOOR_DB = -99, SILENCE_DB = -60, TEMPO_RANGE = [20, 999], BAR_CONF_FULL = 2;
-  const FRESH_HOME_MS = 1500, STATUS_FRESH_MS = 5000;
+  const FRESH_HOME_MS = 1500, STATUS_FRESH_MS = 5000, ABOUT_FRESH_MS = 5000;
   const SRC = ['auto', 'line', 'usb', 'link'], AUTOBAR = ['off', 'start', 'always'], FOLDS = { x2: 2, x4: 4, '/2': 0.5, '/4': 0.25 };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const num = v => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
   const isUpDown = b => b === 'up' || b === 'down';
 
   // ---- what the stick says, as the OLED reads it ----
-  // state: { home (the page's parseHome), homeAt, get ({key: string}), status ({key: string}), statusAt, phase (phaseFeed, optional), delayMs (the display delay) }
+  // state: { home (the page's parseHome), homeAt, get ({key: string}), status ({key: string}), statusAt, about ({key: string}: the `about` reply), aboutAt, phase (phaseFeed, optional), delayMs (the display delay) }
   const fresh = (at, now, maxMs) => at !== undefined && at !== null && now - at <= maxMs;
   const phase = (h, homeAt, now) => {                               // the session's place in the bar (beats), moving at the HOME line's tempo
     if (!h || !(h.bpm > 0) || h.bar === null || h.bar === undefined || !h.quantum) return null;
@@ -58,6 +58,8 @@ const Stick = (() => {
   function ctx(state, now) {
     const g = state.get || {}, st = state.status && fresh(state.statusAt, now, STATUS_FRESH_MS) ? state.status : null;
     const h = state.home && fresh(state.homeAt, now, FRESH_HOME_MS) ? state.home : null;
+    // the ABOUT screen's numbers (the `about` reply, only read while that screen is open): the firmware's unknowns (-1, temp_c -999, reset empty) are null here
+    const ab = state.about && fresh(state.aboutAt, now, ABOUT_FRESH_MS) ? state.about : {}, abNum = k => (num(ab[k]) === null || num(ab[k]) < 0 ? null : num(ab[k]));
     const audio = !!(h && h.audio), delay = state.delayMs || 0, pos = state.phase ? phaseAt(state.phase, now, delay) : phase(h, state.homeAt, now - delay);
     const playing = !!h && h.transport === 'playing', armed = !!h && h.transport === 'armed';
     const level = h && h.level !== null ? h.level : FLOOR_DB;
@@ -78,7 +80,9 @@ const Stick = (() => {
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
-      peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0, tempC: null, cpuPct: null, heapKb: null, psramKb: null, heapMinKb: null, uptimeS: null, flashKb: null, appUsedKb: null, appKb: null, reset: null, version: null, clkLateUs: null, uiLoopUs: null, beatLoopUs: null,
+      peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0, tempC: num(ab.temp_c) === null || num(ab.temp_c) === -999 ? null : num(ab.temp_c), cpuPct: abNum('cpu_pct'), heapKb: abNum('heap_kb'), psramKb: abNum('psram_kb'), heapMinKb: abNum('heap_min_kb'),
+      uptimeS: abNum('uptime_s'), flashKb: abNum('flash_kb'), appUsedKb: abNum('app_used_kb'), appKb: abNum('app_part_kb'), reset: ab.reset ? ab.reset : null, version: g.version ? g.version : null,
+      clkLateUs: abNum('clock_late_us'), uiLoopUs: abNum('ui_loop_us'), beatLoopUs: abNum('beat_loop_us'),
       lineIn: g.source === 'line' || (!!st && st.audio_source === 'line'), bright: 100, sleep: 0, inOff: num(g.lat_trim) || 0, offs: [0, 0, 0], rate: 2,
       boot: false, splash: false, wifi: wifiBars, wifiQ: null, groupPeers: h ? h.air : 0, setup: false, saved: false,
       net: { mode: net, prev: net, group: num(g.group) || 1, ssid: g.ssid || '', pass: g.pass === 'set' ? '********' : '', appass: '', apName: '',
@@ -137,6 +141,8 @@ const Stick = (() => {
 
   // ---- the D-pad: UP / DOWN act at once and repeat while held, NO / YES on HOME act on release, elsewhere at once; NO or YES held
   // with UP / DOWN on HOME is a combo (the nudges), which cancels the release action ----
+  // the ABOUT screen is shown: the page then asks the jank for `about` (and only then)
+  const aboutOpen = m => !!m && m.ui.screen === 'info' && m.ui.page === 'about';
   function create(getCtx, onCombo) {
     return { ui: OLED.create(), held: { up: false, down: false, no: false, yes: false }, deferred: {}, combo: false, repeatAt: {}, getCtx, onCombo };
   }
@@ -180,5 +186,5 @@ const Stick = (() => {
   }
   const framebuffer = (m, now) => screen(m, now, 'oled').fb;                 // the OLED's 128 x 64
 
-  return { KEY_BTN, KEY_HINT, REPEAT, PHASE, BEAT_DELAY_KEY, BEAT_DELAY_MAX, createPhase, phaseReport, phaseFeed, phaseAt, beatDelayEstimate, parseDelay, ctx, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, screen, framebuffer };
+  return { KEY_BTN, KEY_HINT, REPEAT, PHASE, BEAT_DELAY_KEY, BEAT_DELAY_MAX, createPhase, phaseReport, phaseFeed, phaseAt, beatDelayEstimate, parseDelay, ctx, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, aboutOpen, down, up, tick, releaseAll, screen, framebuffer };
 })();

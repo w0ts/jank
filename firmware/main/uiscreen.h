@@ -20,4 +20,6 @@ void uis_boot_screen(void);             /* BOOT / BOOTLOADER, before download mo
 /* the timers, the frames (10 a second, at once after a button), the deferred save; *led filled at each frame */
 void uis_step(uint32_t now, struct uis_led *led);
 uint8_t uis_contrast(void);
+struct jk_sys;
+void uis_sys(struct jk_sys *out);    /* the ABOUT screen's sampled numbers, for the control line's `about` (any task) */
 #endif

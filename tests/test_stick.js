@@ -250,4 +250,26 @@ eq(Stick.KEY_BTN, { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'no', Escape: '
   eq([Stick.parseDelay('120'), Stick.parseDelay('-7'), Stick.parseDelay('900'), Stick.parseDelay(''), Stick.parseDelay(null), Stick.parseDelay('x')], [120, -5, 400, null, null, null], 'a stored delay: rounded to 5, limited, or none');
 }
 
+// ---- the ABOUT screen's numbers: the `about` reply (read only while that screen is open) into the ctx, the values tests/oled_ref/state.js ABOUT_FULL
+// draws (parity with the C rows: cases.txt / cases_ink.txt), the firmware's unknowns as null ----
+{
+  const about = answer('about'), A = ['tempC', 'cpuPct', 'heapKb', 'psramKb', 'flashKb', 'appUsedKb', 'appKb', 'uptimeS', 'heapMinKb', 'reset', 'version', 'clkLateUs', 'uiLoopUs', 'beatLoopUs'];
+  const pick = c => A.map(k => c[k]);
+  eq(Object.keys(about), ['uptime_s', 'reset', 'temp_c', 'cpu_pct', 'heap_kb', 'heap_min_kb', 'psram_kb', 'flash_kb', 'app_used_kb', 'app_part_kb', 'clock_late_us', 'ui_loop_us', 'beat_loop_us'], 'the about transcript has the keys');
+  eq(pick(Stick.ctx(state({ about, aboutAt: 1000 }), 1500)), [41, 37, 123, 7936, 8192, 1260, 3072, 3725, 98, 'POWERON', '0.1.0', 12, 4210, 8800], 'about: every number as the ABOUT screen draws it');
+  eq(pick(Stick.ctx(state(), 1500)), [null, null, null, null, null, null, null, null, null, null, '0.1.0', null, null, null], 'no about reply yet: dashes (the version is from get)');
+  eq(pick(Stick.ctx(state({ about, aboutAt: 0 }), 9000)).slice(0, 4), [null, null, null, null], 'an about reply older than 5 s is not used');
+  const none = { uptime_s: '-1', reset: '', temp_c: '-999', cpu_pct: '-1', heap_kb: '-1', heap_min_kb: '-1', psram_kb: '-1', flash_kb: '-1', app_used_kb: '-1', app_part_kb: '-1', clock_late_us: '-1', ui_loop_us: '-1', beat_loop_us: '-1' };
+  eq(pick(Stick.ctx(state({ about: none, aboutAt: 1000 }), 1500)), [null, null, null, null, null, null, null, null, null, null, '0.1.0', null, null, null], 'the firmware\'s unknowns (-1, temp -999, empty reset) are null');
+  eq(Stick.ctx(state({ about: { ...about, temp_c: '0', clock_late_us: '0' }, aboutAt: 1000 }), 1500).tempC, 0, 'a temperature of 0 C is known');
+  eq(Stick.ctx(state({ about: { ...about, temp_c: '-5', clock_late_us: '0' }, aboutAt: 1000 }), 1500).tempC, -5, 'a temperature below 0 is known (only -999 is unknown)');
+  eq(Stick.ctx(state({ about: { ...about, clock_late_us: '0' }, aboutAt: 1000 }), 1500).clkLateUs, 0, 'a lateness of 0 us is known');
+  const m = Stick.create(() => Stick.ctx(state(), 1000), () => {});
+  eq(Stick.aboutOpen(m), false, 'the ABOUT screen is not open at the start');
+  m.ui.screen = 'info'; m.ui.page = 'battery';
+  eq(Stick.aboutOpen(m), false, 'the BATTERY page is not the ABOUT screen');
+  m.ui.page = 'about';
+  eq([Stick.aboutOpen(m), Stick.aboutOpen(null)], [true, false], 'the ABOUT screen is open');
+}
+
 console.log('stick: ' + checks + ' checks passed');
