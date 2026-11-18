@@ -43,7 +43,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 #msg:empty { display: none; }
 .hide { display: none !important; }
 [hidden] { display: none !important; }
-<!--@include ui/box.css-->
+<!--@include ui/box3.css-->
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
 .live-row > #player { flex: 0 0 340px; width: 340px; }
@@ -100,9 +100,6 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .dev-bar #c-ports-box { margin: 0; }
 #dev-bar #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
 #dev-bar #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-/* units have no RGB LEDs any more: the box drawing's LED group is not shown on this page (the Mac simulator still draws it) */
-#ledView, #seamGlow { display: none; }
-#face .lbl, #face .brand { display: none; }
 #face-box svg { width: 100%; height: auto; }
 </style>
 </head>
@@ -126,7 +123,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
           <label id="c-ports-box" class="hide" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
         </div>
         <div id="face-box">
-          <!--@include ui/box.svg.html-->
+          <!--@include ui/box3.svg.html-->
         </div>
       </section>
       <section id="player" class="hide" tabindex="-1">
@@ -917,6 +914,7 @@ autoConnect();
 </script>
 <!--@include ui/oled.js-->
 <!--@include ui/face.js-->
+<!--@include ui/box3.js-->
 <!--@include ui/lcd2.js-->
 <!--@include ui/ports.js-->
 <!--@include ui/autolat.js-->
@@ -980,8 +978,7 @@ autoConnect();
     const wanted = params.get("screen") === "oled" ? "2.42" : "lcd2";
     if (wanted === screen) return;
     screen = wanted;
-    Face.placeScreen(svg, screen);
-    Face.showLeds(svg, screen);
+    Box3.placeScreen(svg, screen === "lcd2" ? null : OLED.W / OLED.H);
     el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
     el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
   }
@@ -1056,9 +1053,9 @@ autoConnect();
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });
 
+  // the drawing is built from the BOX3 table (ui/box3.js): its viewBox is the case with its port stubs; the keys are only a tooltip and a label
+  Box3.build(svg);
   applyScreen();
-  // the keys are only a tooltip and a label: no text around the drawing; its viewBox is cropped to the box with its jacks and ports
-  svg.setAttribute("viewBox", "-8.5 -6 87 80.5");
   svg.setAttribute("aria-label", Stick.KEY_HINT);
   for (const b of ARMS) {
     const arm = svg.querySelector("#arm-" + b), tip = document.createElementNS(svg.namespaceURI, "title");
