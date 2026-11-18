@@ -310,10 +310,14 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   eq([p.el('pl-name').textContent, p.el('pl-bpm').textContent], ['a.mp3', 'tag BPM 124.00 × pitch → 124.00'], 'a click plays the file; its tag BPM shows');
   p.el('pl-pitch').value = '8';
   p.el('pl-pitch').fire('input', {});
-  eq([p.el('pl-bpm').textContent, p.el('pl-pitch-num').value], ['tag BPM 124.00 × pitch → 133.92', 8], 'the tag BPM follows the pitch');
-  p.el('pl-pitch-num').value = '-2.5';
-  p.el('pl-pitch-num').fire('input', {});
-  eq([p.el('pl-pitch').value, p.el('pl-pitchval').textContent], [-2.5, '-2.50 %'], 'the number box sets the pitch too');
+  eq([p.el('pl-bpm').textContent, p.el('pl-pitch').value], ['tag BPM 124.00 × pitch → 133.92', '8'], 'the tag BPM follows the pitch');
+  p.el('pl-pitch').value = '-2.5';
+  p.el('pl-pitch').fire('input', {});
+  eq([p.el('pl-pitch').value, p.el('pl-pitchval').textContent], ['-2.5', '-2.50 %'], 'the slider sets the pitch (the number box is gone on purpose)');
+  p.el('pl-pitch').fire('dblclick', {});
+  eq([p.el('pl-pitch').value, p.el('pl-pitchval').textContent], [0, '+0.00 %'], 'double-click on the pitch slider resets it to 0');
+  p.el('pl-pitch').value = '-2.5';
+  p.el('pl-pitch').fire('input', {});
   // "then": next
   const audio = p.el('pl-audio');
   audio.fire('ended', {});
@@ -402,8 +406,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     c.page.el('c-advanced').checked = true;
     c.page.el('c-advanced').fire('change', {});
     await settle();
-    c.page.el('pl-monitor').checked = true;
-    c.page.el('pl-monitor').fire('change', {});
+    ok(c.page.el('pl-monitor').getAttribute('aria-pressed') !== 'false', 'the monitor toggle is on by default');
     c.page.el('pl-dir').fire('change', oneFile());
     await settle();
     return { ...c, api, d };
@@ -421,8 +424,8 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   assert.match(r.page.el('pl-output-report').textContent, /stick context: running, sinkId jk/); checks++;
   assert.match(r.page.el('pl-status').textContent, /monitor \+ jank \(303a:4a4b\)/); checks++;
   // muting the monitor leaves the captured stream alone
-  r.page.el('pl-monitor').checked = false;
-  r.page.el('pl-monitor').fire('change', {});
+  r.page.el('pl-monitor').click();
+  eq(r.page.el('pl-monitor').getAttribute('aria-pressed'), 'false', 'the monitor toggle: pressed off');
   eq([r.page.el('pl-audio').muted, r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'source disconnect').length], [true, 1, 0], 'monitor off mutes the element only: the stick path is untouched');
   r.page.box.disconnected();
 

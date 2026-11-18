@@ -56,16 +56,20 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 #player .grow { flex: 1 1 auto; }
 #player button, #player select, #player input { min-height: 30px; padding: 3px 8px; font-size: 13px; }
 #player button.icon { width: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
-#player button.icon.wide { width: auto; min-width: 54px; padding: 0 10px; }
+#player button.icon { width: 32px; height: 32px; min-height: 32px; }
+#player button.icon svg { display: block; }
+#pl-play[data-state="playing"] .i-play, #pl-play:not([data-state="playing"]) .i-pause { display: none; }
+#pl-then[value="next"] .i-random, #pl-then[value="next"] .i-stop, #pl-then[value="random"] .i-next, #pl-then[value="random"] .i-stop, #pl-then[value="stop"] .i-next, #pl-then[value="stop"] .i-random { display: none; }
+#pl-monitor[aria-pressed="true"] .i-off, #pl-monitor[aria-pressed="false"] .i-on { display: none; }
+#player .pl-folder-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+#player .pl-folder-row .quiet-file { margin-top: 0; }
 #player button.small { margin-top: 6px; }
 #player button.link { min-height: 0; padding: 0 2px; background: none; border: 0; color: var(--accent); text-decoration: underline; }
 #player input[type="range"].thin { width: 100%; padding: 0; min-height: 18px; margin: 4px 0 0; }
-#player input.mini { width: 5.2em; }
 #player input[type="checkbox"] { width: auto; min-height: 0; }
 #player select { width: auto; max-width: 100%; }
 #player label { flex-direction: row; align-items: center; gap: 4px; font-size: 12px; }
-#player .then { flex: none; }
-#player .then:first-of-type { margin-left: auto; }
+#player .then { flex: none; margin-left: auto; }
 #player .pl-out button.link { margin-left: 6px; }
 #player .pl-name-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 #player .pl-name-row #pl-name { flex: 1 1 auto; min-width: 0; margin-top: 0; }
@@ -78,7 +82,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 #player .meter { margin-top: 4px; height: 5px; }
 #player .quiet-file { margin-top: 6px; }
 #player details.pl-details { margin-top: 4px; font-size: 12px; color: var(--dim); }
-#pl-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 8px 0 4px; }
+#pl-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 0; flex: 1 1 auto; min-width: 0; }
 #pl-crumbs button { min-height: 24px; padding: 1px 6px; }
 #pl-crumbs .folder { font-size: 12px; color: var(--dim); margin-right: 4px; }
 #pl-list { height: 232px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
@@ -127,24 +131,22 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <p id="pl-help-text" class="note hide">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first time, choose the stick's output once in the browser's own output chooser (no microphone is used); it is remembered. The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card. After a reload the remembered folder needs one click (Play or Open) to be allowed again; on the https address Chrome 122 and later offers "Allow on every visit" in that prompt, which makes this step silent.</p>
         <audio id="pl-audio" preload="auto"></audio>
         <div class="pl-bar">
-          <button id="pl-folder" class="icon" type="button" aria-label="Music folder" title="Choose the music folder the player browses. Remembered in this browser; the files stay on this computer."><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2H19.5A1.5 1.5 0 0 1 21 8.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" fill="currentColor"/></svg></button>
-          <button id="pl-play" class="icon wide" type="button" disabled title="Plays or pauses the file. It plays on this computer (monitor) and through the stick's USB audio, so the stick hears it too.">Play</button>
-          <button id="pl-next" class="icon wide quiet" type="button" disabled title="Plays the next track, or a random one when 'then' is random.">Next</button>
+          <button id="pl-play" class="icon" type="button" disabled data-state="paused" aria-label="Play" title="Plays or pauses the file. It plays on this computer (monitor) and through the stick's USB audio, so the stick hears it too."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-play"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-pause"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg></button>
+          <button id="pl-next" class="icon quiet" type="button" disabled aria-label="Next track" title="Plays the next track, or a random one when the mode after a track is random."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class=""><path d="M5 5v14l10-7zM16.5 5h2.5v14h-2.5z" fill="currentColor"/></svg></button>
+          <button id="pl-then" class="icon quiet" type="button" value="next" aria-label="After a track ends: next" title="After a track ends: next. Press for: random. Only this page."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-next"><path d="M3 12h13M12 7l5 5-5 5M20 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-random"><path d="M3 7h3.5c5 0 5 10 10 10H20M3 17h3.5c1.6 0 2.7-.8 3.6-2M13.5 9c.9-1.2 2-2 3.6-2H20M17.5 4l3 3-3 3M17.5 14l3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-stop"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/></svg></button>
           <span class="num"><span id="pl-pos">0:00</span> / <span id="pl-len">0:00</span></span>
         </div>
-        <label id="pl-dirpick" class="hide quiet-file" title="Choose the music folder with the browser's file picker. The files stay on this computer.">Choose music folder <input id="pl-dir" type="file" webkitdirectory multiple></label>
-        <button id="pl-reopen" class="quiet small hide" type="button" title="Opens the remembered folder again. The browser asks once for permission to read it."></button>
+                <button id="pl-reopen" class="quiet small hide" type="button" title="Opens the remembered folder again. The browser asks once for permission to read it."></button>
         <div class="pl-name-row"><span id="pl-name" class="note">No track</span>
           <label class="then"><input id="pl-scope" type="checkbox" checked title="On: next, random and the end of a track use every audio file under the folder you picked. Off: only the folder you are looking at. Only this page."> all folders</label>
-          <label class="then" title="What plays when a track ends: the next file, a random one, or stop. Only this page.">then <select id="pl-then"><option value="next">next</option><option value="random">random</option><option value="stop">stop</option></select></label>
         </div>
         <input id="pl-seek" class="thin" type="range" min="0" max="1000" value="0" step="1" disabled aria-label="Position" title="Moves the playing position in the file, on this computer and through the stick's audio.">
         <div class="meter" aria-hidden="true" title="the file's level, as measured in this page"><i id="pl-meter"></i></div>
-        <div class="pl-row"><strong>Pitch</strong><span id="pl-pitchval" class="num">+0.00 %</span><input id="pl-pitch-num" class="mini" type="number" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, percent" title="Pitch in percent (-8 to +8, varispeed): changes the speed and pitch you hear, so the tempo the stick tracks changes too. Not a stick setting."></div>
-        <input id="pl-pitch" class="thin" type="range" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, varispeed" title="Pitch in percent (-8 to +8, varispeed): changes the speed and pitch you hear, so the tempo the stick tracks changes too. Not a stick setting.">
+        <div class="pl-row"><strong>Pitch</strong><span id="pl-pitchval" class="num">+0.00 %</span></div>
+        <input id="pl-pitch" class="thin" type="range" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, varispeed" title="Pitch in percent (-8 to +8, varispeed): changes the speed and pitch you hear, so the tempo the stick tracks changes too. Double-click or double-tap resets it to 0. Not a stick setting.">
         <p id="pl-bpm" class="note hide"></p>
         <div class="pl-row"><strong>Volume</strong><input id="pl-vol" class="thin grow" type="range" min="0" max="100" step="1" value="80" aria-label="Volume" title="Changes what you hear on this computer only. The stick gets the file at its true level."><span id="pl-volval" class="num">80 %</span>
-          <label class="monitor" title="On: you hear the file on this computer's speakers. Off mutes only your speakers; the stick still gets the audio."><input id="pl-monitor" type="checkbox" checked> monitor</label></div>
+          <button id="pl-monitor" class="icon quiet" type="button" aria-pressed="true" aria-label="Monitor" title="Monitor on: you hear the file on this computer's speakers. Press to mute them; this mutes only your speakers, the stick still gets the audio."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-on"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-off"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
         <p id="pl-status" class="note">no file</p>
         <p id="pl-out-row" class="note pl-out hide">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button" title="Choose again which audio output is the stick's USB audio, in the browser's output chooser. Remembered in this browser.">change</button>
 </p>
@@ -154,8 +156,12 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
         <p id="pl-note" class="note" aria-live="polite"></p>
         <details class="pl-details"><summary title="Shows or hides the technical details of the player. Only this page.">details</summary><p id="pl-details" class="note"></p><p id="pl-output-report" class="note"></p></details>
         <p id="pl-scope-row" class="note hide"><span id="pl-scope-line"></span> <button id="pl-rescan" class="link" type="button" title="Looks through the picked folder again for audio files. Only this page.">rescan</button></p>
-        <div id="pl-browser" class="hide">
+        <div class="pl-folder-row">
+          <button id="pl-folder" class="icon quiet" type="button" aria-label="Music folder" title="Choose the music folder the player browses. Remembered in this browser; the files stay on this computer."><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2H19.5A1.5 1.5 0 0 1 21 8.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" fill="currentColor"/></svg></button>
+          <label id="pl-dirpick" class="hide quiet-file" title="Choose the music folder with the browser's file picker. The files stay on this computer.">Choose your music folder <input id="pl-dir" type="file" webkitdirectory multiple></label>
           <div id="pl-crumbs" class="pl-crumbs"></div>
+        </div>
+        <div id="pl-browser" class="hide">
           <div id="pl-list"></div>
         </div>
       </section>
@@ -1210,7 +1216,6 @@ autoConnect();
   // ---- playback: pitch (varispeed), volume, position ----
   function applyPitch() {
     const pct = Number(el("pl-pitch").value), rate = Player.pitchToRate(pct);
-    el("pl-pitch-num").value = pct;
     audio.preservesPitch = false;
     audio.defaultPlaybackRate = rate;
     audio.playbackRate = rate;
@@ -1274,13 +1279,33 @@ autoConnect();
   function paintStatus() {
     el("pl-status").textContent = Player.statusText({
       hasFile: url !== null, paused: audio.paused, position: audio.ended ? 0 : audio.currentTime, length: audio.duration,
-      monitor: el("pl-monitor").checked, jank: jank.id ? jank.label : "", jankError: jank.error, volumePct: Number(el("pl-vol").value), error,
+      monitor: monitorOn(), jank: jank.id ? jank.label : "", jankError: jank.error, volumePct: Number(el("pl-vol").value), error,
     });
     el("pl-status").style.color = error ? "var(--warn)" : "";
   }
   const setError = (text) => { error = text; paintStatus(); };
-  const paintPlay = () => { el("pl-play").textContent = audio.paused ? "Play" : "Pause"; paintStatus(); paintPlayEnabled(); };
+  const paintPlay = () => {
+    const playing = !audio.paused, label = playing ? "Pause" : "Play";
+    el("pl-play").setAttribute("data-state", playing ? "playing" : "paused");
+    el("pl-play").setAttribute("aria-label", label);
+    paintStatus();
+    paintPlayEnabled();
+  };
+  const monitorOn = () => el("pl-monitor").getAttribute("aria-pressed") !== "false";
   const thenMode = () => Player.parseAfterMode(el("pl-then").value);
+  const THEN_TEXT = { next: "the next file", random: "a random file", stop: "stop" };
+  function paintThen() {
+    const mode = thenMode(), following = Player.AFTER_MODES[(Player.AFTER_MODES.indexOf(mode) + 1) % Player.AFTER_MODES.length];
+    el("pl-then").setAttribute("value", mode);
+    el("pl-then").setAttribute("aria-label", "After a track ends: " + mode);
+    el("pl-then").title = "After a track ends: " + mode + " (" + THEN_TEXT[mode] + "). Press for: " + following + ". Only this page.";
+  }
+  function setThen(mode) {
+    el("pl-then").value = Player.parseAfterMode(mode);
+    paintThen();
+    store.set(KEY.then, thenMode());
+    paintSteps();
+  }
   const paintSteps = () => { el("pl-next").disabled = Player.skipTrack(thenMode(), queue.entries.length, queue.index, () => 0) < 0; };
 
   function load(file) {
@@ -1429,8 +1454,10 @@ autoConnect();
     }
     routeJank();
   }
+  const MONITOR_ON_TIP = "Monitor on: you hear the file on this computer's speakers. Press to mute them; this mutes only your speakers, the stick still gets the audio.";
+  const MONITOR_OFF_TIP = "Monitor off: your speakers are muted; the stick still gets the audio. Press to hear the file here again.";
   const applyMonitor = () => {
-    if (web.monitor) web.monitor.gain.value = el("pl-monitor").checked ? 1 : 0; else audio.muted = !el("pl-monitor").checked;
+    if (web.monitor) web.monitor.gain.value = monitorOn() ? 1 : 0; else audio.muted = !monitorOn();
     paintStatus();
   };
   function levelFrame(now) {
@@ -1675,7 +1702,10 @@ autoConnect();
   function paintList() {
     el("pl-browser").classList.toggle("hide", browser.rootName === "");
     const crumbs = Player.breadcrumbs([browser.rootName, ...browser.names]).slice(1);
-    el("pl-crumbs").replaceChildren(el("pl-folder").firstElementChild.cloneNode(true), ...crumbs.map((c) => rowButton(c.label, "quiet", "Go back to this folder.", () => goTo(c.depth - 1))));
+    const hint = document.createElement("span");
+    hint.className = "note";
+    hint.textContent = "Choose your music folder";
+    el("pl-crumbs").replaceChildren(...(browser.rootName === "" ? (typeof window.showDirectoryPicker === "function" ? [hint] : []) : crumbs.map((c) => rowButton(c.label, "quiet", "Go back to this folder.", () => goTo(c.depth - 1)))));
     const rows = [];
     if (browser.names.length) rows.push(rowButton("..", "dir", "Go up one folder.", () => goTo(browser.names.length - 1)));
     for (const entry of browser.entries.slice(0, Player.rowsToShow(browser.entries.length, browser.shown))) {
@@ -1821,11 +1851,9 @@ autoConnect();
   el("pl-play").addEventListener("click", togglePlay);
   el("pl-next").addEventListener("click", skip);
   el("pl-pitch").addEventListener("input", applyPitch);
-  el("pl-pitch-num").addEventListener("input", () => {
-    const v = Number(el("pl-pitch-num").value);
-    if (el("pl-pitch-num").value !== "" && Number.isFinite(v)) { el("pl-pitch").value = Math.max(-Player.PITCH_RANGE_PCT, Math.min(Player.PITCH_RANGE_PCT, v)); applyPitch(); }
-  });
-  el("pl-then").addEventListener("change", () => { store.set(KEY.then, thenMode()); paintSteps(); });
+  el("pl-pitch").addEventListener("dblclick", () => { el("pl-pitch").value = 0; applyPitch(); });
+  el("pl-then").addEventListener("click", () => setThen(Player.AFTER_MODES[(Player.AFTER_MODES.indexOf(thenMode()) + 1) % Player.AFTER_MODES.length]));
+  el("pl-then").addEventListener("change", () => setThen(el("pl-then").value));
   el("pl-scope").addEventListener("change", () => {
     scope.on = el("pl-scope").checked;
     store.set(KEY.scope, scope.on ? "1" : "0");
@@ -1842,7 +1870,12 @@ autoConnect();
     if (Number.isFinite(audio.duration)) audio.currentTime = audio.duration * el("pl-seek").value / 1000;
     seeking = false;
   });
-  el("pl-monitor").addEventListener("change", applyMonitor);
+  el("pl-monitor").addEventListener("click", () => {
+    const on = !monitorOn();
+    el("pl-monitor").setAttribute("aria-pressed", String(on));
+    el("pl-monitor").title = on ? MONITOR_ON_TIP : MONITOR_OFF_TIP;
+    applyMonitor();
+  });
   el("pl-change").addEventListener("click", () => el("pl-out").classList.toggle("hide"));
   el("pl-out").addEventListener("change", (e) => {
     const choice = { id: e.target.value, label: e.target.selectedOptions[0].text };
@@ -1876,6 +1909,7 @@ autoConnect();
   el("pl-dir").addEventListener("change", (e) => chooseTree(e.target.files));
 
   el("pl-then").value = Player.parseAfterMode(store.get(KEY.then));
+  paintThen();
   scope.on = store.get(KEY.scope) !== "0";
   el("pl-scope").checked = scope.on;
   el("pl-details").textContent = Player.planDetails(plan, env, Player.browserBrand(navigator.userAgentData, navigator.userAgent));
