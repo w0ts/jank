@@ -43,7 +43,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 #msg:empty { display: none; }
 .hide { display: none !important; }
 [hidden] { display: none !important; }
-<!--@include ui/box.css-->
+<!--@include ui/box3.css-->
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
 .live-row > #player { flex: 0 0 340px; width: 340px; }
@@ -95,11 +95,11 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .check input { width: auto; min-height: 0; }
 #c-advanced-box { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
 #c-advanced-box input { width: auto; min-height: 0; }
-#connect .buttons button { color: var(--ink); background: transparent; border: 1px solid var(--line); }
-#connect .buttons button[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-/* units have no RGB LEDs any more: the box drawing's LED group is not shown on this page (the Mac simulator still draws it) */
-#ledView, #seamGlow { display: none; }
-#face .lbl, #face .brand { display: none; }
+#connect-slot { margin: 4px 0 12px; }
+.dev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.dev-bar #c-ports-box { margin: 0; }
+#dev-bar #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
+#dev-bar #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 #face-box svg { width: 100%; height: auto; }
 </style>
 </head>
@@ -110,20 +110,20 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
   </header>
   <p id="msg"></p>
 
-  <section id="connect">
-    <div class="buttons">
-      <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected disconnects and turns that off.">MIDI port (USB, iPhone app)</button>
-      <label id="c-advanced-box" class="hide" title="Shows the player and the advanced tuning and details on this page. Changes only this page (remembered in this browser); nothing is sent to the stick."><input id="c-advanced" type="checkbox"> Advanced</label>
-    </div>
+  <div id="connect-slot">
+    <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected disconnects and turns that off.">MIDI port (USB, iPhone app)</button>
     <p id="c-waiting" class="note hide" style="margin:8px 0 0">waiting for the jank...</p>
-    <label id="c-ports-box" class="hide" style="margin-top:10px" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
-  </section>
+  </div>
 
   <div id="live" class="hide">
     <div class="live-row">
       <section id="face" class="device">
+        <div id="dev-bar" class="dev-bar">
+          <label id="c-advanced-box" class="hide" title="Shows the player and the advanced tuning and details on this page. Changes only this page (remembered in this browser); nothing is sent to the stick."><input id="c-advanced" type="checkbox"> Advanced</label>
+          <label id="c-ports-box" class="hide" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
+        </div>
         <div id="face-box">
-          <!--@include ui/box.svg.html-->
+          <!--@include ui/box3.svg.html-->
         </div>
       </section>
       <section id="player" class="hide" tabindex="-1">
@@ -404,6 +404,7 @@ function isEnd(line) {
 
 /* The control line over any transport: write(text) puts text on it (as frames), receive(message) takes each whole SysEx that
    comes back. One command at a time; its answer is the lines up to ok or err. */
+const NO_ANSWER = "The jank did not answer";
 class LineClient {
   constructor(write, timers) {
     this.write = write;
@@ -426,7 +427,7 @@ class LineClient {
   send(command, waitMs) {
     const run = () => new Promise((resolve, reject) => {
       const p = { lines: [] };
-      const timer = this.timers.set(() => { if (this.pending === p) this.pending = null; reject(new Error("no answer to " + command)); }, waitMs || 2000);
+      const timer = this.timers.set(() => { if (this.pending === p) this.pending = null; reject(Object.assign(new Error(NO_ANSWER), { noAnswer: true })); }, waitMs || 2000);
       p.end = (end) => {
         this.timers.clear(timer);
         this.pending = null;
@@ -648,20 +649,38 @@ async function session(command, done) {
 }
 
 /* HOME and the details by polling */
+/* the one message for a command that got no answer: the port, what to try. Polled commands repeat every few hundred ms: it is shown once
+   per episode and cleared when an answer comes again */
+function noAnswerText(withSysex) {
+  return NO_ANSWER + (S.portName ? " (" + S.portName + ")" : "") + ". Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port" + (withSysex ? "; if the browser asks, allow SysEx for this page." : ".");
+}
+function pollFailed(e) {
+  if (!e.noAnswer) { say(e.message, true); return; }
+  if (S.noAnswerShown) return;
+  S.noAnswerShown = true;
+  say(noAnswerText(false), true);
+}
+function pollAnswered() {
+  if (!S.noAnswerShown) return;
+  S.noAnswerShown = false;
+  say("");
+}
 async function pollHome() {
   if (!S.line) return;
   try {
     takeHome((await send("home")).values.home);
+    pollAnswered();
   } catch (e) {
-    say(e.message, true);
+    pollFailed(e);
   }
 }
 async function pollStatus() {
   if (!S.line) return;
   try {
     showStatus(await send("status"));
+    pollAnswered();
   } catch (e) {
-    say(e.message, true);
+    pollFailed(e);
   }
 }
 
@@ -700,9 +719,15 @@ async function autoConnect() {
   if (!S.line && !S.waiting) connectMidi(true);
 }
 
+/* the connect button lives under the title when nothing is connected and in the device card's top row while connected */
+function placeConnect(kind) {
+  $(kind ? "dev-bar" : "connect-slot").prepend($("c-midi"));
+}
+
 function setConnected(kind) {
   S.kind = kind;
   $("c-midi").setAttribute("aria-pressed", String(kind === "midi"));
+  placeConnect(kind);
   $("live").classList.toggle("hide", !kind);
   paintAdvanced();
   document.dispatchEvent(new CustomEvent("jank-connection", { detail: { kind } }));
@@ -720,6 +745,7 @@ function disconnected(text) {
   S.line = null;
   S.drop = null;
   S.lastHome = null;
+  S.noAnswerShown = false;
   setConnected(null);
   showGroups(S.lastScans);
   if (text) say(text, true);
@@ -728,6 +754,8 @@ function disconnected(text) {
 async function started(line, kind, drop, portName) {
   S.line = line;
   S.drop = drop;
+  S.portName = portName;
+  S.noAnswerShown = false;
   setConnected(kind);
   try {
     let got;
@@ -736,8 +764,7 @@ async function started(line, kind, drop, portName) {
     say("");
     await pollHome();
   } catch (e) {
-    const named = portName ? e.message.replace(/^(no answer to \S+)/, "$1 from " + portName) : e.message;
-    disconnected(named + ". If the app asks for SysEx, turn it on.");
+    disconnected(e.noAnswer ? noAnswerText(true) : e.message);
     return;
   }
   S.timers.push(setInterval(pollHome, HOME_EVERY_MS));
@@ -888,6 +915,7 @@ autoConnect();
 <!--@include ui/bigfont.js-->
 <!--@include ui/oled.js-->
 <!--@include ui/face.js-->
+<!--@include ui/box3.js-->
 <!--@include ui/lcd2.js-->
 <!--@include ui/ports.js-->
 <!--@include ui/autolat.js-->
@@ -951,8 +979,7 @@ autoConnect();
     const wanted = params.get("screen") === "oled" ? "2.42" : "lcd2";
     if (wanted === screen) return;
     screen = wanted;
-    Face.placeScreen(svg, screen);
-    Face.showLeds(svg, screen);
+    Box3.placeScreen(svg, screen === "lcd2" ? null : OLED.W / OLED.H);
     el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
     el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
   }
@@ -1027,9 +1054,9 @@ autoConnect();
   card.addEventListener("pointerenter", () => { hovered = true; });
   card.addEventListener("pointerleave", () => { hovered = false; });
 
+  // the drawing is built from the BOX3 table (ui/box3.js): its viewBox is the case with its port stubs; the keys are only a tooltip and a label
+  Box3.build(svg);
   applyScreen();
-  // the keys are only a tooltip and a label: no text around the drawing; its viewBox is cropped to the box with its jacks and ports
-  svg.setAttribute("viewBox", "-8.5 -6 87 80.5");
   svg.setAttribute("aria-label", Stick.KEY_HINT);
   for (const b of ARMS) {
     const arm = svg.querySelector("#arm-" + b), tip = document.createElementNS(svg.namespaceURI, "title");
