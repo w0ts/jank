@@ -29,7 +29,9 @@
 #define TASK_PRIO 1                     /* the lowest above idle: everything else on core 0 comes first */
 #define TASK_STACK 3072
 
+#if BOARD_OLED
 static const char *TAG = "oled";
+#endif
 static i2c_master_dev_handle_t s_dev;
 static uint8_t s_addr;
 static SemaphoreHandle_t s_lock;
@@ -60,6 +62,7 @@ static esp_err_t page(uint8_t p, const uint8_t *data)
     return i2c_master_transmit(s_dev, b, sizeof b, TIMEOUT_MS);
 }
 
+#if BOARD_OLED
 static esp_err_t setup(uint8_t contrast)
 {
     static const uint8_t INIT[] = {
@@ -80,6 +83,7 @@ static esp_err_t setup(uint8_t contrast)
         e = page(p, s_shown);           /* blank before it lights */
     return e;
 }
+#endif
 
 int oled_open(uint8_t contrast)
 {
