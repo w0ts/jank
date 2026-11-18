@@ -109,6 +109,10 @@ fi
 "$CC" $FLAGS -std=c11 -I"$HERE/core/beat" "$HERE/tests/test_beat.c" "$HERE"/core/beat/*.c -lm -o "$OUT/test_beat"
 "$OUT/test_beat" "$HERE/tests/beat_ref"
 
+# The front end's cheap stages (fast sqrt, ...) against their exact references: JB_FE_STAGES makes the stages public.
+"$CC" $FLAGS -std=c11 -DJB_FE_STAGES -I"$HERE/core/beat" "$HERE/tests/test_fe_approx.c" "$HERE/core/beat/jb_fe.c" "$HERE/core/beat/jb_lstm.c" "$HERE/core/beat/beat_model.c" -lm -o "$OUT/test_fe_approx"
+"$OUT/test_fe_approx"
+
 # AUTO BAR: the downbeat estimator against beat-listener's live/downbeat.py (golden vectors, tests/down_ref).
 "$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_down.c" "$HERE/core/beat/jb_down.c" "$HERE/core/beat/down_model.c" -lm -o "$OUT/test_down"
 "$OUT/test_down" "$HERE/tests/down_ref"

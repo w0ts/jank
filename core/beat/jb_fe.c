@@ -95,8 +95,10 @@ void jb_fft_scalar(float *z)
  * runs them one by one on a made-up frame to compare variants; otherwise they are static. */
 #ifdef JB_FE_STAGES
 #define STAGE
+#define STAGE_INLINE
 #else
 #define STAGE static
+#define STAGE_INLINE static inline
 #endif
 
 /* fe->buf = the windowed frame fe->frame: even samples to re, odd to im (the symmetric window's halves) */
@@ -112,8 +114,26 @@ STAGE void jb_fe_stage_window(struct jb_fe *fe)
     }
 }
 
-/* the magnitudes of bins 0..s_maxbin-1 of the 2048-point real FFT, from the 1024-point complex FFT of the packed samples */
-STAGE void jb_fe_stage_split(const float *work, float *mag)
+/* sqrt(x) for x >= 0 with no libm: the integer trick's first guess of 1/sqrt(x) (0x5f375a86), two Newton steps, times x. The
+ * relative error is under 4.8e-6 over every normal float (measured, tests/test_fe_approx.c) and sqrt(0) = 0; the software
+ * sqrtf was about 100 cycles on the S3 and this is about a third of that. The 1/sqrt estimate of a denormal is finite, so no NaN. */
+STAGE_INLINE float jb_fe_fast_sqrt(float x)
+{
+    union {
+        float f;
+        uint32_t u;
+    } v = {.f = x};
+    v.u = 0x5f375a86u - (v.u >> 1);
+    const float h = 0.5f * x;
+    float y = v.f;
+    y = y * (1.5f - h * y * y);
+    y = y * (1.5f - h * y * y);
+    return x * y;
+}
+
+/* the magnitudes of bins 0..s_maxbin-1 of the 2048-point real FFT, from the 1024-point complex FFT of the packed samples;
+ * exact: sqrtf (the reference the stage test compares with), else fast_sqrt */
+static inline void split(const float *work, float *mag, int exact)
 {
     for (int k = 0; k < s_maxbin; ++k) {
         int kk = k ? N2 - k : 0;                              /* Z[N2 - k], Z[0] for k = 0 */
@@ -122,9 +142,22 @@ STAGE void jb_fe_stage_split(const float *work, float *mag)
         float dr = 0.5f * (zr - cr), di = 0.5f * (zi - ci);   /* (Z - conj Z') / 2 = i x odd transform */
         float orr = di, oi = -dr;                             /* divided by i */
         float xr = er + s_cos[k] * orr - s_sin[k] * oi, xi = ei + s_cos[k] * oi + s_sin[k] * orr;
-        mag[k] = sqrtf(xr * xr + xi * xi);
+        float q = xr * xr + xi * xi;
+        mag[k] = exact ? sqrtf(q) : jb_fe_fast_sqrt(q);
     }
 }
+
+STAGE void jb_fe_stage_split(const float *work, float *mag)
+{
+    split(work, mag, 0);
+}
+
+#ifdef JB_FE_STAGES
+void jb_fe_stage_split_ref(const float *work, float *mag)
+{
+    split(work, mag, 1);
+}
+#endif
 
 /* the filterbank, log10(1 + x) and the positive difference to fe->prev, from the magnitudes; updates fe->prev */
 STAGE void jb_fe_stage_bands(struct jb_fe *fe, const float *mag, float *feat)
