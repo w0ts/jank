@@ -1,3 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# BEAT-FOLLOW BENCH BUILD: the tracker needs the cycles (the release runs the S3 at 160 MHz)
-CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# BEAT-FOLLOW BUILD: the S3 runs at 160 MHz (2026-11-18: since the FFT, magnitude and log stages got cheaper, the tracker takes about 60 % of core 0 at 160 MHz, measured
+# on the board with a drum loop; 240 MHz ran the chip hotter). The lab image (JANK_HEAT_LAB) can switch the clock at run time: `heat cpu 80|160|240`.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160=y
