@@ -366,6 +366,21 @@ const grpAt = text => L.nameXR - textW(text);
     ok(litIn(au, L.ltX, 2, LT_W[mode], 22).length > 80 && litIn(au, L.ltX + LT_W[mode], 2, 4, 22).length === 0 && same, 'LINK TRANSPORT icon ' + mode + ' (' + ['IGNORE', 'FOLLOW', 'BOTH'][mode] + '): ' + LT_W[mode] + ' x 22 at x ' + L.ltX + ', in AUDIO and in LINK mode');
   }
   eq([0, 1, 2].map(m => new Set([0, 1, 2].map(n => sha([drawn(ctxOf({ ctx: { ltMode: n } })).fb]))).size), [3, 3, 3], 'the three LINK TRANSPORT icons differ');
+  // the three icons are the old 160 x 120 bitmaps painted as exact 2 x 2 blocks (no Scale2x: it rounds the corners and fills the 1 px gap between the two triangles of FOLLOW+LEAD)
+  {
+    const OLD = [
+      ['...#####...', '..##...##..', '.##.....##.', '##.....#.##', '#.....#...#', '#....#....#', '#...#.....#', '##.#.....##', '.##.....##.', '..##...##..', '...#####...'],
+      ['.....#.......', '....##.......', '...###.......', '..####.......', '.############', '#############', '.############', '..####.......', '...###.......', '....##.......', '.....#.......'],
+      ['.....#.#.....', '....##.##....', '...###.###...', '..####.####..', '.###########.', '#############', '.###########.', '..####.####..', '...###.###...', '....##.##....', '.....#.#.....'],
+    ];
+    for (const mode of [0, 1, 2]) {
+      const d = drawn(ctxOf({ ctx: { ltMode: mode } })); let same = true;
+      for (let j = 0; j < 22; j++) for (let i = 0; i < 2 * OLD[mode][0].length; i++) if (d.fb[(L.iconY + j) * 320 + L.ltX + i] !== (OLD[mode][j >> 1][i >> 1] === '#' ? 1 : 0)) same = false;
+      ok(same, 'LINK TRANSPORT icon ' + mode + ' is its small bitmap in exact 2 x 2 blocks');
+    }
+    const d2 = drawn(ctxOf({ ctx: { ltMode: 2 } }));
+    eq([11, 12, 13, 14].map(i => d2.fb[(L.iconY + 7) * 320 + L.ltX + i]), [1, 0, 0, 1], 'FOLLOW+LEAD: the gap between the two triangles stays open');
+  }
   const fold = drawn(ctxOf({ home: { fold: '2' }, ctx: { fold: 2 } }));
   ok(litIn(fold, L.foldX, 2, 31, 22).length > 400 && litIn(fold, L.foldX + 31, 2, 4, 22).length === 0 && litIn(fold, L.ltX, 2, 26, 22).length > 80, 'the fold label X2 is an inverted 31 x 22 box at x 62, next to the LINK icon');
   eq(litIn(drawn(ctxOf({ home: { audio: false, link: 1, fold: '2' }, ctx: { fold: 2 } })), L.foldX, 2, 31, 22).length, 0, 'no fold label in LINK mode');

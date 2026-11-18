@@ -43,7 +43,7 @@ XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens
    Text at "scale k" (the BOOT / splash / edit / overlay / SAVED texts) is this face magnified k times.
 2. **Big tempo digits regenerated at 1 px detail** (style A, rounded): NORMAL 52 x 70, LARGE 70 x 94 (below).
 3. **Frames, bars, boxes, icons at 1 px detail**: frame lines 1 px, the unlit beat boxes 2 px (half of the 4 px the old doubling would give), VU / CONFIDENCE / BAR outlines 1 px; the icons
-   (play / stop, LINK TRANSPORT, battery, plug) are Scale2x of the old small bitmaps or drawn directly; the link glyph is the Optimist's chain.
+   (play / stop, LINK TRANSPORT, battery, plug) are the old small bitmaps (the plug with Scale2x, the LINK TRANSPORT icons in plain 2 x 2 blocks so the two triangles stay apart) or drawn directly; the link glyph is the Optimist's chain.
 4. **The plug moved out of the battery**: a separate 18 x 14 plug glyph immediately left of the battery, only while charging. The battery stays a plain battery with its fill.
 5. **The link glyph is the chain** of the Optimist's `hs_chain` (19 x 14, two rounded links with 2 px strokes, the second down and right of the first), same ink as before.
 
@@ -63,7 +63,7 @@ Every item is a fixed slot, nothing moves when a value changes; icons are 22 row
 | group | item | x range | notes |
 |---|---|---|---|
 | left | transport icon | 4..21 | play triangle 18 x 22 (blinks while armed) or stop square 18 x 18 (y 4..21) |
-| left | LINK TRANSPORT icon | 28..49 (IGNORE, 22 wide) / 28..53 (FOLLOW, BOTH, 26 wide) | **both modes** (`ctx.ltMode`): IGNORE = crossed circle, FOLLOW = arrow in, BOTH = double arrow (the old 11 x 11 / 13 x 11 bitmaps with Scale2x) |
+| left | LINK TRANSPORT icon | 28..49 (IGNORE, 22 wide) / 28..53 (FOLLOW, BOTH, 26 wide) | **both modes** (`ctx.ltMode`): IGNORE = crossed circle, FOLLOW = arrow in, BOTH = double arrow (the old 11 x 11 / 13 x 11 bitmaps in plain 2 x 2 blocks, not Scale2x: it would glue the two triangles of BOTH) |
 | left | fold label | 62..92 | AUDIO mode only, when the fold is not 1 (`X2` `X4` `/2` `/4`: an inverted 31 x 22 box with its corners cut); sits next to the LINK icon |
 | right | `GRP n` (or the Wi-Fi / own network name) | right-aligned to x 187 (`GRP 1` is x 128..186; cut to 7 characters, 90 px) | in AUDIO and LINK mode, directly before the chain |
 | right | chain + peer count | chain 195..213 (19 x 14, y 6..19), count from x 220 (up to 2 digits; slot 195..243) | colour: joined green, alone grey (AUDIO) / red (LINK) |

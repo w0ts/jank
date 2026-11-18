@@ -249,6 +249,16 @@ void jo_icon2(uint8_t *fb, const char *const *rows, int n, int x, int y)
         }
 }
 
+/* the same, plain: every source pixel an exact 2 x 2 block (no Scale2x), for the LINK TRANSPORT icons whose two triangles must stay apart */
+void jo_icon2p(uint8_t *fb, const char *const *rows, int n, int x, int y)
+{
+    for (int j = 0; j < n; j++)
+        for (int i = 0; rows[j][i]; i++)
+            if (rows[j][i] == '#')
+                for (int k = 0; k < 4; k++)
+                    jo_px(fb, x + 2 * i + (k & 1), y + 2 * j + (k >> 1), 1);
+}
+
 /* ---- the ink plane (jo_draw_lcd2) ---- */
 static const uint8_t *s_ink_fb;
 static uint8_t *s_ink;
