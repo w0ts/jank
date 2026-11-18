@@ -117,6 +117,7 @@ uptime_s=3725
 reset=POWERON
 temp_c=41
 cpu_pct=37
+cpu1_pct=3
 heap_kb=123
 heap_min_kb=98
 psram_kb=7936

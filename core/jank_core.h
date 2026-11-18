@@ -296,6 +296,8 @@ struct jk_beat {
     uint32_t uptime_s;
     uint32_t gap_at_ms[6], gap_len_ms[6];  /* the last audio gaps: when (ms since boot) and how long (ms) */
     uint32_t core0_idle_x10;
+    uint32_t core1_busy_x10;          /* core 1: the MIDI clock interrupt's share over the last second, x10 percent (midi.c); core1_ok 0: not measured yet */
+    uint8_t core1_ok;
     uint16_t burn_us;
     uint32_t robust_asked, robust_refused_memory, robust_refused_ratio, robust_coast_ticks, robust_prior_ticks;
 };
@@ -332,6 +334,8 @@ struct jk_sys {
 };
 /* core 0's CPU load %, from its idle task's share in x10 percent (jk_beat core0_idle_x10; 0: not measured -> -1) */
 int jk_cpu_pct(uint32_t core0_idle_x10);
+/* core 1's load %, from the MIDI clock interrupt's share in x10 percent (jk_beat core1_busy_x10; ok 0: not measured -> -1) */
+int jk_cpu1_pct(uint32_t core1_busy_x10, uint8_t ok);
 
 struct jk_snapshot {
     uint8_t usb_up;

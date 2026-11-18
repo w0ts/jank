@@ -118,7 +118,7 @@ struct jo_ctx {
     /* the ABOUT screen: -1 (JO_UNKNOWN) = not known, temp_c JO_TEMP_UNKNOWN, version NULL */
     const char *version;                  /* the firmware version, e.g. "0.1.0" */
     int temp_c;                           /* the chip's temperature, whole degrees C */
-    int cpu_pct;                          /* CPU load over the last sample, % (both cores together) */
+    int cpu_pct, cpu1_pct;                /* CPU load, %: core 0 (the beat, UI and radio), core 1 (the MIDI clock); -1 unknown */
     int heap_kb, psram_kb;                /* free internal heap; free PSRAM (-1 on a board without) */
     int flash_kb, app_used_kb, app_kb;    /* the flash chip; the running app image; its partition */
     int uptime_s, heap_min_kb;            /* seconds since boot; the least free internal heap since boot */

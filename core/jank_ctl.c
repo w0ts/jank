@@ -302,6 +302,12 @@ int jk_cpu_pct(uint32_t core0_idle_x10)
     return core0_idle_x10 ? v < 0 ? 0 : v > 100 ? 100 : v : JK_SYS_UNKNOWN;
 }
 
+int jk_cpu1_pct(uint32_t core1_busy_x10, uint8_t ok)
+{
+    int v = (int)((core1_busy_x10 + 5u) / 10u);
+    return ok ? v > 100 ? 100 : v : JK_SYS_UNKNOWN;
+}
+
 /* `about`: the ABOUT screen's numbers, one key each, the screen's own unknowns (-1; temp_c -999; reset empty). A second reply, not
  * part of `status`: with these the longest status would pass JK_CTL_OUT_MAX (tests/test_ctl.c) */
 static void cmd_about(const struct jk_snapshot *s, struct writer *w)
@@ -309,7 +315,7 @@ static void cmd_about(const struct jk_snapshot *s, struct writer *w)
     struct jk_sys x = s->sys;
     if (!x.known)
         x = (struct jk_sys){0, JK_TEMP_UNKNOWN, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, ""};
-    put(w, "uptime_s=%d\nreset=%s\ntemp_c=%d\ncpu_pct=%d\n", (int)x.uptime_s, x.reset, (int)x.temp_c, jk_cpu_pct(s->beat.core0_idle_x10));
+    put(w, "uptime_s=%d\nreset=%s\ntemp_c=%d\ncpu_pct=%d\ncpu1_pct=%d\n", (int)x.uptime_s, x.reset, (int)x.temp_c, jk_cpu_pct(s->beat.core0_idle_x10), jk_cpu1_pct(s->beat.core1_busy_x10, s->beat.core1_ok));
     put(w, "heap_kb=%d\nheap_min_kb=%d\npsram_kb=%d\nflash_kb=%d\napp_used_kb=%d\napp_part_kb=%d\n", (int)x.heap_kb, (int)x.heap_min_kb, (int)x.psram_kb, (int)x.flash_kb, (int)x.app_used_kb, (int)x.app_kb);
     put(w, "clock_late_us=%d\nui_loop_us=%d\nbeat_loop_us=%d\nok\n", (int)x.clk_late_us, (int)x.ui_loop_us, (int)x.beat_loop_us);
 }

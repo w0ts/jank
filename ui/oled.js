@@ -578,7 +578,7 @@ const OLED = (() => {
       ? (c.appUsedKb / 1024).toFixed(1) + '/' + (c.appKb / 1024).toFixed(1) + 'M' : '-');
     return [{ label: 'NAME', val: 'jank' }, { label: 'VERSION', val: known(c.version) ? c.version : '-' }, { label: 'REPO', val: lcd ? 'github.com/w0ts/jank' : 'w0ts/jank' },
             { label: 'UPTIME', val: up }, { label: 'RESET', val: known(c.reset) ? c.reset : '-' }, { label: 'TEMP', val: known(c.tempC) ? c.tempC + ' C' : '-' },
-            num('CPU', c.cpuPct, '%'), { label: 'MEMORY', val: heap }, num('MIN HEAP', c.heapMinKb, 'K'), { label: 'FLASH', val: flash },
+            { label: 'CPU', val: (known(c.cpuPct) && c.cpuPct >= 0 ? c.cpuPct : '-') + '/' + (known(c.cpu1Pct) && c.cpu1Pct >= 0 ? c.cpu1Pct : '-') + '%' }, { label: 'MEMORY', val: heap }, num('MIN HEAP', c.heapMinKb, 'K'), { label: 'FLASH', val: flash },
             num('CLOCK LATE', c.clkLateUs, ' US'), num('UI LOOP', c.uiLoopUs, ' US'), num('BEAT LOOP', c.beatLoopUs, ' US')];
   };
   function drawInfo(fb, ui, c) {

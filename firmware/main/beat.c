@@ -235,6 +235,7 @@ static uint32_t cycles_now(void) { return esp_cpu_get_cycle_count(); }
 enum { P_PULL, P_METER, P_FE, P_RATE, P_NET, P_DBN, P_DOWN, P_ACT, P_FEED, P_COAST, P_RSTEP, P_CONF, P_STEP, P_BURN, P_N };
 static uint32_t s_prof[P_N], s_prof_pub[P_N], s_pmax[P_N], s_pmax_pub[P_N];
 static uint32_t s_hop_win_max_us, s_hop_over10, s_hop_win_max_pub, s_hop_over10_pub;
+static uint32_t s_busy1_last, s_busy1_pub, s_busy1_ok, s_busy1_started;   /* core 1: the MIDI clock interrupt's cycles (midi_busy_cycles) at the last window, its share published */
 static uint32_t s_idle_cyc, s_idle_last, s_idle_pub;     /* core 0's idle task: cycles spent spinning in it */
 static uint16_t s_burn_us;                               /* BENCH: extra work a frame (set burn) */
 static int64_t s_burn_until_us;                          /* ... only until then (60 s after it was set): a forgotten burn must not stay */
@@ -598,6 +599,8 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     memcpy(b.gap_at_ms, u.gap_at_ms, sizeof b.gap_at_ms);
     memcpy(b.gap_len_ms, u.gap_len_ms, sizeof b.gap_len_ms);
     b.core0_idle_x10 = s_idle_pub;
+    b.core1_busy_x10 = s_busy1_pub;
+    b.core1_ok = (uint8_t)s_busy1_ok;
     b.burn_us = s_burn_us;
     b.conf_us = s_conf_us;
     b.robust_refresh_us = s_rb_pub.refresh_us;
@@ -870,6 +873,15 @@ static void beat_task(void *arg)
                 s_hop_win_max_us = s_hop_over10 = 0;
                 s_idle_pub = (uint32_t)((uint64_t)s_idle_cyc * 1000u / ((uint64_t)mhz * (uint64_t)(now - s_win_start)));
                 s_idle_cyc = 0;
+                {
+                    const uint32_t b1 = midi_busy_cycles();
+                    if (s_busy1_started) {     /* (the first window only sets the starting count) */
+                        s_busy1_pub = (uint32_t)((uint64_t)(b1 - s_busy1_last) * 1000u / ((uint64_t)mhz * (uint64_t)(now - s_win_start)));
+                        s_busy1_ok = 1;
+                    }
+                    s_busy1_last = b1;
+                    s_busy1_started = 1;
+                }
                 s_rate_cycles = s_rate_max_cycles = 0;
                 struct jrb_cycles c = jrb_take_cycles(&s_robust);
                 s_conf_us = s_conf_cycles / mhz;
