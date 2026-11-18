@@ -18,21 +18,9 @@ void jo_ui_init(struct jo_ui *ui)
 static void overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value)
 {
     ui->overlay.on = 1;
-    ui->overlay.live = 0;
     ui->overlay.until = now + JO_OVERLAY_MS;
     snprintf(ui->overlay.title, sizeof ui->overlay.title, "%s", title);
     snprintf(ui->overlay.value, sizeof ui->overlay.value, "%s", value);
-}
-
-#define JO_PAIR_OVERLAY_MS 3000u
-void jo_pair_overlay(struct jo_ui *ui, uint32_t now)
-{
-    ui->hint = -1;
-    ui->overlay.on = 1;
-    ui->overlay.live = 1;
-    ui->overlay.until = now + JO_PAIR_OVERLAY_MS;
-    snprintf(ui->overlay.title, sizeof ui->overlay.title, "BLUETOOTH PAIR");
-    ui->overlay.value[0] = 0;
 }
 
 void jo_show_overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value)

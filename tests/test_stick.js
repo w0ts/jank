@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // The face of a connected stick (ui/stick.js) on transcripts of the firmware's own control line (tests/stick_ref/transcript.txt, made
-// by running core/jank_ctl.c; home lines of a playing session from tests/test_phone.c): the OLED ctx from the stick's state, the
+// by running core/jank_ctl.c; home lines of a playing session from tests/test_home.c): the OLED ctx from the stick's state, the
 // smooth beat phase, the commands the face sends, and the D-pad. Exit status: non-zero on a failure.
 'use strict';
 const fs = require('fs');
@@ -28,7 +28,7 @@ for (const block of read('tests/stick_ref/transcript.txt').split('### ').slice(1
 }
 const answer = cmd => logic.parseAnswer(sections[cmd]).values;
 const get = answer('get'), status = answer('status');
-eq([get.group, get.transport, get.lowconf, get.threshold, get.source, get.ble, get.usbmidi, get.autobar, get.pass, get.net], ['1', 'link', 'stop', '80', 'auto', 'pair', 'on', 'start', 'none', 'jank'], 'the get transcript has the settings the face reads');
+eq([get.group, get.transport, get.lowconf, get.threshold, get.source, get.usbmidi, get.autobar, get.pass, get.net], ['1', 'link', 'stop', '80', 'auto', 'on', 'start', 'none', 'jank'], 'the get transcript has the settings the face reads');
 eq([status.hold, status.outputs, status.bar, status.gated, status.fold], ['0', 'stopped', 'off', '0', '1'], 'the status transcript has the numbers the face reads');
 eq(sections['fold x3'], ['err fold x2, /2 or 1'], 'a refused command answers err <why>');
 const idleHome = logic.parseHome(sections.home[0].replace('home=', ''));
@@ -37,7 +37,7 @@ ok(idleHome && idleHome.bpm === 0 && idleHome.audio === false, 'the idle home li
 const home = line => logic.parseHome(line);
 const LINK = home('h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18 0');
 const AUDIO = home('h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18 1');
-const state = (over = {}) => ({ home: AUDIO, homeAt: 1000, get, status: null, statusAt: 0, beat: null, overBle: false, ...over });
+const state = (over = {}) => ({ home: AUDIO, homeAt: 1000, get, status: null, statusAt: 0, beat: null, ...over });
 
 // ---- no data yet: the silent screen, nothing made up ----
 const none = Stick.ctx({ home: null, get: {}, status: null }, 5000);
@@ -47,7 +47,6 @@ const idle = Stick.ctx(state({ home: idleHome }), 1100);
 eq([idle.bpm, idle.linkBpm, idle.levelDb, idle.beatN, idle.running, idle.fitted], [null, null, -99, null, false, true], 'the stick says nothing playing: the same');
 const stale = Stick.ctx(state(), 1000 + 1501);
 eq([stale.bpm, stale.levelDb, stale.running], [null, -99, false], 'a HOME line older than 1.5 s over USB is not shown');
-eq(Stick.ctx(state({ overBle: true }), 1000 + 4000).bpm, 120, 'over Bluetooth a line is good for 5 s (the push comes every 2 s)');
 
 // ---- AUDIO and LINK mode from the HOME line ----
 const a = Stick.ctx(state(), 1000);
@@ -71,13 +70,12 @@ eq(Stick.ctx(state(), 1000 + 1250).beatN, 5, '+1250 ms: 5.25 (the OLED takes it 
 eq(Stick.ctx(state({ home: home('h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1') }), 5000).beatN, null, 'held: no beat box lit');
 
 // ---- the settings from `get`, the gate and the bar from `status` ----
-eq([a.th, a.confStop, a.ltMode, a.inSrc, a.ble.mode, a.usbMidi, a.autoBar, a.net.group, a.net.mode, a.gain, a.inOff], [80, true, 2, 0, 0, 0, 1, 1, 0, 0, 0], 'get: threshold, lowconf, transport, source, ble, usbmidi, autobar, group, net');
-const g2 = { ...get, lowconf: 'run', transport: 'auto', source: 'usb', ble: 'off', usbmidi: 'off', autobar: 'always', net: 'wifi', ssid: 'HomeNet', pass: 'set', line_gain: '3', lat_trim: '-4', usb: 'host', threshold: '55' };
+eq([a.th, a.confStop, a.ltMode, a.inSrc, a.usbMidi, a.autoBar, a.net.group, a.net.mode, a.gain, a.inOff], [80, true, 2, 0, 0, 1, 1, 0, 0, 0], 'get: threshold, lowconf, transport, source, usbmidi, autobar, group, net');
+const g2 = { ...get, lowconf: 'run', transport: 'auto', source: 'usb', usbmidi: 'off', autobar: 'always', net: 'wifi', ssid: 'HomeNet', pass: 'set', line_gain: '3', lat_trim: '-4', usb: 'host', threshold: '55' };
 const b = Stick.ctx(state({ get: g2 }), 1000);
-eq([b.th, b.confStop, b.ltMode, b.inSrc, b.ble.mode, b.usbMidi, b.autoBar, b.net.mode, b.net.ssid, b.net.pass, b.gain, b.inOff, b.usbRole], [55, false, 0, 2, 2, 1, 2, 1, 'HomeNet', '********', 3, -4, 1], 'get: the other values');
-const st = Stick.ctx(state({ status: { ...status, gated: '1', bar: 'locked', bar_lead: '1.00', ble_state: 'window', ble_left: '95', link_ip: '10.0.0.5', fold_manual: '0' }, statusAt: 1000 }), 1500);
-eq([st.gated, st.bar, st.ble.left, st.ble.phone, st.net.ip], [true, { state: 'locked', conf: 0.5 }, 95, false, '10.0.0.5'], 'status: the gate, the bar estimator, the Bluetooth window, the address');
-eq(Stick.ctx(state({ status: { ...status, ble_state: 'connected' }, statusAt: 1000 }), 1500).ble.phone, true, 'status: a phone connected');
+eq([b.th, b.confStop, b.ltMode, b.inSrc, b.usbMidi, b.autoBar, b.net.mode, b.net.ssid, b.net.pass, b.gain, b.inOff, b.usbRole], [55, false, 0, 2, 1, 2, 1, 'HomeNet', '********', 3, -4, 1], 'get: the other values');
+const st = Stick.ctx(state({ status: { ...status, gated: '1', bar: 'locked', bar_lead: '1.00', link_ip: '10.0.0.5', fold_manual: '0' }, statusAt: 1000 }), 1500);
+eq([st.gated, st.bar, st.net.ip], [true, { state: 'locked', conf: 0.5 }, '10.0.0.5'], 'status: the gate, the bar estimator, the address');
 eq(Stick.ctx(state({ status: { ...status, gated: '1' }, statusAt: 0 }), 9000).gated, false, 'a status older than 5 s is not used');
 
 // ---- held by the user, or stopped by the silence / the gate (the status says which) ----
@@ -97,7 +95,7 @@ eq([0, 1, 2, 3].map(v => F('insrc', v).commands[0]), ['set source auto', 'set so
 eq([F('lowconf', 0).commands[0], F('lowconf', 1).commands[0]], ['set lowconf run', 'set lowconf stop'], 'LOW CONFIDENCE: KEEP RUNNING / STOP START');
 eq([0, 1, 2].map(v => F('autobar', v).commands[0]), ['set autobar off', 'set autobar start', 'set autobar always'], 'AUTO BAR');
 eq([F('usbmidi', 0).commands, F('usbmidi', 1).commands], [['set usbmidi on'], ['set usbmidi off']], 'USB MIDI CLOCK');
-eq([F('ble', 0).commands, F('ble', 1).commands, F('ble', 2).commands], [['set ble pair', 'ble pair'], ['set ble auto'], ['set ble off']], 'BLUETOOTH: PAIR NOW also opens the window');
+ok(/does not take/.test(F('nosuch', 0).refuse), 'a field the control line does not know is refused with the reason');
 eq([F('ltmode', 0).commands, F('ltmode', 2).commands], [['set transport auto'], ['set transport link']], 'LINK TRANSPORT: IGNORE / FOLLOW+LEAD');
 ok(/FOLLOW is not on the control line/.test(F('ltmode', 1).refuse), 'FOLLOW has no control-line value: refused with the reason');
 for (const f of ['out0', 'out1', 'out2', 'rate', 'bright', 'sleep', 'ssid', 'pass', 'apname', 'appass', 'netmode', 'usbrole']) ok(typeof F(f, 0).refuse === 'string' && F(f, 0).refuse.length > 10 && !F(f, 0).commands, f + ' is refused with a reason, nothing sent');
@@ -229,7 +227,7 @@ eq(Stick.KEY_BTN, { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'no', Escape: '
   ph = Stick.phaseFeed(Stick.createPhase(), rep(2), 1000);
   eq([Stick.phaseAt(ph, 1200, 0), Stick.phaseAt(ph, 1200, 100), Stick.phaseAt(ph, 1200, -100)], [2.4, 2.2, 2.6], 'delay +100 ms: 0.2 beat behind; -100 ms: 0.2 ahead');
   // in the ctx
-  const base = { home: AUDIO, homeAt: 1000, get, status: null, statusAt: 0, overBle: false };
+  const base = { home: AUDIO, homeAt: 1000, get, status: null, statusAt: 0 };
   const withPhase = (delayMs, now) => { const st2 = { ...base, phase: Stick.phaseFeed(Stick.createPhase(), { bar: 2.75, bpm: 120, running: true, quantum: 4 }, 1000), delayMs }; return Stick.ctx(st2, now).beatN; };
   eq(withPhase(0, 1250), 3, 'ctx: the box from the smooth phase');
   eq(withPhase(250, 1250), 2, 'ctx: delayed 250 ms: still the previous box');

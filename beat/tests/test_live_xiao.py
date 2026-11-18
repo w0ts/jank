@@ -213,7 +213,7 @@ def test_the_page_reads_the_xiao_reports():
 
 @pytest.mark.parametrize("script", ["xiao_m2b.js", "oled_buttons.js", "xiao_m2i.js", "xiao_m2k.js"])
 def test_the_page_follows_the_xiao_m2b_and_the_one_button(script):
-    """player.html with the XIAO firmware M2b (the sound flag, outputs, home's meter, Bluetooth) and NO's clicks / the
+    """player.html with the XIAO firmware M2b (the sound flag, outputs, home's meter) and NO's clicks / the
     screenless unit, run by node."""
     import shutil
     import subprocess

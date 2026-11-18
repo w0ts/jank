@@ -91,8 +91,7 @@ void store_load(struct jk_cfg *c)
     e = nvs_get_blob(h, KEY, &r, &n);
     if (e == ESP_OK && n == STORED_SIZE && valid(&r)) {
         memcpy(c, &r, STORED_SIZE);           /* the bench settings keep their defaults */
-        if (c->ble > JK_BLE_AUTO)             /* the pad byte of an older build: anything but 0 there is not a setting */
-            c->ble = JK_BLE_PAIR;
+        c->stored_pad = 0;                    /* an older build kept its Bluetooth setting here: gone, whatever it was */
     } else if (e != ESP_ERR_NVS_NOT_FOUND)
         ESP_LOGW(TAG, "stored settings ignored: %s, %u bytes", esp_err_to_name(e), (unsigned)n);
     load_usb(h, c);

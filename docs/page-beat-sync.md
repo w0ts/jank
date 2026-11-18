@@ -6,16 +6,15 @@ with who can know each delay. (The page has no LED dots any more; the boxes are 
 
 ## What drives the boxes
 
-- **AUDIO mode and LINK mode alike: the HOME line** (`home` on the control line, `core/jank_phone.h`): `h <bpm x100> <net> <transport> <bar> <quantum> ...`.
+- **AUDIO mode and LINK mode alike: the HOME line** (`home` on the control line, `core/jank_home.h`): `h <bpm x100> <net> <transport> <bar> <quantum> ...`.
   `bar` is the session's place in the bar in hundredths of a beat (0.01 beat = 5 ms at 120 BPM), taken when the stick builds the line. In AUDIO
   mode the tracker steers that session, so the box follows the beat the tracker found, aligned by the stick's `beat_latency` (below).
-- **How often:** the page asks for `home` every 300 ms over USB (`HOME_EVERY_USB_MS`). Over Bluetooth the stick pushes it at most 2.5 times a
-  second and once in 2 s when nothing changed; the page asks itself only when the push stops for 3 s.
+- **How often:** the page asks for `home` every 300 ms (`HOME_EVERY_MS`).
 - **Between lines the boxes run on the page's own clock** (`Stick.phaseFeed` / `Stick.phaseAt`, `ui/stick.js`, drawn with
   `requestAnimationFrame`): the position advances at the last tempo, and each new line corrects it softly: a quarter of the error,
   backwards by 0.02 beat at most, snapping only past half a beat (a new lock, a moved bar). A stopped transport holds the position; with no
   line for 1.5 s, or a line with no session or tempo (a lost lock), the boxes go empty instead of running on old data.
-- **The `status` poll (every 1.5 s over USB)** does not move the boxes: it feeds the gate, the bar estimator, the Bluetooth window.
+- **The `status` poll (every 1.5 s)** does not move the boxes: it feeds the gate and the bar estimator.
 - **The beat reports** (`F0 7D 'J' 'B' 0x10`, `b <n> <bpm x100> <mode> <audio> <lag us> <link us>` on each tracked beat, `core/jank_sysex.h`) are
   not used by the page any more (only the LED dots used them). Their `lag` field is how long after the instant the stick takes the beat to be
   HEARD (its sample's arrival + `beat_latency`) the report was made: tracker detection delay minus `beat_latency`. A report made about 250 ms
@@ -35,8 +34,7 @@ with who can know each delay. (The page has no LED dots any more; the boxes are 
    Values of -186 / -148 / -38 (sum / auto / shift) were seen on a stick: the stick path was then about 186 ms behind the speakers.
 3. **The report to the page.** HOME line over USB MIDI (SysEx, 1 ms USB frames), the Web MIDI event and the JavaScript task: a few ms, jittering.
    The page stamps a line with its arrival time (`performance.now()`), so the boxes are late by that flight time (about 1-3 ms over USB) and by the
-   quantisation (up to 5 ms); over Bluetooth by the connection interval (30-60 ms, up to 300 ms with the peripheral latency) and the 400 ms push period
-   (the local phase hides the period, not the delay).
+   quantisation (up to 5 ms).
 4. **The page draws.** One animation frame (up to 16 ms), the 1.5 s `status` poll plays no part.
 
 ## Who can know what

@@ -2,11 +2,6 @@
 set(core "../../core")
 set(link "../../third_party/link")
 set(beat "${core}/beat")
-# a BLE MIDI peripheral for the control line (Kconfig JANK_BLE_MIDI, sdkconfig.ble)
-set(ble_srcs "")
-if(CONFIG_JANK_BLE_MIDI)
-    set(ble_srcs "ble_midi.c" "${core}/jank_blemidi.c")
-endif()
 # the screen: the I2C OLED, or the lcd2's SPI colour panel behind the same interface (oled.h). PRIV_REQUIRES cannot depend on
 # the sdkconfig (it is read before it is loaded): esp_lcd and esp_driver_spi are listed for every board and linked only where used.
 if(CONFIG_JANK_BOARD_LCD2)
@@ -24,13 +19,13 @@ idf_component_register(
          "${core}/jank_oled_gfx.c" "${core}/jank_oled_menu.c" "${core}/jank_oled_press.c" "${core}/jank_oled_draw.c" "${core}/jank_oled_qr.c" "${core}/jank_oled_input.c"
          "${core}/jank_usbrole.c" "${core}/jank_tusb320.c" "${core}/jank_uacdesc.c" "${core}/jank_pcm.c" "${core}/jank_midiq.c"
          "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c" "${core}/jank_start.c"
-         "${core}/jank_phone.c" "${core}/jank_vdrive.c" "${core}/jank_live.c" "${core}/jank_hold.c" "${core}/jank_fold.c" "${core}/jank_lat.c" "${core}/jank_conf.c"
+         "${core}/jank_home.c" "${core}/jank_vdrive.c" "${core}/jank_live.c" "${core}/jank_hold.c" "${core}/jank_fold.c" "${core}/jank_lat.c" "${core}/jank_conf.c"
          "${beat}/jb_beat.c" "${beat}/jb_dbn.c" "${beat}/jb_fe.c" "${beat}/jb_lstm.c" "${beat}/jb_lstm_q16.c" "${beat}/jb_mode.c" "${beat}/beat_model.c"
          "${beat}/jb_down.c" "${beat}/down_model.c" "${beat}/jb_follow.c" "${beat}/jb_rate.c" "${beat}/jb_weak.c" "${beat}/jb_comb.c" "${beat}/jb_robust.c" "${beat}/jb_skip.c" "${beat}/jb_graded.c"
-         "${link}/link.c" ${ble_srcs}
+         "${link}/link.c"
     INCLUDE_DIRS "." "${core}" "${link}" "${beat}"
     LDFRAGMENTS "linker.lf"
-    PRIV_REQUIRES app_update esp_partition usb esp_wifi esp_event esp_netif nvs_flash esp_driver_gptimer esp_driver_uart esp_driver_gpio esp_driver_mcpwm esp_driver_i2c esp_driver_ledc esp_timer hal soc esp_hw_support esp_system heap bt esp_coex esp_adc esp_driver_spi esp_lcd
+    PRIV_REQUIRES app_update esp_partition usb esp_wifi esp_event esp_netif nvs_flash esp_driver_gptimer esp_driver_uart esp_driver_gpio esp_driver_mcpwm esp_driver_i2c esp_driver_ledc esp_timer hal soc esp_hw_support esp_system heap esp_adc esp_driver_spi esp_lcd
 )
 # a test build's clock probe at the pin (clkprobe.c): JANK_CLOCK_PROBE=1 scripts/build.sh xiao
 if(DEFINED ENV{JANK_CLOCK_PROBE} AND "$ENV{JANK_CLOCK_PROBE}" STREQUAL "1")

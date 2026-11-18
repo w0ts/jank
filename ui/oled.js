@@ -6,7 +6,7 @@
 
    ctx, read by the UI (the host fills it from /api/status and its own emulated state): link (mode is LINK; the host derives it from the line-in plug detect: plugged = AUDIO, unplugged = LINK), bpm
    (audio mode, after the half/double fold), linkBpm, mode, conf 0..1, th percent, levelDb (dBFS), silent, gated, hold,
-   playing (Link transport), running / armed (the transport icon), fold (AUDIO: 1 2 4 0.5 0.25, the label X2 /2 ... top left; --xiao from the status's fold= / the home line's mode), foldAuto (AUTO RANGE set it), xiao (--xiao: YES sends play / stop in both modes), ble { mode 0 PAIR NOW | 1 ON START | 2 OFF, left (seconds of the pair window left, null = closed), phone (connected) }, peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
+   playing (Link transport), running / armed (the transport icon), fold (AUDIO: 1 2 4 0.5 0.25, the label X2 /2 ... top left; --xiao from the status's fold= / the home line's mode), foldAuto (AUTO RANGE set it), xiao (--xiao: YES sends play / stop in both modes), peers, wifi ('good'|'weak'|'none'), beatN (integer beat or null), beatMs (ms since the beat), usb, fitted, batt percent,
    autoBar (the AUTO BAR setting: 0 OFF, 1 AT START, 2 ALWAYS; true / false = 1 / 0), bar (the downbeat estimator: { state, conf } or null),
    offs [MIDI OUT 1, MIDI OUT 2, CLK] in ms, rate (index into the clock divisions), boot, splash.
    net: { mode 0 JANK | 1 LINK CLIENT | 2 LINK AP | 3 SETUP, prev (mode to return to after SETUP), group (the jank GROUP 1..9: the units on the same group form one Link session over open Wi-Fi frames, no router), ssid, pass, appass, apName,
@@ -39,10 +39,9 @@
               FOLLOW = they also start / stop with the session; FOLLOW+LEAD = and our Start / Stop starts / stops the session),
               AUTO BAR (AUDIO mode: OFF = the bar left where it is; AT START = the bar's 1 found in the music and Link's bar moved onto it
               at a start only, never while playing; ALWAYS = also while playing),
-              NETWORK, USB, BLUETOOTH (PAIR NOW / ON START / OFF; YES on PAIR NOW opens the 2 minute pair window, which HOME's
-              status line counts down), OFFSET, CLK RATE, DISPLAY, BATTERY (UP/DOWN move; the mode is not a setting: plugging in the line = AUDIO)
+              NETWORK, USB, OFFSET, CLK RATE, DISPLAY, BATTERY (UP/DOWN move; the mode is not a setting: plugging in the line = AUDIO)
                 YES on AUDIO / OFFSET -> SUB                    YES on NETWORK -> NET
-                YES on CLK RATE / AUTO BAR / USB / BLUETOOTH -> EDIT              YES on BATTERY -> INFO       NO -> HOME
+                YES on CLK RATE / AUTO BAR / USB -> EDIT              YES on BATTERY -> INFO       NO -> HOME
      SUB      a list of EDITS: UP/DOWN move, YES -> EDIT, NO -> MENU
                 DISPLAY: BRIGHTNESS (10..100 %), SCREEN OFF (NEVER / 30 S / 1 MIN / 5 MIN without a button; the first
                          press on a dark screen only wakes it; SETUP keeps the screen on)
@@ -163,18 +162,11 @@ const OLED = (() => {
     ['.........', '..#...#..', '.##...##.', '#########', '.##...##.', '..#...#..', '.........'],
   ];
   const NET_ICON_XR = 86;                                            // the network icon's right edge: a gap before the plug
-  const NET_ICON_XR_BLE = 82;                                        // ... with the Bluetooth rune beside it (4 columns further left)
-  const BLE_ICON_X = 86, PLUG_X = 92, BATT_X = 107;                  // the rune (5 wide) sits between the network icon and the plug
-  // the Bluetooth rune, 5 x 7: hidden while no window is open and no phone is connected, blinking (ARMED_BLINK_MS) while the
-  // pair window is open, solid while a phone is connected
-  const BLE_ICON = ['..#..', '..##.', '#.#.#', '.###.', '#.#.#', '..##.', '..#..'];
-  const BLE_SHORT = ['PAIR', 'START', 'OFF'];
+  const PLUG_X = 92, BATT_X = 107;
   const AUTOBAR_NAMES = ['OFF', 'AT START', 'ALWAYS'], AUTOBAR_SHORT = ['OFF', 'START', 'ALWAYS'];   // index = dev.autoBar (the old true / false = 1 / 0)
   const autoBarIndex = v => (v === true ? 1 : v === false || v == null ? 0 : v);
   // the fold's label on HOME (AUDIO): x2 x4 /2 /4, nothing at 1
   const foldLabel = k => (k === 2 ? 'X2' : k === 4 ? 'X4' : k === 0.5 ? '/2' : k === 0.25 ? '/4' : '');
-  const BLE_WINDOW_S = 120;                                          // the pair window: 2 minutes
-  const mmss = s => { const t = Math.max(0, Math.ceil(s)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
   const USB_ICON = ['.....####..', '.....######', '#########..', '.....######', '.....####..'];
   function icon(fb, rows, x, y) { rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') px(fb, x + i, y + j, 1); }); }                       // the menu row (LINK TRANSPORT + value fits 21 characters)
   const EDITS = {
@@ -208,10 +200,6 @@ const OLED = (() => {
     // (LINK: USB audio is ignored, a plug in the line in still wins: it is mechanical)
     insrc: { title: 'SOURCE', opts: ['AUTO', 'LINE IN', 'USB AUDIO', 'LINK'], get: c => c.inSrc,
              help: [['LINE IN IF PLUGGED', 'ELSE USB AUDIO'], ['THE LINE IN JACK', 'ONLY'], ['AUDIO OVER USB', 'ONLY'], ['USB AUDIO IGNORED', 'LINE STILL WINS']] },
-    // the phone's Bluetooth: PAIR NOW = on only for a pair window (YES opens it, even unchanged), ON START = a window at
-    // every start too, OFF = never. The triple NO opens the window as well (HOME, no screen needed)
-    ble: { title: 'BLUETOOTH', opts: ['PAIR NOW', 'ON START', 'OFF'], get: c => c.ble.mode, live: false, repick: true,
-           help: [['YES OPENS A 2 MIN', 'WINDOW FOR A PHONE'], ['A 2 MIN WINDOW AT', 'EVERY POWER ON'], ['NO BLUETOOTH', 'AT ALL']] },
     // the USB port's role; MIDI and USB audio work in both (host: battery units, the gear has its own power)
     usbrole: { title: 'USB', opts: ['DEVICE', 'HOST'], get: c => c.usbRole,
                help: [['TO A COMPUTER', 'MIDI + AUDIO'], ['TO SELF-POWERED', 'MIDI + AUDIO GEAR']] },
@@ -227,7 +215,7 @@ const OLED = (() => {
   };
   const helpOf = (sp, v) => (sp.opts ? sp.help[v] : sp.help) || ['', ''];
   const MENU = [                                                    // the top-level menu, in order
-    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'BLUETOOTH', edit: 'ble' }, { name: 'USB MIDI CLOCK', edit: 'usbmidi' }, { name: 'OFFSET', sub: 'offsets' },
+    { name: 'AUDIO', sub: 'audio' }, { name: 'LINK TRANSPORT', edit: 'ltmode' }, { name: 'AUTO BAR', edit: 'autobar' }, { name: 'NETWORK', net: true }, { name: 'USB', edit: 'usbrole' }, { name: 'USB MIDI CLOCK', edit: 'usbmidi' }, { name: 'OFFSET', sub: 'offsets' },
     { name: 'CLK RATE', edit: 'rate' }, { name: 'DISPLAY', sub: 'display' }, { name: 'BATTERY', info: 'battery' },
   ];
   // the lcd2 layout's menu: BEAT FLASH (the whole screen flashes on the beat) after DISPLAY. The OLED menus never list it, so they stay as they were.
@@ -418,24 +406,22 @@ const OLED = (() => {
   const linkInk = c => ((c.peers || 0) >= LINK_JOINED_MIN ? INK.GOOD : c.link ? INK.BAD : INK.DIM);
   // the HOME top bar's boxes (x ranges, inclusive; null = not drawn), so that nothing can overlap: the transport icon, in LINK
   // mode the transport option's icon, in AUDIO mode the fold label (X2 /2 ...), the network's name (right-aligned, truncated
-  // to what is left), the network icon, the Bluetooth rune, the USB plug, the battery
+  // to what is left), the network icon, the USB plug, the battery
   function topBar(c) {
-    const m = c.net.mode, bleOn = !!(c.ble && (c.ble.phone || c.ble.left != null));
-    const xr = bleOn ? NET_ICON_XR_BLE : NET_ICON_XR, netL = xr - [10, 7, 20][m];
+    const m = c.net.mode, xr = NET_ICON_XR, netL = xr - [10, 7, 20][m];
     const lt = c.link ? LT_ICONS[c.ltMode] : null, fl = !c.link ? foldLabel(c.fold) : '';
     const left = lt ? { l: 12, r: 12 + lt[0].length - 1 } : fl ? { l: 12, r: 12 + textW(fl, 1) - 1 } : null;
     const nameLeft = left ? left.r + 5 : 10;
     const full = [c.net.group != null ? 'GRP ' + c.net.group : '', c.net.ssid, c.net.apName][m] || '';
     const name = full ? fit(full, netL - 2 - nameLeft) : '';
     return { tri: { l: 2, r: 8 }, left, label: fl, lt, name, nameBox: name ? { l: netL - 2 - textW(name, 1), r: netL - 3 } : null, nameR: netL - 2,
-             net: { l: netL, r: xr }, xr, ble: bleOn ? { l: BLE_ICON_X, r: BLE_ICON_X + 4, solid: !!c.ble.phone } : null,
+             net: { l: netL, r: xr }, xr,
              usb: c.usb ? { l: PLUG_X, r: PLUG_X + USB_ICON[0].length - 1 } : null, batt: c.fitted ? { l: BATT_X, r: BATT_X + 16 } : null };
   }
   const BATT_BAD_PCT = 15, BATT_WARN_PCT = 30;                       // the battery icon: red under 15 %, amber under 30 %, else green
-  function drawPower(fb, c, now) {
+  function drawPower(fb, c) {
     const t = topBar(c);
     drawNetIcon(fb, c, t.xr);
-    if (t.ble && (t.ble.solid || Math.floor(now / ARMED_BLINK_MS) % 2 === 0)) icon(fb, BLE_ICON, t.ble.l, 0);
     if (c.usb) icon(fb, USB_ICON, PLUG_X, 1);                        // a plug on its cable
     if (c.fitted) {
       frame(fb, 107, 0, 15, 7, 1); rect(fb, 122, 2, 2, 3, 1);
@@ -472,8 +458,6 @@ const OLED = (() => {
     if (peerSeg && wifi.length && fits([peerSeg, ...wifi[0].segs])) wifi[0] = { ...wifi[0], segs: [peerSeg, ...wifi[0].segs], spread: true };
     else if (peerSeg) items.push({ t: c.peers === 1 ? '1 LINK PEER' : c.peers + ' LINK PEERS', bad: false });
     items.push(...wifi);
-    if (c.ble && c.ble.phone) items.push({ t: 'PHONE', bad: false });
-    if (c.ble && c.ble.left != null && !c.ble.phone) { text(fb, 'BT PAIR ' + mmss(c.ble.left), 2, y, 1, 1); return; }   // the open window: shown alone, its count runs
     if (!items.length) return;
     const it = items[Math.floor(now / STATUS_CYCLE_MS) % items.length];
     const segs = it.segs || [{ t: it.t, bad: it.bad }];
@@ -520,12 +504,12 @@ const OLED = (() => {
   function drawHome(fb, c, now) {
     // the transport only: silence and low confidence are already on the IN and CF bars
     const stopped = !c.running;
-    drawPower(fb, c, now);
+    drawPower(fb, c);
     // the transport: a triangle = playing, a blinking triangle = started and waiting (locking / next bar), a square = stopped
     const tri = !stopped || (c.armed && Math.floor(now / ARMED_BLINK_MS) % 2 === 0);
     if (tri) for (let r = 0; r < 7; r++) rect(fb, 2, r, Math.min(r, 6 - r) + 1, 1, 1);
     else if (!c.armed) rect(fb, 2, 1, 5, 5, 1);
-    // the network's name, right-aligned against the network icon (the Bluetooth rune moves both left): group (JANK), SSID
+    // the network's name, right-aligned against the network icon : group (JANK), SSID
     // (CLIENT), AP name (AP); SETUP has its own screen. LINK mode: the transport option's icon after the transport icon
     // (LT_ICONS); AUDIO mode leads Link anyway: its place shows the fold (X2 /2 ...) when there is one
     const t = topBar(c);
@@ -556,7 +540,7 @@ const OLED = (() => {
   function drawMenu(fb, ui, c) {
     titleBar(fb, 'MENU', (ui.cursor + 1) + '/' + MENU.length);
     const vals = { 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': AUTOBAR_SHORT[autoBarIndex(c.autoBar)], NETWORK: NET_SHORT[c.net.mode],
-                   USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' };
+                   USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-' };
     for (let k = 0; k < VISIBLE; k++) {
       const i = ui.top + k; if (i >= MENU.length) break;
       const y = 11 + k * 9, sel = i === ui.cursor, v = sel ? 0 : 1;
@@ -647,10 +631,7 @@ const OLED = (() => {
     text(fb, 'SETUP MODE', 63, 3, 1, 1); text(fb, a, 63, 15, 1, 1); text(fb, b, 63, 24, 1, 1);
     text(fb, 'open', 63, 37, 1, 1); text(fb, '192.168.4.1', 63, 46, 1, 1); text(fb, 'NO: LEAVE', 63, 56, 1, 1);
   }
-  // the triple NO's pair window: a box with its countdown (the window's own seconds come from ctx.ble.left)
-  const PAIR_OVERLAY_MS = 3000;
-  function pairOverlay(ui, now) { ui.hint = null; ui.overlay = { until: now + PAIR_OVERLAY_MS, title: 'BLUETOOTH PAIR', value: '', live: 'pair' }; }
-  function drawOverlays(fb, ui, now, c) {
+  function drawOverlays(fb, ui, now) {
     if (ui.hint) {                                                   // NO / YES held on HOME: what UP / DOWN will do
       boxed(fb, 6, 12, 116, 40);
       textC(fb, ui.hint.title, 17, 1, 0); textC(fb, ui.hint.up, 31, 1, 0); textC(fb, ui.hint.down, 42, 1, 0);
@@ -658,7 +639,7 @@ const OLED = (() => {
     }
     if (ui.overlay && now < ui.overlay.until) {
       boxed(fb, 14, 12, 100, 40);
-      const v = ui.overlay.live === 'pair' ? mmss(c.ble && c.ble.left != null ? c.ble.left : BLE_WINDOW_S) : ui.overlay.value, sc = [3, 2, 1].find(k => textW(v, k) <= 96) || 1;   // the largest size that fits the box
+      const v = ui.overlay.value, sc = [3, 2, 1].find(k => textW(v, k) <= 96) || 1;   // the largest size that fits the box
       textC(fb, ui.overlay.title, 17, 1, 0); textC(fb, v, 38 - Math.round(7 * sc / 2), sc, 0);
     }
   }
@@ -668,13 +649,13 @@ const OLED = (() => {
   // and primitives at integer scales, painted EXACTLY x2 on the 320 x 240 panel (ui/lcd2.js): no bands, no centring, square pixels.
   // The OLED boards keep 128 x 64 and never run this code. Colour is information only (INK, see tag()); menus and edit screens have none.
   //
-  //   HOME (AUDIO)  y 0..12   top bar: transport icon, fold / LINK option icon, GRP n, link glyph + peers, signal bars, BLE rune, USB plug, battery
+  //   HOME (AUDIO)  y 0..12   top bar: transport icon, fold / LINK option icon, GRP n, link glyph + peers, signal bars, USB plug, battery
   //                 y 15..49  the TEMPO, font scale 5 (130 px wide for '120.0'), 'BPM' at its right
   //                 y 52..77  four big beat boxes, 36 x 26, gap 4, the beat indicator; lit = solid, unlit = 2 px outline; the first is amber only while lit
   //                 y 81      CF  87%  [line, notch at the stop threshold]   number and line coloured by the threshold rule
   //                 y 91      IN -20dB [line, notch at the tracker's -50 dBFS] neutral; red clipping, amber too quiet
   //                 y 101     BAR LOCKED [outlined bar]                      AUTO BAR state and its confidence, neutral; only with AUTO BAR on
-  //                 y 111     status line: GATED / HOLD / COAST (left), STOP 70 / MIN 70 (right); or BT PAIR, PHONE, the Wi-Fi line
+  //                 y 111     status line: GATED / HOLD / COAST (left), STOP 70 / MIN 70 (right); or the Wi-Fi line
   //   HOME (LINK)   the same top bar, tempo and status line; the beat boxes 36 x 52 at y 54..105; no audio bars
   //   lists         title bar 11 px, 12 rows of 9 px from y 13; sub menus and info 12 px rows; edit: the value at scale 2
   const SIZES = { oled: { w: OLED_W, h: OLED_H }, lcd2: { w: 160, h: 120 } };
@@ -695,7 +676,7 @@ const OLED = (() => {
 
   // the HOME geometry: one table, the tests read it
   const L2 = {
-    topH: 13, left: 14, nameRight: 66, linkX: 70, signalX: 98, bleX: 112, plugX: 119, battX: 134, battW: 21,
+    topH: 13, left: 14, nameRight: 66, linkX: 70, signalX: 98, plugX: 119, battX: 134, battW: 21,
     tempoY: 15, tempoScale: 5, bpmX: 138, bpmY: 43,
     boxX: 2, boxW: 36, boxGap: 4, boxY: 52, boxH: 26, linkBoxY: 54, linkBoxH: 52, boxBorder: 2,
     rowCF: 81, rowIN: 91, rowBAR: 101, labelX: 2, valueXR: 60, barX: 64, barW: 94, lineH: 3,
@@ -719,8 +700,6 @@ const OLED = (() => {
     const q = signalQuality(c.rssi), bars = SIGNAL_BARS[q];            // the air: three bars, 3 px wide, 3 / 6 / 9 px high
     for (let i = 0; i < 3; i++) { const h = 3 * (i + 1); if (i < bars) rect(fb, L2.signalX + 4 * i, 12 - h, 3, h, 1); else rect(fb, L2.signalX + 4 * i, 11, 3, 1, 1); }
     tag(SIGNAL_INK[q], L2.signalX, 0, 11, L2.topH);
-    const bleOn = !!(c.ble && (c.ble.phone || c.ble.left != null));
-    if (bleOn && (c.ble.phone || Math.floor(now / ARMED_BLINK_MS) % 2 === 0)) icon(fb, BLE_ICON, L2.bleX, 3);
     if (c.usb) icon(fb, USB_ICON, L2.plugX, 4);
     if (c.fitted) {
       frame(fb, L2.battX, 2, L2.battW, 9, 1); rect(fb, L2.battX + L2.battW, 4, 2, 5, 1);
@@ -757,13 +736,11 @@ const OLED = (() => {
     }
   }
   const BAR_WORDS = { locked: 'LOCKED', listening: 'LISTEN', manual: 'MANUAL' };
-  // the bottom line: the confidence words on the left (AUDIO), else the Bluetooth window, the phone or the Wi-Fi line; the threshold on the right
+  // the bottom line: the confidence words on the left (AUDIO), else the Wi-Fi line; the threshold on the right
   function drawStatusLcd2(fb, c, now) {
     const y = L2.statusY, coast = !c.confHold && c.confKnown !== false && !!c.running && c.conf * 100 < c.th;
     const word = c.link ? null : c.gated ? ['GATED', INK.BAD] : c.confHold ? ['HOLD', INK.DIM] : coast ? ['COAST', INK.WARN] : null;
     if (word) { text(fb, word[0], 2, y, 1, 1); tag(word[1], 2, y, textW(word[0], 1), 7); }
-    else if (c.ble && c.ble.left != null && !c.ble.phone) text(fb, 'BT PAIR ' + mmss(c.ble.left), 2, y, 1, 1);
-    else if (c.ble && c.ble.phone) text(fb, 'PHONE', 2, y, 1, 1);
     else {
       const item = wifiItems(c.wifiQ)[0];
       if (item) {
@@ -801,7 +778,7 @@ const OLED = (() => {
     if (right) textR(fb, right, W - 4, y, 1, v);
   }
   const menuValues = c => ({ 'LINK TRANSPORT': LT_SHORT[c.ltMode], 'AUTO BAR': AUTOBAR_SHORT[autoBarIndex(c.autoBar)], NETWORK: NET_SHORT[c.net.mode],
-    USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], BLUETOOTH: BLE_SHORT[c.ble.mode], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-',
+    USB: EDITS.usbrole.opts[c.usbRole], 'USB MIDI CLOCK': EDITS.usbmidi.opts[c.usbMidi], 'CLK RATE': RATES_SHORT[c.rate], BATTERY: c.fitted ? c.batt + '%' : '-',
     'BEAT FLASH': c.beatFlash ? 'SCREEN' : 'BOXES' });
   function drawMenuLcd2(fb, ui, c) {
     titleBarLcd2(fb, 'MENU', (ui.cursor + 1) + '/' + MENU_LCD2.length);
@@ -890,7 +867,7 @@ const OLED = (() => {
     text(fb, 'open', tx, 46, 1, 1); text(fb, '192.168.4.1', tx, 58, 1, 1); text(fb, 'NO: LEAVE', tx, 100, 1, 1);
   }
   const OVERLAY_BOX = { x: 15, y: 30, w: 130, h: 60 };
-  function drawOverlaysLcd2(fb, ui, now, c) {
+  function drawOverlaysLcd2(fb, ui, now) {
     const o = OVERLAY_BOX;
     if (ui.hint) {
       boxed(fb, o.x, o.y, o.w, o.h); untag(o.x, o.y, o.w, o.h);
@@ -899,7 +876,7 @@ const OLED = (() => {
     }
     if (ui.overlay && now < ui.overlay.until) {
       boxed(fb, o.x, o.y, o.w, o.h); untag(o.x, o.y, o.w, o.h);
-      const v = ui.overlay.live === 'pair' ? mmss(c.ble && c.ble.left != null ? c.ble.left : BLE_WINDOW_S) : ui.overlay.value, sc = [4, 3, 2, 1].find(k => textW(v, k) <= o.w - 12) || 1;
+      const v = ui.overlay.value, sc = [4, 3, 2, 1].find(k => textW(v, k) <= o.w - 12) || 1;
       textC(fb, ui.overlay.title, 38, 1, 0); textC(fb, v, 66 - Math.round(7 * sc / 2), sc, 0);
     }
   }
@@ -918,7 +895,7 @@ const OLED = (() => {
     else if (ui.screen === 'sub') drawSubLcd2(fb, ui, c);
     else if (ui.screen === 'info') drawInfoLcd2(fb, ui, c);
     else if (ui.screen === 'edit') drawEditLcd2(fb, ui);
-    drawOverlaysLcd2(fb, ui, now, c);
+    drawOverlaysLcd2(fb, ui, now);
     if (c.saved) { boxed(fb, 35, 42, 90, 34); untag(35, 42, 90, 34); textC(fb, 'SAVED', 52, 2, 0); }
   }
 
@@ -950,9 +927,9 @@ const OLED = (() => {
     else if (ui.screen === 'sub') drawSub(fb, ui, c);
     else if (ui.screen === 'info') drawInfo(fb, ui, c);
     else if (ui.screen === 'edit') drawEdit(fb, ui);
-    drawOverlays(fb, ui, now, c);
+    drawOverlays(fb, ui, now);
     if (c.saved) { boxed(fb, 30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
   }
 
-  return { W, H, SIZES, size: sizeOf, LCD2: L2, INK, create, press, draw, pairOverlay, mmss, BLE_WINDOW_S, DEFAULT_RATE, topBar, foldLabel, autoBarIndex, AUTOBAR_NAMES };
+  return { W, H, SIZES, size: sizeOf, LCD2: L2, INK, create, press, draw, DEFAULT_RATE, topBar, foldLabel, autoBarIndex, AUTOBAR_NAMES };
 })();
