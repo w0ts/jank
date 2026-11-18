@@ -30,7 +30,7 @@ function makeElement() {
     addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
     click: () => { (listeners.click || []).forEach(fn => fn({ target: el })); if (el.onclick) el.onclick({ target: el }); },
     fire: (type, ev) => (listeners[type] || []).forEach(fn => fn(ev)), contains: () => false,
-    append: () => {}, add: () => {}, focus: () => {}, remove: () => {}, removeAttribute: k => { delete attrs[k]; }, replaceChildren: (...kids) => { el.children = kids; },
+    append: () => {}, prepend: function (child) { child.parentId = el.id; }, add: () => {}, focus: () => {}, remove: () => {}, removeAttribute: k => { delete attrs[k]; }, replaceChildren: (...kids) => { el.children = kids; },
     closest: () => null, cloneNode: () => makeElement(), setPointerCapture: () => {}, selectedOptions: [{ text: '' }],
     getContext: () => ({ createImageData: (w = 128, h = 64) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }), putImageData(img) { el.lastImage = img; } }),
   });
@@ -53,7 +53,7 @@ function makePage(opts = {}) {
   let nextTimer = 1, nextFrame = 1;
   const bus = {}, winBus = {}, media = { paused: 0, revoked: [] }, clock = { t: 1000 };
   const document = {
-    getElementById: id => { if (!elements.has(id)) elements.set(id, id === 'pl-audio' ? makeAudio(media, !!opts.audioApi && opts.audioApi.capture !== false) : makeElement()); return elements.get(id); },
+    getElementById: id => { if (!elements.has(id)) elements.set(id, Object.assign(id === 'pl-audio' ? makeAudio(media, !!opts.audioApi && opts.audioApi.capture !== false) : makeElement(), { id })); return elements.get(id); },
     addEventListener: (type, fn) => { (bus[type] = bus[type] || []).push(fn); },
     dispatchEvent: ev => { (bus[ev.type] || []).forEach(fn => fn(ev)); return true; },
     createElement: () => makeElement(), createElementNS: () => makeElement(), activeElement: null,
@@ -174,6 +174,10 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   let { page: p, midi } = await connected();
   eq([pressed(p), shown(p, 'live'), shown(p, 'c-advanced-box'), shown(p, 'player'), shown(p, 'advanced-extra')], [['true'], true, true, false, false], 'USB: the face and the Advanced box appear, the player does not');
   eq(p.el('msg').textContent, '', 'no "Connected." text');
+  eq(p.el('c-midi').parentId, 'dev-bar', 'connected: the connect button moves into the device card\'s top row');
+  p.box.disconnected();
+  eq(p.el('c-midi').parentId, 'connect-slot', 'disconnected: it is back under the title');
+  ({ page: p, midi } = await connected());
   eq([shown(p, 'menu'), shown(p, 'more')], [true, true], 'USB: Settings, Network and Details appear with the connection');
   ok(midi.sent.includes('get') && midi.sent.includes('home'), 'the page read get and home from the stick');
   eq([p.box.S.lastHome.bpm, p.box.S.lastHome.audio, p.box.S.lastGet.group], [120, true, '1'], "the HOME line and get of the stick are held");
