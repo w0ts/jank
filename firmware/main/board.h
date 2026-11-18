@@ -109,8 +109,12 @@
 #elif CONFIG_JANK_BOARD_LCD2
 /* Waveshare ESP32-S3-LCD-2 (sku 30306, ESP32-S3R8, 16 MB flash), pins from the board's schematic (docs/lcd2.md has the
  * sources and what is not verified). The screen is the 240 x 320 ST7789 on SPI, drawn in landscape (lcd.c); no I2C OLED.
- * NO is the BOOT button; no D-pad pins are chosen yet and the board has no LED on a GPIO (its two LEDs are the charger's
- * and the 3V3 rail's). MIDI TX is the XIAO's choice, GPIO43 (the header's U0_TXD pin). */
+ * NO is the BOOT button, and the D-pad and MIDI TX are on header pins chosen from the jank mini 3 board layout (the
+ * jank-mini-3 session's final table, hardware/jank-mini-3/parts.py GPIO, routed clean 2026-11-18; provisional until the
+ * board is ordered). The board has no LED on a GPIO (its two LEDs are the charger's and the 3V3 rail's).
+ * The mini 3's other pins have no firmware use yet and stay undefined here: GPIO2 V5_EN (5 V aux boost enable, idles
+ * low), 4 RST out, 7 LINE_SENSE (ADC1), 8 LINE_IN (ADC1), 10 VBUS_SENSE (ADC1), 11 MIDI_TX2, 13 CLK out, 17 HOST_EN
+ * (idles low), 21 LIN_DET (the LCD-2's 4.7 k pull-up is on it); spares 6, 16, 47, 48. */
 #define BOARD_NAME "lcd2"
 #define BOARD_LCD 1
 #define BOARD_LCD_MOSI_GPIO 38
@@ -124,14 +128,14 @@
 #define BOARD_LED_RGB_GPIO (-1)
 #define BOARD_LED_MONO_GPIO (-1)
 #define BOARD_LED_COUNT 0
-#define BOARD_MIDI_TX_GPIO 43
+#define BOARD_MIDI_TX_GPIO 15
 #define BOARD_MIDI_SOURCE_GPIO (-1)
 #define BOARD_I2C_SDA_GPIO (-1)
 #define BOARD_I2C_SCL_GPIO (-1)
-#define BOARD_BTN_UP_GPIO (-1)
-#define BOARD_BTN_DOWN_GPIO (-1)
-#define BOARD_BTN_YES_GPIO (-1)
-#define BOARD_BTN_NO2_GPIO (-1)
+#define BOARD_BTN_UP_GPIO 12
+#define BOARD_BTN_DOWN_GPIO 18
+#define BOARD_BTN_YES_GPIO 14
+#define BOARD_BTN_NO2_GPIO 9                      /* a second NO, beside BOOT (BTN_NO of the mini 3) */
 #define BOARD_OLED 0
 #define BOARD_CC_SCL_GPIO (-1)
 #define BOARD_CC_SDA_GPIO (-1)
