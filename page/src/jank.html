@@ -982,7 +982,20 @@ autoConnect();
     Box3.placeScreen(svg, screen === "lcd2" ? null : OLED.W / OLED.H);
     el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
     el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
+    snapDevice();
   }
+  // the screen is shown at a whole multiple of its own pixels (the nearest, never wider than the card), so no pixel is dropped or doubled
+  // unevenly; the drawing is therefore not exactly to scale in mm
+  function snapDevice() {
+    const canvas = el("oled"), box = svg.parentElement, avail = box ? box.clientWidth : 0;
+    if (!avail) return;
+    const area = Box3.canvasArea(screen === "lcd2" ? null : OLED.W / OLED.H), vb = Box3.viewBox();
+    const perMm = avail / vb.w, m = Math.max(1, Math.round(area.w * perMm / canvas.width));
+    let width = m * canvas.width / area.w * vb.w;
+    if (width > avail && m > 1) width = (m - 1) * canvas.width / area.w * vb.w;
+    svg.style.width = Math.min(width, avail) + "px";
+  }
+  window.addEventListener("resize", () => { if (screen) snapDevice(); });
   function draw() {
     frame = requestAnimationFrame(draw);
     const now = performance.now(), ctx2d = el("oled").getContext("2d");

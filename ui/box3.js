@@ -2,20 +2,20 @@
    coordinates (origin top left, x right, y down); Box3.build(svg) draws the shell of ui/box3.svg.html from it and nothing else holds a
    position. Positions may still move by +-2 mm: change them here. No text on the device but the keys' own marks. Builds with the DOM only. */
 const BOX3 = {
-  case: { w: 100, h: 79, r: 3 },
+  case: { w: 100, h: 81, r: 3 },
   // the Waveshare LCD-2 in landscape: the active area, and the lid window one mm bigger on each side; the 320 x 240 canvas fills the active area
-  screen: { x: 9.7, y: 24.2, w: 40.8, h: 30.6, windowMargin: 1 },
+  screen: { x: 9.7, y: 25.2, w: 40.8, h: 30.6, windowMargin: 1 },
   // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
-  cross: { cx: 67.0, cy: 39.5, span: 24, arm: 8 },
-  switches: { up: [67.0, 31.5], down: [67.0, 47.5], no: [59.0, 39.5], yes: [75.0, 39.5] },
+  cross: { cx: 67.0, cy: 40.5, span: 24, arm: 8 },
+  switches: { up: [67.0, 32.5], down: [67.0, 48.5], no: [59.0, 40.5], yes: [75.0, 40.5] },
   keyMarks: { up: '▲', down: '▼', no: 'NO', yes: 'YES' },
   // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
   ports: [
     { id: 'midi1', wall: 'top', at: 33.3, kind: 'trs' }, { id: 'midi2', wall: 'top', at: 46.1, kind: 'trs' },
     { id: 'din1', wall: 'top', at: 63.5, kind: 'din' }, { id: 'din2', wall: 'top', at: 85.6, kind: 'din' },
-    { id: 'clock', wall: 'right', at: 29.5, kind: 'trs' }, { id: 'reset', wall: 'right', at: 49.5, kind: 'trs' },
+    { id: 'clock', wall: 'right', at: 30.5, kind: 'trs' }, { id: 'reset', wall: 'right', at: 50.5, kind: 'trs' },
     { id: 'linein', wall: 'bottom', at: 73.5, kind: 'trs' },
-    { id: 'usbHost', wall: 'left', at: 9.6, kind: 'usbc' }, { id: 'usbOwn', wall: 'left', at: 39.5, kind: 'usbc' }, { id: 'usbIn', wall: 'left', at: 68.5, kind: 'usbc' },
+    { id: 'usbIn', wall: 'bottom', at: 9.5, kind: 'usbc' }, { id: 'usbHost', wall: 'bottom', at: 21.0, kind: 'usbc' }, { id: 'usbOwn', wall: 'left', at: 40.5, kind: 'usbc' },
   ],
   // connector sizes: length along the wall, depth out of the wall (3.5 mm jack ~6, 5-pin DIN ~15, USB-C 9 x 3.2)
   kinds: { trs: { len: 6, depth: 3.2 }, din: { len: 15, depth: 3.2 }, usbc: { len: 9, depth: 3.2 } },
