@@ -20,6 +20,9 @@
 #define LINK_JOINED_MIN 1
 #define SIGNAL_GOOD_DBM (-67)
 #define SIGNAL_POOR_DBM (-80)
+#define LOST_BAD_PCT 10
+#define LOST_WARN_PCT 3
+#define RETRY_BAD_PCT 30
 #define BATT_BAD_PCT 15
 #define BATT_WARN_PCT 30
 
@@ -484,6 +487,31 @@ static void signal_row(uint8_t *fb, int y, const struct jo_ctx *c)
     }
 }
 
+/* a percentage on the right of its row with its ink, or "-" while not known */
+static void pct_row(uint8_t *fb, int y, const char *name, int has, int pct, int ink)
+{
+    char s[8];
+    jo_text(fb, name, 4, y, 1, 1);
+    if (!has) {
+        jo_text_r(fb, "-", W - 4, y, 1, 1);
+        return;
+    }
+    snprintf(s, sizeof s, "%d%%", pct);
+    ink_text(fb, s, W - 4 - jo_text_w(s, 1), y, ink);
+}
+
+/* MODE JANK's read-only air rows under SIGNAL, from the peers' frames of the last 10 s window */
+static void air_rows(uint8_t *fb, int y, const struct jo_ctx *c)
+{
+    char level[24] = "-";
+    if (c->rssi_min && c->rssi_max)
+        snprintf(level, sizeof level, "%d/%d dBm", c->rssi_min, c->rssi_max);
+    pct_row(fb, y, "LOST", c->has_air_lost, c->air_lost, c->air_lost >= LOST_BAD_PCT ? JO_INK_BAD : c->air_lost >= LOST_WARN_PCT ? JO_INK_WARN : JO_INK_GOOD);
+    jo_text(fb, "LEVEL", 4, y + PITCH, 1, 1);
+    jo_text_r(fb, level, W - 4, y + PITCH, 1, 1);
+    pct_row(fb, y + 2 * PITCH, "RX RETRY", c->has_air_retry, c->air_retry, c->air_retry >= RETRY_BAD_PCT ? JO_INK_BAD : JO_INK_NONE);
+}
+
 static void net(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
     struct jo_net_row rows[4];
@@ -500,6 +528,8 @@ static void net(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
                     jo_text(fb, rows[i].help[k], 3, 101 + 9 * k, 1, 1);
     }
     signal_row(fb, ROW0 + n * PITCH, c);
+    if (c->net.mode == JO_NET_JANK)
+        air_rows(fb, ROW0 + (n + 1) * PITCH, c);
 }
 
 static void scan(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)

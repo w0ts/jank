@@ -209,7 +209,15 @@ static void parse_state(struct jo_ctx *c, const char *key, const char *v)
     else if (!strcmp(key, "rssi")) {
         parse_num(v, &c->has_rssi, &d);
         c->rssi = (int)d;
-    } else if (!strcmp(key, "peakDb")) parse_num(v, &c->has_peak, &c->peak_db);
+    } else if (!strcmp(key, "airLost")) {
+        parse_num(v, &c->has_air_lost, &d);
+        c->air_lost = (int)d;
+    } else if (!strcmp(key, "airRetry")) {
+        parse_num(v, &c->has_air_retry, &d);
+        c->air_retry = (int)d;
+    } else if (!strcmp(key, "rssiMin")) c->rssi_min = atoi(v);
+    else if (!strcmp(key, "rssiMax")) c->rssi_max = atoi(v);
+    else if (!strcmp(key, "peakDb")) parse_num(v, &c->has_peak, &c->peak_db);
     else if (!strcmp(key, "confKnown")) c->conf_unknown = !atoi(v);
     else if (!strcmp(key, "silent")) c->silent = (uint8_t)atoi(v);
     else if (!strcmp(key, "gated")) c->gated = (uint8_t)atoi(v);
