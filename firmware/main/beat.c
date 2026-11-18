@@ -209,7 +209,7 @@ static void report(char kind, double at_s)
     size_t n = jx_beat_line(line, sizeof line, kind, s_beat_n, (int32_t)llround(bpm * 100.0), (unsigned)mode,
                             u.open ? (s_audio_live ? 2u : 1u) : 0u, extra, link);
     if (n)
-        usb_beat_line(line, n);        /* (not to a phone: it gets the HOME line, level and activation included) */
+        usb_beat_line(line, n);
 }
 
 /* a tracked beat to the downbeat estimator, after ModeBpm took it (live/downbeat.py Driver.tracked) */

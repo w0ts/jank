@@ -1,6 +1,0 @@
-# SPDX-License-Identifier: GPL-3.0-only
-# BLE MIDI with the controller's code in flash instead of IRAM (~20 KB of internal RAM back). Its Kconfig help warns:
-# "Bluetooth may not work properly during erasing flash" unless flash auto suspend is on, which needs a supported flash
-# chip and a bootloader built with it (not reachable by an app-only OTA). jank erases flash only for an update, a saved
-# setting and the drive: a connection should ride those out on its supervision timeout (4 s, ble_midi.c). Unmeasured.
-CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY=y

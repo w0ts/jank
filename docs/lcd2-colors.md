@@ -39,13 +39,13 @@ XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens
 
 | y | height | element | content and colour |
 |---|---|---|---|
-| 0..12 | 13 | top bar | x 2 transport icon (triangle 9 high, square 7, blinks while armed); x 14 fold label or LINK option icon; `GRP n` / SSID right-aligned to x 66; x 70 link glyph + Link peer count; x 98 signal bars (3 bars 3 px wide, 3 / 6 / 9 high); x 112 Bluetooth rune; x 119 USB plug; x 134 battery icon 21 x 9 with nub |
+| 0..12 | 13 | top bar | x 2 transport icon (triangle 9 high, square 7, blinks while armed); x 14 fold label or LINK option icon; `GRP n` / SSID right-aligned to x 66; x 70 link glyph + Link peer count; x 98 signal bars (3 bars 3 px wide, 3 / 6 / 9 high); x 119 USB plug; x 134 battery icon 21 x 9 with nub |
 | 15..49 | 35 | TEMPO | font scale 5 (digits 25 x 35, `120.0` is 130 px wide, x 2..131; the widest, 999.9, also fits); `BPM` at x 138, y 43..49 |
 | 52..77 | 26 | beat boxes | four boxes 36 x 26 (they were 36 x 18), gap 4, margins 2, from x 2 to x 157: the beat indicator now that there are no LEDs; the lit one is a solid fill, the others 2 px outlines; the first is amber only while it is the lit one |
 | 81..87 | 7 | `CF  92%` + line | label x 2; value right-aligned to x 60; one thin line from x 64 (3 px high, rows 83..85, its length the value on 94 px), a notch at the stop threshold (rows 82..86) |
 | 91..97 | 7 | `IN -18dB` + line | the same columns and line; notch at the tracker's -50 dBFS sound level |
 | 101..107 | 7 | `BAR LOCKED` + outlined bar | AUTO BAR's state word and its confidence, in v4's outlined bar (94 x 5, 3 px fill); only with AUTO BAR on (the row stays empty otherwise: the rows never move) |
-| 111..117 | 7 | status line | left: `GATED` / `HOLD` / `COAST`, else `BT PAIR m:ss`, else `PHONE`, else the Wi-Fi line; right-aligned: `STOP 70` or `MIN 70` |
+| 111..117 | 7 | status line | left: `GATED` / `HOLD` / `COAST`, else the Wi-Fi line; right-aligned: `STOP 70` or `MIN 70` |
 
 Every element has its own row, with gaps of 2 to 5 px between rows (the meter rows moved from a 12 px to a 10 px pitch to give the boxes their height); the test checks that no lit pixel lies in a gap, that the rows are in
 increasing order, and that the status word and the threshold text on row 111 do not touch (the v3 overlap of GATED / COAST over STOP 70 is
@@ -94,7 +94,7 @@ row shows what the stick reports about the bar that the boxes do not: AUTO BAR's
 | screen | geometry |
 |---|---|
 | title bar | 11 rows, full width, text at y 2 |
-| MENU | 12 rows of 9 px from y 13 (the 12 items of the lcd2 menu all fit: no scrolling; row k at y 13 + 9k, last at y 112; the OLED menu has 11), value right-aligned at x 156, selected row inverted over the full width |
+| MENU | 11 rows of 9 px from y 13 (the 11 items of the lcd2 menu all fit: no scrolling; row k at y 13 + 9k, last at y 103; the OLED menu has 10), value right-aligned at x 156, selected row inverted over the full width |
 | sub menu (AUDIO, OFFSET, DISPLAY) | rows of 12 px from y 16 |
 | edit | the value at font scale 2 in an inverted box centred on 160 (scale 1 if it would not fit), the two help lines at y 70 and 82 |
 | info (BATTERY) | text rows of 12 px from y 18, the level bar 152 px wide at y 92 |
@@ -102,11 +102,11 @@ row shows what the stick reports about the bar that the boxes do not: AUTO BAR's
 | text editor | 25 character cells of 6 px from x 5, the help lines at y 46, 58, 70 |
 | confirm | two lines centred at y 34 and 46, `YES      NO` at scale 2 at y 84 |
 | SETUP (QR) | the QR box on the left at module size 4, 3 or 2 (the largest that fits 118 rows and leaves 66 px for the text: 25 modules at 3 px = 81 px box); text right of it |
-| overlays | one box 130 x 60 at (15, 30), centred; the value at the largest scale of 4, 3, 2, 1 that fits; the NO / YES hint and the pair countdown use it too; SAVED: 90 x 34 at (35, 42), text scale 2 |
+| overlays | one box 130 x 60 at (15, 30), centred; the value at the largest scale of 4, 3, 2, 1 that fits; the NO / YES hint uses it too; SAVED: 90 x 34 at (35, 42), text scale 2 |
 | BOOT / splash | `BOOT` at scale 5; `JANK` at scale 5 and `MINI 2.2` at scale 3 |
 
 The cursor logic in `OLED.press` still scrolls as if 6 menu rows were visible (`ui.top`); the lcd2 draw ignores `ui.top` and keeps the
-cursor in view by itself (all 12 menu items fit; the scan list centres on the selection), so no state is shared between the layouts.
+cursor in view by itself (all 11 menu items fit; the scan list centres on the selection), so no state is shared between the layouts.
 
 ## BEAT FLASH: the whole screen flashes on the beat (design preview)
 

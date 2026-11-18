@@ -50,13 +50,4 @@ menu "jank"
             The XIAO has no LINE IN. This samples pad D3 (GPIO4) with the LINE IN path (main/linein.c) so it can be tried
             on the bench: a line signal through a bias network to D3 (docs/linein.md), then `set source line`. Off in the
             normal XIAO build (USB audio only). firmware/sdkconfig.linein-bench turns it on.
-
-    config JANK_BLE_MIDI
-        bool "BLE MIDI peripheral for the control line"
-        depends on BT_NIMBLE_ENABLED
-        default n
-        help
-            The standard BLE MIDI service (main/ble_midi.c) for a phone: the control line's SysEx both ways and the
-            HOME line. Bluetooth is on only for a pair window opened on the device, or while a phone stays connected
-            (the setting ble, docs/ble.md). Needs Bluetooth with NimBLE (firmware/sdkconfig.ble).
 endmenu

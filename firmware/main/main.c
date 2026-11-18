@@ -51,9 +51,6 @@ void app_cfg_set(const struct jk_cfg *c)
     xSemaphoreGive(s_set_lock);
     bridge_apply(c);
     usb_midi_clock(c->usbmidi);
-#if CONFIG_JANK_BLE_MIDI
-    ble_midi_setting(c->ble);
-#endif
 }
 
 /* the deferred save, once stopped (the control task, every pass); force: a restart follows, save whatever plays */
@@ -136,14 +133,5 @@ void app_main(void)
     ESP_ERROR_CHECK(ui_screen_early());  /* the screen's panel on while the radio is still off (the 2.42"'s rule) */
     ESP_ERROR_CHECK(bridge_start(&s_cfg, mac, peer_mac));
     ESP_ERROR_CHECK(ui_start());
-#if CONFIG_JANK_BLE_MIDI
-    {
-        /* not fatal: USB and the radio go on without it (and a new image still confirms itself over USB). Bluetooth itself
-         * comes on only for a pair window (the setting `ble`, three clicks, `ble pair`) */
-        esp_err_t e = ble_midi_start(mac, s_cfg.ble);
-        if (e != ESP_OK)
-            ESP_LOGE(TAG, "BLE MIDI: %s", esp_err_to_name(e));
-    }
-#endif
     ota_validate_start();
 }

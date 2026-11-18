@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The control line protocol (jank_core.h): get, set, status. */
 #include "jank_core.h"
-#include "jank_phone.h"
+#include "jank_home.h"
 #include "jank_conf.h"
 #include "jank_fold.h"
 #include "jank_hold.h"
@@ -22,7 +22,6 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->beat = 1;
     c->beat_latency_ms = JK_BEAT_LATENCY_DEFAULT_MS;
     c->autobar = JK_AUTOBAR_START;
-    c->ble = JK_BLE_PAIR;
     c->usb = JUR_USB_DEVICE;
     c->source = JUR_SRC_AUTO;
     c->usbmidi = 1;                    /* on: the clock went over USB-MIDI before there was a setting (see jk_cfg) */
@@ -125,7 +124,6 @@ static void put_lat(const struct jk_cfg *c, struct writer *w)
     put(w, "beat_latency=%d\nlat_auto=%d\nlat_trim=%d\n", c->beat_latency_ms, jla_base(&c->lat, &c->lat_key), jla_trim(&c->lat, &c->lat_key));
 }
 
-static const char *const BLE_NAMES[] = {"pair", "off", "auto"};   /* by enum jk_ble */
 static const char *const SKIP_NAME[] = {"off", "act", "pat"};      /* by enum jsk_mode (core/beat/jb_skip.h) */
 
 static const char *const AUTOBAR_NAMES[] = {"off", "start", "always"};   /* by enum jk_autobar */
@@ -140,7 +138,6 @@ static int parse_name3(const char *s, const char *const names[3], uint8_t *out)
     return -1;
 }
 static const char *lowconf_name(uint32_t v) { return v == JCF_RUN ? "run" : "stop"; }   /* KEEP RUNNING, STOP / START */
-static const char *ble_name(uint32_t v) { return v <= JK_BLE_AUTO ? BLE_NAMES[v] : BLE_NAMES[JK_BLE_PAIR]; }
 
 static void put_ip(struct writer *w, const char *key, uint32_t ip)
 {
@@ -158,7 +155,7 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put(w, "usbmidi=%s\n", on_off(c->usbmidi));
     put(w, "lowconf=%s\nthreshold=%u\nrate=%s\nfollower=%s\nskip=%s\ngraded=%s\n", lowconf_name(c->lowconf), c->threshold, on_off(c->rate),
         c->follower ? "robust" : "tuned", SKIP_NAME[c->skip < 3u ? c->skip : 0u], on_off(c->graded));
-    put(w, "ble=%s\nbeat_flash=%u\n", ble_name(c->ble), (unsigned)c->beat_flash);
+    put(w, "beat_flash=%u\n", (unsigned)c->beat_flash);
     put(w, "usb=%s\nsource=%s\nline_gain=%d\n", jur_usb_name(c->usb), jur_src_name(c->source), c->line_gain_db);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
@@ -307,10 +304,6 @@ static void cmd_status(const struct jk_cfg *c, const struct jk_snapshot *s, uint
     put_audio(c, s, w);
     put_bar(&s->beat, w);
     put_nudge(c, &s->beat, w);
-    if (s->ble_built) {
-        static const char *const st[] = {"off", "window", "connected"};
-        put(w, "ble_state=%s\nble_left=%lu\n", s->ble_state <= 2u ? st[s->ble_state] : "off", (unsigned long)s->ble_left_s);
-    }
     put_usb(&s->usb, w);
     for (uint32_t i = 0; i < JK_PEERS; i++) {
         const struct jk_peer *p = &b->peer[i];
@@ -473,14 +466,6 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
     }
     if (!strcmp(key, "beat_flash"))        /* the lcd2 screen: 0 BOXES, 1 the whole screen flashes on the beat */
         return parse_pair(val, "0", "1", &c->beat_flash);
-    if (!strcmp(key, "ble")) {
-        for (uint8_t i = 0; i <= JK_BLE_AUTO; i++)
-            if (!strcmp(val, BLE_NAMES[i])) {
-                c->ble = i;
-                return 0;
-            }
-        return -1;
-    }
     if (!strcmp(key, "usb"))
         return jur_usb_parse(val, &c->usb);
     if (!strcmp(key, "source"))
@@ -674,15 +659,13 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         put(&w, "err nudge beat +-0.5 to 3 in halves, or nudge ms +-1 to %d\n", JK_NUDGE_MS_STEP_MAX);
     }
     else if (!strcmp(s, "home")) {
-        char h[64];
-        if (jph_home_line(cfg, snap, now_ms, h, sizeof h))
+        char h[JHM_LINE_MAX + 1];
+        if (jhm_home_line(cfg, snap, now_ms, h, sizeof h))
             put(&w, "home=%s\nok\n", h);
         else
             put(&w, "err home line too long\n");
-    } else if (!strcmp(s, "ble pair") || !strcmp(s, "ble close"))
-        return s[4] == 'p' ? JK_CTL_BLE_PAIR : JK_CTL_BLE_CLOSE;
-    else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|ble|beat_flash|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nble pair|close\nreboot\nbootloader\nok\n");
+    } else if (!strcmp(s, "help"))
+        put(&w, "get\nstatus\nhome\nbeat\nscan\nset group|name|filter|peer|transport|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|beat_flash|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;

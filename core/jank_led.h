@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The LED language of a unit without a screen (the RGB LEDs say what the screen would), first to last:
- *   blue blink, 4 a second     a phone's pair window is open (jl_pair_lit)
  *   red flash, slow            the cell is low (on the cell only): 100 ms every 3 s at 30 %, every 0.3 s at 5 % and under,
  *                              over whatever else shows (the emulator's battery blink)
  *   green flash each beat      the transport runs: 80 ms, the bar's 1 150 ms (no longer than a third of a beat);
@@ -27,7 +26,6 @@
 
 struct jlg_state {
     uint32_t now_ms;
-    uint8_t pair_window;                 /* a phone's pair window, no phone yet */
     int8_t batt_pct;                     /* -1: no gauge */
     uint8_t on_usb;                      /* USB power: no battery warning */
     uint8_t joined;                      /* in a Link session (its beat known) */

@@ -42,7 +42,6 @@ enum jo_field {
     JO_F_INSRC,         /* AUDIO > SOURCE: 0 AUTO, 1 LINE IN, 2 USB AUDIO */
     JO_F_USBROLE,       /* 0 DEVICE, 1 HOST */
     JO_F_AUTOBAR,       /* 0 OFF, 1 ON (YES on ON again: picked again); the lcd2 layout: 0 OFF, 1 AT START, 2 ALWAYS */
-    JO_F_BLE,           /* the lcd2 layout's menu only: BLUETOOTH, 0 PAIR NOW, 1 ON START, 2 OFF (YES on PAIR NOW opens the window) */
     JO_F_USBMIDI,       /* the lcd2 layout's menu only: USB MIDI CLOCK, 0 ON, 1 OFF */
     JO_F_BEATFLASH,     /* the lcd2 layout's menu only: 0 BOXES, 1 SCREEN */
     JO_F_EDITS,
@@ -137,9 +136,6 @@ struct jo_ctx {
     uint8_t conf_unknown;                 /* the tracker has no confidence to give: "--", grey */
     uint8_t silent, gated, conf_hold;     /* silence on the source; the outputs stopped for low confidence; the confidence holds */
     int8_t fold_exp;                      /* AUDIO's fold, 2^fold_exp: the label X2 X4 /2 /4 on HOME; 0 and anything else: none */
-    uint8_t ble_mode;                     /* BLUETOOTH setting: 0 PAIR NOW, 1 ON START, 2 OFF */
-    uint8_t ble_phone, has_ble_left;      /* a phone is connected; the pair window is open */
-    int ble_left;                         /* seconds of the pair window left */
     uint8_t usb_midi;                     /* USB MIDI CLOCK: 0 ON, 1 OFF */
     uint8_t beat_flash;                   /* BEAT FLASH: 0 BOXES, 1 SCREEN */
 };
@@ -160,7 +156,6 @@ struct jo_overlay {
     uint32_t until;                       /* ms */
     char title[24];
     char value[16];
-    uint8_t live;                         /* the lcd2 layout shows the pair window's seconds left instead of value (jo_pair_overlay) */
 };
 
 struct jo_ui {
@@ -200,8 +195,6 @@ void jo_draw(uint8_t fb[JO_FB_BYTES], const struct jo_ui *ui, const struct jo_ct
 #define JO_LCD2_INK_BYTES (JO_LCD2_W * JO_LCD2_H)
 enum jo_ink { JO_INK_NONE = 0, JO_INK_GOOD, JO_INK_WARN, JO_INK_BAD, JO_INK_DIM, JO_INK_ONE, JO_INK_IDS };
 void jo_draw_lcd2(uint8_t fb[JO_LCD2_FB_BYTES], uint8_t ink[JO_LCD2_INK_BYTES], const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now);
-/* the triple NO's Bluetooth pair window: a box with its countdown (ctx ble_left; the OLED draws the text "PAIR") */
-void jo_pair_overlay(struct jo_ui *ui, uint32_t now);
 /* one overlay box for 1 s (the emulator's showOverlay): drops the hint */
 void jo_show_overlay(struct jo_ui *ui, uint32_t now, const char *title, const char *value);
 

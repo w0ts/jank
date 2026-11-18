@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The control protocol's task: lines from the USB MIDI port's SysEx (and BLE MIDI's, CONFIG_JANK_BLE_MIDI) to jk_ctl_line,
- * and each answer back to where its line came from. Each source has its own line buffer, so lines from two at once never
- * mix; the input is one message buffer of chunks tagged with their source. */
+/* The control protocol's task: lines from the USB MIDI port's SysEx to jk_ctl_line, and each answer back on the port. The
+ * input is one message buffer of chunks of the line's text. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +15,7 @@
 
 #define CTL_LINE_MAX 256u                /* an update chunk is a line of about 190 (core/jank_ota.h) */
 #define CTL_CHUNK_MAX 64u                /* text a chunk carries (usb.c reads 64 bytes of MIDI at a time) */
-#define CTL_IN_SIZE 1280u                /* room for a few update lines with each chunk's 5 bytes of header */
+#define CTL_IN_SIZE 1280u                /* room for a few update lines with each chunk's 4 bytes of header */
 #define CTL_TICK_MS 1000
 #define OUT_MAX JK_CTL_OUT_MAX
 
@@ -33,37 +32,20 @@ static MessageBufferHandle_t s_in;
 static volatile uint32_t s_beats;      /* passes of the task: it is alive and taking lines */
 static struct jk_snapshot s_snap;
 static char s_out[OUT_MAX];
-static enum ctl_src s_src;             /* where the line being run came from: its answer goes there */
 
-void ctl_line_rx(enum ctl_src src, const uint8_t *data, size_t n)
+void ctl_serial_rx(const uint8_t *data, size_t n)
 {
-    uint8_t chunk[1u + CTL_CHUNK_MAX];
-    if (!s_in || src >= CTL_SRC_COUNT)
+    if (!s_in)
         return;
     while (n) {
         size_t k = n < CTL_CHUNK_MAX ? n : CTL_CHUNK_MAX;
-        chunk[0] = (uint8_t)src;
-        memcpy(chunk + 1, data, k);
-        xMessageBufferSend(s_in, chunk, 1u + k, 0);
+        xMessageBufferSend(s_in, data, k, 0);
         data += k;
         n -= k;
     }
 }
 
-void ctl_serial_rx(const uint8_t *data, size_t n) { ctl_line_rx(CTL_SRC_USB, data, n); }
-
-void ctl_reply(const char *text, size_t n)
-{
-#if CONFIG_JANK_BLE_MIDI
-    if (s_src == CTL_SRC_BLE) {
-        ble_midi_write(text, n);
-        return;
-    }
-#endif
-    usb_serial_write(text, n);
-}
-
-static void reply_out(void) { ctl_reply(s_out, strlen(s_out)); }
+static void reply_out(void) { usb_serial_write(s_out, strlen(s_out)); }
 
 static void run_scan(void)
 {
@@ -84,15 +66,11 @@ static void run_diag(void)
     bridge_diag(s_out + n, sizeof s_out - n);
     n = strlen(s_out);
     drive_state(s_out + n, sizeof s_out - n);
-#if CONFIG_JANK_BLE_MIDI
-    n = strlen(s_out);
-    ble_midi_diag(s_out + n, sizeof s_out - n);
-#endif
     strlcat(s_out, "ok\n", sizeof s_out);
     reply_out();
 }
 
-/* `diag intr`: which interrupts each core has (esp_intr_dump, cut to those in use). With BLE on, core 1 should show the
+/* `diag intr`: which interrupts each core has (esp_intr_dump, cut to those in use). Core 1 should show the
  * MIDI clock's gptimer alone (and the CPU-internal ones the dump leaves out): anything else there delays the clock. */
 static void run_diag_intr(void)
 {
@@ -114,38 +92,6 @@ static void run_diag_intr(void)
     reply_out();
 }
 
-/* Lines a phone may not send (docs/ble.md): an update (a dropped link would leave a slot half written), download mode
- * (only USB can use it), and the Wi-Fi password (the BLE link is not encrypted: no pairing, by the ruling's design, so it
- * would cross the air in clear text). -> the refusal, or NULL */
-static const char *usb_only(const char *line)
-{
-    while (*line == ' ')
-        line++;
-    if (!strncmp(line, "ota", 3))
-        return "err ota over USB only\n";
-    if (!strncmp(line, "bootloader", 10))
-        return "err bootloader over USB only\n";
-    if (!strncmp(line, "set pass", 8) && (!line[8] || line[8] == ' '))
-        return "err the Wi-Fi password over USB only\n";
-    return NULL;
-}
-
-#if CONFIG_JANK_BLE_MIDI
-/* `ble pair` and `ble close`: answered before they act, so that a phone asking to close still hears ok */
-static void run_ble(enum jk_ctl_action a)
-{
-    if (a == JK_CTL_BLE_PAIR) {
-        strcpy(s_out, ble_midi_pair() ? "err ble is off\n" : "ok\n");
-        reply_out();
-        return;
-    }
-    strcpy(s_out, "ok\n");
-    reply_out();
-    vTaskDelay(pdMS_TO_TICKS(200));
-    ble_midi_close();
-}
-#endif
-
 /* `nudge beat <b>` (core/jank_core.h jk_ctl_nudge): the beat task applies it (beat_nudge); the answer is the user's total
  * and the downbeat estimator's view before it */
 static void run_nudge(const char *line)
@@ -165,11 +111,6 @@ static void run_line(const char *line)
 {
     struct jk_cfg cfg;
     enum jk_ctl_action a;
-    const char *refused = s_src == CTL_SRC_USB ? NULL : usb_only(line);
-    if (refused) {
-        ctl_reply(refused, strlen(refused));
-        return;
-    }
     if (ota_line(line))
         return;
     if (!strcmp(line, "diag")) {
@@ -193,7 +134,7 @@ static void run_line(const char *line)
     }
 #ifdef JANK_CLOCK_PROBE
     if (!strncmp(line, "probe", 5) && (!line[5] || !strcmp(line + 5, " reset"))) {
-        ctl_reply(s_out, probe_report(s_out, sizeof s_out, line[5] != 0));
+        usb_serial_write(s_out, probe_report(s_out, sizeof s_out, line[5] != 0));
         return;
     }
 #endif
@@ -205,14 +146,6 @@ static void run_line(const char *line)
         app_cfg_set(&cfg);
     if (a == JK_CTL_SCAN) {
         run_scan();
-        return;
-    }
-    if (a == JK_CTL_BLE_PAIR || a == JK_CTL_BLE_CLOSE) {
-#if CONFIG_JANK_BLE_MIDI
-        run_ble(a);
-#else
-        ctl_reply("err no bluetooth in this build\n", 31);
-#endif
         return;
     }
     if (a == JK_CTL_FOLD) {
@@ -239,13 +172,12 @@ static void run_line(const char *line)
     }
 }
 
-static void take(struct line_in *in, enum ctl_src src, uint8_t c)
+static void take(struct line_in *in, uint8_t c)
 {
     if (c == '\n' || c == '\r') {
         in->line[in->n] = 0;
-        s_src = src;
         if (in->too_long)
-            ctl_reply("err line too long\n", 18);
+            usb_serial_write("err line too long\n", 18);
         else
             run_line(in->line);
         in->n = 0;
@@ -259,8 +191,8 @@ static void take(struct line_in *in, enum ctl_src src, uint8_t c)
 
 static void ctl_task(void *arg)
 {
-    static struct line_in lines[CTL_SRC_COUNT];
-    uint8_t chunk[1u + CTL_CHUNK_MAX];
+    static struct line_in in;
+    uint8_t chunk[CTL_CHUNK_MAX];
     (void)arg;
     for (;;) {
         size_t n;
@@ -271,10 +203,8 @@ static void ctl_task(void *arg)
             ota_idle();
             continue;
         }
-        if (chunk[0] >= CTL_SRC_COUNT)
-            continue;
-        for (size_t i = 1; i < n; ++i)
-            take(&lines[chunk[0]], (enum ctl_src)chunk[0], chunk[i]);
+        for (size_t i = 0; i < n; ++i)
+            take(&in, chunk[i]);
     }
 }
 

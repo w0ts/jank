@@ -21,7 +21,6 @@
 #define SIGNAL_POOR_DBM (-80)
 #define BATT_BAD_PCT 15
 #define BATT_WARN_PCT 30
-#define BLE_WINDOW_S 120
 
 /* the HOME geometry: ui/oled.js's L2 table */
 #define TOP_H 13
@@ -29,7 +28,6 @@
 #define NAME_RIGHT 66
 #define LINK_X 70
 #define SIGNAL_X 98
-#define BLE_X 112
 #define PLUG_X 119
 #define BATT_X 134
 #define BATT_W 21
@@ -54,16 +52,9 @@
 #define LINE_H 3
 #define STATUS_Y 111
 
-static const char *const BLE_ICON[7] = {"..#..", "..##.", "#.#.#", ".###.", "#.#.#", "..##.", "..#.."};
 static const char *const BAR_WORDS[4] = {NULL, "LISTEN", "LOCKED", "MANUAL"};     /* by enum jo_bar_state: off, listening, locked, manual */
 
 static void tag(int id, int x, int y, int w, int h) { jo_tag(id, x, y, w, h); }
-
-static void mmss(int seconds, char *out, size_t cap)
-{
-    int t = seconds > 0 ? seconds : 0;
-    snprintf(out, cap, "%d:%02d", t / 60, t % 60);
-}
 
 static void boxed(uint8_t *fb, int x, int y, int w, int h)
 {
@@ -119,7 +110,7 @@ static const char *fold_label(int8_t exp)
 static void top_bar(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
 {
     static const int8_t BARS_INK[4] = {JO_INK_DIM, JO_INK_BAD, JO_INK_WARN, JO_INK_GOOD};
-    int tri = c->running || (c->armed && (now / ARMED_BLINK_MS) % 2 == 0), bars = signal_bars(c), name_left = LEFT, ble_on;
+    int tri = c->running || (c->armed && (now / ARMED_BLINK_MS) % 2 == 0), bars = signal_bars(c), name_left = LEFT;
     const char *const *lt = c->link && c->lt_mode < 3 ? jo_lt_icons[c->lt_mode] : NULL;
     const char *fl = !c->link ? fold_label(c->fold_exp) : "";
     char full[JO_TEXT_MAX + 16], shown[JO_TEXT_MAX + 16];
@@ -161,9 +152,6 @@ static void top_bar(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
             jo_rect(fb, SIGNAL_X + 4 * i, 11, 3, 1, 1);
     }
     tag(BARS_INK[bars], SIGNAL_X, 0, 11, TOP_H);
-    ble_on = c->ble_phone || c->has_ble_left;
-    if (ble_on && (c->ble_phone || (now / ARMED_BLINK_MS) % 2 == 0))
-        jo_icon(fb, BLE_ICON, 7, BLE_X, 3);
     if (c->usb)
         jo_icon(fb, jo_usb_icon, 5, PLUG_X, 4);
     if (c->fitted) {
@@ -251,7 +239,7 @@ static int wifi_segs(const struct jo_wifiq *q, struct seg *sg)
     return 4;
 }
 
-/* the bottom line: the confidence words on the left (AUDIO), else the Bluetooth window, the phone or the Wi-Fi line; the threshold on the right */
+/* the bottom line: the confidence words on the left (AUDIO), else the Wi-Fi line; the threshold on the right */
 static void status_line(uint8_t *fb, const struct jo_ctx *c)
 {
     int y = STATUS_Y, coast = !c->conf_hold && !c->conf_unknown && c->running && c->conf * 100 < c->th;
@@ -273,14 +261,7 @@ static void status_line(uint8_t *fb, const struct jo_ctx *c)
     if (word) {
         jo_text(fb, word, 2, y, 1, 1);
         tag(ink, 2, y, jo_text_w(word, 1), 7);
-    } else if (c->has_ble_left && !c->ble_phone) {
-        char t[16];
-        mmss(c->ble_left, t, sizeof t);
-        snprintf(s, sizeof s, "BT PAIR %s", t);
-        jo_text(fb, s, 2, y, 1, 1);
-    } else if (c->ble_phone)
-        jo_text(fb, "PHONE", 2, y, 1, 1);
-    else if (c->has_wifiq) {
+    } else if (c->has_wifiq) {
         struct seg sg[4];
         int n = wifi_segs(&c->wifiq, sg), x = 2;
         for (int i = 0; i < n; i++) {
@@ -362,11 +343,10 @@ static void menu_value(const struct jo_ctx *c, int i, char *out, size_t cap)
     case 2: v = c->auto_bar < 3 ? jo_autobar_short[c->auto_bar] : ""; break;
     case 3: v = c->net.mode < 4 ? jo_net_short[c->net.mode] : ""; break;
     case 4: v = c->usb_role < 2 ? jo_usb_names[c->usb_role] : ""; break;
-    case 5: v = c->ble_mode < 3 ? jo_ble_short[c->ble_mode] : ""; break;
-    case 6: v = c->usb_midi < 2 ? jo_off_on_names[c->usb_midi] : ""; break;
-    case 8: v = c->rate < 5 ? jo_rates_short[c->rate] : ""; break;
-    case 10: v = c->beat_flash ? "SCREEN" : "BOXES"; break;
-    case 11:
+    case 5: v = c->usb_midi < 2 ? jo_off_on_names[c->usb_midi] : ""; break;
+    case 7: v = c->rate < 5 ? jo_rates_short[c->rate] : ""; break;
+    case 9: v = c->beat_flash ? "SCREEN" : "BOXES"; break;
+    case 10:
         if (c->fitted)
             snprintf(b, sizeof b, "%d%%", c->batt);
         else
@@ -585,7 +565,7 @@ static void setup(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 #define OV_W 130
 #define OV_H 60
 
-static void overlays(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now)
+static void overlays(uint8_t *fb, const struct jo_ui *ui, uint32_t now)
 {
     static const char *const HINTS[2][3] = {{"NUDGE BEAT", "UP: 1/2 BEAT EARLY", "DOWN: 1/2 BEAT LATE"}, {"NUDGE MS", "UP: 1 MS LATER", "DOWN: 1 MS EARLIER"}};
     if (ui->hint == JO_NO || ui->hint == JO_YES) {    /* NO / YES held on HOME: what UP / DOWN will do */
@@ -598,13 +578,8 @@ static void overlays(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c
         return;
     }
     if (ui->overlay.on && (int32_t)(now - ui->overlay.until) < 0) {
-        char live[16];
         const char *v = ui->overlay.value;
         int sc = 1;
-        if (ui->overlay.live) {
-            mmss(c->has_ble_left ? c->ble_left : BLE_WINDOW_S, live, sizeof live);
-            v = live;
-        }
         for (int k = 4; k >= 1; k--)
             if (jo_text_w(v, k) <= OV_W - 12) {
                 sc = k;
@@ -647,7 +622,7 @@ static void screen(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c, 
         case JO_EDIT: edit(fb, ui); break;
         default: break;
         }
-    overlays(fb, ui, c, now);
+    overlays(fb, ui, now);
     if (c->saved) {
         boxed(fb, 35, 42, 90, 34);
         jo_untag(35, 42, 90, 34);

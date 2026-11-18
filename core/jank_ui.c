@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { ST_IDLE, ST_DOWN1, ST_WAIT2, ST_DOWN2, ST_WAIT3, ST_LONG };
+enum { ST_IDLE, ST_DOWN1, ST_WAIT2, ST_DOWN2, ST_LONG };
 
 void jb_init(struct jb_button *b) { memset(b, 0, sizeof *b); }
 
@@ -56,18 +56,8 @@ enum jb_event jb_step(struct jb_button *b, int pressed, uint32_t now_ms)
             return JB_CLICK;
         }
         break;
-    case ST_DOWN2:                    /* the second press, however long: its release may be followed by a third */
+    case ST_DOWN2:                    /* the second press, however long: its release is the double */
         if (edge && !b->level) {
-            b->state = ST_WAIT3;
-            b->t_edge = now_ms;
-        }
-        break;
-    case ST_WAIT3:
-        if (edge && b->level) {
-            b->state = ST_LONG;       /* (waits for the release) */
-            return JB_TRIPLE;
-        }
-        if (now_ms - b->t_edge >= JB_DOUBLE_MS) {
             b->state = ST_IDLE;
             return JB_DOUBLE;
         }
@@ -201,13 +191,6 @@ static void set_rgb(uint8_t rgb[3], uint8_t r, uint8_t g, uint8_t b)
     rgb[0] = r;
     rgb[1] = g;
     rgb[2] = b;
-}
-
-int jl_pair_lit(uint32_t t_ms, uint8_t rgb[3])
-{
-    int lit = t_ms % JL_PAIR_MS < JL_PAIR_MS / 2u;
-    set_rgb(rgb, 0, 0, lit ? 40 : 0);
-    return lit;
 }
 
 int jl_pattern(enum jl_event e, uint32_t group, uint32_t t_ms, uint8_t rgb[3])

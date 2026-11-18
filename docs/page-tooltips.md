@@ -7,9 +7,8 @@ Persistence statements come from `core/jank_core.h` (`JK_CFG_STORED`: what is ab
 | Control | Tooltip | Source of the claim |
 |---|---|---|
 | #c-midi | Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected disconnects and turns that off. | page code (connectMidi, autoConnect, permission rule in the browser) |
-| #c-bluetooth | Connects to a jank over Bluetooth (Web Bluetooth). Needs a click each time. The Wi-Fi password and Download mode work over USB only. | docs/firmware.md (ota, bootloader, set pass over USB only); page code |
 | #c-advanced-box | Shows the player and the advanced tuning and details on this page. Changes only this page (remembered in this browser); nothing is sent to the stick. | page code (paintAdvanced, localStorage jank.advanced) |
-| #c-ports-box | Picks which jank to use when the browser sees more than one (USB and Bluetooth). Switching disconnects and connects to the one you pick. | page code (showJankChoice) |
+| #c-ports-box | Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick. | page code (showJankChoice) |
 | #pl-help | Shows or hides the help text of the player. Only this page. | page code |
 | #pl-folder | Choose the music folder the player browses. Remembered in this browser; the files stay on this computer. | page code (IndexedDB handle); no network code in the page |
 | #pl-play | Plays or pauses the file. It plays on this computer (monitor) and through the stick's USB audio, so the stick hears it too. | page code (stick path + monitor), the player's help text |
@@ -31,7 +30,6 @@ Persistence statements come from `core/jank_core.h` (`JK_CFG_STORED`: what is ab
 | #al-resend | Sends the page's auto latency suggestion to the stick again now, ignoring the 3 ms and 5 s limits. Overwrites the stick's auto base; only while playing through the stick over USB. | page code (force bypasses the 3 ms guard) |
 | #scan | Listens on the air for the jank and FM-1 groups and lists them. Joins nothing and changes no setting. | docs/firmware.md (scan joins nothing) |
 | #net-apply | Sends the Join choice (jank mode, or the Wi-Fi name and password) to the stick and restarts it; give it a few seconds. Kept after the restart. | page code networkCommands (set net/ssid/pass + reboot); docs/firmware.md (saved before a restart) |
-| #ble-close | Ends the Bluetooth link and closes the stick's pairing window. | page code, docs/firmware.md (ble close) |
 | #bootloader | Restarts the stick into the ROM's download mode so esptool can flash it over USB. Unplug and replug it afterwards to run again. | docs/firmware.md (bootloader), the page's own message |
 | Beat follow | Whether the stick's beat tracker steers the Link session's tempo and beat. Changes the stick now; not kept after a restart (back to on). | core/jank_core.h (beat: after the stored line, not stored; default on) |
 | Follower | Which beat follower the stick runs: tuned or robust (an A/B variant). Changes the stick now; not kept after a restart (back to tuned). | core/jank_ctl.c comment (not stored) |
