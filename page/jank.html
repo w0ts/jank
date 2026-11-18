@@ -1397,7 +1397,7 @@ const OLED = (() => {
       else if (btn === 'no') ui.screen = 'net';
     } else if (ui.screen === 'info') {
       if (!d) ui.screen = 'menu';
-      else if (ui.page === 'about') ui.ascroll = clamp(ui.ascroll - d, 0, Math.max(0, ABOUT_ROWS - (c.layout === 'lcd2' ? ABOUT_VIS_LCD2 : ABOUT_VIS_OLED)));      // ABOUT: scroll when its rows do not all fit
+      else if (ui.page === 'about') { const vis = c.layout === 'lcd2' ? ABOUT_VIS_LCD2 : ABOUT_VIS_OLED; ui.ascroll = clamp(ui.ascroll - d * vis, 0, Math.max(0, ABOUT_ROWS - vis)); }      // ABOUT: a press moves one page, clamped
     } else if (ui.screen === 'edit') {
       if (d) stepEdit(ui, c, d);
       else endEdit(ui, c, btn === 'yes');
@@ -1609,22 +1609,23 @@ const OLED = (() => {
       text(fb, sp.title, 4, y, 1, v); textR(fb, sp.opts ? (f === 'lowconf' ? (sp.get(c) ? 'STOP' : 'RUN') : sp.opts[sp.get(c)]) : editText(sp, sp.get(c)), W - 4, y, 1, v);
     });
   }
-  // the ABOUT screen: its rows as text, "-" for what is not known (null / undefined in the ctx); the repo is shortened on the OLED, the lcd2 layout adds the PSRAM
+  // the ABOUT screen: its rows as { label, val } (label left, value right aligned), "-" for what is not known (null / undefined in the ctx); the repo is shortened on the OLED, the lcd2 layout adds the PSRAM
   const ABOUT_ROWS = 13, ABOUT_VIS_OLED = 5, ABOUT_VIS_LCD2 = 8;
   const known = v => v !== null && v !== undefined;
   const aboutRows = (c, lcd) => {
-    const num = (label, v, unit) => label + ' ' + (known(v) && v >= 0 ? v + unit : '-');
+    const num = (label, v, unit) => ({ label, val: known(v) && v >= 0 ? v + unit : '-' });
     const up = !known(c.uptimeS) || c.uptimeS < 0 ? '-' : c.uptimeS >= 86400 ? Math.floor(c.uptimeS / 86400) + 'd ' + Math.floor(c.uptimeS % 86400 / 3600) + 'h'
       : Math.floor(c.uptimeS / 3600) + ':' + String(Math.floor(c.uptimeS % 3600 / 60)).padStart(2, '0') + ':' + String(c.uptimeS % 60).padStart(2, '0');
     const heap = !known(c.heapKb) || c.heapKb < 0 ? '-' : c.heapKb + 'K' + (lcd && known(c.psramKb) && c.psramKb >= 0 ? ' PSRAM ' + c.psramKb + 'K' : '');
     const flash = !known(c.flashKb) || c.flashKb < 0 ? '-' : Math.trunc(c.flashKb / 1024) + 'M ' + (known(c.appUsedKb) && c.appUsedKb >= 0 && known(c.appKb) && c.appKb >= 0
       ? (c.appUsedKb / 1024).toFixed(1) + '/' + (c.appKb / 1024).toFixed(1) + 'M' : '-');
-    return ['NAME jank', 'VERSION ' + (known(c.version) ? c.version : '-'), 'REPO ' + (lcd ? 'github.com/w0ts/jank' : 'w0ts/jank'), 'UPTIME ' + up,
-            'RESET ' + (known(c.reset) ? c.reset : '-'), 'TEMP ' + (known(c.tempC) ? c.tempC + ' C' : '-'), num('CPU', c.cpuPct, '%'), 'MEMORY ' + heap,
-            num('MIN HEAP', c.heapMinKb, 'K'), 'FLASH ' + flash, num('CLOCK LATE', c.clkLateUs, ' US'), num('UI LOOP', c.uiLoopUs, ' US'), num('BEAT LOOP', c.beatLoopUs, ' US')];
+    return [{ label: 'NAME', val: 'jank' }, { label: 'VERSION', val: known(c.version) ? c.version : '-' }, { label: 'REPO', val: lcd ? 'github.com/w0ts/jank' : 'w0ts/jank' },
+            { label: 'UPTIME', val: up }, { label: 'RESET', val: known(c.reset) ? c.reset : '-' }, { label: 'TEMP', val: known(c.tempC) ? c.tempC + ' C' : '-' },
+            num('CPU', c.cpuPct, '%'), { label: 'MEMORY', val: heap }, num('MIN HEAP', c.heapMinKb, 'K'), { label: 'FLASH', val: flash },
+            num('CLOCK LATE', c.clkLateUs, ' US'), num('UI LOOP', c.uiLoopUs, ' US'), num('BEAT LOOP', c.beatLoopUs, ' US')];
   };
   function drawInfo(fb, ui, c) {
-    if (ui.page === 'about') { titleBar(fb, 'ABOUT'); aboutRows(c, false).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_OLED).forEach((r, k) => text(fb, r, 4, 13 + k * 9, 1, 1)); return; }
+    if (ui.page === 'about') { titleBar(fb, 'ABOUT'); aboutRows(c, false).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_OLED).forEach((r, k) => { text(fb, r.label, 4, 13 + k * 9, 1, 1); textR(fb, r.val, W - 4, 13 + k * 9, 1, 1); }); return; }
     titleBar(fb, 'BATTERY');
     const rows = [];
     if (!c.fitted) rows.push('NO CELL FITTED', 'POWER ' + (c.usb ? 'USB' : 'NONE'));
@@ -1930,7 +1931,7 @@ const OLED = (() => {
     });
   }
   function drawInfoLcd2(fb, ui, c) {
-    if (ui.page === 'about') { titleBarLcd2(fb, 'ABOUT'); aboutRows(c, true).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_LCD2).forEach((r, k) => text(fb, r, 8, 36 + k * 24, 1, 1)); return; }
+    if (ui.page === 'about') { titleBarLcd2(fb, 'ABOUT'); aboutRows(c, true).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_LCD2).forEach((r, k) => { text(fb, r.label, 8, 36 + k * 24, 1, 1); textR(fb, r.val, W - 8, 36 + k * 24, 1, 1); }); return; }
     titleBarLcd2(fb, 'BATTERY');
     const rows = [];
     if (!c.fitted) rows.push('NO CELL FITTED', 'POWER ' + (c.usb ? 'USB' : 'NONE'));

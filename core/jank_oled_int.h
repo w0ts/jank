@@ -15,7 +15,11 @@ void jo_fixed(double x, int digits, char *out, size_t cap);
 #define JO_ABOUT_ROWS 13
 #define JO_ABOUT_VIS_OLED 5
 #define JO_ABOUT_VIS_LCD2 8
-void jo_about_rows(const struct jo_ctx *c, char rows[JO_ABOUT_ROWS][40]);
+struct jo_about_row {
+    char label[16];                 /* drawn at the left */
+    char val[32];                   /* drawn right aligned; "-" when not known */
+};
+void jo_about_rows(const struct jo_ctx *c, struct jo_about_row rows[JO_ABOUT_ROWS]);
 
 /* The grid the primitives draw on: the OLED's 128 x 64, or the lcd2 layout's 320 x 240 for the one call of jo_draw_lcd2 (the emulator's
  * W and H, set per draw). Both are bit-per-pixel in the page layout, byte (y >> 3) * width + x. jo_fine is set with the lcd2 grid: the text is the
