@@ -1,0 +1,52 @@
+# linein_esd.py: LINE IN, buttons, ESD paths
+
+## LINE IN (bias 1.467 V, ADC 0..2.9 V: headroom 1.43 V at each node)
+| f | mono (tip = ring = 1 V): A - B | stereo L only: A - B | ground offset (tip = ring = sleeve = 1 V): A - B | rejection |
+|---|---|---|---|---|
+| 5 Hz | 0.442 | 0.221 | 0.00e+00 | 233 dB |
+| 10 Hz | 0.513 | 0.256 | 0.00e+00 | 234 dB |
+| 20 Hz | 0.537 | 0.268 | 0.00e+00 | 235 dB |
+| 50 Hz | 0.544 | 0.272 | 0.00e+00 | 235 dB |
+| 100 Hz | 0.545 | 0.272 | 0.00e+00 | 235 dB |
+| 1000 Hz | 0.544 | 0.272 | 0.00e+00 | 235 dB |
+| 5000 Hz | 0.510 | 0.255 | 0.00e+00 | 234 dB |
+| 10000 Hz | 0.435 | 0.218 | 0.00e+00 | 233 dB |
+| 13000 Hz | 0.389 | 0.195 | 0.00e+00 | 232 dB |
+| 20000 Hz | 0.301 | 0.151 | 0.00e+00 | 230 dB |
+| 40000 Hz | 0.172 | 0.086 | 0.00e+00 | 225 dB |
+
+-3 dB band (mono): 3.6 Hz .. 13.3 kHz; mid-band gain A-B / v = 0.544 (node A alone 0.544)
+clipping at 1 kHz: mono 2.64 V peak (+7.6 dBu); one channel only 5.27 V peak. Line level (+4 dBu = 1.74 V peak) fits mono with +3.6 dB to spare
+ground-offset rejection with 1 % R, 5 % C (Monte Carlo 4000): >= 36 dB at 50 Hz, >= 35 dB at 1 kHz
+fault +12 V step on the tip: node would reach +4.73 V, held at +3.80 V by the pin's diodes, ~124 uA into the pin for ~20 ms (PESD15VL2BT off below 17 V)
+fault -12 V step on the tip: node would reach -1.80 V, held at -0.50 V by the pin's diodes, ~173 uA into the pin for ~20 ms (PESD15VL2BT off below 17 V)
+plug detect: no plug -> J7's ring switch (3) on the ring (2), R37 100k down vs R38 1M up: LIN_DET = 0.30 V (low); a plug opens it: 3.3 V through 1M (high)
+
+## Buttons
+- UP (IO16) / DOWN (IO21): the LCD-2's 4.7k pull-ups (R4 / R5): pressed 0.70 mA, released 3.3 V; NO (IO6) / YES (IO18): the S3's internal pull-up (~45 k, ESP32-S3 datasheet): pressed ~73 uA. No RC fitted (C80..C83 DNP pads): the firmware debounces. A button shorts only its GPIO to GND: a GPIO driven high by a firmware fault into a pressed button is limited by the S3's drive (~40 mA, drive strength 2), a fault, not a damage case at the default drive.
+- ESD: the TS-1187A's actuator is plastic and its contacts sit inside; the case covers the frame. No exposed metal on the button nets, so no ESD part (the connectors below are the exposed paths).
+
+## ESD, +8 kV contact (150 pF / 330 ohm) on each connector pin (peak at the protected node)
+| path | node | peak | min |
+|---|---|---|---|
+| MIDI ring (no array: through R14 into V5M) | v5m | 0.1 V | 0.0 V |
+| MIDI tip -> R15 -> the array on the FET drain | k | 4.9 V | 0.0 V |
+| CLOCK tip -> U21 output | n | 1.2 V | 0.0 V |
+| LINE IN tip -> GPIO8 | a | 0.5 V | 0.0 V |
+| USB D+ -> the S3 | a | 1.9 V | 1.2 V |
+
+## MIDI jacks mis-patched with a modular output (V5A held by the clamp at <= 6.05 V + 10 ohm x I)
+| where | source | current | in the 220 ohm 1206 (0.25 W) | into the rail / out of GND |
+|---|---|---|---|---|
+| tip | +12 V through 1000 ohm | 4.3 mA | 4 mW | rail |
+| tip | +12 V through 100 ohm | 16.2 mA | 58 mW | rail |
+| tip | +12 V through 0 ohm | 23.6 mA | 123 mW | rail |
+| tip | -12 V through 1000 ohm | 9.2 mA | 19 mW | GND / rail |
+| tip | -12 V through 100 ohm | 35.2 mA | 272 mW | GND / rail |
+| tip | -12 V through 0 ohm | 51.1 mA | 575 mW | GND / rail |
+| ring | +12 V through 1000 ohm | 5.7 mA | 7 mW | rail |
+| ring | +12 V through 100 ohm | 21.9 mA | 105 mW | rail |
+| ring | +12 V through 0 ohm | 31.8 mA | 223 mW | rail |
+| ring | -12 V through 1000 ohm | 13.9 mA | 43 mW | GND / rail |
+| ring | -12 V through 100 ohm | 53.1 mA | 621 mW | GND / rail |
+| ring | -12 V through 0 ohm | 77.3 mA | 1314 mW | GND / rail |

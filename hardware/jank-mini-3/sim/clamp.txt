@@ -1,0 +1,11 @@
+# clamp.py: the 5 V aux rail against its 5.83 V clamp (Monte Carlo, 200000 boards)
+
+- boost PWM: 0.000 % of boards conduct, worst 0.0 mA, smallest margin +596 mV
+- boost PFM (+16 mV, ASSUMED): 0.000 % of boards conduct, worst 0.0 mA, smallest margin +487 mV
+- USB pass-through, no load: 0.000 % of boards conduct, worst 0.0 mA, smallest margin +345 mV
+- USB 5.5 V pass-through, hot (VF 0.06 V): 0.000 % of boards conduct, worst 0.0 mA, smallest margin +316 mV
+
+clamp threshold 5.750 .. 6.045 V; boost set point 4.812 .. 5.346 V
+
+fault, +10 V into CLOCK and RESET: 3.7 mA into the rail, V5A <= 6.08 V (U21 74AHCT04 VCC abs max 7 V, recommended 5.5 V; TPS61023 VOUT abs max 7 V); U19 22 mW (300 mW)
+fault, +12 V: 5.7 mA, V5A <= 6.10 V, U19 34 mW

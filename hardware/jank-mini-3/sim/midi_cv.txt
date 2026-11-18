@@ -1,0 +1,52 @@
+# midi_cv.py: MIDI OUT loops and CLOCK / RESET (ngspice, generic models)
+
+## MIDI: receiver current (MIDI 1.0 asks ~5 mA; optos switch from ~1.5..2 mA)
+| V5M | opto LED | + 1N4148 | loop current |
+|---|---|---|---|
+| 4.79 V | 1.2 V | no | 5.40 mA |
+| 4.79 V | 1.2 V | yes | 4.45 mA |
+| 4.79 V | 1.5 V | no | 4.96 mA |
+| 4.79 V | 1.5 V | yes | 4.02 mA |
+| 4.79 V | 1.7 V | no | 4.67 mA |
+| 4.79 V | 1.7 V | yes | 3.67 mA |
+| 5.0 V | 1.2 V | no | 5.72 mA |
+| 5.0 V | 1.2 V | yes | 4.68 mA |
+| 5.0 V | 1.5 V | no | 5.28 mA |
+| 5.0 V | 1.5 V | yes | 4.33 mA |
+| 5.0 V | 1.7 V | no | 4.98 mA |
+| 5.0 V | 1.7 V | yes | 4.03 mA |
+| 5.32 V | 1.2 V | no | 6.19 mA |
+| 5.32 V | 1.2 V | yes | 5.23 mA |
+| 5.32 V | 1.5 V | no | 5.75 mA |
+| 5.32 V | 1.5 V | yes | 4.72 mA |
+| 5.32 V | 1.7 V | no | 5.45 mA |
+| 5.32 V | 1.7 V | yes | 4.50 mA |
+| 5.37 V | 1.2 V | no | 6.27 mA |
+| 5.37 V | 1.2 V | yes | 5.30 mA |
+| 5.37 V | 1.5 V | no | 5.82 mA |
+| 5.37 V | 1.5 V | yes | 4.87 mA |
+| 5.37 V | 1.7 V | no | 5.52 mA |
+| 5.37 V | 1.7 V | yes | 4.57 mA |
+
+Monte Carlo (100k): 3.46 .. 6.49 mA
+fault, ring / DIN 4 shorted to GND: 24.4 mA, 131 mW in the 220 ohm 1206 (250 mW) at the 5.37 V pass-through corner
+fault, tip / DIN 5 to another box's +5 V: the FET off = no path (open drain); FET on: 24.4 mA through the sink, AO3400A 0.03 mW
+
+## CLOCK / RESET into a module input (5 ms pulse)
+| load | high level | rise 0.4 -> 3.6 V | peak drive current (74AHCT04: 8 mA rec., 25 mA abs) |
+|---|---|---|---|
+| 10k // 100n | 3.98 V | 392 us | 2.3 mA |
+| 100k | 4.69 V | 6 us | 2.1 mA |
+| 10k | 3.98 V | 9 us | 2.1 mA |
+
+## CLOCK / RESET faults: a stiff +-10 / +-12 V source on the jack
+| fault | output state | into the jack | from the 74AHCT04 (8 mA rec., 25 abs) | into V5C (BAV99) | each 1k 1206 (0.25 W) |
+|---|---|---|---|---|---|
+| +10 V | high | +2.5 mA | -2.5 mA | -0.0 mA | 6 mW |
+| +10 V | low | +4.9 mA | -4.9 mA | +0.0 mA | 24 mW |
+| -10 V | high | -7.2 mA | +7.2 mA | +0.0 mA | 52 mW |
+| -10 V | low | -4.9 mA | +4.9 mA | +0.0 mA | 24 mW |
+| +12 V | high | +3.5 mA | -3.5 mA | -0.0 mA | 12 mW |
+| +12 V | low | +5.9 mA | -5.9 mA | +0.0 mA | 34 mW |
+| -12 V | high | -8.2 mA | +8.2 mA | +0.0 mA | 67 mW |
+| -12 V | low | -5.9 mA | +5.9 mA | +0.0 mA | 34 mW |

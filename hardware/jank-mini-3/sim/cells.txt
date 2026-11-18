@@ -1,0 +1,22 @@
+cells.py: 2-3 x 1S LiPo, 0.33 ohm each, DW01A + FS8205A (seed 1, 100000 draws)
+
+DISCHARGE (no USB): the overcurrent trip current = VEDI / (2 x RDS), VGS = the cell voltage
+  cells at 4.2 V: trip 1.94 A (lowest of 100000) .. 4.03 A; 0.1 % point 2.04 A; load estimate 0.62 A, checked to 1.2 A
+  cells at 3.6 V: trip 1.78 A (lowest of 100000) .. 3.71 A; 0.1 % point 1.90 A; load estimate 0.62 A, checked to 1.2 A
+  cells at 3.0 V: trip 1.68 A (lowest of 100000) .. 3.43 A; 0.1 % point 1.77 A; load estimate 0.62 A, checked to 1.2 A
+  cells at 2.6 V: trip 1.61 A (lowest of 100000) .. 3.30 A; 0.1 % point 1.70 A; load estimate 0.62 A, checked to 1.2 A
+  short circuit (VM > 0.82 V): trips within 0.6 ms; the cells' current is limited by R_S anyway (4.2 V / (0.33 + 0.06) = 10.8 A per cell max, before the FETs)
+
+CHARGE (USB in, the charger's 2 A into BAT+; the protector carries it backwards)
+  3 cells: the most-loaded cell takes 0.76 A (1.7 C of a 450, 1.4 C of a 550); R_S drops <= 252 mV and burns <= 0.19 W during the 2 A phase; VM down to -149 mV (the DW01A lists no charge-overcurrent level: no trip)
+  2 cells: the most-loaded cell takes 1.11 A (2.5 C of a 450, 2.0 C of a 550); R_S drops <= 366 mV and burns <= 0.41 W during the 2 A phase; VM down to -149 mV (the DW01A lists no charge-overcurrent level: no trip)
+  1 cell: 2 A = 4.4 C of a 450 (too much: use 2 or 3 cells)
+  end of charge: the charger's CV 4.17..4.25 V against the DW01A's overcharge 4.25..4.35 V: overlap in 0.000 % of pairs (then it only stops charging at the very top, releases at 4.05..4.15 V; harmless)
+
+PLUGGING IN A CELL AT ANOTHER VOLTAGE (the current between cells does not pass the protector)
+  0.3 V apart: up to 0.39 A at the start (0.9 C into a 450), 0.05 W in each R_S, falling as they even out (tau ~ R x C_eq ~ 0.8 ohm x 675 F ~ 9 min, from a 450's ~1.2 V over its capacity)
+  0.6 V apart: up to 0.77 A at the start (1.7 C into a 450), 0.20 W in each R_S, falling as they even out (tau ~ R x C_eq ~ 0.8 ohm x 675 F ~ 9 min, from a 450's ~1.2 V over its capacity)
+  1.2 V apart: up to 1.55 A at the start (3.4 C into a 450), 0.79 W in each R_S, falling as they even out (tau ~ R x C_eq ~ 0.8 ohm x 675 F ~ 9 min, from a 450's ~1.2 V over its capacity)
+  (1.2 V = a full 4.2 V cell beside one cut off near 3.0 V: the README rule; the 2 W part keeps the worst case under half its rating)
+
+OVER-DISCHARGE: VOD 2.40..2.60 V at BAT+ (the joined node, after R_S: at 0.6 A over 3 cells it reads ~66 mV under the cells), released at 2.80..3.00 V or by plugging in USB. Sleep current through the DW01A ~3 uA.
