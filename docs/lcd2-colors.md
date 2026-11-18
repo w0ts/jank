@@ -1,4 +1,4 @@
-# jank on the Waveshare ESP32-S3-LCD-2: the colour screen on its own 160 x 120 grid (design preview, v11)
+# jank on the Waveshare ESP32-S3-LCD-2: the colour screen on its own 160 x 120 grid (design preview, v13)
 
 The variant uses a 2.0 inch 240 x 320 ST7789 colour LCD **in landscape** (320 x 240), no touch, no RGB LEDs. The owner said the screen
 was not used fully (the 128 x 64 UI doubled is 256 x 128 with black bands and small text) and asked for more visual feedback, small
@@ -34,14 +34,20 @@ XOR-ed through a fill). Menus, edit, info, network, text, confirm, setup screens
 | bad | 255, 104, 92 | #ff685c | 7.0 | poor, below the line, clipping, empty |
 | dim | 150, 156, 168 | #969ca8 | 7.2 | nothing there / not reported |
 
-## v11: what changed (owner review of v10)
+## v13: what changed (owner review of v12)
 
-1. **AUDIO beat boxes are squares** (27 x 27, equal gaps, centred), the same size with and without the BAR row.
-2. **Padding**: 4 empty rows between the tempo and the squares and between the squares and the text below; even gaps between the text rows.
-3. **LINK**: 4 empty rows between the top bar icons and the tempo (the same rule applies in AUDIO: the tempo moved from y 15 to y 16); the squares are re-fitted under it.
+1. **AUDIO beat boxes are spaced like LINK's**: 36 wide, 4 px gaps, x 2..157 (28 high: true 36 x 36 squares are 7 rows short with the BAR row, see below).
+2. **The info rows are tight and centred**: 1 row apart, the whole block centred vertically between the boxes and the state line (the odd row goes below).
+3. The padding between the tempo and the boxes stays 4 (equal to the lit margin above the tempo, which is 4 / 4 as measured in v12); the 3 rows under the boxes are the 3 px minimum.
 
-(v10: INPUT above CONFIDENCE, even rows, the centred state word without PLAYING, the LARGE LINK digits, the battery with the plug inside, GRP n next to the link glyph, the LINK icon in both
-modes. v9: the small digit after the dot, the centred tempo, the signal on the NETWORK screen, the state line.)
+(v12: the LINK tempo margins 7 / 7 measured on lit pixels. v11: the AUDIO boxes as squares, paddings. v10: INPUT above CONFIDENCE, the centred state word, the LARGE LINK digits, the top bar changes.)
+
+## The margins around the tempo (measured on lit pixels)
+
+Above = the first lit row of the digits minus the last lit row of the top bar (y 11) minus 1; below = the first lit row of the squares minus the last lit row of the digits minus 1. The test draws
+frames and measures: for every numeric text (`120.0`, `98.4`, `88.8`, `146.1`, `133.3`, `999.9`) AUDIO has 4 above (digits y 16..50) and 4 below (squares at y 55), and LINK has 7 above and 7 below (digits y 19..65,
+squares at y 73). Every digit uses the first and the last row of its cell, so the digit cell extent is the lit extent. `---` lights only the 5 (AUDIO) or 8 (LINK) dash rows in the middle of the cell: AUDIO 19 above and 19 below, LINK 26 above and
+27 below (an 8 row dash cannot be exactly in the middle of 47 rows).
 
 ## The top bar (y 1..11, both modes; `OLED.LCD2` holds the numbers)
 
@@ -59,44 +65,44 @@ Every item is a fixed slot, nothing moves when a value changes; items are 11 row
 Gaps: 4 px between GRP n and the link glyph (x 99..102) and between the link slot and the battery (x 130..133). Free width: x 46..69 (24 px) between the left group (with the fold label) and
 `GRP n`; without a fold label (or in LINK mode) x 27..69 (43 px, 45 after the IGNORE icon). Right edge: the nub ends at x 157.
 
-**Charging** is not reported by the stick; the lcd2 layout uses exactly the inference of the BATTERY info screen (`CHARGING`): `usb` and a cell fitted and under 100 %
+**Charging** is not reported by the jank; the lcd2 layout uses exactly the inference of the BATTERY info screen (`CHARGING`): `usb` and a cell fitted and under 100 %
 (`charging(c)` in `ui/oled.js`); at 100 % with USB the info screen says FULL and no plug is drawn. `Stick.ctx` sets `usb` to true always, so on the page this reads as charging whenever the
 battery is under 100 %; on a unit running from the cell it would be wrong until the firmware reports USB power. With no cell fitted nothing is drawn (there is no plug icon of its own any more).
 
 ## HOME (AUDIO) on 160 x 120: the row table
 
-Padding: the icons end at y 11 and the tempo starts at y 16 (4 empty rows, the same rule in LINK); 4 empty rows between the tempo and the squares; 4 between the squares and the first
-text row (INPUT) when the BAR row is shown. The four beat boxes are SQUARES 27 x 27 (width == height) with 4 px gaps, a row of 120 px centred (x 20..139), at the same place whether the
-BAR row is shown or not. The state line keeps its reserved row at the bottom (y 113..119).
-
-The BAR row exists only with AUTO BAR on (a state of `locked`, `listening` or `manual`): then the stack is the first table, else the second.
+The four beat boxes are 36 wide with 4 px gaps, spanning x 2..157, at the same x positions as LINK's boxes (x 2, 42, 82, 122); they are 28 high (`OLED.LCD2.audioBox = { w: 36, h: 28, gap: 4 }`). The info rows
+(INPUT, CONFIDENCE, BAR when shown) are 1 row apart (`rowGap`) and form one block, centred vertically between the bottom of the boxes (y 82) and the state line (y 113): the empty rows above and below the block
+differ by at most 1, the odd one goes below. The BAR row exists only with AUTO BAR on (a state of `locked`, `listening` or `manual`). The state line keeps its reserved row (y 113..119) in both.
 
 | y | height | element (with the BAR row) | empty rows before it |
 |---|---|---|---|
 | 1..11 | 11 | top bar | |
 | 16..50 | 35 | TEMPO (NORMAL digits, centred; the digit after the dot 23 rows, y 28..50) | 4 (y 12..15) |
-| 55..81 | 27 | four beat squares 27 x 27, gap 4, x 20..139 (lit = solid, unlit = 2 px outline; the first amber only while lit) | 4 (y 51..54) |
-| 86..92 | 7 | `INPUT` + VU meter (rows 87..91, notch rows 86..92) + number | 4 (y 82..85) |
-| 95..101 | 7 | `CONFIDENCE` + line (rows 97..99, notch rows 96..100) + value | 2 |
-| 104..110 | 7 | `BAR` + state word + outlined bar (rows 105..109) | 2 |
-| 113..119 | 7 | state word, centred, AUDIO only (reserved, empty while running) | 2 |
+| 55..82 | 28 | four beat boxes 36 x 28, gap 4, x 2..157 (lit = solid, unlit = 2 px outline; the first amber only while lit) | 4 (y 51..54) |
+| 86..92 | 7 | `INPUT` + VU meter (rows 87..91, notch rows 86..92) + number | 3 (y 83..85) |
+| 94..100 | 7 | `CONFIDENCE` + line (rows 96..98, notch rows 95..99) + value | 1 |
+| 102..108 | 7 | `BAR` + state word + outlined bar (rows 103..107) | 1 |
+| 113..119 | 7 | state word, centred, AUDIO only (reserved, empty while running) | 4 (y 109..112) |
 
 | y | height | element (without the BAR row) | empty rows before it |
 |---|---|---|---|
 | 16..50 | 35 | TEMPO | 4 |
-| 55..81 | 27 | four beat squares (the same place) | 4 |
-| 87..93 | 7 | `INPUT` | 5 (y 82..86) |
-| 100..106 | 7 | `CONFIDENCE` | 6 |
-| 113..119 | 7 | state word | 6 |
+| 55..82 | 28 | four beat boxes (the same place) | 4 |
+| 90..96 | 7 | `INPUT` | 7 (y 83..89) |
+| 98..104 | 7 | `CONFIDENCE` | 1 |
+| 113..119 | 7 | state word | 8 (y 105..112) |
 
-**Why 27**: the width would allow 36 (with 4 px gaps), the height does not: from the tempo's end (y 50) to row 119 there are 69 rows for the squares, INPUT, CONFIDENCE, BAR, the state line and the
-paddings (4 + 4 above and below the squares, gaps of 2 between text rows): 69 - 4 - 4 - 3 x 7 - 3 x 2 - 7 = 27. (With 3 px paddings it would be 29.) The squares are the same size and place with and without the BAR row; the
-9 rows the missing BAR row frees go to the gaps below the squares (5) and between the text rows (6, 6), evenly, so nothing is left empty inside the stack. The state line is not given back to
-the stack while it is empty: anything that grew into it would have to jump back when a word appears.
+**Why 36 x 28 and not 36 x 36.** True 36 x 36 squares do not fit with the BAR row. From the tempo's end (y 50) to row 119 there are 69 rows. The squares (36), the block of three info rows (3 x 7 + 2 = 23), the
+state line (7), the 4 empty rows between the tempo and the squares, and at least 3 empty rows under the squares and 3 above the state line (so the block is centred with the 3 px minimum) need
+4 + 36 + 3 + 23 + 3 + 7 = 76 rows: **7 rows missing** (6 with 3 px under the tempo as well). Without the BAR row (block of 15) it would fit. The largest height that fits with the BAR row is 28 (4 + 28 + 3 + 23 + 3 + 7 = 68, one
+spare row goes to the centring), so the default is **A: boxes 36 wide x 28 high, not square**. The alternative **B** keeps true squares: the largest side is 28 as well, spread over the full width with equal gaps
+(4 x 28 + 3 x 14 = 154, x 3..156). The boxes are the same size and place with and without the BAR row. The state line is not given back to the stack while it is empty: anything that grew into it would have to
+jump back when a word appears.
 
-**LINK layout**: the top bar above; the tempo in the LARGE digits (47 rows, y 16..62), centred (4 empty rows under the icons); four SQUARE beat boxes 36 x 36 with 4 px gaps, a row of 156 px
-centred (x 2..157), at y 73..108, centred vertically in the space under the tempo (10 empty rows above, 11 below, both over the 4 px minimum); the first amber only while lit; no audio rows, no
-state line. The boxes are as large as the width allows with 4 px gaps (4 x 36 + 3 x 4 = 156).
+**LINK layout**: the top bar above; the tempo in the LARGE digits (47 rows, y 19..65), centred; four SQUARE beat boxes 36 x 36 with 4 px gaps, a row of 156 px centred (x 2..157), at y 73..108 (11 empty
+rows under them); the first amber only while lit; no audio rows, no state line. The boxes are as large as the width allows with 4 px gaps (4 x 36 + 3 x 4 = 156). The tempo has 7 empty rows above
+(y 12..18) and 7 below (y 66..72).
 
 ### The state word (AUDIO only)
 
@@ -104,11 +110,11 @@ At most one word, centred (`left = floor((160 - width) / 2)`), the first that ap
 
 | word | when | colour |
 |---|---|---|
-| `GATED` | the stick says the outputs stopped for low confidence (`gated`) | red |
+| `GATED` | the jank says the outputs stopped for low confidence (`gated`) | red |
 | `HOLD` | the confidence holds (`confHold`) | grey |
 | `COAST` | running, the confidence known and under the threshold, not holding | amber |
 | `STOPPED` | not running (`running` false; the armed, blinking icon counts as not running yet) | grey |
-| `SILENT` | running, and nothing is heard (`silent`: level under -60 dBFS or the stick says so) | grey |
+| `SILENT` | running, and nothing is heard (`silent`: level under -60 dBFS or the jank says so) | grey |
 | (nothing) | otherwise: running with sound and confidence | |
 
 ### The big digits (`ui/bigfont.js`: the tables ARE the fonts)
@@ -123,7 +129,7 @@ Two fonts, one face (rounded 7-segment). `BigFont.NORMAL` is for AUDIO, `BigFont
 | small digit (after the point, 2/3 size, bottom-aligned) | 17 x 23, 3 px strokes, 1 px cuts | 23 x 31, 5 px strokes, 2 px cuts |
 | gap between glyphs | 3 | 4 |
 | `120.0` / `98.4` / `---` | 112 / 83 / 84 px | 151 / 112 / 113 px |
-| rows | y 16..50 | y 16..62 |
+| rows | y 16..50 | y 19..65 |
 
 The text is `bpm.toFixed(1)` (`120.0`, `98.4`, `999.9`): big digits, the point, then the small digit; or `---` (three big dashes) when there is no tempo. The whole text is centred:
 `left = floor((160 - width) / 2)` (24 and 38 for NORMAL, 4 and 24 for LARGE; an odd width leaves the spare column on the right).
@@ -173,7 +179,7 @@ Value, line and notch carry the same ink id.
 
 | value | rule |
 |---|---|
-| confidence | red below the stick's threshold; amber from it up to +10 points; green above; grey when the stick reports no value (`--`, no line) or there is silence |
+| confidence | red below the jank's threshold; amber from it up to +10 points; green above; grey when the jank reports no value (`--`, no line) or there is silence |
 
 The BAR row keeps the outlined bar (now 62 x 5, a 3 px fill inside it: round(60 x confidence), neutral, no tick). The value moved from the left of the bar to the
 right of it because `CONFIDENCE` (59 px) fills the label column: `CONFIDENCE`, bar, `90%`.
@@ -183,10 +189,10 @@ right of it because `CONFIDENCE` (59 px) fills the label column: `CONFIDENCE`, b
 A read-only row under the screen's rows (TYPE, GROUP, PEERS in JANK mode: y 40; TYPE and 3 more in the Wi-Fi modes: y 49; that is 13 + 9 x the number of rows), label x 4, never inverted, never selectable, no new menu item:
 `SIGNAL` on the left; on the right the dBm and a word, right-aligned to x 155: `-55dBm GOOD`. The dBm is the best jank peer's (`rssi`), or the router's in Wi-Fi mode (`wifi_rssi`).
 The word is coloured by the rule the bars had: `GOOD` green (>= -67 dBm), `FAIR` amber (-80..-68), `POOR` red (< -80), `NONE` grey (nothing heard, 0: no dBm shown); `-`
-alone when the stick does not report it. The `NETWORK` screen's existing `STATUS` row is a connection state, not a signal, so it was not used. The word is the
+alone when the jank does not report it. The `NETWORK` screen's existing `STATUS` row is a connection state, not a signal, so it was not used. The word is the
 only ink on the screen. The OLED layout's NETWORK screen is unchanged.
 
-## What the stick reports for each coloured item
+## What the jank reports for each coloured item
 
 | element | colour rule | reported today |
 |---|---|---|
@@ -232,7 +238,7 @@ cursor in view by itself (all 10 menu items fit; the scan list centres on the se
 
 ## Tests in this stage
 
-`tests/test_lcd2.js` (494 checks): the palette (AA) and the ramp (32 exact RGB, each at least 6.5 : 1, neighbours within 16 per channel, the id mapping); sizes and the exact
+`tests/test_lcd2.js` (510 checks): the palette (AA) and the ramp (32 exact RGB, each at least 6.5 : 1, neighbours within 16 per channel, the id mapping); sizes and the exact
 x2; the row table (order, no lit pixel in a gap, the text of every label and value checked pixel by pixel against the 5 x 7 font parsed from `ui/oled.js`); the big and the small
 digits (both tables complete, sizes, the tempo texts `120.0` `98.4` `88.8` `146.1` `---` `999.9` drawn exactly as the tables say, centred, in AUDIO and LINK, the small digit on
 the baseline); the four beat boxes on every beat in both layouts; the CONFIDENCE rule and line lengths at 0 / 50 / 100 %; the VU meter (continuous columns, the id of every column, the notch);

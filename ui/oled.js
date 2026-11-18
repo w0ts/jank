@@ -646,10 +646,11 @@ const OLED = (() => {
   //
   //   HOME (AUDIO)  y 1..11    top bar: transport icon, LINK TRANSPORT icon, fold label (left); GRP n, link glyph + peers, battery with the plug inside while charging (right)
   //                 y 16..50   the TEMPO in the NORMAL digits (35 rows; the digit after the dot is 23 rows), centred on the 160 columns; 4 empty rows under the top bar
-  //                 y 55..81   four SQUARE beat boxes 27 x 27, gap 4, a row of 120 centred (x 20..139); 4 empty rows above and below
-  //                 then, INPUT (VU meter, notch at the tracker's -50 dBFS), CONFIDENCE (line, notch at the stop threshold), BAR (AUTO BAR's state, only with
-  //                 AUTO BAR on), and the state line (GATED / HOLD / COAST / STOPPED / SILENT, centred, empty otherwise; its row y 113..119 is always reserved)
-  //   HOME (LINK)   the same top bar; the tempo in the LARGE digits (47 rows, y 16..62), centred; four square beat boxes 36 x 36, centred as a row; no audio rows
+  //                 y 55..82   four beat boxes 36 x 28 at the same x positions as LINK's (gap 4, x 2..157); 4 empty rows above
+  //                 then the info rows INPUT (VU meter, notch at the tracker's -50 dBFS), CONFIDENCE (line, notch at the stop threshold), BAR (AUTO BAR's
+  //                 state, only with AUTO BAR on), 1 row apart, as one block centred between the boxes and the state line (GATED / HOLD / COAST /
+  //                 STOPPED / SILENT, centred, empty otherwise; its row y 113..119 is always reserved)
+  //   HOME (LINK)   the same top bar; the tempo in the LARGE digits (47 rows, y 19..65), centred, 7 empty rows above and below; four square beat boxes 36 x 36, centred as a row; no audio rows
   //   lists         title bar 11 px, 12 rows of 9 px from y 13; sub menus and info 12 px rows; edit: the value at scale 2
   const SIZES = { oled: { w: OLED_W, h: OLED_H }, lcd2: { w: 160, h: 120 } };
   const sizeOf = layout => (layout === 'lcd2' ? SIZES.lcd2 : SIZES.oled);
@@ -673,9 +674,8 @@ const OLED = (() => {
   // the HOME geometry: one table, the tests read it
   const L2 = {
     topH: 13, iconY: 1, iconH: 11, playX: 2, ltX: 14, foldX: 31, nameXR: 99, nameMaxW: 50, linkX: 103, linkW: 27, peersX: 118, battX: 134, battW: 24,
-    tempoY: 16,
-    boxGap: 4, boxBorder: 2, boxSide: 27, boxY: 55,
-    stack: { withBar: { rowIN: 86, rowCF: 95, rowBAR: 104 }, noBar: { rowIN: 87, rowCF: 100 } }, stateY: 113,
+    tempoY: 16, linkTempoY: 19,
+    boxGap: 4, boxBorder: 2, boxY: 55, audioBox: { w: 36, h: 28, gap: 4 }, rowGap: 1, stateY: 113,
     linkBoxSide: 36, linkBoxY: 73,
     labelX: 2, valueXR: 158, barX: 64, barW: 62, lineH: 3, vuH: 5,
   };
@@ -734,7 +734,7 @@ const OLED = (() => {
   }
   function drawTempoLcd2(fb, c) {
     const bpm = c.link ? c.linkBpm : c.bpm, s = bpm ? bpm.toFixed(1) : '---', font = c.link ? BigFont.LARGE : BigFont.NORMAL;
-    font.draw((x, y) => px(fb, x, y, 1), s, Math.floor((W - font.width(s)) / 2), L2.tempoY);
+    font.draw((x, y) => px(fb, x, y, 1), s, Math.floor((W - font.width(s)) / 2), c.link ? L2.linkTempoY : L2.tempoY);
   }
 
   function rowText(fb, y, label, value) {
@@ -770,10 +770,10 @@ const OLED = (() => {
     frame(fb, L2.barX, y + 1, L2.barW, 5, 1);
     rect(fb, L2.barX + 1, y + 2, Math.round((L2.barW - 2) * clamp(frac, 0, 1)), 3, 1);
   }
-  const boxRowX = side => Math.floor((W - (4 * side + 3 * L2.boxGap)) / 2);          // the four squares as a row, centred
-  function beatBoxesLcd2(fb, c, x0, y, w, h) {                           // the beat indicator (no LEDs): the lit box solid, the others 2 px outlines; the first one is amber only while lit
+  const boxRowX = (w, gap) => Math.floor((W - (4 * w + 3 * gap)) / 2);          // the four boxes as a row, centred
+  function beatBoxesLcd2(fb, c, x0, y, w, h, gap) {                           // the beat indicator (no LEDs): the lit box solid, the others 2 px outlines; the first one is amber only while lit
     for (let i = 0; i < 4; i++) {
-      const x = x0 + i * (w + L2.boxGap), on = c.beatN != null && ((c.beatN % 4) + 4) % 4 === i;
+      const x = x0 + i * (w + gap), on = c.beatN != null && ((c.beatN % 4) + 4) % 4 === i;
       if (on) rect(fb, x, y, w, h, 1);
       else { frame(fb, x, y, w, h, 1); frame(fb, x + 1, y + 1, w - 2, h - 2, 1); }          // an unlit box: a 2 px outline
       if (i === 0 && on) tag(INK.ONE, x, y, w, h);
@@ -795,15 +795,22 @@ const OLED = (() => {
     const state = stateWordLcd2(c);
     if (state) inkText(fb, state[0], Math.floor((W - textW(state[0], 1)) / 2), L2.stateY, state[1]);
   }
+  // the AUDIO info rows (INPUT, CONFIDENCE, BAR when shown), RGAP apart, as one block centred vertically between the bottom of the beat boxes and the
+  // state line (y stateY): the empty rows above and below the block differ by at most 1, the odd one goes below
+  function audioRows(withBar) {
+    const n = withBar ? 3 : 2, block = n * 7 + (n - 1) * L2.rowGap, bottom = L2.boxY + L2.audioBox.h;
+    const rowIN = bottom + Math.floor((L2.stateY - bottom - block) / 2), pitch = 7 + L2.rowGap;
+    return { rowIN, rowCF: rowIN + pitch, rowBAR: rowIN + 2 * pitch };
+  }
   function drawHomeLcd2(fb, c, now) {
     drawTopBarLcd2(fb, c, now);
     drawTempoLcd2(fb, c);
     if (c.link) {
-      beatBoxesLcd2(fb, c, boxRowX(L2.linkBoxSide), L2.linkBoxY, L2.linkBoxSide, L2.linkBoxSide);
+      beatBoxesLcd2(fb, c, boxRowX(L2.linkBoxSide, L2.boxGap), L2.linkBoxY, L2.linkBoxSide, L2.linkBoxSide, L2.boxGap);
       return;
     }
-    const withBar = !!(c.bar && BAR_WORDS[c.bar.state]), r = withBar ? L2.stack.withBar : L2.stack.noBar;
-    beatBoxesLcd2(fb, c, boxRowX(L2.boxSide), L2.boxY, L2.boxSide, L2.boxSide);
+    const withBar = !!(c.bar && BAR_WORDS[c.bar.state]), b = L2.audioBox, r = audioRows(withBar);
+    beatBoxesLcd2(fb, c, boxRowX(b.w, b.gap), L2.boxY, b.w, b.h, b.gap);
     vuRow(fb, r.rowIN, c);
     const known = c.confKnown !== false;
     lineRow(fb, r.rowCF, 'CONFIDENCE', known ? Math.round(c.conf * 100) + '%' : '--', known ? c.conf : 0, c.th / 100, confInk(c));
