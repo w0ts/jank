@@ -104,7 +104,7 @@ const px = (img, x, y) => [...img.data.slice(4 * (y * 320 + x), 4 * (y * 320 + x
 }
 
 // ---- helpers that read the pixels: the 5 x 7 font is parsed from ui/oled.js's own table, so a text is checked pixel by pixel ----
-const L = OLED.LCD2, NB = L.stack.noBar, WB = L.stack.withBar, SQ = L.boxSide, X0A = Math.floor((160 - (4 * SQ + 3 * L.boxGap)) / 2);
+const L = OLED.LCD2, NB = { rowIN: 90, rowCF: 98 }, WB = { rowIN: 86, rowCF: 94, rowBAR: 102 }, AW = 36, AH = 28, X0A = 2;      // the AUDIO rows without / with the BAR row, written out
 const FONT = {};
 for (const m of oledSrc.matchAll(/'(.)': '([.#|]{41})'/g)) FONT[m[1]] = m[2].split('|');
 const adv = ch => ('.:,'.includes(ch) ? 3 : ch === ' ' ? 4 : 6);
@@ -123,15 +123,20 @@ function isText(d, s, x, y, ink) {
 const rightText = (s, xr = 158) => xr - textW(s);
 
 // ---- the labels, the rows: one table, every element's box, and nothing in the gaps ----
-const BANDS = [['top bar', 0, 12], ['tempo', L.tempoY, L.tempoY + 34], ['beat squares', L.boxY, L.boxY + SQ - 1], ['INPUT', WB.rowIN, WB.rowIN + 6], ['CONFIDENCE', WB.rowCF, WB.rowCF + 6], ['BAR', WB.rowBAR, WB.rowBAR + 6], ['state', L.stateY, L.stateY + 6]];
+const BANDS = [['top bar', 0, 12], ['tempo', L.tempoY, L.tempoY + 34], ['beat boxes', L.boxY, L.boxY + AH - 1], ['INPUT', WB.rowIN, WB.rowIN + 6], ['CONFIDENCE', WB.rowCF, WB.rowCF + 6], ['BAR', WB.rowBAR, WB.rowBAR + 6], ['state', L.stateY, L.stateY + 6]];
 for (let i = 1; i < BANDS.length; i++) ok(BANDS[i][1] > BANDS[i - 1][2], BANDS[i][0] + ' starts below ' + BANDS[i - 1][0] + ' (' + BANDS[i][1] + ' > ' + BANDS[i - 1][2] + '): the rows do not overlap');
 const gaps = bands => bands.slice(1).map((b, i) => b[1] - bands[i][2] - 1);
-eq(gaps(BANDS), [3, 4, 4, 2, 2, 2], 'with the BAR row, the empty rows between the items (top bar rows 0..12 incl. its margin row): 3 above the tempo (rows 13..15, 4 under the icons), 4 tempo to squares, 4 squares to INPUT, 2 between INPUT, CONFIDENCE, BAR and the state line');
-eq([L.tempoY - 12, L.boxY - (L.tempoY + 35), WB.rowIN - (L.boxY + SQ), WB.rowCF - (WB.rowIN + 7), WB.rowBAR - (WB.rowCF + 7), L.stateY - (WB.rowBAR + 7)], [4, 4, 4, 2, 2, 2], 'padding: 4 rows between the icons (y 1..11) and the tempo, 4 between the tempo and the squares, 4 between the squares and INPUT, then even gaps of 2');
-eq([L.tempoY + 34, L.boxY + SQ - 1, L.stateY + 6, X0A, X0A + 4 * SQ + 3 * L.boxGap], [50, 81, 119, 20, 140], 'tempo ends at y 50, the squares at y 81 (27 x 27, x 20..139), the state line at y 119 (the last row of the grid)');
+eq(gaps(BANDS), [3, 4, 3, 1, 1, 4], 'with the BAR row, the empty rows between the items: 3 (the top bar band ends at its margin row 12) above the tempo, 4 tempo to boxes, 3 boxes to INPUT, 1 between INPUT, CONFIDENCE and BAR, 4 BAR to the state line');
+eq([L.audioBox, L.rowGap, L.boxY, L.stateY], [{ w: 36, h: 28, gap: 4 }, 1, 55, 113], 'the AUDIO box data: 36 x 28, gap 4, y 55; the info rows 1 apart; the state line at y 113');
+eq([L.tempoY - 12, L.boxY - (L.tempoY + 35), WB.rowIN - (L.boxY + AH), WB.rowCF - (WB.rowIN + 7), WB.rowBAR - (WB.rowCF + 7), L.stateY - (WB.rowBAR + 7)], [4, 4, 3, 1, 1, 4], 'padding: 4 rows between the icons (y 1..11) and the tempo, 4 between the tempo and the boxes, 3 under the boxes, the info rows 1 apart, 4 above the state line');
+eq([L.tempoY + 34, L.boxY + AH - 1, L.stateY + 6, X0A, X0A + 4 * AW + 3 * L.audioBox.gap], [50, 82, 119, 2, 158], 'tempo ends at y 50, the boxes at y 82 (36 x 28, x 2..157 like LINK\'s), the state line at y 119 (the last row of the grid)');
+eq(Math.floor((160 - (4 * L.linkBoxSide + 3 * L.boxGap)) / 2), X0A, 'the AUDIO boxes are at the same x positions as LINK\'s (x 2, 42, 82, 122)');
 {
-  const nb = [['tempo', L.tempoY, L.tempoY + 34], ['beat squares', L.boxY, L.boxY + SQ - 1], ['INPUT', NB.rowIN, NB.rowIN + 6], ['CONFIDENCE', NB.rowCF, NB.rowCF + 6], ['state', L.stateY, L.stateY + 6]];
-  eq(gaps(nb), [4, 5, 6, 6], 'without the BAR row: 4 tempo to squares, 5 squares to INPUT, 6 between INPUT, CONFIDENCE and the state line (the 9 free rows go to the gaps; the squares do not move)');
+  const nb = [['tempo', L.tempoY, L.tempoY + 34], ['beat boxes', L.boxY, L.boxY + AH - 1], ['INPUT', NB.rowIN, NB.rowIN + 6], ['CONFIDENCE', NB.rowCF, NB.rowCF + 6], ['state', L.stateY, L.stateY + 6]];
+  eq(gaps(nb), [4, 7, 1, 8], 'without the BAR row: 4 tempo to boxes, 7 boxes to INPUT, 1 between INPUT and CONFIDENCE, 8 CONFIDENCE to the state line');
+  // the info block is centred between the boxes (last row 82) and the state line (first row 113): the empty rows above and below differ by at most 1, the odd one is below
+  const block = (rows, top, n) => [top - (L.boxY + AH), L.stateY - (top + rows)];
+  eq([block(23, WB.rowIN), block(15, NB.rowIN)], [[3, 4], [7, 8]], 'the info block (with BAR 23 rows, without 15) is centred in the 30 rows between the boxes and the state line: 3 above and 4 below, 7 above and 8 below (an odd leftover goes below)');
 }
 const barOn = { bar: { state: 'locked', conf: 0.5 } };
 const full = drawn(ctxOf({ ctx: barOn }));
@@ -185,9 +190,9 @@ const full = drawn(ctxOf({ ctx: barOn }));
   eq([LG.GLYPHS['0'][0], LG.GLYPHS['0'][10], LG.SMALL['0'][0]], ['...#############################...', '#######.....................#######', '..###################..'], 'LARGE 0: 7 px strokes, 3 px corner cuts; small 0: 5 px strokes, 2 px cuts');
   eq(['120.0', '98.4', '88.8', '146.1', '---', '999.9'].map(t => LG.width(t)), [151, 112, 112, 151, 113, 151], 'LARGE widths: 120.0 = 3 x 35 + 7 + 23 + 4 x 4 = 151, all fit 156');
   for (const [t, bpm] of [['120.0', 120], ['98.4', 98.4], ['88.8', 88.8], ['146.1', 146.1], ['---', null]]) {
-    const left = Math.floor((160 - LG.width(t)) / 2), want = new Set(); LG.draw((x, y) => want.add(y * 160 + x), t, left, L.tempoY);
+    const left = Math.floor((160 - LG.width(t)) / 2), want = new Set(); LG.draw((x, y) => want.add(y * 160 + x), t, left, L.linkTempoY);
     const k = drawn(ctxOf({ home: { audio: false, link: 1, bpm } }, {}));
-    let same = true; for (let j = L.tempoY; j < L.tempoY + 47; j++) for (let i = 0; i < 160; i++) if ((k.fb[j * 160 + i] === 1) !== want.has(j * 160 + i)) same = false;
+    let same = true; for (let j = L.linkTempoY; j < L.linkTempoY + 47; j++) for (let i = 0; i < 160; i++) if ((k.fb[j * 160 + i] === 1) !== want.has(j * 160 + i)) same = false;
     ok(same && left === Math.floor((160 - LG.width(t)) / 2), 'LINK: the tempo "' + t + '" is drawn with the LARGE tables, centred (left ' + left + ', width ' + LG.width(t) + ')');
   }
   { const d = drawn(ctxOf({ home: { bpm: 120 } }), {}), x0 = 24, smallX = x0 + 26 * 3 + 5 + 4 * 3 - 0;
@@ -197,7 +202,7 @@ const full = drawn(ctxOf({ ctx: barOn }));
 }
 
 // healthy: ink only inside the top bar's link / battery, the first beat box, the CONFIDENCE number and line and the VU bar
-const R = { link: [L.linkX, 0, L.linkW, 13], batt: [L.battX, 1, L.battW, 11], beat1: [X0A, L.boxY, SQ, SQ],
+const R = { link: [L.linkX, 0, L.linkW, 13], batt: [L.battX, 1, L.battW, 11], beat1: [X0A, L.boxY, AW, AH],
             cfValue: [158 - 23, NB.rowCF, 23, 7], cfBar: [L.barX, NB.rowCF, L.barW, 7], inValue: [158 - 29, NB.rowIN, 29, 7], inBar: [L.barX, NB.rowIN, L.barW, 7] };
 const insideAny = (boxes, x, y) => boxes.some(([bx, by, bw, bh]) => x >= bx && x < bx + bw && y >= by && y < by + bh);
 const outsideInk = (d, boxes) => { let n = 0; for (let i = 0; i < d.ink.length; i++) if (d.ink[i] !== 0 && !insideAny(boxes, i % d.w, Math.floor(i / d.w))) n++; return n; };
@@ -207,7 +212,7 @@ eq(outsideInk(healthy, [R.link, R.batt, R.beat1, R.cfValue, R.cfBar, R.inBar, [2
 eq(idsIn(healthy, ...R.link), [INK.GOOD], 'joined (2 Link peers): the link glyph and its count are green');
 eq(idsIn(healthy, ...R.batt), [0], '80 %: the battery is neutral (colour only when it informs)');
 eq(idsIn(healthy, ...R.beat1), [INK.ONE], 'the first beat box, lit, carries the bar-1 id');
-eq([1, 2, 3].map(i => idsIn(healthy, X0A + i * (SQ + L.boxGap), L.boxY, SQ, SQ)), [[0], [0], [0]], 'the other boxes are neutral');
+eq([1, 2, 3].map(i => idsIn(healthy, X0A + i * (AW + L.audioBox.gap), L.boxY, AW, AH)), [[0], [0], [0]], 'the other boxes are neutral');
 eq(idsIn(healthy, ...R.cfValue), [INK.GOOD], 'CONFIDENCE 90 against 70: the value is green');
 eq(idsIn(healthy, ...R.inValue), [0], 'an input at -20 dB: the number is neutral');
 
@@ -215,14 +220,14 @@ eq(idsIn(healthy, ...R.inValue), [0], 'an input at -20 dB: the number is neutral
 {
   const on = drawn(ctxOf({ ctx: { beatN: 4 } })), off = drawn(ctxOf({ ctx: { beatN: 1 } })), none = drawn(ctxOf({ ctx: { beatN: null } }));
   eq([idsIn(on, ...R.beat1), idsIn(off, ...R.beat1), idsIn(none, ...R.beat1)], [[INK.ONE], [0], [0]], 'beat 4 is the bar\'s first again (amber); beat 2 and no beat: the first box is a neutral frame');
-  const box = (d, i) => litIn(d, X0A + i * (SQ + L.boxGap), L.boxY, SQ, SQ).length;
+  const box = (d, i) => litIn(d, X0A + i * (AW + L.audioBox.gap), L.boxY, AW, AH).length;
   const outline = (w, h) => w * h - (w - 4) * (h - 4);
-  eq([box(on, 0), box(on, 1), box(off, 1), box(off, 0)], [SQ * SQ, outline(SQ, SQ), SQ * SQ, outline(SQ, SQ)], 'the lit box is solid (27 x 27), the others are 2 px outlines');
+  eq([box(on, 0), box(on, 1), box(off, 1), box(off, 0)], [AW * AH, outline(AW, AH), AW * AH, outline(AW, AH)], 'the lit box is solid (36 x 28), the others are 2 px outlines');
 }
 
 // the four boxes, every beat, both layouts: exact rectangles, solid when lit, 2 px outline when not, even gaps, amber only for a lit first box
-for (const [mode, over, y, h] of [['AUDIO', {}, L.boxY, SQ], ['AUDIO (BAR row)', { ctx: barOn }, L.boxY, SQ], ['LINK', { home: { audio: false, link: 1 } }, L.linkBoxY, L.linkBoxSide]]) {
-  const W0 = h, X0 = Math.floor((160 - (4 * W0 + 3 * L.boxGap)) / 2);
+for (const [mode, over, y, h, w] of [['AUDIO', {}, L.boxY, AH, AW], ['AUDIO (BAR row)', { ctx: barOn }, L.boxY, AH, AW], ['LINK', { home: { audio: false, link: 1 } }, L.linkBoxY, L.linkBoxSide, L.linkBoxSide]]) {
+  const W0 = w, X0 = Math.floor((160 - (4 * W0 + 3 * L.boxGap)) / 2);
   for (let beat = 0; beat < 4; beat++) {
     const d = drawn(ctxOf({ ...over, ctx: { ...(over.ctx || {}), beatN: beat } }));
     const ids = [], solid = [];
@@ -243,7 +248,7 @@ for (const [mode, over, y, h] of [['AUDIO', {}, L.boxY, SQ], ['AUDIO (BAR row)',
   }
   const d = drawn(ctxOf({ ...over, ctx: { ...(over.ctx || {}), beatN: 1 } }));
   let gapLit = 0; for (let g = 0; g < 3; g++) for (let k = 0; k < L.boxGap; k++) gapLit += litIn(d, X0 + (g + 1) * W0 + g * L.boxGap + k, y, 1, h).length;
-  eq([gapLit, litIn(d, 0, y, X0, h).length, litIn(d, X0 + 4 * W0 + 3 * L.boxGap, y, d.w - (X0 + 4 * W0 + 3 * L.boxGap), h).length], [0, 0, 0], mode + ': the three 4 px gaps and the side margins are dark; width == height: ' + W0 + ' x ' + h + '');
+  eq([gapLit, litIn(d, 0, y, X0, h).length, litIn(d, X0 + 4 * W0 + 3 * L.boxGap, y, d.w - (X0 + 4 * W0 + 3 * L.boxGap), h).length], [0, 0, 0], mode + ': the three 4 px gaps and the side margins are dark; ' + W0 + ' x ' + h + '');
 }
 
 // ---- confidence: the value, the line and the notch all carry the id of the rule ----
@@ -410,11 +415,27 @@ eq(idsIn(drawn(ctxOf({ home: { battery: null } })), ...R.batt), [], 'no battery 
   eq(litIn(drawn(ctxOf({ ctx: { gated: true } })), 0, 111, 160, 2).length, 0, 'the state line keeps its place (y 113..119) whether a word is shown or not: the gap above it is empty');
 }
 
+// ---- the margins around the tempo, measured on the LIT pixels of drawn frames: above (last lit row of the top bar to the first lit row of the digits) == below (last lit row of the digits to the first lit row of the squares) ----
+{
+  const litRowsOf = (d, x0, x1, y0, y1) => { const r = []; for (let j = y0; j <= y1; j++) for (let i = x0; i < x1; i++) if (d.fb[j * d.w + i]) { r.push(j); break; } return r; };
+  const margins = (d, tempoTop, boxTop) => {
+    const bar = litRowsOf(d, 0, 160, 0, tempoTop - 1), digits = litRowsOf(d, 0, 160, tempoTop, boxTop - 1), box = litRowsOf(d, 0, 160, boxTop, boxTop);
+    return { above: digits[0] - bar[bar.length - 1] - 1, below: boxTop - digits[digits.length - 1] - 1, first: digits[0], last: digits[digits.length - 1], box: box[0] };
+  };
+  for (const [t, bpm] of [['120.0', 120], ['98.4', 98.4], ['88.8', 88.8], ['146.1', 146.1], ['133.3', 133.3], ['999.9', 999.9]]) {
+    const a = margins(drawn(ctxOf({ home: { bpm } })), L.tempoY - 3, L.boxY), k = margins(drawn(ctxOf({ home: { audio: false, link: 1, bpm } })), L.linkTempoY - 3, L.linkBoxY);
+    eq([a.above, a.below, a.first, a.last], [4, 4, 16, 50], 'AUDIO "' + t + '": lit margins above (top bar y 11 to the digits y 16) and below (digits to y 50, squares y 55) are both 4 rows');
+    eq([k.above, k.below, k.first, k.last], [7, 7, 19, 65], 'LINK "' + t + '": lit margins above (y 11 to y 19) and below (y 65 to the squares at y 73) are both 7 rows');
+  }
+  { const a = margins(drawn(ctxOf({ home: { bpm: null } })), L.tempoY - 3, L.boxY), k = margins(drawn(ctxOf({ home: { audio: false, link: 1, bpm: null } })), L.linkTempoY - 3, L.linkBoxY);
+    eq([a.above, a.below, k.above, k.below], [19, 19, 26, 27], '"---" (only the dash rows are lit, in the middle of the digit cell): AUDIO 19 above and 19 below; LINK 26 above and 27 below (the 8 dash rows cannot sit exactly in the middle of 47)'); }
+}
+
 // ---- the LINK layout: the same top bar, the LARGE tempo, four SQUARE beat boxes, no audio rows, no state line ----
 {
   const link = drawn(ctxOf({ home: { audio: false, link: 1, bpm: 98.4 } })), S = L.linkBoxSide, x0 = Math.floor((160 - (4 * S + 3 * L.boxGap)) / 2);
   eq([S, L.linkBoxY, x0, 4 * S + 3 * L.boxGap], [36, 73, 2, 156], 'LINK: four square boxes 36 x 36 with 4 px gaps, a row of 156 centred (x 2..157), at y 73..108');
-  eq([L.tempoY - 12, L.linkBoxY - (L.tempoY + 47), 120 - (L.linkBoxY + S)], [4, 10, 11], 'LINK: 4 empty rows between the top bar icons and the tempo (y 16..62); the squares are centred in the space under it (10 empty rows above, 11 below, both over the 4 px minimum)');
+  eq([L.linkTempoY - 12, L.linkBoxY - (L.linkTempoY + 47), 120 - (L.linkBoxY + S)], [7, 7, 11], 'LINK: the LARGE tempo (y 19..65) has 7 empty rows above (under the top bar icons) and 7 below (to the squares); the squares keep their place, 11 empty rows under them');
   for (let i = 0; i < 4; i++) {
     const x = x0 + i * (S + L.boxGap), on = drawn(ctxOf({ home: { audio: false, link: 1 }, ctx: { beatN: i } }));
     let solid = true, ring = true, inner = 0; for (let dy = 0; dy < S; dy++) for (let dx = 0; dx < S; dx++) { const v = on.fb[(L.linkBoxY + dy) * 160 + x + dx], edge = dx < 2 || dy < 2 || dx >= S - 2 || dy >= S - 2; if (!v) solid = false; if (edge && !v) ring = false; if (!edge && v) inner++; }
@@ -424,7 +445,7 @@ eq(idsIn(drawn(ctxOf({ home: { battery: null } })), ...R.batt), [], 'no battery 
   }
   eq([0, 1, 2].map(g => litIn(link, x0 + (g + 1) * S + g * L.boxGap, L.linkBoxY, L.boxGap, S).filter(() => true).length), [0, 0, 0], 'LINK: the three 4 px gaps between the boxes are dark');
   eq([litIn(link, 0, L.linkBoxY + S, link.w, 120 - L.linkBoxY - S).length, outsideInk(link, [R.link, R.batt, [x0, L.linkBoxY, 4 * S + 12, S]])], [0, 0], 'LINK HOME: nothing under the boxes (no CONFIDENCE, INPUT or BAR rows, no state line), no stray ink');
-  ok(litRows(link, 0, 160).has(L.tempoY + 46) && !litRows(link, 0, 160).has(L.tempoY + 47) && !litRows(link, 0, 160).has(L.linkBoxY - 1), 'the LARGE tempo fills rows 16..62 and nothing lies between it and the boxes');
+  ok(litRows(link, 0, 160).has(L.linkTempoY + 46) && !litRows(link, 0, 160).has(L.linkTempoY + 47) && !litRows(link, 0, 160).has(L.linkBoxY - 1), 'the LARGE tempo fills rows 19..65 and nothing lies between it and the boxes');
 }
 
 // ---- menus, edit, info, net, text, confirm, setup: neutral, the whole grid, no ink ----
