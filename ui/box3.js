@@ -5,7 +5,9 @@ const BOX3 = {
   case: { w: 100, h: 79, r: 3 },
   // the Waveshare LCD-2 in landscape: the active area, and the lid window one mm bigger on each side; the 320 x 240 canvas fills the active area
   screen: { x: 9.7, y: 24.2, w: 40.8, h: 30.6, windowMargin: 1 },
-  keys: { d: 6, up: [67.0, 30.5], down: [67.0, 48.5], no: [58.0, 39.5], yes: [76.0, 39.5] },
+  // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
+  cross: { cx: 67.0, cy: 39.5, span: 24, arm: 8 },
+  switches: { up: [67.0, 31.5], down: [67.0, 47.5], no: [59.0, 39.5], yes: [75.0, 39.5] },
   keyMarks: { up: '▲', down: '▼', no: 'NO', yes: 'YES' },
   // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
   ports: [
@@ -30,7 +32,16 @@ const Box3 = (() => {
     const y = p.wall === 'top' ? -k.depth : p.wall === 'bottom' ? c.h : p.at - h / 2;
     return { x, y, w, h };
   }
-  const keyCentre = (name) => BOX3.keys[name];
+  // a button's click area: the arm's end square (arm x arm mm) centred on its switch; the cross' centre square is no button
+  function armRect(name) {
+    const a = BOX3.cross.arm, [x, y] = BOX3.switches[name];
+    return { x: x - a / 2, y: y - a / 2, w: a, h: a };
+  }
+  // the cap's outline: a plus, twelve corners
+  function crossPoints() {
+    const { cx, cy, span, arm } = BOX3.cross, h = span / 2, a = arm / 2;
+    return [[cx - a, cy - h], [cx + a, cy - h], [cx + a, cy - a], [cx + h, cy - a], [cx + h, cy + a], [cx + a, cy + a], [cx + a, cy + h], [cx - a, cy + h], [cx - a, cy + a], [cx - h, cy + a], [cx - h, cy - a], [cx - a, cy - a]];
+  }
   // the view box: the case and the port stubs, with a small margin
   function viewBox() {
     const rects = BOX3.ports.map(portRect);
@@ -63,13 +74,15 @@ const Box3 = (() => {
       const r = portRect(p);
       return make(svg, 'rect', { id: 'port-' + p.id, x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1, class: 'port' });
     }));
-    svg.querySelector('#dpad').replaceChildren(...['up', 'down', 'no', 'yes'].map((name) => {
-      const [x, y] = keyCentre(name), g = make(svg, 'g', { id: 'arm-' + name, 'data-b': name });
-      const mark = make(svg, 'text', { x, y: y + (name === 'no' || name === 'yes' ? 0.9 : 1.1), class: name === 'no' || name === 'yes' ? 'glyph s' : 'glyph' });
+    const cap = make(svg, 'path', { id: 'cap', d: 'M' + crossPoints().map(([x, y]) => mm(x) + ' ' + mm(y)).join('L') + 'Z', class: 'cap' });
+    svg.querySelector('#dpad').replaceChildren(cap, ...['up', 'down', 'no', 'yes'].map((name) => {
+      const [x, y] = BOX3.switches[name], r = armRect(name), g = make(svg, 'g', { id: 'arm-' + name, 'data-b': name });
+      const wide = name === 'no' || name === 'yes';
+      const mark = make(svg, 'text', { x, y: y + (wide ? 0.9 : 1.1), class: wide ? 'glyph s' : 'glyph' });
       mark.textContent = BOX3.keyMarks[name];
-      g.append(make(svg, 'circle', { cx: x, cy: y, r: BOX3.keys.d / 2, class: 'btnarm' }), mark);
+      g.append(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }), mark);
       return g;
     }));
   }
-  return { build, placeScreen, windowRect, portRect, viewBox, canvasArea };
+  return { build, placeScreen, windowRect, portRect, viewBox, canvasArea, armRect, crossPoints };
 })();
