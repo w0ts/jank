@@ -317,6 +317,7 @@ static void ui_task(void *arg)
         on_button(jb_step(&b, no, now));
         if (UI_STATE)
             uis_step(now, &s_led);
+        uis_sys_step(now);               /* (the ABOUT numbers for the control line, also where there is no screen) */
         led_step(now);
         if ((uint32_t)(now - last_auto) >= AUTO_CHECK_MS) {
             last_auto = now;
