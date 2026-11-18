@@ -130,7 +130,8 @@ static void press_home(struct jo_ui *ui, enum jo_btn b, int d, uint32_t now, con
         char v[16] = "---";
         if (ops && ops->tempo_step && ops->tempo_step(ops->user, d, &bpm) == 0)
             jo_fixed(bpm, 1, v, sizeof v);
-        overlay(ui, now, c->link ? "LINK TEMPO" : d > 0 ? "DOUBLE" : "HALF", v);
+        if (!c->link)                                 /* a Link step shows on the big tempo itself */
+            overlay(ui, now, d > 0 ? "DOUBLE" : "HALF", v);
     } else if (b == JO_YES) {                         /* Stop / Start the outputs; the transport icon shows it */
         if (c->link) {
             if (ops && ops->link_start_stop)
