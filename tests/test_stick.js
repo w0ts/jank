@@ -73,6 +73,8 @@ eq(Stick.ctx(state({ home: home('h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1') })
 eq([a.th, a.confStop, a.ltMode, a.inSrc, a.usbMidi, a.autoBar, a.net.group, a.net.mode, a.gain, a.inOff], [80, true, 2, 0, 0, 1, 1, 0, 0, 0], 'get: threshold, lowconf, transport, source, usbmidi, autobar, group, net');
 const g2 = { ...get, lowconf: 'run', transport: 'auto', source: 'usb', usbmidi: 'off', autobar: 'always', net: 'wifi', ssid: 'HomeNet', pass: 'set', line_gain: '3', lat_trim: '-4', usb: 'host', threshold: '55' };
 const b = Stick.ctx(state({ get: g2 }), 1000);
+eq([get.lead, a.ltMode], ['on', 2], 'the get transcript has lead=on: transport link + lead -> FOLLOW+LEAD (2)');
+eq([[{ ...get, lead: 'off' }, { ...get, lead: 'on' }, { ...get, lead: 'off', transport: 'auto' }, { ...get, lead: 'on', transport: 'auto' }].map(x => Stick.ctx(state({ get: x }), 1000).ltMode), Stick.ctx(state({ get: { ...get, lead: undefined } }), 1000).ltMode], [[1, 2, 0, 0], 2], 'ltMode as the firmware: auto 0, else lead 2 / FOLLOW 1; no lead key (older jank): 2');
 eq([b.th, b.confStop, b.ltMode, b.inSrc, b.usbMidi, b.autoBar, b.net.mode, b.net.ssid, b.net.pass, b.gain, b.inOff, b.usbRole], [55, false, 0, 2, 1, 2, 1, 'HomeNet', '********', 3, -4, 1], 'get: the other values');
 const st = Stick.ctx(state({ status: { ...status, gated: '1', bar: 'locked', bar_lead: '1.00', link_ip: '10.0.0.5', fold_manual: '0' }, statusAt: 1000 }), 1500);
 eq([st.gated, st.bar, st.net.ip], [true, { state: 'locked', conf: 0.5 }, '10.0.0.5'], 'status: the gate, the bar estimator, the address');
@@ -105,8 +107,9 @@ eq([F('lowconf', 0).commands[0], F('lowconf', 1).commands[0]], ['set lowconf run
 eq([0, 1, 2].map(v => F('autobar', v).commands[0]), ['set autobar off', 'set autobar start', 'set autobar always'], 'AUTO BAR');
 eq([F('usbmidi', 0).commands, F('usbmidi', 1).commands], [['set usbmidi on'], ['set usbmidi off']], 'USB MIDI CLOCK');
 ok(/does not take/.test(F('nosuch', 0).refuse), 'a field the control line does not know is refused with the reason');
-eq([F('ltmode', 0).commands, F('ltmode', 2).commands], [['set transport auto'], ['set transport link']], 'LINK TRANSPORT: IGNORE / FOLLOW+LEAD');
-ok(/FOLLOW is not on the control line/.test(F('ltmode', 1).refuse), 'FOLLOW has no control-line value: refused with the reason');
+eq([0, 1, 2].map(v => F('ltmode', v).commands), [['set transport auto'], ['set transport link', 'set lead off'], ['set transport link', 'set lead on']], 'LINK TRANSPORT: IGNORE / FOLLOW / FOLLOW+LEAD');
+eq([F('ltmode', 0, false).commands, F('ltmode', 2, false).commands], [['set transport auto'], ['set transport link']], 'a jank without `lead`: IGNORE / FOLLOW+LEAD as before');
+ok(/FOLLOW is not on the control line/.test(F('ltmode', 1, false).refuse), 'a jank without `lead`: FOLLOW is refused with the old reason');
 for (const f of ['out0', 'out1', 'out2', 'rate', 'bright', 'sleep', 'ssid', 'pass', 'apname', 'appass', 'netmode', 'usbrole']) ok(typeof F(f, 0).refuse === 'string' && F(f, 0).refuse.length > 10 && !F(f, 0).commands, f + ' is refused with a reason, nothing sent');
 ok(!!F('nonsense', 1).refuse, 'an unknown field is refused, not ignored');
 const aud = Stick.ctx(state(), 1000), lnk = Stick.ctx(state({ home: LINK }), 1000);
