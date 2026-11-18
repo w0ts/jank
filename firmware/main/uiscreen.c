@@ -311,6 +311,10 @@ void uis_sys(struct jk_sys *out)
     snprintf(out->reset, sizeof out->reset, "%s", reset_name());
 }
 
+/* the sampler's own step, called every loop by the ui task whether or not it keeps a screen's state (UI_STATE in ui.c is false on the plain
+ * XIAO, where uis_step never runs: the control line's `about` would answer all unknowns). Rate-limited inside; the same task as build_ctx's call */
+void uis_sys_step(uint32_t now) { sys_sample(now); }
+
 static const struct jo_ctx *build_ctx(void *user, uint32_t now)
 {
     struct jo_ctx *c = &s_ctx;
