@@ -1,8 +1,8 @@
 # jank on the Waveshare ESP32-S3-LCD-2 (board `lcd2`)
 
 Stage 1 (2026-11-17): the firmware builds for the board (`scripts/build.sh lcd2`); nothing has run on hardware. The screen
-is the same 128 x 64 1-bit UI as the OLED's, drawn in landscape (320 x 240). Stage 1 drew it in one foreground colour;
-stage 2 (2026-11-17) draws it in the approved colour design: neutral near-white on near-black, with colour only where it informs
+is the same UI as the OLED's, drawn in landscape (320 x 240). Stage 1 drew it in one foreground colour;
+stage 2 (2026-11-17) draws it in the approved colour design (on its own 160 x 120 grid, painted x2; since 2026-11-18 at the true 320 x 240 pixels): neutral near-white on near-black, with colour only where it informs
 (docs/lcd2-colors.md: the confidence number, link glyph, signal bars, battery, input level, the bar's first beat while it is lit).
 
 ## Sources (read in this session)
@@ -106,16 +106,17 @@ measured on the panel: the colours as it shows them, its gamma and viewing angle
 
 ## Drawing
 
-The lcd2 layout has its own 160 x 120 grid (ui/oled.js, `ctx.layout 'lcd2'`; C: `core/jank_oled_lcd2.c`, `jo_draw_lcd2`), painted **exactly x2**
-on 320 x 240: no bands, no centring (`core/jank_lcd.c`, host-tested in `tests/test_lcd.c`). The frame is 160 x 120 bits (2.4 KB, page
-layout), the ink plane 160 x 120 bytes (19.2 KB). Colours: the palette in `core/jank_lcd.h` (`JLC_PALETTE`, `JLC_INK_MAP`), checked against `ui/lcd2.js` by `tests/test_lcd_palette.js`, converted to RGB565 once. Nothing is measured on the panel
-(colours as shown, gamma, viewing angle).
+The lcd2 layout is drawn at the panel's own 320 x 240 pixels (ui/oled.js, `ctx.layout 'lcd2'`; C: `core/jank_oled_lcd2.c`, `jo_draw_lcd2`), one frame pixel per panel pixel: no scaling, no bands, no
+centring (`core/jank_lcd.c`, host-tested in `tests/test_lcd.c`). The frame is 320 x 240 bits (9.6 KB, page layout), the ink plane 320 x 240 bytes (76.8 KB). Colours: the palette in `core/jank_lcd.h`
+(`JLC_PALETTE`, `JLC_INK_MAP`), checked against `ui/lcd2.js` by `tests/test_lcd_palette.js`, converted to RGB565 once. Nothing is measured on the panel (colours as shown, gamma, viewing angle).
 
-Only the changed 16-row strips are sent (the first frame in full); SPI clock 40 MHz; the task runs on core 0 at priority 1.
+Only the changed 8-row strips are sent (the first frame in full); SPI clock 40 MHz; the task runs on core 0 at priority 1.
 
-RAM (from the linked image): the three frames 3 x 2.4 KB and the DMA chunk buffers 5 KB are internal `.bss` / `.data`; the four ink planes
-(UI, pending, being sent, shown: 76.8 KB) are heap, from PSRAM when the board has it (else internal, where the allocation may fail). Not
-observed: whether they land in PSRAM.
+RAM: the four ink planes (UI, pending, being sent, shown: 4 x 76.8 KB) and the four 1-bit frames (the UI's, pending, being sent, shown: 4 x 9.6 KB) are ONE block of 345.6 KB from PSRAM (`lcd.c`,
+`heap_caps_calloc(MALLOC_CAP_SPIRAM)`); there is no internal fallback (the internal RAM has no room for them: the screen does not start without PSRAM, and logs why). Only the two DMA chunk buffers
+(2 x 4 rows x 320 x 2 B = 5 KB) are internal. Nothing in PSRAM is handed to the DMA. Not observed: that the block lands in PSRAM, how fast the frame passes (every frame copies the 9.6 KB frame and the 76.8 KB ink
+plane into the pending slot, compares them with the shown one and copies them again once sent: all in PSRAM) and how long the redraw takes (`jo_draw_lcd2` also clears and filters the whole ink plane, one pass over 76.8 K
+pixels each); the ABOUT screen's UI LOOP row is there to measure it on the board.
 
 ## UNVERIFIED
 

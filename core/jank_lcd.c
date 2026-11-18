@@ -29,7 +29,7 @@ static const uint8_t VU_RGB[][3] = {
 
 _Static_assert(sizeof INK_COLOUR == JO_INK_VU0, "one palette colour for each ink id below the VU ramp");
 _Static_assert(sizeof VU_RGB / sizeof VU_RGB[0] == JO_VU_STEPS, "one ramp colour for each VU step");
-_Static_assert(JLC_W == JO_LCD2_W * JLC_SCALE && JLC_H == JO_LCD2_H * JLC_SCALE, "the frame fills the panel exactly");
+_Static_assert(JLC_W == JO_LCD2_W && JLC_H == JO_LCD2_H, "the frame fills the panel exactly");
 
 uint16_t jlc_rgb565(uint8_t r, uint8_t g, uint8_t b) { return (uint16_t)((r & 0xF8u) << 8 | (g & 0xFCu) << 3 | b >> 3); }
 
@@ -48,19 +48,18 @@ void jlc_palette(struct jlc_pal *pal, int swap_bytes)
 
 void jlc_row(const uint8_t fb[JO_LCD2_FB_BYTES], const uint8_t *ink, const struct jlc_pal *pal, unsigned y, uint16_t row[JLC_W])
 {
-    unsigned fy = y / JLC_SCALE, bit = fy % 8u;
-    const uint8_t *page = fb + (fy / 8u) * JO_LCD2_W;
+    unsigned bit = y % 8u;
+    const uint8_t *page = fb + (y / 8u) * JO_LCD2_W;
     for (unsigned x = 0; x < JO_LCD2_W; x++) {
         uint16_t v = pal->bg;
         if (page[x] >> bit & 1u) {
-            unsigned id = ink ? ink[fy * JO_LCD2_W + x] : 0u;
+            unsigned id = ink ? ink[y * JO_LCD2_W + x] : 0u;
             v = pal->ink[id < JO_INK_IDS ? id : 0u];
         }
-        row[JLC_SCALE * x] = v;
-        row[JLC_SCALE * x + 1] = v;
+        row[x] = v;
     }
 }
 
-unsigned jlc_page_y(unsigned page) { return page * 8u * JLC_SCALE; }
+unsigned jlc_page_y(unsigned page) { return page * 8u; }
 
-unsigned jlc_page_rows(void) { return 8u * JLC_SCALE; }
+unsigned jlc_page_rows(void) { return 8u; }

@@ -1,24 +1,30 @@
 // node scripts/gen_bigfont.js > core/jank_bigfont_tables.c
-// The big tempo digits of the lcd2 layout as const tables for the firmware: ui/bigfont.js's own glyph rows, one integer per row (the leftmost
-// column is the highest bit of the glyph's width). tests/test_oled.c draws the tempo texts with these tables and compares them with the
-// frames ui/oled.js draws with ui/bigfont.js, so a table that differs from the JS fails there.
+// The big tempo digits of the lcd2 layout as const tables for the firmware: ui/bigfont.js's own glyph rows, each row packed into whole bytes, the
+// leftmost column the highest bit of the first byte (a glyph of width w has ceil(w / 8) bytes per row, the unused bits 0). tests/test_oled.c draws
+// the tempo texts with these tables and compares them with the frames ui/oled.js draws with ui/bigfont.js, so a table that differs from the JS fails there.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const BigFont = new Function(fs.readFileSync(path.join(__dirname, '..', 'ui', 'bigfont.js'), 'utf8') + '; return BigFont;')();
 
 const ORDER = '0123456789-.';
-const mask = row => parseInt(row.replace(/#/g, '1').replace(/\./g, '0'), 2);
-const hex = (v, digits) => '0x' + v.toString(16).padStart(digits, '0');
-const hexDigits = w => Math.ceil(w / 4);
+const bytesOf = row => {
+  const out = [];
+  for (let i = 0; i < row.length; i += 8) {
+    let b = 0;
+    for (let k = 0; k < 8; k++) b = b << 1 | (row[i + k] === '#' ? 1 : 0);
+    out.push('0x' + b.toString(16).padStart(2, '0'));
+  }
+  return out;
+};
 const lines = [];
 
-function table(type, name, glyphs, chars, rows) {
-  lines.push('static const ' + type + ' ' + name + '[' + chars.length + '][' + rows + '] = {');
+function table(name, glyphs, chars, rows) {
+  lines.push('static const uint8_t ' + name + '[] = {');
   for (const ch of chars) {
-    const g = glyphs[ch], d = hexDigits(g[0].length);
+    const g = glyphs[ch];
     if (g.length !== rows) throw new Error(name + ' ' + ch + ': ' + g.length + ' rows');
-    lines.push('    {/* ' + ch + ' */ ' + g.map(r => hex(mask(r), d)).join(', ') + '},');
+    lines.push('    /* ' + ch + ' */ ' + g.map(r => bytesOf(r).join(', ')).join(', ') + ',');
   }
   lines.push('};');
 }
@@ -29,9 +35,9 @@ lines.push('#include "jank_bigfont.h"');
 lines.push('');
 for (const [key, label] of [['NORMAL', 'normal'], ['LARGE', 'large']]) {
   const f = BigFont[key], w = f.GLYPHS['0'][0].length, dot = f.GLYPHS['.'][0].length, sw = f.SMALL['0'][0].length;
-  table('uint64_t', label + '_big', f.GLYPHS, ORDER, f.ROWS);
-  table('uint32_t', label + '_small', f.SMALL, ORDER.slice(0, 10), f.SMALL_ROWS);
-  lines.push('const struct jbf_font jbf_' + label + ' = {' + [f.ROWS, f.SMALL_ROWS, f.GAP, w, dot, sw].join(', ') + ', ' + label + '_big[0], ' + label + '_small[0]};');
+  table(label + '_big', f.GLYPHS, ORDER, f.ROWS);
+  table(label + '_small', f.SMALL, ORDER.slice(0, 10), f.SMALL_ROWS);
+  lines.push('const struct jbf_font jbf_' + label + ' = {' + [f.ROWS, f.SMALL_ROWS, f.GAP, w, dot, sw].join(', ') + ', ' + label + '_big, ' + label + '_small};');
   lines.push('');
 }
 process.stdout.write(lines.join('\n') + '\n');

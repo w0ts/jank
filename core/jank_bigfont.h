@@ -9,8 +9,8 @@
 struct jbf_font {
     uint8_t rows, small_rows, gap;        /* big glyph height, small digit height, columns between glyphs */
     uint8_t width, dot_width, small_width;
-    const uint64_t *big;                  /* '0'..'9', '-', '.' (12 glyphs of `rows` rows); a row is its columns, the leftmost the highest bit */
-    const uint32_t *small;                /* '0'..'9' (10 glyphs of `small_rows` rows) */
+    const uint8_t *big;                   /* '0'..'9', '-', '.' (12 glyphs of `rows` rows); a row is ceil(width / 8) bytes, the leftmost column the highest bit of the first */
+    const uint8_t *small;                 /* '0'..'9' (10 glyphs of `small_rows` rows) */
 };
 extern const struct jbf_font jbf_normal, jbf_large;
 

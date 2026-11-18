@@ -201,12 +201,12 @@ void jo_ui_init(struct jo_ui *ui);
 void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx *c, const struct jo_ops *ops);
 void jo_draw(uint8_t fb[JO_FB_BYTES], const struct jo_ui *ui, const struct jo_ctx *c, uint32_t now);
 
-/* The lcd2 layout (ui/oled.js with ctx.layout 'lcd2'): its own grid of 160 x 120 pixels, painted exactly x2 on the 320 x 240 panel. fb is
- * 160 x 120 bits in the same page layout (byte (y >> 3) * 160 + x, bit y & 7), JO_LCD2_FB_BYTES; ink (or NULL) one byte per pixel,
- * y * 160 + x, JO_LCD2_INK_BYTES, naming which LIT pixels carry information (OLED.INK; the ids are meanings, never colours: core/jank_lcd.h
+/* The lcd2 layout (ui/oled.js with ctx.layout 'lcd2'): drawn at the 320 x 240 panel's own pixels, one frame pixel per panel pixel. fb is
+ * 320 x 240 bits in the same page layout (byte (y >> 3) * 320 + x, bit y & 7), JO_LCD2_FB_BYTES; ink (or NULL) one byte per pixel,
+ * y * 320 + x, JO_LCD2_INK_BYTES, naming which LIT pixels carry information (OLED.INK; the ids are meanings, never colours: core/jank_lcd.h
  * maps them). Menus, edit, info, network, setup screens and overlays have no ink. The OLED draws with jo_draw above, never with this. */
-#define JO_LCD2_W 160
-#define JO_LCD2_H 120
+#define JO_LCD2_W 320
+#define JO_LCD2_H 240
 #define JO_LCD2_FB_BYTES (JO_LCD2_W * JO_LCD2_H / 8)
 #define JO_LCD2_INK_BYTES (JO_LCD2_W * JO_LCD2_H)
 /* ids 6 .. 37 are the VU meter's ramp (ui/oled.js OLED.VU: JO_VU_STEPS ids from JO_INK_VU0, green quiet to red hot) */

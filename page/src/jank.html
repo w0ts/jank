@@ -975,7 +975,7 @@ autoConnect();
   };
 
   const paintArms = () => { for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", model.held[b]); };
-  // the screen of the box: the colour landscape LCD (ui/lcd2.js: its own 160 x 120 grid, painted x2) for every stick, whatever its board; ?screen=oled shows the old
+  // the screen of the box: the colour landscape LCD (ui/lcd2.js: drawn at its own 320 x 240 pixels, painted 1:1) for every stick, whatever its board; ?screen=oled shows the old
   // black and white 2.42 in OLED
   const params = new URLSearchParams(location.search);
   let screen = "";
@@ -987,21 +987,19 @@ autoConnect();
     el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
     el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
   }
-  // the screen is shown at an even multiple (2x, 4x, ...) of its own source pixels (160 x 120 colour, 128 x 64 black and white), the nearest one
-  // that fits the card and never under 2x, so no pixel is dropped or doubled unevenly; the drawing is therefore not exactly to scale in mm.
-  // Called every frame: the card is hidden until a jank is connected, and its width changes with the window
+  // the screen is shown at 1x: one canvas pixel is one css pixel (320 x 240 colour; the old 128 x 64 black and white one also 1:1), so no pixel is
+  // dropped or doubled unevenly; the drawing is therefore not exactly to scale in mm. Narrower than the card, it shrinks to fit (the browser scales
+  // the whole drawing). Called every frame: the card is hidden until a jank is connected, and its width changes with the window
   function snapDevice() {
     const row = svg.closest(".live-row"), box = svg.parentElement;
     if (!box || !row || !row.clientWidth) return;
     const native = screen === "lcd2" ? Lcd2.SRC_W : OLED.W;
     const area = Box3.canvasArea(screen === "lcd2" ? null : OLED.W / OLED.H), vb = Box3.viewBox();
     const toSvg = (k) => k * native / area.w * vb.w;
-    row.classList.toggle("stack", toSvg(2) > row.clientWidth - 340 - 12 - 30);   // beside the player: 340 px, the gap and the card's padding
+    row.classList.toggle("stack", toSvg(1) > row.clientWidth - 340 - 12 - 30);   // beside the player: 340 px, the gap and the card's padding
     const avail = box.clientWidth;
     if (!avail) return;
-    let k = Math.max(2, 2 * Math.round(area.w * (avail / vb.w) / native / 2));
-    while (k > 2 && toSvg(k) > avail) k -= 2;
-    const width = Math.min(toSvg(k), avail) + "px";
+    const width = Math.min(toSvg(1), avail) + "px";
     if (svg.style.width !== width) svg.style.width = width;
   }
   function draw() {

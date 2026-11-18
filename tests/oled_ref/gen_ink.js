@@ -1,6 +1,6 @@
-// The reference for the lcd2 layout (ctx.layout 'lcd2': its own 160 x 120 grid) and its ink plane: ui/oled.js's own draw(), run in node, for
-// every screen the layout has. Each frame is the 1-bit frame in the page layout (byte (y >> 3) * 160 + x, bit y & 7) as runs of one byte, "hh:length,...", and the ink
-// plane as runs of one id 0..5 per pixel, "id:length,..." (y * 160 + x, OLED.INK). test_oled.c replays each case in C (jo_press and
+// The reference for the lcd2 layout (ctx.layout 'lcd2': its own 320 x 240 grid) and its ink plane: ui/oled.js's own draw(), run in node, for
+// every screen the layout has. Each frame is the 1-bit frame in the page layout (byte (y >> 3) * 320 + x, bit y & 7) as runs of one byte, "hh:length,...", and the ink
+// plane as runs of one id 0..5 per pixel, "id:length,..." (y * 320 + x, OLED.INK). test_oled.c replays each case in C (jo_press and
 // jo_draw_lcd2) and must draw both exactly, and log the same setter calls. The QR encoder is the one the OLED parity uses (beat/live/player.html).
 // Usage: node tests/oled_ref/gen_cases.js --ink > tests/oled_ref/cases_ink.txt
 'use strict';

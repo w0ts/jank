@@ -171,7 +171,7 @@ const Stick = (() => {
   }
   const releaseAll = (m, now) => { for (const b of Object.keys(m.held)) up(m, b, now); };
   // the screen of a layout: { fb, ink, w, h }. 'oled' (default): the 128 x 64 frame buffer, no ink. 'lcd2': the colour screen's own grid
-  // (OLED.size('lcd2'), 160 x 120) with its ink plane (ui/lcd2.js paints them). Buffers are made here, so a caller never guesses a size.
+  // (OLED.size('lcd2'), 320 x 240) with its ink plane (ui/lcd2.js paints them). Buffers are made here, so a caller never guesses a size.
   function screen(m, now, layout) {
     const lcd = layout === 'lcd2', size = OLED.size(layout), fb = new Uint8Array(size.w * size.h), ink = lcd ? new Uint8Array(size.w * size.h) : null;
     const c = m.getCtx(now);

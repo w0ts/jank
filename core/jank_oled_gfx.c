@@ -61,7 +61,7 @@ void jo_fixed(double x, int digits, char *out, size_t cap)
         snprintf(out, cap, "%s%llu", x < 0 ? "-" : "", (unsigned long long)n);
 }
 
-int jo_gw = JO_W, jo_gh = JO_H;
+int jo_gw = JO_W, jo_gh = JO_H, jo_fine;
 
 void jo_px(uint8_t *fb, int x, int y, int v)
 {
@@ -158,7 +158,26 @@ static const uint8_t *rows_of(char ch)
 }
 
 static int narrow(char ch) { return ch == '.' || ch == ':' || ch == ','; }
-static int adv(char ch) { return narrow(ch) ? 3 : ch == ' ' ? 4 : 6; }
+static int adv(char ch) { return (jo_fine ? 2 : 1) * (narrow(ch) ? 3 : ch == ' ' ? 4 : 6); }
+
+/* Scale2x (EPX, ui/bigfont.js scale2x) of the pixel (c, r) of a w x h bitmap of 0 / 1 bytes: o[0..3] are its 2 x 2 block, top left, top right,
+ * bottom left, bottom right */
+static int src_at(const uint8_t *src, int w, int h, int c, int r) { return r >= 0 && r < h && c >= 0 && c < w && src[r * w + c]; }
+
+static void epx(const uint8_t *src, int w, int h, int c, int r, int o[4])
+{
+    int p = src_at(src, w, h, c, r), a = src_at(src, w, h, c, r - 1), b = src_at(src, w, h, c + 1, r), cc = src_at(src, w, h, c - 1, r),
+        d = src_at(src, w, h, c, r + 1);
+    o[0] = o[1] = o[2] = o[3] = p;
+    if (cc == a && cc != d && a != b)
+        o[0] = a;
+    if (a == b && a != cc && b != d)
+        o[1] = b;
+    if (d == cc && d != b && cc != a)
+        o[2] = cc;
+    if (b == d && b != a && d != cc)
+        o[3] = d;
+}
 
 int jo_text_w(const char *s, int sc)
 {
@@ -174,6 +193,22 @@ void jo_text(uint8_t *fb, const char *s, int x, int y, int sc, int v)
     for (; *s; s++) {
         const uint8_t *g = rows_of(*s);
         int off = narrow(*s);
+        if (jo_fine) {                                   /* the face doubled with Scale2x: 10 x 14, the glyph 1 px into its 12 px cell */
+            uint8_t src[35];
+            for (int r = 0; r < 7; r++)
+                for (int c = 0; c < 5; c++)
+                    src[r * 5 + c] = g[r] >> (4 - c) & 1u;
+            for (int r = 0; r < 7; r++)
+                for (int c = 0; c < 5; c++) {
+                    int o[4];
+                    epx(src, 5, 7, c, r, o);
+                    for (int k = 0; k < 4; k++)
+                        if (o[k])
+                            jo_rect(fb, cx + (1 + 2 * c + (k & 1) - 2 * off) * sc, y + (2 * r + (k >> 1)) * sc, sc, sc, v);
+                }
+            cx += adv(*s) * sc;
+            continue;
+        }
         for (int r = 0; r < 7; r++)
             for (int c = 0; c < 5; c++)
                 if (g[r] & (0x10u >> c))
@@ -195,6 +230,23 @@ void jo_icon(uint8_t *fb, const char *const *rows, int n, int x, int y)
         for (int i = 0; rows[j][i]; i++)
             if (rows[j][i] == '#')
                 jo_px(fb, x + i, y + j, 1);
+}
+
+void jo_icon2(uint8_t *fb, const char *const *rows, int n, int x, int y)
+{
+    uint8_t src[16 * 16];
+    int w = (int)strlen(rows[0]);
+    for (int j = 0; j < n; j++)
+        for (int i = 0; i < w; i++)
+            src[j * w + i] = rows[j][i] == '#';
+    for (int j = 0; j < n; j++)
+        for (int i = 0; i < w; i++) {
+            int o[4];
+            epx(src, w, n, i, j, o);
+            for (int k = 0; k < 4; k++)
+                if (o[k])
+                    jo_px(fb, x + 2 * i + (k & 1), y + 2 * j + (k >> 1), 1);
+        }
 }
 
 /* ---- the ink plane (jo_draw_lcd2) ---- */
