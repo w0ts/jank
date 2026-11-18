@@ -48,6 +48,9 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
 .live-row > #player { flex: 0 0 340px; width: 340px; }
+/* the player goes under the device when the screen at 2x does not fit beside it (snapDevice) */
+.live-row.stack { flex-direction: column; align-items: stretch; }
+.live-row.stack > #player { flex: none; width: auto; }
 @media (max-width: 800px) { .live-row { flex-direction: column; align-items: stretch; } .live-row > #player { flex: none; width: auto; } }
 #player { padding: 10px 12px; }
 #player h2 { margin: 0; }
@@ -983,24 +986,29 @@ autoConnect();
     Box3.placeScreen(svg, screen === "lcd2" ? null : OLED.W / OLED.H);
     el("oled").width = screen === "lcd2" ? Lcd2.W : OLED.W;
     el("oled").height = screen === "lcd2" ? Lcd2.H : OLED.H;
-    snapDevice();
   }
-  // the screen is shown at a whole multiple of its own pixels (the nearest, never wider than the card), so no pixel is dropped or doubled
-  // unevenly; the drawing is therefore not exactly to scale in mm
+  // the screen is shown at an even multiple (2x, 4x, ...) of its own source pixels (160 x 120 colour, 128 x 64 black and white), the nearest one
+  // that fits the card and never under 2x, so no pixel is dropped or doubled unevenly; the drawing is therefore not exactly to scale in mm.
+  // Called every frame: the card is hidden until a jank is connected, and its width changes with the window
   function snapDevice() {
-    const canvas = el("oled"), box = svg.parentElement, avail = box ? box.clientWidth : 0;
-    if (!avail) return;
+    const row = svg.closest(".live-row"), box = svg.parentElement;
+    if (!box || !row || !row.clientWidth) return;
+    const native = screen === "lcd2" ? Lcd2.SRC_W : OLED.W;
     const area = Box3.canvasArea(screen === "lcd2" ? null : OLED.W / OLED.H), vb = Box3.viewBox();
-    const perMm = avail / vb.w, m = Math.max(1, Math.round(area.w * perMm / canvas.width));
-    let width = m * canvas.width / area.w * vb.w;
-    if (width > avail && m > 1) width = (m - 1) * canvas.width / area.w * vb.w;
-    svg.style.width = Math.min(width, avail) + "px";
+    const toSvg = (k) => k * native / area.w * vb.w;
+    row.classList.toggle("stack", toSvg(2) > row.clientWidth - 340 - 12 - 30);   // beside the player: 340 px, the gap and the card's padding
+    const avail = box.clientWidth;
+    if (!avail) return;
+    let k = Math.max(2, 2 * Math.round(area.w * (avail / vb.w) / native / 2));
+    while (k > 2 && toSvg(k) > avail) k -= 2;
+    const width = Math.min(toSvg(k), avail) + "px";
+    if (svg.style.width !== width) svg.style.width = width;
   }
-  window.addEventListener("resize", () => { if (screen) snapDevice(); });
   function draw() {
     frame = requestAnimationFrame(draw);
     const now = performance.now(), ctx2d = el("oled").getContext("2d");
     applyScreen();
+    snapDevice();
     if (S.homeAt !== seenHomeAt) {
       seenHomeAt = S.homeAt;
       phase = Stick.phaseFeed(phase, Stick.phaseReport(S.lastHome), S.homeAt);
