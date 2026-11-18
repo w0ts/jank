@@ -82,6 +82,8 @@ fi
 # LOW CONFIDENCE: the grid-fit confidence and its gate against beat-listener's live/confidence.py (golden vectors, tests/conf_ref).
 "$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_conf.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_mode.c" -lm -o "$OUT/test_conf"
 "$OUT/test_conf" "$HERE/tests/conf_ref"
+"$CC" $FLAGS "$HERE/tests/test_prefs.c" "$HERE/core/jank_prefs.c" $CORE -o "$OUT/test_prefs"
+"$OUT/test_prefs"
 # Advanced beat follow (M2i): the tempo glide, the line confidence and the spectral rate against beat-listener's
 # eval/follow_bpm.py, live/follow.py and live/rate.py (golden vectors, tests/follow_ref).
 "$CC" $FLAGS -I"$HERE/core/beat" "$HERE/tests/test_follow.c" "$HERE/core/jank_conf.c" "$HERE/core/beat/jb_follow.c" "$HERE/core/beat/jb_mode.c" "$HERE/core/beat/jb_rate.c" "$HERE/core/beat/jb_fe.c" "$HERE/core/beat/beat_model.c" -lm -o "$OUT/test_follow"
