@@ -23,6 +23,7 @@
 #include "board.h"
 #include "esp_log.h"
 #include "jank_oled_int.h"
+#include "jank_phone.h"
 #include "jank_usbrole.h"
 #include "nvs.h"
 #include "oled.h"
@@ -68,7 +69,13 @@ static struct jo_ui s_ui;
 static struct jo_input s_in;
 static struct jo_ctx s_ctx;
 static struct jk_snapshot s_snap;
-static uint8_t s_fb[JO_FB_BYTES];       /* the frame drawn (the driver keeps its own copy) */
+#if BOARD_LCD
+#define FRAME_BYTES JO_LCD2_FB_BYTES
+#else
+#define FRAME_BYTES JO_FB_BYTES
+#endif
+static uint8_t s_fb[FRAME_BYTES];       /* the frame drawn (the driver keeps its own copy) */
+static uint32_t s_quantum = 4;          /* the bar's beats, for the screen's beat flash */
 static char s_ap_name[JO_SSID_MAX + 1] = "jank", s_ap_pass[JO_TEXT_MAX + 1] = "";
 
 struct meter_step {
@@ -225,6 +232,14 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->silent = audio ? b->silent : 0;
     c->gated = audio ? b->gated : 0;
     c->conf_hold = audio ? b->conf_hold : 0;
+    c->fold_exp = audio ? b->fold_exp : 0;
+    c->ble_mode = cfg.ble == JK_BLE_PAIR ? 0 : cfg.ble == JK_BLE_AUTO ? 1 : 2;      /* PAIR NOW, ON START, OFF: the menu's order */
+    c->ble_phone = s_snap.ble_built && s_snap.ble_state == JPH_CONNECTED;
+    c->has_ble_left = s_snap.ble_built && s_snap.ble_state == JPH_WINDOW;
+    c->ble_left = (int)s_snap.ble_left_s;
+    c->usb_midi = cfg.usbmidi ? 0 : 1;                                              /* ON, OFF */
+    c->beat_flash = cfg.beat_flash;
+    s_quantum = cfg.quantum ? cfg.quantum : 4u;
     c->th = s_prefs.th;
     c->gain = s_prefs.gain;
     c->conf_stop = s_prefs.conf_stop;
@@ -312,7 +327,9 @@ static void set_network(int v)
 
 static void set_field(void *user, enum jo_field f, int v)
 {
-    static const char *const SRC[] = {"auto", "line", "usb"};
+    static const char *const SRC[] = {"auto", "line", "usb", "link"};
+    static const char *const AUTOBAR[] = {"off", "start", "always"};
+    static const char *const BLE[] = {"pair", "auto", "off"};         /* the menu's order: PAIR NOW, ON START, OFF */
     (void)user;
     switch (f) {
     case JO_F_NETMODE: set_network(v); break;
@@ -332,9 +349,18 @@ static void set_field(void *user, enum jo_field f, int v)
             set_pref(NULL, &s_prefs.lead, v == 2);
         break;
     case JO_F_GROUP: ctl_set("set group %d", v + 1); break;
-    case JO_F_INSRC: ctl_set("set source %s", v >= 0 && v < 3 ? SRC[v] : "auto"); break;
+    case JO_F_INSRC: ctl_set("set source %s", v >= 0 && v < 4 ? SRC[v] : "auto"); break;
     case JO_F_USBROLE: ctl_set("set usb %s", v ? "host" : "device"); break;
-    case JO_F_AUTOBAR: ctl_set("set autobar %s", v ? "on" : "off"); break;
+    case JO_F_AUTOBAR: ctl_set("set autobar %s", v >= 0 && v < 3 ? AUTOBAR[v] : "off"); break;
+    case JO_F_BLE:                      /* PAIR NOW picked (even when it is the setting already) also opens the pair window */
+        ctl_set("set ble %s", v >= 0 && v < 3 ? BLE[v] : "pair");
+#if CONFIG_JANK_BLE_MIDI
+        if (v == 0)
+            ble_midi_pair();
+#endif
+        break;
+    case JO_F_USBMIDI: ctl_set("set usbmidi %s", v ? "off" : "on"); break;
+    case JO_F_BEATFLASH: ctl_set("set beat_flash %d", v ? 1 : 0); break;
     default: break;
     }
 }
@@ -407,7 +433,11 @@ void uis_cancel_no(void)
     s_in.hint_on = 0;
     s_ui.hint = -1;
     s_ui.screen = JO_HOME;
+#if BOARD_LCD
+    jo_pair_overlay(&s_ui, bridge_ms());   /* the box counts the window's seconds down */
+#else
     say("BLUETOOTH", "PAIR");
+#endif
     s_want_frame = 1;
 }
 
@@ -415,7 +445,7 @@ void uis_cancel_no(void)
 static void draw_frame(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
 {
 #if BOARD_LCD
-    jo_draw_ink(fb, lcd_ink(), &s_ui, c, now);
+    jo_draw_lcd2(fb, lcd_ink(), &s_ui, c, now);
 #else
     jo_draw(fb, &s_ui, c, now);
 #endif
@@ -423,17 +453,19 @@ static void draw_frame(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
 
 static void dark_frame(uint8_t *fb)
 {
-    memset(fb, 0, JO_FB_BYTES);
+    memset(fb, 0, FRAME_BYTES);
 #if BOARD_LCD
-    memset(lcd_ink(), 0, JO_INK_BYTES);
+    memset(lcd_ink(), 0, JO_LCD2_INK_BYTES);
 #endif
 }
 
-static void show_frame(const uint8_t *fb)
+/* flash_ok: the colour screen may flash this frame on the beat (the BEAT FLASH setting SCREEN, HOME, the transport running; never a dark frame) */
+static void show_frame(const uint8_t *fb, int flash_ok)
 {
 #if BOARD_LCD
-    lcd_show(fb);
+    lcd_show(fb, flash_ok, s_quantum);
 #else
+    (void)flash_ok;
     oled_show(fb, uis_contrast());
 #endif
 }
@@ -444,7 +476,7 @@ void uis_boot_screen(void)
     if (!s_screen)
         return;
     draw_frame(s_fb, build_ctx(NULL, bridge_ms()), bridge_ms());
-    show_frame(s_fb);
+    show_frame(s_fb, 0);
 }
 
 void uis_step(uint32_t now, struct uis_led *led)
@@ -472,9 +504,11 @@ void uis_step(uint32_t now, struct uis_led *led)
     led->valid = 1;
     if (!s_screen)
         return;
-    if (jo_asleep(&s_in, c, now))
+    if (jo_asleep(&s_in, c, now)) {
         dark_frame(fb);                   /* SCREEN OFF: a dark frame; the panel stays on (the 2.42"'s power rule) */
-    else
-        draw_frame(fb, c, now);
-    show_frame(fb);
+        show_frame(fb, 0);
+        return;
+    }
+    draw_frame(fb, c, now);
+    show_frame(fb, c->beat_flash && s_ui.screen == JO_HOME && !c->setup && !c->boot && !c->splash && c->has_beat);
 }

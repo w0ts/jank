@@ -274,6 +274,37 @@ static void test_cfg_name(void)
     CHECK(jk_cfg_set_name(&cfg, "ok name") == 0 && !strcmp(cfg.name, "ok name"));
 }
 
+/* the lcd2 screen's BEAT FLASH: the setting, and the flash window it shares with the LED (jk_flash_at) */
+static void test_beat_flash(void)
+{
+    enum { BEAT = 1000000 };
+    int32_t mpb = 500000;
+    int64_t flash = (int64_t)JK_BEAT_FLASH_MS * 1000 * BEAT / mpb, bar = (int64_t)JK_BAR_FLASH_MS * 1000 * BEAT / mpb;
+    struct jk_cfg before;
+    setup();
+    CHECK(cfg.beat_flash == 0);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "ble=pair\nbeat_flash=0\n"));
+    before = cfg;
+    CHECK(run("set beat_flash 1") == JK_CTL_CFG_CHANGED && cfg.beat_flash == 1 && jk_cfg_stored_differs(&before, &cfg));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "beat_flash=1\n"));
+    CHECK(run("set beat_flash 0") == JK_CTL_CFG_CHANGED && cfg.beat_flash == 0);
+    CHECK(run("set beat_flash 2") == JK_CTL_NONE && strstr(out, "err ") == out && cfg.beat_flash == 0);
+    CHECK(run("set beat_flash on") == JK_CTL_NONE && strstr(out, "err ") == out && run("set beat_flash") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|beat_flash|"));
+    /* the window: the first beat of a bar of 4 is the BAR flash for 150 ms, the others the BEAT flash for 80 ms, before the session's 0 too */
+    CHECK(jk_flash_at(1, 0, mpb, 4) == JK_FLASH_BAR && jk_flash_at(1, bar - 1, mpb, 4) == JK_FLASH_BAR && jk_flash_at(1, bar, mpb, 4) == JK_FLASH_NONE);
+    CHECK(jk_flash_at(1, BEAT, mpb, 4) == JK_FLASH_BEAT && jk_flash_at(1, BEAT + flash - 1, mpb, 4) == JK_FLASH_BEAT && jk_flash_at(1, BEAT + flash, mpb, 4) == JK_FLASH_NONE);
+    CHECK(jk_flash_at(1, 4 * (int64_t)BEAT + 10, mpb, 4) == JK_FLASH_BAR && jk_flash_at(1, -4 * (int64_t)BEAT + 10, mpb, 4) == JK_FLASH_BAR);
+    CHECK(jk_flash_at(1, -BEAT + 10, mpb, 4) == JK_FLASH_BEAT && jk_flash_at(1, -10, mpb, 4) == JK_FLASH_NONE);
+    CHECK(jk_flash_at(1, 3 * (int64_t)BEAT + 10, mpb, 3) == JK_FLASH_BAR && jk_flash_at(1, 3 * (int64_t)BEAT + 10, mpb, 0) == JK_FLASH_BAR);
+    CHECK(jk_flash_at(0, 0, mpb, 4) == JK_FLASH_NONE && jk_flash_at(1, 0, 0, 4) == JK_FLASH_NONE && jk_flash_at(1, 0, -5, 4) == JK_FLASH_NONE);
+    CHECK(jk_flash_at(1, BEAT / 3 - 1, 200000, 4) == JK_FLASH_BAR && jk_flash_at(1, BEAT / 3, 200000, 4) == JK_FLASH_NONE);        /* 300 BPM: the cap */
+    CHECK(jk_flash_at(1, BEAT + BEAT / 3 - 1, 200000, 4) == JK_FLASH_BEAT && jk_flash_at(1, BEAT + BEAT / 3, 200000, 4) == JK_FLASH_NONE);
+    /* the LED is built on it: lit exactly where a flash is */
+    for (int64_t ub = -3 * (int64_t)BEAT; ub < 9 * (int64_t)BEAT; ub += 9973)
+        CHECK(jk_led_lit(JK_NET_JANK, 1, ub, mpb, 4) == (jk_flash_at(1, ub, mpb, 4) != JK_FLASH_NONE));
+}
+
 static void test_led(void)
 {
     enum { BEAT = 1000000 };           /* micro-beats */
@@ -716,6 +747,7 @@ int main(void)
     test_short_buffer();
     test_cfg_name();
     test_led();
+    test_beat_flash();
     test_button();
     test_usb();
     test_status_size();

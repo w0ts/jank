@@ -23,6 +23,7 @@ follower=tuned
 skip=off
 graded=off
 ble=pair
+beat_flash=0
 usb=device
 source=auto
 line_gain=0

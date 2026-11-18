@@ -75,6 +75,10 @@ const Stick = (() => {
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', hold: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : 2, xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
+      // for the colour screen's beat flash (ui/lcd2.js): the setting (`get` beat_flash, 0 / absent = BOXES, 1 = SCREEN), and the session's beat
+      // position (beats, fractional, display delay included), tempo and bar length; null / 0 when there is no beat to flash on
+      beatFlash: g.beat_flash === '1' ? 1 : 0, beatPos: h && pos !== null && playing ? pos : null, beatBpm: h && h.bpm > 0 ? h.bpm : null, quantum: h && h.quantum > 0 ? h.quantum : 4,
+      ...(state.layout ? { layout: state.layout } : {}),
       peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0,
       lineIn: g.source === 'line' || (!!st && st.audio_source === 'line'), bright: 100, sleep: 0, inOff: num(g.lat_trim) || 0, offs: [0, 0, 0], rate: 2,
       boot: false, splash: false, wifi: wifiBars, wifiQ: null, groupPeers: h ? h.air : 0, setup: false, saved: false,
@@ -105,6 +109,7 @@ const Stick = (() => {
   // an OLED edit (field, value as the OLED holds it) -> { commands: [...] } or { refuse: 'why' }
   function fieldCommands(field, val) {
     if (NO_STICK_SETTING[field]) return refuse(NO_STICK_SETTING[field]);
+    if (field === 'beatflash') return cmds('set beat_flash ' + (val ? 1 : 0));
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));
     if (field === 'group') return cmds('set group ' + (val + 1));
     if (field === 'gain') return cmds('set line_gain ' + clamp(Math.round(val), -12, 12));
@@ -169,12 +174,15 @@ const Stick = (() => {
     }
   }
   const releaseAll = (m, now) => { for (const b of Object.keys(m.held)) up(m, b, now); };
-  // ink: an optional Uint8Array(OLED.W * OLED.H) the colour screen (ui/lcd2.js) passes: it gets the lcd2 layout and its ink plane filled
-  const framebuffer = (m, now, ink) => {
-    const fb = new Uint8Array(OLED.W * OLED.H), c = m.getCtx(now);
-    OLED.draw(fb, m.ui, ink ? { ...c, layout: 'lcd2' } : c, now, ink);
-    return fb;
-  };
+  // the screen of a layout: { fb, ink, w, h }. 'oled' (default): the 128 x 64 frame buffer, no ink. 'lcd2': the colour screen's own grid
+  // (OLED.size('lcd2'), 160 x 120) with its ink plane (ui/lcd2.js paints them). Buffers are made here, so a caller never guesses a size.
+  function screen(m, now, layout) {
+    const lcd = layout === 'lcd2', size = OLED.size(layout), fb = new Uint8Array(size.w * size.h), ink = lcd ? new Uint8Array(size.w * size.h) : null;
+    const c = m.getCtx(now);
+    OLED.draw(fb, m.ui, lcd ? { ...c, layout } : c, now, ink);
+    return { fb, ink, w: size.w, h: size.h };
+  }
+  const framebuffer = (m, now) => screen(m, now, 'oled').fb;                 // the OLED's 128 x 64
 
-  return { KEY_BTN, KEY_HINT, REPEAT, PHASE, BEAT_DELAY_KEY, BEAT_DELAY_MAX, createPhase, phaseReport, phaseFeed, phaseAt, beatDelayEstimate, parseDelay, ctx, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, framebuffer };
+  return { KEY_BTN, KEY_HINT, REPEAT, PHASE, BEAT_DELAY_KEY, BEAT_DELAY_MAX, createPhase, phaseReport, phaseFeed, phaseAt, beatDelayEstimate, parseDelay, ctx, fieldCommands, tempoCommand, playCommand, nudgeCommand, create, down, up, tick, releaseAll, screen, framebuffer };
 })();

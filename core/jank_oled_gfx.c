@@ -61,22 +61,24 @@ void jo_fixed(double x, int digits, char *out, size_t cap)
         snprintf(out, cap, "%s%llu", x < 0 ? "-" : "", (unsigned long long)n);
 }
 
+int jo_gw = JO_W, jo_gh = JO_H;
+
 void jo_px(uint8_t *fb, int x, int y, int v)
 {
     uint8_t bit;
-    if (x < 0 || x >= JO_W || y < 0 || y >= JO_H)
+    if (x < 0 || x >= jo_gw || y < 0 || y >= jo_gh)
         return;
     bit = (uint8_t)(1u << (y & 7));
     if (v)
-        fb[(y >> 3) * JO_W + x] |= bit;
+        fb[(y >> 3) * jo_gw + x] |= bit;
     else
-        fb[(y >> 3) * JO_W + x] &= (uint8_t)~bit;
+        fb[(y >> 3) * jo_gw + x] &= (uint8_t)~bit;
 }
 
 void jo_xor_px(uint8_t *fb, int x, int y)
 {
-    if (x >= 0 && x < JO_W && y >= 0 && y < JO_H)
-        fb[(y >> 3) * JO_W + x] ^= (uint8_t)(1u << (y & 7));
+    if (x >= 0 && x < jo_gw && y >= 0 && y < jo_gh)
+        fb[(y >> 3) * jo_gw + x] ^= (uint8_t)(1u << (y & 7));
 }
 
 void jo_rect(uint8_t *fb, int x, int y, int w, int h, int v)
@@ -184,7 +186,7 @@ void jo_text_r(uint8_t *fb, const char *s, int xr, int y, int sc, int v) { jo_te
 
 void jo_text_c(uint8_t *fb, const char *s, int y, int sc, int v)
 {
-    jo_text(fb, s, jo_iround((double)(JO_W - jo_text_w(s, sc)) / 2.0), y, sc, v);
+    jo_text(fb, s, jo_iround((double)(jo_gw - jo_text_w(s, sc)) / 2.0), y, sc, v);
 }
 
 void jo_icon(uint8_t *fb, const char *const *rows, int n, int x, int y)
@@ -193,4 +195,51 @@ void jo_icon(uint8_t *fb, const char *const *rows, int n, int x, int y)
         for (int i = 0; rows[j][i]; i++)
             if (rows[j][i] == '#')
                 jo_px(fb, x + i, y + j, 1);
+}
+
+/* ---- the ink plane (jo_draw_lcd2) ---- */
+static const uint8_t *s_ink_fb;
+static uint8_t *s_ink;
+
+void jo_ink_begin(const uint8_t *fb, uint8_t *ink)
+{
+    s_ink_fb = fb;
+    s_ink = ink;
+    if (s_ink)
+        memset(s_ink, 0, (size_t)jo_gw * (size_t)jo_gh);
+}
+
+void jo_ink_end(void)
+{
+    s_ink_fb = NULL;
+    s_ink = NULL;
+}
+
+void jo_tag(int id, int x, int y, int w, int h)
+{
+    if (!s_ink || id == JO_INK_NONE)
+        return;
+    for (int j = jo_clampi(y, 0, jo_gh); j < jo_clampi(y + h, 0, jo_gh); j++)
+        for (int i = jo_clampi(x, 0, jo_gw); i < jo_clampi(x + w, 0, jo_gw); i++)
+            if (jo_get(s_ink_fb, i, j))
+                s_ink[j * jo_gw + i] = (uint8_t)id;
+}
+
+void jo_untag(int x, int y, int w, int h)
+{
+    if (!s_ink)
+        return;
+    for (int j = jo_clampi(y, 0, jo_gh); j < jo_clampi(y + h, 0, jo_gh); j++)
+        for (int i = jo_clampi(x, 0, jo_gw); i < jo_clampi(x + w, 0, jo_gw); i++)
+            s_ink[j * jo_gw + i] = 0;
+}
+
+void jo_ink_lit_only(void)
+{
+    if (!s_ink)
+        return;
+    for (int j = 0; j < jo_gh; j++)
+        for (int i = 0; i < jo_gw; i++)
+            if (!jo_get(s_ink_fb, i, j))
+                s_ink[j * jo_gw + i] = 0;
 }
