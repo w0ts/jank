@@ -8,7 +8,9 @@ const BOX3 = {
   // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
   cross: { cx: 67.0, cy: 40.5, span: 24, arm: 8 },
   switches: { up: [67.0, 32.5], down: [67.0, 48.5], no: [59.0, 40.5], yes: [75.0, 40.5] },
-  keyMarks: { up: '▲', down: '▼', no: 'NO', yes: 'YES' },
+  keyMarks: { no: ['NO', 'MENU'], yes: ['YES'] },          // the text on the keys, one line each; UP and DOWN carry a drawn triangle (arrowSize), NO is the menu key too
+  arrowSize: { w: 3.2, h: 2.6 },
+  markSize: { NO: 2.5, MENU: 2.0, YES: 2.5 }, markGap: 0.8,
   // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
   ports: [
     { id: 'midi1', wall: 'top', at: 33.3, kind: 'trs' }, { id: 'midi2', wall: 'top', at: 46.1, kind: 'trs' },
@@ -77,10 +79,23 @@ const Box3 = (() => {
     const cap = make(svg, 'path', { id: 'cap', d: 'M' + crossPoints().map(([x, y]) => mm(x) + ' ' + mm(y)).join('L') + 'Z', class: 'cap' });
     svg.querySelector('#dpad').replaceChildren(cap, ...['up', 'down', 'no', 'yes'].map((name) => {
       const [x, y] = BOX3.switches[name], r = armRect(name), g = make(svg, 'g', { id: 'arm-' + name, 'data-b': name });
-      const wide = name === 'no' || name === 'yes';
-      const mark = make(svg, 'text', { x, y: y + (wide ? 0.9 : 1.1), class: wide ? 'glyph s' : 'glyph' });
-      mark.textContent = BOX3.keyMarks[name];
-      g.append(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }), mark);
+      // the marks are centred on the arm's centre: the text lines as a block of capital letters (cap height 0.71 em, the lines markGap apart), the arrows drawn as triangles
+      const marks = [];
+      if (name === 'up' || name === 'down') {
+        const { w, h } = BOX3.arrowSize, s = name === 'up' ? 1 : -1;
+        marks.push(make(svg, 'path', { d: 'M' + mm(x - w / 2) + ' ' + mm(y + s * h / 2) + 'L' + mm(x + w / 2) + ' ' + mm(y + s * h / 2) + 'L' + mm(x) + ' ' + mm(y - s * h / 2) + 'Z', class: 'glyph' }));
+      } else {
+        const lines = BOX3.keyMarks[name], sizes = lines.map((t) => BOX3.markSize[t]), caps = sizes.map((z) => 0.71 * z);
+        const total = caps.reduce((a, b) => a + b, 0) + BOX3.markGap * (lines.length - 1);
+        let top = y - total / 2;
+        lines.forEach((t, i) => {
+          const m = make(svg, 'text', { x, y: mm(top + caps[i]), 'font-size': sizes[i], class: 'glyph' });
+          m.textContent = t;
+          marks.push(m);
+          top += caps[i] + BOX3.markGap;
+        });
+      }
+      g.append(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }), ...marks);
       return g;
     }));
   }

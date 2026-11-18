@@ -12,7 +12,10 @@
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
 main { max-width: 1100px; margin: 0 auto; }
-h1 { font-size: 22px; margin: 0; }
+h1 { font-size: 36px; margin: 0; line-height: 1.1; }
+#home-links { display: flex; gap: 14px; font-size: 14px; }
+#home-links a { color: var(--accent); text-decoration: none; }
+#home-links a:hover { text-decoration: underline; }
 h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
@@ -52,8 +55,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .device .cap { fill:#2c2e31; stroke:#16171a; stroke-width:.4; stroke-linejoin:round; pointer-events:none; }
 .device .armarea { fill:transparent; stroke:none; cursor:pointer; }
 .device .armarea.on { fill:#4b4f54; }
-.device .glyph { fill:#c9ccd0; font-size:3.2px; text-anchor:middle; dominant-baseline:central; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
-.device .glyph.s { font-size:2.5px; }
+.device .glyph { fill:#c9ccd0; text-anchor:middle; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
 .device canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#04060a; }
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
@@ -121,6 +123,10 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 <main>
   <header>
     <h1>jank</h1>
+    <nav id="home-links" class="hide" aria-label="Links">
+      <a href="https://github.com/w0ts/jank" target="_blank" rel="noopener" title="The jank's source code and documentation on GitHub.">GitHub</a>
+      <a href="https://w0ts.github.io/jank/" target="_blank" rel="noopener" title="Audio works better on the GitHub hosted page than on this page opened from the jank's drive.">Open the GitHub hosted page</a>
+    </nav>
   </header>
   <p id="msg"></p>
 
@@ -978,6 +984,7 @@ $("bootloader").addEventListener("click", async () => {
   disconnected("The jank restarted for flashing. Unplug it and plug it back in to run again.");
 });
 setConnected(null);
+if (location.protocol === "file:") $("home-links").classList.remove("hide");   /* opened from the jank's drive: point to the GitHub hosted page */
 S.auto = storedAutoConnect();
 autoConnect();
 </script>
@@ -2193,7 +2200,9 @@ const BOX3 = {
   // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
   cross: { cx: 67.0, cy: 40.5, span: 24, arm: 8 },
   switches: { up: [67.0, 32.5], down: [67.0, 48.5], no: [59.0, 40.5], yes: [75.0, 40.5] },
-  keyMarks: { up: '▲', down: '▼', no: 'NO', yes: 'YES' },
+  keyMarks: { no: ['NO', 'MENU'], yes: ['YES'] },          // the text on the keys, one line each; UP and DOWN carry a drawn triangle (arrowSize), NO is the menu key too
+  arrowSize: { w: 3.2, h: 2.6 },
+  markSize: { NO: 2.5, MENU: 2.0, YES: 2.5 }, markGap: 0.8,
   // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
   ports: [
     { id: 'midi1', wall: 'top', at: 33.3, kind: 'trs' }, { id: 'midi2', wall: 'top', at: 46.1, kind: 'trs' },
@@ -2262,10 +2271,23 @@ const Box3 = (() => {
     const cap = make(svg, 'path', { id: 'cap', d: 'M' + crossPoints().map(([x, y]) => mm(x) + ' ' + mm(y)).join('L') + 'Z', class: 'cap' });
     svg.querySelector('#dpad').replaceChildren(cap, ...['up', 'down', 'no', 'yes'].map((name) => {
       const [x, y] = BOX3.switches[name], r = armRect(name), g = make(svg, 'g', { id: 'arm-' + name, 'data-b': name });
-      const wide = name === 'no' || name === 'yes';
-      const mark = make(svg, 'text', { x, y: y + (wide ? 0.9 : 1.1), class: wide ? 'glyph s' : 'glyph' });
-      mark.textContent = BOX3.keyMarks[name];
-      g.append(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }), mark);
+      // the marks are centred on the arm's centre: the text lines as a block of capital letters (cap height 0.71 em, the lines markGap apart), the arrows drawn as triangles
+      const marks = [];
+      if (name === 'up' || name === 'down') {
+        const { w, h } = BOX3.arrowSize, s = name === 'up' ? 1 : -1;
+        marks.push(make(svg, 'path', { d: 'M' + mm(x - w / 2) + ' ' + mm(y + s * h / 2) + 'L' + mm(x + w / 2) + ' ' + mm(y + s * h / 2) + 'L' + mm(x) + ' ' + mm(y - s * h / 2) + 'Z', class: 'glyph' }));
+      } else {
+        const lines = BOX3.keyMarks[name], sizes = lines.map((t) => BOX3.markSize[t]), caps = sizes.map((z) => 0.71 * z);
+        const total = caps.reduce((a, b) => a + b, 0) + BOX3.markGap * (lines.length - 1);
+        let top = y - total / 2;
+        lines.forEach((t, i) => {
+          const m = make(svg, 'text', { x, y: mm(top + caps[i]), 'font-size': sizes[i], class: 'glyph' });
+          m.textContent = t;
+          marks.push(m);
+          top += caps[i] + BOX3.markGap;
+        });
+      }
+      g.append(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }), ...marks);
       return g;
     }));
   }

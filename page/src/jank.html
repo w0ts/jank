@@ -12,7 +12,10 @@
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
 main { max-width: 1100px; margin: 0 auto; }
-h1 { font-size: 22px; margin: 0; }
+h1 { font-size: 36px; margin: 0; line-height: 1.1; }
+#home-links { display: flex; gap: 14px; font-size: 14px; }
+#home-links a { color: var(--accent); text-decoration: none; }
+#home-links a:hover { text-decoration: underline; }
 h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
@@ -111,6 +114,10 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 <main>
   <header>
     <h1>jank</h1>
+    <nav id="home-links" class="hide" aria-label="Links">
+      <a href="https://github.com/w0ts/jank" target="_blank" rel="noopener" title="The jank's source code and documentation on GitHub.">GitHub</a>
+      <a href="https://w0ts.github.io/jank/" target="_blank" rel="noopener" title="Audio works better on the GitHub hosted page than on this page opened from the jank's drive.">Open the GitHub hosted page</a>
+    </nav>
   </header>
   <p id="msg"></p>
 
@@ -934,6 +941,7 @@ $("bootloader").addEventListener("click", async () => {
   disconnected("The jank restarted for flashing. Unplug it and plug it back in to run again.");
 });
 setConnected(null);
+if (location.protocol === "file:") $("home-links").classList.remove("hide");   /* opened from the jank's drive: point to the GitHub hosted page */
 S.auto = storedAutoConnect();
 autoConnect();
 </script>
