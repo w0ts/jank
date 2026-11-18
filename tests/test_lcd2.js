@@ -491,7 +491,28 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
     eq(outsideInk(n, [[wx, SY, textW(word), 7]]), 0, '... the word is the only ink on the screen');
   }
   { const n = netD(null); eq([isText(n, 'SIGNAL', 4, SY, null), isText(n, '-', 156 - textW('-'), SY, 0), n.ink.every(v => v === 0)], [true, true, true], 'NETWORK, signal unknown: SIGNAL and "-", no ink'); }
-  eq([litIn(netD(-55), 0, SY + 8, 160, 8).length, litIn(drawn({ ...batt, rssi: -55 }, { ui: { ...OLED.create(), screen: 'net', ncur: 1 } }), 0, SY - 1, 160, 1).length], [0, 0], 'the SIGNAL row is never selected (not inverted) and keeps its place');
+  eq([litIn(netD(-55), 0, SY + 7, 160, 2).length, litIn(drawn({ ...batt, rssi: -55 }, { ui: { ...OLED.create(), screen: 'net', ncur: 1 } }), 0, SY - 1, 160, 1).length], [0, 0], 'the SIGNAL row is never selected (not inverted) and keeps its place');
+  // the air rows under SIGNAL (JANK mode only): LOST, LEVEL, RX RETRY; the quality word and the percentages are the only ink
+  const AY = SY + 9, airD = (air, over = {}) => drawn({ ...batt, rssi: -55, ...air, ...over }, { ui: { ...OLED.create(), screen: 'net', ncur: 0 } });
+  const right = (s, y) => [156 - textW(s), y];
+  const airRows = (n, lost, lostInk, level, retry, retryInk) => [isText(n, 'LOST', 4, AY, null), isText(n, lost, ...right(lost, AY), lostInk), isText(n, 'LEVEL', 4, AY + 9, null),
+    isText(n, level, ...right(level, AY + 9), 0), isText(n, 'RX RETRY', 4, AY + 18, null), isText(n, retry, ...right(retry, AY + 18), retryInk)];
+  for (const [lost, id] of [[0, INK.GOOD], [2, INK.GOOD], [3, INK.WARN], [9, INK.WARN], [10, INK.BAD], [100, INK.BAD]]) {
+    const n = airD({ airLost: lost, airRetry: 1, rssiMin: -78, rssiMax: -52 });
+    eq(airRows(n, lost + '%', id, '-78/-52 dBm', '1%', 0), Array(6).fill(true), 'NETWORK, LOST ' + lost + '%: the label, the value in ink ' + id + ', LEVEL -78/-52 dBm and RX RETRY 1% neutral');
+    eq(outsideInk(n, [[156 - textW('GOOD'), SY, textW('GOOD'), 7], [156 - textW(lost + '%'), AY, textW(lost + '%'), 7]]), 0, '... the SIGNAL word and LOST are the only ink on the screen');
+  }
+  for (const [retry, id] of [[0, 0], [29, 0], [30, INK.BAD], [100, INK.BAD]]) {
+    const n = airD({ airLost: 0, airRetry: retry, rssiMin: -60, rssiMax: -60 });
+    eq(airRows(n, '0%', INK.GOOD, '-60/-60 dBm', retry + '%', id), Array(6).fill(true), 'NETWORK, RX RETRY ' + retry + '%: ink ' + id);
+  }
+  { const n = airD({ airLost: null, airRetry: null, rssiMin: 0, rssiMax: 0 }, { rssi: null });
+    eq(airRows(n, '-', 0, '-', '-', 0), Array(6).fill(true), 'NETWORK, the air not known: LOST, LEVEL and RX RETRY read "-"');
+    eq(n.ink.every(v => v === 0), true, '... and there is no ink'); }
+  for (const mode of [1, 2]) {
+    const n = airD({ airLost: 20, airRetry: 40, rssiMin: -80, rssiMax: -50 }, { rssi: null, net: { ...batt.net, mode } });
+    eq([litIn(n, 0, AY + 9, 160, 20).length, n.ink.every(v => v === 0)], [0, true], 'NETWORK, mode ' + mode + ': no air rows, no ink');
+  }
   d = drawn({ ...batt, net: { ...batt.net, scan: [{ name: 'home-wifi', bars: 3 }, { name: 'cafe', bars: 1 }, { name: 'x', bars: 2 }] } }, { ui: { ...OLED.create(), screen: 'scan', scur: 1, stop: 0 } }); noInk(d, 'the scan list');
   d = drawn(batt, { ui: { ...OLED.create(), screen: 'text', txt: { field: 'pass', text: 'secret', pos: 2, mask: true } } }); noInk(d, 'the text editor');
   const setupC = { ...batt, setup: true, qr, net: { ...batt.net, setupName: 'jank-setup-1234' } };

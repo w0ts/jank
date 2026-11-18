@@ -130,6 +130,9 @@ struct jo_ctx {
     uint8_t layout_lcd2;                  /* jo_press picks the lcd2 menu and edit specs; jo_draw_lcd2 draws this layout */
     uint8_t has_rssi;
     int rssi;                             /* dBm of the best peer (jank) or the router (Wi-Fi client); 0: none heard */
+    uint8_t has_air_lost, has_air_retry;  /* MODE JANK's peers over the last 10 s window (the NETWORK screen's LOST and RX RETRY rows); 0: not known, shown "-" */
+    int air_lost, air_retry;              /* percent */
+    int rssi_min, rssi_max;               /* dBm of the weakest and the strongest frame (LEVEL); 0: none */
     uint8_t has_peak;
     double peak_db;                       /* the input's peak over the last second, dBFS */
     uint8_t conf_unknown;                 /* the tracker has no confidence to give: "--", grey */

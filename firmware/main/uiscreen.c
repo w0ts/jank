@@ -176,6 +176,19 @@ static void ip_text(uint32_t ip, char *out, size_t cap)
     snprintf(out, cap, "%u.%u.%u.%u", (unsigned)(ip >> 24), (unsigned)(ip >> 16 & 255u), (unsigned)(ip >> 8 & 255u), (unsigned)(ip & 255u));
 }
 
+/* MODE JANK's air over the last 10 s window of the peers' frames (jank_core.h jk_win_summary) */
+static void air_ctx(struct jo_ctx *c, uint32_t now)
+{
+    struct jk_airsum a;
+    jk_win_summary(&s_snap.b.win, now, &a);
+    c->has_air_lost = a.lost_pct >= 0;
+    c->air_lost = a.lost_pct;
+    c->has_air_retry = a.retry_pct >= 0;
+    c->air_retry = a.retry_pct;
+    c->rssi_min = a.rssi_min;
+    c->rssi_max = a.rssi_max;
+}
+
 static void net_ctx(struct jo_ctx *c, const struct jk_cfg *cfg, uint32_t now)
 {
     struct jo_net *n = &c->net;
@@ -201,6 +214,7 @@ static void net_ctx(struct jo_ctx *c, const struct jk_cfg *cfg, uint32_t now)
     c->has_wifiq = cfg->net == JK_NET_JANK;   /* MODE JANK's air: its signal at 1 Mbit/s; no retry / lost counts kept */
     c->wifiq = (struct jo_wifiq){rssi, 1000.0, 0, 0, 0};
     c->group_peers = (int)jk_peers_heard(&s_snap.b, now);
+    air_ctx(c, now);
 }
 
 static const struct jo_ctx *build_ctx(void *user, uint32_t now)

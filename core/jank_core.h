@@ -24,6 +24,9 @@
 
 #define JK_PEERS 8u                   /* units kept; a bigger group still bridges, it is only not counted */
 #define JK_HEARD_MS 3000u             /* a unit not heard this long is gone (the same 3 s MODE JANK uses) */
+#define JK_WIN_MS 10000u              /* the window of the air statistics */
+#define JK_WIN_MIN 10u                /* fewer frames than this in a window: the percentages are unknown */
+#define JK_SEQ_JUMP 2000u             /* a sequence gap above this is a restart or a long silence: the count starts again */
 #define JK_ADOPT_HOLD_MS 10000u       /* after adopting a computer's MAC, no other is adopted for this long */
 #define JK_NAME_MAX 23u
 
@@ -59,6 +62,21 @@ struct jk_peer {
     uint32_t frames;
 };
 
+/* What the peers' frames say about the air, over a tumbling window (jk_win_*): all peers together */
+struct jk_win {
+    uint32_t heard;                   /* frames counted (a retry of a frame already counted is not) */
+    uint32_t dup;                     /* retries of a frame already counted */
+    uint32_t missed;                  /* sequence numbers skipped by the senders: frames that never arrived */
+    uint32_t retry;                   /* frames with the 802.11 Retry bit set, the dup ones too */
+    int8_t rssi_min, rssi_max;        /* dBm over the frames counted; 0: none */
+};
+
+struct jk_airwin {
+    uint8_t on;                       /* start is set */
+    uint32_t start;                   /* ms */
+    struct jk_win cur, done;          /* the window running, and the last one completed */
+};
+
 struct jk_bridge {
     uint8_t mac[6];                   /* the computer's adapter address, and the stick's on the air */
     uint8_t bssid[6];
@@ -69,6 +87,7 @@ struct jk_bridge {
     uint32_t t_adopt;
     struct jk_peer peer[JK_PEERS];
     struct jk_stats st;
+    struct jk_airwin win;
 };
 
 uint8_t jk_channel(uint32_t group);                         /* 1, 6, 11 repeating; 0 for a bad group */
@@ -92,6 +111,19 @@ size_t jk_air_to_eth(struct jk_bridge *b, const uint8_t *air, size_t len, int8_t
 
 uint32_t jk_peers_heard(const struct jk_bridge *b, uint32_t now_ms);
 int8_t jk_best_rssi(const struct jk_bridge *b, uint32_t now_ms);     /* 0: none heard */
+
+/* Air statistics from the peers' frames (MODE JANK only). The sequence number is the sender's 12-bit counter, so the gaps
+ * between a peer's frames are the frames that never arrived. Our own sends are not measured: group frames are not acked. */
+struct jk_airsum {
+    int lost_pct;                     /* % of the peers' frames missing; -1: unknown */
+    int retry_pct;                    /* % of the peers' frames that arrived with the Retry bit set; -1: unknown */
+    int8_t rssi_min, rssi_max;        /* the weakest and the strongest frame of the last window, dBm; 0: none */
+};
+unsigned jk_seq_missed(uint32_t last, uint32_t seq);        /* frames skipped between two sequence numbers; 0 after a jump */
+void jk_win_roll(struct jk_airwin *w, uint32_t now_ms);     /* completes the window when its 10 s are over */
+void jk_win_heard(struct jk_airwin *w, uint32_t now_ms, unsigned missed, int retry, int8_t rssi);
+void jk_win_dup(struct jk_airwin *w, uint32_t now_ms);
+void jk_win_summary(const struct jk_airwin *w, uint32_t now_ms, struct jk_airsum *out);   /* of the last completed window */
 
 /* settings */
 /* AUTO BAR (core/jank_beatlink.h jbl_bar_mode): OFF; AT START (the default) the 1 is placed only at a (re)start, never

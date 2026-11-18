@@ -190,7 +190,20 @@ A read-only row under the screen's rows (TYPE, GROUP, PEERS in JANK mode: y 40; 
 `SIGNAL` on the left; on the right the dBm and a word, right-aligned to x 155: `-55dBm GOOD`. The dBm is the best jank peer's (`rssi`), or the router's in Wi-Fi mode (`wifi_rssi`).
 The word is coloured by the rule the bars had: `GOOD` green (>= -67 dBm), `FAIR` amber (-80..-68), `POOR` red (< -80), `NONE` grey (nothing heard, 0: no dBm shown); `-`
 alone when the jank does not report it. The `NETWORK` screen's existing `STATUS` row is a connection state, not a signal, so it was not used. The word is the
-only ink on the screen. The OLED layout's NETWORK screen is unchanged.
+only ink on the SIGNAL row. The OLED layout's NETWORK screen is unchanged.
+
+### The NETWORK screen's air rows (MODE JANK only)
+
+Three more read-only rows after SIGNAL (y 49, 58, 67; the selected row's help stays at y 101 and 110), label x 4, value right-aligned to x 155. In Wi-Fi client and own-network
+mode the screen is unchanged (SIGNAL only: there is no peer traffic to measure). The numbers are those of the last completed 10 s window of the peers' frames (`docs/firmware.md`, "Air statistics").
+
+| row | value | ink |
+|---|---|---|
+| `LOST` | `3%`; `-` while not known | `<` 3 % green, 3..9 % amber, from 10 % red |
+| `LEVEL` | `-78/-52 dBm`: the weakest and the strongest frame of the window; `-` when none | none (neutral) |
+| `RX RETRY` | `2%`; `-` while not known | from 30 % red, else neutral |
+
+`RX RETRY` is the peers' retries seen here, not this device's own (a group frame is never acknowledged, so the device cannot count its own).
 
 ## What the jank reports for each coloured item
 
@@ -199,7 +212,8 @@ only ink on the screen. The OLED layout's NETWORK screen is unchanged.
 | CONFIDENCE value, line, notch | the rule above | HOME `conf`, `get` threshold and lowconf: yes |
 | state word | `GATED` red, `HOLD` / `STOPPED` / `SILENT` grey, `COAST` amber, empty while running | status `gated=1`, HOME hold / coast suffix: yes |
 | link glyph + peers | joined (>= 1 Link peer) green; alone: grey in AUDIO mode, red in LINK mode | HOME `link` (Link peers): yes. "Searching" is not reported |
-| SIGNAL row (NETWORK screen) | >= -67 dBm green GOOD, -80..-68 amber FAIR, < -80 red POOR, none grey NONE, not reported `-` | status `rssi` or `wifi_rssi`: yes. Retry / loss shares: no |
+| SIGNAL row (NETWORK screen) | >= -67 dBm green GOOD, -80..-68 amber FAIR, < -80 red POOR, none grey NONE, not reported `-` | status `rssi` or `wifi_rssi`: yes. Retry / loss shares: no (see the air rows) |
+| LOST / LEVEL / RX RETRY rows (NETWORK screen, MODE JANK) | LOST green / amber from 3 % / red from 10 %; RX RETRY red from 30 %; LEVEL neutral; not known `-` | status `air_lost_pct`, `air_retry_pct` (-1: not known), `rssi_min`, `rssi_max` (0: none): yes |
 | battery (+ plug inside while charging) | neutral from 30 %, amber 15..29, red under 15 | HOME `battery` percent: yes. **Charging: not reported**, inferred as the BATTERY screen does (`usb`, cell fitted, under 100 %) |
 | INPUT number | rule above | HOME `level`, status `peak_db`: yes |
 | VU bar | the ramp (position on the dBFS scale) | the same |
