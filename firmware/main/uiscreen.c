@@ -30,6 +30,7 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "jank_oled_int.h"
+#include "jank_prefs.h"
 #include "jank_usbrole.h"
 #include "nvs.h"
 #include "oled.h"
@@ -40,7 +41,6 @@ void app_reboot(void);
 #define FRAME_MS 100u                   /* 10 frames a second; the driver sends the changed pages only */
 #define FRAME_MIN_MS 30u                /* a button's frame comes at once, but not more often than this */
 #define SPLASH_MS 800u
-#define PREFS_SETTLE_MS 2000u           /* a stored preference waits this long after its last change (live edits) */
 #define REBOOT_MS 800u
 #define TEMPO_MIN 90                    /* the emulator's tempo range for UP / DOWN */
 #define TEMPO_MAX 180
@@ -61,15 +61,9 @@ void app_reboot(void);
 
 static const char *TAG = "uiscreen";
 
-/* the preferences stored apart ("ui1"): the screen's own and the settings nothing uses yet */
-struct prefs {
-    uint8_t version, lead, bright, sleep, rate, conf_stop, th;
-    int8_t out1, out2, gain;
-};
-#define PREFS_VERSION 1
-static struct prefs s_prefs = {PREFS_VERSION, 1, 100, 0, 2, 1, 80, 0, 0, 0};
-static uint8_t s_prefs_pending;
-static uint32_t s_prefs_changed;
+/* the preferences stored apart ("ui1"): the screen's own and the settings nothing uses yet (core/jank_prefs.h) */
+static struct jk_prefs s_prefs;
+static struct jk_prefs_save s_prefs_save;
 
 static int s_screen;
 static uint32_t s_start, s_last_frame, s_reboot_at;
@@ -103,22 +97,23 @@ static struct {
 static void prefs_load(void)
 {
     nvs_handle_t h;
-    struct prefs p;
-    size_t n = sizeof p;
+    uint8_t b[JK_PREFS_SIZE + 1u];
+    size_t n = sizeof b;
+    jk_prefs_defaults(&s_prefs);
     if (nvs_open("jank", NVS_READONLY, &h) != ESP_OK)
         return;
-    if (nvs_get_blob(h, "ui1", &p, &n) == ESP_OK && n == sizeof p && p.version == PREFS_VERSION && p.bright >= 10 && p.bright <= 100 &&
-        p.sleep < 4 && p.rate < 5 && p.th <= 100)
-        s_prefs = p;
+    if (nvs_get_blob(h, "ui1", b, &n) == ESP_OK)
+        jk_prefs_unpack(&s_prefs, b, n);
     nvs_close(h);
 }
 
 static void prefs_save(void)
 {
     nvs_handle_t h;
+    uint8_t b[JK_PREFS_SIZE];
     esp_err_t e = nvs_open("jank", NVS_READWRITE, &h);
     if (e == ESP_OK) {
-        e = nvs_set_blob(h, "ui1", &s_prefs, sizeof s_prefs);
+        e = nvs_set_blob(h, "ui1", b, jk_prefs_pack(&s_prefs, b, sizeof b));
         if (e == ESP_OK)
             e = nvs_commit(h);
         nvs_close(h);
@@ -127,16 +122,17 @@ static void prefs_save(void)
         ESP_LOGE(TAG, "screen settings not saved: %s", esp_err_to_name(e));
 }
 
-static void prefs_changed(uint32_t now)
-{
-    s_prefs_pending = 1;
-    s_prefs_changed = now;
-}
-
-/* the flash rule of the settings (jank_core.h jk_save_due): only while stopped; and after the edits have settled */
+/* the flash rule of the settings (jank_core.h jk_save_due): not while playing; and once the edits have settled (JK_PREFS_SETTLE_MS) */
 static void prefs_step(uint32_t now)
 {
-    if (s_prefs_pending && now - s_prefs_changed >= PREFS_SETTLE_MS && jk_save_due(&s_prefs_pending, bridge_is_playing()))
+    if (jk_prefs_due(&s_prefs_save, now, bridge_is_playing(), 0))
+        prefs_save();
+}
+
+/* every esp_restart: a preference still waiting goes out first (the settings' own flush is in main.c) */
+static void prefs_flush_at_restart(void)
+{
+    if (jk_prefs_due(&s_prefs_save, bridge_ms(), 0, 1))
         prefs_save();
 }
 
@@ -416,15 +412,6 @@ static int tempo_step(void *user, int d, double *bpm)
 
 static void say(const char *title, const char *value) { jo_show_overlay(&s_ui, bridge_ms(), title, value); }
 
-static void set_pref(int8_t *p8, uint8_t *u8, int v)
-{
-    if (p8)
-        *p8 = (int8_t)v;
-    else
-        *u8 = (uint8_t)v;
-    prefs_changed(bridge_ms());
-}
-
 static void set_network(int v)
 {
     struct jk_cfg cfg;
@@ -453,25 +440,22 @@ static void set_field(void *user, enum jo_field f, int v)
     case JO_F_NETMODE: set_network(v); break;
     case JO_F_INOFF: ctl_set("set beat_latency %d", v); break;
     case JO_F_OUT0: ctl_set("set offset %d", v); break;
-    case JO_F_OUT1: set_pref(&s_prefs.out1, NULL, v); break;
-    case JO_F_OUT2: set_pref(&s_prefs.out2, NULL, v); break;
-    case JO_F_RATE: set_pref(NULL, &s_prefs.rate, v); break;
-    case JO_F_THRESHOLD: set_pref(NULL, &s_prefs.th, v); break;
-    case JO_F_GAIN: set_pref(&s_prefs.gain, NULL, v); break;
-    case JO_F_BRIGHT: set_pref(NULL, &s_prefs.bright, v); break;
-    case JO_F_SLEEP: set_pref(NULL, &s_prefs.sleep, v); break;
-    case JO_F_LOWCONF: set_pref(NULL, &s_prefs.conf_stop, v == 1); break;
     case JO_F_LTMODE:                   /* IGNORE: transport auto; FOLLOW / FOLLOW+LEAD: transport link, and the lead kept here */
         ctl_set("set transport %s", v == 0 ? "auto" : "link");
-        if (v)
-            set_pref(NULL, &s_prefs.lead, v == 2);
+        if (v) {
+            s_prefs.lead = v == 2;
+            jk_prefs_changed(&s_prefs_save, bridge_ms());
+        }
         break;
     case JO_F_GROUP: ctl_set("set group %d", v + 1); break;
     case JO_F_INSRC: ctl_set("set source %s", v >= 0 && v < 4 ? SRC[v] : "auto"); break;
     case JO_F_USBROLE: ctl_set("set usb %s", v ? "host" : "device"); break;
     case JO_F_AUTOBAR: ctl_set("set autobar %s", v >= 0 && v < 3 ? AUTOBAR[v] : "off"); break;
     case JO_F_USBMIDI: ctl_set("set usbmidi %s", v ? "off" : "on"); break;
-    default: break;
+    default:
+        if (jk_prefs_set_field(&s_prefs, f, v))
+            jk_prefs_changed(&s_prefs_save, bridge_ms());
+        break;
     }
 }
 
@@ -510,6 +494,7 @@ uint8_t uis_contrast(void) { return (uint8_t)((s_prefs.bright * 255u + 50u) / 10
 void uis_init(void)
 {
     prefs_load();
+    esp_register_shutdown_handler(prefs_flush_at_restart);
 }
 
 int uis_open_screen(void)
