@@ -43,7 +43,7 @@ for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) {
 }
 const mid = { x: X.cx - aa, y: X.cy - aa, w: X.arm, h: X.arm };
 ok(keys.every((k) => { const q = rects[k]; return q.x + q.w <= mid.x + 1e-9 || mid.x + mid.w <= q.x + 1e-9 || q.y + q.h <= mid.y + 1e-9 || mid.y + mid.h <= q.y + 1e-9; }), 'the centre square is no button');
-eq(BOX3.ports.map((p) => p.id + ':' + p.wall + ':' + p.at), ['midi1:top:33.3', 'midi2:top:46.1', 'din1:top:63.5', 'din2:top:85.6', 'clock:right:30.5', 'reset:right:50.5', 'linein:bottom:33.5', 'usbIn:top:9.5', 'usbHost:top:21', 'usbOwn:left:40.5'], 'ten ports, none else');
+eq(BOX3.ports.map((p) => p.id + ':' + p.wall + ':' + p.at), ['midi1:top:33.3', 'midi2:top:46.1', 'din1:top:63.5', 'din2:top:85.6', 'clock:right:30.5', 'reset:right:50.5', 'linein:bottom:33.5', 'usbIn:top:8.7', 'usbHost:top:21.7', 'usbOwn:left:40.5'], 'ten ports, none else');
 const c = BOX3.case;
 for (const p of BOX3.ports) {
   const rect = Box3.portRect(p), horizontal = p.wall === 'top' || p.wall === 'bottom';
