@@ -156,19 +156,19 @@ static void test_ink_picks_the_pixels_own_id(void)
     CHECK(row[40] == NEUTRAL && row[41] == NEUTRAL);
 }
 
-/* the VU ramp: ids 6 .. 37, RGB565 worked out by hand from ui/lcd2.js VU_RAMP (steps 0, 11, 20, 26 and 31), and the first id past it is neutral */
+/* the VU ramp: ids 6 .. 37, RGB565 worked out by hand from ui/lcd2.js VU_RAMP (steps 0, 16, 17, 23, 28 and 31), and the first id past it is neutral */
 static void test_vu_ramp(void)
 {
     static const struct {
         unsigned step;
         uint16_t want;
-    } T[] = {{0, 0x4EF0u}, {10, 0x4EF0u}, {11, 0x56EFu}, {20, 0xB728u}, {26, 0xFD84u}, {31, 0xFB0Bu}};
+    } T[] = {{0, 0x4EF0u}, {16, 0x4EF0u}, {17, 0x56EEu}, {23, 0xB728u}, {28, 0xFD84u}, {31, 0xFB0Bu}};
     struct jlc_pal swapped;
     CHECK(JO_INK_VU0 == 6 && JO_VU_STEPS == 32 && JO_INK_IDS == 38);
     for (unsigned i = 0; i < sizeof T / sizeof T[0]; i++)
         CHECK(pal.ink[JO_INK_VU0 + T[i].step] == T[i].want);
     jlc_palette(&swapped, 1);
-    CHECK(swapped.ink[JO_INK_VU0 + 11] == 0xEF56u && swapped.ink[JO_INK_VU0 + 31] == 0x0BFBu);
+    CHECK(swapped.ink[JO_INK_VU0 + 17] == 0xEE56u && swapped.ink[JO_INK_VU0 + 31] == 0x0BFBu);
     for (unsigned i = 1; i < JO_VU_STEPS; i++)
         CHECK(pal.ink[JO_INK_VU0 + i] != BG && pal.ink[JO_INK_VU0 + i] != NEUTRAL);
     clear();
