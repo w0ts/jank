@@ -365,6 +365,94 @@ static void test_rx_dup(void)
     CHECK(jk_air_to_eth(&b, tmp, air(HOST, FM2, 6, 0x08, 0x0800, NULL, 40), -50, 0, ebuf, sizeof ebuf) != 0);
 }
 
+/* a group frame of a peer, as the air statistics see it */
+static void heard(struct jk_bridge *b, const uint8_t from[6], uint16_t seq, uint8_t fc1, int8_t rssi, uint32_t t)
+{
+    jk_air_to_eth(b, tmp, air(LINK_MC, from, seq, fc1, 0x0800, NULL, 40), rssi, t, ebuf, sizeof ebuf);
+}
+
+static void test_seq_missed(void)
+{
+    CHECK(jk_seq_missed(5, 6) == 0 && jk_seq_missed(5, 7) == 1 && jk_seq_missed(5, 15) == 9);
+    CHECK(jk_seq_missed(5, 5) == 0);                    /* the same number: nothing skipped */
+    CHECK(jk_seq_missed(4095, 0) == 0 && jk_seq_missed(4095, 1) == 1 && jk_seq_missed(4090, 3) == 8);   /* the wrap at 4095 */
+    CHECK(jk_seq_missed(0, 2000) == 1999 && jk_seq_missed(0, 2001) == 0);    /* above 2000: a restart or a long silence */
+    CHECK(jk_seq_missed(10, 5) == 0 && jk_seq_missed(2000, 1) == 0);         /* backwards: a restart */
+}
+
+static void test_win_roll(void)
+{
+    struct jk_airwin w;
+    struct jk_airsum s;
+    memset(&w, 0, sizeof w);
+    jk_win_heard(&w, 500, 0, 0, -60);
+    CHECK(w.on && w.start == 500 && w.cur.heard == 1 && w.done.heard == 0);
+    jk_win_heard(&w, 500 + JK_WIN_MS - 1, 2, 1, -70);
+    CHECK(w.cur.heard == 2 && w.cur.missed == 2 && w.cur.retry == 1 && w.done.heard == 0);
+    CHECK(w.cur.rssi_min == -70 && w.cur.rssi_max == -60);
+    jk_win_dup(&w, 500 + JK_WIN_MS);                    /* the next window: the first one is done */
+    CHECK(w.done.heard == 2 && w.done.missed == 2 && w.cur.heard == 0 && w.cur.dup == 1 && w.cur.retry == 1);
+    CHECK(w.start == 500 + JK_WIN_MS);
+    jk_win_heard(&w, 500 + 3 * JK_WIN_MS + 5000u, 0, 0, -50);       /* two windows on: the one between had no frame */
+    CHECK(w.done.heard == 0 && w.done.dup == 0 && w.cur.heard == 1 && w.start == 500 + 3 * JK_WIN_MS);
+    jk_win_summary(&w, 500 + 4 * JK_WIN_MS, &s);        /* read at the end of the window: its 1 frame is too few for a percentage */
+    CHECK(s.lost_pct == -1 && s.rssi_min == -50 && s.rssi_max == -50);
+    jk_win_summary(&w, 500 + 5 * JK_WIN_MS, &s);        /* a whole window of silence since: nothing known */
+    CHECK(s.lost_pct == -1 && s.retry_pct == -1 && s.rssi_min == 0 && s.rssi_max == 0);
+    CHECK(w.cur.heard == 1 && w.start == 500 + 3 * JK_WIN_MS);          /* reading changes nothing */
+    memset(&w, 0, sizeof w);
+    w.on = 1;
+    w.start = 0xFFFFFFFFu - 4999u;                      /* the millisecond counter wraps inside a window */
+    jk_win_heard(&w, w.start + 1u, 0, 0, -40);
+    jk_win_heard(&w, 5000u, 0, 0, -41);
+    CHECK(w.done.heard == 1 && w.cur.heard == 1 && w.start == 5000u);
+}
+
+static void test_win_summary(void)
+{
+    struct jk_airwin w;
+    struct jk_airsum s;
+    memset(&w, 0, sizeof w);
+    w.on = 1;
+    w.done = (struct jk_win){.heard = 9, .retry = 9, .rssi_min = -80, .rssi_max = -40};
+    jk_win_summary(&w, 0, &s);                          /* 9 frames: too few */
+    CHECK(s.lost_pct == -1 && s.retry_pct == -1 && s.rssi_min == -80 && s.rssi_max == -40);
+    w.done = (struct jk_win){.heard = 8, .missed = 2, .dup = 2, .retry = 3};
+    jk_win_summary(&w, 0, &s);                          /* lost 2 of 10; retry 3 of 10 (8 heard and 2 duplicates) */
+    CHECK(s.lost_pct == 20 && s.retry_pct == 30);
+    w.done = (struct jk_win){.heard = 199, .missed = 1};
+    jk_win_summary(&w, 0, &s);                          /* 0.5 % rounds up; no retry is 0 %, not unknown */
+    CHECK(s.lost_pct == 1 && s.retry_pct == 0);
+    w.done = (struct jk_win){.heard = 97, .missed = 3, .retry = 1};
+    jk_win_summary(&w, 0, &s);
+    CHECK(s.lost_pct == 3 && s.retry_pct == 1);
+    w.done = (struct jk_win){.heard = 0, .dup = 12, .retry = 12, .rssi_min = -50, .rssi_max = -50};
+    jk_win_summary(&w, 0, &s);                          /* only copies of frames never counted: no level */
+    CHECK(s.lost_pct == -1 && s.retry_pct == 100 && s.rssi_min == 0 && s.rssi_max == 0);
+}
+
+static void test_air_stats(void)
+{
+    struct jk_bridge b;
+    struct jk_airsum s;
+    bridge(&b, JK_FILTER_LINK);
+    for (uint16_t i = 0; i < 12; i++)                   /* FM1: 12 frames across the wrap at 4095, none missing */
+        heard(&b, FM1, (uint16_t)(4090 + i) & 0xFFF, 0, i == 6 ? -40 : -60, 1000 + i);
+    heard(&b, FM1, 7, 0, -75, 1100);                    /* 6 skipped */
+    heard(&b, FM1, 7, 0x08, -30, 1200);                 /* a copy of it: not heard again, its level not counted */
+    heard(&b, FM1, 8, 0x08, -45, 1300);                 /* a retry with a new number: the first copy was lost */
+    heard(&b, FM2, 100, 0x08, -50, 1400);               /* a unit's first frame: nothing to compare */
+    heard(&b, FM2, 103, 0, -52, 1500);                  /* 101 and 102 skipped */
+    heard(&b, FM2, 2200, 0, -52, 1600);                 /* a jump above 2000: a restart, not 2096 lost */
+    jk_win_summary(&b.win, 1000 + JK_WIN_MS - 1, &s);
+    CHECK(s.lost_pct == -1 && s.retry_pct == -1 && s.rssi_min == 0);         /* no window is complete yet */
+    jk_win_summary(&b.win, 1000 + JK_WIN_MS, &s);       /* heard 17, missed 3, copies 1, retries 3 (the copy included) */
+    CHECK(s.lost_pct == 15 && s.retry_pct == 17 && s.rssi_min == -75 && s.rssi_max == -40);
+    jk_win_summary(&b.win, 1000 + 2 * JK_WIN_MS, &s);
+    CHECK(s.lost_pct == -1 && s.rssi_max == 0);
+    CHECK(jk_set_group(&b, 4) == 0 && !b.win.on && !b.win.cur.heard);
+}
+
 static void test_peers(void)
 {
     struct jk_bridge b;
@@ -451,6 +539,10 @@ int main(void)
     test_rx_rejects();
     test_rx_qos();
     test_rx_dup();
+    test_seq_missed();
+    test_win_roll();
+    test_win_summary();
+    test_air_stats();
     test_peers();
     test_set_group();
     test_is_group();

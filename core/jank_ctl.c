@@ -288,11 +288,20 @@ static void put_nudge(const struct jk_cfg *c, const struct jk_beat *t, struct wr
     put(w, "beat_latency_src=%s\nusbmidi=%s\n", jla_name(&c->lat_key, src), on_off(c->usbmidi));
 }
 
+/* the peers' air in the last completed 10 s window: -1 for a percentage not known, 0 for no level */
+static void put_air(const struct jk_bridge *b, uint32_t now_ms, struct writer *w)
+{
+    struct jk_airsum a;
+    jk_win_summary(&b->win, now_ms, &a);
+    put(w, "air_lost_pct=%d\nair_retry_pct=%d\nrssi_min=%d\nrssi_max=%d\n", a.lost_pct, a.retry_pct, a.rssi_min, a.rssi_max);
+}
+
 static void cmd_status(const struct jk_cfg *c, const struct jk_snapshot *s, uint32_t now_ms, struct writer *w)
 {
     const struct jk_bridge *b = &s->b;
     put(w, "usb=%u\nuptime=%lu\ngroup=%u\nchannel=%u\n", s->usb_up, (unsigned long)s->uptime_s, b->group, b->channel);
     put(w, "peers=%lu\nrssi=%d\n", (unsigned long)jk_peers_heard(b, now_ms), jk_best_rssi(b, now_ms));
+    put_air(b, now_ms, w);
     put(w, "wifi=%u\n", s->wifi_up);
     put_ip(w, "wifi_ip", s->wifi_ip);
     put(w, "wifi_rssi=%d\nwifi_channel=%u\n", s->wifi_rssi, s->wifi_channel);

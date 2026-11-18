@@ -70,6 +70,7 @@ int jk_set_group(struct jk_bridge *b, uint32_t group)
     b->group = (uint8_t)group;
     b->channel = jk_channel(group);
     memset(b->peer, 0, sizeof b->peer);
+    memset(&b->win, 0, sizeof b->win);
     return 0;
 }
 
@@ -199,13 +200,17 @@ static int note_peer(struct jk_bridge *b, const uint8_t *a, int8_t rssi, uint32_
 {
     struct jk_peer *p = peer_slot(b, a + 10, now_ms);
     uint32_t seq = (uint32_t)a[22] >> 4 | (uint32_t)a[23] << 4;
+    int retry = (a[1] & FC1_RETRY) != 0;
     if (!p)
         return 0;                     /* a full table still bridges: no retry filter for that unit */
     p->rssi = rssi;
     p->t_heard = now_ms;
     p->frames++;
-    if ((a[1] & FC1_RETRY) && p->have_seq && p->seq == seq)
+    if (retry && p->have_seq && p->seq == seq) {
+        jk_win_dup(&b->win, now_ms);
         return 1;
+    }
+    jk_win_heard(&b->win, now_ms, p->have_seq ? jk_seq_missed(p->seq, seq) : 0, retry, rssi);
     p->have_seq = 1;
     p->seq = (uint16_t)seq;
     return 0;
@@ -245,6 +250,68 @@ size_t jk_air_to_eth(struct jk_bridge *b, const uint8_t *a, size_t len, int8_t r
     memcpy(eth + JK_ETH_HDR, a + hdr + JK_LLC_LEN, pl);
     b->st.usb_out++;
     return JK_ETH_HDR + pl;
+}
+
+unsigned jk_seq_missed(uint32_t last, uint32_t seq)
+{
+    uint32_t gap = (seq - last) & 0x0FFFu;
+    return gap > 1u && gap <= JK_SEQ_JUMP ? gap - 1u : 0u;
+}
+
+void jk_win_roll(struct jk_airwin *w, uint32_t now_ms)
+{
+    uint32_t over;
+    if (!w->on) {
+        w->on = 1;
+        w->start = now_ms;
+        return;
+    }
+    over = now_ms - w->start;
+    if (over < JK_WIN_MS)
+        return;
+    memset(&w->done, 0, sizeof w->done);
+    if (over < 2u * JK_WIN_MS)        /* a whole window with no frame at all leaves done empty */
+        w->done = w->cur;
+    memset(&w->cur, 0, sizeof w->cur);
+    w->start = now_ms - over % JK_WIN_MS;
+}
+
+void jk_win_heard(struct jk_airwin *w, uint32_t now_ms, unsigned missed, int retry, int8_t rssi)
+{
+    struct jk_win *c;
+    jk_win_roll(w, now_ms);
+    c = &w->cur;
+    if (!c->heard || rssi < c->rssi_min)
+        c->rssi_min = rssi;
+    if (!c->heard || rssi > c->rssi_max)
+        c->rssi_max = rssi;
+    c->heard++;
+    c->missed += missed;
+    c->retry += retry != 0;
+}
+
+void jk_win_dup(struct jk_airwin *w, uint32_t now_ms)
+{
+    jk_win_roll(w, now_ms);
+    w->cur.dup++;
+    w->cur.retry++;
+}
+
+static int pct(uint32_t part, uint32_t whole)
+{
+    return whole < JK_WIN_MIN ? -1 : (int)((200ull * part + whole) / (2ull * whole));
+}
+
+void jk_win_summary(const struct jk_airwin *w, uint32_t now_ms, struct jk_airsum *out)
+{
+    struct jk_airwin t = *w;
+    const struct jk_win *d;
+    jk_win_roll(&t, now_ms);
+    d = &t.done;
+    out->lost_pct = pct(d->missed, d->missed + d->heard);
+    out->retry_pct = pct(d->retry, d->heard + d->dup);
+    out->rssi_min = d->heard ? d->rssi_min : 0;
+    out->rssi_max = d->heard ? d->rssi_max : 0;
 }
 
 uint32_t jk_peers_heard(const struct jk_bridge *b, uint32_t now_ms)
