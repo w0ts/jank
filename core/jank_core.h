@@ -154,8 +154,6 @@ struct jk_cfg {
     /* ... and since M2i: the advanced beat follow's spectral rate (core/beat/jb_rate.h) */
     uint8_t rate;                     /* 1 (default): a pitch move read from the spectrum steers the follower; 0: the beats alone
                                          (CPU: the rate costs ~0.4 % of core 0 while it runs) */
-    /* ... and BEAT FLASH (the lcd2 screen, since 2026-11-18): 0 BOXES (default), 1 the whole screen flashes on the beat */
-    uint8_t beat_flash;
     /* Stored in their own blob (store.c, key "lat1") since M2d: beat_latency per audio source (core/jank_lat.h) */
     struct jla lat;
     struct jla_key lat_key;           /* the source beat_latency_ms belongs to now (not stored: usbrole.c follows it) */
@@ -360,11 +358,6 @@ const char *jk_half_beats(int halves, char *out);
 #define JK_BAR_FLASH_MS 150u           /* the bar's first beat, by quantum, on Link's beat count as MIDI start uses */
 #define JK_FLASH_CAP_DIV 3             /* no flash is longer than a third of a beat: they stay apart at fast tempos */
 int jk_led_lit(uint32_t net, int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum);
-/* the flash window itself (jk_led_lit is built on it; the lcd2 screen's BEAT FLASH uses it too): JK_FLASH_BEAT inside the first
- * JK_BEAT_FLASH_MS of a beat, JK_FLASH_BAR inside the first JK_BAR_FLASH_MS of the bar's first beat (index 0 of quantum beats), neither
- * longer than a beat / JK_FLASH_CAP_DIV; JK_FLASH_NONE outside, with no session (joined 0) or no tempo (mpb <= 0) */
-enum jk_flash { JK_FLASH_NONE = 0, JK_FLASH_BEAT = 1, JK_FLASH_BAR = 2 };
-int jk_flash_at(int joined, int64_t beat_ub, int32_t mpb, uint32_t quantum);
 /* the session's beat at beat_ub is its bar's first (by quantum): with AUTO BAR locked, that flash shows the music's 1 */
 int jk_led_bar_one(int64_t beat_ub, uint32_t quantum);
 #define JK_LED_ONE_RGB 40, 18, 0       /* the locked 1's flash: amber (the other flashes keep the network's colour) */

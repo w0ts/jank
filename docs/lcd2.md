@@ -82,16 +82,10 @@ measured on the panel: the colours as it shows them, its gamma and viewing angle
 
 The lcd2 layout has its own 160 x 120 grid (ui/oled.js, `ctx.layout 'lcd2'`; C: `core/jank_oled_lcd2.c`, `jo_draw_lcd2`), painted **exactly x2**
 on 320 x 240: no bands, no centring (`core/jank_lcd.c`, host-tested in `tests/test_lcd.c`). The frame is 160 x 120 bits (2.4 KB, page
-layout), the ink plane 160 x 120 bytes (19.2 KB). Colours: the palette in `core/jank_lcd.h` (`JLC_PALETTE`, `JLC_INK_MAP`,
-`JLC_FLASH_FIELD`), checked against `ui/lcd2.js` by `tests/test_lcd_palette.js`, converted to RGB565 once. Nothing is measured on the panel
+layout), the ink plane 160 x 120 bytes (19.2 KB). Colours: the palette in `core/jank_lcd.h` (`JLC_PALETTE`, `JLC_INK_MAP`), checked against `ui/lcd2.js` by `tests/test_lcd_palette.js`, converted to RGB565 once. Nothing is measured on the panel
 (colours as shown, gamma, viewing angle).
 
-BEAT FLASH (setting `beat_flash`, 0 BOXES / 1 SCREEN; `get`, `set`, `help`, stored in the `usb1` blob as its 8th byte, older blobs keep 0; the
-lcd2 menu item after DISPLAY): while the screen is HOME with the setting on SCREEN and the transport running, `lcd.c` asks the session for its
-beat (`bridge_beat`) and decides with `jk_flash_at` (core/jank_core.c: the LED's own window, 80 ms, 150 ms for the bar's first beat, at most a
-third of a beat). During a flash the field is the flash colour and every lit pixel near-black. The task sleeps to the next beat and sends the whole
-frame about every 33 ms while a flash lasts (153.6 KB, 31 ms of bus at 40 MHz), otherwise only the changed 16-row strips. SPI clock 40 MHz; the
-task runs on core 0 at priority 1.
+Only the changed 16-row strips are sent (the first frame in full); SPI clock 40 MHz; the task runs on core 0 at priority 1.
 
 RAM (from the linked image): the three frames 3 x 2.4 KB and the DMA chunk buffers 5 KB are internal `.bss` / `.data`; the four ink planes
 (UI, pending, being sent, shown: 76.8 KB) are heap, from PSRAM when the board has it (else internal, where the allocation may fail). Not

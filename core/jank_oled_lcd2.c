@@ -345,8 +345,7 @@ static void menu_value(const struct jo_ctx *c, int i, char *out, size_t cap)
     case 4: v = c->usb_role < 2 ? jo_usb_names[c->usb_role] : ""; break;
     case 5: v = c->usb_midi < 2 ? jo_off_on_names[c->usb_midi] : ""; break;
     case 7: v = c->rate < 5 ? jo_rates_short[c->rate] : ""; break;
-    case 9: v = c->beat_flash ? "SCREEN" : "BOXES"; break;
-    case 10:
+    case 9:
         if (c->fitted)
             snprintf(b, sizeof b, "%d%%", c->batt);
         else

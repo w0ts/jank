@@ -11,7 +11,7 @@
 #define NS "jank"
 #define KEY "cfg1"
 #define KEY_USB "usb1"                 /* USB DEVICE / HOST, AUDIO > SOURCE, AUTO BAR, USB MIDI CLOCK, LOW CONFIDENCE, THRESHOLD,
-                                        * RATE, BEAT FLASH: eight bytes, apart from the release's blob (an older, shorter one keeps the rest's
+                                        * RATE: seven bytes, apart from the release's blob (an older, shorter one keeps the rest's
                                         * defaults) */
 #define KEY_LAT "lat1"                 /* beat_latency per audio source, the auto bases (core/jank_lat.h jla_pack) */
 #define KEY_TRIM "latt"                /* the AUDIO SHIFTs on top (jla_pack_trim, M2h): none stored (an older firmware's): 0 */
@@ -30,11 +30,12 @@ static int valid(const struct jk_cfg *c)
 static void load_usb(nvs_handle_t h, struct jk_cfg *c)
 {
     uint8_t u[8];                      /* usb, source, autobar (since M2c), usbmidi (since M2d), lowconf, threshold (since M2e),
-                                        * rate (since M2i), beat_flash (since the lcd2): a shorter blob keeps the defaults */
+                                        * rate (since M2i): a shorter blob keeps the defaults. The 8th byte (the retired BEAT FLASH, written by
+                                        * the lcd2 builds) is read to fit the blob, never used; it is not written any more */
     size_t n = sizeof u;
     esp_err_t e = nvs_get_blob(h, KEY_USB, u, &n);
     if (e == ESP_OK && n >= 2u && u[0] <= JUR_USB_HOST && u[1] <= JUR_SRC_LINK && (n < 3u || u[2] <= JK_AUTOBAR_ALWAYS) && (n < 4u || u[3] <= 1u)
-        && (n < 5u || u[4] <= JCF_STOP) && (n < 6u || u[5] <= 100u) && (n < 7u || u[6] <= 1u) && (n < 8u || u[7] <= 1u)) {
+        && (n < 5u || u[4] <= JCF_STOP) && (n < 6u || u[5] <= 100u) && (n < 7u || u[6] <= 1u)) {
         c->usb = u[0];
         c->source = u[1];
         if (n >= 3u)
@@ -47,8 +48,6 @@ static void load_usb(nvs_handle_t h, struct jk_cfg *c)
         }
         if (n >= 7u)
             c->rate = u[6];
-        if (n >= 8u)
-            c->beat_flash = u[7];
     } else if (e != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGW(TAG, "stored USB settings ignored: %s, %u bytes", esp_err_to_name(e), (unsigned)n);
     }
@@ -107,7 +106,7 @@ esp_err_t store_save(const struct jk_cfg *c)
         return e;
     e = nvs_set_blob(h, KEY, c, STORED_SIZE);
     if (e == ESP_OK) {
-        const uint8_t u[8] = {c->usb, c->source, c->autobar, c->usbmidi, c->lowconf, c->threshold, c->rate, c->beat_flash};
+        const uint8_t u[7] = {c->usb, c->source, c->autobar, c->usbmidi, c->lowconf, c->threshold, c->rate};
         e = nvs_set_blob(h, KEY_USB, u, sizeof u);
     }
     if (e == ESP_OK) {
