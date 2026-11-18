@@ -32,6 +32,9 @@ function ok(c, what) {
 ok(html === expandedTemplate, "page/jank.html is the expansion of page/src/jank.html: run make page");
 ok(!/<!--@include/.test(html), "no include marker left");
 ok(/<script id="face-ui">/.test(html) && /<script id="advanced-ui">/.test(html) && /const Stick = /.test(html) && /const Face = /.test(html), "the face's, Advanced's and the player's scripts are in the page");
+ok(!/id="connect"|class="buttons"/.test(html.split('id="live"')[0]), "no connection card: nothing but the title, the message and the connect button above the face");
+ok(html.indexOf('id="connect-slot"') < html.indexOf('id="c-midi"') && html.indexOf('id="c-midi"') < html.indexOf('id="live"'), "the connect button starts in the slot under the title");
+ok(html.indexOf('id="dev-bar"') > html.indexOf('id="face"') && html.indexOf('id="c-advanced-box"') > html.indexOf('id="dev-bar"') && html.indexOf('id="c-advanced-box"') < html.indexOf('id="face-box"'), "the Advanced check box sits in the device card's top row");
 ok(/id="c-midi"[^>]*aria-pressed="false"/.test(html), "Connect: the MIDI port button, not pressed before a connection");
 ok(!/bluetooth|gatt|\bble\b|\bble[-_]/i.test(html), "no Bluetooth, BLE or GATT anywhere in the page");
 ok(!/id="c-sim"|>Demo<|>Simulator<|Sim\.|const Sim|sim\.js|\?sim=/.test(html), "no Demo / simulator mode left");

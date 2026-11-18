@@ -95,8 +95,11 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .check input { width: auto; min-height: 0; }
 #c-advanced-box { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
 #c-advanced-box input { width: auto; min-height: 0; }
-#connect .buttons button { color: var(--ink); background: transparent; border: 1px solid var(--line); }
-#connect .buttons button[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+#connect-slot { margin: 4px 0 12px; }
+.dev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.dev-bar #c-ports-box { margin: 0; }
+#dev-bar #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
+#dev-bar #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 /* units have no RGB LEDs any more: the box drawing's LED group is not shown on this page (the Mac simulator still draws it) */
 #ledView, #seamGlow { display: none; }
 #face .lbl, #face .brand { display: none; }
@@ -110,18 +113,18 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
   </header>
   <p id="msg"></p>
 
-  <section id="connect">
-    <div class="buttons">
-      <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected disconnects and turns that off.">MIDI port (USB, iPhone app)</button>
-      <label id="c-advanced-box" class="hide" title="Shows the player and the advanced tuning and details on this page. Changes only this page (remembered in this browser); nothing is sent to the stick."><input id="c-advanced" type="checkbox"> Advanced</label>
-    </div>
+  <div id="connect-slot">
+    <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected disconnects and turns that off.">MIDI port (USB, iPhone app)</button>
     <p id="c-waiting" class="note hide" style="margin:8px 0 0">waiting for the jank...</p>
-    <label id="c-ports-box" class="hide" style="margin-top:10px" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
-  </section>
+  </div>
 
   <div id="live" class="hide">
     <div class="live-row">
       <section id="face" class="device">
+        <div id="dev-bar" class="dev-bar">
+          <label id="c-advanced-box" class="hide" title="Shows the player and the advanced tuning and details on this page. Changes only this page (remembered in this browser); nothing is sent to the stick."><input id="c-advanced" type="checkbox"> Advanced</label>
+          <label id="c-ports-box" class="hide" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
+        </div>
         <div id="face-box">
           <!--@include ui/box.svg.html-->
         </div>
@@ -719,9 +722,15 @@ async function autoConnect() {
   if (!S.line && !S.waiting) connectMidi(true);
 }
 
+/* the connect button lives under the title when nothing is connected and in the device card's top row while connected */
+function placeConnect(kind) {
+  $(kind ? "dev-bar" : "connect-slot").prepend($("c-midi"));
+}
+
 function setConnected(kind) {
   S.kind = kind;
   $("c-midi").setAttribute("aria-pressed", String(kind === "midi"));
+  placeConnect(kind);
   $("live").classList.toggle("hide", !kind);
   paintAdvanced();
   document.dispatchEvent(new CustomEvent("jank-connection", { detail: { kind } }));
