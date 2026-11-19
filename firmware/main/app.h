@@ -80,6 +80,7 @@ int beat_nudge(int halves, int8_t *total, char *view, size_t cap);
  * the cell's level from the same ADC pattern. Boards without it: linein_start does nothing, no battery percent. */
 esp_err_t linein_start(void);
 int linein_batt_pct(void);                                   /* -1: no cell, or no reading yet */
+void linein_cell_step(uint32_t now_ms);                      /* boards with a cell pin and no line in: a oneshot read every few seconds (ui task, core 0); else nothing */
 void linein_report(char *out, size_t cap);                   /* the `line` command's answer, ending in ok */
 
 /* midi.c: the free-running microsecond timer and the 24 PPQN output */

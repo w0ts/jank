@@ -398,6 +398,8 @@ int linein_batt_pct(void)
     return p;
 }
 
+void linein_cell_step(uint32_t now_ms) { (void)now_ms; }   /* the cell is in the ADC pattern */
+
 void linein_report(char *out, size_t cap)
 {
     struct line_pub p;
@@ -419,11 +421,83 @@ void linein_report(char *out, size_t cap)
              (unsigned long)p.isr_avg_cycles, (unsigned long)p.task_avg_cycles);
 }
 
-#else /* no LINE IN on this board */
+#elif BOARD_CELL_GPIO >= 0 /* no LINE IN, but a cell pin (lcd2): a oneshot read every few seconds */
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_log.h"
+#include "jank_line.h"
+
+#define CELL_STEP_MS 5000u
+#define CELL_SAMPLES 16
+
+static adc_oneshot_unit_handle_t s_unit;
+static adc_cali_handle_t s_cali;
+static adc_channel_t s_ch;
+static int s_up;                       /* 0 not tried, 1 ready, -1 failed: the percent stays -1 */
+static uint32_t s_last_ms;
+static volatile int8_t s_pct = -1;     /* one byte, written by the ui task only */
+
+static int cell_up(void)
+{
+    adc_unit_t unit;
+    adc_oneshot_unit_init_cfg_t ucfg = {.unit_id = ADC_UNIT_1};
+    adc_oneshot_chan_cfg_t ccfg = {.atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12};
+    adc_cali_curve_fitting_config_t cc = {.unit_id = ADC_UNIT_1, .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12};
+    if (adc_oneshot_io_to_channel(BOARD_CELL_GPIO, &unit, &s_ch) != ESP_OK || unit != ADC_UNIT_1)
+        return -1;
+    if (adc_oneshot_new_unit(&ucfg, &s_unit) != ESP_OK)
+        return -1;
+    if (adc_oneshot_config_channel(s_unit, s_ch, &ccfg) != ESP_OK)
+        return -1;
+    cc.chan = s_ch;
+    if (adc_cali_create_scheme_curve_fitting(&cc, &s_cali) != ESP_OK)
+        s_cali = NULL;                 /* no eFuse values: the nominal scale, as in the line-in build */
+    return 1;
+}
+
+void linein_cell_step(uint32_t now_ms)
+{
+    int32_t sum = 0, n = 0, mv;
+    if (s_up < 0 || (s_up > 0 && (uint32_t)(now_ms - s_last_ms) < CELL_STEP_MS))
+        return;
+    s_last_ms = now_ms;
+    if (s_up == 0) {
+        s_up = cell_up();
+        if (s_up < 0) {
+            ESP_LOGE("cell", "ADC1 oneshot for GPIO%d failed: no battery percent", BOARD_CELL_GPIO);
+            return;
+        }
+    }
+    for (int i = 0; i < CELL_SAMPLES; i++) {
+        int raw;
+        if (adc_oneshot_read(s_unit, s_ch, &raw) == ESP_OK) {
+            sum += raw;
+            n++;
+        }
+    }
+    if (!n)
+        return;                        /* keep the last value */
+    sum = (sum + n / 2) / n;
+    mv = 0;
+    if (!s_cali || adc_cali_raw_to_voltage(s_cali, (int)sum, (int *)&mv) != ESP_OK)
+        mv = sum * 3100 / 4095;        /* the 12 dB range's nominal ~3.1 V [est] */
+    s_pct = (int8_t)jl_cell_pin_pct(mv, BOARD_CELL_DIV, BOARD_CELL_EMPTY_MV);
+}
+
+esp_err_t linein_start(void) { return ESP_OK; }
+
+int linein_batt_pct(void) { return s_pct; }
+
+void linein_report(char *out, size_t cap) { snprintf(out, cap, "line_in=none\nbatt_pct=%d\nok\n", s_pct); }
+
+#else /* no LINE IN and no cell on this board */
 
 esp_err_t linein_start(void) { return ESP_OK; }
 
 int linein_batt_pct(void) { return -1; }
+
+void linein_cell_step(uint32_t now_ms) { (void)now_ms; }
 
 void linein_report(char *out, size_t cap) { snprintf(out, cap, "line_in=none\nok\n"); }
 #endif
