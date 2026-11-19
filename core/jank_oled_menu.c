@@ -31,7 +31,7 @@ static const char *const H_OUT1[][2] = {{"MIDI OUT 2 TIMING", LATER}};
 static const char *const H_OUT2[][2] = {{"MODULAR CLOCK TIMING", LATER}};
 static const char *const H_RATE[][2] = {{"1 PULSE PER BEAT", "ON CLK OUT"}, {"2 PULSES PER BEAT", "ON CLK OUT"}, {"4 PULSES PER BEAT", "ON CLK OUT"},
                                         {"8 PULSES PER BEAT", "ON CLK OUT"}, {"24 PULSES PER BEAT", "ON CLK OUT"}};
-static const char *const H_THRESHOLD[][2] = {{"STOPS UNDER MARKER", "RUNS AGAIN 5 ABOVE IT"}};
+static const char *const H_THRESHOLD[][2] = {{"BELOW IT: STOP", "(LOW CONFIDENCE)"}};
 static const char *const H_GAIN[][2] = {{"INPUT LEVEL", "- CUT   + BOOST"}};
 static const char *const H_LTMODE[][2] = {{"CLOCKS RUN ON LINK", "TEMPO, OWN START"}, {"CLOCKS START + STOP", "WITH THE SESSION"},
                                           {"FOLLOWS, AND START/", "STOP DRIVES LINK"}};

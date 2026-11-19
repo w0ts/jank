@@ -58,13 +58,13 @@ static void bar(uint8_t *fb, int x, int y, int w, double frac)
 }
 
 /* a full-width 11 px bar with its value written inside, XOR-ed so it reads over the fill and over the empty part */
-static void value_bar(uint8_t *fb, int y, double frac, double tick_frac, const char *label, int right)
+static void value_bar(uint8_t *fb, int y, double frac, double tick_frac, const char *label)
 {
     uint8_t tmp[JO_FB_BYTES];
     jo_rect(fb, 3, y + 1, jo_iround(122 * jo_clampd(frac, 0.0, 1.0)), 9, 1);
     jo_xor_col(fb, 2 + jo_iround(123 * tick_frac), y - 1, y + 11);
     memset(tmp, 0, sizeof tmp);
-    jo_text(tmp, label, right ? 123 - jo_text_w(label, 1) : 5, y + 2, 1, 1);
+    jo_text(tmp, label, 5, y + 2, 1, 1);
     for (size_t i = 0; i < sizeof tmp; i++)
         fb[i] ^= tmp[i];
 }
@@ -252,11 +252,11 @@ static void home(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
     beat_boxes(fb, c, 87, 9, 9, 9, 1);
     bar_marks(fb, c, 87, 9, 9, 9, 1);
     snprintf(s, sizeof s, "IN %ddB", jo_iround(c->level_db));
-    value_bar(fb, 31, (c->level_db - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, s, 0);
+    value_bar(fb, 31, (c->level_db - METER_MIN_DB) / -METER_MIN_DB, (SILENCE_DB - METER_MIN_DB) / -METER_MIN_DB, s);
     jo_xor_col(fb, 3 + jo_iround(121 * jo_clampd((c->level_min - METER_MIN_DB) / -METER_MIN_DB, 0.0, 1.0)), 32, 41);
     jo_xor_col(fb, 3 + jo_iround(121 * jo_clampd((c->level_max - METER_MIN_DB) / -METER_MIN_DB, 0.0, 1.0)), 32, 41);
     snprintf(s, sizeof s, "CF %d%%", jo_iround(c->conf * 100));
-    value_bar(fb, 44, c->conf, c->th / 100.0, s, 0);
+    value_bar(fb, 44, c->conf, c->th / 100.0, s);
     status_line(fb, c, now, 57);
 }
 
@@ -356,13 +356,8 @@ static void edit(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
     int w, x;
     title_bar(fb, sp->title, NULL);
     if (ui->edit.field == JO_F_THRESHOLD) {          /* the live CF bar with the threshold as a marker UP / DOWN moves: no digits for it */
-        snprintf(s, sizeof s, "%d%%", ui->edit.val);      /* the number on the right is the setting */
-        value_bar(fb, 22, c->conf, ui->edit.val / 100.0, s, 1);
-        if (c->conf_unknown)
-            snprintf(s, sizeof s, "NOW -");
-        else
-            snprintf(s, sizeof s, "NOW %d%%", jo_iround(c->conf * 100));
-        jo_text(fb, s, 5, 35, 1, 1);                        /* the live value, below the bar */
+        snprintf(s, sizeof s, "CF %d%%", jo_iround(c->conf * 100));
+        value_bar(fb, 22, c->conf, ui->edit.val / 100.0, s);
     } else {
         jo_edit_text(sp, ui->edit.val, s, sizeof s);  /* the menus' one font size, always */
         w = jo_text_w(s, 1) + 12;

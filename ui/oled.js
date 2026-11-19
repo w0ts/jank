@@ -191,7 +191,7 @@ const OLED = (() => {
     rate: { title: 'CLOCK RATE', opts: RATES, get: c => c.rate,
             help: [['1 PULSE PER BEAT', 'ON CLK OUT'], ['2 PULSES PER BEAT', 'ON CLK OUT'], ['4 PULSES PER BEAT', 'ON CLK OUT'],
                    ['8 PULSES PER BEAT', 'ON CLK OUT'], ['24 PULSES PER BEAT', 'ON CLK OUT']] },
-    threshold: { title: 'THRESHOLD', lo: 0, hi: 100, step: 5, unit: '%', get: c => c.th, help: ['STOPS UNDER MARKER', 'RUNS AGAIN 5 ABOVE IT'] },
+    threshold: { title: 'THRESHOLD', lo: 0, hi: 100, step: 5, unit: '%', get: c => c.th, help: ['BELOW IT: STOP', '(LOW CONFIDENCE)'] },
     gain: { title: 'LEVEL', lo: -12, hi: 12, step: 1, unit: ' dB', get: c => c.gain, help: ['INPUT LEVEL', '- CUT   + BOOST'] },   // before the tracker
     ltmode: { title: 'LINK TRANSPORT', opts: LT_MODES, get: c => c.ltMode,      // LINK mode only: the session's start / stop
               help: [['CLOCKS RUN ON LINK', 'TEMPO, OWN START'], ['CLOCKS START + STOP', 'WITH THE SESSION'],
@@ -597,8 +597,7 @@ const OLED = (() => {
     const e = ui.edit, sp = EDITS[e.field];
     titleBar(fb, sp.title);
     if (e.field === 'threshold') {                                    // the live CF bar, the threshold a marker UP / DOWN moves: no digits for it
-      valueBar(fb, 22, c.conf, e.val / 100, e.val + '%', true, false);                  // the number on the right is the setting
-      text(fb, 'NOW ' + (c.confKnown === false ? '-' : Math.round(c.conf * 100) + '%'), 5, 35, 1, 1);   // the live value, below the bar
+      valueBar(fb, 22, c.conf, e.val / 100, 'CF ' + Math.round(c.conf * 100) + '%', false, false);
     } else {
       const s = editText(sp, e.val);                                  // the menus' one font size, always
       const w = textW(s, 1) + 12, x = Math.round((W - w) / 2);
@@ -913,9 +912,7 @@ const OLED = (() => {
     titleBarLcd2(fb, sp.title);
     if (e.field === 'threshold') {                                    // the live CONFIDENCE line, its notch the threshold UP / DOWN moves: no digits for it
       const known = c.confKnown !== false;
-      lineRow(fb, 80, 'THRESHOLD', e.val + '%', known ? c.conf : 0, e.val / 100, confInk(c, e.val));      // the number on the right is the setting
-      const now = known ? Math.round(c.conf * 100) + '%' : '-';                                     // the live value, below the line
-      rowText(fb, 104, 'NOW', now); tag(confInk(c, e.val), L2.valueXR - textW(now, 1), 104, textW(now, 1), 14);
+      lineRow(fb, 80, 'CONFIDENCE', known ? Math.round(c.conf * 100) + '%' : '--', known ? c.conf : 0, e.val / 100, confInk(c, e.val));
     } else {
       const s = editText(sp, e.val), sc = textW(s, 2) + 32 <= W - 8 ? 2 : 1;    // the value in the biggest of two sizes that fits
       const w = textW(s, sc) + 32, h = 14 * sc + 16, x = Math.round((W - w) / 2);
