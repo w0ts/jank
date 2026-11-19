@@ -187,8 +187,9 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   sound keeps the grid, LOST above). `core/beat/jb_resume.c`, in `follow_conf`, the tuned follower with STOP / START.
   While the outputs run on a trusted glide the period and the SHAPE of the song's beat are remembered (the activation
   folded at the period from the published lines, 20 points: which peak is the beat and which the off-beat), no time
-  limit. Silence or LOST's near silence arms it: the old phase is thrown away, neither the gate nor LOST's own return may
-  bring the old grid back until RESUME matches or the follower locks or jumps on a grid of its own. Each step the last 4
+  limit. Silence or LOST's near silence (the PAUSE LEVEL below) arms it: the old phase is thrown away, neither the gate
+  nor LOST's own return may bring the old grid back until RESUME matches, the follower locks or jumps on a grid of its
+  own, or the sound has been back 4 s without a match (then the song comes back as before). Each step the last 4
   periods of activation (all 4 with a peak of 0.2) are folded at the remembered period and cross-correlated with the shape
   over 20 shifts; Pearson r >= 0.6: the follower is seeded on the new phase with the remembered period (a clean ModeBpm fed
   the grid as beats) and the outputs run at once; the DBN's tempo prior (jb_dbn.h, the robust follower's) is held on the
@@ -196,15 +197,23 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   noise, and its beats dragged the grid off).
   - Measured (the firmware's code from the audio of 30 of the user's tracks, a pause of white noise at -40 dBFS, the song
     back where it stopped, threshold 55; today / RESUME, time to running after the music returns / the next 10 s on the
-    grid): 5 s 2.0 s, 44 % / 1.4 s, 74 %; 30 s 2.4 s, 65 % / 1.4 s, 100 %; 2 min 8.3 s / 1.6 s; 10 min 17.3 s / 1.7 s
-    (100 % on the grid both). The 5 s misses: on some tracks a -40 dB gap is not 30 dB under the song (LOST's QUIET), so
-    there is no pause; and a few resumes half a beat off. 200 whole tracks, normal play: the same 83 stops, 560 -> 515 s
-    stopped, 16 resumes after quiet passages, no track worse. Rejected: waiting for the tracker's beats (after a pause its
+    grid; with the PAUSE LEVEL at -40 dBFS): 5 s 2.0 s, 44 % / 1.5 s, 100 %; 30 s 2.4 s, 65 % / 1.4 s, 100 %; 2 min 8.3 s
+    / 1.4 s; 10 min 17.3 s / 1.5 s (100 % on the grid both). 200 whole tracks, normal play: the same 87 stops, 653 ->
+    613 s stopped, 19 resumes after quiet passages; the worst track 2.8 -> 5.1 s stopped (before the 4 s limit: 102 s, a
+    quiet part RESUME did not recognise). Rejected: waiting for the tracker's beats (after a pause its
     DBN comes back at a wrong tempo); a band-profile fingerprint (57-69 % of other songs looked the same); a comb of the
     activation alone (it took the off-beat on house tracks); the kick band to choose beat or off-beat (worse).
   - `tests/test_tempo.c`: after 5 s, 2 min and 10 min of near silence the song back 0.17 s off the old grid: running on
     the new phase 1.53 s after its first beat (4 beats in); the shape found on the beat when the off-beat peaks higher; one beat back is
     not enough. RAM: ~110 bytes + the 40-float prior. Cost: per step 80 activation reads, when armed 20 correlations of 20.
+- **PAUSE LEVEL** (`set pause_db -70..-20`, stored, -40 dBFS by default; the colour layout's AUDIO > PAUSE LEVEL; the
+  INPUT bar's notch on the colour screen and the page): the input under it for 2 grid lines is a pause (LOST's QUIET:
+  the outputs stop, RESUME finds the new phase after it). The user, 2026-11-19: "silence does not have to be -100 dB ...
+  it could be like -40 dB"; "40 sounds about right"; "make it a setting, also visible on the input bar". It replaced
+  LOST's earlier rule (under -55 dBFS or 30 dB under the song): what is shown is what counts. Measured (200 of the user's
+  tracks, LOST off / on): the -40 dBFS rule stops 4 more times in quiet song parts than the old one (87 against 83 stops,
+  653 against 560 s stopped); with RESUME those come back on the beat. The mono OLED layout (the frozen mini 2.2) keeps
+  its silence notch and has no PAUSE LEVEL row (its references, tests/oled_ref/cases.txt, are not made again here).
 - **LOST: when the outputs stop once they run** (`core/beat/jb_lost.c`, `jb_kick.c`, `jb_song.c`, in `follow_conf`, the
   tuned follower with STOP / START; silence, LINK mode, KEEP RUNNING, a threshold of 0 and the robust follower: off).
   History: the first LOST (2026-11-18, "it should stop sooner when it does not know") stopped after a bar of grid lines
@@ -216,7 +225,7 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   - Each line of the published grid, a period after it: FIT when a strong beat (jb_weak's test) or a KICK (the input
     under 120 Hz: a transient within 10 % of a period of the line, 15 dB over the band between the lines, within 20 dB
     of its loudest of the last 8 s) is on it; OFF when no fit and a strong beat lies 10-50 % of a period from it;
-    QUIET when the input over its period is under -55 dBFS or 30 dB under the fitted lines' running level. Neither:
+    QUIET when the input over its period is under the PAUSE LEVEL (above, -40 dBFS by default). Neither:
     a beat-less line of the song, it holds. LOST: 2 quiet lines in a row; 8 off lines since the last fit (the
     follower's jumps and the spectral rate did not take those beats); with `set newsong on`, 4 lines with no fit and
     jb_song's NEW (the harmony of the last 6 s, 400 Hz-4 kHz folded to 12 pitch classes, against the 90 s before:

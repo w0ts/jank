@@ -69,9 +69,19 @@ void jre_arm(struct jb_resume *r, uint32_t mark)
         return;
     r->armed = 1;
     r->mark = mark;
+    r->sound_since = -1.0;
 }
 
-int jre_holds(const struct jb_resume *r, uint32_t mark) { return r->armed && mark == r->mark; }
+void jre_sound(struct jb_resume *r, double now)
+{
+    if (r->armed && r->sound_since < 0.0)
+        r->sound_since = now;
+}
+
+int jre_holds(const struct jb_resume *r, uint32_t mark, double now)
+{
+    return r->armed && mark == r->mark && (r->sound_since < 0.0 || now - r->sound_since < JRE_WAIT_S);
+}
 
 void jre_disarm(struct jb_resume *r) { r->armed = 0; }
 

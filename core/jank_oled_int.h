@@ -83,8 +83,9 @@ void jo_help_of(const struct jo_spec *sp, int v, const char **h1, const char **h
 
 struct jo_sub {
     const char *title;
-    uint8_t n;
-    uint8_t rows[4];                      /* enum jo_field */
+    uint8_t n;                            /* the lcd2 layout's rows */
+    uint8_t n_oled;                       /* the OLED layout's: the first n_oled (PAUSE LEVEL is the colour layout's only) */
+    uint8_t rows[5];                      /* enum jo_field */
 };
 extern const struct jo_sub jo_subs[3];
 

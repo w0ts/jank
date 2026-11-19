@@ -75,7 +75,7 @@ const Stick = (() => {
     return {
       link: !audio, bpm: audio && h.bpm > 0 ? h.bpm : null, linkBpm: !audio && h && h.bpm > 0 ? h.bpm : null, mode: 'steady',
       conf: h && h.conf !== null ? h.conf / 100 : 0, confKnown: !!h && h.conf !== null, rssi, airLost: st ? pctOf(st.air_lost_pct) : null, airRetry: st ? pctOf(st.air_retry_pct) : null,
-      rssiMin: st ? num(st.rssi_min) : null, rssiMax: st ? num(st.rssi_max) : null, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), confGraded: !!st && st.graded === 'on' && audio, confGate: st && num(st.conf_gate) !== null ? num(st.conf_gate) / 100 : undefined, th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
+      rssiMin: st ? num(st.rssi_min) : null, rssiMax: st ? num(st.rssi_max) : null, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), confGraded: !!st && st.graded === 'on' && audio, confGate: st && num(st.conf_gate) !== null ? num(st.conf_gate) / 100 : undefined, th: num(g.threshold) === null ? 80 : num(g.threshold), pauseDb: num(g.pause_db) === null ? undefined : num(g.pause_db), gain: num(g.line_gain) || 0,
       confStop: g.lowconf !== 'run', levelDb: level, levelMin: h && h.levelMin !== null ? h.levelMin : FLOOR_DB, levelMax: h && h.levelMax !== null ? h.levelMax : FLOOR_DB,
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', held: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : g.lead === 'off' ? 1 : 2,   // as the firmware's menu: auto -> IGNORE, else FOLLOW+LEAD when lead (a jank with no `lead` key: always FOLLOW+LEAD, as before)
@@ -118,6 +118,7 @@ const Stick = (() => {
       return field === 'bright' ? cmds('set bright ' + clamp(Math.round(val), 10, 100)) : SLEEP[val] ? cmds('set sleep ' + SLEEP[val]) : refuse('SCREEN OFF has no such value');
     }
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));
+    if (field === 'pause') return cmds('set pause_db ' + clamp(Math.round(val), -70, -20));   // PAUSE LEVEL (an older jank answers err: refused there)
     if (field === 'group') return cmds('set group ' + (val + 1));
     if (field === 'gain') return cmds('set line_gain ' + clamp(Math.round(val), -12, 12));
     if (field === 'inoff') return cmds('set lat_trim ' + clamp(Math.round(val), -100, 100));

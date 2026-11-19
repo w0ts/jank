@@ -3,7 +3,7 @@
 
 function baseState() {
   return {
-    link: false, lineIn: true, bpm: 124, linkBpm: 124, conf: 0.9, th: 80, gain: 0, confStop: true,
+    link: false, lineIn: true, bpm: 124, linkBpm: 124, conf: 0.9, th: 80, pauseDb: -40, gain: 0, confStop: true,
     levelDb: -20, levelMin: -25, levelMax: -15, running: true, armed: false, trackerLeads: false, xiao: false,
     beatN: 1, peers: 2, wifi: 'good', wifiQ: null, usb: true, fitted: true, batt: 80,
     ltMode: 2, inSrc: 0, usbRole: 0, autoBar: true, bar: { state: 'locked', conf: 1 }, inOff: 0, offs: [0, 0, 0],
@@ -25,7 +25,7 @@ function dumpState(out, s) {
   const num = v => (v === null || v === undefined ? 'null' : String(v));
   for (const k of ['link', 'lineIn', 'confStop', 'running', 'armed', 'trackerLeads', 'xiao', 'usb', 'fitted', 'autoBar', 'boot', 'splash', 'saved'])
     L(k, s[k] ? 1 : 0);
-  for (const k of ['bpm', 'linkBpm', 'conf', 'th', 'gain', 'levelDb', 'levelMin', 'levelMax', 'beatN', 'peers', 'batt', 'ltMode', 'inSrc',
+  for (const k of ['bpm', 'linkBpm', 'conf', 'th', 'pauseDb', 'gain', 'levelDb', 'levelMin', 'levelMax', 'beatN', 'peers', 'batt', 'ltMode', 'inSrc',
                    'usbRole', 'inOff', 'rate', 'bright', 'sleep', 'groupPeers'])
     L(k, num(s[k]));
   if ('cpuPct' in s) L('about', ABOUT_KEYS.map(k => num(s[k])).join(' '));   // the ABOUT screen's numbers (null = unknown); only the cases that show it carry them

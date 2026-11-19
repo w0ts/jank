@@ -10,8 +10,8 @@
  *   FIT     a strong beat (jb_weak.h's strong test: the network's activation) or a kick (jb_kick.h: the band under
  *           120 Hz) within JL_TOL of a period of it
  *   OFF     no fit, and a strong beat between JL_TOL and half a period from it (beats off the grid)
- *   QUIET   the input's level over the line's period under JL_QUIET_ABS dBFS, or JL_QUIET_REL dB under the running
- *           level of the fitted lines
+ *   QUIET   the input's level over the line's period under the PAUSE LEVEL (jl_set_pause_db; the user's setting,
+ *           -40 dBFS by default, the INPUT bar's notch: what is shown is what counts)
  *   (none of these: a beat-less line of the song: it HOLDS, nothing counts)
  * LOST (while the outputs run): JL_QUIET_LINES quiet lines in a row; or JL_OFF_LINES off lines since the last fit (the
  * follower did not take the new phase or tempo: its jumps and the spectral rate had those beats); or, with the new-song
@@ -32,9 +32,7 @@
 #include "jb_kick.h"
 
 #define JL_QUIET_LINES 2               /* the user: "more than n beats ... start with 2" */
-#define JL_QUIET_ABS -55.0             /* dBFS */
-#define JL_QUIET_REL 30.0              /* dB under the fitted lines' level */
-#define JL_LEVEL_EMA 0.05              /* the fitted lines' running level */
+#define JL_PAUSE_DB -40.0              /* dBFS: the default PAUSE LEVEL (core/jank_core.h JK_PAUSE_DB_DEFAULT) */
 #define JL_OFF_LINES 8                 /* two bars of beats off the grid */
 #define JL_SONG_LINES 4                /* lines without a fit before a new song counts */
 #define JL_BACK_LINES 3
@@ -46,7 +44,7 @@ enum jl_cause { JLO_NONE = 0, JLO_QUIET = 1, JLO_OFF = 2, JLO_SONG = 3 };
 
 struct jb_lost {
     double next_line;                  /* the next line to judge; < 0: none (no grid) */
-    double level;                      /* the fitted lines' running level, dBFS; JBK_NONE: none yet */
+    double pause_db;                   /* the PAUSE LEVEL, dBFS (jl_set_pause_db) */
     uint8_t lost, cause;               /* enum jl_cause of the current LOST */
     uint8_t fit_run, quiet_run, off_n, unfit_run;   /* capped */
     uint8_t hold_back;                 /* the caller holds the return (jl_hold_back) */
@@ -62,7 +60,9 @@ int jl_step(struct jb_lost *l, const double *strong, size_t n_strong, const stru
             double period, double now, int running, int song_new, uint8_t *back);
 /* LOST's own return held back (RESUME's match comes first, jb_resume.h jre_holds): 1 while held */
 static inline void jl_hold_back(struct jb_lost *l, int hold) { l->hold_back = (uint8_t)(hold != 0); }
-/* silence, a restart: no lines, not lost, the level forgotten */
+/* the PAUSE LEVEL, dBFS: a line's input under it is QUIET (kept across jl_clear) */
+static inline void jl_set_pause_db(struct jb_lost *l, double db) { l->pause_db = db; }
+/* silence, a restart: no lines, not lost */
 void jl_clear(struct jb_lost *l);
 
 #endif

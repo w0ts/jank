@@ -413,6 +413,7 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->fold_exp = audio ? b->fold_exp : 0;
     c->usb_midi = cfg.usbmidi ? 0 : 1;                                              /* ON, OFF */
     c->th = s_prefs.th;
+    c->pause_db = cfg.pause_db;         /* PAUSE LEVEL: the INPUT bar's notch */
     c->gain = s_prefs.gain;
     c->conf_stop = s_prefs.conf_stop;
     c->level_db = s_meter.bar;
@@ -527,6 +528,7 @@ static void set_field(void *user, enum jo_field f, int v)
     case JO_F_USBROLE: ctl_set("set usb %s", v ? "host" : "device"); break;
     case JO_F_AUTOBAR: ctl_set("set autobar %s", v >= 0 && v < 3 ? AUTOBAR[v] : "off"); break;
     case JO_F_USBMIDI: ctl_set("set usbmidi %s", v ? "off" : "on"); break;
+    case JO_F_PAUSE: ctl_set("set pause_db %d", v); break;
     default:
         if (jk_prefs_set_field(&s_prefs, f, v)) {
             jk_prefs_changed(&s_prefs_save, bridge_ms());

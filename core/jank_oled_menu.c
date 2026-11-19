@@ -32,6 +32,7 @@ static const char *const H_OUT2[][2] = {{"MODULAR CLOCK TIMING", LATER}};
 static const char *const H_RATE[][2] = {{"1 PULSE PER BEAT", "ON CLK OUT"}, {"2 PULSES PER BEAT", "ON CLK OUT"}, {"4 PULSES PER BEAT", "ON CLK OUT"},
                                         {"8 PULSES PER BEAT", "ON CLK OUT"}, {"24 PULSES PER BEAT", "ON CLK OUT"}};
 static const char *const H_THRESHOLD[][2] = {{"BELOW IT: STOP", "(LOW CONFIDENCE)"}};
+static const char *const H_PAUSE[][2] = {{"UNDER IT: A PAUSE", "THEN RESYNC"}};
 static const char *const H_GAIN[][2] = {{"INPUT LEVEL", "- CUT   + BOOST"}};
 static const char *const H_LTMODE[][2] = {{"CLOCKS RUN ON LINK", "TEMPO, OWN START"}, {"CLOCKS START + STOP", "WITH THE SESSION"},
                                           {"FOLLOWS, AND START/", "STOP DRIVES LINK"}};
@@ -72,6 +73,7 @@ static const struct jo_spec SPECS[JO_F_EDITS] = {
     [JO_F_INSRC] = {"SOURCE", OPTS(INSRC), 0, 0, 0, "", 1, 0, H_INSRC},
     [JO_F_USBROLE] = {"USB", OPTS(jo_usb_names), 0, 0, 0, "", 1, 0, H_USBROLE},
     [JO_F_AUTOBAR] = {"AUTO BAR", OPTS(OFF_ON), 0, 0, 0, "", 0, 1, H_AUTOBAR},
+    [JO_F_PAUSE] = {"PAUSE LEVEL", NULL, 0, -70, -20, 1, " dB", 1, 0, H_PAUSE},
 };
 
 /* the lcd2 layout's choices that differ from the OLED's, and the one it adds */
@@ -102,6 +104,7 @@ int jo_spec_get(enum jo_field f, const struct jo_ctx *c)
     case JO_F_OUT2: return c->offs[2];
     case JO_F_RATE: return c->rate;
     case JO_F_THRESHOLD: return c->th;
+    case JO_F_PAUSE: return c->pause_db;
     case JO_F_GAIN: return c->gain;
     case JO_F_LTMODE: return c->lt_mode;
     case JO_F_BRIGHT: return c->bright;
@@ -154,9 +157,9 @@ const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2] = {
 };
 
 const struct jo_sub jo_subs[3] = {
-    {"AUDIO", 4, {JO_F_INSRC, JO_F_GAIN, JO_F_LOWCONF, JO_F_THRESHOLD}},
-    {"OFFSET", 4, {JO_F_INOFF, JO_F_OUT0, JO_F_OUT1, JO_F_OUT2}},
-    {"DISPLAY", 2, {JO_F_BRIGHT, JO_F_SLEEP}},
+    {"AUDIO", 5, 4, {JO_F_INSRC, JO_F_GAIN, JO_F_LOWCONF, JO_F_THRESHOLD, JO_F_PAUSE}},
+    {"OFFSET", 4, 4, {JO_F_INOFF, JO_F_OUT0, JO_F_OUT1, JO_F_OUT2}},
+    {"DISPLAY", 2, 2, {JO_F_BRIGHT, JO_F_SLEEP}},
 };
 
 static void stars(char *out, size_t len)
