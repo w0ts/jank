@@ -8,7 +8,9 @@
  *                   the weak confidence and the gate (core/jank_conf.c). Each beat's state (to STATE_S), each 5th tick's
  *                   confidences (to CONF_NEAR) and every gate decision (exact) are compared.
  *   NAME.nc.txt     the same with the study's look-ahead view (the whole activation pushed first): the port of weak.py
- *                   as it was measured */
+ *                   as it was measured
+ * And LOST (core/beat/jb_lost.h, applied as firmware/main/beat.c follow_conf does): the stop and the return times pinned on
+ * a synthetic track whose activation falls while the tracker keeps ticking on the grid. */
 #include <dirent.h>
 #include <math.h>
 #include <stdio.h>
@@ -16,6 +18,7 @@
 #include <string.h>
 #include "jank_conf.h"
 #include "jb_follow.h"
+#include "jb_lost.h"
 #include "jb_weak.h"
 
 static int fails, checks, verbose;
@@ -105,7 +108,9 @@ struct run {
     struct jb_follow f;
     struct jb_weak w;
     struct jcf conf;
-    uint8_t gated, was_running;
+    struct jb_lost lost;
+    uint8_t use_lost;                   /* LOST as beat.c (the golden runs: 0, as the Python) */
+    uint8_t gated, was_running, is_lost;
     double now;
     /* the last tick's */
     int has_bpm, has_grid, running;
@@ -156,9 +161,24 @@ static void tick(struct run *r, int silent)
                                        &r->w.last_conf, NULL);
         r->strict = jcf_lines_confidence(r->conf.t, r->conf.n, r->conf.line, r->conf.lines, r->has_grid, r->p, now,
                                          JCF_WINDOW_S, JCF_DELAY_S, JCF_TOL);
+        if (r->use_lost) {
+            uint8_t back = 0;
+            r->is_lost = (uint8_t)jl_step(&r->lost, jw_strong(&r->w), r->w.n_strong, r->has_bpm && r->has_grid, r->t0, r->p,
+                                          now, r->was_running, &back);
+            if (back) {
+                r->gated = 0;
+                r->was_running = 1;
+            }
+        }
         r->c = jcf_weak_pick(r->strict, r->loose, r->gated, r->was_running);
     }
+    if (silent && r->use_lost) {
+        jl_clear(&r->lost);
+        r->is_lost = 0;
+    }
     r->gated = jcf_gate(r->gated, r->c, JCF_STOP, THRESHOLD);
+    if (r->is_lost)
+        r->gated = 1;
     r->running = r->has_bpm && !r->gated && !silent;
     r->was_running = (uint8_t)r->running;
 }
@@ -401,6 +421,104 @@ static void test_weak_confidence(void)
     CHECK(jcf_weak_pick(0.3, 0.9, 1, 1) == 0.3 && jcf_weak_pick(0.3, 0.9, 0, 0) == 0.3 && jcf_weak_pick(0.3, 0.9, 0, 1) == 0.9);
 }
 
+/* LOST on a synthetic 120 BPM track (period 0.5 s): a beat every 0.5 s from 1 s to 80 s, the activation 0.8 at the beats
+ * (0.01 between), except [gap_from, gap_to) where it is 0.01 at the beats too: the DBN keeps ticking on the grid from its
+ * tempo model, as in a breakdown. Fed as beat.c does: the activation per frame, a beat 3 frames late, the coast, the step
+ * every 0.25 s and after each beat. *stop / *back: the first stop at or after gap_from, the first run again after it
+ * (-1: none); returns the share of the steps from 20 s to gap_from that ran. */
+struct lost_res {
+    double stop, back, ran_before;
+    int stops;
+};
+
+static struct lost_res lost_run(int use_lost, double gap_from, double gap_to)
+{
+    static struct run r;
+    struct lost_res o = {-1.0, -1.0, 0.0, 0};
+    memset(&r, 0, sizeof r);
+    jb_follow_init(&r.f);
+    jcf_init(&r.conf);
+    jw_init(&r.w, &s_store, NULL, 0, 1);
+    jl_init(&r.lost);
+    r.use_lost = (uint8_t)use_lost;
+    int64_t pend = -1;
+    double last_step = 0.0;
+    int was = 0, before = 0, before_n = 0;
+    for (int64_t k = 0; k < 8000; k++) {
+        double now = (double)k / JW_FPS;
+        int beat_frame = k >= 100 && (k - 100) % 50 == 0;
+        int in_gap = now >= gap_from && now < gap_to;
+        jw_act(&r.w, k, beat_frame && !in_gap ? 0.8f : 0.01f);
+        if (beat_frame)
+            pend = k;
+        int fed = 0;
+        if (pend >= 0 && k >= pend + JW_STRONG_HALF) {
+            beat(&r, (double)pend / JW_FPS);
+            pend = -1;
+            fed = 1;
+        }
+        jw_coast(&r.w, &r.f, now);
+        if (!fed && now - last_step < 0.25)
+            continue;
+        last_step = now;
+        r.now = now;
+        tick(&r, 0);
+        if (now >= 20.0 && now < gap_from) {
+            before += r.running;
+            before_n++;
+        }
+        if (was && !r.running && now >= 20.0)
+            o.stops++;
+        if (o.stop < 0 && now >= gap_from && !r.running)
+            o.stop = now;
+        if (o.stop >= 0 && o.back < 0 && r.running)
+            o.back = now;
+        was = r.running;
+    }
+    o.ran_before = before_n ? (double)before / before_n : 0.0;
+    return o;
+}
+
+static void test_lost(void)
+{
+    /* a 20 s breakdown after the last strong beat at 39.5 s: today the outputs run through it */
+    struct lost_res now = lost_run(0, 39.75, 60.0);
+    printf("lost: today: ran %.2f before, stop at %.2f s (beat gone after 39.5 s)\n", now.ran_before, now.stop);
+    CHECK(now.ran_before > 0.99 && (now.stop < 0 || now.stop >= 60.0));
+    /* LOST: stopped once a bar of lines (40.0 .. 41.5) is judged, a period + 50 ms after the 4th: at 42.05 s, the next step
+     * (0.25 s apart) at the latest; strong beats back from 60.0 s: running again once 4 lines (60.0 .. 61.5) are judged */
+    struct lost_res lo = lost_run(1, 39.75, 60.0);
+    printf("lost: LOST: ran %.2f before, stop %.2f s after the last strong beat, back %.2f s after the first, %d stops\n",
+           lo.ran_before, lo.stop - 39.5, lo.back - 60.0, lo.stops);
+    CHECK(lo.ran_before > 0.99);
+    CHECK(lo.stop >= 39.5 + 4 * 0.5 + 0.5 + JL_LAG_S && lo.stop <= 39.5 + 4 * 0.5 + 0.5 + JL_LAG_S + 0.25);
+    CHECK(lo.back >= 60.0 + 3 * 0.5 + 0.5 + JL_LAG_S && lo.back <= 60.0 + 3 * 0.5 + 0.5 + JL_LAG_S + 0.25);
+    CHECK(lo.stops == 1);
+    /* a fill: 3 lines with no strong beat (40.0, 40.5, 41.0) do not stop */
+    struct lost_res fill = lost_run(1, 39.75, 41.25);
+    printf("lost: a 3-line fill: %d stops, ran %.2f before\n", fill.stops, fill.ran_before);
+    CHECK(fill.stops == 0 && fill.ran_before > 0.99);
+    /* a steady beat: never */
+    struct lost_res steady = lost_run(1, 1000.0, 1000.0);
+    CHECK(steady.stops == 0 && steady.ran_before > 0.99);
+    /* the module alone: no grid, not running, a new grid seeded 2 s back */
+    struct jb_lost l;
+    jl_init(&l);
+    double strong[1] = {0.0};
+    uint8_t back = 9;
+    CHECK(jl_step(&l, strong, 0, 0, 0.0, 0.5, 10.0, 1, &back) == 0 && back == 0 && l.next_line < 0);
+    /* seeded at 8.0 s: lines 8.0 .. 9.5 judged by 10.05 s (a period + JL_LAG_S after each) */
+    CHECK(jl_step(&l, strong, 0, 1, 0.0, 0.5, 10.0, 1, &back) == 0 && l.miss_run == JL_LOST_LINES - 1);
+    CHECK(jl_step(&l, strong, 0, 1, 0.0, 0.5, 10.05, 0, &back) == 0 && l.miss_run == JL_LOST_LINES);   /* not running */
+    CHECK(jl_step(&l, strong, 0, 1, 0.0, 0.5, 10.1, 1, &back) == 1 && l.losts == 1);
+    /* strong beats on 4 lines in a row: back */
+    double on[4] = {10.0, 10.5, 11.0, 11.5};
+    CHECK(jl_step(&l, on, 3, 1, 0.0, 0.5, 11.6, 1, &back) == 1 && back == 0);
+    CHECK(jl_step(&l, on, 4, 1, 0.0, 0.5, 12.1, 0, &back) == 0 && back == 1 && l.ev_run == JL_BACK_LINES);
+    jl_clear(&l);
+    CHECK(!l.lost && l.next_line < 0 && l.losts == 1);
+}
+
 int main(int argc, char **argv)
 {
     const char *dir = argc > 1 ? argv[1] : "tests/tempo_ref";
@@ -412,6 +530,7 @@ int main(int argc, char **argv)
     test_fast_jump();
     test_weak_confidence();
     test_hold_shown();
+    test_lost();
     int n = test_runs(dir);
     printf("tempo: %d tracks x 2 views against studies/tempo-changes tuned-l16 (state %.0g s, confidences %.0g, gates "
            "exact)\n", n, STATE_S, CONF_NEAR);

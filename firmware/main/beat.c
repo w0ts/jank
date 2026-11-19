@@ -51,6 +51,7 @@
 #include "jb_down.h"
 #include "jb_follow.h"
 #include "jb_graded.h"
+#include "jb_lost.h"
 #include "jb_robust.h"
 #include "jb_skip.h"
 #include "jb_mode.h"
@@ -107,6 +108,7 @@ static uint8_t s_rate_qn;
 static uint8_t s_conf_ran;             /* the automatic layer ran at the last step (a tempo, the gate open, no silence): the
                                         * gate is then judged on the weak confidence */
 static uint32_t s_weak_holds;          /* steps the weak confidence held the gate open with the strict one under it */
+static struct jb_lost s_lost;          /* LOST (core/beat/jb_lost.h): a bar with no strong beat on the grid closes the gate */
 static uint8_t s_conf_hold;            /* M2k: the weak confidence holds its last value (no evidence): shown eased */
 static double s_conf_shown, s_conf_at; /* the confidence shown (jcf_show_step) and the stream time of its step */
 static struct jbl s_jbl;
@@ -391,6 +393,7 @@ static void restart_tracker(void)
     jb_beat_reset(&s_b);
     jb_follow_init(&s_follow);
     jw_init(&s_weak, s_weak_store, NULL, 0, 1);    /* the frame count starts over with the tracker */
+    jl_init(&s_lost);
     jrb_init(&s_robust, s_robust_store);           /* ... and the robust follower's: no memory, no ring */
     s_robust.clock = cycles_now;
     jsk_init(&s_skip, &s_robust);                  /* SKIP starts over with the estimator */
@@ -633,7 +636,7 @@ static void follow_conf(const struct jk_cfg *cfg)
     double tb = 0.0, period = 0.0, strict = 0.0, conf = 0.0, bpm, now = (double)s_samples / (double)UAC_RATE;
     double conf_shown = 0.0;
     int has_bpm = 0, has = 0, use_graded = 0;
-    uint8_t weak_picked = 0, held = 0;
+    uint8_t weak_picked = 0, held = 0, lost = 0;
     if (s_audio_live && !s_conf.silent) {
         has = jb_follow_grid(&s_follow, &tb, &period);
         has_bpm = jb_follow_bpm_at(&s_follow, now, &bpm);
@@ -645,10 +648,23 @@ static void follow_conf(const struct jk_cfg *cfg)
             double weak = jcf_weak_confidence(jw_strong(&s_weak), s_weak.n_strong, jw_seen(&s_weak), s_weak.n_seen,
                                               jw_weak(&s_weak), s_weak.n_weak, s_conf.line, s_conf.lines, has, period, now,
                                               JW_MIN_OBS, &s_weak.last_conf, &held);
+            /* LOST (the tuned follower with STOP / START): a bar of grid lines with no strong beat closes the gate; strong
+             * beats on the held grid again open it at once (the weak confidence judges it from there) */
+            if (!s_follower && cfg->lowconf == JCF_STOP && cfg->threshold) {
+                uint8_t back = 0;
+                lost = (uint8_t)jl_step(&s_lost, jw_strong(&s_weak), s_weak.n_strong, has_bpm && has, tb, period, now,
+                                        s_conf_ran, &back);
+                if (back) {
+                    s_gated = 0;
+                    s_conf_ran = 1;
+                }
+            } else
+                jl_clear(&s_lost);
             weak_picked = (uint8_t)(!s_gated && s_conf_ran);
             conf = jcf_weak_pick(strict, weak, s_gated, s_conf_ran);
         }
-    }
+    } else
+        jl_clear(&s_lost);              /* silence or LINK mode: what comes next is new music */
     /* shown: a hold eases toward the threshold instead of a frozen value (M2k); the gate below takes the real one */
     s_conf_hold = (uint8_t)(weak_picked && held);
     if (s_follower) {
@@ -674,6 +690,8 @@ static void follow_conf(const struct jk_cfg *cfg)
         }
     } else {
         s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
+        if (lost)
+            s_gated = 1;
         s_coast = 0;
         if (s_graded && s_audio_live && !s_conf.silent) {
             /* the tuned follower's graded confidence (jb_graded.h) is shown instead; the gate above is unchanged */
@@ -695,7 +713,9 @@ static void follow_conf(const struct jk_cfg *cfg)
     s_conf_pct = jcf_pct(s_conf_shown);
     s_conf_gate_pct = jcf_pct(conf);
     s_conf_graded = (uint8_t)use_graded;
-    s_conf_open = (uint8_t)!jcf_gate(1, conf, JCF_STOP, cfg->threshold);   /* (a closed gate's test: open at threshold + 5) */
+    /* (a closed gate's test: open at threshold + 5; never while LOST, whose confidence the DBN's own beats can fill: a
+     * Start keeps the outputs running until strong beats are back) */
+    s_conf_open = (uint8_t)(!lost && !jcf_gate(1, conf, JCF_STOP, cfg->threshold));
     if (weak_picked && !s_gated && cfg->lowconf == JCF_STOP && strict < (double)cfg->threshold / 100.0)
         s_weak_holds++;
     s_conf_ran = (uint8_t)(s_audio_live && has_bpm && !s_gated && !s_conf.silent);
@@ -1093,6 +1113,7 @@ esp_err_t beat_start(void)
     /* the weak-signal hold's ring and lists: PSRAM only; none: M2i's follow (every beat at once, the strict gate) */
     s_weak_store = heap_caps_malloc(sizeof *s_weak_store, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     jw_init(&s_weak, s_weak_store, NULL, 0, 1);
+    jl_init(&s_lost);
     if (s_weak_store)
         ESP_LOGI(TAG, "WEAK: %u bytes + %u bytes in PSRAM", (unsigned)sizeof s_weak, (unsigned)sizeof *s_weak_store);
     else

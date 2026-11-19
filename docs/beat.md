@@ -174,3 +174,24 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   - `beat`: `weak`, `weak_holds`, `coasts`, `weak_beats`, `fast_jumps`. Cost (estimate): +0.16-0.24 % of core 0 (host
     time scaled by ModeBpm's QEMU-measured soft-double cost; ~0.05 % if it ran like float code). RAM: ~0.3 KB internal,
     7.3 KB PSRAM; without PSRAM, M2i's follow.
+- **LOST: stop when it does not know** (2026-11-18, the user: "it should stop sooner when it does not know";
+  `core/beat/jb_lost.c`, in `follow_conf`, the tuned follower with STOP / START). Once the outputs ran, the weak
+  confidence counted a line as hit by any tracked beat, and through a breakdown the online DBN keeps emitting beats from
+  its own tempo model, right on the lines: the confidence stayed near 100 % with no beat in the music (the follower gives
+  up only after 30 s). Now each line of the published grid, a period after it, needs a STRONG beat (jb_weak's test)
+  within 10 % of a period: 4 lines in a row (a bar) without one close the gate; 4 in a row with one open it again at once,
+  on the held grid (from the next bar line, as any gate opening). A Start pressed while LOST keeps the outputs running
+  until strong beats are back (`conf_open` is 0 while LOST). Silence, LINK mode, KEEP RUNNING, a threshold of 0 and the
+  robust follower: off.
+  - Measured offline (`worktrees/beat-stop-scratch`, not in git: the firmware's C tracker and this chain on the user's
+    Traktor mp3s; 795 tracks, 34 left out where Traktor's grid sits off the audible beat; 43 h of clear beat; ~1900
+    passages of 8+ grid beats where the network hears no beat on Traktor's grid, median 9.7 s): median stop 29 s → 2.7 s;
+    stopped within 4 s 17 % → 63 %; never stopped before the beat came back 48 % → 24 % (mostly breakdowns with an
+    occasional kick on the grid); back 2.6 s → 3.3 s after the beat returns. Cost: stops in short fills (a 1-bar kick
+    drop) 9.4 → 14.0 an hour of music; stops on a clear beat 6.0 → 3.8 an hour. Rejected: small salient peaks as
+    evidence (never fires: hats in breakdowns); "at most 2 of the last 8 lines" (doubles the stops on half-time beats);
+    back after 2 lines (1.3 s, but 16.8 fill stops an hour). The ground truth is the network's activation on Traktor's
+    grid, not hand-marked beats.
+  - `tests/test_tempo.c` pins it: a 20 s breakdown on a synthetic 120 BPM track ran through before; now stopped 2.78 s
+    after the last strong beat (a bar + a period + 50 ms, the next 0.25 s step), running again 2.28 s after the first one
+    back, no stop on a 3-line fill. Cost: per step a search of the strong beats for the one or two lines judged. RAM: 16 bytes.

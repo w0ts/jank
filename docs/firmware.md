@@ -138,6 +138,7 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   | started | open | run (from the session's bar line once the tracker is locked) |
   | started | gate closed (conf < threshold) | stopped; open again at threshold + 5: run again, no new Start |
   | started | silence (0.5 s under -60 dBFS) | stopped at once; ends a Start's override: the next music waits for the gate |
+  | started | LOST: a bar of grid lines with no strong beat (docs/beat.md) | stopped (the gate closes); 4 strong beats on the grid: run again |
   | `play` | gate closed | the Start forces the gate open until the confidence has reached threshold + 5 once |
 
   `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
