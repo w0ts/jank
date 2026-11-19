@@ -178,17 +178,20 @@ cap's shape, 2.6 x 2.1, `lab_tri`) points at each socket (mots: "use our triangl
 
 Picture: `box-top.png`.
 
-**Bambu Studio projects** (mots: black body, pink text, PETG Basic; the nozzle is per project, so two files):
-- `box-shell-0.2.3mf`: the shell, face down, labels on filament 2. **P2S 0.2 nozzle**, 0.10 mm Standard (the 2.2 mm
-  text's ~0.37 mm strokes are under a 0.4 nozzle's line; PLA text was ruled out: it barely bonds to PETG).
-- `box-lid-cap-0.4.3mf`: plate 1 the lid (outside down), plate 2 the D-pad cap (face down, symbols on filament 2,
-  1.7 mm strokes). **P2S 0.4 nozzle**, 0.20 mm Standard.
+**Bambu Studio projects** (mots, 2026-11-19: everything in **PLA Basic**, black, pink and grey; the nozzle is per
+project, so two files):
+- `box-shell-0.2.3mf`: the shell (black, filament 1), face down, labels pink (filament 2). **P2S 0.2 nozzle**,
+  0.10 mm Standard (the 2.2 mm text's ~0.37 mm strokes are under a 0.4 nozzle's line).
+- `box-lid-cap-0.4.3mf`: plate 1 the lid (black, outside down), plate 2 the D-pad cap (grey, filament 3; face down,
+  symbols pink, 1.7 mm strokes). **P2S 0.4 nozzle**, 0.20 mm Standard.
 
-Both: two Bambu PETG Basic filaments (1 black #000000, 2 pink #F5A3C7: mots matches them to the AMS), Textured PEI
-plate. Built with the Bambu Studio CLI (`--load-assemble-list`, the system presets flattened through their `inherits`
-chain first: loaded alone, the P2S preset lacks its 256 mm bed), then patched for what the CLI leaves out (objects
-missing from their plates, the bed type: Cool Plate refuses PETG, the colours, the object names). The CLI loads and
-validates them but crashes slicing a P2S (nozzle grouping), so they are not sliced here: mots slices in the app.
+Both: three Bambu PLA Basic filaments (1 black #000000, 2 pink #F5A3C7, 3 grey #8E9089: mots matches them to the
+AMS), Textured PEI plate. PLA softens from ~55 C (no car, no sun) and is brittle: the lid's hook bends ~5 % at its
+root (estimate, not measured), more than PLA takes. Built with the Bambu Studio CLI (`--load-assemble-list`, the
+system presets flattened through their `inherits` chain first: loaded alone, the P2S preset lacks its 256 mm bed),
+then patched for what the CLI leaves out (objects missing from their plates, the bed type, the colours, the object
+names). The CLI loads and validates them but crashes slicing a P2S (nozzle grouping), so they are not sliced here:
+mots slices in the app.
 
 ## Parameters and their sources
 
