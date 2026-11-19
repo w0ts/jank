@@ -352,6 +352,18 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   p.el('pl-next').click();
   await settle();
   eq(p.el('pl-name').textContent, 'a.mp3', 'the Next button wraps to the first');
+  eq(p.el('pl-prev').disabled, false, 'a track is loaded: Previous is usable');
+  p.el('pl-prev').click();
+  await settle();
+  eq(p.el('pl-name').textContent, 'b10.mp3', 'Previous (at the start of a track): the track played before');
+  p.el('pl-prev').click();
+  await settle();
+  eq(p.el('pl-name').textContent, 'b2.mp3', 'Previous again: one more back through the history');
+  p.el('pl-next').click();
+  await settle();
+  eq(p.el('pl-name').textContent, 'b10.mp3', 'Next after going back: the list order goes on');
+  p.el('pl-next').click();
+  await settle();
   p.el('pl-then').value = 'stop';
   p.el('pl-then').fire('change', {});
   audio.fire('ended', {});
@@ -438,7 +450,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   eq(r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), [['new', 'jk', 44100]], 'saved id: the stick context is created with sinkId and 44.1 kHz');
   eq(shown(r.page, 'pl-out-row'), false, 'resolved automatically and routed without an error: the whole "stick output" line is hidden');
   eq(r.api.log.filter(e => e[0] === 'setSinkId'), [], 'its sinkId reads back as the saved id: no second setSinkId needed');
-  eq(r.api.log.filter(e => /->/.test(e[0])).map(e => e.join('')), ['gain->destination', 'source->analyser', 'source->gain'], 'captureStream -> MediaStreamSource -> mono gain -> that context\'s destination');
+  eq(r.api.log.filter(e => /->/.test(e[0])).map(e => e.join('')), ['gain->destination', 'source->gain'], 'captureStream -> MediaStreamSource -> mono gain -> that context\'s destination');
   eq([r.api.gains[0].channelCount, r.api.gains[0].channelCountMode, r.api.gains[0].channelInterpretation], [1, 'explicit', 'speakers'], 'the stick path is mixed down to one channel explicitly');
   eq([r.api.contexts[0].state, r.api.contexts[0].sinkId, r.d.calls.getUserMedia], ['running', 'jk', 0], 'the context runs, aimed at the stick, no microphone');
   assert.match(r.page.el('pl-output-report').textContent, /stick context: running, sinkId jk/); checks++;
@@ -468,13 +480,13 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   r = await startPlayback({}, {}, null);
   await play(r);
   eq(shown(r.page, 'pl-out-row'), true, 'no stick output found: the line (and its change link) is shown');
-  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), r.api.log.filter(e => e.join('') === 'source->gain').length], [1, [['new', null, 44100]], 0], 'no output chosen: a context for the meter, nothing sent to the stick');
+  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), r.api.log.filter(e => e.join('') === 'source->gain').length], [1, [['new', null, 44100]], 0], 'no output chosen: a context, nothing sent to the stick');
   const pausedBefore = r.page.media.paused;
   r.page.el('pl-pick').click();
   await settle();
   eq(r.api.log.filter(e => e[0] === 'setSinkId'), [['setSinkId', 'jk']], 'the choice re-aims the running context: setSinkId(jk)');
   eq(shown(r.page, 'pl-out-row'), false, 'after the choice routes without an error: the line is hidden again');
-  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.page.media.paused - pausedBefore, r.page.el('pl-audio').paused, r.api.log.filter(e => e[0] === 'source->').map(e => e[1])], [1, 0, false, ['analyser', 'gain']], 'live: same context, the track was not stopped, the source now feeds the stick path');
+  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.page.media.paused - pausedBefore, r.page.el('pl-audio').paused, r.api.log.filter(e => e[0] === 'source->').map(e => e[1])], [1, 0, false, ['gain']], 'live: same context, the track was not stopped, the source now feeds the stick path');
   r.page.box.disconnected();
 
   // a saved device that is not listed (ids shown, no match) is dropped; when it appears (devicechange) it is used, live
@@ -514,7 +526,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   await settle();
   p.el('pl-dir').fire('change', { target: { files: ['Music/a.mp3', 'Music/Sub/b.mp3', 'Music/Sub/Deep/c.mp3', 'Music/Sub/Deep/.hidden.mp3', 'Music/__MACOSX/x.mp3', 'Music/$RECYCLE.BIN/y.mp3', 'Music/cover.jpg'].map(rel) } });
   await settle();
-  eq(p.el('pl-scope-line').textContent, '3 files in scope', 'the scope: audio files under the picked folder, junk and hidden skipped');
+  eq(p.el('pl-scope-line').textContent, '', 'the scope: audio files under the picked folder, junk and hidden skipped');
   eq([p.el('pl-scope').checked, shown(p, 'pl-scope-row')], [true, true], 'all folders is on by default');
   p.el('pl-list').children.find(b => b.textContent === 'a.mp3').click();
   await settle();
@@ -548,10 +560,10 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   eq(p.el('pl-next').disabled, false, 'on again: the whole tree is the scope again');
   p.el('pl-rescan').click();
   await settle();
-  eq(p.el('pl-scope-line').textContent, '3 files in scope', 'rescan walks it again');
+  eq(p.el('pl-scope-line').textContent, '', 'rescan walks it again');
   p.el('c-advanced').checked = false;
   p.el('c-advanced').fire('change', {});
-  eq(p.el('pl-scope-line').textContent, '0 files in scope', 'leaving Advanced cancels the scan and clears the list');
+  eq(p.el('pl-scope-line').textContent, '', 'leaving Advanced cancels the scan and clears the list');
   p.box.disconnected();
 
 
@@ -581,7 +593,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await flush();
     await flush();
     await flush();
-    eq(p.el('pl-scope-line').textContent, '5 files in scope', 'the scan finishes: the whole scope');
+    eq(p.el('pl-scope-line').textContent, '', 'the scan finishes: the whole scope');
     // the queue is the whole scope now: random from a file in A can land in B or C
     const reached = new Set();
     for (let k = 0; k < 20; k++) {
@@ -954,7 +966,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await flush();
     ok(['a1.mp3', 'a2.mp3'].includes(g.page.el('pl-name').textContent), 'Play starts a random one of the files found so far (' + g.page.el('pl-name').textContent + ')');
     await flush(); await flush(); await flush();
-    eq(g.page.el('pl-scope-line').textContent, '4 files in scope', 'the scan goes on to the whole scope');
+    eq(g.page.el('pl-scope-line').textContent, '', 'the scan goes on to the whole scope');
     eq([shown(g.page, 'pl-reopen'), g.page.el('pl-play').disabled], [false, false], 'the folder is open: the Open button is gone');
     g.page.box.disconnected();
     // Space over the card does the same

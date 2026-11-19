@@ -2,7 +2,7 @@
    choice, the tempo tag of the playing file, and the music folder's listing (natural sort, audio filter, breadcrumbs, a tree from webkitRelativePath).
    The simulator's own player runs on the Mac (beat/live/player.py); this one plays files in the browser. */
 const Player = (() => {
-  const PITCH_RANGE_PCT = 8, DEFAULT_VOLUME_PCT = 80, MAX_ROWS = 500, LEVEL_FLOOR_DB = -90, LEVEL_TAU_MS = 150;
+  const PITCH_RANGE_PCT = 8, DEFAULT_VOLUME_PCT = 80, MAX_ROWS = 500;
   const AUDIO_EXT = ['mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'opus', 'aiff'];
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
@@ -19,22 +19,11 @@ const Player = (() => {
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   }
 
-  // the file's level as the device's IN bar reads it: RMS of the last samples in dBFS, floored at -90
-  function rmsOf(samples) {
-    if (!samples || samples.length === 0) return 0;
-    let sum = 0;
-    for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
-    return Math.sqrt(sum / samples.length);
-  }
-  const rmsToDb = rms => (rms > 0 ? Math.max(LEVEL_FLOOR_DB, 20 * Math.log10(rms)) : LEVEL_FLOOR_DB);
-  // an exponential ease toward the new level (in dB), `dtMs` after the last one
-  const smoothDb = (prev, next, dtMs, tauMs) => prev + (next - prev) * (1 - Math.exp(-Math.max(0, dtMs) / (tauMs || LEVEL_TAU_MS)));
-  const meterFraction = db => clamp((db - LEVEL_FLOOR_DB) / -LEVEL_FLOOR_DB, 0, 1);
 
   // ---- what this browser can do for the two outputs ----
   // env: the `typeof` of each API: { captureStream, mozCaptureStream, audioContext, audioContextSetSinkId, elementSetSinkId }
   // path: 'captureStream' (the element plays on the default output, its captureStream feeds the stick's context: the tested path),
-  // 'webaudio' (the element goes through Web Audio: a gain for the monitor, the analyser, a stream to the stick), 'none' (no Web Audio).
+  // 'webaudio' (the element goes through Web Audio: a gain for the monitor, a stream to the stick), 'none' (no Web Audio).
   // stick: how the stick's output is reached: 'context' (AudioContext.setSinkId), 'element' (a hidden <audio> with setSinkId), 'none'.
   const APIS = [['captureStream', 'audio.captureStream'], ['mozCaptureStream', 'audio.mozCaptureStream'], ['audioContext', 'AudioContext'],
                 ['audioContextSetSinkId', 'AudioContext.prototype.setSinkId'], ['elementSetSinkId', 'HTMLMediaElement.prototype.setSinkId']];
@@ -47,7 +36,7 @@ const Player = (() => {
   }
   // one plain line when something is missing that matters, '' when both outputs can work
   function planNote(plan) {
-    if (plan.path === 'none') return 'This browser has no Web Audio: only the monitor plays, and there is no level meter.';
+    if (plan.path === 'none') return 'This browser has no Web Audio: only the monitor plays.';
     if (plan.stick === 'none') return "This browser cannot send sound to a chosen output (no setSinkId): only the monitor plays.";
     return '';
   }
@@ -137,7 +126,7 @@ const Player = (() => {
     return { files, capped, cancelled: shouldStop() };
   }
   // s: { scanning, count, capped, done (a scan ran to its end), root (the picked folder's name) }
-  const scopeLine = s => (s.scanning ? 'scanning: ' + s.count.toLocaleString('en-US') + ' files' : s.done && s.count === 0 ? 'no audio files under ' + (s.root || 'the folder') : s.capped ? s.count.toLocaleString('en-US') + ' files (capped)' : s.count.toLocaleString('en-US') + ' files in scope');
+  const scopeLine = s => (s.scanning ? 'scanning: ' + s.count.toLocaleString('en-US') + ' files' : s.done && s.count === 0 ? 'no audio files under ' + (s.root || 'the folder') : s.capped ? s.count.toLocaleString('en-US') + ' files (capped)' : '');
 
   // the output the user chose last time, found again in a device list (ids first; a label when the list has labels and the id changed)
   function matchSaved(devices, saved) {
@@ -218,6 +207,22 @@ const Player = (() => {
     return n >= 0 ? n : (count > 0 && index !== 0 ? 0 : -1);
   }
 
+  // the Previous button: the page keeps the tracks it started (the last HISTORY_MAX; the last one is the playing track). Pressed more than
+  // RESTART_AFTER_S seconds into a track, or with no track before it, it restarts the playing track; else it goes back to the track before.
+  // Returns { action: 'none' | 'restart' | 'back', history (a new list), entry (the track to play, for 'back') }
+  const HISTORY_MAX = 50, RESTART_AFTER_S = 3;
+  const pushHistory = (history, entry) => {
+    const list = history || [];
+    if (list.length > 0 && pathKey(list[list.length - 1].path) === pathKey(entry.path)) return list;
+    return [...list, entry].slice(-HISTORY_MAX);
+  };
+  function previousTrack(history, positionSec) {
+    const list = history || [];
+    if (list.length === 0) return { action: 'none', history: list, entry: null };
+    if (!(positionSec <= RESTART_AFTER_S) || list.length < 2) return { action: 'restart', history: list, entry: list[list.length - 1] };
+    const back = list.slice(0, -1);
+    return { action: 'back', history: back, entry: back[back.length - 1] };
+  }
 
   // ---- the tempo tag of the playing file (never a folder scan): ID3v2 TBPM, MP4 tmpo, FLAC / Ogg Vorbis / Opus BPM= ----
   // Every parser takes the bytes it was given (Uint8Array) and returns a number or null; a short, cut or malformed input is null.
@@ -414,6 +419,6 @@ const Player = (() => {
   // the BPM the stick should hear for a tag BPM at a playback rate: the plain product (the stick folds half / double, this does not)
   const expectedBpm = (tag, rate) => tag * rate;
 
-  return { MAX_TAG_BYTES, parseBpmText, id3TotalSize, parseId3, mp4Atom, parseMp4Tmpo, parseFlac, parseOgg, sniff, tagBpm, expectedBpm, PITCH_RANGE_PCT, DEFAULT_VOLUME_PCT, MAX_ROWS, AUDIO_EXT, LEVEL_FLOOR_DB, rmsOf, rmsToDb, smoothDb, meterFraction, statusText, pitchToRate, formatPitch, volumeFromPct, parseVolumePct, formatTime,
-           savedStatus, sinkMatches, outputReport, SCOPE_CAP, isJunkName, pathKey, scanTree, scopeLine, matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, firstTrack, afterTrack, skipTrack, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
+  return { MAX_TAG_BYTES, parseBpmText, id3TotalSize, parseId3, mp4Atom, parseMp4Tmpo, parseFlac, parseOgg, sniff, tagBpm, expectedBpm, PITCH_RANGE_PCT, DEFAULT_VOLUME_PCT, MAX_ROWS, AUDIO_EXT, statusText, pitchToRate, formatPitch, volumeFromPct, parseVolumePct, formatTime,
+           savedStatus, sinkMatches, outputReport, SCOPE_CAP, isJunkName, pathKey, scanTree, scopeLine, matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, firstTrack, afterTrack, skipTrack, previousTrack, pushHistory, HISTORY_MAX, RESTART_AFTER_S, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
 })();
