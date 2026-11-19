@@ -136,7 +136,9 @@ process.on('uncaughtException', e => errors.push(e));
 process.on('unhandledRejection', e => errors.push(e));
 const eq = (a, b, what) => { checks++; assert.deepStrictEqual(a, b, what); };
 const ok = (c, what) => { checks++; assert.ok(c, what); };
-const hidden = page => ['live', 'c-advanced-box', 'player', 'advanced-extra'].map(id => shown(page, id));
+const hidden = page => ['live'].map(id => shown(page, id));
+const openSec = (page, id, on) => { page.el(id).open = on; page.el(id).fire('toggle', {}); };
+const opened = page => ['sec-settings', 'sec-player', 'sec-advanced'].map(id => page.el(id).open);
 
 async function connected(replies, opts) {
   const page = makePage(opts), midi = fakeMidi(replies);
@@ -152,8 +154,8 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // ---- before any connection ----
   let page = makePage();
   eq(pressed(page), ['false'], 'no button is pressed before a connection');
-  eq(hidden(page), [false, false, false, false], 'the face, the Advanced box, the player and the Advanced extra are hidden');
-  eq([shown(page, 'menu'), shown(page, 'more')], [false, false], 'Settings, Network and Details are hidden before a connection');
+  eq(hidden(page), [false], 'the face, the Advanced box, the player and the Advanced extra are hidden');
+  eq(hidden(page), [false], 'the three sections (inside the connected area) are hidden before a connection');
   page.key('keydown', 'ArrowUp');
   eq([page.frames.size, page.timers.size], [0, 0], 'no face, no frame, no timer, and the keys do nothing');
 
@@ -162,7 +164,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   page.box.navigator.requestMIDIAccess = () => Promise.reject(new Error('nope'));
   page.el('c-midi').click();
   await settle();
-  eq([pressed(page), hidden(page), page.el('msg').textContent, page.el('msg').classList.contains('bad')], [['false'], [false, false, false, false], 'nope', true], 'a failed connect: nothing shown, the reason shown');
+  eq([pressed(page), hidden(page), page.el('msg').textContent, page.el('msg').classList.contains('bad')], [['false'], [false], 'nope', true], 'a failed connect: nothing shown, the reason shown');
   page = makePage();
   page.box.navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map(), outputs: new Map() });
   page.el('c-midi').click();
@@ -172,15 +174,14 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
 
   // ---- connected over USB: the face shows the stick's live state ----
   let { page: p, midi } = await connected();
-  eq([pressed(p), shown(p, 'live'), shown(p, 'c-advanced-box'), shown(p, 'player'), shown(p, 'advanced-extra')], [['true'], true, true, false, false], 'USB: the face and the Advanced box appear, the player does not');
+  eq([pressed(p), shown(p, 'live'), opened(p)], [['true'], true, [false, true, false]], 'USB: the face and the three sections appear: Settings closed, Player open, Advanced closed');
+  ok(!midi.sent.includes('diag') && p.intervals().length === 2, 'Advanced closed: no diag poll (only the connection\'s home and status)');
   eq(p.el('msg').textContent, '', 'no "Connected." text');
   eq([p.el('dev').querySelector('#dpad').children.length, p.el('dev').querySelector('#ports').children.length, p.el('dev').getAttribute('viewBox').split(' ').length], [5, 10, 4], 'the drawing is built from the table: the cap and four arms, ten ports, a view box');
   eq(p.el('dev').querySelector('#oledFO').getAttribute('width'), '40.8', 'the screen canvas fills the active area (40.8 mm wide)');
-  eq(p.el('c-midi').parentId, 'dev-bar', 'connected: the connect button moves into the device card\'s top row');
   p.box.disconnected();
-  eq(p.el('c-midi').parentId, 'connect-slot', 'disconnected: it is back under the title');
   ({ page: p, midi } = await connected());
-  eq([shown(p, 'menu'), shown(p, 'more')], [true, true], 'USB: Settings, Network and Details appear with the connection');
+  eq(shown(p, 'live'), true, 'USB: Settings, Player and Advanced appear with the connection');
   ok(midi.sent.includes('get') && midi.sent.includes('home'), 'the page read get and home from the stick');
   eq([p.box.S.lastHome.bpm, p.box.S.lastHome.audio, p.box.S.lastGet.group], [120, true, '1'], "the HOME line and get of the stick are held");
   ok(p.frames.size === 1, 'the face draws frames while connected');
@@ -189,7 +190,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   ok(lit > 100, 'the screen shows the stick\'s HOME (' + lit + ' lit pixels)');
   eq([p.el('oled').width, p.el('oled').height, p.el('oled').lastImage.width], [320, 240, 320], 'the default screen is the colour lcd2 landscape (320 x 240), for every board');
   p.box.disconnected();
-  eq([shown(p, 'menu'), shown(p, 'more')], [false, false], 'after a disconnect Settings, Network and Details are hidden again');
+  eq(hidden(p), [false], 'after a disconnect the sections are hidden again');
   {
     const q = await connected(undefined, { search: '?screen=oled' });
     q.page.runFrame();
@@ -248,23 +249,34 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   ok(p.timers.size > 0 && p.frames.size === 1, 'timers and a frame run while connected');
   midi.access.inputs.delete('in');
   midi.access.onstatechange();
-  eq([pressed(p), hidden(p), p.timers.size, p.frames.size, midi.input.onmidimessage, p.box.S.line], [['false'], [false, false, false, false], 0, 0, null, null], 'the port went away: face gone, nothing pressed, no timer, no frame, the input released');
+  eq([pressed(p), hidden(p), p.timers.size, p.frames.size, midi.input.onmidimessage, p.box.S.line], [['false'], [false], 0, 0, null, null], 'the port went away: face gone, nothing pressed, no timer, no frame, the input released');
   eq(p.el('msg').textContent, "The jank's MIDI port went away.", 'and it says so');
   const afterGone = midi.sent.length;
   tap(p, 'ArrowUp');
   eq(midi.sent.length, afterGone, 'the keys do nothing any more');
 
+  // ---- the sections remember open / closed, one key each; storage that throws changes nothing ----
+  {
+    const mem = new Map([['jank.sec-player', '0'], ['jank.sec-settings', '1']]);
+    const q = makePage({ storage: { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v), removeItem: k => mem.delete(k) } });
+    eq(opened(q), [true, false, false], 'stored states are used: Settings open, Player closed, Advanced default closed');
+    openSec(q, 'sec-advanced', true);
+    eq([mem.get('jank.sec-advanced'), mem.get('jank.sec-player'), mem.get('jank.sec-settings')], ['1', '0', '1'], 'opening a section stores only its own key');
+    const bad = makePage({ storage: { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => {} } });
+    openSec(bad, 'sec-player', false);
+    eq(opened(bad), [false, false, false], 'storage blocked: the defaults apply and a toggle does not throw');
+  }
+
   // ---- pressing the active button again leaves it ----
   ({ page: p, midi } = await connected());
   p.el('c-midi').click();
-  eq([pressed(p), hidden(p), p.timers.size, p.frames.size], [['false'], [false, false, false, false], 0, 0], 'the active button pressed again: disconnected, all gone');
+  eq([pressed(p), hidden(p), p.timers.size, p.frames.size], [['false'], [false], 0, 0], 'the active button pressed again: disconnected, all gone');
 
   // ---- Advanced over USB: the player and the extra info, diag polled every 2 s ----
   ({ page: p, midi } = await connected());
-  p.el('c-advanced').checked = true;
-  p.el('c-advanced').fire('change', {});
+  openSec(p, 'sec-advanced', true);
   await settle();
-  eq([shown(p, 'player'), shown(p, 'advanced-extra')], [true, true], 'Advanced ticked: the player and the extra show');
+  eq(opened(p)[2], true, 'the Advanced section opened');
   ok(midi.sent.includes('diag'), 'diag is read at once');
   eq(p.el('adv-boots').textContent, 'boots 3 · reset: poweron', 'boots and the reset reason, first');
   eq([p.el('adv-settled').textContent, p.el('adv-drift').textContent, p.el('adv-rtt').textContent, p.el('adv-drive').textContent, p.el('adv-save').textContent].map(String), ['yes', '12', '800', 'ok', 'no'], 'the diag fields');
@@ -304,19 +316,15 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   await settle();
   eq(p.el('adv-restart').textContent.includes('NaN'), false, 'no NaN notice');
   // untick: the poll stops
-  p.el('c-advanced').checked = false;
-  p.el('c-advanced').fire('change', {});
-  eq([shown(p, 'player'), shown(p, 'advanced-extra'), p.timers.size > 0], [false, false, true], 'Advanced unticked: both hide (the connection\'s own timers go on)');
-  p.el('c-advanced').checked = true;
-  p.el('c-advanced').fire('change', {});
+  openSec(p, 'sec-advanced', false);
+  eq([p.timers.size > 0, p.el('adv-boots').textContent], [true, 'boots - \u00b7 reset: -'], 'Advanced closed: the diag poll stops (the connection\'s own timers go on)');
+  openSec(p, 'sec-advanced', true);
   await settle();
   p.box.disconnected();
-  eq([hidden(p), p.timers.size, p.frames.size], [[false, false, false, false], 0, 0], 'a disconnect with Advanced ticked: everything hidden, nothing left running');
+  eq([hidden(p), p.timers.size, p.frames.size], [[false], 0, 0], 'a disconnect with Advanced ticked: everything hidden, nothing left running');
 
   // ---- the player: the folder fallback, the "then" choice, stop on leaving ----
   ({ page: p, midi } = await connected());
-  p.el('c-advanced').checked = true;
-  p.el('c-advanced').fire('change', {});
   await settle();
   const file = (name, rel, data = Buffer.from('')) => ({ name, webkitRelativePath: rel, slice: (a, b) => ({ arrayBuffer: async () => Uint8Array.from(data.subarray(a, b)).buffer }) });
   const tagged = Buffer.concat([Buffer.from('ID3'), Buffer.from([3, 0, 0, 0, 0, 0, 17]), Buffer.from('TBPM'), Buffer.from([0, 0, 0, 7, 0, 0, 0]), Buffer.from('124.00')]);
@@ -376,9 +384,8 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   await settle();
   ok(['b2.mp3', 'b10.mp3'].includes(p.el('pl-name').textContent), '"then random": another file of the folder, never the one that ended');
   audio.paused = false;
-  p.el('c-advanced').checked = false;
-  p.el('c-advanced').fire('change', {});
-  eq([shown(p, 'player'), p.media.paused > 0, p.media.revoked.length > 0, p.el('pl-play').disabled], [false, true, true, true], 'Advanced unticked: playback stops and the file is released');
+  p.box.disconnected();
+  eq([p.media.paused > 0, p.media.revoked.length > 0, p.el('pl-play').disabled], [true, true, true], 'a disconnect: playback stops and the file is released');
 
 
   // ---- the stick's output without the microphone ----
@@ -394,8 +401,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   };
   let dev = fakeDevices(true);
   ({ page: p, midi } = await connected(undefined, dev.opts));
-  p.el('c-advanced').checked = true;
-  p.el('c-advanced').fire('change', {});
   await settle();
   eq([shown(p, 'pl-pick'), p.el('pl-pick').textContent, p.el('pl-pick-help').textContent], [true, "Choose the stick's output", "Choose the stick's output (jank) once."], 'no stick output chosen yet: the chooser button and its one line');
   eq(dev.calls, { getUserMedia: 0, selectAudioOutput: 0, enumerate: 1, stopped: 0 }, 'the card read the device list (ids, no permission) and asked for nothing');
@@ -418,8 +423,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // a browser with no output chooser: the microphone only behind the explicit button
   dev = fakeDevices(false);
   ({ page: p, midi } = await connected(undefined, dev.opts));
-  p.el('c-advanced').checked = true;
-  p.el('c-advanced').fire('change', {});
   await settle();
   eq(shown(p, 'pl-out-row'), true, 'permission still needed: the line is shown');
   eq([p.el('pl-pick').textContent, p.el('pl-pick-help').textContent, dev.calls.getUserMedia], ['Allow device names (asks for the microphone)', 'Chrome will ask for the microphone only to read the device names; nothing is recorded.', 0], 'no output chooser: the explicit button and its sentence; the microphone is not asked at load');
@@ -435,8 +438,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     const api = fakeAudioApi(audioOpts), d = fakeDevices(true, saved, listing, devOpts);
     d.opts.audioApi = api;
     const c = await connected(undefined, d.opts);
-    c.page.el('c-advanced').checked = true;
-    c.page.el('c-advanced').fire('change', {});
     await settle();
     ok(c.page.el('pl-monitor').getAttribute('aria-pressed') !== 'false', 'the monitor toggle is on by default');
     c.page.el('pl-dir').fire('change', oneFile());
@@ -507,8 +508,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   const dn = fakeDevices(false, null, null, { current: [{ kind: 'audiooutput', label: '', deviceId: '' }] });
   dn.opts.audioApi = fakeAudioApi({});
   ({ page: p, midi } = await connected(undefined, dn.opts));
-  p.el('c-advanced').checked = true;
-  p.el('c-advanced').fire('change', {});
   await settle();
   dn.extra.current = named;
   p.el('pl-pick').click();
@@ -521,8 +520,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // ---- the play scope: every audio file under the picked folder ----
   const rel = (path) => ({ name: path.split('/').pop(), webkitRelativePath: path, slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) }) });
   ({ page: p, midi } = await connected());
-  p.el('c-advanced').checked = true;
-  p.el('c-advanced').fire('change', {});
   await settle();
   p.el('pl-dir').fire('change', { target: { files: ['Music/a.mp3', 'Music/Sub/b.mp3', 'Music/Sub/Deep/c.mp3', 'Music/Sub/Deep/.hidden.mp3', 'Music/__MACOSX/x.mp3', 'Music/$RECYCLE.BIN/y.mp3', 'Music/cover.jpg'].map(rel) } });
   await settle();
@@ -561,8 +558,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   p.el('pl-rescan').click();
   await settle();
   eq(p.el('pl-scope-line').textContent, '', 'rescan walks it again');
-  p.el('c-advanced').checked = false;
-  p.el('c-advanced').fire('change', {});
+  p.box.disconnected();
   eq(p.el('pl-scope-line').textContent, '', 'leaving Advanced cancels the scan and clears the list');
   p.box.disconnected();
 
@@ -573,8 +569,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     class StepChannel { constructor() { this.port1 = { onmessage: null, close() {} }; this.port2 = { postMessage: () => pending.push(this.port1), close() {} }; } }
     const flush = async () => { const q = pending.splice(0); q.forEach(port => port.onmessage && port.onmessage()); await settle(4); };
     ({ page: p, midi } = await connected(undefined, { MessageChannel: StepChannel }));
-    p.el('c-advanced').checked = true;
-    p.el('c-advanced').fire('change', {});
     await settle();
     eq(p.el('pl-play').disabled, true, 'no source yet: Play is disabled');
     const names = ['A/a1.mp3', 'A/a2.mp3', 'B/b1.mp3', 'B/b2.mp3', 'C/c1.mp3'];
@@ -608,8 +602,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   }
   {
     ({ page: p, midi } = await connected());
-    p.el('c-advanced').checked = true;
-    p.el('c-advanced').fire('change', {});
     await settle();
     p.el('pl-dir').fire('change', { target: { files: ['Music/Sub/s1.mp3', 'Music/Sub/s2.mp3', 'Music/r1.mp3'].map(rel) } });
     await settle();
@@ -626,8 +618,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   }
   {
     ({ page: p, midi } = await connected());
-    p.el('c-advanced').checked = true;
-    p.el('c-advanced').fire('change', {});
     await settle();
     p.el('pl-scope').checked = false;
     p.el('pl-scope').fire('change', {});
@@ -642,8 +632,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   }
   {
     ({ page: p, midi } = await connected());
-    p.el('c-advanced').checked = true;
-    p.el('c-advanced').fire('change', {});
     await settle();
     p.el('pl-dir').fire('change', { target: { files: ['Music/cover.jpg', 'Music/Sub/notes.txt'].map(rel) } });
     await settle();
@@ -847,6 +835,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     const setup = async (source) => {
       const c = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
       c.midi.text.status = statusUsb(source);
+      openSec(c.page, 'sec-advanced', true);
       return c;
     };
     let a = await setup('usb');
@@ -889,6 +878,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // ---- the beat display delay: the page's own latencies, the estimate, the stored value; it never touches the stick ----
   {
     r = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
+    openSec(r.page, 'sec-advanced', true);
     const delays = [];
     r.page.box.document.addEventListener('jank-beat-delay', e => delays.push(e.detail.ms));
     await play(r);
@@ -919,8 +909,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     const dd = fakeDevices(true, null, null, {});
     dd.store.set('jank.beat.delay', '75');
     ({ page: p, midi } = await connected(undefined, dd.opts));
-    p.el('c-advanced').checked = true;
-    p.el('c-advanced').fire('change', {});
+    openSec(p, 'sec-advanced', true);
     await settle();
     eq(p.el('bd-num').value, 75, 'a stored delay is shown again on the next visit');
     p.box.disconnected();
@@ -943,8 +932,6 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
       const m = music(perm), opts = { indexedDB: fakeIdb(m.handle), showDirectoryPicker: async () => m.handle };
       if (StepChannel) opts.MessageChannel = StepChannel;
       const c = await connected(undefined, opts);
-      c.page.el('c-advanced').checked = true;
-      c.page.el('c-advanced').fire('change', {});
       await settle();
       return { ...c, m };
     };
