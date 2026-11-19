@@ -245,7 +245,7 @@ mode the screen is unchanged (SIGNAL only: there is no peer traffic to measure).
 | text editor | 25 character cells of 12 px from x 10, the help lines at y 92, 116, 140 |
 | confirm | two lines centred at y 68 and 92, `YES      NO` at scale 2 at y 168 |
 | SETUP (QR) | the QR box on the left at module size 8, 6 or 4 (the largest that fits 238 rows and leaves 119 px for the text: 25 modules at 6 px = 162 px box); text right of it |
-| overlays | one box 260 x 120 at (30, 60), centred, with a 1 px dark line inside (4 px in); the value at the largest scale of 4, 3, 2, 1 that fits; the NO / YES hint uses it too; SAVED: 180 x 68 at (70, 84), text scale 2 |
+| overlays | one box 260 x 120 at (30, 60), centred, with a 1 px dark line inside (4 px in); the value at the largest scale of 4, 3, 2, 1 that fits; the NO / YES hint uses it too (shown after a 400 ms hold in AUDIO mode; releasing that key then does nothing); SAVED: 180 x 68 at (70, 84), text scale 2 |
 | BOOT / splash | `BOOT` at scale 5; `JANK` at scale 5 and `MINI 2.2` at scale 3 |
 
 The cursor logic in `OLED.press` still scrolls as if 6 menu rows were visible (`ui.top`); the lcd2 draw ignores `ui.top` and keeps the

@@ -152,8 +152,11 @@ const Stick = (() => {
   // with UP / DOWN on HOME is a combo (the nudges), which cancels the release action ----
   // the ABOUT screen is shown: the page then asks the jank for `about` (and only then)
   const aboutOpen = m => !!m && m.ui.screen === 'info' && m.ui.page === 'about';
+  // NO / YES held on HOME in AUDIO mode for HINT_MS: a box says what UP / DOWN will do (the texts of the board's screen), and that hold's release does nothing
+  const HINT_MS = 400;
+  const HINTS = { no: { title: 'NUDGE BEAT', up: 'UP: 1/2 BEAT EARLY', down: 'DOWN: 1/2 BEAT LATE' }, yes: { title: 'NUDGE MS', up: 'UP: 1 MS LATER', down: 'DOWN: 1 MS EARLIER' } };
   function create(getCtx, onCombo) {
-    return { ui: OLED.create(), held: { up: false, down: false, no: false, yes: false }, deferred: {}, combo: false, repeatAt: {}, getCtx, onCombo };
+    return { ui: OLED.create(), held: { up: false, down: false, no: false, yes: false }, deferred: {}, combo: false, shown: {}, hintDue: null, hintBtn: null, repeatAt: {}, getCtx, onCombo };
   }
   const press = (m, b, now) => OLED.press(m.ui, b, now, m.getCtx(now));
   const onHome = (m, now) => m.ui.screen === 'home' && !m.getCtx(now).setup;
@@ -163,23 +166,32 @@ const Stick = (() => {
     if (!onHome(m, now)) { press(m, b, now); if (isUpDown(b)) m.repeatAt[b] = now + REPEAT.firstMs; return; }
     if (isUpDown(b)) {
       const mod = m.held.no ? 'no' : m.held.yes ? 'yes' : null;
-      if (mod && m.deferred[mod]) { m.combo = true; m.onCombo(mod, b === 'up' ? 1 : -1); return; }
+      if (mod && m.deferred[mod]) { m.combo = true; m.shown[mod] = true; m.ui.hint = null; m.onCombo(mod, b === 'up' ? 1 : -1); return; }
       press(m, b, now);
       m.repeatAt[b] = now + REPEAT.firstMs;
       return;
     }
     m.deferred[b] = true;
     m.combo = false;
+    m.shown[b] = false;
+    m.hintBtn = b;
+    m.hintDue = now + HINT_MS;
   }
   function up(m, b, now) {
     if (!m.held[b]) return;
     m.held[b] = false;
     delete m.repeatAt[b];
+    if (b === 'no' || b === 'yes') { m.hintDue = null; m.ui.hint = null; }
     if (!m.deferred[b]) return;
     m.deferred[b] = false;
-    if (onHome(m, now) && !m.combo) press(m, b, now);
+    if (onHome(m, now) && !m.combo && !m.shown[b]) press(m, b, now);
   }
   function tick(m, now) {
+    if (m.hintDue !== null && now >= m.hintDue) {
+      const b = m.hintBtn;
+      m.hintDue = null;
+      if (m.held[b] && !m.combo && !m.getCtx(now).link && onHome(m, now)) { m.ui.hint = HINTS[b]; m.shown[b] = true; }
+    }
     for (const b of Object.keys(m.repeatAt)) {
       while (m.repeatAt[b] <= now) { press(m, b, m.repeatAt[b]); m.repeatAt[b] += REPEAT.everyMs; }
     }
