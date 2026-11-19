@@ -143,9 +143,9 @@
 #define BOARD_CC_SCL_GPIO (-1)
 #define BOARD_CC_SDA_GPIO (-1)
 #define BOARD_CC_INT_GPIO (-1)
-#define BOARD_HOST_EN_GPIO 17                     /* the mini 3: high = the 5 V presence signal + Rp on J4. No lcd2 code drives it
-                                                     yet (only usbport_tusb320.c, off here), so host mode stays off: R91 and the
-                                                     LCD-2's R6 hold it low */
+#define BOARD_HOST_EN_GPIO 17                     /* the mini 3: high = the 5 V presence signal + Rp on J4, only through usbport_mini3.c
+                                                     (VBUS sense low, setting HOST); R91 and the LCD-2's R6 hold it low */
+#define BOARD_USBPORT_MINI3 1                     /* the port HAL: usbport_mini3.c (no CC chip, VBUS sense decides) */
 #define BOARD_VBUS_SENSE_GPIO 10                  /* the mini 3's VBUS_SENSE (J15.10, parts.py): 10 k / 15 k, 3.0 V at 5 V on the LCD-2's own
                                                      USB-C; high = a computer or charger there. An ADC1 pin read as a plain digital input, no
                                                      internal pull (the board has its divider; usbrole.c input() sets none) */
@@ -176,5 +176,8 @@
 #endif
 #ifndef BOARD_LCD
 #define BOARD_LCD 0
+#endif
+#ifndef BOARD_USBPORT_MINI3
+#define BOARD_USBPORT_MINI3 0
 #endif
 #endif

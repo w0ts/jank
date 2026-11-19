@@ -237,6 +237,7 @@ struct jo_input {
     int8_t rep_mod[JO_BTNS];              /* -1: the repeat presses; JO_NO / JO_YES: it repeats that combo */
     uint32_t rep_due[JO_BTNS];
     uint8_t hint_on, hint_btn;
+    uint8_t shown[JO_BTNS];               /* the hint was shown for, or UP / DOWN was used with, this held NO / YES: its release does nothing */
     uint32_t hint_due;
     uint32_t last_input;
 };

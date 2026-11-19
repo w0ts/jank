@@ -36,6 +36,8 @@ fi
 "$CC" $FLAGS -ffp-contract=off "$HERE/tests/test_led.c" "$HERE/core/jank_led.c" $OLED $CORE -o "$OUT/test_led"
 "$OUT/test_led"
 "$CC" $FLAGS "$HERE/tests/test_clock.c" "$HERE/core/jank_clock.c" -o "$OUT/test_clock"
+"$CC" $FLAGS "$HERE/tests/test_clockout.c" "$HERE/core/jank_clockout.c" -o "$OUT/test_clockout"
+"$OUT/test_clockout"
 "$CC" $FLAGS "$HERE/tests/test_lcd.c" "$HERE/core/jank_lcd.c" -o "$OUT/test_lcd"
 "$OUT/test_lcd"
 "$CC" $FLAGS "$HERE/tests/test_sysex.c" "$HERE/core/jank_sysex.c" -o "$OUT/test_sysex"
@@ -61,6 +63,8 @@ fi
 
 # USB host mode: the port's role, the TUSB320 CC chip, a hosted device's audio descriptors and its PCM.
 "$CC" $FLAGS "$HERE/tests/test_usbrole.c" "$HERE/core/jank_usbrole.c" -o "$OUT/test_usbrole"
+"$CC" $FLAGS "$HERE/tests/test_usbhost.c" "$HERE/core/jank_usbhost.c" "$HERE/core/jank_usbrole.c" -o "$OUT/test_usbhost"
+"$OUT/test_usbhost"
 "$OUT/test_usbrole"
 "$CC" $FLAGS "$HERE/tests/test_tusb320.c" "$HERE/core/jank_tusb320.c" -o "$OUT/test_tusb320"
 "$OUT/test_tusb320"
