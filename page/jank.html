@@ -47,14 +47,18 @@ details.sec > summary { cursor: pointer; color: var(--dim); font-size: 13px; fon
 .hide { display: none !important; }
 [hidden] { display: none !important; }
 .device svg { display:block; flex:none; margin:0 auto; outline:none; touch-action:none; user-select:none; -webkit-user-select:none; }
-.device .lid { fill:#8d9094; stroke:#5d6064; stroke-width:.5; }
-.device .lidshade { fill:none; stroke:#a9acb0; stroke-width:.4; }
-.device .port { fill:#16171a; stroke:#4a4d50; stroke-width:.35; }
-.device .bezel { fill:#0b0c0d; stroke:#5d6064; stroke-width:.2; }
-.device .cap { fill:#2c2e31; stroke:#16171a; stroke-width:.4; stroke-linejoin:round; pointer-events:none; }
+/* the printed box: black body, pink labels and symbols, a grey D-pad (hardware/jank-mini-3/case/BOX.md); the outlines use the page's own tokens so the black body shows on a dark page too */
+.device .lid { fill:#000000; stroke:var(--dim); stroke-width:.5; }
+.device .lidshade { fill:none; stroke:#262626; stroke-width:.4; }
+.device .port { fill:#000000; stroke:var(--dim); stroke-width:.35; }
+.device .bezel { fill:#0b0c0d; stroke:#3a3a3a; stroke-width:.2; }
+.device .cap { fill:#5f5f5f; stroke:#2a2a2a; stroke-width:.4; stroke-linejoin:round; pointer-events:none; }
 .device .armarea { fill:transparent; stroke:none; cursor:pointer; }
-.device .armarea.on { fill:#4b4f54; }
-.device .glyph { fill:#c9ccd0; text-anchor:middle; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
+.device .armarea.on { fill:#8a8a8a; }
+.device .sym { fill:#F5A3C7; stroke:none; pointer-events:none; }
+.device .sym.tick { fill:none; stroke:#F5A3C7; stroke-linejoin:miter; stroke-linecap:butt; }
+.device .label { fill:#F5A3C7; text-anchor:middle; pointer-events:none; font-family:'Avenir Next Condensed','Arial Narrow','Helvetica Neue',sans-serif; font-weight:800; font-stretch:condensed; }
+.device .label-arrow { fill:#F5A3C7; stroke:#F5A3C7; stroke-width:.2; stroke-linejoin:round; pointer-events:none; }
 .device canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#04060a; }
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
@@ -143,13 +147,11 @@ header #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent
         </div>
         <div id="face-box">
 <svg id="dev" viewBox="0 0 100 81" tabindex="0" aria-label="jank mini 3, top view, 1 unit = 1 mm">
-  <defs>
-    <linearGradient id="lidg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9da1"/><stop offset="1" stop-color="#83868a"/></linearGradient>
-  </defs>
   <!-- the shell only: every position and size is set from the BOX3 table in ui/box3.js (Box3.build) -->
   <g id="ports"></g>
-  <rect id="lid" x="0" y="0" width="1" height="1" fill="url(#lidg)" class="lid"/>
+  <rect id="lid" x="0" y="0" width="1" height="1" class="lid"/>
   <rect id="lidshade" x="0" y="0" width="1" height="1" class="lidshade"/>
+  <g id="labels"></g>
   <g id="oledView">
     <rect id="oledBezel" class="bezel" rx="1.6" x="0" y="0" width="1" height="1"/>
     <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="320" height="240"></canvas></foreignObject>
@@ -2156,31 +2158,54 @@ const Face = (() => {
 })();
 </script>
 <script>
-/* The device drawing of the control page: jank-mini-3 seen from the top (the lid). Every number lives in the BOX3 table below, in mm, case
-   coordinates (origin top left, x right, y down); Box3.build(svg) draws the shell of ui/box3.svg.html from it and nothing else holds a
-   position. Positions may still move by +-2 mm: change them here. No text on the device but the keys' own marks. Builds with the DOM only. */
-const BOX3 = {
-  case: { w: 100, h: 81, r: 3 },
-  // the Waveshare LCD-2 in landscape: the active area, and the lid window one mm bigger on each side; the 320 x 240 canvas fills the active area
-  screen: { x: 9.7, y: 25.2, w: 40.8, h: 30.6, windowMargin: 1 },
-  // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
-  cross: { cx: 67.0, cy: 40.5, span: 24, arm: 8 },
-  switches: { up: [67.0, 32.5], down: [67.0, 48.5], no: [59.0, 40.5], yes: [75.0, 40.5] },
-  keyMarks: { no: ['NO', 'MENU'], yes: ['YES'] },          // the text on the keys, one line each; UP and DOWN carry a drawn triangle (arrowSize), NO is the menu key too
-  arrowSize: { w: 3.2, h: 2.6 },
-  markSize: { NO: 2.5, MENU: 2.0, YES: 2.5 }, markGap: 0.8,
-  // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
-  ports: [
-    { id: 'midi1', wall: 'top', at: 33.3, kind: 'trs' }, { id: 'midi2', wall: 'top', at: 46.1, kind: 'trs' },
-    { id: 'din1', wall: 'top', at: 63.5, kind: 'din' }, { id: 'din2', wall: 'top', at: 85.6, kind: 'din' },
-    { id: 'clock', wall: 'right', at: 30.5, kind: 'trs' }, { id: 'reset', wall: 'right', at: 50.5, kind: 'trs' },
-    { id: 'linein', wall: 'bottom', at: 33.5, kind: 'trs' },
-    { id: 'usbIn', wall: 'top', at: 8.7, kind: 'usbc' }, { id: 'usbHost', wall: 'top', at: 21.7, kind: 'usbc' }, { id: 'usbOwn', wall: 'left', at: 40.5, kind: 'usbc' },
-  ],
-  // connector sizes: length along the wall, depth out of the wall (3.5 mm jack ~6, 5-pin DIN ~15, USB-C 9 x 3.2)
-  kinds: { trs: { len: 6, depth: 3.2 }, din: { len: 15, depth: 3.2 }, usbc: { len: 9, depth: 3.2 } },
-  margin: 1.5,
-};
+/* The device drawing of the control page: jank-mini-3 seen from the top (the lid), as the printed box looks (hardware/jank-mini-3/case/BOX.md,
+   box.scad). Every number lives in the BOX3 table below, in mm, case coordinates (origin top left, x right, y down); Box3.build(svg) draws the
+   shell of ui/box3.svg.html from it and nothing else holds a position. The case origin lies 2.4 mm (fit 0.4 + wall 2.0) outside the board's
+   corner, so a board coordinate of box.scad is b(x) here; the tables below say b(...) wherever the number comes from box.scad. Positions may
+   still move by +-2 mm: change them here. The face labels are the LABELS and ARROWS tables, the D-pad cap's symbols are drawn polygons.
+   Builds with the DOM only. */
+const BOX3 = (() => {
+  const b = (v) => Math.round((v + 2.4) * 100) / 100;          // box.scad board mm -> case mm
+  const W = 95.5, H = 82.0;                                       // the board (box.scad W, H)
+  const J = { j1: 31.95, j4: 44.95, j2: 6.3, j3: 19.1, j5: W - 33.0, j6: W - 10.9, j13: H / 2 - 10.0, j14: H / 2 + 10.0, j7: 30.0, lcd2Usb: 41.0 };
+  const rows = [b(2.4), b(5.2)];                                  // the top edge's rows: triangles, names (box.scad LAB_ROWS)
+  return {
+    case: { w: 100.3, h: 86.8, r: 3 },
+    // the Waveshare LCD-2 in landscape: the active area, and the lid window 0.5 mm bigger on each side; the 320 x 240 canvas fills the active area
+    screen: { x: b(5.4), y: b(25.7), w: 40.8, h: 30.6, windowMargin: 0.5 },
+    // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
+    cross: { cx: b(64.75), cy: b(41.0), span: 24, arm: 8 },
+    switches: { up: [b(64.75), b(33.0)], down: [b(64.75), b(49.0)], no: [b(56.75), b(41.0)], yes: [b(72.75), b(41.0)] },
+    // the symbols on the cap (box.scad sym_*): centred symR out on the arms, a solid triangle up and down, an X on NO, a tick on YES
+    symbols: { symR: 8.7, tri: { w: 5.0, h: 4.0 }, x: { size: 4.6, bold: 1.7 }, tick: { bold: 1.7, points: [[-2.0, 0.1], [-0.6, -1.3], [1.7, 1.5]], centre: [0.12, 0.26] } },
+    // the face labels as printed: [x, y, text, turn in degrees (counter-clockwise)] (box.scad LABELS); the font is in ui/box3.css
+    labelSize: 2.2, labelSpacing: 0.12,
+    labels: [
+      [b(J.j2), rows[1], '1'], [b((J.j2 + J.j3) / 2), rows[1], 'MIDI'], [b(J.j3), rows[1], '2'],
+      [b(J.j1), rows[1], 'ESP'], [b(J.j4), rows[1], 'DEVICE'],
+      [b(J.j5), rows[1], '1'], [b((J.j5 + J.j6) / 2), rows[1], 'MIDI'], [b(J.j6), rows[1], '2'],
+      [b(J.j7), b(H - 5.0), 'LINE IN'], [b(W - 7.0), b(J.j13), 'CLK'], [b(W - 7.0), b(J.j14), 'RST'],
+      [b(0.4), b(J.lcd2Usb + 5.6), 'ESP', 90],
+    ],
+    // the triangles that point at the sockets: [x, y, direction in degrees: 0 up, -90 right, 180 down, 90 left] (box.scad LAB_ARROWS); size w x h
+    arrows: [
+      ...[J.j2, J.j3, J.j1, J.j4, J.j5, J.j6].map((x) => [b(x), rows[0], 0]),
+      [b(W - 2.2), b(J.j13), -90], [b(W - 2.2), b(J.j14), -90], [b(J.j7), b(H - 1.8), 180], [b(0.4), b(J.lcd2Usb), 90],
+    ],
+    arrowSize: { w: 2.6, h: 2.1 },
+    // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
+    ports: [
+      { id: 'midi1', wall: 'top', at: b(J.j2), kind: 'trs' }, { id: 'midi2', wall: 'top', at: b(J.j3), kind: 'trs' },
+      { id: 'din1', wall: 'top', at: b(J.j5), kind: 'din' }, { id: 'din2', wall: 'top', at: b(J.j6), kind: 'din' },
+      { id: 'clock', wall: 'right', at: b(J.j13), kind: 'trs' }, { id: 'reset', wall: 'right', at: b(J.j14), kind: 'trs' },
+      { id: 'linein', wall: 'bottom', at: b(J.j7), kind: 'trs' },
+      { id: 'usbIn', wall: 'top', at: b(J.j1), kind: 'usbc' }, { id: 'usbHost', wall: 'top', at: b(J.j4), kind: 'usbc' }, { id: 'usbOwn', wall: 'left', at: b(J.lcd2Usb), kind: 'usbc' },
+    ],
+    // connector sizes: length along the wall, depth out of the wall (3.5 mm jack ~6, 5-pin DIN ~15, USB-C 9 x 3.2)
+    kinds: { trs: { len: 6, depth: 3.2 }, din: { len: 15, depth: 3.2 }, usbc: { len: 9, depth: 3.2 } },
+    margin: 1.5,
+  };
+})();
 
 const Box3 = (() => {
   const windowRect = (s = BOX3.screen) => ({ x: s.x - s.windowMargin, y: s.y - s.windowMargin, w: s.w + 2 * s.windowMargin, h: s.h + 2 * s.windowMargin });
@@ -2220,6 +2245,38 @@ const Box3 = (() => {
   const make = (svg, tag, attrs) => { const e = document.createElementNS(svg.namespaceURI, tag); setAttrs(e, attrs); return e; };
   const mm = (v) => Math.round(v * 100) / 100;
 
+  // a symbol's points as an SVG points string, about the centre (x, y)
+  const pts = (list, x, y) => list.map(([px, py]) => mm(x + px) + ',' + mm(y + py)).join(' ');
+  // the cap's symbol on an arm, centred symR out from the cap's centre along its arm, as box.scad draws them (y down here)
+  function symbolFor(svg, name, x, y) {
+    const S = BOX3.symbols, cls = { class: 'sym' };
+    if (name === 'up' || name === 'down') {
+      const s = name === 'up' ? 1 : -1, hw = S.tri.w / 2, hh = S.tri.h / 2;
+      return [make(svg, 'polygon', { ...cls, id: 'sym-' + name, points: pts([[-hw, s * hh], [hw, s * hh], [0, -s * hh]], x, y) })];
+    }
+    if (name === 'no') {
+      // two bars of width bold, cut flush by the size x size square: two hexagons
+      const h = S.x.size / 2, d = S.x.bold / 2 * Math.SQRT2;
+      return [[[-h, -h], [-h + d, -h], [h, h - d], [h, h], [h - d, h], [-h, -h + d]], [[-h, h], [-h, h - d], [h - d, -h], [h, -h], [h, -h + d], [-h + d, h]]]
+        .map((poly, i) => make(svg, 'polygon', { ...cls, id: 'sym-no' + i, points: pts(poly, x, y) }));
+    }
+    const T = S.tick, [cx, cy] = T.centre;
+    return [make(svg, 'polyline', { class: 'sym tick', id: 'sym-yes', 'stroke-width': T.bold, points: pts(T.points.map(([px, py]) => [px - cx, -(py - cy)]), x, y) })];
+  }
+  // the printed texts and the pointing triangles of the face
+  function labelEls(svg) {
+    const z = BOX3.labelSize, { w, h } = BOX3.arrowSize;
+    const texts = BOX3.labels.map(([x, y, t, turn = 0]) => {
+      const e = make(svg, 'text', { x: mm(x), y: mm(y + 0.36 * z), 'font-size': z, 'letter-spacing': BOX3.labelSpacing, class: 'label', 'data-label': t });
+      if (turn) e.setAttribute('transform', 'rotate(' + -turn + ' ' + mm(x) + ' ' + mm(y) + ')');
+      e.textContent = t;
+      return e;
+    });
+    const tris = BOX3.arrows.map(([x, y, dir]) => make(svg, 'polygon', {
+      class: 'label-arrow', transform: 'translate(' + mm(x) + ' ' + mm(y) + ') rotate(' + -dir + ')', points: [[-w / 2, h / 2], [w / 2, h / 2], [0, -h / 2]].map((q) => q.join(',')).join(' '),
+    }));
+    return [...texts, ...tris];
+  }
   function placeScreen(svg, aspect) {
     const win = windowRect(), area = canvasArea(aspect);
     setAttrs(svg.querySelector('#oledBezel'), { x: mm(win.x), y: mm(win.y), width: mm(win.w), height: mm(win.h) });
@@ -2234,26 +2291,13 @@ const Box3 = (() => {
       const r = portRect(p);
       return make(svg, 'rect', { id: 'port-' + p.id, x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1, class: 'port' });
     }));
+    svg.querySelector('#labels').replaceChildren(...labelEls(svg));
     const cap = make(svg, 'path', { id: 'cap', d: 'M' + crossPoints().map(([x, y]) => mm(x) + ' ' + mm(y)).join('L') + 'Z', class: 'cap' });
     svg.querySelector('#dpad').replaceChildren(cap, ...['up', 'down', 'no', 'yes'].map((name) => {
       const [x, y] = BOX3.switches[name], r = armRect(name), g = make(svg, 'g', { id: 'arm-' + name, 'data-b': name });
-      // the marks are centred on the arm's centre: the text lines as a block of capital letters (cap height 0.71 em, the lines markGap apart), the arrows drawn as triangles
-      const marks = [];
-      if (name === 'up' || name === 'down') {
-        const { w, h } = BOX3.arrowSize, s = name === 'up' ? 1 : -1;
-        marks.push(make(svg, 'path', { d: 'M' + mm(x - w / 2) + ' ' + mm(y + s * h / 2) + 'L' + mm(x + w / 2) + ' ' + mm(y + s * h / 2) + 'L' + mm(x) + ' ' + mm(y - s * h / 2) + 'Z', class: 'glyph' }));
-      } else {
-        const lines = BOX3.keyMarks[name], sizes = lines.map((t) => BOX3.markSize[t]), caps = sizes.map((z) => 0.71 * z);
-        const total = caps.reduce((a, b) => a + b, 0) + BOX3.markGap * (lines.length - 1);
-        let top = y - total / 2;
-        lines.forEach((t, i) => {
-          const m = make(svg, 'text', { x, y: mm(top + caps[i]), 'font-size': sizes[i], class: 'glyph' });
-          m.textContent = t;
-          marks.push(m);
-          top += caps[i] + BOX3.markGap;
-        });
-      }
-      g.append(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }), ...marks);
+      const dir = { up: [0, -1], down: [0, 1], no: [-1, 0], yes: [1, 0] }[name], C = BOX3.cross, R = BOX3.symbols.symR;
+      g.append(...symbolFor(svg, name, C.cx + dir[0] * R, C.cy + dir[1] * R));
+      g.prepend(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }));
       return g;
     }));
   }

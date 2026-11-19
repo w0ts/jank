@@ -1,11 +1,9 @@
 <svg id="dev" viewBox="0 0 100 81" tabindex="0" aria-label="jank mini 3, top view, 1 unit = 1 mm">
-  <defs>
-    <linearGradient id="lidg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9da1"/><stop offset="1" stop-color="#83868a"/></linearGradient>
-  </defs>
   <!-- the shell only: every position and size is set from the BOX3 table in ui/box3.js (Box3.build) -->
   <g id="ports"></g>
-  <rect id="lid" x="0" y="0" width="1" height="1" fill="url(#lidg)" class="lid"/>
+  <rect id="lid" x="0" y="0" width="1" height="1" class="lid"/>
   <rect id="lidshade" x="0" y="0" width="1" height="1" class="lidshade"/>
+  <g id="labels"></g>
   <g id="oledView">
     <rect id="oledBezel" class="bezel" rx="1.6" x="0" y="0" width="1" height="1"/>
     <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="320" height="240"></canvas></foreignObject>
