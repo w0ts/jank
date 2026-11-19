@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The graded confidence (jb_graded.h): graded.py's names and order. */
 #include "jb_graded.h"
+#include "jb_comb.h"
 #include <math.h>
 
 static double kern(double x, double period)
@@ -101,8 +102,12 @@ double jg_tuned_step(struct jg_tuned *g, const struct jb_robust *r, const struct
     }
     if (now >= g->next_t || now < g->next_t - 2.0 * JG_EVERY_S) {   /* (a stream time that went back: the tracker restarted) */
         g->next_t = now + JG_EVERY_S;
+        /* the comb ends at the tracker's newest frame: the stream clock (`now`, the samples in) runs ~2 frames ahead of it (a
+         * frame needs 1024 samples after its centre), and a curve ending past the newest frame is refused (the tempo part
+         * was 0 on the device until 2026-11-19: the value shown never passed 75 %) */
+        const double t_comb = r && r->act_n > 0 && (double)(r->act_n - 1) / JC_FPS < now ? (double)(r->act_n - 1) / JC_FPS : now;
         g->value = jg_graded(jg_soft_f(seen, n_seen, lines, n_lines, period, now), jg_jitter(seen, n_seen),
-                             jrb_tempo_agreement(r, now, period), (double)jb_dbn_mass_near(dbn, 60.0 / period, JRB_DBN_NEAR));
+                             jrb_tempo_agreement(r, t_comb, period), (double)jb_dbn_mass_near(dbn, 60.0 / period, JRB_DBN_NEAR));
     }
     return g->value;
 }

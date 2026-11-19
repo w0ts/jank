@@ -356,7 +356,7 @@ static void test_cfg_name(void)
 static void test_beat_flash_gone(void)
 {
     setup();
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "graded=on\nusb=") && !strstr(out, "beat_flash"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "graded=on\nnewsong=off\nusb=") && !strstr(out, "beat_flash"));
     CHECK(run("set beat_flash 1") == JK_CTL_NONE && strstr(out, "err ") == out);
     CHECK(run("help") == JK_CTL_NONE && !strstr(out, "beat_flash"));
 }
@@ -757,8 +757,13 @@ static void test_follow(void)
         CHECK(run("get") == JK_CTL_NONE && strstr(out, "\ngraded=off\n"));
         CHECK(run("set graded maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.graded == 0);
         CHECK(run("set graded on") == JK_CTL_CFG_CHANGED && cfg.graded == 1);
+        /* NEW SONG (core/beat/jb_song.h): set newsong on|off, off by default, not stored */
+        CHECK(cfg.newsong == 0 && run("set newsong on") == JK_CTL_CFG_CHANGED && cfg.newsong == 1 && !jk_cfg_stored_differs(&was, &cfg));
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\ngraded=on\nnewsong=on\n"));
+        CHECK(run("set newsong maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.newsong == 1);
+        CHECK(run("set newsong off") == JK_CTL_CFG_CHANGED && cfg.newsong == 0);
     }
-    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|follower|skip|graded|burn|"));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|follower|skip|graded|newsong|burn|"));
     CHECK(run("set rate maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n") && cfg.rate == 0);
     CHECK(run("set rate on") == JK_CTL_CFG_CHANGED && cfg.rate == 1);
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .conf_pct = 97, .follow = 2 /* glide */, .drift_ppm = -35,
@@ -778,7 +783,7 @@ static void test_follow(void)
     snap.beat.follow = 1;                                             /* lock */
     snap.beat.rate_x10000 = 9700;
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nfollow=lock\n") && strstr(out, "\nrate_ratio=0.9700\n"));
-    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|follower|skip|graded|burn|usb|") && !strstr(out, "ble"));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|follower|skip|graded|newsong|burn|usb|") && !strstr(out, "ble"));
 }
 
 /* `about`: the ABOUT screen's numbers as a second reply (not in `status`, which has no room for them: test_status_size). Unknown until the
