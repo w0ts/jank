@@ -203,7 +203,7 @@ static esp_err_t adc_up(void)
         s_pub.cal = (uint8_t)(s_cali != NULL);
         cell_boot();
     }
-    /* the pattern: 12 dB for both (LINE IN swings 0.05 .. 3.29 V at the pin, the cell's half 1.6 .. 2.1 V) */
+    /* the pattern: 12 dB for both (mini 2.2: LINE IN swings 0.05 .. 3.29 V at the pin; mini 3: about 1.47 V +- 1.47 V, board README) */
     pat[0] = (adc_digi_pattern_config_t){.atten = ADC_ATTEN_DB_12, .channel = s_line_ch, .unit = ADC_UNIT_1, .bit_width = SOC_ADC_DIGI_MAX_BITWIDTH};
     if (n == 2u)
         pat[1] = (adc_digi_pattern_config_t){.atten = ADC_ATTEN_DB_12, .channel = (uint8_t)s_cell_ch, .unit = ADC_UNIT_1, .bit_width = SOC_ADC_DIGI_MAX_BITWIDTH};

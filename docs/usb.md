@@ -86,6 +86,23 @@ Flash writes run in the control task; a sector erase stalls the CPU for tens of 
 interrupt (IRAM) goes on but the clock bytes reach USB late: do not update during a performance.
 Beat-follow bench build only: the device is also a UAC2 speaker, an OUT endpoint, see [beat.md](beat.md).
 
+## The EP0 SETUP crash (found with the panic recorder)
+
+About one in three first boots of a new image, the jank panicked 450 ms after boot and the update rolled back. `diag` after
+the rollback showed `panic_task=IDLE0`, `panic_msg=LoadProhibited`, `panic_cause=28`, `panic_vaddr=0x00000000`, `panic_pc` in the ROM and
+`panic_a0=0x82032ec5` (windowed ABI: the top two bits of a0 are the window increment, the address is `0x42032ec5`). addr2line of that
+address on the elf of the flashed image gave `dcd_event_setup_received` inlined by `handle_epout_dma` (`dcd_dwc2.c`, the `setup_phase_done`
+branch): the USB interrupt reading the SETUP packet through a null pointer. The branch takes the pointer from `DOEPDMA0 - 8` ("the
+last valid SETUP data", programming guide 9.1.2.1) and copies 8 bytes from it. With `DOEPDMA0` = 8 (the pointer never armed with the setup
+buffer when the host's first SETUP after a bus reset arrived, which is when a host re-enumerates a restarted jank) that is address 0.
+Only the timing of the host decides, so it is intermittent.
+
+`third_party/esp_tinyusb-dwc2-setup-guard.patch` (applied by `scripts/patch_tinyusb.sh`) checks that the pointer lies inside the
+setup buffer; if not it drops the event, calls `dma_setup_prepare` and returns. The host then repeats its request (a lost SETUP is
+retried by the host). Not proven on the jank: the cause of the stale pointer is read from the code, the crash is intermittent, and only
+several first flashes in a row show that it is gone. The slave (FIFO) path has no such pointer (it reads the setup buffer itself), so it
+is not patched. The decode recipe is in docs/firmware.md ("Decoding an address").
+
 ## Host mode
 
 The setting `usb` (`set usb device|host`, the menu's USB: DEVICE / HOST later; stored, default `device`) chooses.
@@ -108,6 +125,27 @@ Where the role comes from (`core/jank_usbrole.c`, host-tested):
   (Try.SNK), so a computer always gets the control line. A different stack is a restart (about a second; the clock stops
   for it); a stack runs at least 3 s before the next one. The setting DEVICE keeps the port a sink: never 5 V, the charger
   always charges. The usb order (no TUSB320) behaves as the XIAO.
+- **jank mini 3** (lcd2 board, `main/usbport_mini3.c`, `core/jank_usbhost.c`, host-tested in `tests/test_usbhost.c`): no
+  CC chip. **A computer or a charger on the LCD-2's own USB-C (VBUS sense, GPIO10, high) always wins**: the device stack,
+  HOST_EN low. Only with the setting HOST and VBUS sense low does the board act as a host on the OUT port (J4, TO DEVICE):
+  HOST_EN (GPIO17) high puts a 680 ohm "5 V present" signal and Rp 56 k on J4's VBUS / CC, no power (bus-powered gear needs
+  its own supply or a powered hub). Gear on J4 cannot be seen without a CC chip, so the host stack simply waits with the
+  signal on. The rules, in this order of importance:
+  - HOST_EN is low from the first line of boot (`power_early_init`), in `open()` again, on every `vbus_on(0)`, on a change of
+    the setting to DEVICE, and in a shutdown handler before any restart.
+  - HOST_EN **falls in the same step** in which VBUS sense reads high (steps are 20 ms), with no debounce.
+  - HOST_EN **rises only** with all of: the setting HOST; VBUS sense low without a break for 500 ms (`JUH_DEBOUNCE_MS`); the
+    5 V rail (V5_EN) on for 100 ms (`JUH_V5_SETTLE_MS`, counted from the HAL's `open()`); the role core asking for it.
+    A flapping VBUS cannot chatter it: at most one rise per quiet 500 ms, and a rise needs 500 ms of calm first.
+  - A start with VBUS high is a device; one with VBUS low starts the host stack (setting HOST), HOST_EN rising 500 ms after
+    the start. A computer plugged in while hosting: HOST_EN down at once, then the role core restarts into the device stack
+    (at least 3 s after the last start). Unplugged: after 500 ms the role core restarts into the host stack.
+  - `status` shows `usb_cc` `host` for "a computer or a charger" and `device` for "nothing there" (the name is the port
+    chip's vocabulary; this board has no chip).
+  - A pin that reads wrong: VBUS sense stuck high or floating high: the board stays a device, HOST_EN low. Stuck low (a wrong
+    pin map) with a computer plugged in: HOST_EN could rise; it is the 680 ohm signal onto J4 only (nothing of ours drives
+    the LCD-2's VBUS: J1's VBUS and CC are open), but the host stack would then share D+ / D- with the computer. HOST_EN
+    itself on a wrong pin is a different pin: R91 and the LCD-2's R6 hold the real one low.
 - The port chip sits behind a small HAL (`main/usbport.h`: attach state and orientation, set role, prepare and switch
   VBUS out): another chip (a power-bank IC with its own role logic) is another file, the role logic stays as it is.
 

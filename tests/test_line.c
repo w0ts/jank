@@ -74,6 +74,28 @@ static void test_parse(void)
     CHECK(r.line_n == 0 && out[0] == 0 && out[199] == 0);
 }
 
+/* the mini 3 (lcd2): LINE_IN GPIO7 = ADC1 channel 6, the cell GPIO5 = channel 4; LINE_SENSE GPIO8 = channel 7 is in no pattern yet, so
+ * a word of it (it should never come) is "other", never mixed into the line */
+static void test_mini3_channels(void)
+{
+    uint32_t conv[JL_CONV_MAX];
+    uint16_t out[JL_FRAME];
+    struct jl_parse r;
+    for (unsigned i = 0; i < JL_FRAME; i++) {
+        conv[2u * i] = word(1900u + i % 7u, 6, 0);
+        conv[2u * i + 1u] = word(1500, 4, 0);
+    }
+    jl_parse(conv, JL_CONV_MAX, 6, 4, out, &r);
+    CHECK(r.line_n == JL_FRAME && r.cell_n == JL_FRAME && r.cell_sum == 1500u * JL_FRAME && r.other == 0 && out[8] == 1901);
+    conv[20] = word(3000, 7, 0);
+    jl_parse(conv, JL_CONV_MAX, 6, 4, out, &r);
+    CHECK(r.line_n == JL_FRAME - 1u && r.other == 1 && out[10] == 1900u + 11u % 7u);
+    /* the same two-channel pattern, so the same 24 us line sample as the mini 2.2 */
+    CHECK(jl_interval(80000000u, jl_conv_hz(2)) == 30u && JL_SAMPLE_US == 24);
+    /* the bias 1.467 V at the 12 dB range (nominal 3.1 V) is code ~1938: inside the 12-bit range with room both ways */
+    CHECK(4095.0 * 1.467 / 3.1 > 1900 && 4095.0 * 1.467 / 3.1 < 2000);
+}
+
 /* stamps: frame k ends with sample 200 (k + 1) - 1 at T0 + 24 (200 (k + 1) - 1) + latency */
 static double urand(void) { return rand() / (RAND_MAX + 1.0); }
 
@@ -341,6 +363,7 @@ int main(void)
 {
     test_rates();
     test_parse();
+    test_mini3_channels();
     test_fit();
     test_cond();
     test_cell();

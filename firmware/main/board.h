@@ -113,8 +113,8 @@
  * mini 3 board layout (hardware/jank-mini-3/parts.py GPIO, the source of truth; docs/lcd2.md has the table; provisional
  * until the board is ordered). The board has no LED on a GPIO (its two LEDs are the charger's and the 3V3 rail's).
  * power.c drives GPIO4 V5_EN (5 V aux boost enable; R131 holds it ON until then), 2 RST and 15 CLK (idle low) at boot. The
- * other pins have no firmware use yet and stay undefined here: 7 LINE_IN (ADC1), 8 LINE_SENSE (ADC1),
- * 18 LIN_DET (line in plug detect); free: 12, 14 (no pad), 47, 48 (pads, the IMU
+ * other pins have no firmware use yet and stay undefined here: 8 LINE_SENSE is defined below but not sampled yet;
+ * free: 12, 14 (no pad), 47, 48 (pads, the IMU
  * bus). */
 #define BOARD_NAME "lcd2"
 #define BOARD_LCD 1
@@ -143,18 +143,24 @@
 #define BOARD_CC_SCL_GPIO (-1)
 #define BOARD_CC_SDA_GPIO (-1)
 #define BOARD_CC_INT_GPIO (-1)
-#define BOARD_HOST_EN_GPIO 17                     /* the mini 3: high = the 5 V presence signal + Rp on J4. No lcd2 code drives it
-                                                     yet (only usbport_tusb320.c, off here), so host mode stays off: R91 and the
-                                                     LCD-2's R6 hold it low */
+#define BOARD_HOST_EN_GPIO 17                     /* the mini 3: high = the 5 V presence signal + Rp on J4, only through usbport_mini3.c
+                                                     (VBUS sense low, setting HOST); R91 and the LCD-2's R6 hold it low */
+#define BOARD_USBPORT_MINI3 1                     /* the port HAL: usbport_mini3.c (no CC chip, VBUS sense decides) */
+#define BOARD_BRIDGE_SLOTS_PSRAM 1                /* bridge.c's 20 frame slots (30 KB) in PSRAM: internal DRAM is full with LINE IN */
 #define BOARD_VBUS_SENSE_GPIO 10                  /* the mini 3's VBUS_SENSE (J15.10, parts.py): 10 k / 15 k, 3.0 V at 5 V on the LCD-2's own
                                                      USB-C; high = a computer or charger there. An ADC1 pin read as a plain digital input, no
                                                      internal pull (the board has its divider; usbrole.c input() sets none) */
-#define BOARD_LINE_DETECT_GPIO (-1)
+#define BOARD_LINE_DETECT_GPIO 18                 /* the mini 3's LIN_DET (J15.6): J7's ring switch, R38 1 M up: high = a plug, low = none.
+                                                     A plain input, no internal pull (the board has its own) */
 #define BOARD_PUMP_GPIO (-1)
 #define BOARD_USBPORT_TUSB320 0
-#define BOARD_HAS_LINEIN 0
+/* LINE IN (linein.c): node A = the tip + ring mix on GPIO7 = ADC1 channel 6 (bias 1.467 V), first version A alone; node B
+ * (the jack's sleeve) on GPIO8 = ADC1 channel 7 is for the later A - B step and is not sampled */
+#define BOARD_HAS_LINEIN 1
+#define BOARD_LINEIN_GPIO 7
+#define BOARD_LINESENSE_GPIO 8
 /* the cell: the LCD-2's own BAT_ADC, GPIO5 = ADC1 channel 4, R19 200 k / R20 100 k from VBAT (docs/lcd2.md): the pin sees a third,
- * 1.4 V at 4.2 V. No line in here, so linein.c reads it by oneshot every few seconds (linein_cell_step) */
+ * 1.4 V at 4.2 V. Read in the line in's ADC pattern [LINE IN, cell], as on the mini 2.2 (linein_cell_step then does nothing) */
 #define BOARD_CELL_GPIO 5
 #define BOARD_CELL_DIV 3                          /* the cell's volts / the pin's */
 #define BOARD_CELL_EMPTY_MV 3300
@@ -171,5 +177,11 @@
 #endif
 #ifndef BOARD_LCD
 #define BOARD_LCD 0
+#endif
+#ifndef BOARD_USBPORT_MINI3
+#define BOARD_USBPORT_MINI3 0
+#endif
+#ifndef BOARD_BRIDGE_SLOTS_PSRAM
+#define BOARD_BRIDGE_SLOTS_PSRAM 0
 #endif
 #endif
