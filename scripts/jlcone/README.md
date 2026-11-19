@@ -27,6 +27,18 @@ Options (environment) for `jlcone_pcba.mjs`:
 
 JLC traps the scripts handle: the cookie banner covers the PCBA type buttons (declined first); one BOM line per LCSC
 code (JLC leaves two lines matched to one part unselected); JLC assembles nothing under 10 x 10 mm; the quote page
-is sometimes slow (a timeout: run again). LCSC refuses headless browsers (`lcsc_probe.mjs` shows it): for LCSC, paste
-a `code,qty` list into its Quick Order (e.g. `hardware/jank-mini-3/fab/default/lcsc-order.txt`). `cart_sum.mjs` still
-needs JLCONE on 9222.
+is sometimes slow (a timeout: run again). `cart_sum.mjs` still needs JLCONE on 9222.
+
+LCSC refuses headless browsers (`lcsc_probe.mjs` shows it), so its scripts open a **visible** Chrome window on the same
+profile (mots, 2026-11-19: "use a real not headless browser"); it comes to the front while they run:
+
+```sh
+node ../lcsc_cart.mjs list                       # the LCSC cart (also: add CODE:QTY ..., del CODE ...)
+node ../lcsc_cart.mjs login                      # once, if LCSC asks: sign in, then close the tab
+node ../lcsc_search.mjs "round rocker switch"    # search results as text (+ lcsc-search.png)
+node ../lcsc_addpage.mjs CODE QTY                # add from the product page when the cart API refuses a part
+node ../lcsc_show.mjs CODE                       # product and datasheet pictures, image URLs
+```
+
+LCSC rounds quantities up to each part's minimum / multiple. Or paste a `code,qty` list into LCSC's Quick Order
+(e.g. `hardware/jank-mini-3/fab/default/lcsc-order.txt`).
