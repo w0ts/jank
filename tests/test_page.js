@@ -33,16 +33,28 @@ ok(html === expandedTemplate, "page/jank.html is the expansion of page/src/jank.
 ok(!/<!--@include/.test(html), "no include marker left");
 ok(/<script id="face-ui">/.test(html) && /<script id="advanced-ui">/.test(html) && /const Stick = /.test(html) && /const Face = /.test(html), "the face's, Advanced's and the player's scripts are in the page");
 ok(!/id="connect"|class="buttons"/.test(html.split('id="live"')[0]), "no connection card: nothing but the title, the message and the connect button above the face");
-ok(html.indexOf('id="connect-slot"') < html.indexOf('id="c-midi"') && html.indexOf('id="c-midi"') < html.indexOf('id="live"'), "the connect button starts in the slot under the title");
-ok(html.indexOf('id="dev-bar"') > html.indexOf('id="face"') && html.indexOf('id="c-advanced-box"') > html.indexOf('id="dev-bar"') && html.indexOf('id="c-advanced-box"') < html.indexOf('id="face-box"'), "the Advanced check box sits in the device card's top row");
+ok(/<div class="title-row"><h1>jank<\/h1>\s*<button id="c-midi"/.test(html) && html.indexOf('id="c-midi"') < html.indexOf('id="connect-slot"') && !/placeConnect/.test(html), "the connect / eject button sits in the title row, right after the jank title, and stays there");
+ok(html.indexOf('id="dev-bar"') > html.indexOf('id="face"') && !/id="c-advanced|storedAdvanced|rememberAdvanced/.test(html), "the Advanced check box is gone from the device card and from the code");
+{
+  const at = (s) => html.indexOf(s);
+  const order = ['id="face"', 'id="sec-settings"', 'id="sec-player"', 'id="sec-advanced"'].map(at);
+  ok(order.every((n, i) => n > 0 && (i === 0 || n > order[i - 1])), "after the device card: the Settings, Player and Advanced sections, in that order");
+  ok(/<details id="sec-settings"[^>]*><summary[^>]*>Settings<\/summary>/.test(html) && /<details id="sec-player"[^>]* open><summary[^>]*>Player<\/summary>/.test(html) && /<details id="sec-advanced"[^>]*><summary[^>]*>Advanced<\/summary>/.test(html), "each section is a <details> with its title; only the Player starts open");
+  ok(!/id="face"[^>]*><details|<details[^>]*id="face"/.test(html), "the device card is not collapsible");
+  const inAdv = html.slice(at('id="sec-advanced"'), at('</main>'));
+  ok(['adv-boots', 'bd-num', 'al-on', 's-rssi', 'units', 's-version', 'bootloader'].every((id) => inAdv.includes('id="' + id + '"')), "Advanced holds the stats, the tuning, the beat display, Auto latency, Air and Link, Peers heard and Firmware");
+  ok(!/id="more"|id="advanced-extra"/.test(html), "the old Details and Advanced extra wrappers are gone");
+  const inSet = html.slice(at('id="sec-settings"'), at('id="sec-player"'));
+  ok(inSet.includes('id="c-name"') && inSet.includes('id="net-apply"') && !/id="scan"|id="groups"|id="scan-result"|Scan the groups/.test(html), "Settings keeps the name and the Wi-Fi; the groups block is gone");
+}
 ok(/id="c-midi"[^>]*aria-pressed="false"/.test(html), "Connect: the MIDI port button, not pressed before a connection");
 ok(/id="c-midi"[^>]*><span class="connect-text">Connect<\/span><svg class="eject"/.test(html) && !/MIDI port \(USB, iPhone app\)/.test(html), "the button says Connect, and shows an eject icon while connected");
 ok(!/bluetooth|gatt|\bble\b|\bble[-_]/i.test(html), "no Bluetooth, BLE or GATT anywhere in the page");
 ok(!/id="c-sim"|>Demo<|>Simulator<|Sim\.|const Sim|sim\.js|\?sim=/.test(html), "no Demo / simulator mode left");
 ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id="c-off"/.test(html), "no Device or Connect heading, no tag, no status text, no Disconnect button");
 ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
-ok(/<summary[^>]*>Details<\/summary>/.test(html), "the Details section is still there");
-ok(/id="live" class="hide"/.test(html) && /id="c-advanced-box" class="hide"/.test(html) && /id="player" class="hide"/.test(html) && /id="advanced-extra" class="hide"/.test(html), "the face, the Advanced box, the Player card and the Advanced extra start hidden");
+ok(!/<summary[^>]*>Details<\/summary>/.test(html), "the separate Details section is merged into Advanced");
+ok(/id="live" class="hide"/.test(html), "the face and the three sections (inside it) start hidden");
 ok(!/face-hint|The stick has no screen: this is a virtual screen of its state/.test(html), "no key-hint line and no 'no screen' note around the device");
 ok(!/class="lbl|class="brand|<text[^>]*class="lbl/.test(html) && !/max-width: 520px/.test(html), "the new drawing has no edge labels and no caption (no text but the keys' marks); the drawing is not capped at 520 px");
 ok(/Box3\.build\(svg\)/.test(html) && !/setAttribute\("viewBox"/.test(html) && /card\.title = Stick\.KEY_HINT/.test(html) && /id="dev"/.test(html) && !/id="ledView"|id="pwr"|class="brand"/.test(html), "the box is drawn by Box3.build from its table (view box from the table), no LEDs, no power switch, the keys are a tooltip");
@@ -56,7 +68,7 @@ ok(!/lastBeat|takeBeat|parseBeat/.test(html), "the page keeps no beat-report cod
 ok(/Stick\.phaseFeed/.test(faceUi) && /id="bd-num"/.test(html) && /id="bd-slider"/.test(html), "the beat boxes run on the smooth phase, with the display delay row under Advanced");
 ok(!/id="home"|id="h-|id="t-(tempo|set|play|up|down)"|id="n-(beat|ms)/.test(html), "the HOME card is gone");
 for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the stick's menu has it, the page does not");
-for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "scan", "groups", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
+for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
   ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
 ok(!/id="pl-file"|id="pl-reset"|dragover|type="file" accept/.test(html), "no single-file button, no drag and drop");
 ok(/id="pl-folder"[^>]*aria-label="Music folder"[^>]*><svg/.test(html) && /id="pl-then"[^>]*><svg/.test(html) && /id="pl-help"/.test(html), "the music folder and the after-track mode are icon buttons, the help toggle is there");
@@ -281,11 +293,7 @@ eq(box.splitLines("", "a\r\nb\n"), { lines: ["a", "b"], rest: "" });
   eq(a.values, { group: "3", name: "front of house" });
   eq(a.units[0], { mac: "8c:aa:bb:cc:dd:ee", rssi: -44, age: 100, frames: 5 });
   eq(box.parseAnswer(["peer=on"]).values.peer, "on");
-  eq(box.parseAnswer(["scan=3,11,4,3,1,-50"]).scans[0], { group: 3, channel: 11, frames: 4, units: 3, janks: 1, rssi: -50 });
-  eq(box.parseAnswer(["scan=none"]).scans, []);
 }
-eq(box.peerText({ units: 3, janks: 1 }), "3, of which 1 jank");
-eq(box.peerText({ units: 2, janks: 0 }), "2");
 eq(box.isEnd("ok"), true);
 eq(box.isEnd("err bad setting"), true);
 eq(box.isEnd("okay"), false);
@@ -325,8 +333,7 @@ eq(box.setCommand("pass", "secret12"), null);         // not through the setting
   ok(titles.length > 40, "the page carries its tooltips (" + titles.length + ")");
   eq(titles.filter(([, v]) => !v.trim() || v.length > 240).map(([id, v]) => id + " (" + v.length + ")"), []);
   const tipOf = (id) => (html.match(new RegExp('<[a-z]+ [^>]*id="' + id + '"[^>]*>')) || [""])[0];
-  for (const id of ["c-midi", "pl-play", "pl-vol", "bd-slider", "al-on", "net-apply", "bootloader", "scan"]) ok(/\stitle="[^"]+"/.test(tipOf(id)), id + " has a tooltip of its own");
-  ok(/action\.title = "Makes the stick join this group/.test(html), "the Join buttons of the group list are built with a tooltip");
+  for (const id of ["c-midi", "pl-play", "pl-vol", "bd-slider", "al-on", "net-apply", "bootloader"]) ok(/\stitle="[^"]+"/.test(tipOf(id)), id + " has a tooltip of its own");
   ok(/Pitch[^"]*tempo the stick tracks/.test(tipOf("pl-pitch")) && /mutes only your speakers/.test(html) && /restarts it/.test(tipOf("net-apply")), "the tooltips carry the side effects: pitch moves the tracked tempo, monitor off mutes only the speakers, Save and restart restarts the stick");
 }
 
