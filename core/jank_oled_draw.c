@@ -348,18 +348,23 @@ static void info(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
         jo_text(fb, rows[i], 4, 14 + i * 11, 1, 1);
 }
 
-static void edit(uint8_t *fb, const struct jo_ui *ui)
+static void edit(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
     const struct jo_spec *sp = jo_spec(ui->edit.field);
     const char *h1, *h2;
     char s[24];
     int w, x;
     title_bar(fb, sp->title, NULL);
-    jo_edit_text(sp, ui->edit.val, s, sizeof s);      /* the menus' one font size, always */
-    w = jo_text_w(s, 1) + 12;
-    x = jo_iround((double)(JO_W - w) / 2.0);
-    jo_rect(fb, x, 16, w, 13, 1);
-    jo_text(fb, s, x + 6, 19, 1, 0);                 /* the value, inverted */
+    if (ui->edit.field == JO_F_THRESHOLD) {          /* the live CF bar with the threshold as a marker UP / DOWN moves: no digits for it */
+        snprintf(s, sizeof s, "CF %d%%", jo_iround(c->conf * 100));
+        value_bar(fb, 22, c->conf, ui->edit.val / 100.0, s);
+    } else {
+        jo_edit_text(sp, ui->edit.val, s, sizeof s);  /* the menus' one font size, always */
+        w = jo_text_w(s, 1) + 12;
+        x = jo_iround((double)(JO_W - w) / 2.0);
+        jo_rect(fb, x, 16, w, 13, 1);
+        jo_text(fb, s, x + 6, 19, 1, 0);             /* the value, inverted */
+    }
     jo_help_of(sp, ui->edit.val, &h1, &h2);
     jo_text_c(fb, h1, 44, 1, 1);
     jo_text_c(fb, h2, 54, 1, 1);
@@ -540,7 +545,7 @@ void jo_draw(uint8_t fb[JO_FB_BYTES], const struct jo_ui *ui, const struct jo_ct
         case JO_MENU: menu(fb, ui, c); break;
         case JO_SUB: sub(fb, ui, c); break;
         case JO_INFO: info(fb, ui, c); break;
-        case JO_EDIT: edit(fb, ui); break;
+        case JO_EDIT: edit(fb, ui, c); break;
         default: break;
         }
     overlays(fb, ui, now);
