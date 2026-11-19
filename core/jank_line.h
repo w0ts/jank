@@ -99,4 +99,7 @@ int jl_cell_add(struct jl_cell *c, uint32_t sum, uint32_t n, uint32_t block_n);
  * JL_NO_CELL_MV (no cell: the usb order holds the pin at 0 V) */
 #define JL_NO_CELL_MV 2000
 int jl_batt_pct(int32_t mv, int32_t empty_mv);
+/* the same from the millivolts at the ADC pin and the board's divider (the cell's volts / the pin's): -1 = no cell (the pin
+ * under JL_NO_CELL_MV / div: a floating or grounded pin never shows as a low cell) */
+int jl_cell_pin_pct(int32_t pin_mv, int32_t div, int32_t empty_mv);
 #endif
