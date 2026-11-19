@@ -51,7 +51,9 @@
 #include "jb_down.h"
 #include "jb_follow.h"
 #include "jb_graded.h"
+#include "jb_kick.h"
 #include "jb_lost.h"
+#include "jb_song.h"
 #include "jb_robust.h"
 #include "jb_skip.h"
 #include "jb_mode.h"
@@ -108,7 +110,11 @@ static uint8_t s_rate_qn;
 static uint8_t s_conf_ran;             /* the automatic layer ran at the last step (a tempo, the gate open, no silence): the
                                         * gate is then judged on the weak confidence */
 static uint32_t s_weak_holds;          /* steps the weak confidence held the gate open with the strict one under it */
-static struct jb_lost s_lost;          /* LOST (core/beat/jb_lost.h): a bar with no strong beat on the grid closes the gate */
+static struct jb_lost s_lost;          /* LOST (core/beat/jb_lost.h): when the tuned follower's outputs stop once they run */
+static struct jb_kick *s_kick;         /* the kick band and the input level per tracker frame, LOST's evidence (core/beat/jb_kick.h;
+                                          PSRAM); NULL: no RAM, LOST on strong beats alone */
+static struct jb_song *s_song;         /* NEW SONG (core/beat/jb_song.h, `set newsong`; PSRAM); NULL: no RAM, off */
+static uint8_t s_song_on;              /* the setting as last read (the beat task) */
 static uint8_t s_conf_hold;            /* M2k: the weak confidence holds its last value (no evidence): shown eased */
 static double s_conf_shown, s_conf_at; /* the confidence shown (jcf_show_step) and the stream time of its step */
 static struct jbl s_jbl;
@@ -334,6 +340,8 @@ static void on_frame(void *ctx, const struct jb_frame *f)
             s_beat_seen = 1;            /* a decision: the session's bar is looked after now */
         PROF_END(P_DOWN);
     }
+    if (s_song && s_song_on)
+        js_frame(s_song, f->bands);
     if (f->act > s_win_act)
         s_win_act = f->act;
     {
@@ -391,6 +399,10 @@ static void restart_tracker(void)
     /* (the user's PHASE stays: the automatic layer never changes it, M2h) */
     s_bar_now = 1;
     jb_beat_reset(&s_b);
+    if (s_kick)
+        jbk_reset(s_kick);             /* (its hops are the tracker's frames) */
+    if (s_song)
+        js_reset(s_song);
     jb_follow_init(&s_follow);
     jw_init(&s_weak, s_weak_store, NULL, 0, 1);    /* the frame count starts over with the tracker */
     jl_init(&s_lost);
@@ -648,12 +660,12 @@ static void follow_conf(const struct jk_cfg *cfg)
             double weak = jcf_weak_confidence(jw_strong(&s_weak), s_weak.n_strong, jw_seen(&s_weak), s_weak.n_seen,
                                               jw_weak(&s_weak), s_weak.n_weak, s_conf.line, s_conf.lines, has, period, now,
                                               JW_MIN_OBS, &s_weak.last_conf, &held);
-            /* LOST (the tuned follower with STOP / START): a bar of grid lines with no strong beat closes the gate; strong
-             * beats on the held grid again open it at once (the weak confidence judges it from there) */
+            /* LOST (the tuned follower with STOP / START): near silence, beats off the grid or (option) a new song close
+             * the gate; a drop of the same song holds it; beats or kicks on the held grid again open it at once */
             if (!s_follower && cfg->lowconf == JCF_STOP && cfg->threshold) {
                 uint8_t back = 0;
-                lost = (uint8_t)jl_step(&s_lost, jw_strong(&s_weak), s_weak.n_strong, has_bpm && has, tb, period, now,
-                                        s_conf_ran, &back);
+                lost = (uint8_t)jl_step(&s_lost, jw_strong(&s_weak), s_weak.n_strong, s_kick, has_bpm && has, tb, period,
+                                        now, s_conf_ran, s_song && cfg->newsong && js_new(s_song), &back);
                 if (back) {
                     s_gated = 0;
                     s_conf_ran = 1;
@@ -663,8 +675,11 @@ static void follow_conf(const struct jk_cfg *cfg)
             weak_picked = (uint8_t)(!s_gated && s_conf_ran);
             conf = jcf_weak_pick(strict, weak, s_gated, s_conf_ran);
         }
-    } else
+    } else {
         jl_clear(&s_lost);              /* silence or LINK mode: what comes next is new music */
+        if (s_song)
+            js_reset(s_song);
+    }
     /* shown: a hold eases toward the threshold instead of a frozen value (M2k); the gate below takes the real one */
     s_conf_hold = (uint8_t)(weak_picked && held);
     if (s_follower) {
@@ -689,7 +704,12 @@ static void follow_conf(const struct jk_cfg *cfg)
             use_graded = 1;
         }
     } else {
+        const uint8_t was = s_gated;
         s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
+        /* the user (2026-11-19): once the outputs run, a drop of the same song holds them: the confidence no longer stops
+         * them, LOST does (and silence, the follower giving up); the threshold decides the start */
+        if (cfg->lowconf == JCF_STOP && cfg->threshold && !was && s_conf_ran)
+            s_gated = 0;
         if (lost)
             s_gated = 1;
         s_coast = 0;
@@ -738,6 +758,8 @@ static void work(const int16_t *x, size_t n)
     jlv_push(&s_live, x, n);
     jcf_samples(&s_conf, sumsq, n);    /* the silence first: a block that begins it keeps none of its beats (engine.py) */
     s_prof[P_METER] += esp_cpu_get_cycle_count() - m0;
+    if (s_kick)
+        jbk_push_s16(s_kick, x, n);    /* the same samples as the tracker: its hop k is the tracker's frame k */
     jb_beat_push_s16(&s_b, x, n, on_frame, NULL);
     uint32_t cycles = esp_cpu_get_cycle_count() - c0;
     int64_t us = esp_timer_get_time() - t0;
@@ -941,6 +963,9 @@ static void beat_task(void *arg)
         app_cfg_get(&cfg);
         apply_autobar(&cfg);
         s_rate_cfg = cfg.rate;
+        if (s_song && cfg.newsong != s_song_on)
+            js_reset(s_song);           /* (switched on: the song is learnt from now) */
+        s_song_on = cfg.newsong;
         {
             uint8_t want = (uint8_t)(cfg.follower && s_robust_store && s_weak_store);
             uint8_t want_skip = want && cfg.skip <= JSK_PAT ? cfg.skip : 0;
@@ -1114,6 +1139,17 @@ esp_err_t beat_start(void)
     s_weak_store = heap_caps_malloc(sizeof *s_weak_store, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     jw_init(&s_weak, s_weak_store, NULL, 0, 1);
     jl_init(&s_lost);
+    s_kick = heap_caps_malloc(sizeof *s_kick, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_kick)
+        jbk_init(s_kick);
+    else
+        ESP_LOGW(TAG, "LOST: no PSRAM for the kick band, strong beats only");
+    s_song = heap_caps_malloc(sizeof *s_song, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_song) {
+        js_init(s_song);
+        ESP_LOGI(TAG, "NEW SONG: %u bytes in PSRAM (off until `set newsong on`)", (unsigned)sizeof *s_song);
+    } else
+        ESP_LOGW(TAG, "NEW SONG: no PSRAM, off");
     if (s_weak_store)
         ESP_LOGI(TAG, "WEAK: %u bytes + %u bytes in PSRAM", (unsigned)sizeof s_weak, (unsigned)sizeof *s_weak_store);
     else

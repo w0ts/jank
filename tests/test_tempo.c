@@ -9,8 +9,10 @@
  *                   confidences (to CONF_NEAR) and every gate decision (exact) are compared.
  *   NAME.nc.txt     the same with the study's look-ahead view (the whole activation pushed first): the port of weak.py
  *                   as it was measured
- * And LOST (core/beat/jb_lost.h, applied as firmware/main/beat.c follow_conf does): the stop and the return times pinned on
- * a synthetic track whose activation falls while the tracker keeps ticking on the grid. */
+ * And LOST (core/beat/jb_lost.h, applied as firmware/main/beat.c follow_conf does, the gate held once the outputs run):
+ * synthetic audio (a kick on the beats over a pad) and activation: a drop of the same song holds, near silence stops within
+ * 2 lines, the beat back runs again after 3; a weak activation with the kick there holds; jb_kick.h, the off-grid count
+ * and jb_song.h on their own. */
 #include <dirent.h>
 #include <math.h>
 #include <stdio.h>
@@ -18,7 +20,9 @@
 #include <string.h>
 #include "jank_conf.h"
 #include "jb_follow.h"
+#include "jb_kick.h"
 #include "jb_lost.h"
+#include "jb_song.h"
 #include "jb_weak.h"
 
 static int fails, checks, verbose;
@@ -109,6 +113,7 @@ struct run {
     struct jb_weak w;
     struct jcf conf;
     struct jb_lost lost;
+    const struct jb_kick *kick;         /* LOST's kick band and level (NULL: none) */
     uint8_t use_lost;                   /* LOST as beat.c (the golden runs: 0, as the Python) */
     uint8_t gated, was_running, is_lost;
     double now;
@@ -163,8 +168,8 @@ static void tick(struct run *r, int silent)
                                          JCF_WINDOW_S, JCF_DELAY_S, JCF_TOL);
         if (r->use_lost) {
             uint8_t back = 0;
-            r->is_lost = (uint8_t)jl_step(&r->lost, jw_strong(&r->w), r->w.n_strong, r->has_bpm && r->has_grid, r->t0, r->p,
-                                          now, r->was_running, &back);
+            r->is_lost = (uint8_t)jl_step(&r->lost, jw_strong(&r->w), r->w.n_strong, r->kick, r->has_bpm && r->has_grid, r->t0,
+                                          r->p, now, r->was_running, 0, &back);
             if (back) {
                 r->gated = 0;
                 r->was_running = 1;
@@ -176,7 +181,12 @@ static void tick(struct run *r, int silent)
         jl_clear(&r->lost);
         r->is_lost = 0;
     }
-    r->gated = jcf_gate(r->gated, r->c, JCF_STOP, THRESHOLD);
+    {
+        const uint8_t was = r->gated;
+        r->gated = jcf_gate(r->gated, r->c, JCF_STOP, THRESHOLD);
+        if (r->use_lost && !was && r->was_running)
+            r->gated = 0;               /* (beat.c: once running, the confidence no longer stops the outputs; LOST does) */
+    }
     if (r->is_lost)
         r->gated = 1;
     r->running = r->has_bpm && !r->gated && !silent;
@@ -421,17 +431,36 @@ static void test_weak_confidence(void)
     CHECK(jcf_weak_pick(0.3, 0.9, 1, 1) == 0.3 && jcf_weak_pick(0.3, 0.9, 0, 0) == 0.3 && jcf_weak_pick(0.3, 0.9, 0, 1) == 0.9);
 }
 
-/* LOST on a synthetic 120 BPM track (period 0.5 s): a beat every 0.5 s from 1 s to 80 s, the activation 0.8 at the beats
- * (0.01 between), except [gap_from, gap_to) where it is 0.01 at the beats too: the DBN keeps ticking on the grid from its
- * tempo model, as in a breakdown. Fed as beat.c does: the activation per frame, a beat 3 frames late, the coast, the step
- * every 0.25 s and after each beat. *stop / *back: the first stop at or after gap_from, the first run again after it
- * (-1: none); returns the share of the steps from 20 s to gap_from that ran. */
+/* LOST on a synthetic track at 120 BPM (beats every 0.5 s from 1.0 s). Audio: a pad (330 Hz, -23 dBFS) and a kick (60 Hz,
+ * 50 ms decay) on the beats; the activation 0.8 on the beats, 0.01 between. From `from` to `to` the passage KIND:
+ *   DROP  no kick, activation 0.01 (the DBN keeps ticking on the grid from its tempo model): a drop of the same song
+ *   QUIET everything 40 dB down (over the -60 dBFS silence gate, under the song by more than JL_QUIET_REL)
+ *   WEAK  the kick plays, the activation is 0.01 (the online network deaf to it, as on Rhyw - Driptych)
+ * Fed as beat.c does: the samples to the kick band, the activation per frame, a beat 3 frames late, the coast, the step
+ * every 0.25 s and after each beat. stop / back: the first stop at or after `from`, the first run again after it (-1:
+ * none); ran_before: the share of the steps from 20 s to `from` that ran. */
+enum lost_kind { LK_DROP, LK_QUIET, LK_WEAK };
+
 struct lost_res {
     double stop, back, ran_before;
     int stops;
 };
 
-static struct lost_res lost_run(int use_lost, double gap_from, double gap_to)
+static struct jb_kick s_kick;
+
+/* one hop of the synthetic audio: the pad, and the kick that began at kick_t (< 0: none) */
+static void synth_hop(int16_t *x, double now, double kick_t, double gain)
+{
+    for (int i = 0; i < 441; i++) {
+        const double ts = now + i / 44100.0;
+        double v = 0.1 * sin(2 * M_PI * 330.0 * ts);
+        if (kick_t >= 0 && ts >= kick_t)
+            v += 0.7 * exp(-(ts - kick_t) / 0.05) * sin(2 * M_PI * 60.0 * (ts - kick_t));
+        x[i] = (int16_t)lrint(32767.0 * gain * v);
+    }
+}
+
+static struct lost_res lost_run(int use_lost, enum lost_kind kind, double from, double to)
 {
     static struct run r;
     struct lost_res o = {-1.0, -1.0, 0.0, 0};
@@ -440,15 +469,22 @@ static struct lost_res lost_run(int use_lost, double gap_from, double gap_to)
     jcf_init(&r.conf);
     jw_init(&r.w, &s_store, NULL, 0, 1);
     jl_init(&r.lost);
+    jbk_init(&s_kick);
+    r.kick = &s_kick;
     r.use_lost = (uint8_t)use_lost;
     int64_t pend = -1;
-    double last_step = 0.0;
+    double last_step = 0.0, kick_t = -1.0;
     int was = 0, before = 0, before_n = 0;
+    int16_t x[441];
     for (int64_t k = 0; k < 8000; k++) {
-        double now = (double)k / JW_FPS;
-        int beat_frame = k >= 100 && (k - 100) % 50 == 0;
-        int in_gap = now >= gap_from && now < gap_to;
-        jw_act(&r.w, k, beat_frame && !in_gap ? 0.8f : 0.01f);
+        const double now = (double)k / JW_FPS;
+        const int beat_frame = k >= 100 && (k - 100) % 50 == 0;
+        const int in = now >= from && now < to;
+        if (beat_frame)
+            kick_t = in && kind == LK_DROP ? -1.0 : now;
+        synth_hop(x, now, kick_t, in && kind == LK_QUIET ? 0.01 : 1.0);
+        jbk_push_s16(&s_kick, x, 441);
+        jw_act(&r.w, k, beat_frame && !in ? 0.8f : 0.01f);
         if (beat_frame)
             pend = k;
         int fed = 0;
@@ -463,13 +499,13 @@ static struct lost_res lost_run(int use_lost, double gap_from, double gap_to)
         last_step = now;
         r.now = now;
         tick(&r, 0);
-        if (now >= 20.0 && now < gap_from) {
+        if (now >= 20.0 && now < from) {
             before += r.running;
             before_n++;
         }
         if (was && !r.running && now >= 20.0)
             o.stops++;
-        if (o.stop < 0 && now >= gap_from && !r.running)
+        if (o.stop < 0 && now >= from && !r.running)
             o.stop = now;
         if (o.stop >= 0 && o.back < 0 && r.running)
             o.back = now;
@@ -479,44 +515,104 @@ static struct lost_res lost_run(int use_lost, double gap_from, double gap_to)
     return o;
 }
 
-static void test_lost(void)
+static void test_kick_unit(void)
 {
-    /* a 20 s breakdown after the last strong beat at 39.5 s: today the outputs run through it */
-    struct lost_res now = lost_run(0, 39.75, 60.0);
-    printf("lost: today: ran %.2f before, stop at %.2f s (beat gone after 39.5 s)\n", now.ran_before, now.stop);
-    CHECK(now.ran_before > 0.99 && (now.stop < 0 || now.stop >= 60.0));
-    /* LOST: stopped once a bar of lines (40.0 .. 41.5) is judged, a period + 50 ms after the 4th: at 42.05 s, the next step
-     * (0.25 s apart) at the latest; strong beats back from 60.0 s: running again once 4 lines (60.0 .. 61.5) are judged */
-    struct lost_res lo = lost_run(1, 39.75, 60.0);
-    printf("lost: LOST: ran %.2f before, stop %.2f s after the last strong beat, back %.2f s after the first, %d stops\n",
-           lo.ran_before, lo.stop - 39.5, lo.back - 60.0, lo.stops);
-    CHECK(lo.ran_before > 0.99);
-    CHECK(lo.stop >= 39.5 + 4 * 0.5 + 0.5 + JL_LAG_S && lo.stop <= 39.5 + 4 * 0.5 + 0.5 + JL_LAG_S + 0.25);
-    CHECK(lo.back >= 60.0 + 3 * 0.5 + 0.5 + JL_LAG_S && lo.back <= 60.0 + 3 * 0.5 + 0.5 + JL_LAG_S + 0.25);
-    CHECK(lo.stops == 1);
-    /* a fill: 3 lines with no strong beat (40.0, 40.5, 41.0) do not stop */
-    struct lost_res fill = lost_run(1, 39.75, 41.25);
-    printf("lost: a 3-line fill: %d stops, ran %.2f before\n", fill.stops, fill.ran_before);
-    CHECK(fill.stops == 0 && fill.ran_before > 0.99);
-    /* a steady beat: never */
-    struct lost_res steady = lost_run(1, 1000.0, 1000.0);
-    CHECK(steady.stops == 0 && steady.ran_before > 0.99);
-    /* the module alone: no grid, not running, a new grid seeded 2 s back */
+    /* kicks at 10.0 s and 10.5 s over the pad: evidence on those lines, none a quarter period off, none with no kick */
+    jbk_init(&s_kick);
+    int16_t x[441];
+    for (int64_t k = 0; k < 1200; k++) {
+        const double now = (double)k / 100.0;
+        synth_hop(x, now, now >= 11.0 ? -1.0 : now >= 10.5 ? 10.5 : now >= 10.0 ? 10.0 : -1.0, 1.0);
+        jbk_push_s16(&s_kick, x, 441);
+    }
+    CHECK(s_kick.frames == 1200);
+    CHECK(jbk_on_line(&s_kick, 10.0, 0.5, JL_TOL) && jbk_on_line(&s_kick, 10.5, 0.5, JL_TOL));
+    CHECK(!jbk_on_line(&s_kick, 10.25, 0.5, JL_TOL) && !jbk_on_line(&s_kick, 11.0, 0.5, JL_TOL));
+    CHECK(!jbk_on_line(&s_kick, 5.0, 0.5, JL_TOL));                      /* no longer in the ring (2.56 s) */
+    const double lv = jbk_line_level(&s_kick, 11.0, 0.5);                 /* the pad alone: 0.1 x full scale, -23 dBFS */
+    CHECK(lv > -24.0 && lv < -22.0);
+    CHECK(jbk_line_level(&s_kick, 11.8, 0.5) == JBK_NONE);                 /* frames not in yet */
+}
+
+static void test_lost_unit(void)
+{
     struct jb_lost l;
     jl_init(&l);
-    double strong[1] = {0.0};
     uint8_t back = 9;
-    CHECK(jl_step(&l, strong, 0, 0, 0.0, 0.5, 10.0, 1, &back) == 0 && back == 0 && l.next_line < 0);
-    /* seeded at 8.0 s: lines 8.0 .. 9.5 judged by 10.05 s (a period + JL_LAG_S after each) */
-    CHECK(jl_step(&l, strong, 0, 1, 0.0, 0.5, 10.0, 1, &back) == 0 && l.miss_run == JL_LOST_LINES - 1);
-    CHECK(jl_step(&l, strong, 0, 1, 0.0, 0.5, 10.05, 0, &back) == 0 && l.miss_run == JL_LOST_LINES);   /* not running */
-    CHECK(jl_step(&l, strong, 0, 1, 0.0, 0.5, 10.1, 1, &back) == 1 && l.losts == 1);
-    /* strong beats on 4 lines in a row: back */
-    double on[4] = {10.0, 10.5, 11.0, 11.5};
-    CHECK(jl_step(&l, on, 3, 1, 0.0, 0.5, 11.6, 1, &back) == 1 && back == 0);
-    CHECK(jl_step(&l, on, 4, 1, 0.0, 0.5, 12.1, 0, &back) == 0 && back == 1 && l.ev_run == JL_BACK_LINES);
+    const double none[1] = {0.0};
+    CHECK(jl_step(&l, none, 0, NULL, 0, 0.0, 0.5, 10.0, 1, 0, &back) == 0 && back == 0 && l.next_line < 0);
+    /* a new grid is judged from JL_SEED_S back: at 12.05 s the lines 10.0 .. 11.5 (each a period + JL_LAG_S after it).
+     * No beat, no kick band: they hold (nothing counts) */
+    CHECK(jl_step(&l, none, 0, NULL, 1, 0.0, 0.5, 12.05, 1, 0, &back) == 0 && l.unfit_run == 4 && l.off_n == 0 && !l.lost);
+    /* strong beats 0.2 period off the grid: OFF once JL_OFF_LINES lines are judged (10.0 .. 13.5, by 14.05 s) */
     jl_clear(&l);
-    CHECK(!l.lost && l.next_line < 0 && l.losts == 1);
+    double off[16];
+    for (int i = 0; i < 16; i++)
+        off[i] = 10.1 + 0.5 * i;
+    CHECK(jl_step(&l, off, 16, NULL, 1, 0.0, 0.5, 12.05, 1, 0, &back) == 0 && l.off_n == 4);
+    CHECK(jl_step(&l, off, 16, NULL, 1, 0.0, 0.5, 14.05, 1, 0, &back) == 1 && l.cause == JLO_OFF && l.losts[JLO_OFF] == 1);
+    /* strong beats on the grid again (14.0, 14.5, 15.0): back once JL_BACK_LINES are judged */
+    const double fit[3] = {14.0, 14.5, 15.0};
+    CHECK(jl_step(&l, fit, 3, NULL, 1, 0.0, 0.5, 15.05, 0, 0, &back) == 1 && back == 0 && l.fit_run == 2);
+    CHECK(jl_step(&l, fit, 3, NULL, 1, 0.0, 0.5, 15.55, 0, 0, &back) == 0 && back == 1 && l.fit_run == JL_BACK_LINES);
+    /* a new song (the option) counts only after JL_SONG_LINES lines with no fit (15.5 .. 17.0) */
+    CHECK(jl_step(&l, fit, 3, NULL, 1, 0.0, 0.5, 16.55, 1, 1, &back) == 0 && l.unfit_run == 2);
+    CHECK(jl_step(&l, fit, 3, NULL, 1, 0.0, 0.5, 17.55, 1, 1, &back) == 1 && l.cause == JLO_SONG && l.unfit_run == JL_SONG_LINES);
+    jl_clear(&l);
+    CHECK(!l.lost && l.next_line < 0 && l.losts[JLO_SONG] == 1 && l.losts[JLO_OFF] == 1);
+}
+
+static void test_song_unit(void)
+{
+    /* 40 s of one harmony, then another: NEW within JS_RECENT blocks of the change; one harmony all along: never */
+    static struct jb_song s;
+    js_init(&s);
+    float a[JS_BANDS], b[JS_BANDS];
+    int used = 0;
+    for (int i = 0; i < JS_BANDS; i++) {
+        used += s.pc[i] >= 0;
+        a[i] = s.pc[i] == 0 || s.pc[i] == 4 || s.pc[i] == 7 ? 1.0f : 0.2f;     /* C E G */
+        b[i] = s.pc[i] == 1 || s.pc[i] == 6 || s.pc[i] == 10 ? 1.0f : 0.2f;    /* C# F# A# */
+    }
+    CHECK(used >= 30);
+    int first_new = -1;
+    for (int f = 0; f < 6000; f++) {
+        js_frame(&s, f < 4000 ? a : b);
+        if (first_new < 0 && js_new(&s))
+            first_new = f;
+    }
+    CHECK(first_new >= 4000 && first_new < 4000 + JS_RECENT * JS_BLOCK);
+    js_reset(&s);
+    int any = 0;
+    for (int f = 0; f < 12000; f++) {
+        js_frame(&s, a);
+        any |= js_new(&s);
+    }
+    CHECK(!any && s.n_blocks == JS_BLOCKS);
+}
+
+static void test_lost(void)
+{
+    /* a 20 s drop of the same song after the last beat at 39.5 s: held through */
+    const struct lost_res drop = lost_run(1, LK_DROP, 39.75, 60.0);
+    printf("lost: a drop: %d stops, ran %.2f before\n", drop.stops, drop.ran_before);
+    CHECK(drop.ran_before > 0.99 && drop.stops == 0 && drop.stop < 0);
+    /* near silence (40 dB down) from 39.75 s: lines 40.0 and 40.5 quiet, judged a period + JL_LAG_S after: stopped by
+     * 41.05 s (the next step, 0.25 s, at the latest); the music back at 60.0 s: 3 lines (60.0 .. 61.0) fitted by 61.55 s */
+    const struct lost_res q = lost_run(1, LK_QUIET, 39.75, 60.0);
+    printf("lost: near silence: stop %.2f s after it began, back %.2f s after the beat, %d stops\n", q.stop - 39.75,
+           q.back - 60.0, q.stops);
+    CHECK(q.ran_before > 0.99 && q.stops == 1);
+    CHECK(q.stop >= 40.5 + 0.5 + JL_LAG_S && q.stop <= 40.5 + 0.5 + JL_LAG_S + 0.25);
+    CHECK(q.back >= 61.0 + 0.5 + JL_LAG_S && q.back <= 61.0 + 0.5 + JL_LAG_S + 0.25);
+    /* the kick there, the network deaf to it: held; a steady beat: never stopped */
+    const struct lost_res w = lost_run(1, LK_WEAK, 39.75, 60.0);
+    CHECK(w.ran_before > 0.99 && w.stops == 0 && w.stop < 0);
+    const struct lost_res steady = lost_run(1, LK_DROP, 1000.0, 1000.0);
+    CHECK(steady.stops == 0 && steady.ran_before > 0.99);
+    test_kick_unit();
+    test_lost_unit();
+    test_song_unit();
 }
 
 int main(int argc, char **argv)

@@ -5,6 +5,8 @@
  *   - the tuned chain of firmware/main/beat.c (activation -> DBN -> weak follower -> lines -> gate) replayed on the real
  *     activations of tests/beat_ref and the synthetic tracks of tests/robust_ref, twice: with the graded value computed at
  *     every step and without; the gate's confidence, the gate, the tempo, the grid and the lines must be bit for bit the same
+ *   - the device's clock: the stream time runs ~2 frames ahead of the newest activation frame; the value must not lose its
+ *     comb (tempo) part for it (until 2026-11-19 it did: the value shown on the jank never passed 75 %)
  *   - `test_graded DIR... --report`: the distribution of the gate's value and of the graded one (percent at 0, at 100, between)
  * Exit status: the number of failed checks. */
 #include <dirent.h>
@@ -85,6 +87,37 @@ static void test_parts(void)
     }
     /* the mean is clipped, the parts are all 0..1 */
     CHECK(jg_graded(1, 1, 1, 1) == 1.0 && jg_graded(0, 0, 0, 0) == 0.0 && fabs(jg_graded(1, 0, 0, 0) - 0.25) < 1e-12);
+}
+
+/* the device's view: a steady 120 BPM activation (a peak every 50 frames), its DBN, beats and lines on the grid; the value at
+ * the newest frame and 2.3 frames later (the stream clock of beat.c's follow_conf) must be the same, and high */
+static void test_device_clock(void)
+{
+    static struct jrb_store st;
+    static struct jb_robust rb;
+    static struct jb_dbn dbn;
+    double beats[N], lines[N], t = 0.0;
+    jrb_init(&rb, &st);
+    CHECK(jb_dbn_init(&dbn, 90.0, 180.0, 100.0) == 0);
+    const int frames = 1200;
+    for (int k = 0; k < frames; k++) {
+        const float a = k % 50 == 0 ? 0.9f : k % 50 == 1 || k % 50 == 49 ? 0.3f : 0.02f;
+        jrb_act(&rb, k, a);
+        jb_dbn_step(&dbn, a, &t);
+    }
+    size_t n = 0;
+    for (int k = 100; k < frames - 20 && n < N; k += 50, n++)
+        beats[n] = lines[n] = (double)k / 100.0;
+    const double last = (double)(frames - 1) / 100.0, dev = last + 0.023;
+    struct jg_tuned g1, g2;
+    jg_tuned_reset(&g1);
+    jg_tuned_reset(&g2);
+    const double v_last = jg_tuned_step(&g1, &rb, &dbn, beats, n, lines, n, 1, 0.5, last);
+    const double v_dev = jg_tuned_step(&g2, &rb, &dbn, beats, n, lines, n, 1, 0.5, dev);
+    printf("graded: the device's clock: %.3f (at the newest frame %.3f, its comb part %.3f)\n", v_dev, v_last,
+           jrb_tempo_agreement(&rb, last, 0.5));
+    CHECK(jrb_tempo_agreement(&rb, last, 0.5) > 0.9);
+    CHECK(v_last > 0.9 && fabs(v_dev - v_last) < 0.01);       /* (soft F reads its window at each `now`) */
 }
 
 /* ---- the tuned chain ---- */
@@ -336,6 +369,7 @@ int main(int argc, char **argv)
             synth_dir = argv[i];
     }
     test_parts();
+    test_device_clock();
     test_dir(real_dir, 0, &real, &runs_real);
     test_dir(synth_dir, 1, &synth, &runs_synth);
     CHECK(runs_real >= 3 && runs_synth >= 10);

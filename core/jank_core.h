@@ -173,6 +173,8 @@ struct jk_cfg {
     uint8_t skip;                     /* SKIP (core/beat/jb_skip.h, on the robust follower): 0 off, 1 ACT, 2 PAT. Not stored */
     uint8_t graded;                   /* the shown confidence is the graded one (core/beat/jb_graded.h, both followers): display only;
                                          0 off, 1 on (the default). Not stored: 1 again at every start. The gate never uses it */
+    uint8_t newsong;                  /* NEW SONG (core/beat/jb_song.h): LOST also stops the outputs when a beat-less passage's
+                                         harmony is not the song's (a new song's intro). 0 off (the default), 1 on. Not stored */
     /* Stored apart from the blob above (store.c, key "usb1"), so the blob stays 130: USB host mode (core/jank_usbrole.h)
      * and AUTO BAR */
     uint8_t autobar;                  /* enum jk_autobar: the downbeat estimator puts the session's bar on the music's 1 */
