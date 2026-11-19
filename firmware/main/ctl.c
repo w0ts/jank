@@ -144,6 +144,8 @@ static void run_line(const char *line)
     usbrole_snapshot(&s_snap.usb);
     uis_sys(&s_snap.sys);
     s_snap.lead = (uint8_t)uis_lead_get();
+    s_snap.sleep = (uint8_t)uis_sleep_get();
+    s_snap.bright = (uint8_t)uis_bright_get();
     a = jk_ctl_line(line, &cfg, &s_snap, bridge_ms(), s_out, sizeof s_out);
     if (a == JK_CTL_CFG_CHANGED)
         app_cfg_set(&cfg);
@@ -151,6 +153,15 @@ static void run_line(const char *line)
         int on;
         if (!jk_ctl_lead(line, &on))
             uis_lead_set(on);
+    }
+    if (a == JK_CTL_DISPLAY) {
+        int br, v;
+        if (!jk_ctl_display(line, &br, &v)) {
+            if (br)
+                uis_bright_set(v);
+            else
+                uis_sleep_set(v);
+        }
     }
     if (a == JK_CTL_SCAN) {
         run_scan();

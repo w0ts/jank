@@ -33,6 +33,7 @@ static void setup(void)
     snap.uptime_s = 12;
     strcpy(snap.board, "lcd2");
     snap.lead = 1;                        /* the menu's default: FOLLOW+LEAD */
+    snap.bright = 100;                    /* the menu's defaults: BRIGHTNESS 100 %, SCREEN OFF NEVER (snap.sleep 0) */
 }
 
 static enum jk_ctl_action run(const char *line)
@@ -122,7 +123,7 @@ static void test_lead(void)
     int on = -1;
     static char big[4096];
     setup();
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "transport=link\nquantum=4\noffset=0.00\nlead=on\nbeat=on\n"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "transport=link\nquantum=4\noffset=0.00\nlead=on\nsleep=never\nbright=100\nbeat=on\n"));
     snap.lead = 0;
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlead=off\n"));
     before = cfg;
@@ -133,10 +134,49 @@ static void test_lead(void)
     CHECK(run("set lead maybe") == JK_CTL_NONE && !strcmp(out, "err bad setting\n"));
     CHECK(run("set lead 1") == JK_CTL_NONE && run("set lead ON") == JK_CTL_NONE && run("set leadx on") == JK_CTL_NONE);
     CHECK(jk_ctl_lead("set lead maybe", &on) && jk_ctl_lead("set transport link", &on) && jk_ctl_lead("get", &on));
-    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|transport|lead|quantum|"));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|transport|lead|sleep|"));
     snap.lead = 1;
     memset(snap.board, 'x', 11);
     cfg.name[0] = 0;
+    memset(cfg.name, 'n', JK_NAME_MAX);
+    memset(cfg.ssid, 's', JK_SSID_MAX);
+    CHECK(jk_ctl_line("get", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
+    printf("longest get: %zu bytes (limit %u)\n", strlen(big), (unsigned)JK_CTL_OUT_MAX);
+    CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
+}
+
+/* SCREEN OFF and BRIGHTNESS are the menu's own preferences too: get reads snap.sleep / snap.bright, `set sleep` / `set bright` are an action carrying the value */
+static void test_display(void)
+{
+    static const char *const NAMES[4] = {"never", "30s", "1min", "5min"};
+    struct jk_cfg before;
+    char line[32];
+    int br = -1, v = -1;
+    static char big[4096];
+    setup();
+    for (int i = 0; i < 4; i++) {
+        snap.sleep = (uint8_t)i;
+        snprintf(line, sizeof line, "set sleep %s", NAMES[i]);
+        CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nsleep=") && !strncmp(strstr(out, "sleep=") + 6, NAMES[i], strlen(NAMES[i])));
+        br = -1;
+        CHECK(run(line) == JK_CTL_DISPLAY && !strcmp(out, "ok\n") && !jk_ctl_display(line, &br, &v) && br == 0 && v == i);
+    }
+    snap.bright = 40;
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nbright=40\n"));
+    before = cfg;
+    CHECK(run("set bright 10") == JK_CTL_DISPLAY && !strcmp(out, "ok\n") && !jk_ctl_display("set bright 10", &br, &v) && br == 1 && v == 10);
+    CHECK(run("set bright 100") == JK_CTL_DISPLAY && !jk_ctl_display("  set bright 70 \r\n", &br, &v) && br == 1 && v == 70);
+    CHECK(!memcmp(&cfg, &before, sizeof cfg));
+    CHECK(run("set sleep") == JK_CTL_NONE && !strcmp(out, "err bad setting\n"));
+    CHECK(run("set sleep 30") == JK_CTL_NONE && run("set sleep NEVER") == JK_CTL_NONE && run("set sleep 2") == JK_CTL_NONE && run("set sleepx never") == JK_CTL_NONE);
+    CHECK(run("set bright") == JK_CTL_NONE && !strcmp(out, "err bad setting\n"));
+    CHECK(run("set bright 9") == JK_CTL_NONE && run("set bright 101") == JK_CTL_NONE && run("set bright 0") == JK_CTL_NONE && run("set bright -10") == JK_CTL_NONE);
+    CHECK(run("set bright 5x") == JK_CTL_NONE && run("set bright 1000") == JK_CTL_NONE && run("set bright ") == JK_CTL_NONE && run("set brightx 50") == JK_CTL_NONE);
+    CHECK(jk_ctl_display("set bright 9", &br, &v) && jk_ctl_display("set sleep x", &br, &v) && jk_ctl_display("set lead on", &br, &v) && jk_ctl_display("get", &br, &v));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|lead|sleep|bright|quantum|"));
+    snap.sleep = 3;
+    snap.bright = 100;
+    memset(snap.board, 'x', 11);
     memset(cfg.name, 'n', JK_NAME_MAX);
     memset(cfg.ssid, 's', JK_SSID_MAX);
     CHECK(jk_ctl_line("get", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
@@ -793,6 +833,7 @@ int main(void)
     test_status_size();
     test_about();
     test_lead();
+    test_display();
     test_save();
     test_intr_summary();
     printf("ctl: %d checks, %d failed\n", checks, fails);
