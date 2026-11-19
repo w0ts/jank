@@ -121,14 +121,16 @@ static int level_ink(const struct jo_ctx *c)
     return c->level_db < QUIET_DB ? JO_INK_WARN : JO_INK_NONE;
 }
 
-static int conf_ink(const struct jo_ctx *c)
+static int conf_ink_at(const struct jo_ctx *c, int th)
 {
     int pct;
     if (c->conf_unknown || c->silent)
         return JO_INK_DIM;
     pct = jo_iround(c->conf * 100);
-    return pct < c->th ? JO_INK_BAD : pct <= c->th + CONF_WARN_MARGIN ? JO_INK_WARN : JO_INK_GOOD;
+    return pct < th ? JO_INK_BAD : pct <= th + CONF_WARN_MARGIN ? JO_INK_WARN : JO_INK_GOOD;
 }
+
+static int conf_ink(const struct jo_ctx *c) { return conf_ink_at(c, c->th); }
 
 static const char *fold_label(int8_t exp)
 {
@@ -488,20 +490,28 @@ static void info(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
         jo_text(fb, rows[i], 8, 36 + i * 24, 1, 1);
 }
 
-static void edit(uint8_t *fb, const struct jo_ui *ui)
+static void edit(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
     const struct jo_spec *sp = jo_spec_l(ui->edit.field, 1);
     const char *h1, *h2;
     char s[24];
     int sc, w, h, x;
     title_bar(fb, sp->title, NULL);
-    jo_edit_text(sp, ui->edit.val, s, sizeof s);
-    sc = jo_text_w(s, 2) + 32 <= W - 8 ? 2 : 1;       /* the value in the biggest of two sizes that fits */
-    w = jo_text_w(s, sc) + 32;
-    h = 14 * sc + 16;
-    x = jo_iround((double)(W - w) / 2.0);
-    jo_rect(fb, x, 48, w, h, 1);
-    jo_text(fb, s, x + 16, 56, sc, 0);
+    if (ui->edit.field == JO_F_THRESHOLD) {          /* the live CONFIDENCE line, its notch the threshold UP / DOWN moves: no digits for it */
+        if (c->conf_unknown)
+            snprintf(s, sizeof s, "--");
+        else
+            snprintf(s, sizeof s, "%d%%", jo_iround(c->conf * 100));
+        line_row(fb, 80, "CONFIDENCE", s, c->conf_unknown ? 0.0 : c->conf, ui->edit.val / 100.0, conf_ink_at(c, ui->edit.val));
+    } else {
+        jo_edit_text(sp, ui->edit.val, s, sizeof s);
+        sc = jo_text_w(s, 2) + 32 <= W - 8 ? 2 : 1;   /* the value in the biggest of two sizes that fits */
+        w = jo_text_w(s, sc) + 32;
+        h = 14 * sc + 16;
+        x = jo_iround((double)(W - w) / 2.0);
+        jo_rect(fb, x, 48, w, h, 1);
+        jo_text(fb, s, x + 16, 56, sc, 0);
+    }
     jo_help_of(sp, ui->edit.val, &h1, &h2);
     jo_text_c(fb, h1, 140, 1, 1);
     jo_text_c(fb, h2, 164, 1, 1);
@@ -746,7 +756,7 @@ static void screen(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c, 
         case JO_MENU: menu(fb, ui, c); break;
         case JO_SUB: sub(fb, ui, c); break;
         case JO_INFO: info(fb, ui, c); break;
-        case JO_EDIT: edit(fb, ui); break;
+        case JO_EDIT: edit(fb, ui, c); break;
         default: break;
         }
     overlays(fb, ui, now);
