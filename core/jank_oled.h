@@ -105,6 +105,7 @@ struct jo_ctx {
     uint8_t conf_stop;
     double level_db, level_min, level_max;   /* the input meter, dBFS */
     uint8_t running, armed;               /* the transport icon */
+    uint8_t held;                         /* the user's hold (Stop pressed, either mode): not running and not armed shows a square when held, a pause when not */
     uint8_t tracker_leads;                /* AUDIO with the tracker owning tempo and transport: UP / DOWN / YES only say so */
     uint8_t no_beat_nudge, no_ms_nudge;   /* NO + UP/DOWN, YES + UP/DOWN not available: they say TRACKER LEADS */
     uint8_t has_beat;

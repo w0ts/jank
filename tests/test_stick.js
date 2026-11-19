@@ -50,13 +50,13 @@ eq([stale.bpm, stale.levelDb, stale.running], [null, -99, false], 'a HOME line o
 
 // ---- AUDIO and LINK mode from the HOME line ----
 const a = Stick.ctx(state(), 1000);
-eq([a.link, a.bpm, a.linkBpm, a.conf, a.levelDb, a.levelMin, a.levelMax, a.running, a.armed, a.hold, a.peers, a.groupPeers, a.fitted, a.batt, a.fold, a.xiao],
+eq([a.link, a.bpm, a.linkBpm, a.conf, a.levelDb, a.levelMin, a.levelMax, a.running, a.armed, a.held, a.peers, a.groupPeers, a.fitted, a.batt, a.fold, a.xiao],
    [false, 120, null, 0.87, -24, -31, -18, true, false, false, 2, 0, true, 64, 1, true], 'AUDIO: the tracker tempo, the meter, the transport, the peers, the battery');
 const l = Stick.ctx(state({ home: LINK }), 1000);
 eq([l.link, l.bpm, l.linkBpm, l.running], [true, null, 120, true], "LINK: the session's tempo, no tracker tempo");
 eq(Stick.ctx(state({ home: home('h 12000 j3 1 275 4 2 0 64 -24 87 -31 -18 x2') }), 1000).fold, 2, 'the fold from the mode token');
 eq(Stick.ctx(state({ home: home('h 6400 j3 1 275 4 2 0 64 -24 87 -31 -18 /2') }), 1000).fold, 0.5, '/2');
-eq(Stick.ctx(state({ home: home('h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1') }), 1000).hold, true, 'transport stopped in AUDIO mode: held');
+eq(Stick.ctx(state({ home: home('h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1') }), 1000).held, true, 'transport stopped in AUDIO mode: held');
 const armed = Stick.ctx(state({ home: home('h 12000 j3 2 275 4 2 0 64 -24 87 -31 -18 1') }), 1000);
 eq([armed.armed, armed.running], [true, false], 'transport armed: the blinking triangle, not running');
 const hold = Stick.ctx(state({ home: home('h 12000 j3 1 275 4 2 0 - -24 87h -31 -18 1') }), 1000);
@@ -92,9 +92,9 @@ eq([airOld.airLost, airOld.airRetry, airOld.rssiMin, airOld.rssiMax], [null, nul
 // ---- held by the user, or stopped by the silence / the gate (the status says which) ----
 {
   const stopped = home('h 12000 j3 0 275 4 2 0 64 -24 87 -31 -18 1');
-  eq(Stick.ctx(state({ home: stopped }), 1000).hold, true, 'transport stopped, no status: held');
-  eq(Stick.ctx(state({ home: stopped, status: { ...status, hold: '1' }, statusAt: 1000 }), 1100).hold, true, 'status hold=1: held');
-  eq(Stick.ctx(state({ home: stopped, status: { ...status, hold: '0', silent: '1' }, statusAt: 1000 }), 1100).hold, false, 'status hold=0: not the user\'s hold');
+  eq(Stick.ctx(state({ home: stopped }), 1000).held, true, 'transport stopped, no status: held');
+  eq(Stick.ctx(state({ home: stopped, status: { ...status, hold: '1' }, statusAt: 1000 }), 1100).held, true, 'status hold=1: held');
+  eq(Stick.ctx(state({ home: stopped, status: { ...status, hold: '0', silent: '1' }, statusAt: 1000 }), 1100).held, false, 'status hold=0: not the user\'s hold');
   eq(Stick.ctx(state({ home: stopped, status: { ...status, silent: '1' }, statusAt: 1000 }), 1100).silent, true, 'status silent=1: silent, whatever the meter says');
 }
 

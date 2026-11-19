@@ -47,8 +47,8 @@ function world(state) {
     state.bpm = state.bpm ? (d > 0 ? state.bpm * 2 : state.bpm / 2) : 0;
     return state.bpm;
   };
-  const setHold = on => { log.push('hold ' + (on ? 1 : 0)); state.running = !on; };
-  const linkStartStop = on => { log.push('lss ' + (on ? 1 : 0)); state.running = on; };
+  const setHold = on => { log.push('hold ' + (on ? 1 : 0)); state.running = !on; state.held = !!on; };
+  const linkStartStop = on => { log.push('lss ' + (on ? 1 : 0)); state.running = on; state.held = !on; };
   const ctx = () => Object.assign({}, state, { setup: state.net.mode === 3, qr: QR.encode('WIFI:S:' + state.net.setupName + ';T:nopass;;'),
                                                net: state.net, tempoStep, setField, setHold, linkStartStop });
   const ui = OLED.create();

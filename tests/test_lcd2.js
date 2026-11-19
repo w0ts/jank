@@ -356,8 +356,14 @@ const grpAt = text => L.nameXR - textW(text);
   eq([Math.min(...ch), Math.max(...ch), litCols(d, 0, 26).filter(x => x >= L.linkX && x < L.linkX + L.linkW).length > 19], [6, 19, true], 'the chain is 14 rows high, centred in the bar (y 6..19), 19 wide (the Optimist\'s icon)');
   eq([isText(d, 'GRP 1', grpAt('GRP 1'), 6, null), litIn(d, 58, 0, grpAt('GRP 1') - 59, 26).length, litIn(d, L.nameXR, 0, L.linkX - L.nameXR, 26).length], [true, 0, 0], 'GRP n sits next to the chain (right-aligned to x 186, 8 px before it); the middle of the bar is free (x 58..' + (grpAt('GRP 1') - 1) + ')');
   eq(litIn(d, 22, 0, 6, 26).length, 0, 'nothing between the transport icon and the LINK icon (x 22..27)');
-  const stop = drawn(ctxOf({ ctx: { running: false, armed: false } }));
-  eq([litIn(stop, 4, 4, 18, 18).length, litIn(stop, 4, 2, 18, 2).length, litIn(stop, 4, 22, 18, 2).length], [324, 0, 0], 'stopped: an 18 x 18 square at x 4..21, y 4..21');
+  // the four transport states, from the HOME line and the status (held = status hold=1; hold=0 with the outputs not running = the machine layer holds them)
+  const st = (transport, hold) => drawn(ctxOf({ home: { transport } }, { status: { rssi: '-55', peak_db: '-12', hold } }));
+  const stop = st('stopped', '1'), pause = st('stopped', '0'), armedOn = st('armed', '0');
+  eq([litIn(stop, 4, 4, 18, 18).length, litIn(stop, 4, 2, 18, 2).length, litIn(stop, 4, 22, 18, 2).length], [324, 0, 0], 'user stopped (hold=1): an 18 x 18 square at x 4..21, y 4..21');
+  eq([litIn(pause, 4, 4, 6, 18).length, litIn(pause, 16, 4, 6, 18).length, litIn(pause, 10, 2, 6, 22).length, litIn(pause, 4, 2, 18, 2).length, litIn(pause, 4, 22, 18, 2).length], [108, 108, 0, 0, 0], 'started, not running (hold=0): two 6 x 18 bars at x 4..9 and x 16..21, y 4..21, the 6 px between empty');
+  eq([litIn(armedOn, 4, 2, 18, 22).length > 0, litIn(armedOn, 10, 12, 6, 1).length], [true, 6], 'armed (at t=1100 the lit half of the blink): the triangle, no pause bars');
+  eq(Stick.ctx({ home: { ...home, transport: 'stopped' }, homeAt: 1000, get: {}, status: { hold: '0' }, statusAt: 1000, beat: null }, NOW).held, false, 'ctx.held follows status hold=0');
+  eq(Stick.ctx({ home: { ...home, transport: 'stopped' }, homeAt: 1000, get: {}, status: { hold: '1' }, statusAt: 1000, beat: null }, NOW).held, true, 'ctx.held follows status hold=1');
   const play = drawn(ctxOf({ ctx: { running: true } })); eq([litIn(play, 4, 2, 18, 22).length, litIn(play, 4, 12, 18, 1).length, litIn(play, 4, 2, 18, 1).length], [200, 18, 1], 'running: the play triangle, 18 wide at its middle rows, 1 at its tips');
   // the LINK TRANSPORT icon is in the bar in both modes, the same pixels; the fold label (AUDIO) sits next to it
   for (const mode of [0, 1, 2]) {

@@ -21,6 +21,7 @@ const ABOUT_NONE = Object.fromEntries(ABOUT_KEYS.map(k => [k, null]));
 
 function dumpState(out, s) {
   const L = (k, v) => out.push('c ' + k + ' ' + v);
+  if (s.held) L('held', 1);                                // only when set: a case that does not say it is the user's Start
   const num = v => (v === null || v === undefined ? 'null' : String(v));
   for (const k of ['link', 'lineIn', 'confStop', 'running', 'armed', 'trackerLeads', 'xiao', 'usb', 'fitted', 'autoBar', 'boot', 'splash', 'saved'])
     L(k, s[k] ? 1 : 0);

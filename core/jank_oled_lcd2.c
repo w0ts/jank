@@ -144,8 +144,14 @@ static void transport_icon(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
     if (tri)
         for (int r = 0; r < 22; r++)
             jo_rect(fb, PLAY_X, ICON_Y + r, TRI_W[r], 1, 1);
-    else if (!c->armed)
-        jo_rect(fb, PLAY_X, ICON_Y + 2, 18, 18, 1);
+    else if (!c->armed) {
+        if (c->held)
+            jo_rect(fb, PLAY_X, ICON_Y + 2, 18, 18, 1);
+        else {                                                  /* the user's Start, the outputs held by the machine layer: pause */
+            jo_rect(fb, PLAY_X, ICON_Y + 2, 6, 18, 1);
+            jo_rect(fb, PLAY_X + 12, ICON_Y + 2, 6, 18, 1);
+        }
+    }
 }
 
 /* the LINK TRANSPORT icon (both modes) and, in AUDIO mode when the fold is not 1, the fold label beside it */

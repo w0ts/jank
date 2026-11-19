@@ -62,7 +62,7 @@ Every item is a fixed slot, nothing moves when a value changes; icons are 22 row
 
 | group | item | x range | notes |
 |---|---|---|---|
-| left | transport icon | 4..21 | play triangle 18 x 22 (blinks while armed) or stop square 18 x 18 (y 4..21) |
+| left | transport icon | 4..21 | play triangle 18 x 22 (running; blinks while armed), stop square 18 x 18 (y 4..21) when the user stopped (`ctx.held`), pause = two bars 6 x 18 at x 4..9 and x 16..21 (y 4..21) when the user started but the outputs do not run (no bpm yet, low-confidence gate, silence, LOST) |
 | left | LINK TRANSPORT icon | 28..49 (IGNORE, 22 wide) / 28..53 (FOLLOW, 26 wide) / 28..57 (BOTH, 30 wide) | **both modes** (`ctx.ltMode`): IGNORE = crossed circle, FOLLOW = arrow in, BOTH = two outward triangles drawn natively at 320 x 240 (each up to 11 x 22, row width max(1, round(12 * (1 - abs(y - 10.5) / 11))), left one ends at x 11 and right one starts at x 18, so 6 px (x 12..17) stay open on every row; 4 px free before the fold label at x 62). IGNORE and FOLLOW are the old 11 x 11 / 13 x 11 bitmaps in plain 2 x 2 blocks |
 | left | fold label | 62..92 | AUDIO mode only, when the fold is not 1 (`X2` `X4` `/2` `/4`: an inverted 31 x 22 box with its corners cut); sits next to the LINK icon |
 | right | `GRP n` (or the Wi-Fi / own network name) | right-aligned to x 187 (`GRP 1` is x 128..186; cut to 7 characters, 90 px) | in AUDIO and LINK mode, directly before the chain |
