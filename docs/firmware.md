@@ -62,10 +62,13 @@ One command a line; each answer ends with `ok` or `err <why>`:
 get | status | about | home | scan | help | reboot | bootloader
 tempo 20..999 (BPM, up to two decimals) | play | stop
 set group 1..9 | name <text> | filter link|all | peer on|off | transport link|auto | lead on|off
+set sleep never|30s|1min|5min | bright 10..100
 set quantum 1..16 | offset -100.00..100.00 (ms, 10 us steps) | net jank|wifi | ssid <name> | pass <8..63 chars>
 ```
 
 `lead` (`get` key `lead=on|off`) is LINK TRANSPORT's FOLLOW+LEAD (on) or FOLLOW (off), with `transport link`; the menu's own preference, not a setting: `set lead` and the menu both write `s_prefs.lead` (`firmware/main/uiscreen.c`, `uis_lead_get` / `uis_lead_set`; the ui task applies it and saves it by the usual 400 ms rule), `get` reads it through `struct jk_snapshot`'s `lead`, and `set lead` answers `ok` with the action `JK_CTL_LEAD` (`jk_ctl_lead` parses the value; `cfg` is untouched). The menu's three choices are therefore `set transport auto` (IGNORE), `set transport link` + `set lead off` (FOLLOW), `set transport link` + `set lead on` (FOLLOW+LEAD). An older jank has no `lead` key and answers `err bad setting`; the page then keeps the old behaviour (FOLLOW refused).
+
+`sleep` (`never|30s|1min|5min`, the menu's SCREEN OFF) and `bright` (10..100 %, the menu's BRIGHTNESS) are the same kind: `get` keys `sleep=` / `bright=`, `set sleep` / `set bright` write `s_prefs.sleep` / `s_prefs.bright` (the 'ui1' blob, 400 ms rule, `uis_sleep_get` / `uis_sleep_set` / `uis_bright_get` / `uis_bright_set`; the started bit in bit 7 of the sleep byte is a separate field and stays), answer `ok` with the action `JK_CTL_DISPLAY` (`jk_ctl_display` parses; `cfg` untouched), and a bad value answers `err bad setting`. The jank (XIAO) has no screen: the value is only stored and shown back by the page's menu. An older jank has neither key: the page refuses the two menu rows (`this jank has no screen setting`).
 `home` answers `home=h ...`, the HOME line the page polls (`core/jank_home.h`). `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
 nothing. `net jank` is the protocol's name for jank mode. `tempo`, `play` and `stop` change the whole Link session, as
 any Link app may; with no settled session (joining one) they answer `err no session`. Alone the stick runs a session of

@@ -370,6 +370,7 @@ struct jk_snapshot {
     int8_t batt_pct;                  /* -1: no battery gauge */
     char board[12];                   /* the board the firmware is built for ("xiao", "lcd2"): `get` says it so the page picks the screen */
     struct jk_usb usb;
+    uint8_t sleep, bright;            /* the menu's SCREEN OFF (0 NEVER, 1 30 S, 2 1 MIN, 3 5 MIN) and BRIGHTNESS (10..100 %), for `get` sleep= bright= */
     uint8_t lead;                     /* LINK TRANSPORT FOLLOW+LEAD (1) or FOLLOW (0): the menu's own preference (uiscreen.c uis_lead_get), for `get` lead= */
     struct jk_sys sys;                /* for `about` (ctl.c fills it from the ui task's sampler) */
     struct jk_bridge b;
@@ -386,6 +387,7 @@ enum jk_ctl_action {
     JK_CTL_STOP,                      /* out is empty: the caller stops the session, answers ok or err */
     JK_CTL_FOLD,                      /* out is empty: the caller folds (jk_ctl_fold), answers fold=<f> ok or err link mode */
     JK_CTL_LEAD,                      /* `set lead on|off`, out is "ok\n": the caller stores the menu's FOLLOW+LEAD preference (jk_ctl_lead), cfg is untouched */
+    JK_CTL_DISPLAY,                   /* `set sleep <v>` / `set bright <n>`, out is "ok\n": the caller stores the menu's SCREEN OFF / BRIGHTNESS preference (jk_ctl_display), cfg is untouched */
     JK_CTL_NUDGE                      /* out is empty: the caller nudges the beat (jk_ctl_nudge), answers nudge_beats=<b> ok or err */
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
@@ -397,6 +399,8 @@ int jk_ctl_tempo(const char *line, int32_t *mpb);
 int jk_ctl_fold(const char *line, int *dir);
 /* "set lead on" / "set lead off" (LINK TRANSPORT FOLLOW+LEAD / FOLLOW) -> 0 and 1 / 0; -1 not one */
 int jk_ctl_lead(const char *line, int *on);
+/* "set sleep never|30s|1min|5min" -> 0, *bright 0 and *v 0..3; "set bright 10..100" -> 0, *bright 1 and *v the percent; -1 not one */
+int jk_ctl_display(const char *line, int *bright, int *v);
 /* NUDGE BEAT and NUDGE MS (AUDIO mode: the device's NO / YES held + UP/DOWN). "nudge beat <b>", b in half beats, signed,
  * 0.5 to 3 (+0.5, -0.5, 1, -1.5) -> 0 and the half beats (+-1..+-6); -1 not one. The caller nudges (core/jank_beatlink.h
  * jbl_nudge) and answers `nudge_beats=<total>`, the estimator's view before it, ok; or err link mode, no beat, at the limit */

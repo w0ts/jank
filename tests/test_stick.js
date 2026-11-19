@@ -110,7 +110,13 @@ ok(/does not take/.test(F('nosuch', 0).refuse), 'a field the control line does n
 eq([0, 1, 2].map(v => F('ltmode', v).commands), [['set transport auto'], ['set transport link', 'set lead off'], ['set transport link', 'set lead on']], 'LINK TRANSPORT: IGNORE / FOLLOW / FOLLOW+LEAD');
 eq([F('ltmode', 0, false).commands, F('ltmode', 2, false).commands], [['set transport auto'], ['set transport link']], 'a jank without `lead`: IGNORE / FOLLOW+LEAD as before');
 ok(/FOLLOW is not on the control line/.test(F('ltmode', 1, false).refuse), 'a jank without `lead`: FOLLOW is refused with the old reason');
-for (const f of ['out0', 'out1', 'out2', 'rate', 'bright', 'sleep', 'ssid', 'pass', 'apname', 'appass', 'netmode', 'usbrole']) ok(typeof F(f, 0).refuse === 'string' && F(f, 0).refuse.length > 10 && !F(f, 0).commands, f + ' is refused with a reason, nothing sent');
+for (const f of ['out0', 'out1', 'out2', 'rate', 'ssid', 'pass', 'apname', 'appass', 'netmode', 'usbrole']) ok(typeof F(f, 0).refuse === 'string' && F(f, 0).refuse.length > 10 && !F(f, 0).commands, f + ' is refused with a reason, nothing sent');
+eq([[0, 1, 2, 3].map(v => F('sleep', v).commands[0]), [F('bright', 10).commands, F('bright', 70).commands, F('bright', 5).commands, F('bright', 250).commands]], [['set sleep never', 'set sleep 30s', 'set sleep 1min', 'set sleep 5min'], [['set bright 10'], ['set bright 70'], ['set bright 10'], ['set bright 100']]], 'SCREEN OFF and BRIGHTNESS go to the control line');
+ok(/no such value/.test(F('sleep', 4).refuse), 'a SCREEN OFF value the menu has not: refused');
+ok(/no screen setting/.test(F('sleep', 1, true, false).refuse) && /no screen setting/.test(F('bright', 50, true, false).refuse) && !/stick/.test(F('sleep', 1, true, false).refuse), 'a jank without sleep / bright in `get`: refused, nothing sent');
+eq([get.sleep, get.bright, a.sleep, a.bright], ['never', '100', 0, 100], 'the get transcript has sleep / bright: the ctx shows them');
+eq([['never', '30s', '1min', '5min'].map(s => Stick.ctx(state({ get: { ...get, sleep: s, bright: '40' } }), 1000).sleep), Stick.ctx(state({ get: { ...get, bright: '40' } }), 1000).bright], [[0, 1, 2, 3], 40], 'ctx: sleep index and bright from get');
+eq([Stick.ctx(state({ get: { ...get, sleep: undefined, bright: undefined } }), 1000).sleep, Stick.ctx(state({ get: { ...get, sleep: undefined, bright: undefined } }), 1000).bright], [0, 100], 'an older jank (no keys): the old values');
 ok(!!F('nonsense', 1).refuse, 'an unknown field is refused, not ignored');
 const aud = Stick.ctx(state(), 1000), lnk = Stick.ctx(state({ home: LINK }), 1000);
 eq(Stick.tempoCommand(aud, 1), { commands: ['fold x2'], expected: 240 }, 'AUDIO UP: fold x2, the tempo expected doubled');
