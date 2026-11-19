@@ -36,10 +36,10 @@ Rules kept by every row: core 1 is the MIDI clock's alone (every task pinned to 
 5. **USB host** (row 5): last of the active ones, because it needs V5_EN (row 1), the VBUS sense (row 4) and is the only driver that puts a voltage on a connector another person plugs gear into.
 6. MIDI TX2 is only a scope check; IMU and TF card: nothing.
 
-## Questions for the owner
+## Decisions (owner, 2026-11-19)
 
-1. CLK and RST shape: the bench toggles CLK on every MIDI clock (edges); should the jack give short pulses (which rate: every clock, every 16th) and how long a RESET pulse?
-2. At what cell voltage should the jank switch the 5 V rail off (MIDI, CLK, RST, host signal go with it), or should it only warn on screen?
-3. Host mode on the mini 3 has no CC chip: is "USB menu setting HOST, and a computer or charger on the LCD-2's USB-C always wins" the behaviour you want?
-4. LINE IN first version: the full differential input (A - B, more code) or the tip alone (simple, hum not cancelled)?
-5. Is the IMU and the TF card out of scope for now (nothing written for either)?
+1. **CLK / RST: short pulses, like Mutable Instruments Grids.** Every output pulse is high for about 1 ms (Grids: `kPulseDuration` 8 ticks of an 8 kHz timer = 1 ms, all outputs cleared together). CLK pulses once per clock step, RST pulses at step 0. Velocity and accents are ignored. Both pins idle LOW.
+2. **Low cell: warn only**, on the screen. The firmware never cuts the 5 V rail (V5_EN stays high), so row 1 has no cutoff.
+3. **USB host: a computer or charger on the LCD-2's USB-C (VBUS sense) always wins**: device mode, HOST_EN low. Only with the USB menu = HOST and nothing plugged in does the jank drive the OUT port.
+4. **LINE IN is not balanced audio.** The "differential" input of the hardware README is a ground-sensing difference, not a symmetrical connection: the jack is an ordinary stereo jack. Checked against `parts.py` (R30 / R31 / C30 / C31, R65 / R66 / C65 / C66, R32 / R67, R33 / R34, C32 / C67) and `hardware/mini2/README.md` ("The digital LINE IN"): tip and ring (L and R), each 20 k + 1 uF, mix into node A (LINE_IN, GPIO7); the jack's sleeve (ground, to the board's ground through 100 ohm, R39) goes through two 20 k + 1 uF branches into node B (LINE_SENSE, GPIO8); both nodes sit on the same 1.467 V bias. The firmware subtracts B from A, so the hum a ground loop puts on the sleeve cancels. The board does what the plan says, no disagreement. **First version: node A alone** (the L + R mix), so audio works; the A - B subtraction is a later step with host tests.
+5. **IMU and TF card: out of scope.**

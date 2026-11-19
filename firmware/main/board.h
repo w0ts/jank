@@ -112,8 +112,8 @@
  * NO is the BOOT button (and GPIO21, beside it); the D-pad, MIDI TX and HOST_EN are on header pins chosen from the jank
  * mini 3 board layout (hardware/jank-mini-3/parts.py GPIO, the source of truth; docs/lcd2.md has the table; provisional
  * until the board is ordered). The board has no LED on a GPIO (its two LEDs are the charger's and the 3V3 rail's).
- * The mini 3's other pins have no firmware use yet and stay undefined here: GPIO4 V5_EN (5 V aux boost enable; R131
- * holds the boost ON until the firmware drives it), 2 RST out, 15 CLK out, 7 LINE_IN (ADC1), 8 LINE_SENSE (ADC1),
+ * power.c drives GPIO4 V5_EN (5 V aux boost enable; R131 holds it ON until then), 2 RST and 15 CLK (idle low) at boot. The
+ * other pins have no firmware use yet and stay undefined here: 7 LINE_IN (ADC1), 8 LINE_SENSE (ADC1),
  * 10 VBUS_SENSE (ADC1, 3.0 V at 5 V), 18 LIN_DET (line in plug detect); free: 12, 14 (no pad), 47, 48 (pads, the IMU
  * bus). */
 #define BOARD_NAME "lcd2"
@@ -152,8 +152,16 @@
 #define BOARD_USBPORT_TUSB320 0
 #define BOARD_HAS_LINEIN 0
 #define BOARD_CELL_GPIO (-1)
+#define BOARD_V5_EN_GPIO 4                        /* the mini 3: the 5 V aux boost's enable (J15.2, parts.py V5_EN_IO) */
+#define BOARD_CLK_GPIO 15                         /* the mini 3: CLK out (J16.7, parts.py CLK_IO); the XIAO bench's BENCH_CLK is another thing */
+#define BOARD_RST_GPIO 2                          /* the mini 3: RST out (J15.1, parts.py RST_IO) */
 #else
 #error "no board chosen"
+#endif
+#ifndef BOARD_V5_EN_GPIO
+#define BOARD_V5_EN_GPIO (-1)
+#define BOARD_CLK_GPIO (-1)
+#define BOARD_RST_GPIO (-1)
 #endif
 #ifndef BOARD_LCD
 #define BOARD_LCD 0

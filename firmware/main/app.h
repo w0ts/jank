@@ -11,6 +11,9 @@
 #include "jank_core.h"
 #include "jank_ui.h"
 
+/* power.c: the first line of app_main. On the lcd2: HOST_EN, CLK, RST low, then V5_EN high. Other boards: nothing */
+void power_early_init(void);
+
 /* store.c: settings in NVS */
 void store_load(struct jk_cfg *c);
 esp_err_t store_save(const struct jk_cfg *c);
