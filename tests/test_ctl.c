@@ -788,21 +788,21 @@ static void test_about(void)
     static char big[4096];
     setup();
     CHECK(run("about") == JK_CTL_NONE);
-    CHECK(!strcmp(out, "uptime_s=-1\nreset=\ntemp_c=-999\ncpu_pct=-1\ncpu1_pct=-1\nheap_kb=-1\nheap_min_kb=-1\npsram_kb=-1\nflash_kb=-1\napp_used_kb=-1\n"
+    CHECK(!strcmp(out, "uptime_s=-1\nreset=\npanic=\ntemp_c=-999\ncpu_pct=-1\ncpu1_pct=-1\nheap_kb=-1\nheap_min_kb=-1\npsram_kb=-1\nflash_kb=-1\napp_used_kb=-1\n"
                        "app_part_kb=-1\nclock_late_us=-1\nui_loop_us=-1\nbeat_loop_us=-1\nok\n"));
-    snap.sys = (struct jk_sys){1, 41, 123, 7936, 98, 3725, 8192, 1260, 3072, 12, 4210, 8800, "POWERON"};
+    snap.sys = (struct jk_sys){1, 41, 123, 7936, 98, 3725, 8192, 1260, 3072, 12, 4210, 8800, "POWERON", "loopTask@0x4200abcd"};
     snap.beat.core0_idle_x10 = 630;
     snap.beat.core1_busy_x10 = 27;
     snap.beat.core1_ok = 1;
     CHECK(run("about") == JK_CTL_NONE);
-    CHECK(!strcmp(out, "uptime_s=3725\nreset=POWERON\ntemp_c=41\ncpu_pct=37\ncpu1_pct=3\nheap_kb=123\nheap_min_kb=98\npsram_kb=7936\nflash_kb=8192\napp_used_kb=1260\n"
+    CHECK(!strcmp(out, "uptime_s=3725\nreset=POWERON\npanic=loopTask@0x4200abcd\ntemp_c=41\ncpu_pct=37\ncpu1_pct=3\nheap_kb=123\nheap_min_kb=98\npsram_kb=7936\nflash_kb=8192\napp_used_kb=1260\n"
                        "app_part_kb=3072\nclock_late_us=12\nui_loop_us=4210\nbeat_loop_us=8800\nok\n"));
     CHECK(jk_cpu_pct(0) == -1 && jk_cpu_pct(1000) == 0 && jk_cpu_pct(1004) == 0 && jk_cpu_pct(985) == 1 && jk_cpu_pct(5) == 99 && jk_cpu_pct(4000) == 0);
     CHECK(jk_cpu1_pct(0, 0) == -1 && jk_cpu1_pct(0, 1) == 0 && jk_cpu1_pct(27, 1) == 3 && jk_cpu1_pct(24, 1) == 2 && jk_cpu1_pct(1000, 1) == 100 && jk_cpu1_pct(4000, 1) == 100);
-    snap.sys = (struct jk_sys){1, -999, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, "PWR GLITCH"};
+    snap.sys = (struct jk_sys){1, -999, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, 2147483647, "PWR GLITCH", "0123456789abcde@0x4200abcd"};
     CHECK(jk_ctl_line("about", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest about: %zu bytes (status limit %u)\n", strlen(big), (unsigned)JK_CTL_OUT_MAX);
-    CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
+    CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n") && strstr(big, "panic=0123456789abcde@0x4200abcd\n"));
     CHECK(run("help") == JK_CTL_NONE && strstr(out, "status\nabout\n"));
 }
 

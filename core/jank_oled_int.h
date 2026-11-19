@@ -12,7 +12,7 @@ static inline int jo_clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi
 /* JavaScript's Number.prototype.toFixed(digits) for |x| < 1e21: the exact value, halves away from zero */
 void jo_fixed(double x, int digits, char *out, size_t cap);
 /* the ABOUT screen: its JO_ABOUT_ROWS rows as text, and how many show at once (JO_ABOUT_VIS_OLED, JO_ABOUT_VIS_LCD2) */
-#define JO_ABOUT_ROWS 12
+#define JO_ABOUT_ROWS 13
 #define JO_ABOUT_VIS_OLED 5
 #define JO_ABOUT_VIS_LCD2 9
 struct jo_about_row {

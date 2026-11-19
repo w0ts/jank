@@ -335,6 +335,7 @@ struct jk_sys {
     int32_t temp_c, heap_kb, psram_kb, heap_min_kb, uptime_s, flash_kb, app_used_kb, app_kb;
     int32_t clk_late_us, ui_loop_us, beat_loop_us;
     char reset[12];                   /* why the chip last reset, upper case ("POWERON", "PWR GLITCH"); "": unknown */
+    const char *panic;                /* the last panic since power was lost, "<task>@0x4200abcd" (jk_panic_brief); NULL or "": none */
 };
 /* core 0's CPU load %, from its idle task's share in x10 percent (jk_beat core0_idle_x10; 0: not measured -> -1) */
 int jk_cpu_pct(uint32_t core0_idle_x10);

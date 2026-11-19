@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The JANK drive as a made-up FAT16 volume (the UF2 bootloaders' trick, for a plain jank.bin): nothing of it is stored.
- * Reads are worked out from a table: the boot sector, the FATs, the root directory with jank.html, UPDATE.TXT and
+ * Reads are worked out from a table: the boot sector, the FATs, the root directory with jank.html, UPDATE.TXT, PANIC.TXT and
  * README.txt, and their data from memory. A jank.bin copied onto it is recognised by its first sector (an ESP32-S3 app image header) and
  * goes STRAIGHT into the spare app slot as it arrives: no FAT on flash, no copy of the file anywhere, so it works on a
  * 4 MB chip whose two app slots leave no room for a drive that could hold the file (the FH4R2).
@@ -15,7 +15,7 @@
  *
  * What else the host writes (FAT, directories, the macOS ._ files, .fseventsd) is kept in a small cache, so that it reads
  * back what it wrote while the volume is mounted; past the cache it reads zeros. Nothing survives a restart: the drive
- * comes back with jank.html (and UPDATE.TXT, the last update's note) only. */
+ * comes back with jank.html (and UPDATE.TXT, the last update's note, and PANIC.TXT, the last panic's record) only. */
 #ifndef JANK_VDRIVE_H
 #define JANK_VDRIVE_H
 #include <stddef.h>
@@ -58,7 +58,7 @@ typedef void *(*jv_alloc_fn)(void *ctx);   /* one JV_SECTOR buffer, or NULL */
 typedef int (*jv_read_fn)(void *ctx, uint32_t offset, uint8_t *out, uint32_t n);   /* image bytes already in the slot: 0 ok */
 
 struct jv {
-    struct jv_file file[3];
+    struct jv_file file[4];
     uint32_t nfiles;
     uint32_t serial;
     /* the cache: what the host wrote outside the image */
@@ -78,9 +78,9 @@ struct jv {
     struct jv_len len;
 };
 
-/* html: the control page; note: UPDATE.TXT's text (NULL or empty: no such file); readme: README.txt's text, listed last
+/* html: the control page; note: UPDATE.TXT's text (NULL or empty: no such file); panic: PANIC.TXT's text (NULL or empty: no such file); readme: README.txt's text, listed last
  * (NULL or empty: no such file). serial: the volume's id */
-void jv_init(struct jv *d, const uint8_t *html, uint32_t html_size, const char *note, const char *readme, uint32_t serial,
+void jv_init(struct jv *d, const uint8_t *html, uint32_t html_size, const char *note, const char *panic, const char *readme, uint32_t serial,
              uint32_t slot_size, jv_alloc_fn alloc, void *alloc_ctx);
 
 /* a read: the sector at lba into out. -> -1 out of range; 0 done; 1 it is the image's: out is to be read from the slot

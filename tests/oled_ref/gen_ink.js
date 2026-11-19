@@ -245,7 +245,7 @@ scenario('battery info', null, [...presses([...menuItem(9), 'yes']), draw(20), [
 for (const [b, usb, fitted] of [[100, true, true], [37, false, true], [0, true, true], [64, false, false], [64, true, false], [99, true, true]])
   scenario('battery info ' + b + ' ' + usb + ' ' + fitted, audio({ batt: b, usb, fitted }), [...presses([...menuItem(9), 'yes']), draw(20)]);
 
-// ---- ABOUT: the system rows, 8 of 13 on the colour layout (UP / DOWN scroll), "-" for what is not known ----
+// ---- ABOUT: the system rows, 9 of 13 on the colour layout (UP / DOWN scroll), "-" for what is not known ----
 scenario('about', audio(ABOUT_FULL), [...presses([...menuItem(10), 'yes']), draw(20), ...walk(Array(7).fill('down'), 30), ['press', 'up', 400], draw(401), ['press', 'yes', 402], draw(403)]);
 scenario('about unknown', audio(ABOUT_NONE), [...presses([...menuItem(10), 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down', 'down', 'down'], 30)]);
 scenario('about long uptime', audio({ ...ABOUT_FULL, uptimeS: 200000, flashKb: 4096, appUsedKb: null, reset: 'PANIC' }), [...presses([...menuItem(10), 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down'], 30)]);

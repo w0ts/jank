@@ -124,6 +124,7 @@ struct jo_ctx {
     int flash_kb, app_used_kb, app_kb;    /* the flash chip; the running app image; its partition */
     int uptime_s, heap_min_kb;            /* seconds since boot; the least free internal heap since boot */
     const char *reset;                    /* why the chip last reset, upper case ("POWERON", "PANIC"), NULL unknown */
+    const char *panic;                    /* the last panic since power was lost, "<task>@0x4200abcd"; NULL or "": none (the PANIC row shows "-") */
     int clk_late_us;                      /* the MIDI clock alarm's worst lateness since boot */
     int ui_loop_us, beat_loop_us;         /* the longest pass of the UI task / the beat task since boot */
     uint8_t lt_mode, in_src, usb_role, auto_bar;

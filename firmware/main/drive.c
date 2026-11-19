@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The JANK drive: a made-up FAT16 volume (core/jank_vdrive.h) served straight from TinyUSB's mass storage callbacks. It
- * holds jank.html (the control page, from the image), README.txt (docs/drive-readme.txt, from the image) and UPDATE.TXT (the
- * last update's note); nothing of it is stored.
+ * holds jank.html (the control page, from the image), README.txt (docs/drive-readme.txt, from the image), UPDATE.TXT (the
+ * last update's note) and PANIC.TXT (the last panic since power was lost, only when there was one); nothing of it is stored.
  *
  * Updating: the user copies a jank.bin (the app image, no conversion) onto the drive. Its first sector gives it away (an
  * ESP32-S3 image header); from there each sector the computer writes goes straight into the spare app slot (a 4 KB page
@@ -18,6 +18,7 @@
  * hooks (tud_mount_cb, tud_umount_cb) find no storage and do nothing. Flash writes run in TinyUSB's task: USB waits out a
  * page erase (tens of ms), as it did with the FAT drive's wear levelling. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "app.h"
 #include "esp_heap_caps.h"
@@ -30,6 +31,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "jank_ota.h"
+#include "jank_panic.h"
 #include "jank_vdrive.h"
 #include "nvs.h"
 #include "tusb.h"
@@ -404,15 +406,18 @@ void drive_state(char *out, size_t cap)
 esp_err_t drive_start(void)
 {
     uint8_t mac[6] = {0};
+    char *panic_txt = NULL;               /* PANIC.TXT's text: kept for as long as the drive is (only when a panic was recorded) */
     int forget = note_for_start(s_note, sizeof s_note);
     if (s_note[0])
         strlcat(s_note, "\r\n", sizeof s_note);
     if (forget)
         drive_note_forget();
+    if (panic_info_brief()[0] && (panic_txt = malloc(JK_PANIC_FILE_MAX)) != NULL)
+        panic_info_file(panic_txt, JK_PANIC_FILE_MAX);
     s_slot = esp_ota_get_next_update_partition(NULL);
     esp_efuse_mac_get_default(mac);
     /* page_end - 1: a text blob ends in a NUL (target_add_binary_data TEXT) */
-    jv_init(&s_d, page_start, (uint32_t)(page_end - page_start - 1), s_note, readme_start, (uint32_t)mac[2] << 24 | (uint32_t)mac[3] << 16 | (uint32_t)mac[4] << 8 | mac[5],
+    jv_init(&s_d, page_start, (uint32_t)(page_end - page_start - 1), s_note, panic_txt, readme_start, (uint32_t)mac[2] << 24 | (uint32_t)mac[3] << 16 | (uint32_t)mac[4] << 8 | mac[5],
             s_slot ? (uint32_t)s_slot->size : 0u, alloc_sector, NULL);
     /* the image check (esp_image_verify, SHA-256) and the NVS note run on this stack, as ota.c's do_end did on the control task's */
     if (xTaskCreatePinnedToCore(drive_task, "drive", 4096, NULL, 3, &s_task, 0) != pdPASS)

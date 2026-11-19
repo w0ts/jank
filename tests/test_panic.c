@@ -61,6 +61,22 @@ int main(void)
     jk_panic_pack(&z, 1, 2, 3, 4, 5, 0, 6, "a\nb=c", "x\ty\n");   /* control characters cannot forge a line */
     n = jk_panic_text(&z, out, sizeof out);
     assert(strstr(out, "panic_task=a?b=c\n") && strstr(out, "panic_msg=x?y?\n"));
+
+    /* PANIC.TXT, the about line's short form */
+    n = jk_panic_file(&r, "0.1.0", out, sizeof out);
+    assert(n == strlen(out) && n < JK_PANIC_FILE_MAX && strstr(out, "\r\n") && !strstr(out, "\n\n"));
+    assert(strstr(out, "when      123456 ms after the start\r\n") && strstr(out, "task      ui (core 1)\r\n") && strstr(out, "cause     28 (LoadProhibited)\r\n"));
+    assert(strstr(out, "pc        0x4200abcd\r\n") && strstr(out, "a0        0x4201beef\r\n") && strstr(out, "sp        0x3fc9a120\r\n") && strstr(out, "vaddr     0x00000010\r\n"));
+    assert(strstr(out, "message   Cache disabled but cached memory region\r\n") && strstr(out, "firmware  0.1.0\r\n"));
+    assert(strstr(out, "xtensa-esp32s3-elf-addr2line -pfiaC -e jank.elf 0x4200abcd 0x4201beef\r\n") && strstr(out, "must belong to exactly this firmware"));
+    jk_panic_pack(&z, 1, 77, 3, 4, 5, 0, 6, "a\nb", "x\n");   /* an unnamed cause, a control character */
+    n = jk_panic_file(&z, NULL, out, sizeof out);
+    assert(n && strstr(out, "cause     77\r\n") && strstr(out, "task      a?b (core 0)\r\n") && strstr(out, "firmware  ?\r\n"));
+    assert(jk_panic_file(NULL, "0.1.0", out, sizeof out) == 0 && !out[0]);
+    assert(jk_panic_file(&r, "0.1.0", small, sizeof small) == 0 && !small[0]);
+    n = jk_panic_brief(&r, out, sizeof out);
+    assert(n == strlen(out) && !strcmp(out, "ui@0x4200abcd"));
+    assert(jk_panic_brief(NULL, out, sizeof out) == 0 && !out[0] && jk_panic_brief(&r, small, 8) == 0 && !small[0]);
     printf("panic ok\n");
     return 0;
 }

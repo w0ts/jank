@@ -23,7 +23,7 @@ once (it changes the partition table and the bootloader; see [boards.md](boards.
    checks it (`esp_image_verify`: segments, checksum, SHA-256) and picks it for the next start.
 3. The stick restarts when the computer has been quiet for 1.5 s (it writes the file's directory entry and FAT just after
    the data), at the latest 10 s after the image was whole, or at once on an eject. The drive comes back with `jank.html`
-   and `UPDATE.TXT`, which says what happened. macOS may complain that the drive was not ejected: it was pulled while
+   and `UPDATE.TXT`, which says what happened (and `PANIC.TXT` after a panic, see `docs/firmware.md`). macOS may complain that the drive was not ejected: it was pulled while
    mounted, as with any UF2 board.
 
 Refused, with the reason in `UPDATE.TXT` after a restart and the old firmware still running: an image bigger than the slot

@@ -21,6 +21,7 @@
 static RTC_NOINIT_ATTR jk_panic_t s_rtc;
 static jk_panic_t s_last;
 static int s_have;
+static char s_brief[JK_PANIC_TASK + 12];          /* "<task>@0x4200abcd", made once at the boot */
 
 extern void __real_esp_panic_handler(panic_info_t *info);
 
@@ -41,6 +42,7 @@ void panic_info_take(void)
     if (jk_panic_valid(&s_rtc)) {
         s_last = s_rtc;
         s_have = 1;
+        jk_panic_brief(&s_last, s_brief, sizeof s_brief);
     }
     memset(&s_rtc, 0, sizeof s_rtc);                 /* each panic is handed over once; garbage is dropped too */
 }
@@ -48,4 +50,11 @@ void panic_info_take(void)
 size_t panic_info_text(char *out, size_t cap)
 {
     return jk_panic_text(s_have ? &s_last : NULL, out, cap);
+}
+
+const char *panic_info_brief(void) { return s_brief; }
+
+size_t panic_info_file(char *out, size_t cap)
+{
+    return jk_panic_file(s_have ? &s_last : NULL, JK_VERSION, out, cap);
 }

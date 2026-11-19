@@ -118,6 +118,7 @@ ok
 ### about
 uptime_s=3725
 reset=POWERON
+panic=loopTask@0x4200abcd
 temp_c=41
 cpu_pct=37
 cpu1_pct=3

@@ -198,7 +198,7 @@ int jo_net_rows(const struct jo_ctx *c, struct jo_net_row rows[4])
 }
 
 /* the ABOUT rows, a label (left) and its value (right aligned by the screens), "-" for what is not known: VERSION, REPO, UPTIME, RESET,
- * TEMP, CPU, MEMORY, MIN HEAP, FLASH, CLOCK LATE, UI LOOP, BEAT LOOP. The repo is shortened on the OLED (21 characters across); the lcd2 layout
+ * TEMP, CPU, MEMORY, MIN HEAP, FLASH, CLOCK LATE, UI LOOP, BEAT LOOP, PANIC. The repo is shortened on the OLED (21 characters across); the lcd2 layout
  * adds the PSRAM to MEMORY */
 static void about_num(struct jo_about_row *r, const char *label, int v, const char *unit)
 {
@@ -225,6 +225,21 @@ static void about_txt(struct jo_about_row *r, const char *label, const char *val
 {
     snprintf(r->label, sizeof r->label, "%s", label);
     snprintf(r->val, sizeof r->val, "%s", val);
+}
+
+/* PANIC: "-" when none, else "<task> 0x4200abcd" from the "<task>@0x4200abcd" the firmware keeps. The task is cut to what fits beside the label
+ * (3 characters on the OLED's 20, 7 on the colour layout); the address is always whole */
+static void about_panic(struct jo_about_row *r, const char *p, int lcd2)
+{
+    const char *at = p ? strrchr(p, '@') : NULL;
+    int task = at ? (int)(at - p) : 0, max = lcd2 ? 7 : 3;
+    snprintf(r->label, sizeof r->label, "PANIC");
+    if (!p || !p[0])
+        snprintf(r->val, sizeof r->val, "-");
+    else if (!at)
+        snprintf(r->val, sizeof r->val, "%s", p);
+    else
+        snprintf(r->val, sizeof r->val, "%.*s%s%s", task < max ? task : max, p, task ? " " : "", at + 1);
 }
 
 void jo_about_rows(const struct jo_ctx *c, struct jo_about_row rows[JO_ABOUT_ROWS])
@@ -261,4 +276,5 @@ void jo_about_rows(const struct jo_ctx *c, struct jo_about_row rows[JO_ABOUT_ROW
     about_num(&rows[9], "CLOCK LATE", c->clk_late_us, " US");
     about_num(&rows[10], "UI LOOP", c->ui_loop_us, " US");
     about_num(&rows[11], "BEAT LOOP", c->beat_loop_us, " US");
+    about_panic(&rows[12], c->panic, c->layout_lcd2);
 }
