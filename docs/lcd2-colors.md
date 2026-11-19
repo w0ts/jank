@@ -187,10 +187,11 @@ LED's low-confidence blink all judge the **same shown confidence**: the graded v
 always drawn, at the threshold, so the user sees the line cross it exactly when the colour changes and the outputs stop (closes at the threshold, opens again at
 threshold + 5). The same on the mono OLED's `CF` bar (tick).
 
-**The THRESHOLD edit screen** (menu AUDIO > THRESHOLD) shows no digits for the threshold: it draws the same live CONFIDENCE line as HOME (row at y 80, the
-shown confidence filling it, value `NN%` or `--`) with the notch as the marker UP / DOWN moves (steps of 5, 0..100, applied and kept as before), and the line's
-ink follows the colour rule against the marker (red below it, amber up to +10, green above), so the user sees and feels when it is too high or too low. The title
-and the help lines stay. The mono OLED does the same with its `CF` bar (y 22) and the tick as the marker.
+**The THRESHOLD edit screen** (menu AUDIO > THRESHOLD): the row `THRESHOLD` is the live bar (the shown confidence filling it) with the notch as the marker UP / DOWN
+moves (steps of 5, 0..100, applied and kept as before); the number on its right is the **setting** (`60%`), as the other edit screens show theirs. The live
+confidence is below it, a row `NOW 72%` (`NOW -` when unknown, value right aligned like the other rows). The ink (red below the marker, amber up to +10, green
+above) covers the bar row and the NOW value. The help lines read `STOPS UNDER MARKER` / `RUNS AGAIN 5 ABOVE IT` (the gate closes under the threshold and opens
+again at threshold + 5). The mono OLED does the same: the `CF` bar at y 22 with the setting right aligned inside it, `NOW 72%` at y 35. HOME is unchanged.
 
 | value | rule |
 |---|---|

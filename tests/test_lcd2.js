@@ -506,6 +506,19 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
     for (let j = 40; j < 120; j++) { let lo = -1, hi = -1; for (let i = 0; i < LW; i++) if (d.fb[j * LW + i]) { if (lo < 0) lo = i; hi = i; } if (lo >= 0 && hi - lo > 60) box.push([lo, hi]); }
     ok(box.length > 0 && Math.abs(box[0][0] - (LW - 1 - box[0][1])) <= 1, 'the edit value box is centred on the 320 px width (x ' + (box[0] || []) + ')');
   }
+  // the THRESHOLD edit screen: the live bar (conf 72) with the setting (60%) on the right of its row and the marker, the live value below as NOW
+  {
+    const th = withUi(ctxOf({ ctx: { conf: 0.72, th: 60 } }), ['no', 'yes', 'down', 'down', 'down', 'yes'], 'lcd2');
+    eq(th.ui.screen + ':' + th.ui.edit.field + ':' + th.ui.edit.val, 'edit:threshold:60', 'the AUDIO > THRESHOLD edit opens at the stored 60');
+    d = drawn(th.c, { ui: th.ui });
+    const inkIds = (y0, y1) => new Set(Array.from({ length: (y1 - y0) * LW }, (_, i) => d.ink[y0 * LW + i]).filter(v => v !== 0));
+    eq([...inkIds(80, 96)], [INK.GOOD], 'the bar row (THRESHOLD, 60% on its right) carries one ink: green, 72 over the marker at 60');
+    eq([...inkIds(104, 118)], [INK.GOOD], 'the NOW row carries the same ink');
+    ok(litIn(d, 232, 104, 80, 14).length > 0 && litIn(d, 232, 80, 80, 14).length > 0, 'a number on the right of the bar row and of the NOW row');
+    const lo = withUi(ctxOf({ ctx: { conf: 0.72, th: 60 } }), ['no', 'yes', 'down', 'down', 'down', 'yes', 'up', 'up', 'up'], 'lcd2');
+    d = drawn(lo.c, { ui: lo.ui });
+    eq([...inkIds(80, 96)], [INK.BAD], 'the marker moved up to 75: the same live bar turns red');
+  }
   const batt = { ...ctxOf(), tempoStep: () => null, setField() {}, setHold() {}, linkStartStop() {} };
   const infoUi = { ...OLED.create(), screen: 'info', page: 'battery' };
   d = drawn(batt, { ui: infoUi }); noInk(d, 'the BATTERY info screen');
