@@ -88,13 +88,15 @@ ok(/params\.get\("screen"\) === "oled" \? "2\.42" : "lcd2"/.test(html) && !/boar
 // the only web addresses in the page are the two links (the hosted page one only on the jank's drive); nothing is loaded from them
 const withoutLinks = html.replace(/<a (id="home-hosted" class="hide" )?href="https:\/\/(github\.com\/w0ts\/jank|w0ts\.github\.io\/jank\/)"/g, "");
 ok(!/<nav id="home-links"[\s\S]*?target=/.test(html.split("</nav>")[0]), "the two links open in the same tab");
-ok(!/https?:\/\//.test(withoutLinks), "the page loads nothing external");
+const withoutNs = withoutLinks.replace("xmlns='http://www.w3.org/2000/svg'", "");   // the favicon's SVG namespace is a name, not a load
+ok(!/https?:\/\//.test(withoutNs), "the page loads nothing external");
+ok(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,/.test(html), "the page has its own favicon, inline");
 ok(/<nav id="home-links" aria-label="Links">/.test(html) && /<a id="home-hosted" class="hide"/.test(html) && /location\.protocol === "file:"\) \$\("home-hosted"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub link (with its icon) always shows; the hosted page link only when the page is opened from a file");
 ok(/<a href="https:\/\/github\.com\/w0ts\/jank"[^>]*><svg class="gh"/.test(html), "the GitHub link carries the GitHub icon");
 ok(/Audio works better on the GitHub hosted page/.test(html), "the hosted page link's tip says audio works better there");
 ok(/navigator\.mediaSession\.setActionHandler\("previoustrack", \(\) => \{ if \(!el\("pl-prev"\)\.disabled\) previous\(\); \}\)/.test(html), "the media key previous track does what the Previous button does");
 ok(/navigator\.mediaSession\.setActionHandler\("nexttrack", \(\) => \{ if \(!el\("pl-next"\)\.disabled\) skip\(\); \}\)/.test(html), "the media key next track does what the Next button does");
-ok(!/<script[^>]+src=/.test(html) && !/<link/.test(html), "no script or style from elsewhere");
+ok(!/<script[^>]+src=/.test(html) && !/<link(?![^>]*rel="icon"[^>]*href="data:)/.test(html), "no script or style from elsewhere (the favicon is inline data)");
 ok(/<title>jank<\/title>/.test(html), "title");
 ok(!/innerHTML/.test(html), "device text goes in through textContent only");
 // the iPhone apps' polyfills (Web MIDI Browser's open source; MIDIWeb Browser's is closed): one .then(ok, fail) on
