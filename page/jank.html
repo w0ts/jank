@@ -1666,16 +1666,12 @@ const OLED = (() => {
     }
     rows.forEach((r, i) => text(fb, r, 4, 14 + i * 11, 1, 1));
   }
-  function drawEdit(fb, ui, c) {
+  function drawEdit(fb, ui) {
     const e = ui.edit, sp = EDITS[e.field];
     titleBar(fb, sp.title);
-    if (e.field === 'threshold') {                                    // the live CF bar, the threshold a marker UP / DOWN moves: no digits for it
-      valueBar(fb, 22, c.conf, e.val / 100, 'CF ' + Math.round(c.conf * 100) + '%', false, false);
-    } else {
-      const s = editText(sp, e.val);                                  // the menus' one font size, always
-      const w = textW(s, 1) + 12, x = Math.round((W - w) / 2);
-      rect(fb, x, 16, w, 13, 1); text(fb, s, x + 6, 19, 1, 0);               // the value, inverted
-    }
+    const s = editText(sp, e.val);                                    // the menus' one font size, always
+    const w = textW(s, 1) + 12, x = Math.round((W - w) / 2);
+    rect(fb, x, 16, w, 13, 1); text(fb, s, x + 6, 19, 1, 0);                 // the value, inverted
     const [h1, h2] = helpOf(sp, e.val);
     textC(fb, h1, 44, 1, 1); textC(fb, h2, 54, 1, 1);                         // what the setting does
   }
@@ -1770,10 +1766,10 @@ const OLED = (() => {
     if (clip) return INK.BAD;
     return c.levelDb < QUIET_DB ? INK.WARN : INK.NONE;
   }
-  function confInk(c, th = c.th) {
+  function confInk(c) {
     if (c.confKnown === false || c.silent) return INK.DIM;
     const pct = Math.round(c.conf * 100);
-    return pct < th ? INK.BAD : pct <= th + CONF_WARN_MARGIN ? INK.WARN : INK.GOOD;
+    return pct < c.th ? INK.BAD : pct <= c.th + CONF_WARN_MARGIN ? INK.WARN : INK.GOOD;
   }
   const battInk = pct => (pct < BATT_BAD_PCT ? INK.BAD : pct < BATT_WARN_PCT ? INK.WARN : INK.NONE);      // neutral while healthy
   const charging = c => !!c.usb && !!c.fitted && c.batt < 100;       // the BATTERY info screen's inference: on USB and not full
@@ -1980,17 +1976,12 @@ const OLED = (() => {
     }
     rows.forEach((r, i) => text(fb, r, 8, 36 + i * 24, 1, 1));
   }
-  function drawEditLcd2(fb, ui, c) {
+  function drawEditLcd2(fb, ui) {
     const e = ui.edit, sp = EDITS[e.field];
     titleBarLcd2(fb, sp.title);
-    if (e.field === 'threshold') {                                    // the live CONFIDENCE line, its notch the threshold UP / DOWN moves: no digits for it
-      const known = c.confKnown !== false;
-      lineRow(fb, 80, 'CONFIDENCE', known ? Math.round(c.conf * 100) + '%' : '--', known ? c.conf : 0, e.val / 100, confInk(c, e.val));
-    } else {
-      const s = editText(sp, e.val), sc = textW(s, 2) + 32 <= W - 8 ? 2 : 1;    // the value in the biggest of two sizes that fits
-      const w = textW(s, sc) + 32, h = 14 * sc + 16, x = Math.round((W - w) / 2);
-      rect(fb, x, 48, w, h, 1); text(fb, s, x + 16, 56, sc, 0);
-    }
+    const s = editText(sp, e.val), sc = textW(s, 2) + 32 <= W - 8 ? 2 : 1;      // the value in the biggest of two sizes that fits
+    const w = textW(s, sc) + 32, h = 14 * sc + 16, x = Math.round((W - w) / 2);
+    rect(fb, x, 48, w, h, 1); text(fb, s, x + 16, 56, sc, 0);
     const [h1, h2] = helpOf(sp, e.val);
     textC(fb, h1, 140, 1, 1); textC(fb, h2, 164, 1, 1);
   }
@@ -2099,7 +2090,7 @@ const OLED = (() => {
     else if (ui.screen === 'menu') drawMenuLcd2(fb, ui, c);
     else if (ui.screen === 'sub') drawSubLcd2(fb, ui, c);
     else if (ui.screen === 'info') drawInfoLcd2(fb, ui, c);
-    else if (ui.screen === 'edit') drawEditLcd2(fb, ui, c);
+    else if (ui.screen === 'edit') drawEditLcd2(fb, ui);
     drawOverlaysLcd2(fb, ui, now);
     if (c.saved) { boxedLcd2(fb, 70, 84, 180, 68); untag(70, 84, 180, 68); textC(fb, 'SAVED', 104, 2, 0); }
   }
@@ -2131,7 +2122,7 @@ const OLED = (() => {
     else if (ui.screen === 'menu') drawMenu(fb, ui, c);
     else if (ui.screen === 'sub') drawSub(fb, ui, c);
     else if (ui.screen === 'info') drawInfo(fb, ui, c);
-    else if (ui.screen === 'edit') drawEdit(fb, ui, c);
+    else if (ui.screen === 'edit') drawEdit(fb, ui);
     drawOverlays(fb, ui, now);
     if (c.saved) { boxed(fb, 30, 22, 68, 22); textC(fb, 'SAVED', 29, 2, 0); }
   }

@@ -224,8 +224,6 @@ scenario('edit autobar repick', audio({ autoBar: 2 }), [...presses([...menuItem(
 scenario('edit insrc', null, [...presses(['no', 'yes', 'yes']), draw(10), ...walk(['up', 'up', 'up', 'up', 'down'], 20), ['press', 'no', 60], draw(61)]);
 scenario('edit gain live', audio({ gain: 11 }), [...presses(['no', 'yes', 'down', 'yes']), draw(10), ...walk(['up', 'up', 'down', 'down', 'down'], 20), ['press', 'no', 100], draw(101)]);
 scenario('edit threshold', audio({ th: 95 }), [...presses(['no', 'yes', 'down', 'down', 'down', 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20)]);
-scenario('edit threshold live bar green', audio({ th: 50, conf: 0.72 }), [...presses(['no', 'yes', 'down', 'down', 'down', 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20)]);
-scenario('edit threshold live bar red', audio({ th: 90, conf: 0.72 }), [...presses(['no', 'yes', 'down', 'down', 'down', 'yes']), draw(10), ...walk(['down', 'down'], 20)]);
 scenario('edit lowconf wide', null, [...presses(['no', 'yes', 'down', 'down', 'yes']), draw(10), ...walk(['up', 'up'], 20), ['press', 'yes', 50], draw(51)]);
 scenario('edit ltmode wide', null, [...presses([...menuItem(1), 'yes']), draw(10), ...walk(['up', 'up', 'up', 'down'], 20), ['press', 'yes', 60], draw(61)]);
 scenario('edit usb', null, [...presses([...menuItem(4), 'yes']), draw(10), ...walk(['down', 'down'], 20), ['press', 'yes', 50], draw(51)]);
