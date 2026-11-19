@@ -419,6 +419,7 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->level_max = s_meter.hi;
     c->armed = s_snap.armed;
     c->running = s_snap.playing && !s_snap.armed;
+    c->held = s_snap.hold;
     c->tracker_leads = (uint8_t)audio;
     c->no_beat_nudge = 1;
     if (c->running && s_snap.mpb > 0) {

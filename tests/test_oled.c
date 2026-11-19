@@ -125,6 +125,7 @@ static void set_hold(void *user, int on)
     struct world *w = user;
     logf_(w, "hold %d", on ? 1 : 0);
     w->c.running = !on;
+    w->c.held = (uint8_t)(on != 0);
 }
 
 static void link_start_stop(void *user, int on)
@@ -132,6 +133,7 @@ static void link_start_stop(void *user, int on)
     struct world *w = user;
     logf_(w, "lss %d", on ? 1 : 0);
     w->c.running = (uint8_t)(on != 0);
+    w->c.held = (uint8_t)(!on);
 }
 
 static void shift_beats(void *user, int halves)
@@ -186,6 +188,7 @@ static void parse_state(struct jo_ctx *c, const char *key, const char *v)
     else if (!strcmp(key, "confStop")) c->conf_stop = (uint8_t)atoi(v);
     else if (!strcmp(key, "running")) c->running = (uint8_t)atoi(v);
     else if (!strcmp(key, "armed")) c->armed = (uint8_t)atoi(v);
+    else if (!strcmp(key, "held")) c->held = (uint8_t)atoi(v);
     else if (!strcmp(key, "trackerLeads")) c->tracker_leads = (uint8_t)atoi(v);
     else if (!strcmp(key, "xiao")) c->no_beat_nudge = c->no_ms_nudge = (uint8_t)atoi(v);
     else if (!strcmp(key, "usb")) c->usb = (uint8_t)atoi(v);

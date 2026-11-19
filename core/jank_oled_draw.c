@@ -213,8 +213,14 @@ static void home_top(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
     if (tri)
         for (int r = 0; r < 7; r++)
             jo_rect(fb, 2, r, (r < 6 - r ? r : 6 - r) + 1, 1, 1);
-    else if (!c->armed)
-        jo_rect(fb, 2, 1, 5, 5, 1);
+    else if (!c->armed) {
+        if (c->held)
+            jo_rect(fb, 2, 1, 5, 5, 1);
+        else {                                                  /* the user's Start, the outputs held by the machine layer: pause */
+            jo_rect(fb, 2, 1, 2, 5, 1);
+            jo_rect(fb, 5, 1, 2, 5, 1);
+        }
+    }
     if (lt)
         jo_icon(fb, lt, 7, 12, 0);
     if (c->net.mode < 3) {

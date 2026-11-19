@@ -176,7 +176,8 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   (as no hold). A first start with STOP / START waits for the window to fill with beats on the grid (about 7 s of music
   at 80 %), as the player. `status` and `beat`: `conf=`, `act=`, `gated=0|1`, `silent=0|1`, `threshold=`, `lowconf=`;
   `get`: `lowconf=`, `threshold=`; the transport icon (`outputs=`) is `stopped` while gated, `armed` once the gate opens
-  until the bar line. The HOME line's `conf` is the new confidence.
+  until the bar line. The screen's top-left icon: triangle = running, blinking triangle = armed, square = the user's Stop (`hold=1`, either mode),
+  two bars (pause) = not running, not armed and `hold=0` (the machine layer holds the outputs: no bpm yet, gate, silence, LOST). The HOME line's `conf` is the new confidence.
   **The confidence SHOWN is graded** (`set graded on|off`, default on, not stored: on again at every start; both followers; `get`
   and `status` say `graded=`): the CONFIDENCE bar, HOME's and `status`'s `conf` are the graded value (docs/beat.md "The graded
   confidence") instead of the gate's, which is about 100 % whenever the follower is locked and 0 % when not. The gate itself is

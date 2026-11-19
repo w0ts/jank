@@ -67,7 +67,7 @@ function setters(s, log) {
     s.bpm = s.bpm ? (d > 0 ? s.bpm * 2 : s.bpm / 2) : 0;
     return s.bpm;
   };
-  return { setField, tempoStep, setHold: on => { log.push('hold ' + (on ? 1 : 0)); s.running = !on; }, linkStartStop: on => { log.push('lss ' + (on ? 1 : 0)); s.running = on; } };
+  return { setField, tempoStep, setHold: on => { log.push('hold ' + (on ? 1 : 0)); s.running = !on; s.held = !!on; }, linkStartStop: on => { log.push('lss ' + (on ? 1 : 0)); s.running = on; s.held = !on; } };
 }
 
 // one case: a state, then steps ['draw', t] | ['press', btn, t]
@@ -173,7 +173,12 @@ scenario('state coast unknown conf', audio({ confKnown: false, conf: 0.2, runnin
 scenario('state armed', audio({ running: false, armed: true, beatN: null }), [draw(0), draw(400)]);
 
 // ---- the top bar: transport, fold, link glyph and peers, signal, plug, battery ----
-scenario('stopped', audio({ running: false, beatN: null }), [draw(0)]);
+scenario('transport running', audio({}), [draw(0)]);
+scenario('transport armed', audio({ running: false, armed: true, beatN: null }), [draw(0), draw(400)]);
+scenario('transport paused (started, not running)', audio({ running: false, beatN: null }), [draw(0)]);
+scenario('transport stopped (user hold)', audio({ running: false, held: true, beatN: null }), [draw(0)]);
+scenario('link transport paused', link({ running: false, beatN: null }), [draw(0)]);
+scenario('link transport stopped (user hold)', link({ running: false, held: true, beatN: null }), [draw(0)]);
 scenario('armed blink', audio({ running: false, armed: true, beatN: null }), [draw(0), draw(400), draw(799), draw(1200)]);
 for (const f of [2, 4, 0.5, 0.25]) scenario('fold ' + f, audio({ fold: f }), [draw(0)]);
 for (const p of [0, 1, 2, 12]) {
