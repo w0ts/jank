@@ -122,6 +122,7 @@ static void prefs_save(void)
         ESP_LOGE(TAG, "screen settings not saved: %s", esp_err_to_name(e));
 }
 
+static volatile int8_t s_play_req = -1;   /* the user's Start / Stop (bridge_play) the ui task has not stored yet: 1 / 0, -1 none */
 static volatile int8_t s_lead_req = -1;   /* a `set lead` the ui task has not applied yet: 0 / 1, -1 none */
 
 /* the flash rule of the settings (jank_core.h jk_save_due): not while playing; and once the edits have settled (JK_PREFS_SETTLE_MS) */
@@ -132,6 +133,14 @@ static void prefs_step(uint32_t now)
         s_lead_req = -1;
         if (s_prefs.lead != (uint8_t)req) {
             s_prefs.lead = (uint8_t)req;
+            jk_prefs_changed(&s_prefs_save, now);
+        }
+    }
+    req = s_play_req;
+    if (req >= 0) {                      /* the user's Start / Stop: stored with the other preferences (the gate's and the silence's holds never come here) */
+        s_play_req = -1;
+        if (s_prefs.started != (uint8_t)req) {
+            s_prefs.started = (uint8_t)req;
             jk_prefs_changed(&s_prefs_save, now);
         }
     }
@@ -333,6 +342,10 @@ int uis_lead_get(void)
 }
 
 void uis_lead_set(int on) { s_lead_req = on ? 1 : 0; }
+
+/* the user's last Start (1) / Stop (0) of the outputs: read once at boot (bridge_start), written by every user press (bridge_play) */
+int uis_started_get(void) { return s_prefs.started; }
+void uis_started_set(int on) { s_play_req = on ? 1 : 0; }
 
 static const struct jo_ctx *build_ctx(void *user, uint32_t now)
 {

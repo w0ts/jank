@@ -6,6 +6,7 @@
 #include "app.h"
 #include "board.h"
 #include "jank_hold.h"
+#include "uiscreen.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -495,6 +496,7 @@ int bridge_play(int play)
         follow_transport(midi_now_us());
     }
     xSemaphoreGive(s_lock);
+    uis_started_set(play);            /* every user press (HOME's YES, `play` / `stop`, the click) ends here: stored */
     return r;
 }
 
@@ -555,7 +557,9 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     memcpy(s_bssid, s_b.bssid, 6);
     memcpy(s_own, mac, 6);
     js_clear(&s_scan);
-    jho_init(&s_hold);                 /* power-on: the user's layer stopped until the user's Start (M2h) */
+    jho_init(&s_hold);                 /* power-on: the user's layer stopped until the user's Start (M2h) ... */
+    if (uis_started_get())
+        jho_set(&s_hold, 0);           /* ... unless the user's last press was Start (stored): as that Start, nothing sent to a Link session */
     jp_init(&s_peer, peer_mac, mac, esp_random(), peer_out, NULL);
     s_on_network = cfg->net == JK_NET_WIFI;
     jn_init(&s_net, mac, esp_random(), cfg->name, LK_MCAST_IP, net_out, NULL);
