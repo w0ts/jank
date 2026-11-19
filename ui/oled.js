@@ -34,7 +34,9 @@
                             the line under the boxes = how sure; nothing under the boxes = still listening
                 YES + UP/DOWN  AUDIO mode: AUDIO SHIFT, the timing 1 ms (every output; repeats while held; 1 s overlay
                                "AUDIO SHIFT +3 MS", "AUTO" at 0): the user's shift on top of the auto latency (jank M2h).
-                               A combo cancels the NO / YES release action.
+                               A combo cancels the NO / YES release action. So does a hold long enough for the hint box
+                               (400 ms, AUDIO mode, HOME): it says what UP / DOWN will do, and releasing the key then does nothing.
+                               A tap (released before the box) acts as always; LINK mode shows no box, a long press there still acts.
      MENU     AUDIO, LINK TRANSPORT (LINK mode: IGNORE = the clocks run on Link's tempo and beat, own Start / Stop only;
               FOLLOW = they also start / stop with the session; FOLLOW+LEAD = and our Start / Stop starts / stops the session),
               AUTO BAR (AUDIO mode: OFF = the bar left where it is; AT START = the bar's 1 found in the music and Link's bar moved onto it
