@@ -2,10 +2,11 @@
 
 `box.scad` (parametric OpenSCAD), the board as boxes in `board_model.scad` (written from `../lcd2.kicad_pcb` by
 `board_model.py`, KiCad's python), pictures by `make_renders.sh`, the floor map by `floor_map.py`, the collision check
-`box_check.py`. The older `case.scad` (93 x 62.6 layout) is untouched. STLs: `box-shell.stl`, `box-lid.stl`,
-`box-cap.stl` + `box-cap-symbols.stl` (the cap's inlaid symbols, second colour, same origin), exported in the
-ASSEMBLY orientation (turn them in the slicer: shell face down, lid outside down, cap top down; load the cap and its
-symbols together as one multi-part object so they stay aligned).
+`box_check.py`. The older `case.scad` (93 x 62.6 layout) is untouched. STLs: `box-shell.stl` + `box-shell-labels.stl`
+(the face's inlaid labels, second colour, same origin), `box-lid.stl`, `box-cap.stl` + `box-cap-symbols.stl` (the
+cap's inlaid symbols, second colour, same origin), exported in the ASSEMBLY orientation (turn them in the slicer:
+shell face down, lid outside down, cap top down; load each part with its inlays as one multi-part object so they stay
+aligned).
 
 **Cap symbols** (mots, 2026-11-19; multi-material, AMS / MMU): a solid up-pointing triangle on the UP arm (SW3), a
 solid down-pointing one on the DOWN arm (SW4) (as jank's own page D-pad, no stem), an X (NO) on the left arm (SW1), a
@@ -23,7 +24,7 @@ flush: cut 0.6 deep (`sym_depth`, 3 layers of 0.2) into the cap's top face; `box
 |---|---|
 | `box-assembly.png` | closed box, 3/4 view from the front left |
 | `box-exploded.png` | shell up, cap above it, board, lid down |
-| `box-top.png` | the face from above: screen window, D-pad, the engraved labels |
+| `box-top.png` | the face from above: screen window, D-pad, the inlaid labels and cap symbols in the second colour |
 | `box-inside.png` | the lid with the parts under the board (shell and our board hidden): strip rails, the cell in its corner, the L, the screw tabs, the hook, tongues, the power switch |
 | `box-section-din.png` | section x = 64.75 (J5's DIN, the D-pad centre: the cap's pivot nub and the UP / DOWN pads, the L's top arm, the cell), seen from the right |
 | `box-section-screen.png` | section y = 41 (the D-pad centre, the screen, the LCD-2's USB-C slot, the L's left arm, the cell), seen from the front |
@@ -41,6 +42,11 @@ flush: cut 0.6 deep (`sym_depth`, 3 layers of 0.2) into the cap's top face; `box
 - **Bottom lid**: flat, 2.0 mm, with the parts that hold things from below: two rails under each bridge strip, the
   cell's L, three screw tabs and a hook (below) and tongues that close the wall slots under the jacks and the LCD-2's
   USB-C. **Printed outside down**: everything grows straight up, no bridges.
+- **The DIN lock** (mots, 2026-11-19: "a rail to lock the din so that the effort is not on the pcb"), on the lid:
+  a **rail** behind both DIN bodies (x 52.05-92.6, y 15.385-19.4, from the lid up to 0.2 under our board; it joins the
+  L's top arm and stops 1.5 short of the hook's tab so the tab can flex) takes a plug's push; a **tongue** in the DIN
+  window (its width less 0.2 a side) rises 2.0 over the lid, in front of the DIN plates' lowest 1.5 mm, and takes a
+  plug's pull. ASSUMED: the DIN-504B's plug opening starts more than 1.5 mm above its bottom (`din_lock_h`): **measure**.
 - **The lid's fixing** (mots, 2026-11-19: no corner towers): SIDE SCREWS. Three tabs rise from the lid just inside
   the walls; an M3 countersunk screw goes sideways through the wall into an M3 heat-set insert in each tab, its head
   flush in a countersink in the wall. The right wall has no free stretch for a screw (J6's DIN reaches the floor to
@@ -149,8 +155,40 @@ Heights about our board's top (z 0): face top 6.8, face underside 4.4, board bot
 | lid screws | top x 37, bottom x 46, left y 10; z -19.0 | d 3.4 with a 90 deg countersink d 6.4 |
 | the hook's window | right wall, y 15.99-21.59, z -17.3..-14.5 | 5.6 x 2.8 through the wall |
 
-Labels engraved 0.6 mm (Liberation Sans Bold 2.2 mm): MIDI 1, MIDI 2, TO / ESP, TO / DEVICE, MIDI 1, MIDI 2 (top
-edge), CLK, RST (right), LINE IN (bottom).
+**Face labels** (mots, 2026-11-19: a second colour, multi-material): inlaid like the cap's symbols, cut 0.6 deep (3
+layers; the shell prints face down, so they are its first 3 layers) into the face's top; `box-shell-labels.stl` is
+the same shapes 0.6 thick filling the cuts, same origin as `box-shell.stl`. Font **Avenir Next Condensed Heavy**, a
+macOS system font (`/System/Library/Fonts/Avenir Next Condensed.ttc`, found on this Mac; another machine without it
+falls back to another font: check the picture), **size 2.2** (mots: 5.4 was "too big ! make the text half size",
+then "a bit smaller"), letter spacing 1.1, outlines thinned 0.02 (`lab_h`, `lab_spacing`, `lab_thin`). At 5.4 a
+morphological test gave strokes >= 0.9 and gaps >= 0.55 mm; at 2.2 that scales to **strokes about >= 0.37 and gaps
+>= 0.22 mm (not re-measured)**: under a 0.4 nozzle's line (thin strokes may print patchy, the E's arms may merge);
+meant for a 0.2 nozzle. A small triangle (the
+cap's shape, 2.6 x 2.1, `lab_tri`) points at each socket (mots: "use our triangle to point at the socket"):
+
+| label | where (board mm) |
+|---|---|
+| top edge, from the wall in | triangles (y 2.4) at each socket, then the names (y 5.2); no "TO" (mots) |
+| 1 MIDI 2 (TRS) | 1 at x 6.3, MIDI at x 12.7 (between them), 2 at x 19.1 |
+| ESP, DEVICE (USB-C) | ESP at x 31.95, DEVICE at x 44.95 |
+| 1 MIDI 2 (DIN) | 1 at x 62.5, MIDI at x 73.55, 2 at x 84.6 |
+| ESP (the LCD-2's USB-C, left wall) | triangle pointing left at x 0.4, y 41; the word running up the edge below it (y 46.6): only ~5.7 mm between the face's edge and the window's chamfer (mots: "we miss the esp socket on the left") |
+| CLK, RST | text at x 88.5, y 31 / 51; triangle pointing right at x 93.3 |
+| LINE IN | text at x 30, y 77; triangle pointing down at y 80.2 |
+
+Picture: `box-top.png`.
+
+**Bambu Studio projects** (mots: black body, pink text, PETG Basic; the nozzle is per project, so two files):
+- `box-shell-0.2.3mf`: the shell, face down, labels on filament 2. **P2S 0.2 nozzle**, 0.10 mm Standard (the 2.2 mm
+  text's ~0.37 mm strokes are under a 0.4 nozzle's line; PLA text was ruled out: it barely bonds to PETG).
+- `box-lid-cap-0.4.3mf`: plate 1 the lid (outside down), plate 2 the D-pad cap (face down, symbols on filament 2,
+  1.7 mm strokes). **P2S 0.4 nozzle**, 0.20 mm Standard.
+
+Both: two Bambu PETG Basic filaments (1 black #000000, 2 pink #F5A3C7: mots matches them to the AMS), Textured PEI
+plate. Built with the Bambu Studio CLI (`--load-assemble-list`, the system presets flattened through their `inherits`
+chain first: loaded alone, the P2S preset lacks its 256 mm bed), then patched for what the CLI leaves out (objects
+missing from their plates, the bed type: Cool Plate refuses PETG, the colours, the object names). The CLI loads and
+validates them but crashes slicing a P2S (nozzle grouping), so they are not sliced here: mots slices in the app.
 
 ## Parameters and their sources
 
@@ -275,5 +313,5 @@ backlight outline from our top to the screen front; the LCD-2's back parts one 3
 ```bash
 cd hardware/jank-mini-3/case && /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3.9 board_model.py   # only after a board change
 cd hardware/jank-mini-3/case && sh make_renders.sh && python3 floor_map.py && python3 box_check.py   # python3 box_check.py din_depth=19.6
-cd hardware/jank-mini-3/case && for p in shell lid cap; do nice -n 19 openscad --backend=manifold -D "part=\"$p\"" -o box-$p.stl box.scad; done; nice -n 19 openscad -D 'part="cap_symbols"' -o box-cap-symbols.stl box.scad
+cd hardware/jank-mini-3/case && for p in shell lid cap; do nice -n 19 openscad --backend=manifold -D "part=\"$p\"" -o box-$p.stl box.scad; done; for p in cap_symbols shell_labels; do nice -n 19 openscad --backend=manifold -D "part=\"$p\"" -o "box-$(echo $p | tr _ -).stl" box.scad; done
 ```
