@@ -182,6 +182,14 @@ static void test_cell(void)
     CHECK(jl_batt_pct(3700, 3300) == 33 && jl_batt_pct(3725, 3300) == 39 && jl_batt_pct(4000, 3300) == 80);
     CHECK(jl_batt_pct(3500, 3500) == 0 && jl_batt_pct(4200, 3500) == 100 && jl_batt_pct(3600, 3500) > 0);
     CHECK(jl_batt_pct(3600, 3300) > jl_batt_pct(3550, 3300));
+    /* the lcd2's divider (R19 200 k / R20 100 k, ratio 3): a full cell is 1400 mV at the pin, empty 1100 mV */
+    CHECK(jl_cell_pin_pct(1400, 3, 3300) == 100 && jl_cell_pin_pct(1233, 3, 3300) == jl_batt_pct(3699, 3300));
+    CHECK(jl_cell_pin_pct(1100, 3, 3300) == 0 && jl_cell_pin_pct(1000, 3, 3300) == 0);
+    CHECK(jl_cell_pin_pct(1333, 3, 3300) == jl_batt_pct(3999, 3300) && jl_cell_pin_pct(1167, 3, 3300) == jl_batt_pct(3501, 3300));
+    /* fitted (>= 0) only above 2000 mV at the cell = 667 mV at the pin: a grounded or floating-low pin is no cell, never 0 % */
+    CHECK(jl_cell_pin_pct(0, 3, 3300) == -1 && jl_cell_pin_pct(5, 3, 3300) == -1 && jl_cell_pin_pct(666, 3, 3300) == -1);
+    CHECK(jl_cell_pin_pct(667, 3, 3300) == 0 && jl_cell_pin_pct(-1, 3, 3300) == -1 && jl_cell_pin_pct(1400, 0, 3300) == -1);
+    CHECK(jl_cell_pin_pct(1000, 2, 3300) == 0);
 }
 
 #define IN_N 125000u                   /* 3 s at 41,666.67 Hz */
