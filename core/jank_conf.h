@@ -28,7 +28,7 @@
 #define JCF_DELAY_S 0.1
 #define JCF_TOL 0.1                     /* of a period */
 #define JCF_HYST_PCT 5                  /* the gate opens again this many points above the threshold */
-#define JCF_THRESHOLD_DEFAULT 60        /* percent: the threshold applies to the confidence SHOWN (the graded value); the owner tunes it by feel */
+#define JCF_THRESHOLD_DEFAULT 80        /* percent (player.py DEFAULT_MIN_CONFIDENCE 0.8, the emulator's THRESHOLD) */
 /* tracked beats kept: the window needs (8 s + 2 margins) / the tracker's shortest period (180 BPM, 0.33 s) = 26; the rest
  * is room for a tracker that beats faster than its range in a short burst */
 #define JCF_KEEP 64

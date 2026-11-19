@@ -182,10 +182,10 @@ One line 6 px high (rows y + 4..y + 9), no outline, no track; its **length is th
 wide, 10 tall, rows y + 2..y + 11) is XOR-ed at `128 + round(122 x threshold)`: a gap where the line passes, a stub above and below where it does not.
 Value, line and notch carry the same ink id.
 
-**One number.** The line, the value, the notch, the ink (red / amber / green), the state word's COAST, the jank's gate (STOP / START, `gated`) and the
-LED's low-confidence blink all judge the **same shown confidence**: the graded value (`graded=on`, the default) or, with `graded=off`, the gate's value. The notch is
-always drawn, at the threshold, so the user sees the line cross it exactly when the colour changes and the outputs stop (closes at the threshold, opens again at
-threshold + 5). The same on the mono OLED's `CF` bar (tick).
+**With the graded confidence shown** (`confGraded`, the jank's `graded=on`, the default): the length and the value are the graded number, which has no
+threshold, so the notch is **not drawn** (the line is the whole of the row). The ink (red / amber / green) and the state word's COAST keep judging the
+jank's gate value (`confGate`, `status` `conf_gate`), so a good-looking line does not hide a gate that is about to stop the outputs. With `graded=off`
+(or an older jank) everything is as above. The same on the mono OLED's `CF` bar (no tick).
 
 | value | rule |
 |---|---|
