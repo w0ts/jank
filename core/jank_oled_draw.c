@@ -302,7 +302,7 @@ static void sub(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
     const struct jo_sub *s = &jo_subs[ui->sub];
     title_bar(fb, s->title, NULL);
-    for (int i = 0; i < s->n; i++) {
+    for (int i = 0; i < s->n_oled; i++) {
         int y = 14 + i * 11, sel = i == ui->ocur, v = !sel, g = jo_spec_get(s->rows[i], c);
         const struct jo_spec *sp = jo_spec(s->rows[i]);
         char val[24];

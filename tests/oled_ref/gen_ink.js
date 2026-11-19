@@ -50,7 +50,7 @@ function setters(s, log) {
   const n = s.net;
   const setField = (f, v) => {
     log.push('set ' + f + ' ' + v);
-    if (f === 'threshold') s.th = v; else if (f === 'lowconf') s.confStop = v === 1; else if (f === 'ltmode') s.ltMode = v;
+    if (f === 'threshold') s.th = v; else if (f === 'pause') s.pauseDb = v; else if (f === 'lowconf') s.confStop = v === 1; else if (f === 'ltmode') s.ltMode = v;
     else if (f === 'gain') s.gain = v; else if (f === 'bright') s.bright = v; else if (f === 'sleep') s.sleep = v;
     else if (f === 'inoff') s.inOff = v; else if (f === 'out0') s.offs[0] = v; else if (f === 'out1') s.offs[1] = v;
     else if (f === 'out2') s.offs[2] = v; else if (f === 'rate') s.rate = v;
@@ -110,6 +110,7 @@ for (const v of [0, 0.5, 1]) scenario('cf line ' + v, audio({ conf: v, th: 70 })
 scenario('cf 75 th 50', audio({ conf: 0.75, th: 50 }), [draw(0)]);
 scenario('cf 75 th 90 keep running', audio({ conf: 0.75, th: 90, confStop: false }), [draw(0)]);
 scenario('cf th 0', audio({ conf: 0.01, th: 0 }), [draw(0)]);
+scenario('input notch pause -30', audio({ pauseDb: -30, levelDb: -35 }), [draw(0)]);
 scenario('cf th 100', audio({ conf: 0.99, th: 100 }), [draw(0)]);
 scenario('cf rounding 69.5', audio({ conf: 0.695, th: 70 }), [draw(0)]);
 scenario('cf unknown', audio({ confKnown: false, conf: 0 }), [draw(0)]);
@@ -233,6 +234,8 @@ scenario('edit insrc', null, [...presses(['no', 'yes', 'yes']), draw(10), ...wal
 scenario('edit gain live', audio({ gain: 11 }), [...presses(['no', 'yes', 'down', 'yes']), draw(10), ...walk(['up', 'up', 'down', 'down', 'down'], 20), ['press', 'no', 100], draw(101)]);
 scenario('edit threshold', audio({ th: 95 }), [...presses(['no', 'yes', 'down', 'down', 'down', 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20)]);
 scenario('edit threshold live green', audio({ th: 50, conf: 0.72 }), [...presses(['no', 'yes', 'down', 'down', 'down', 'yes']), draw(10), ...walk(['up', 'up', 'down'], 20)]);
+scenario('sub audio pause', audio({ pauseDb: -45 }), [...presses(['no', 'yes']), draw(5), ...walk(['down', 'down', 'down', 'down', 'down'], 10)]);
+scenario('edit pause', audio({ pauseDb: -40 }), [...presses(['no', 'yes', 'down', 'down', 'down', 'down', 'yes']), draw(10), ...walk(['up', 'up', 'down', 'down', 'down'], 20), ['press', 'yes', 80], draw(81)]);
 scenario('edit threshold live red', audio({ th: 90, conf: 0.72 }), [...presses(['no', 'yes', 'down', 'down', 'down', 'yes']), draw(10), ...walk(['down', 'down'], 20)]);
 scenario('edit threshold live unknown', audio({ th: 70, confKnown: false }), [...presses(['no', 'yes', 'down', 'down', 'down', 'yes']), draw(10), ...walk(['up'], 20)]);
 scenario('edit lowconf wide', null, [...presses(['no', 'yes', 'down', 'down', 'yes']), draw(10), ...walk(['up', 'up'], 20), ['press', 'yes', 50], draw(51)]);

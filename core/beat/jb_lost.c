@@ -6,15 +6,16 @@ void jl_init(struct jb_lost *l)
 {
     for (int i = 0; i < 4; i++)
         l->losts[i] = 0;
+    l->pause_db = JL_PAUSE_DB;
     jl_clear(l);
 }
 
 void jl_clear(struct jb_lost *l)
 {
     l->next_line = -1.0;
-    l->level = JBK_NONE;
     l->lost = l->cause = 0;
     l->fit_run = l->quiet_run = l->off_n = l->unfit_run = 0;
+    l->hold_back = 0;
 }
 
 static uint8_t inc(uint8_t v) { return v < 255u ? (uint8_t)(v + 1u) : v; }
@@ -44,9 +45,7 @@ static void judge_line(struct jb_lost *l, const double *strong, size_t ns, const
         fit = 1;
     const double lv = kick ? jbk_line_level(kick, line, p) : JBK_NONE;
     const int known = lv > JBK_NONE + 1.0;
-    const int quiet = known && (lv < JL_QUIET_ABS || (l->level > JBK_NONE + 1.0 && lv < l->level - JL_QUIET_REL));
-    if (fit && known)
-        l->level = l->level > JBK_NONE + 1.0 ? l->level + JL_LEVEL_EMA * (lv - l->level) : lv;
+    const int quiet = known && lv < l->pause_db;
     if (fit) {
         l->fit_run = inc(l->fit_run);
         l->off_n = 0;
@@ -86,7 +85,7 @@ int jl_step(struct jb_lost *l, const double *strong, size_t n_strong, const stru
     uint8_t b = 0;
     judge(l, strong, n_strong, kick, has_grid, t0, period, now);
     if (l->lost) {
-        if (l->fit_run >= JL_BACK_LINES && l->quiet_run == 0) {
+        if (l->fit_run >= JL_BACK_LINES && l->quiet_run == 0 && !l->hold_back) {
             l->lost = 0;
             l->cause = JLO_NONE;
             b = 1;

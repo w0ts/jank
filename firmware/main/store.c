@@ -29,9 +29,10 @@ static int valid(const struct jk_cfg *c)
 
 static void load_usb(nvs_handle_t h, struct jk_cfg *c)
 {
-    uint8_t u[8];                      /* usb, source, autobar (since M2c), usbmidi (since M2d), lowconf, threshold (since M2e),
+    uint8_t u[9];                      /* usb, source, autobar (since M2c), usbmidi (since M2d), lowconf, threshold (since M2e),
                                         * rate (since M2i): a shorter blob keeps the defaults. The 8th byte (the retired BEAT FLASH, written by
-                                        * the lcd2 builds) is read to fit the blob, never used; it is not written any more */
+                                        * the lcd2 builds) is read to fit the blob, never used; written 0. The 9th (since 2026-11-19):
+                                        * PAUSE LEVEL as -dBFS (core/jank_core.h pause_db) */
     size_t n = sizeof u;
     esp_err_t e = nvs_get_blob(h, KEY_USB, u, &n);
     if (e == ESP_OK && n >= 2u && u[0] <= JUR_USB_HOST && u[1] <= JUR_SRC_LINK && (n < 3u || u[2] <= JK_AUTOBAR_ALWAYS) && (n < 4u || u[3] <= 1u)
@@ -48,6 +49,8 @@ static void load_usb(nvs_handle_t h, struct jk_cfg *c)
         }
         if (n >= 7u)
             c->rate = u[6];
+        if (n >= 9u && u[8] >= (uint8_t)-JK_PAUSE_DB_MAX && u[8] <= (uint8_t)-JK_PAUSE_DB_MIN)
+            c->pause_db = (int8_t)-(int)u[8];
     } else if (e != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGW(TAG, "stored USB settings ignored: %s, %u bytes", esp_err_to_name(e), (unsigned)n);
     }
@@ -106,7 +109,7 @@ esp_err_t store_save(const struct jk_cfg *c)
         return e;
     e = nvs_set_blob(h, KEY, c, STORED_SIZE);
     if (e == ESP_OK) {
-        const uint8_t u[7] = {c->usb, c->source, c->autobar, c->usbmidi, c->lowconf, c->threshold, c->rate};
+        const uint8_t u[9] = {c->usb, c->source, c->autobar, c->usbmidi, c->lowconf, c->threshold, c->rate, 0, (uint8_t)-(int)c->pause_db};
         e = nvs_set_blob(h, KEY_USB, u, sizeof u);
     }
     if (e == ESP_OK) {

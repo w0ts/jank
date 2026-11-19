@@ -692,7 +692,15 @@ static void test_lowconf(void)
     struct jk_cfg before;
     setup();
     CHECK(cfg.lowconf == JCF_STOP && cfg.threshold == 80);
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=stop\nthreshold=80\n"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=stop\nthreshold=80\npause_db=-40\n"));
+    /* PAUSE LEVEL (core/beat/jb_lost.h): set pause_db -70..-20 dBFS, -40 by default, stored */
+    before = cfg;
+    CHECK(cfg.pause_db == JK_PAUSE_DB_DEFAULT && run("set pause_db -35") == JK_CTL_CFG_CHANGED && cfg.pause_db == -35);
+    CHECK(jk_cfg_stored_differs(&before, &cfg));
+    CHECK(run("set pause_db -71") == JK_CTL_NONE && run("set pause_db -19") == JK_CTL_NONE && run("set pause_db x") == JK_CTL_NONE);
+    CHECK(run("set pause_db -70") == JK_CTL_CFG_CHANGED && run("set pause_db -20") == JK_CTL_CFG_CHANGED && cfg.pause_db == -20);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nthreshold=80\npause_db=-20\nrate="));
+    run("set pause_db -40");
     before = cfg;
     CHECK(run("set lowconf run") == JK_CTL_CFG_CHANGED && cfg.lowconf == JCF_RUN && jk_cfg_stored_differs(&before, &cfg));
     CHECK(run("set lowconf stop") == JK_CTL_CFG_CHANGED && cfg.lowconf == JCF_STOP);
@@ -731,7 +739,7 @@ static void test_follow(void)
     struct jk_cfg before;
     setup();
     CHECK(cfg.rate == 1);
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nthreshold=80\nrate=on\n"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nthreshold=80\npause_db=-40\nrate=on\n"));
     before = cfg;
     CHECK(run("set rate off") == JK_CTL_CFG_CHANGED && cfg.rate == 0 && jk_cfg_stored_differs(&before, &cfg));
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nrate=off\n"));
@@ -783,7 +791,7 @@ static void test_follow(void)
     snap.beat.follow = 1;                                             /* lock */
     snap.beat.rate_x10000 = 9700;
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nfollow=lock\n") && strstr(out, "\nrate_ratio=0.9700\n"));
-    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|rate|follower|skip|graded|newsong|burn|usb|") && !strstr(out, "ble"));
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "|threshold|pause_db|rate|follower|skip|graded|newsong|burn|usb|") && !strstr(out, "ble"));
 }
 
 /* `about`: the ABOUT screen's numbers as a second reply (not in `status`, which has no room for them: test_status_size). Unknown until the

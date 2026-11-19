@@ -31,7 +31,8 @@ struct stats {
     } while (0)
 
 static const char *const FIELD_NAMES[JO_F_COUNT] = {"netmode", "inoff", "out0", "out1", "out2", "rate", "threshold", "gain", "ltmode", "bright",
-                                                    "sleep", "group", "lowconf", "insrc", "usbrole", "autobar", "usbmidi", "ssid", "pass", "appass", "apname"};
+                                                    "sleep", "group", "lowconf", "insrc", "usbrole", "autobar", "usbmidi", "pause", "ssid", "pass", "appass",
+                                                    "apname"};
 
 /* one case's world, as gen_cases.js's world(): the state the setters change, and the log of calls */
 struct world {
@@ -59,6 +60,7 @@ static void set_field(void *user, enum jo_field f, int v)
     logf_(w, "set %s %d", FIELD_NAMES[f], v);
     switch (f) {
     case JO_F_THRESHOLD: c->th = v; break;
+    case JO_F_PAUSE: c->pause_db = v; break;
     case JO_F_LOWCONF: c->conf_stop = v == 1; break;
     case JO_F_LTMODE: c->lt_mode = (uint8_t)v; break;
     case JO_F_GAIN: c->gain = v; break;
@@ -203,6 +205,7 @@ static void parse_state(struct jo_ctx *c, const char *key, const char *v)
     else if (!strcmp(key, "linkBpm")) parse_num(v, &c->has_link_bpm, &c->link_bpm);
     else if (!strcmp(key, "conf")) c->conf = strtod(v, NULL);
     else if (!strcmp(key, "th")) c->th = atoi(v);
+    else if (!strcmp(key, "pauseDb")) c->pause_db = atoi(v);
     else if (!strcmp(key, "gain")) c->gain = atoi(v);
     else if (!strcmp(key, "levelDb")) c->level_db = strtod(v, NULL);
     else if (!strcmp(key, "levelMin")) c->level_min = strtod(v, NULL);
