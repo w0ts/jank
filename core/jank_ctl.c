@@ -245,6 +245,7 @@ static void put_audio(const struct jk_cfg *c, const struct jk_snapshot *s, struc
         jfo_name(t->fold_exp), t->fold_manual);
     put(w, "rms_db=%d\nrms_min_db=%d\nrms_max_db=%d\npeak_db=%d\n", t->level_db, t->level_min_db, t->level_max_db, t->peak_db);
     put_conf(c, t, w);
+    put(w, "conf_gate=%u\n", t->conf_graded ? t->conf_gate_pct : t->conf_pct);   /* the gate's own value (conf is the graded one while graded=on) */
     put_follow(c, t, w, 0);
 }
 

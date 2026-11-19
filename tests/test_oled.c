@@ -245,6 +245,8 @@ static void parse_state(struct jo_ctx *c, const char *key, const char *v)
     else if (!strcmp(key, "silent")) c->silent = (uint8_t)atoi(v);
     else if (!strcmp(key, "gated")) c->gated = (uint8_t)atoi(v);
     else if (!strcmp(key, "confHold")) c->conf_hold = (uint8_t)atoi(v);
+    else if (!strcmp(key, "confGraded")) c->conf_graded = (uint8_t)atoi(v);
+    else if (!strcmp(key, "confGate")) c->conf_gate = strtod(v, NULL);
     else if (!strcmp(key, "fold")) {
         double f = strtod(v, NULL);
         c->fold_exp = f == 2.0 ? 1 : f == 4.0 ? 2 : f == 0.5 ? -1 : f == 0.25 ? -2 : 0;

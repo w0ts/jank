@@ -69,7 +69,7 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
 | `err_us` | the session's beat grid against the tracked beat before the last correction; stays within 5 ms when they agree |
 | `offset_us`, `latency_us` | the sample-count-to-local-time offset (µs since the timer started) and the latency setting |
 | `bar`, `bar_phi`, `bar_lead`, `bar_moves` | AUTO BAR (also in `status`): off / listening / locked / manual, the 1's count position (-1 none), the best phase's lead (the first move at 2.00), the session's bar moves |
-| `conf` | the confidence SHOWN (also in `status`): with `graded=on` (default) the graded value, see "The graded confidence"; with `graded=off` LOW CONFIDENCE's gate value, since M2i against the grid lines the outputs published, not the grid extended back. the gate and the threshold judge this same number (the robust follower keeps its own gate and shows it) |
+| `conf` | the confidence SHOWN (also in `status`): with `graded=on` (default) the graded value, see "The graded confidence"; with `graded=off` LOW CONFIDENCE's gate value, since M2i against the grid lines the outputs published, not the grid extended back. `status` `conf_gate` is the gate's own value either way |
 | `conf_hold` | 1 while the confidence holds (no evidence: a break, a track change; M2k): `conf` is then the shown value easing toward the threshold, the gate keeps the held one |
 | `follow`, `drift_ppm`, `rate_ratio` | the follower (also in `status`): stopped / lock (ModeBpm's grid) / glide (the Kalman follower); the glide's period change a beat in ppm; the last rate ratio it took from the spectrum (1.0000: none yet) |
 | `manoeuvres` | tempo moves the glide took from the beats |
@@ -121,8 +121,8 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   starts it places (70 % right; 25 % if unplaced). **The CF bar's HOLD**: while the weak confidence holds its last value
   (no evidence), `conf_hold=1` (status, beat; the HOME line's conf as `<pct>h`) and the shown confidence eases toward the
   threshold (most of the way in 8 s) instead of a frozen 100 %, then snaps to the measured value; the gate is unchanged.
-- **The graded confidence** (`core/beat/jb_graded.[ch]`, beat-listener `studies/follow-robust/graded.py`; `set graded on|off`,
-  default on, tuned follower: the threshold, the gate, COAST, the colour and the LED judge it). The gate's value is a wall and a cliff (about 100 % while locked, 0 % when not), so the number
+- **The graded confidence** (`core/beat/jb_graded.[ch]`, beat-listener `studies/follow-robust/graded.py`; display only, `set graded on|off`,
+  default on, both followers). The gate's value is a wall and a cliff (about 100 % while locked, 0 % when not), so the number
   and the bar shown are the mean of four parts, each 0..1, clipped: **soft F** (the tracker's beats against the published lines
   over 8 s, a triangular kernel: 1 on the line, 0 half a period off), **jitter** (1 - clip(cv of the last 16 beat intervals /
   0.15)), the **tempo** agreement (the comb of the activation's last 8 s at the follower's period against the best period) and
@@ -133,10 +133,9 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   estimated 0.3 .. 0.5 M cycles/s on the S3 from the operation counts (about 200 autocorrelation lags of 800 products per
   refresh, soft F's 8 s window), no heap, 16 bytes of DRAM; NOT measured on the jank. The robust follower keeps its own 0.5 s
   refresh of the tempo and DBN parts and the per-step soft F. The gate, the lock and jump decisions, the tempo and the lines are
-  now judged by the gate (default threshold 60; tests/test_graded.c replays the tuned chain on tests/beat_ref and
-  tests/robust_ref gated on the old gate value at 80 and on this value at 60: `test_graded DIR DIR --report` prints seconds from
-  the lock to the outputs running and stops per hour for both). The first 5.5 s after a lock the tempo part is 0 (the comb needs
-  that much activation), so the value ramps up; no ramp rule is added. The graded value is a measurement: no HOLD easing, `conf_hold=0` while it is shown.
+  bit for bit the same with it (tests/test_graded.c: the tuned chain on tests/beat_ref and tests/robust_ref with and without it;
+  and the same trace from the previous core). The first 5.5 s after a lock the tempo part is 0 (the comb needs that much
+  activation), so the value ramps up. The graded value is a measurement: no HOLD easing, `conf_hold=0` while it is shown.
 - **ADVANCED FOLLOW** (M2i; beat-listener `studies/advanced-follow`, golden vectors in `tests/follow_ref`). Three parts,
   each a port checked against the Python:
   - the **glide** (`core/beat/jb_follow.c`, `eval/follow_bpm.py`): ModeBpm locks; then a 3-state Kalman filter (phase,

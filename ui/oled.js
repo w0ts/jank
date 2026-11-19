@@ -376,7 +376,7 @@ const OLED = (() => {
     if (hatch) {                                                            // a HOLD: every other pixel, a checkerboard
       for (let yy = y + 1; yy < y + 10; yy++) for (let xx = 3; xx < 3 + wFill; xx++) if ((xx + yy) % 2 === 0) px(fb, xx, yy, 1);
     } else rect(fb, 3, y + 1, wFill, 9, 1);                                 // no outline: the fill, its text and the tick only
-    xorCol(fb, 2 + Math.round(123 * tickFrac), y - 1, y + 11);
+    if (tickFrac >= 0) xorCol(fb, 2 + Math.round(123 * tickFrac), y - 1, y + 11);     // (< 0: no tick: the graded confidence has no threshold)
     const lx = right ? 123 - textW(label, 1) : 5;
     const tmp = new Uint8Array(W * H); text(tmp, label, lx, y + 2, 1, 1);
     if (hatch) {                                                            // a checkerboard under XOR-ed text is unreadable: clear a box for the label, then OR it in
@@ -542,8 +542,8 @@ const OLED = (() => {
     }
     // CF: hatched, HOLD, while the confidence holds (jank M2k: no evidence; the value shown eases toward the threshold)
     // COAST: the outputs keep running under the threshold (the robust follower holds a tempo through weak patches): hatched too
-    const coast = !c.confHold && !!c.running && c.conf * 100 < c.th;
-    valueBar(fb, 44, c.conf, c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%' + (c.confHold ? ' HOLD' : coast ? ' COAST' : ''), false, !!c.confHold || coast);
+    const coast = !c.confHold && !!c.running && gateConf(c) * 100 < c.th;
+    valueBar(fb, 44, c.conf, c.confGraded ? -1 : c.th / 100, 'CF ' + Math.round(c.conf * 100) + '%' + (c.confHold ? ' HOLD' : coast ? ' COAST' : ''), false, !!c.confHold || coast);
     statusLine(fb, c, now, 57);
   }
   function drawMenu(fb, ui, c) {
@@ -693,9 +693,11 @@ const OLED = (() => {
     if (clip) return INK.BAD;
     return c.levelDb < QUIET_DB ? INK.WARN : INK.NONE;
   }
+  // the gate's own confidence: the graded value (confGraded) is what is shown, the colour, COAST and the notch's meaning stay the gate's
+  const gateConf = c => (c.confGraded && typeof c.confGate === 'number' ? c.confGate : c.conf);
   function confInk(c) {
     if (c.confKnown === false || c.silent) return INK.DIM;
-    const pct = Math.round(c.conf * 100);
+    const pct = Math.round(gateConf(c) * 100);
     return pct < c.th ? INK.BAD : pct <= c.th + CONF_WARN_MARGIN ? INK.WARN : INK.GOOD;
   }
   const battInk = pct => (pct < BATT_BAD_PCT ? INK.BAD : pct < BATT_WARN_PCT ? INK.WARN : INK.NONE);      // neutral while healthy
@@ -797,6 +799,7 @@ const OLED = (() => {
     const n = barFillWidth(frac);
     rect(fb, L2.barX, y + 4, n, L2.lineH, 1);
     tag(ink, L2.barX, y + 4, n, L2.lineH);
+    if (tickFrac < 0) return;                                              // (< 0: no notch: the graded confidence has no threshold)
     const x = barTickX(tickFrac); xorCols(fb, x, 2, y + 2, y + 11); tag(ink, x, y + 2, 2, 10);
   }
   // the INPUT row: a continuous VU meter 10 px high on 124 px: round(124 x level) columns, no segments and no gaps. Every column has the ramp id of its
@@ -831,7 +834,7 @@ const OLED = (() => {
   // the state line (AUDIO only), the first state that applies: GATED (the outputs stopped for low confidence), HOLD (the confidence holds), COAST
   // (running under the threshold), STOPPED (not running), SILENT (running, nothing heard); null while it is simply running
   function stateWordLcd2(c) {
-    const coast = !c.confHold && c.confKnown !== false && !!c.running && c.conf * 100 < c.th;
+    const coast = !c.confHold && c.confKnown !== false && !!c.running && gateConf(c) * 100 < c.th;
     if (c.gated) return ['GATED', INK.BAD];
     if (c.confHold) return ['HOLD', INK.DIM];
     if (coast) return ['COAST', INK.WARN];
@@ -860,7 +863,7 @@ const OLED = (() => {
     beatBoxesLcd2(fb, c, boxRowX(b.w, b.gap), L2.boxY, b.w, b.h, b.gap);
     vuRow(fb, r.rowIN, c);
     const known = c.confKnown !== false;
-    lineRow(fb, r.rowCF, 'CONFIDENCE', known ? Math.round(c.conf * 100) + '%' : '--', known ? c.conf : 0, c.th / 100, confInk(c));
+    lineRow(fb, r.rowCF, 'CONFIDENCE', known ? Math.round(c.conf * 100) + '%' : '--', known ? c.conf : 0, c.confGraded ? -1 : c.th / 100, confInk(c));
     if (withBar) outlinedRow(fb, r.rowBAR, 'BAR', BAR_WORDS[c.bar.state], c.bar.state === 'manual' ? 0 : c.bar.conf || 0);
     drawStateLcd2(fb, c);
   }

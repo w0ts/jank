@@ -651,8 +651,8 @@ static void test_lowconf(void)
 {
     struct jk_cfg before;
     setup();
-    CHECK(cfg.lowconf == JCF_STOP && cfg.threshold == 60);
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=stop\nthreshold=60\n"));
+    CHECK(cfg.lowconf == JCF_STOP && cfg.threshold == 80);
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=stop\nthreshold=80\n"));
     before = cfg;
     CHECK(run("set lowconf run") == JK_CTL_CFG_CHANGED && cfg.lowconf == JCF_RUN && jk_cfg_stored_differs(&before, &cfg));
     CHECK(run("set lowconf stop") == JK_CTL_CFG_CHANGED && cfg.lowconf == JCF_STOP);
@@ -673,6 +673,11 @@ static void test_lowconf(void)
     CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=1\ncoast=1\nact=91\n"));
     snap.beat.coast = 0;
     snap.beat.conf_hold = 0;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nlowconf=run\nconf_gate=62\n"));   /* not graded: the gate's value is the shown one */
+    snap.beat.conf_graded = 1;                                        /* the graded value is shown: the gate's own is conf_gate */
+    snap.beat.conf_gate_pct = 91;
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nconf=62\n") && strstr(out, "\nlowconf=run\nconf_gate=91\n"));
+    snap.beat.conf_graded = 0;
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nlowconf=run\nthreshold=70\n"));
     snap.beat.silent = 1;
     CHECK(run("beat") == JK_CTL_NONE && strstr(out, "\nconf=62\nconf_hold=0\ncoast=0\nact=91\ngated=1\nsilent=1\nthreshold=70\nlowconf=run\nmode="));
@@ -686,7 +691,7 @@ static void test_follow(void)
     struct jk_cfg before;
     setup();
     CHECK(cfg.rate == 1);
-    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nthreshold=60\nrate=on\n"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nthreshold=80\nrate=on\n"));
     before = cfg;
     CHECK(run("set rate off") == JK_CTL_CFG_CHANGED && cfg.rate == 0 && jk_cfg_stored_differs(&before, &cfg));
     CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nrate=off\n"));

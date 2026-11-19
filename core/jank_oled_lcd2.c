@@ -126,7 +126,7 @@ static int conf_ink(const struct jo_ctx *c)
     int pct;
     if (c->conf_unknown || c->silent)
         return JO_INK_DIM;
-    pct = jo_iround(c->conf * 100);
+    pct = jo_iround((c->conf_graded ? c->conf_gate : c->conf) * 100);   /* the colour is the gate's judgment, also while the graded value is shown */
     return pct < c->th ? JO_INK_BAD : pct <= c->th + CONF_WARN_MARGIN ? JO_INK_WARN : JO_INK_GOOD;
 }
 
@@ -272,11 +272,13 @@ static void row_text(uint8_t *fb, int y, const char *label, const char *value)
  * through it at tick; the value, the line and the notch carry ink, the label stays neutral */
 static void line_row(uint8_t *fb, int y, const char *label, const char *value, double frac, double tick, int ink)
 {
-    int n = bar_fill_width(frac), x = bar_tick_x(tick);
+    int n = bar_fill_width(frac), x = tick < 0.0 ? 0 : bar_tick_x(tick);
     row_text(fb, y, label, value);
     tag(ink, VALUE_XR - jo_text_w(value, 1), y, jo_text_w(value, 1), TEXT_H);
     jo_rect(fb, BAR_X, y + 4, n, LINE_H, 1);
     tag(ink, BAR_X, y + 4, n, LINE_H);
+    if (tick < 0.0)                      /* (< 0: no notch: the graded confidence has no threshold) */
+        return;
     xor_cols(fb, x, 2, y + 2, y + 11);
     tag(ink, x, y + 2, 2, 10);
 }
@@ -327,7 +329,7 @@ static int box_row_x(int w, int gap) { return (W - (4 * w + 3 * gap)) / 2; }
 /* the state line (AUDIO only), the first state that applies; nothing while it is simply running */
 static void state_word(uint8_t *fb, const struct jo_ctx *c)
 {
-    int coast = !c->conf_hold && !c->conf_unknown && c->running && c->conf * 100 < c->th;
+    int coast = !c->conf_hold && !c->conf_unknown && c->running && (c->conf_graded ? c->conf_gate : c->conf) * 100 < c->th;
     const char *word = NULL;
     int ink = JO_INK_DIM;
     if (c->gated) {
@@ -370,7 +372,7 @@ static void home(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
         snprintf(value, sizeof value, "--");
     else
         snprintf(value, sizeof value, "%d%%", jo_iround(c->conf * 100));
-    line_row(fb, row + pitch, "CONFIDENCE", value, c->conf_unknown ? 0.0 : c->conf, c->th / 100.0, conf_ink(c));
+    line_row(fb, row + pitch, "CONFIDENCE", value, c->conf_unknown ? 0.0 : c->conf, c->conf_graded ? -1.0 : c->th / 100.0, conf_ink(c));
     if (with_bar)
         outlined_row(fb, row + 2 * pitch, "BAR", BAR_WORDS[c->bar_state], c->bar_state == JO_BAR_MANUAL ? 0.0 : c->bar_conf);
     state_word(fb, c);
