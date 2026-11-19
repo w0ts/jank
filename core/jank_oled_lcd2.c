@@ -498,11 +498,14 @@ static void edit(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
     int sc, w, h, x;
     title_bar(fb, sp->title, NULL);
     if (ui->edit.field == JO_F_THRESHOLD) {          /* the live CONFIDENCE line, its notch the threshold UP / DOWN moves: no digits for it */
+        snprintf(s, sizeof s, "%d%%", ui->edit.val);      /* the number on the right is the setting */
+        line_row(fb, 80, "THRESHOLD", s, c->conf_unknown ? 0.0 : c->conf, ui->edit.val / 100.0, conf_ink_at(c, ui->edit.val));
         if (c->conf_unknown)
-            snprintf(s, sizeof s, "--");
+            snprintf(s, sizeof s, "-");
         else
             snprintf(s, sizeof s, "%d%%", jo_iround(c->conf * 100));
-        line_row(fb, 80, "CONFIDENCE", s, c->conf_unknown ? 0.0 : c->conf, ui->edit.val / 100.0, conf_ink_at(c, ui->edit.val));
+        row_text(fb, 104, "NOW", s);                        /* the live value, below the line */
+        tag(conf_ink_at(c, ui->edit.val), VALUE_XR - jo_text_w(s, 1), 104, jo_text_w(s, 1), TEXT_H);
     } else {
         jo_edit_text(sp, ui->edit.val, s, sizeof s);
         sc = jo_text_w(s, 2) + 32 <= W - 8 ? 2 : 1;   /* the value in the biggest of two sizes that fits */
