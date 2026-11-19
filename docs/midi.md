@@ -46,6 +46,8 @@ tick's first byte, so an edge sits with that byte's start bit (a start tick's fi
 interface as above: each pad through 1 kohm into a line input's tip (Fireface: one input each, 96 kHz if it can), the
 XIAO's GND to the sleeves. 3.3 V logic: no 5 V, no current to speak of.
 
+**CLK / RST jacks on the mini 3** (`BOARD_CLK_GPIO` 15 / `BOARD_RST_GPIO` 2, lcd2 only; the XIAO bench above is a different thing, its pins 2 / 1 are not these): short pulses, like Grids. At a clock step the pin goes high in the clock interrupt (`pulse_pins`, after the UART has the byte, a register write), and 1 ms later (`JCO_PULSE_US`) a second one-shot hardware timer (a gptimer on core 1, priority 2, armed from `on_alarm` with a counter reset and an alarm set) brings both pins low: no task, no polling, and the clock's own timer is never touched. CLK pulses once per step of the CLOCK RATE setting (24 / 12 / 6 / 3 / 1 MIDI ticks for 1/4, 1/8, 1/16, 1/32, 24 PPQN), RST once with the first clock after a Start; nothing moves while stopped; velocity plays no part. The decision is `core/jank_clockout.c` (host test `tests/test_clockout.c`). Added to the tick interrupt: a table lookup per byte and, on a pulse tick only, two GPIO register writes, one counter reset and one alarm write (the same call the clock's own re-arm makes), estimated 1 to 2 us, not measured. Idle level LOW, kept from `power_early_init`: U21 is two inverters in series, so no inversion is needed.
+
 **Over USB-MIDI** (the Mac's Link library against arrival times, `aalink`): sd 110 to 240 us, p99 about 1 ms, a mean of
 0.4 to 0.6 ms late. USB full speed polls every 1 ms, so this path is bounded by USB; a computer is better served by Link
 itself, over the stick's network adapter.
