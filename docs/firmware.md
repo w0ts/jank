@@ -30,6 +30,10 @@ first, see [boards.md](boards.md)):
 bash -c '. scripts/env.sh && cd "$JANK_SCRATCH/build-xiao" && python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'
 ```
 
+## Boot order on the mini 3 (lcd2)
+
+`power_early_init()` (`power.c`) is the first line of `app_main`. HOST_EN (GPIO17), CLK (GPIO15) and RST (GPIO2) are driven low (each level is set before the pin becomes an output), then V5_EN (GPIO4) is driven high and one log line is printed. HOST_EN comes first because it is the only driver that puts a voltage on a connector. R131 already holds V5_EN high until the firmware drives it, so driving it changes nothing electrically: it makes the state deliberate (the MIDI loops, the CLK / RST buffer and the host signal depend on the 5 V rail). The pins come from `hardware/jank-mini-3/parts.py`; the other boards have -1 and do nothing. Nothing else is driven there yet; CLK / RST pulses and the host port come later (`docs/mini3-drivers.md`).
+
 ## Button and LED (as the firmware does it today)
 
 One button (`BOARD_BUTTON_GPIO`; debounce 20 ms, double-click window 350 ms, `core/jank_ui.h`):
