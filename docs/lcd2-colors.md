@@ -80,7 +80,7 @@ battery is under 100 %; on a unit running from the cell it would be wrong until 
 ## HOME (AUDIO) on 320 x 240: the row table
 
 The four beat boxes are 72 wide with 8 px gaps, spanning x 4..315, at the same x positions as LINK's boxes (x 4, 84, 164, 244); they are 56 high (`OLED.LCD2.audioBox = { w: 72, h: 56, gap: 8 }`). The info rows
-(INPUT, CONFIDENCE, BAR when shown) are 2 rows apart (`rowGap`) and form one block, centred vertically between the bottom of the boxes (y 165) and the state line (y 226): the empty rows above and below the block
+(INPUT, CONFIDENCE, BAR when shown) are 4 rows apart (`rowGap`) and form one block, centred vertically between the bottom of the boxes (y 165) and the state line (y 226): the empty rows above and below the block
 differ by at most 1, the odd one goes below. The BAR row exists only with AUTO BAR on (a state of `locked`, `listening` or `manual`). The state line keeps its reserved row (y 226..239) in both.
 
 | y | height | element (with the BAR row) | empty rows before it |
@@ -88,22 +88,22 @@ differ by at most 1, the odd one goes below. The BAR row exists only with AUTO B
 | 2..23 | 22 | top bar | |
 | 32..101 | 70 | TEMPO (NORMAL digits, centred; the digit after the dot 46 rows, y 56..101) | 8 (y 24..31) |
 | 110..165 | 56 | four beat boxes 72 x 56, gap 8, x 4..315 (lit = solid, unlit = 2 px outline; the first amber only while lit) | 8 (y 102..109) |
-| 173..186 | 14 | `INPUT` + VU meter (rows 175..184, notch rows 173..186) + number | 7 (y 166..172) |
-| 189..202 | 14 | `CONFIDENCE` + line (rows 193..198, notch rows 191..200) + value | 2 |
-| 205..218 | 14 | `BAR` + state word + outlined bar (frame rows 207..216) | 2 |
-| 226..239 | 14 | state word, centred, AUDIO only (reserved, empty while running) | 7 (y 219..225) |
+| 171..184 | 14 | `INPUT` + VU meter (rows 173..182, notch rows 171..184) + number | 5 (y 166..170) |
+| 189..202 | 14 | `CONFIDENCE` + line (rows 193..198, notch rows 191..200) + value | 4 (y 185..188) |
+| 207..220 | 14 | `BAR` + state word + outlined bar (frame rows 209..218) | 4 (y 203..206) |
+| 226..239 | 14 | state word, centred, AUDIO only (reserved, empty while running) | 5 (y 221..225) |
 
 | y | height | element (without the BAR row) | empty rows before it |
 |---|---|---|---|
 | 32..101 | 70 | TEMPO | 8 |
 | 110..165 | 56 | four beat boxes (the same place) | 8 |
-| 181..194 | 14 | `INPUT` | 15 (y 166..180) |
-| 197..210 | 14 | `CONFIDENCE` | 2 |
-| 226..239 | 14 | state word | 15 (y 211..225) |
+| 180..193 | 14 | `INPUT` | 14 (y 166..179) |
+| 198..211 | 14 | `CONFIDENCE` | 4 (y 194..197) |
+| 226..239 | 14 | state word | 14 (y 212..225) |
 
-**Why 72 x 56 and not 72 x 72.** True 72 x 72 squares do not fit with the BAR row. From the tempo's end (y 101) to row 239 there are 138 rows. The squares (72), the block of three info rows (3 x 14 + 4 = 46), the
+**Why 72 x 56 and not 72 x 72.** True 72 x 72 squares do not fit with the BAR row. From the tempo's end (y 101) to row 239 there are 138 rows. The squares (72), the block of three info rows (3 x 14 + 2 x 4 = 50), the
 state line (14), the 8 empty rows between the tempo and the squares, and at least 7 empty rows under the squares and 7 above the state line need
-8 + 72 + 7 + 46 + 7 + 14 = 154 rows: **16 rows missing**. Without the BAR row (block of 30) it would fit. The largest height that fits with the BAR row is 56, so the default is **A: boxes 72 wide x 56 high, not square**.
+8 + 72 + 7 + 50 + 7 + 14 = 158 rows: **20 rows missing**. Without the BAR row (block of 32) it would fit. The largest height that fits with the BAR row is 56, so the default is **A: boxes 72 wide x 56 high, not square**.
 The alternative **B** keeps true squares: the largest side is 56 as well, spread over the full width with equal gaps (4 x 56 + 3 x 28 = 308, x 6..313). The boxes are the same size and place with and without
 the BAR row. The state line is not given back to the stack while it is empty: anything that grew into it would have to jump back when a word appears. (The owner has not chosen A or B.)
 
@@ -236,12 +236,12 @@ mode the screen is unchanged (SIGNAL only: there is no peer traffic to measure).
 | screen | geometry |
 |---|---|
 | title bar | 22 rows, full width, text at x 6, y 4 |
-| MENU | 11 rows of 18 px from y 26 (the 11 items of the lcd2 menu all fit: no scrolling; row k at y 26 + 18k, last at y 206; the OLED menu has 10), text at x 8, value right-aligned at x 311, selected row inverted over the full width (y - 2, 18 rows) |
+| MENU | 11 rows of 19 px from y 26 (the 11 items of the lcd2 menu all fit: no scrolling; row k at y 26 + 19k, last at y 216; 5 px between the text lines; the OLED menu has 10), text at x 8, value right-aligned at x 311, selected row inverted over the full width (y - 2, 18 rows) |
 | sub menu (AUDIO, OFFSET, DISPLAY) | rows of 24 px from y 36 (the selected bar 22 rows) |
 | edit | the value at font scale 2 in an inverted box centred on 320 (16 px padding; scale 1 if it would not fit), the two help lines at y 140 and 164. THRESHOLD is the exception: no box and no help lines, the CONFIDENCE line (label x 4, the 6 px line on 124 px with the notch at the threshold being edited, no number on the row) at y 60, then NOW (the live confidence, `-` when unknown, inked like the HOME row judged against the edited threshold) at y 84 and THRESHOLD (the edited value, neutral) at y 108, labels at x 4, values right aligned to x 316 |
 | info (BATTERY) | text rows of 24 px from y 36, the level bar 304 px wide x 14 at y 184 (1 px outline) |
 | info (ABOUT) | VERSION, REPO, UPTIME, RESET, TEMP, CPU (core 0 / core 1 in percent, `57/3%`, `-` for a core not known), MEMORY (+ PSRAM), MIN HEAP, FLASH, CLOCK LATE, UI LOOP, BEAT LOOP, PANIC (`-` when there was no panic since power was lost, else `<task> 0x4200abcd`, the task cut to 7 characters, the address whole; on the OLED the task is cut to 3): rows of 22 px from y 36 (the last of 9 ends at y 226), 9 shown of 13, each a label at x 8 and its value right aligned to x 312 (the list rows' margin); UP / DOWN move one page (9 rows: the pages start at row 0 and 9, so the second shows rows 9 to 12 and the rest of the screen under them stays empty, no row on two pages). The OLED shows 5 at 9 px from y 13, label at x 4, value right aligned to x 124, one page is 5 rows (pages start at row 0, 5, 10); `-` when not known; no bar, no ink |
-| NETWORK / scan list | rows of 18 px like the menu (scan: 11 rows, the selected one kept near the middle, signal bars of 6 px at x 288, 296, 304, heights 4 / 8 / 12), the selected row's help at y 202 and 220 |
+| NETWORK / scan list | rows of 19 px like the menu (scan: 10 rows, the selected one kept near the middle, signal bars of 6 px at x 288, 296, 304, heights 4 / 8 / 12), the selected row's help at y 202 and 220 |
 | text editor | 25 character cells of 12 px from x 10, the help lines at y 92, 116, 140 |
 | confirm | two lines centred at y 68 and 92, `YES      NO` at scale 2 at y 168 |
 | SETUP (QR) | the QR box on the left at module size 8, 6 or 4 (the largest that fits 238 rows and leaves 119 px for the text: 25 modules at 6 px = 162 px box); text right of it |

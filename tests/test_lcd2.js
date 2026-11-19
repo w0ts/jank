@@ -104,7 +104,7 @@ const px = (img, x, y) => [...img.data.slice(4 * (y * 320 + x), 4 * (y * 320 + x
 }
 
 // ---- helpers that read the pixels: the 5 x 7 font is parsed from ui/oled.js's own table and doubled with Scale2x (BigFont.scale2x), so a text is checked pixel by pixel ----
-const L = OLED.LCD2, NB = { rowIN: 181, rowCF: 197 }, WB = { rowIN: 173, rowCF: 189, rowBAR: 205 }, AW = 72, AH = 56, X0A = 4;      // the AUDIO rows without / with the BAR row, written out
+const L = OLED.LCD2, NB = { rowIN: 180, rowCF: 198 }, WB = { rowIN: 171, rowCF: 189, rowBAR: 207 }, AW = 72, AH = 56, X0A = 4;      // the AUDIO rows without / with the BAR row, written out
 const FONT = {};
 for (const m of oledSrc.matchAll(/'(.)': '([.#|]{41})'/g)) FONT[m[1]] = m[2].split('|');
 const adv = ch => ('.:,'.includes(ch) ? 6 : ch === ' ' ? 8 : 12);
@@ -126,17 +126,17 @@ const rightText = (s, xr = 316) => xr - textW(s);
 const BANDS = [['top bar', 0, 25], ['tempo', L.tempoY, L.tempoY + 69], ['beat boxes', L.boxY, L.boxY + AH - 1], ['INPUT', WB.rowIN, WB.rowIN + 13], ['CONFIDENCE', WB.rowCF, WB.rowCF + 13], ['BAR', WB.rowBAR, WB.rowBAR + 13], ['state', L.stateY, L.stateY + 13]];
 for (let i = 1; i < BANDS.length; i++) ok(BANDS[i][1] > BANDS[i - 1][2], BANDS[i][0] + ' starts below ' + BANDS[i - 1][0] + ' (' + BANDS[i][1] + ' > ' + BANDS[i - 1][2] + '): the rows do not overlap');
 const gaps = bands => bands.slice(1).map((b, i) => b[1] - bands[i][2] - 1);
-eq(gaps(BANDS), [6, 8, 7, 2, 2, 7], 'with the BAR row, the empty rows between the items: 6 under the top bar band (y 0..25), 8 tempo to boxes, 7 boxes to INPUT, 2 between INPUT, CONFIDENCE and BAR, 7 BAR to the state line');
-eq([L.audioBox, L.rowGap, L.boxY, L.stateY], [{ w: 72, h: 56, gap: 8 }, 2, 110, 226], 'the AUDIO box data: 72 x 56, gap 8, y 110; the info rows 2 apart; the state line at y 226');
-eq([L.tempoY - 24, L.boxY - (L.tempoY + 70), WB.rowIN - (L.boxY + AH), WB.rowCF - (WB.rowIN + 14), WB.rowBAR - (WB.rowCF + 14), L.stateY - (WB.rowBAR + 14)], [8, 8, 7, 2, 2, 7], 'padding: 8 rows between the icons (y 2..23) and the tempo, 8 between the tempo and the boxes, 7 under the boxes, the info rows 2 apart, 7 above the state line');
+eq(gaps(BANDS), [6, 8, 5, 4, 4, 5], 'with the BAR row, the empty rows between the items: 6 under the top bar band (y 0..25), 8 tempo to boxes, 5 boxes to INPUT, 4 between INPUT, CONFIDENCE and BAR, 5 BAR to the state line');
+eq([L.audioBox, L.rowGap, L.boxY, L.stateY], [{ w: 72, h: 56, gap: 8 }, 4, 110, 226], 'the AUDIO box data: 72 x 56, gap 8, y 110; the info rows 4 apart; the state line at y 226');
+eq([L.tempoY - 24, L.boxY - (L.tempoY + 70), WB.rowIN - (L.boxY + AH), WB.rowCF - (WB.rowIN + 14), WB.rowBAR - (WB.rowCF + 14), L.stateY - (WB.rowBAR + 14)], [8, 8, 5, 4, 4, 5], 'padding: 8 rows between the icons (y 2..23) and the tempo, 8 between the tempo and the boxes, 5 under the boxes, the info rows 4 apart, 5 above the state line');
 eq([L.tempoY + 69, L.boxY + AH - 1, L.stateY + 13, X0A, X0A + 4 * AW + 3 * L.audioBox.gap], [101, 165, 239, 4, 316], 'tempo ends at y 101, the boxes at y 165 (72 x 56, x 4..315 like LINK\'s), the state line at y 239 (the last row of the frame)');
 eq(Math.floor((320 - (4 * L.linkBoxSide + 3 * L.boxGap)) / 2), X0A, 'the AUDIO boxes are at the same x positions as LINK\'s (x 4, 84, 164, 244)');
 {
   const nb = [['tempo', L.tempoY, L.tempoY + 69], ['beat boxes', L.boxY, L.boxY + AH - 1], ['INPUT', NB.rowIN, NB.rowIN + 13], ['CONFIDENCE', NB.rowCF, NB.rowCF + 13], ['state', L.stateY, L.stateY + 13]];
-  eq(gaps(nb), [8, 15, 2, 15], 'without the BAR row: 8 tempo to boxes, 15 boxes to INPUT, 2 between INPUT and CONFIDENCE, 15 CONFIDENCE to the state line');
+  eq(gaps(nb), [8, 14, 4, 14], 'without the BAR row: 8 tempo to boxes, 14 boxes to INPUT, 4 between INPUT and CONFIDENCE, 14 CONFIDENCE to the state line');
   // the info block is centred between the boxes (last row 165) and the state line (first row 226): the empty rows above and below differ by at most 1, the odd one is below
   const block = (rows, top) => [top - (L.boxY + AH), L.stateY - (top + rows)];
-  eq([block(46, WB.rowIN), block(30, NB.rowIN)], [[7, 7], [15, 15]], 'the info block (with BAR 46 rows, without 30) is centred in the 60 rows between the boxes and the state line: 7 above and 7 below, 15 above and 15 below');
+  eq([block(50, WB.rowIN), block(32, NB.rowIN)], [[5, 5], [14, 14]], 'the info block (with BAR 50 rows, without 32) is centred in the 60 rows between the boxes and the state line: 5 above and 5 below, 14 above and 14 below');
 }
 const barOn = { bar: { state: 'locked', conf: 0.5 } };
 const full = drawn(ctxOf({ ctx: barOn }));
@@ -491,16 +491,16 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   let d = drawn(menu.c, { ui: menu.ui });
   noInk(d, 'MENU');
   eq([d.fb[0], d.fb[LW - 1], d.fb[21 * LW], d.fb[22 * LW]], [1, 1, 1, 0], 'the title bar is 22 rows, the full width');
-  const rowBand = k => litIn(d, 0, 26 + 18 * k, d.w, 14).length;
-  eq([rowBand(0), rowBand(1), rowBand(10)].map(n => n > 0), [true, true, true], 'the 11 menu items are rows of 18 px from y 26 (the last at y ' + (26 + 180) + ')');
+  const rowBand = k => litIn(d, 0, 26 + 19 * k, d.w, 14).length;
+  eq([rowBand(0), rowBand(1), rowBand(10)].map(n => n > 0), [true, true, true], 'the 11 menu items are rows of 19 px from y 26 (the last at y ' + (26 + 190) + ')');
   eq([d.fb[(26 - 2) * LW], d.fb[(26 - 2) * LW + LW - 1], d.fb[30 * LW + 2]], [1, 1, 1], 'the selected row (the first) is inverted over the full width');
-  eq(litIn(d, 0, 26 + 18 - 2, 1, 18).length, 0, 'the next row is not');
+  eq(litIn(d, 0, 26 + 19 - 2, 1, 18).length, 0, 'the next row is not');
   const lastLit = Math.max(...litRows(d));
-  ok(lastLit >= 26 + 18 * 10 && lastLit < LH, 'the list reaches y ' + lastLit + ' of 239: the frame is used');
+  ok(lastLit >= 26 + 19 * 10 && lastLit < LH, 'the list reaches y ' + lastLit + ' of 239: the frame is used');
   const dn = withUi(ctxOf(), ['no', ...Array(10).fill('down')], 'lcd2');
   d = drawn(dn.c, { ui: dn.ui });
   noInk(d, 'MENU, last item selected');
-  eq(d.fb[(26 + 180 - 2) * LW + 100], 1, 'the last item (ABOUT) is the selected, inverted row at the bottom');
+  eq(d.fb[(26 + 190 - 2) * LW + 100], 1, 'the last item (ABOUT) is the selected, inverted row at the bottom');
   const sub = withUi(ctxOf(), ['no', 'yes'], 'lcd2');
   d = drawn(sub.c, { ui: sub.ui });
   noInk(d, 'a sub menu (' + sub.ui.screen + ')');
@@ -549,7 +549,7 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   for (const screen of ['netinfo', 'confirm']) { d = drawn(batt, { ui: { ...OLED.create(), screen, ncur: 0 } }); noInk(d, 'the ' + screen + ' screen'); }
   // the NETWORK screen: its rows (TYPE, GROUP, PEERS) and the read-only SIGNAL row under them, the only ink on the screen is the quality word
   const netD = rssi => drawn({ ...batt, rssi }, { ui: { ...OLED.create(), screen: 'net', ncur: 0 } });
-  const SY = 26 + 3 * 18;                                            // the SIGNAL row follows the 3 rows of the JANK mode
+  const SY = 26 + 3 * 19;                                            // the SIGNAL row follows the 3 rows of the JANK mode
   for (const [rssi, dbm, word, id] of [[-55, '-55dBm', 'GOOD', INK.GOOD], [-67, '-67dBm', 'GOOD', INK.GOOD], [-68, '-68dBm', 'FAIR', INK.WARN], [-80, '-80dBm', 'FAIR', INK.WARN], [-81, '-81dBm', 'POOR', INK.BAD], [0, null, 'NONE', INK.DIM]]) {
     const n = netD(rssi), wx = 312 - textW(word);
     eq([isText(n, 'SIGNAL', 8, SY, null), isText(n, word, wx, SY, id), dbm === null || isText(n, dbm, wx - 12 - textW(dbm), SY, 0)], [true, true, true], 'NETWORK, signal ' + rssi + ': SIGNAL ' + (dbm || '') + ' ' + word + ' (' + id + ')');
@@ -558,10 +558,10 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   { const n = netD(null); eq([isText(n, 'SIGNAL', 8, SY, null), isText(n, '-', 312 - textW('-'), SY, 0), n.ink.every(v => v === 0)], [true, true, true], 'NETWORK, signal unknown: SIGNAL and "-", no ink'); }
   eq([litIn(netD(-55), 0, SY + 14, 320, 2).length, litIn(drawn({ ...batt, rssi: -55 }, { ui: { ...OLED.create(), screen: 'net', ncur: 1 } }), 0, SY - 2, 320, 1).length], [0, 0], 'the SIGNAL row is never selected (not inverted) and keeps its place');
   // the air rows under SIGNAL (JANK mode only): LOST, LEVEL, RX RETRY; the quality word and the percentages are the only ink
-  const AY = SY + 18, airD = (air, over = {}) => drawn({ ...batt, rssi: -55, ...air, ...over }, { ui: { ...OLED.create(), screen: 'net', ncur: 0 } });
+  const AY = SY + 19, airD = (air, over = {}) => drawn({ ...batt, rssi: -55, ...air, ...over }, { ui: { ...OLED.create(), screen: 'net', ncur: 0 } });
   const right = (s, y) => [312 - textW(s), y];
-  const airRows = (n, lost, lostInk, level, retry, retryInk) => [isText(n, 'LOST', 8, AY, null), isText(n, lost, ...right(lost, AY), lostInk), isText(n, 'LEVEL', 8, AY + 18, null),
-    isText(n, level, ...right(level, AY + 18), 0), isText(n, 'RX RETRY', 8, AY + 36, null), isText(n, retry, ...right(retry, AY + 36), retryInk)];
+  const airRows = (n, lost, lostInk, level, retry, retryInk) => [isText(n, 'LOST', 8, AY, null), isText(n, lost, ...right(lost, AY), lostInk), isText(n, 'LEVEL', 8, AY + 19, null),
+    isText(n, level, ...right(level, AY + 19), 0), isText(n, 'RX RETRY', 8, AY + 38, null), isText(n, retry, ...right(retry, AY + 38), retryInk)];
   for (const [lost, id] of [[0, INK.GOOD], [2, INK.GOOD], [3, INK.WARN], [9, INK.WARN], [10, INK.BAD], [100, INK.BAD]]) {
     const n = airD({ airLost: lost, airRetry: 1, rssiMin: -78, rssiMax: -52 });
     eq(airRows(n, lost + '%', id, '-78/-52 dBm', '1%', 0), Array(6).fill(true), 'NETWORK, LOST ' + lost + '%: the label, the value in ink ' + id + ', LEVEL -78/-52 dBm and RX RETRY 1% neutral');
@@ -576,7 +576,7 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
     eq(n.ink.every(v => v === 0), true, '... and there is no ink'); }
   for (const mode of [1, 2]) {
     const n = airD({ airLost: 20, airRetry: 40, rssiMin: -80, rssiMax: -50 }, { rssi: null, net: { ...batt.net, mode } });
-    eq([litIn(n, 0, AY + 18, 320, 40).length, n.ink.every(v => v === 0)], [0, true], 'NETWORK, mode ' + mode + ': no air rows, no ink');
+    eq([litIn(n, 0, AY + 19, 320, 40).length, n.ink.every(v => v === 0)], [0, true], 'NETWORK, mode ' + mode + ': no air rows, no ink');
   }
   d = drawn({ ...batt, net: { ...batt.net, scan: [{ name: 'home-wifi', bars: 3 }, { name: 'cafe', bars: 1 }, { name: 'x', bars: 2 }] } }, { ui: { ...OLED.create(), screen: 'scan', scur: 1, stop: 0 } }); noInk(d, 'the scan list');
   d = drawn(batt, { ui: { ...OLED.create(), screen: 'text', txt: { field: 'pass', text: 'secret', pos: 2, mask: true } } }); noInk(d, 'the text editor');
