@@ -1,9 +1,10 @@
-# jank-mini-3: the LCD-2 module board (placed and routed 2026-11-18; in review, not ordered)
+# jank-mini-3: the LCD-2 module board (FINAL 2026-11-19: review rounds 9 and 10 clean; not ordered)
 
-A removable add-on board for a Waveshare ESP32-S3-LCD-2 (sku 30306). The LCD-2 plugs in on its own two 1 x 14
-male headers; jank-mini-3: it sits in our notch, its PCB level with ours, and two bridge strips (strip/) join its
-rows to our J15 / J16. How it is held is open (mots: one side of the strips soldered). No screws. The plan,
-cost, sketches and bench tests are in `worktrees/lcd2-addon-scratch/` (README.md there).
+A removable add-on board for a Waveshare ESP32-S3-LCD-2 (sku 30306). The LCD-2 sits in our notch, its PCB level with
+ours; two bridge strips (strip/), each with two 1 x 14 sockets, plug onto its pins and onto our J15 / J16 (standard
+male headers): nothing is soldered between them, a printed support in the case holds the strips from below. No screws.
+The plan, cost, sketches and bench tests are in `worktrees/lcd2-addon-scratch/` (README.md there). **The current
+order remarks and bench steps are in "Ordering" near the end; the review-round sections are history.**
 
 | file | what |
 |---|---|
@@ -33,11 +34,11 @@ OUT gives hosted gear only a 680 ohm host signal on VBUS, never power (mots, 202
 
 Board 95.5 x 82 mm (93 x 74 until round 3: +2.5 mm wide for the mid-mount USB-C pair, +4 mm above and below the
 LCD-2 for the bands beside it, mots 2026-11-18), the LCD-2 in a notch open to the left edge (its PCB level with ours,
-LCD-2 centred). Two bridge strips (strip/: one 1 x 14 socket for the LCD-2's pins, beside it 14 plated holes for our
-male rows J15 / J16, C44526 cut to 1 x 14, 11.5 mm of pin below the plastic) join its pins to ours, under the board.
-**Assembly (mots):** solder J15 / J16 into our board (the 3 mm tails in our holes, the plastic under the board); push
-a strip's holes onto our pins and the LCD-2's pins into its socket; seat the LCD-2 level in the notch; then solder our
-pins in the strip's holes from below (~1.4 mm stand out: trim). The LCD-2 stays removable; the strips stay on our board.
+LCD-2 centred). Two bridge strips (strip/, 37.06 x 10 mm: two 1 x 14 sockets C2905420 3.81 mm apart, pin k straight
+across to pin k) join its pins to ours under the board; our J15 / J16 are standard male headers (C2905490: 2.5 mm
+plastic, 6 mm pin), the same stack as the LCD-2's own header, so both seat ~6 mm into the 8.5 mm sockets and the strip
+hangs ~11 mm below. **Assembly (mots):** solder J15 / J16 into our board from below with a strip and the LCD-2 plugged
+on as a jig (their 1.2 mm holes let a loose header sit ~0.3 mm off its row); then the strips plug on and off.
 **The cell (mots, 2026-11-19, after review 6A R1): on the LCD-2's own MX1.25 connector, not on this board.** One EEMB
 LP103454 2000 mAh 1S LiPo (34.5 x 56 x 10.6 mm, its own PCM, a JST PHR-02 plug) through an adapter lead mots makes: a
 PH2.0 pigtail that mates with the cell's plug, soldered to an MX1.25 (Molex PicoBlade 51021 type) 2-pin pigtail, red to
@@ -47,10 +48,9 @@ the first plug-in. The LCD-2 charges it (ETA6098, ~2 A, about 1 C) on its own co
 its lead end toward +y or -y; the lead runs to the LCD-2. (J18, a PH2.0 socket on our VBAT, was tried and left again:
 it put the whole charge through the LCD-2's unmeasured trace to P2.14.) **The cell must have its own PCM:** nothing on
 the LCD-2 or on ours protects it. Under the board, hand-soldered by mots (fab/lcd2-hand.csv): the DINs, the jacks,
-J15 / J16. On top, by JLC: every SMD part and both USB-C. Walls: USB-C TO ESP (J1) + TO DEVICE (J4) side by side
-(13 mm), right of the two TRS jacks, on the top wall, mid-mount (Shou Han TYPE-C 16P CB1.6 073, C2906290, each in a
-9.3 x 6.75 mm notch of our edge, 1.56 mm above our top: the plug's overmold stays under the box top with a 2 mm lid),
-MIDI (2 TRS + 2 DIN) top, CLOCK / RESET right, LINE IN bottom under its LCD-2 pins; the LCD-2's own USB-C on the left
+J15 / J16, and on top the two USB-C J1 / J4 (through hole, soldered from below). On top, by JLC: every SMD part.
+Walls: USB-C TO ESP (J1) + TO DEVICE (J4) side by side (13 mm), right of the two TRS jacks, on the top wall: GCT
+USB4085-GF-A (C7095263), on top at the edge, 3.46 mm tall (see "Through-hole USB-C" below), MIDI (2 TRS + 2 DIN) top, CLOCK / RESET right, LINE IN bottom under its LCD-2 pins; the LCD-2's own USB-C on the left
 wall. One 24 mm cross D-pad: no part under it.
 The GPIO map is assigned from the layout (tools/gpio_opt.py, the joint search tools/layout_opt.sh) within
 check_nets' pin rules.
@@ -202,3 +202,89 @@ cd hardware/jank-mini-3 && sh tools/route_try.sh 82 1      # place + route one a
 - If the board is ever touched again (8A N1, N2; not needed to work): a 10 uF at L5.1 with its own GND via (the boost's
   input ripple runs ~36 mm to C99), a 100 nF at U21's pins 14 / 7 (C105 sits 13 mm away); bench: scope L5.1 and J16.14.
   8B N3: the PJ307C slots are 0.8 x 1.5 mm (JLC wants 2:1), hand-soldered, at worst a little loose.
+
+### Ordering (2026-11-19): one folder per variant, JLC quotes for 5 units
+
+`make_fab.sh` writes `fab/default/` and `fab/full/`; `strip/fab/bare/` and `strip/fab/assembled/` hold the strip's.
+Upload a folder's `gerbers.zip`, then its `bom.csv` and `cpl.csv`. Quotes (jlcpcb.com, headless Chrome through
+`scripts/jlcone/`, 2026-11-19, before shipping; DHL showed ~$23.5):
+
+| Variant | What JLC does | Price |
+|---|---|---|
+| jank mini 3 default, x5 | top SMD (Standard PCBA: the USB-C C2906290 is "Standard only"); mots solders `fab/default/hand.csv` | $120.18 (mid-mount USB-C, before the switch below) |
+| jank mini 3 full, x5 | also the DINs, jacks and J15 / J16 under the board (Standard, both sides) | $177.70 |
+| strip bare, x10 | PCB only | ~$6.10 |
+| strip assembled, x10 | both sockets fitted (Economic) | $18.46 |
+
+- JLC flags the USB-C as "difficult to process": it reviews it after the order and may charge for an advanced option.
+- The full variant's bottom through-hole rotations come from KiCad as they are: check JLC's placement preview.
+- The strip (mots's idea, 2026-11-19): two sockets, our J15 / J16 standard male headers (C2905490), the case holds
+  the strip from below; 10 mm wide (JLC assembles nothing under 10 x 10 mm). Not covered by review rounds 7 / 8.
+- The BOM has one line per LCSC code (JLC refuses two lines matched to one part).
+
+### Through-hole USB-C (mots, 2026-11-19): GCT USB4085-GF-A instead of the mid-mount C2906290
+
+- Why: the mid-mount part is "Standard only" at JLC (5 boards $120.18) and its 0.5 mm SMD pads need hot air. The GCT
+  USB4085-GF-A (C7095263, $1.40) is through hole (0.85 mm pitch, two rows 1.35 mm apart), soldered by hand with an
+  iron from below; the rest goes Economic: **5 boards $50.89** (quoted 2026-11-19), J1 / J4 on `fab/default/hand.csv`.
+- Footprint: JLC's (EasyEDA) origin, pads per GCT's drawing USB4085 rev B sheet 2 (16 x 0.40 mm holes, 0.65 mm pads,
+  shell slots 0.60 x 2.10 / 1.40); 3D model KiCad's. On top at the top edge, mouths 0.3 mm past it, no notches; the
+  part stands 3.46 mm above the board (the mid-mount 1.56 mm): the case's USB openings move up.
+- `lcd2.kicad_dru`: GCT's layout leaves 0.45 mm between neighbouring holes (JLC's general rule 0.5 mm, different nets);
+  JLC stocks and wave-solders this part; the rule allows 0.44 mm between J1's / J4's own holes only.
+- Re-routed only the USB corner (`.t/swap_usb_th.py`, then the repair pass with the rest locked). CC2 is in the front
+  row; R160 now serves CC2O and R161 CC1O (both 56k Rp to HOST5), so the CC paths from U5 no longer cross.
+- `make_board.USB_MID = True` brings the mid-mount layout back (notches, usb_fan / usb_pair).
+
+### Review round 9 (2026-11-19: worktrees/mini3-review9-A, -B): clean (0 will-not-work, 0 risky)
+
+- Notes folded in: this README's stale mid-mount and old-strip text replaced; the order remarks and bench steps below are
+  the current ones (the earlier rounds' remarks about notches, reliefs and shell legs are void). The repair pass also
+  moved 3 GND stitching vias by the boost (9B N5): GND only, DRC clean. JLC wave-soldering this exact layout is not
+  verified (9B): the order remark below asks them to keep it.
+- For the firmware session (9A N3): host mode should set `BOARD_VBUS_SENSE_GPIO 10` for lcd2, raise HOST_EN only while
+  VBUS_SENSE reads low and drop it if it rises (a swapped cable puts J4's host signal on the LCD-2's 5 V, harmless).
+- If the board is touched again: a GND via by U5's GND pad (9A N1: its top-pour island reaches GND 4.9 mm away); the
+  USB4085's 0.06 mm silk dot (9B N8).
+
+## Ordering (current, 2026-11-19)
+
+What to order for 5 units (option 2, mots, 2026-11-19): JLC: jank mini 3 x5 from `fab/default/` (Economic, top
+side), the strips x10 bare from `strip/fab/bare/` (1.6 mm); LCSC: the parts in `fab/default/hand.csv` plus 2 strip
+sockets C2905420 per strip (spares: +2 USB4085, +4 sockets, +2 of each jack, DIN and header). Assembled strips instead:
+`strip/fab/assembled/` (Economic, 10 mm wide for JLC's 10 x 10 mm minimum).
+
+Order remarks for JLC (jank mini 3):
+- 1.6 mm, 1 oz copper (tracks down to 0.10 mm), lead-free HASL; "Confirm Production file: Yes" (10B N2: shows what
+  JLC's CAM did to J1 / J4's rings and where its tooling holes go).
+- "J1 / J4 GCT USB4085: 0.40 mm holes in 0.65 mm pads and 0.44-0.45 mm hole spacing as in the maker's recommended
+  layout; please do not enlarge the pads or reduce the holes; breakout acceptable" (9B N1: JLC's ring minimum is 0.18 mm).
+- Default variant (`fab/default/`, Economic): JLC fits the top SMD parts only. Full (`fab/full/`, Standard both sides):
+  check J1 / J4's position and rotation and every bottom part's rotation in JLC's placement preview before paying.
+
+mots's fallback (2026-11-19): if J1 / J4 do not work, USB host mode is regained with a powered USB hub on the LCD-2's
+own USB-C; the rest of jank works without them.
+
+Bench steps (mots), in this order:
+- Before paying: JLC's placement preview for the polarised top parts (default variant), every part in the full one.
+- Before fitting anything else: U19 CJ431 pin order on LCSC's picture (1 REF, 2 K, 3 A); first power-up from a
+  current-limited supply.
+- While the LCD-2 serves as the jig for soldering J15 / J16: no cell and no USB on it. Trim the bottom tails after.
+- The spare 0 ohm lands (10A N3): cut JP8 before bridging R123 (else the 5 V boost meets the LCD-2's 3.3 V rail);
+  lift Q10-Q13 and un-invert the TX before bridging R126-R129 (else a GPIO is shorted to GND).
+- J1 / J4 from below: their signal tails end flush with the board's bottom (1.60 mm), the front shell legs 0.8 mm short
+  of it (fill those slots); fine tip, flux. Then meter: J4 VUSB against GND and CC1O, J1's VBUS pairs against GND,
+  neighbouring pins against each other, D+ / D- continuity J1 -> U5 -> J4 (9A N2, 9B N2).
+- The LCD-2's rows (J15 = P1, J16 = P2, pin 14 at the USB end) and the strips' seating on the dry fit; measure the
+  LCD-2's PCB thickness (its top should sit level with ours).
+- The case: the LCD's front stands ~4.1 mm above our top (sets the lid height, 10B N5; scaled from Waveshare's
+  drawing), its own USB-C reaches ~0.7 mm past our left edge; J1 / J4 stand 3.46 mm, their mouths at y -0.255; the plugs' overmolds span about -1.4 to +5.1 mm about the
+  board's top: the lid needs a raised pocket ~18 x 9.3 mm and wall openings for the overmolds (9B N4); label TO ESP /
+  TO DEVICE on the case (the board's "TO DEVICE" is on the bottom silk).
+
+### Review round 10 (2026-11-19: worktrees/mini3-review10-A, -B): clean, the board is FINAL
+
+- 10A and 10B: 0 will-not-work, 0 risky; with round 9, two successive clean rounds (mots's rule). No copper change
+  since round 9; notes folded into "Ordering" above.
+- For a later board (10A N1, N2): ESD on CLOCK / RESET sleeves (R120 / R121 0402 alone), 0.5 W MIDI TRS resistors
+  against a stiff negative output patched in.

@@ -1,0 +1,9 @@
+{
+  "name": "jank-jlcone",
+  "private": true,
+  "description": "JLCONE quote scripts (Playwright over CDP, port 9222); never pay",
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.49.1"
+  }
+}

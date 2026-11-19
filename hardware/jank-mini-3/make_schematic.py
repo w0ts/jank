@@ -58,6 +58,12 @@ SYMBOLS = {
               [("A8", "SBU1", PAS), ("B8", "SBU2", PAS), ("A1", "GND", PAS), ("B12", "GND", PAS), ("B1", "GND", PAS),
                ("A12", "GND", PAS), ("25", "SHELL", PAS), ("26", "SHELL", PAS), ("27", "SHELL", PAS), ("28", "SHELL", PAS)],
               "J", 10.16),
+    # (the through-hole GCT USB4085: the same contacts, one shell pin S1 for its 4 legs)
+        "usbth": ([("A4", "VBUS", PAS), ("B9", "VBUS", PAS), ("A9", "VBUS", PAS), ("B4", "VBUS", PAS), ("A5", "CC1", PAS),
+               ("B5", "CC2", PAS), ("A6", "DP1", PAS), ("B6", "DP2", PAS), ("A7", "DN1", PAS), ("B7", "DN2", PAS)],
+              [("A8", "SBU1", PAS), ("B8", "SBU2", PAS), ("A1", "GND", PAS), ("B12", "GND", PAS), ("B1", "GND", PAS),
+               ("A12", "GND", PAS), ("S1", "SHELL", PAS)],
+              "J", 10.16),
     "esd": ([("1", "IO1", PAS), ("6", "IO1", PAS), ("3", "IO2", PAS), ("4", "IO2", PAS)],
             [("5", "VBUS", PAS), ("2", "GND", PAS)], "U", 7.62),
     "flag": ([], [("1", "pwr", "power_out")], "#FLG", 2.54),

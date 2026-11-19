@@ -20,7 +20,7 @@ Refs: mini 2.2's ref for every circuit taken over unchanged; new parts get new n
 # (HOST5 -> R93 -> D16), never power (mots).
 
 FP = {   # JLC / EasyEDA footprint names (mini 2.2's lib/chip.pretty where it had them)
-    "usbc": "USB-C-SMD_TYPE-C-16PIN-2MD-073", "usbcm": "USB-C-SMD_SHOU_TYPE-C-16P-CB1.6", "sot236bl1": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL-1",
+    "usbc": "USB-C-SMD_TYPE-C-16PIN-2MD-073", "usbcm": "USB-C-SMD_SHOU_TYPE-C-16P-CB1.6", "usbth": "USB-C-TH_GCT_USB4085-GF-A", "sot236bl1": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL-1",
     "tvs2": "SOT-23_L2.9-W1.3-P1.90-LS2.4-BR", "det": "SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR",
     "sma_rd": "SMA_L4.3-W2.6-LS5.2-RD", "smaf_rd": "SMAF_L3.5-W2.6-LS4.7-RD-1", "sot563": "SOT-563_L1.6-W1.2-P0.50-LS1.6-BR", "ind2016": "IND-SMD_L2.0-W1.6-1",
     "tssop14": "TSSOP-14_L5.0-W4.4-P0.65-LS6.4-BL", "jack5": "AUDIO-TH_PJ307C", "jack": "AUDIO-TH_PJ-320A-4P-DIP",
@@ -77,8 +77,11 @@ PARTS = [
     # ---- the LCD-2's sockets (through hole: mots, or JLC's hand soldering; JOIN.md option a)
     # (mots, 2026-11-18: the bridge strips are soldered to OUR board: J15 / J16 are male headers with ~11 mm of pin below
     #  the plastic, C44526 (2.54 mm 1 x 40, 11.5 / 2.5 / 3 mm), cut to 1 x 14; the 3 mm tail in our board, from below)
-    ("J15", "hdr14", "LCD-2 P1 1x14 M 11.5 mm (cut from C44526)", "fhdr14", "", J15),
-    ("J16", "hdr14", "LCD-2 P2 1x14 M 11.5 mm (cut from C44526)", "fhdr14", "", J16),
+    # (mots, 2026-11-19, after review 8: a SECOND socket on each strip takes our row too, so standard male headers
+    #  (Kinghelm KH-2.54PH180-1X14P-L11.5, C2905490: 6 mm mating pin) instead of the 11.5 mm long pins; the strip plugs
+    #  onto both boards and the case holds it from below. Same maker as the strip socket C2905420.)
+    ("J15", "hdr14", "LCD-2 P1 1x14 M 2.54 (C2905490)", "fhdr14", "C2905490", J15),
+    ("J16", "hdr14", "LCD-2 P2 1x14 M 2.54 (C2905490)", "fhdr14", "C2905490", J16),
     ("C60", "C", "10u", "c0603", "C19702", {"1": "+3V3", "2": "GND"}),
     ("C61", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
     # spare GPIOs to pads (no part): the LCD-2's I2C, IO47 / 48 (the IMU's 4.7k pull-ups on it), on J20
@@ -89,19 +92,24 @@ PARTS = [
     #      the hosted gear), D+ / D- straight through, U5 ESD on the shared pair (REF on +3V3: mini 2.2 review pass 2)
     #      (mots, 2026-11-18, review mini3-2B R3: MID-MOUNT, Shou Han TYPE-C 16P CB1.6 073, C2906290: it sinks into a
     #      9.3 x 6.5 mm notch in our edge, 1.56 mm above our top instead of 3.26, the plug's centre at our top's level)
-    ("J1", "usbcm", "USB-C TO ESP (loop)", "usbcm", "C2906290",
-     {"A1": "GND", "B12": "GND", "B1": "GND", "A12": "GND", "25": "GND", "26": "GND", "27": "GND", "28": "GND",
+    #      (mots, 2026-11-19, after the JLC quotes: THROUGH-HOLE instead, GCT USB4085-GF-A, C7095263: the mid-mount part
+    #       is "Standard only" at JLC, $69 more for 5 boards, and 0.5 mm SMD pads need hot air; this one is soldered by hand
+    #       with an iron from below (0.85 mm pitch, two rows), on top of the board at the edge, no notch)
+    ("J1", "usbth", "USB-C TO ESP (loop)", "usbth", "C7095263",
+     {"A1": "GND", "B12": "GND", "B1": "GND", "A12": "GND", "S1": "GND",
       "A4": "J1_VBUS1", "B9": "J1_VBUS1", "A9": "J1_VBUS2", "B4": "J1_VBUS2",   # (open; a net per touching pair, nothing to route)
       "A6": "UDP", "B6": "UDP", "A7": "UDN", "B7": "UDN"}),
-    ("J4", "usbcm", "USB-C TO DEVICE (host)", "usbcm", "C2906290",
-     {"A1": "GND", "B12": "GND", "B1": "GND", "A12": "GND", "25": "GND", "26": "GND", "27": "GND", "28": "GND",
+    ("J4", "usbth", "USB-C TO DEVICE (host)", "usbth", "C7095263",
+     {"A1": "GND", "B12": "GND", "B1": "GND", "A12": "GND", "S1": "GND",
       # (only the VBUS pair on CC1's side, A4 / B9 (usb_fan rel +2.4, away from J1 / U5), on VUSB: a plug ties its four
       #  VBUS pins together, so one receptacle pair meets VBUS in both orientations, and here VBUS is a mA presence
       #  signal. The other pair's drawn drop sat in the D+ path from J1 / U5, round 3; it is an open net, as J1's)
       "A4": "VUSB", "B9": "VUSB", "A9": "J4_VBUS2", "B4": "J4_VBUS2", "A5": "CC1O", "B5": "CC2O",
       "A6": "UDP", "B6": "UDP", "A7": "UDN", "B7": "UDN"}),
-    ("R160", "R", "56k", "r0402", "C25796", {"1": "HOST5", "2": "CC1O"}),   # (Rp, USB Type-C 2.x Table 4-24: 56k to 5 V)
-    ("R161", "R", "56k", "r0402", "C25796", {"1": "HOST5", "2": "CC2O"}),
+    # (2026-11-19, the through-hole USB-C: R160 on CC2O and R161 on CC1O, so the CC paths from U5 do not cross; the same
+    #  56k Rp each, only which resistor serves which CC)
+    ("R160", "R", "56k", "r0402", "C25796", {"1": "HOST5", "2": "CC2O"}),   # (Rp, USB Type-C 2.x Table 4-24: 56k to 5 V)
+    ("R161", "R", "56k", "r0402", "C25796", {"1": "HOST5", "2": "CC1O"}),
     # U5: one channel per exposed line, D+, D- (both connectors share them) and J4's CC1 / CC2 (REF +3V3: an open CC at
     # HOST5's 5 V leaks ~20 uA into +3V3 through 56k and the steering diode: harmless)
     ("U5", "esd4", "SRV05-4", "sot236bl1", "C7420376", {"1": "UDP", "3": "UDN", "4": "CC1O", "6": "CC2O", "2": "GND", "5": "+3V3"}),
@@ -314,7 +322,9 @@ LCSC = {
     "C25900": "4.7 k 1% 0402",
     "C18199199": "hongjiacheng SS34F, 3 A 40 V Schottky, SMAF (1.06 mm tall: under the 2.1 mm lid gap)",
     "C2905420": "Kinghelm KH-2.54FH-1X14P-H8.5, 1 x 14 female socket, 2.54 mm, 8.5 mm tall, through hole (JLC hand-solders it)",
+    "C2905490": "Kinghelm KH-2.54PH180-1X14P-L11.5, 1 x 14 male header, 2.54 mm, 11.5 mm long (6 mm mating), through hole",
     "C2906290": "SHOU HAN TYPE-C 16P CB1.6 073, USB 2.0 mid-mount receptacle (1.6 mm board, 1.56 mm above it)",
+    "C7095263": "GCT USB4085-GF-A, USB 2.0 Type-C receptacle, through hole, right angle, top mount (hand-soldered)",
     "C25796": "56 k 1% 0402 (Rp)",
     "C7420376": "Hongjiacheng SRV05-4, 4-line + rail ESD array, SOT-23-6 (5 the rail, 2 GND, I/O 1 / 3 / 4 / 6)",
     "C15127": "AOS AO3401A, P-MOSFET 30 V 4 A, SOT-23 (1 G, 2 S, 3 D)", "C20917": "AOS AO3400A, N-MOSFET 30 V 5.7 A, SOT-23",
@@ -351,3 +361,7 @@ def nets():
         for pad, net in pins.items():
             out.setdefault(net, []).append(f"{ref}.{pad}")
     return out
+
+# top-side parts JLC's Economic assembly cannot place and mots solders by hand (they go to fab/default/hand.csv; the
+# full variant has JLC place them too). (mots, 2026-11-19: the through-hole USB-C.)
+HAND = {"J1", "J4"}

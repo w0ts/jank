@@ -34,4 +34,13 @@ rm -rf fab/gerbers
 $LOW "$KC" pcb render --side top --width 1600 --height 1100 --quality basic --zoom 0.95 -o render-top.png lcd2.kicad_pcb 2>&1 | Q >/dev/null
 $LOW "$KC" pcb render --side bottom --width 1600 --height 1100 --quality basic --zoom 0.95 -o render-bottom.png lcd2.kicad_pcb 2>&1 | Q >/dev/null
 $LOW "$KC" pcb render --width 1600 --height 1200 --quality basic --perspective --rotate "-40,0,-25" --zoom 0.85 -o render-3d.png lcd2.kicad_pcb 2>&1 | Q >/dev/null
-ls -la fab/lcd2-gerbers.zip fab/lcd2-bom.csv fab/lcd2-cpl.csv render-top.png render-bottom.png render-3d.png
+# one folder per order variant (mots, 2026-11-19): upload a folder's gerbers.zip, bom.csv and cpl.csv in JLC's quote
+#   fab/default/  JLC fits the top SMD parts (Economic PCBA, top side); mots solders the parts in hand.csv
+#   fab/full/     JLC also solders the through-hole parts under the board (Standard PCBA, both sides)
+"$KP" make_assembly.py 2>&1 | Q >/dev/null
+JLC_FULL=1 "$KP" make_assembly.py 2>&1 | Q
+mkdir -p fab/default fab/full
+cp fab/lcd2-gerbers.zip fab/default/gerbers.zip; cp fab/lcd2-bom.csv fab/default/bom.csv; cp fab/lcd2-cpl.csv fab/default/cpl.csv
+cp fab/lcd2-hand.csv fab/default/hand.csv
+cp fab/lcd2-gerbers.zip fab/full/gerbers.zip; mv fab/full/lcd2-bom.csv fab/full/bom.csv; mv fab/full/lcd2-cpl.csv fab/full/cpl.csv
+ls -la fab/lcd2-gerbers.zip fab/lcd2-bom.csv fab/lcd2-cpl.csv render-top.png render-bottom.png render-3d.png fab/default fab/full
