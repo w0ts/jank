@@ -199,3 +199,10 @@ int jl_batt_pct(int32_t mv, int32_t empty_mv)
             return CURVE_PCT[i - 1u] + (v - CURVE_MV[i - 1u]) * (CURVE_PCT[i] - CURVE_PCT[i - 1u]) / (CURVE_MV[i] - CURVE_MV[i - 1u]);
     return 100;
 }
+
+int jl_cell_pin_pct(int32_t pin_mv, int32_t div, int32_t empty_mv)
+{
+    if (pin_mv < 0 || div < 1)
+        return -1;
+    return jl_batt_pct(pin_mv * div, empty_mv);
+}

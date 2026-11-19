@@ -114,7 +114,7 @@
  * until the board is ordered). The board has no LED on a GPIO (its two LEDs are the charger's and the 3V3 rail's).
  * power.c drives GPIO4 V5_EN (5 V aux boost enable; R131 holds it ON until then), 2 RST and 15 CLK (idle low) at boot. The
  * other pins have no firmware use yet and stay undefined here: 7 LINE_IN (ADC1), 8 LINE_SENSE (ADC1),
- * 10 VBUS_SENSE (ADC1, 3.0 V at 5 V), 18 LIN_DET (line in plug detect); free: 12, 14 (no pad), 47, 48 (pads, the IMU
+ * 18 LIN_DET (line in plug detect); free: 12, 14 (no pad), 47, 48 (pads, the IMU
  * bus). */
 #define BOARD_NAME "lcd2"
 #define BOARD_LCD 1
@@ -146,12 +146,18 @@
 #define BOARD_HOST_EN_GPIO 17                     /* the mini 3: high = the 5 V presence signal + Rp on J4. No lcd2 code drives it
                                                      yet (only usbport_tusb320.c, off here), so host mode stays off: R91 and the
                                                      LCD-2's R6 hold it low */
-#define BOARD_VBUS_SENSE_GPIO (-1)
+#define BOARD_VBUS_SENSE_GPIO 10                  /* the mini 3's VBUS_SENSE (J15.10, parts.py): 10 k / 15 k, 3.0 V at 5 V on the LCD-2's own
+                                                     USB-C; high = a computer or charger there. An ADC1 pin read as a plain digital input, no
+                                                     internal pull (the board has its divider; usbrole.c input() sets none) */
 #define BOARD_LINE_DETECT_GPIO (-1)
 #define BOARD_PUMP_GPIO (-1)
 #define BOARD_USBPORT_TUSB320 0
 #define BOARD_HAS_LINEIN 0
-#define BOARD_CELL_GPIO (-1)
+/* the cell: the LCD-2's own BAT_ADC, GPIO5 = ADC1 channel 4, R19 200 k / R20 100 k from VBAT (docs/lcd2.md): the pin sees a third,
+ * 1.4 V at 4.2 V. No line in here, so linein.c reads it by oneshot every few seconds (linein_cell_step) */
+#define BOARD_CELL_GPIO 5
+#define BOARD_CELL_DIV 3                          /* the cell's volts / the pin's */
+#define BOARD_CELL_EMPTY_MV 3300
 #define BOARD_V5_EN_GPIO 4                        /* the mini 3: the 5 V aux boost's enable (J15.2, parts.py V5_EN_IO) */
 #define BOARD_CLK_GPIO 15                         /* the mini 3: CLK out (J16.7, parts.py CLK_IO); the XIAO bench's BENCH_CLK is another thing */
 #define BOARD_RST_GPIO 2                          /* the mini 3: RST out (J15.1, parts.py RST_IO) */

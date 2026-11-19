@@ -349,6 +349,7 @@ void uis_sys(struct jk_sys *out)
 void uis_sys_step(uint32_t now)
 {
     sys_sample(now);
+    linein_cell_step(now);               /* (lcd2: the cell by a oneshot read, every few seconds; elsewhere nothing) */
     prefs_step(now);                     /* (where uis_step never runs, a control line change is saved here, by the same 400 ms rule) */
 }
 
