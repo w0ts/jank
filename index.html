@@ -33,9 +33,8 @@ button:disabled { opacity: .45; cursor: default; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
 th, td { text-align: left; padding: 3px 8px 3px 0; }
 th { color: var(--dim); font-weight: 500; font-size: 12px; }
-table.groups tbody tr.on td { color: var(--accent); font-weight: 600; }
 td button { padding: 4px 12px; min-height: 32px; }
-details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 2px; }
+details.sec > summary { cursor: pointer; color: var(--dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 2px; }
 .row { display: flex; gap: 8px; align-items: end; }
 .row input { width: 7em; }
 .meter { height: 8px; border-radius: 4px; background: var(--off); overflow: hidden; margin-top: 6px; }
@@ -48,25 +47,24 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .hide { display: none !important; }
 [hidden] { display: none !important; }
 .device svg { display:block; flex:none; margin:0 auto; outline:none; touch-action:none; user-select:none; -webkit-user-select:none; }
-.device .lid { fill:#8d9094; stroke:#5d6064; stroke-width:.5; }
-.device .lidshade { fill:none; stroke:#a9acb0; stroke-width:.4; }
-.device .port { fill:#16171a; stroke:#4a4d50; stroke-width:.35; }
-.device .bezel { fill:#0b0c0d; stroke:#5d6064; stroke-width:.2; }
-.device .cap { fill:#2c2e31; stroke:#16171a; stroke-width:.4; stroke-linejoin:round; pointer-events:none; }
+/* the printed box: black body, pink labels and symbols, a grey D-pad (hardware/jank-mini-3/case/BOX.md); the outlines use the page's own tokens so the black body shows on a dark page too */
+.device .lid { fill:#000000; stroke:var(--dim); stroke-width:.5; }
+.device .lidshade { fill:none; stroke:#262626; stroke-width:.4; }
+.device .port { fill:#000000; stroke:var(--dim); stroke-width:.35; }
+.device .bezel { fill:#0b0c0d; stroke:#3a3a3a; stroke-width:.2; }
+.device .cap { fill:#5f5f5f; stroke:#2a2a2a; stroke-width:.4; stroke-linejoin:round; pointer-events:none; }
 .device .armarea { fill:transparent; stroke:none; cursor:pointer; }
-.device .armarea.on { fill:#4b4f54; }
-.device .glyph { fill:#c9ccd0; text-anchor:middle; pointer-events:none; font-family:-apple-system, system-ui, sans-serif; font-weight:600; }
+.device .armarea.on { fill:#8a8a8a; }
+.device .sym { fill:#F5A3C7; stroke:none; pointer-events:none; }
+.device .sym.tick { fill:none; stroke:#F5A3C7; stroke-linejoin:miter; stroke-linecap:butt; }
+.device .label { fill:#F5A3C7; text-anchor:middle; pointer-events:none; font-family:'Avenir Next Condensed','Arial Narrow','Helvetica Neue',sans-serif; font-weight:800; font-stretch:condensed; }
+.device .label-arrow { fill:#F5A3C7; stroke:#F5A3C7; stroke-width:.2; stroke-linejoin:round; pointer-events:none; }
 .device canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#04060a; }
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
-.live-row > #player { flex: 0 0 340px; width: 340px; }
-/* the player goes under the device when the screen at 2x does not fit beside it (snapDevice) */
-.live-row.stack { flex-direction: column; align-items: stretch; }
-.live-row.stack > #player { flex: none; width: auto; }
-@media (max-width: 800px) { .live-row { flex-direction: column; align-items: stretch; } .live-row > #player { flex: none; width: auto; } }
 #player { padding: 10px 12px; }
 #player h2 { margin: 0; }
-#player .pl-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+#player .pl-title { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 2px; }
 #player .pl-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 #player .pl-vol { display: flex; align-items: center; gap: 6px; flex: 1 1 110px; min-width: 0; margin-left: auto; }
 #player .pl-vol input[type="range"] { flex: 1 1 50px; min-width: 40px; margin: 0; }
@@ -113,13 +111,12 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .adv-boots.restarted { color: var(--warn); }
 .check { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
 .check input { width: auto; min-height: 0; }
-#c-advanced-box { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
-#c-advanced-box input { width: auto; min-height: 0; }
 #connect-slot { margin: 4px 0 12px; }
+.title-row { display: flex; align-items: center; gap: 12px; }
 .dev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .dev-bar #c-ports-box { margin: 0; }
-#dev-bar #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
-#dev-bar #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+header #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
+header #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 #c-midi .eject { display: none; vertical-align: -2px; }
 #c-midi[aria-pressed="true"] .eject { display: inline-block; }
 #c-midi[aria-pressed="true"] .connect-text { display: none; }
@@ -129,7 +126,8 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 <body>
 <main>
   <header>
-    <h1>jank</h1>
+    <div class="title-row"><h1>jank</h1>
+    <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button></div>
     <nav id="home-links" class="hide" aria-label="Links">
       <a href="https://github.com/w0ts/jank" title="The jank's source code and documentation on GitHub.">GitHub</a>
       <a href="https://w0ts.github.io/jank/" title="Audio works better on the GitHub hosted page than on this page opened from the jank's drive.">Open the GitHub hosted page</a>
@@ -138,7 +136,6 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
   <p id="msg"></p>
 
   <div id="connect-slot">
-    <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button>
     <p id="c-waiting" class="note hide" style="margin:8px 0 0">waiting for the jank...</p>
   </div>
 
@@ -146,18 +143,15 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
     <div class="live-row">
       <section id="face" class="device">
         <div id="dev-bar" class="dev-bar">
-          <label id="c-advanced-box" class="hide" title="Shows the player and the advanced tuning and details on this page. Changes only this page (remembered in this browser); nothing is sent to the stick."><input id="c-advanced" type="checkbox"> Advanced</label>
           <label id="c-ports-box" class="hide" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
         </div>
         <div id="face-box">
 <svg id="dev" viewBox="0 0 100 81" tabindex="0" aria-label="jank mini 3, top view, 1 unit = 1 mm">
-  <defs>
-    <linearGradient id="lidg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9da1"/><stop offset="1" stop-color="#83868a"/></linearGradient>
-  </defs>
   <!-- the shell only: every position and size is set from the BOX3 table in ui/box3.js (Box3.build) -->
   <g id="ports"></g>
-  <rect id="lid" x="0" y="0" width="1" height="1" fill="url(#lidg)" class="lid"/>
+  <rect id="lid" x="0" y="0" width="1" height="1" class="lid"/>
   <rect id="lidshade" x="0" y="0" width="1" height="1" class="lidshade"/>
+  <g id="labels"></g>
   <g id="oledView">
     <rect id="oledBezel" class="bezel" rx="1.6" x="0" y="0" width="1" height="1"/>
     <foreignObject id="oledFO" x="0" y="0" width="1" height="1"><canvas id="oled" width="320" height="240"></canvas></foreignObject>
@@ -166,8 +160,31 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 </svg>
         </div>
       </section>
-      <section id="player" class="hide" tabindex="-1">
-        <div class="pl-title"><h2>Player</h2><button id="pl-help" class="link" type="button" aria-expanded="false" title="Shows or hides the help text of the player. Only this page.">?</button></div>
+    </div>
+
+  <details id="sec-settings" class="sec"><summary title="Shows or hides the settings: the name and the Wi-Fi. Only this page.">Settings</summary>
+    <section id="menu">
+      <div class="grid">
+        <label title="The stick's name, up to 23 printable characters. Changes the stick; kept after a restart.">Name <input id="c-name" maxlength="23"></label>
+      </div>
+
+      <h2 style="margin-top:14px">Network</h2>
+      <p id="net-state" class="note">-</p>
+      <div class="grid">
+        <label title="Jank mode or a Wi-Fi network. Nothing changes until Save and restart.">Join <select id="net-mode"><option value="jank">MODE JANK</option><option value="wifi">A Wi-Fi network</option></select></label>
+        <label title="The Wi-Fi network's name (up to 32 characters), used when Join is a Wi-Fi network. Sent with Save and restart.">Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
+        <label title="8 to 63 characters, sent over USB only; empty keeps the saved one. The stick keeps it in its flash, unencrypted, and never sends it back.">Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
+      </div>
+      <p class="note" id="net-note">2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.</p>
+      <div class="buttons">
+        <button id="net-apply" disabled title="Sends the Join choice (jank mode, or the Wi-Fi name and password) to the stick and restarts it; give it a few seconds. Kept after the restart.">Save and restart</button>
+      </div>
+    </section>
+
+  </details>
+  <details id="sec-player" class="sec" open><summary title="Shows or hides the player. Hiding it does not stop the sound. Only this page.">Player</summary>
+      <section id="player" tabindex="-1">
+        <div class="pl-title"><button id="pl-help" class="link" type="button" aria-expanded="false" title="Shows or hides the help text of the player. Only this page.">?</button></div>
         <p id="pl-help-text" class="note hide">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first time, choose the stick's output once in the browser's own output chooser (no microphone is used); it is remembered. The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card. After a reload the remembered folder needs one click (Play or Open) to be allowed again; on the https address Chrome 122 and later offers "Allow on every visit" in that prompt, which makes this step silent.</p>
         <audio id="pl-audio" preload="auto"></audio>
         <div class="pl-bar">
@@ -203,12 +220,9 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
           <div id="pl-list"></div>
         </div>
       </section>
-    </div>
-  </div>
-
-  <div id="advanced-extra" class="hide">
+  </details>
+  <details id="sec-advanced" class="sec"><summary title="Shows or hides the advanced settings and details: tuning, signal, Link, peers and firmware. Only this page.">Advanced</summary>
     <section>
-      <h2>Advanced</h2>
       <p id="adv-boots" class="adv-boots">boots - &middot; reset: -</p>
       <p id="adv-panic" class="note hide"></p>
       <p id="adv-restart" class="note hide"></p>
@@ -257,35 +271,6 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <code>set beat_latency</code>) as the monitor's output latency minus the stick path's, when it is more than 3 ms away from the stick's, at most once in 5 s.
       The page cannot see the stick's USB buffering or the capture chain's, so finish by ear with Audio shift (the manual layer, above).</p>
     </section>
-  </div>
-
-  <section id="menu" class="hide">
-    <h2>Settings</h2>
-    <div class="grid">
-      <label title="The stick's name, up to 23 printable characters. Changes the stick; kept after a restart.">Name <input id="c-name" maxlength="23"></label>
-      <div class="row"><button id="scan" class="quiet" disabled title="Listens on the air for the jank and FM-1 groups and lists them. Joins nothing and changes no setting.">Scan the groups</button></div>
-    </div>
-    <table class="groups" style="margin-top:8px">
-      <thead><tr><th>Group</th><th>Ch.</th><th>Peers</th><th>dBm</th><th></th></tr></thead>
-      <tbody id="groups"></tbody>
-    </table>
-    <p id="scan-result" class="note"></p>
-
-    <h2 style="margin-top:14px">Network</h2>
-    <p id="net-state" class="note">-</p>
-    <div class="grid">
-      <label title="Jank mode or a Wi-Fi network. Nothing changes until Save and restart.">Join <select id="net-mode"><option value="jank">MODE JANK</option><option value="wifi">A Wi-Fi network</option></select></label>
-      <label title="The Wi-Fi network's name (up to 32 characters), used when Join is a Wi-Fi network. Sent with Save and restart.">Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
-      <label title="8 to 63 characters, sent over USB only; empty keeps the saved one. The stick keeps it in its flash, unencrypted, and never sends it back.">Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
-    </div>
-    <p class="note" id="net-note">2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.</p>
-    <div class="buttons">
-      <button id="net-apply" disabled title="Sends the Join choice (jank mode, or the Wi-Fi name and password) to the stick and restarts it; give it a few seconds. Kept after the restart.">Save and restart</button>
-    </div>
-  </section>
-
-  <details class="more hide" id="more">
-    <summary title="Shows or hides the stick's details: signal, Link, peers and firmware. Only this page.">Details</summary>
     <section>
       <h2>Air and Link</h2>
       <div class="grid">
@@ -317,6 +302,8 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
       <button id="bootloader" class="quiet" disabled title="Restarts the stick into the ROM's download mode so esptool can flash it over USB. Unplug and replug it afterwards to run again.">Download mode</button>
     </section>
   </details>
+  </div>
+
 </main>
 
 <script id="logic">
@@ -416,25 +403,19 @@ class SysexIn {
 function parseAnswer(lines) {
   const values = {};
   const units = [];
-  const scans = [];
   for (const line of lines) {
     const at = line.indexOf("=");
     if (at < 0) continue;
     const key = line.slice(0, at);
     const value = line.slice(at + 1);
-    if (key === "scan") {
-      if (value !== "none") {
-        const [group, channel, frames, count, janks, rssi] = value.split(",").map(Number);
-        scans.push({ group, channel, frames, units: count, janks, rssi });
-      }
-    } else if (key === "peer" && value.includes(",")) {      /* a unit in `status`; plain peer= is the setting in `get` */
+    if (key === "peer" && value.includes(",")) {      /* a unit in `status`; plain peer= is the setting in `get` */
       const [mac, rssi, age, frames] = value.split(",");
       units.push({ mac, rssi: Number(rssi), age: Number(age), frames: Number(frames) });
     } else {
       values[key] = value;
     }
   }
-  return { values, units, scans };
+  return { values, units };
 }
 
 function isEnd(line) {
@@ -491,10 +472,6 @@ function portList(map) {
   const out = [];
   if (map && typeof map.forEach === "function") map.forEach((port) => { if (port && port.state !== "disconnected") out.push(port); });
   return out;
-}
-/* the FM-1s and janks heard in a group: a jank shows only by its MAC prefix */
-function peerText(row) {
-  return row.janks ? row.units + ", of which " + row.janks + " jank" : String(row.units);
 }
 
 
@@ -589,7 +566,7 @@ const $ = (id) => document.getElementById(id);
 const SETTINGS = ["name", "beat", "follower", "skip", "graded", "rate", "lat_trim", "beat_latency", "filter", "peer", "quantum", "offset"];
 const JANK_WAIT_MS = 15000;
 const HOME_EVERY_MS = 300, STATUS_EVERY_MS = 1500, ABOUT_EVERY_MS = 1500;
-const S = { line: null, kind: null, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastAbout: null, aboutAt: -Infinity, aboutTried: -Infinity, aboutBusy: false, aboutOff: false, lastScans: [], timers: [],
+const S = { line: null, kind: null, drop: null, lastGet: {}, lastHome: null, homeAt: 0, lastAbout: null, aboutAt: -Infinity, aboutTried: -Infinity, aboutBusy: false, aboutOff: false, timers: [],
             lastStatus: null, statusAt: 0, waiting: null, auto: true };
 
 function say(text, bad) {
@@ -641,47 +618,6 @@ function showStatus({ values: v, units }) {
   $("s-drops").textContent = faultDrops(v);
   $("units").replaceChildren(...units.map((u) => cells(document.createElement("tr"), [u.mac, u.rssi, u.age, u.frames])));
   $("net-state").textContent = networkLine({ ...S.lastGet, ...v });
-}
-
-function showGroups(scans) {
-  S.lastScans = scans;
-  const home = String(S.lastGet.group);
-  $("groups").replaceChildren(...scans.map((g) => {
-    const on = String(g.group) === home;
-    const row = document.createElement("tr");
-    row.classList.toggle("on", on);
-    let action = "Joined";
-    if (!on) {
-      action = document.createElement("button");
-      action.textContent = "Join";
-      action.title = "Makes the stick join this group (set group). Saved on the stick.";
-      action.disabled = !S.line;
-      action.addEventListener("click", async () => {
-        try {
-          await send("set group " + g.group);
-          showSettings(await send("get"));
-          showGroups(S.lastScans);
-          say("Saved on the jank.");
-        } catch (e) {
-          say(e.message, true);
-        }
-      });
-    }
-    return cells(row, [g.group, g.channel, peerText(g), g.rssi, action]);
-  }));
-  $("scan-result").textContent = scans.length ? "" : "No group heard.";
-}
-
-async function scan() {
-  $("scan").disabled = true;
-  $("scan-result").textContent = "Scanning...";
-  try {
-    showGroups((await send("scan", 4000)).scans);
-  } catch (e) {
-    $("scan-result").textContent = "";
-    say(e.message, true);
-  }
-  $("scan").disabled = !S.line;
 }
 
 async function change(key) {
@@ -764,20 +700,22 @@ async function pollAbout() {
   }
 }
 
-/* Advanced: a check box shown only over USB MIDI; it shows the Player card (and the room for the extra info of the next stage) */
+/* the three sections under the device (Settings, Player, Advanced) show with the connection; each is open or closed as the user left it
+   (one key each in this browser; default: Player open). The live polling of the Advanced section runs only while it is open. */
+const SECTION_OPEN = { "sec-settings": false, "sec-player": true, "sec-advanced": false };
+function storedOpen(id) {
+  try {
+    const v = localStorage.getItem("jank." + id);
+    if (v !== null) return v === "1";
+  } catch (e) { /* storage blocked: the default */ }
+  return SECTION_OPEN[id];
+}
+function rememberOpen(id, on) {
+  try { localStorage.setItem("jank." + id, on ? "1" : "0"); } catch (e) { /* not remembered */ }
+}
 function paintAdvanced() {
-  const visible = S.kind === "midi" && $("c-advanced").checked;
-  $("c-advanced-box").classList.toggle("hide", S.kind !== "midi");
-  $("player").classList.toggle("hide", !visible);
-  $("advanced-extra").classList.toggle("hide", !visible);
+  const visible = S.kind === "midi" && !!$("sec-advanced").open;
   document.dispatchEvent(new CustomEvent("jank-advanced", { detail: { visible } }));
-}
-const ADVANCED_KEY = "jank.advanced";
-function storedAdvanced() {
-  try { return localStorage.getItem(ADVANCED_KEY) === "1"; } catch (e) { return false; }     /* storage blocked: not remembered */
-}
-function rememberAdvanced(on) {
-  try { localStorage.setItem(ADVANCED_KEY, on ? "1" : "0"); } catch (e) { /* not remembered */ }
 }
 
 /* the page connects to a jank by itself (USB MIDI) unless the user left it: pressing the active MIDI button turns it off, pressing it again on */
@@ -799,22 +737,14 @@ async function autoConnect() {
   if (!S.line && !S.waiting) connectMidi(true);
 }
 
-/* the connect button lives under the title when nothing is connected and in the device card's top row while connected */
-function placeConnect(kind) {
-  $(kind ? "dev-bar" : "connect-slot").prepend($("c-midi"));
-}
-
 function setConnected(kind) {
   S.kind = kind;
   $("c-midi").setAttribute("aria-pressed", String(kind === "midi"));
   $("c-midi").setAttribute("aria-label", kind === "midi" ? "Disconnect" : "Connect");
-  placeConnect(kind);
   $("live").classList.toggle("hide", !kind);
   paintAdvanced();
   document.dispatchEvent(new CustomEvent("jank-connection", { detail: { kind } }));
-  $("menu").classList.toggle("hide", !kind);
-  $("more").classList.toggle("hide", !kind);
-  for (const id of ["scan", "net-apply", "bootloader"]) $(id).disabled = !kind;
+  for (const id of ["net-apply", "bootloader"]) $(id).disabled = !kind;
 }
 
 function disconnected(text) {
@@ -830,7 +760,6 @@ function disconnected(text) {
   S.aboutOff = false;
   S.noAnswerShown = false;
   setConnected(null);
-  showGroups(S.lastScans);
   if (text) say(text, true);
 }
 
@@ -960,9 +889,10 @@ $("c-midi").addEventListener("click", () => {
   setAutoConnect(!leaving);
   if (leaving) disconnected(); else connectMidi(false);
 });
-$("c-advanced").checked = storedAdvanced();
-$("c-advanced").addEventListener("change", () => { rememberAdvanced($("c-advanced").checked); paintAdvanced(); });
-$("scan").addEventListener("click", scan);
+for (const id of Object.keys(SECTION_OPEN)) {
+  $(id).open = storedOpen(id);
+  $(id).addEventListener("toggle", () => { rememberOpen(id, !!$(id).open); if (id === "sec-advanced") paintAdvanced(); });
+}
 /* the face's NO / YES held with UP / DOWN: `command` is Stick.nudgeCommand's; the answer says what moved */
 async function nudge(kind, command) {
   try {
@@ -1274,6 +1204,7 @@ const OLED = (() => {
             help: [['1 PULSE PER BEAT', 'ON CLK OUT'], ['2 PULSES PER BEAT', 'ON CLK OUT'], ['4 PULSES PER BEAT', 'ON CLK OUT'],
                    ['8 PULSES PER BEAT', 'ON CLK OUT'], ['24 PULSES PER BEAT', 'ON CLK OUT']] },
     threshold: { title: 'THRESHOLD', lo: 0, hi: 100, step: 5, unit: '%', get: c => c.th, help: ['BELOW IT: STOP', '(LOW CONFIDENCE)'] },
+    pause: { title: 'PAUSE LEVEL', lo: -70, hi: -20, step: 1, unit: ' dB', get: c => pauseDb(c), help: ['UNDER IT: A PAUSE', 'THEN RESYNC'] },   // `set pause_db`: the INPUT bar's notch
     gain: { title: 'LEVEL', lo: -12, hi: 12, step: 1, unit: ' dB', get: c => c.gain, help: ['INPUT LEVEL', '- CUT   + BOOST'] },   // before the tracker
     ltmode: { title: 'LINK TRANSPORT', opts: LT_MODES, get: c => c.ltMode,      // LINK mode only: the session's start / stop
               help: [['CLOCKS RUN ON LINK', 'TEMPO, OWN START'], ['CLOCKS START + STOP', 'WITH THE SESSION'],
@@ -1310,11 +1241,14 @@ const OLED = (() => {
     { name: 'ABOUT', info: 'about' },
   ];
   // sub-menus: a title and the EDITS they list
-  const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
+  // (PAUSE LEVEL is the colour layout's only: the OLED layout lists a sub-menu's rows without it)
+  const subRows = (sub, c) => (c && c.layout === 'lcd2' ? SUBS[sub].rows : SUBS[sub].rows.filter(f => f !== 'pause'));
+  const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold', 'pause'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
                  display: { title: 'DISPLAY', rows: ['bright', 'sleep'] } };
   const VISIBLE = 6;
   const OVERLAY_MS = 1000;
-  const METER_MIN_DB = -90, SILENCE_DB = -60;
+  const METER_MIN_DB = -90, SILENCE_DB = -60, PAUSE_DB_DEFAULT = -40;   // (the OLED layout's INPUT notch stays at the silence gate: PAUSE LEVEL is the colour layout's)
+  const pauseDb = c => (Number.isFinite(c.pauseDb) ? c.pauseDb : PAUSE_DB_DEFAULT);   // PAUSE LEVEL, dBFS (`get` pause_db; an older jank: the default)
   const sgn = v => (v > 0 ? '+' : '') + v;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -1406,7 +1340,7 @@ const OLED = (() => {
         else { ui.screen = 'info'; ui.page = it.info; ui.ascroll = 0; }
       }
     } else if (ui.screen === 'sub') {
-      const rows = SUBS[ui.sub].rows;
+      const rows = subRows(ui.sub, c);
       if (d) ui.ocur = clamp(ui.ocur - d, 0, rows.length - 1);
       else if (btn === 'no') ui.screen = 'menu';
       else startEdit(ui, rows[ui.ocur], c);
@@ -1645,7 +1579,7 @@ const OLED = (() => {
   function drawSub(fb, ui, c) {
     const sub = SUBS[ui.sub];
     titleBar(fb, sub.title);
-    sub.rows.forEach((f, i) => {
+    subRows(ui.sub, c).forEach((f, i) => {
       const y = 14 + i * 11, sel = i === ui.ocur, v = sel ? 0 : 1, sp = EDITS[f];
       if (sel) rect(fb, 0, y - 2, W, 11, 1);
       text(fb, sp.title, 4, y, 1, v); textR(fb, sp.opts ? (f === 'lowconf' ? (sp.get(c) ? 'STOP' : 'RUN') : sp.opts[sp.get(c)]) : editText(sp, sp.get(c)), W - 4, y, 1, v);
@@ -1664,10 +1598,11 @@ const OLED = (() => {
     // PANIC: "-" when none, else "<task> 0x4200abcd" from "<task>@0x4200abcd"; the task is cut to what fits beside the label (3 characters on the OLED, 7 on the colour layout), the address stays whole
     const pAt = known(c.panic) ? c.panic.lastIndexOf('@') : -1;
     const panic = !known(c.panic) || c.panic === '' ? '-' : pAt < 0 ? c.panic : c.panic.slice(0, Math.min(pAt, lcd ? 7 : 3)) + (pAt > 0 ? ' ' : '') + c.panic.slice(pAt + 1);
-    return [{ label: 'VERSION', val: known(c.version) ? c.version : '-' }, { label: 'REPO', val: lcd ? 'github.com/w0ts/jank' : 'w0ts/jank' },
+    const rows = [{ label: 'VERSION', val: known(c.version) ? c.version : '-' }, { label: 'REPO', val: lcd ? 'github.com/w0ts/jank' : 'w0ts/jank' },
             { label: 'UPTIME', val: up }, { label: 'RESET', val: known(c.reset) ? c.reset : '-' }, { label: 'TEMP', val: known(c.tempC) ? c.tempC + ' C' : '-' },
             { label: 'CPU', val: (known(c.cpuPct) && c.cpuPct >= 0 ? c.cpuPct : '-') + '/' + (known(c.cpu1Pct) && c.cpu1Pct >= 0 ? c.cpu1Pct : '-') + '%' }, { label: 'MEMORY', val: heap }, num('MIN HEAP', c.heapMinKb, 'K'), { label: 'FLASH', val: flash },
             num('CLOCK LATE', c.clkLateUs, ' US'), num('UI LOOP', c.uiLoopUs, ' US'), num('BEAT LOOP', c.beatLoopUs, ' US'), { label: 'PANIC', val: panic }];
+    return lcd && known(c.panic) && c.panic !== '' ? [rows[12], ...rows.slice(0, 12)] : rows;   // colour layout: a panic on record puts its row first
   };
   function drawInfo(fb, ui, c) {
     if (ui.page === 'about') { titleBar(fb, 'ABOUT'); aboutRows(c, false).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_OLED).forEach((r, k) => { text(fb, r.label, 4, 13 + k * 9, 1, 1); textR(fb, r.val, W - 4, 13 + k * 9, 1, 1); }); return; }
@@ -1767,7 +1702,7 @@ const OLED = (() => {
   //   HOME (AUDIO)  y 2..23    top bar: transport icon, LINK TRANSPORT icon, fold label (left); GRP n, the chain icon + peers, the plug (only while charging) and the battery (right)
   //                 y 32..101  the TEMPO in the NORMAL digits (70 rows; the digit after the dot is 46 rows), centred on the 320 columns
   //                 y 110..165 four beat boxes 72 x 56 (gap 8, x 4..315)
-  //                 then the info rows INPUT (VU meter, notch at the tracker's -50 dBFS), CONFIDENCE (line, notch at the stop threshold), BAR (AUTO BAR's
+  //                 then the info rows INPUT (VU meter, notch at the PAUSE LEVEL), CONFIDENCE (line, notch at the stop threshold), BAR (AUTO BAR's
   //                 state, only with AUTO BAR on), 2 rows apart, as one block centred between the boxes and the state line (GATED / HOLD / COAST /
   //                 STOPPED / SILENT, centred, empty otherwise; its row y 226..239 is always reserved)
   //   HOME (LINK)   the same top bar; the tempo in the LARGE digits (94 rows, y 38..131), centred; four square beat boxes 72 x 72, centred as a row; no audio rows
@@ -1894,14 +1829,14 @@ const OLED = (() => {
     const x = barTickX(tickFrac); xorCols(fb, x, 2, y + 2, y + 11); tag(ink, x, y + 2, 2, 10);
   }
   // the INPUT row: a continuous VU meter 10 px high on 124 px: round(124 x level) columns, no segments and no gaps. Every column has the ramp id of its
-  // position on the dBFS scale (green quiet, red hot). A notch (14 px tall, 2 wide, XOR-ed) marks the tracker's -50 dBFS. The number carries the level rule's ink.
+  // position on the dBFS scale (green quiet, red hot). A notch (14 px tall, 2 wide, XOR-ed) marks the PAUSE LEVEL (under it for 2 beats: a pause). The number carries the level rule's ink.
   function vuRow(fb, y, c) {
     const value = Math.round(c.levelDb) + 'dB', top = y + 2, n = barFillWidth(dbFrac(c.levelDb));
     rowText(fb, y, 'INPUT', value);
     tag(levelInk(c), L2.valueXR - textW(value, 1), y, textW(value, 1), 14);
     rect(fb, L2.barX, top, n, L2.vuH, 1);
     for (let i = 0; i < n; i++) tag(vuInk(i), L2.barX + i, top, 1, L2.vuH);
-    xorCols(fb, barTickX(dbFrac(QUIET_DB)), 2, y, y + 13);
+    xorCols(fb, barTickX(dbFrac(pauseDb(c))), 2, y, y + 13);
   }
   // the BAR row: the label and AUTO BAR's state (the 10 character label column), a 1 px outlined bar (124 x 10, the fill inside, so the fill is
   // round(122 x confidence)); neutral, no tick
@@ -2223,31 +2158,54 @@ const Face = (() => {
 })();
 </script>
 <script>
-/* The device drawing of the control page: jank-mini-3 seen from the top (the lid). Every number lives in the BOX3 table below, in mm, case
-   coordinates (origin top left, x right, y down); Box3.build(svg) draws the shell of ui/box3.svg.html from it and nothing else holds a
-   position. Positions may still move by +-2 mm: change them here. No text on the device but the keys' own marks. Builds with the DOM only. */
-const BOX3 = {
-  case: { w: 100, h: 81, r: 3 },
-  // the Waveshare LCD-2 in landscape: the active area, and the lid window one mm bigger on each side; the 320 x 240 canvas fills the active area
-  screen: { x: 9.7, y: 25.2, w: 40.8, h: 30.6, windowMargin: 1 },
-  // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
-  cross: { cx: 67.0, cy: 40.5, span: 24, arm: 8 },
-  switches: { up: [67.0, 32.5], down: [67.0, 48.5], no: [59.0, 40.5], yes: [75.0, 40.5] },
-  keyMarks: { no: ['NO', 'MENU'], yes: ['YES'] },          // the text on the keys, one line each; UP and DOWN carry a drawn triangle (arrowSize), NO is the menu key too
-  arrowSize: { w: 3.2, h: 2.6 },
-  markSize: { NO: 2.5, MENU: 2.0, YES: 2.5 }, markGap: 0.8,
-  // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
-  ports: [
-    { id: 'midi1', wall: 'top', at: 33.3, kind: 'trs' }, { id: 'midi2', wall: 'top', at: 46.1, kind: 'trs' },
-    { id: 'din1', wall: 'top', at: 63.5, kind: 'din' }, { id: 'din2', wall: 'top', at: 85.6, kind: 'din' },
-    { id: 'clock', wall: 'right', at: 30.5, kind: 'trs' }, { id: 'reset', wall: 'right', at: 50.5, kind: 'trs' },
-    { id: 'linein', wall: 'bottom', at: 33.5, kind: 'trs' },
-    { id: 'usbIn', wall: 'top', at: 8.7, kind: 'usbc' }, { id: 'usbHost', wall: 'top', at: 21.7, kind: 'usbc' }, { id: 'usbOwn', wall: 'left', at: 40.5, kind: 'usbc' },
-  ],
-  // connector sizes: length along the wall, depth out of the wall (3.5 mm jack ~6, 5-pin DIN ~15, USB-C 9 x 3.2)
-  kinds: { trs: { len: 6, depth: 3.2 }, din: { len: 15, depth: 3.2 }, usbc: { len: 9, depth: 3.2 } },
-  margin: 1.5,
-};
+/* The device drawing of the control page: jank-mini-3 seen from the top (the lid), as the printed box looks (hardware/jank-mini-3/case/BOX.md,
+   box.scad). Every number lives in the BOX3 table below, in mm, case coordinates (origin top left, x right, y down); Box3.build(svg) draws the
+   shell of ui/box3.svg.html from it and nothing else holds a position. The case origin lies 2.4 mm (fit 0.4 + wall 2.0) outside the board's
+   corner, so a board coordinate of box.scad is b(x) here; the tables below say b(...) wherever the number comes from box.scad. Positions may
+   still move by +-2 mm: change them here. The face labels are the LABELS and ARROWS tables, the D-pad cap's symbols are drawn polygons.
+   Builds with the DOM only. */
+const BOX3 = (() => {
+  const b = (v) => Math.round((v + 2.4) * 100) / 100;          // box.scad board mm -> case mm
+  const W = 95.5, H = 82.0;                                       // the board (box.scad W, H)
+  const J = { j1: 31.95, j4: 44.95, j2: 6.3, j3: 19.1, j5: W - 33.0, j6: W - 10.9, j13: H / 2 - 10.0, j14: H / 2 + 10.0, j7: 30.0, lcd2Usb: 41.0 };
+  const rows = [b(2.4), b(5.2)];                                  // the top edge's rows: triangles, names (box.scad LAB_ROWS)
+  return {
+    case: { w: 100.3, h: 86.8, r: 3 },
+    // the Waveshare LCD-2 in landscape: the active area, and the lid window 0.5 mm bigger on each side; the 320 x 240 canvas fills the active area
+    screen: { x: b(5.4), y: b(25.7), w: 40.8, h: 30.6, windowMargin: 0.5 },
+    // the D-pad: one cross-shaped cap, flush with the lid; its four arms are the four buttons, the switches sit under the arm ends
+    cross: { cx: b(64.75), cy: b(41.0), span: 24, arm: 8 },
+    switches: { up: [b(64.75), b(33.0)], down: [b(64.75), b(49.0)], no: [b(56.75), b(41.0)], yes: [b(72.75), b(41.0)] },
+    // the symbols on the cap (box.scad sym_*): centred symR out on the arms, a solid triangle up and down, an X on NO, a tick on YES
+    symbols: { symR: 8.7, tri: { w: 5.0, h: 4.0 }, x: { size: 4.6, bold: 1.7 }, tick: { bold: 1.7, points: [[-2.0, 0.1], [-0.6, -1.3], [1.7, 1.5]], centre: [0.12, 0.26] } },
+    // the face labels as printed: [x, y, text, turn in degrees (counter-clockwise)] (box.scad LABELS); the font is in ui/box3.css
+    labelSize: 2.2, labelSpacing: 0.12,
+    labels: [
+      [b(J.j2), rows[1], '1'], [b((J.j2 + J.j3) / 2), rows[1], 'MIDI'], [b(J.j3), rows[1], '2'],
+      [b(J.j1), rows[1], 'ESP'], [b(J.j4), rows[1], 'DEVICE'],
+      [b(J.j5), rows[1], '1'], [b((J.j5 + J.j6) / 2), rows[1], 'MIDI'], [b(J.j6), rows[1], '2'],
+      [b(J.j7), b(H - 5.0), 'LINE IN'], [b(W - 7.0), b(J.j13), 'CLK'], [b(W - 7.0), b(J.j14), 'RST'],
+      [b(0.4), b(J.lcd2Usb + 5.6), 'ESP', 90],
+    ],
+    // the triangles that point at the sockets: [x, y, direction in degrees: 0 up, -90 right, 180 down, 90 left] (box.scad LAB_ARROWS); size w x h
+    arrows: [
+      ...[J.j2, J.j3, J.j1, J.j4, J.j5, J.j6].map((x) => [b(x), rows[0], 0]),
+      [b(W - 2.2), b(J.j13), -90], [b(W - 2.2), b(J.j14), -90], [b(J.j7), b(H - 1.8), 180], [b(0.4), b(J.lcd2Usb), 90],
+    ],
+    arrowSize: { w: 2.6, h: 2.1 },
+    // each port: the wall it is on and its centre along that wall (x for top and bottom, y for left and right), mm
+    ports: [
+      { id: 'midi1', wall: 'top', at: b(J.j2), kind: 'trs' }, { id: 'midi2', wall: 'top', at: b(J.j3), kind: 'trs' },
+      { id: 'din1', wall: 'top', at: b(J.j5), kind: 'din' }, { id: 'din2', wall: 'top', at: b(J.j6), kind: 'din' },
+      { id: 'clock', wall: 'right', at: b(J.j13), kind: 'trs' }, { id: 'reset', wall: 'right', at: b(J.j14), kind: 'trs' },
+      { id: 'linein', wall: 'bottom', at: b(J.j7), kind: 'trs' },
+      { id: 'usbIn', wall: 'top', at: b(J.j1), kind: 'usbc' }, { id: 'usbHost', wall: 'top', at: b(J.j4), kind: 'usbc' }, { id: 'usbOwn', wall: 'left', at: b(J.lcd2Usb), kind: 'usbc' },
+    ],
+    // connector sizes: length along the wall, depth out of the wall (3.5 mm jack ~6, 5-pin DIN ~15, USB-C 9 x 3.2)
+    kinds: { trs: { len: 6, depth: 3.2 }, din: { len: 15, depth: 3.2 }, usbc: { len: 9, depth: 3.2 } },
+    margin: 1.5,
+  };
+})();
 
 const Box3 = (() => {
   const windowRect = (s = BOX3.screen) => ({ x: s.x - s.windowMargin, y: s.y - s.windowMargin, w: s.w + 2 * s.windowMargin, h: s.h + 2 * s.windowMargin });
@@ -2287,6 +2245,38 @@ const Box3 = (() => {
   const make = (svg, tag, attrs) => { const e = document.createElementNS(svg.namespaceURI, tag); setAttrs(e, attrs); return e; };
   const mm = (v) => Math.round(v * 100) / 100;
 
+  // a symbol's points as an SVG points string, about the centre (x, y)
+  const pts = (list, x, y) => list.map(([px, py]) => mm(x + px) + ',' + mm(y + py)).join(' ');
+  // the cap's symbol on an arm, centred symR out from the cap's centre along its arm, as box.scad draws them (y down here)
+  function symbolFor(svg, name, x, y) {
+    const S = BOX3.symbols, cls = { class: 'sym' };
+    if (name === 'up' || name === 'down') {
+      const s = name === 'up' ? 1 : -1, hw = S.tri.w / 2, hh = S.tri.h / 2;
+      return [make(svg, 'polygon', { ...cls, id: 'sym-' + name, points: pts([[-hw, s * hh], [hw, s * hh], [0, -s * hh]], x, y) })];
+    }
+    if (name === 'no') {
+      // two bars of width bold, cut flush by the size x size square: two hexagons
+      const h = S.x.size / 2, d = S.x.bold / 2 * Math.SQRT2;
+      return [[[-h, -h], [-h + d, -h], [h, h - d], [h, h], [h - d, h], [-h, -h + d]], [[-h, h], [-h, h - d], [h - d, -h], [h, -h], [h, -h + d], [-h + d, h]]]
+        .map((poly, i) => make(svg, 'polygon', { ...cls, id: 'sym-no' + i, points: pts(poly, x, y) }));
+    }
+    const T = S.tick, [cx, cy] = T.centre;
+    return [make(svg, 'polyline', { class: 'sym tick', id: 'sym-yes', 'stroke-width': T.bold, points: pts(T.points.map(([px, py]) => [px - cx, -(py - cy)]), x, y) })];
+  }
+  // the printed texts and the pointing triangles of the face
+  function labelEls(svg) {
+    const z = BOX3.labelSize, { w, h } = BOX3.arrowSize;
+    const texts = BOX3.labels.map(([x, y, t, turn = 0]) => {
+      const e = make(svg, 'text', { x: mm(x), y: mm(y + 0.36 * z), 'font-size': z, 'letter-spacing': BOX3.labelSpacing, class: 'label', 'data-label': t });
+      if (turn) e.setAttribute('transform', 'rotate(' + -turn + ' ' + mm(x) + ' ' + mm(y) + ')');
+      e.textContent = t;
+      return e;
+    });
+    const tris = BOX3.arrows.map(([x, y, dir]) => make(svg, 'polygon', {
+      class: 'label-arrow', transform: 'translate(' + mm(x) + ' ' + mm(y) + ') rotate(' + -dir + ')', points: [[-w / 2, h / 2], [w / 2, h / 2], [0, -h / 2]].map((q) => q.join(',')).join(' '),
+    }));
+    return [...texts, ...tris];
+  }
   function placeScreen(svg, aspect) {
     const win = windowRect(), area = canvasArea(aspect);
     setAttrs(svg.querySelector('#oledBezel'), { x: mm(win.x), y: mm(win.y), width: mm(win.w), height: mm(win.h) });
@@ -2301,26 +2291,13 @@ const Box3 = (() => {
       const r = portRect(p);
       return make(svg, 'rect', { id: 'port-' + p.id, x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1, class: 'port' });
     }));
+    svg.querySelector('#labels').replaceChildren(...labelEls(svg));
     const cap = make(svg, 'path', { id: 'cap', d: 'M' + crossPoints().map(([x, y]) => mm(x) + ' ' + mm(y)).join('L') + 'Z', class: 'cap' });
     svg.querySelector('#dpad').replaceChildren(cap, ...['up', 'down', 'no', 'yes'].map((name) => {
       const [x, y] = BOX3.switches[name], r = armRect(name), g = make(svg, 'g', { id: 'arm-' + name, 'data-b': name });
-      // the marks are centred on the arm's centre: the text lines as a block of capital letters (cap height 0.71 em, the lines markGap apart), the arrows drawn as triangles
-      const marks = [];
-      if (name === 'up' || name === 'down') {
-        const { w, h } = BOX3.arrowSize, s = name === 'up' ? 1 : -1;
-        marks.push(make(svg, 'path', { d: 'M' + mm(x - w / 2) + ' ' + mm(y + s * h / 2) + 'L' + mm(x + w / 2) + ' ' + mm(y + s * h / 2) + 'L' + mm(x) + ' ' + mm(y - s * h / 2) + 'Z', class: 'glyph' }));
-      } else {
-        const lines = BOX3.keyMarks[name], sizes = lines.map((t) => BOX3.markSize[t]), caps = sizes.map((z) => 0.71 * z);
-        const total = caps.reduce((a, b) => a + b, 0) + BOX3.markGap * (lines.length - 1);
-        let top = y - total / 2;
-        lines.forEach((t, i) => {
-          const m = make(svg, 'text', { x, y: mm(top + caps[i]), 'font-size': sizes[i], class: 'glyph' });
-          m.textContent = t;
-          marks.push(m);
-          top += caps[i] + BOX3.markGap;
-        });
-      }
-      g.append(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }), ...marks);
+      const dir = { up: [0, -1], down: [0, 1], no: [-1, 0], yes: [1, 0] }[name], C = BOX3.cross, R = BOX3.symbols.symR;
+      g.append(...symbolFor(svg, name, C.cx + dir[0] * R, C.cy + dir[1] * R));
+      g.prepend(make(svg, 'rect', { x: mm(r.x), y: mm(r.y), width: r.w, height: r.h, rx: 1.5, class: 'armarea' }));
       return g;
     }));
   }
@@ -2527,7 +2504,7 @@ const Stick = (() => {
     return {
       link: !audio, bpm: audio && h.bpm > 0 ? h.bpm : null, linkBpm: !audio && h && h.bpm > 0 ? h.bpm : null, mode: 'steady',
       conf: h && h.conf !== null ? h.conf / 100 : 0, confKnown: !!h && h.conf !== null, rssi, airLost: st ? pctOf(st.air_lost_pct) : null, airRetry: st ? pctOf(st.air_retry_pct) : null,
-      rssiMin: st ? num(st.rssi_min) : null, rssiMax: st ? num(st.rssi_max) : null, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), confGraded: !!st && st.graded === 'on' && audio, confGate: st && num(st.conf_gate) !== null ? num(st.conf_gate) / 100 : undefined, th: num(g.threshold) === null ? 80 : num(g.threshold), gain: num(g.line_gain) || 0,
+      rssiMin: st ? num(st.rssi_min) : null, rssiMax: st ? num(st.rssi_max) : null, peakDb: st ? num(st.peak_db) : null, confHold: !!(h && h.confHold), confGraded: !!st && st.graded === 'on' && audio, confGate: st && num(st.conf_gate) !== null ? num(st.conf_gate) / 100 : undefined, th: num(g.threshold) === null ? 80 : num(g.threshold), pauseDb: num(g.pause_db) === null ? undefined : num(g.pause_db), gain: num(g.line_gain) || 0,
       confStop: g.lowconf !== 'run', levelDb: level, levelMin: h && h.levelMin !== null ? h.levelMin : FLOOR_DB, levelMax: h && h.levelMax !== null ? h.levelMax : FLOOR_DB,
       silent: level < SILENCE_DB || (!!st && st.silent === '1'), gated: !!st && st.gated === '1', held: !!h && h.transport === 'stopped' && !(st && st.hold === '0'), playing, running: playing, armed,
       ltMode: g.transport === 'auto' ? 0 : g.lead === 'off' ? 1 : 2,   // as the firmware's menu: auto -> IGNORE, else FOLLOW+LEAD when lead (a jank with no `lead` key: always FOLLOW+LEAD, as before)
@@ -2570,6 +2547,7 @@ const Stick = (() => {
       return field === 'bright' ? cmds('set bright ' + clamp(Math.round(val), 10, 100)) : SLEEP[val] ? cmds('set sleep ' + SLEEP[val]) : refuse('SCREEN OFF has no such value');
     }
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));
+    if (field === 'pause') return cmds('set pause_db ' + clamp(Math.round(val), -70, -20));   // PAUSE LEVEL (an older jank answers err: refused there)
     if (field === 'group') return cmds('set group ' + (val + 1));
     if (field === 'gain') return cmds('set line_gain ' + clamp(Math.round(val), -12, 12));
     if (field === 'inoff') return cmds('set lat_trim ' + clamp(Math.round(val), -100, 100));
@@ -3159,7 +3137,6 @@ const Player = (() => {
     const native = screen === "lcd2" ? Lcd2.SRC_W : OLED.W;
     const area = Box3.canvasArea(screen === "lcd2" ? null : OLED.W / OLED.H), vb = Box3.viewBox();
     const toSvg = (k) => k * native / area.w * vb.w;
-    row.classList.toggle("stack", toSvg(1) > row.clientWidth - 340 - 12 - 30);   // beside the player: 340 px, the gap and the card's padding
     const avail = box.clientWidth;
     if (!avail) return;
     const width = Math.min(toSvg(1), avail) + "px";
@@ -3666,7 +3643,7 @@ const Player = (() => {
     if (web.monitor) web.monitor.gain.value = monitorOn() ? 1 : 0; else audio.muted = !monitorOn();
     paintStatus();
   };
-  // leaving Advanced (or the USB connection) takes the player away: playback stops and the file is released
+  // leaving the USB connection takes the player away: playback stops and the file is released
   function releasePlayer() {
     cancelScan();
     Object.assign(scope, { files: [], count: 0, capped: false, done: false });
@@ -4087,7 +4064,7 @@ const Player = (() => {
   audio.addEventListener("error", () => setError("cannot decode this file as audio"));
   audio.addEventListener("playing", () => { error = ""; startTap(); });
   for (const type of ["pause", "ended", "emptied"]) audio.addEventListener(type, paintStatus);
-  document.addEventListener("jank-advanced", (e) => { if (!e.detail.visible) releasePlayer(); else if (scope.on && browser.rootName !== "") scanScope(); });
+  document.addEventListener("jank-connection", (e) => { if (!e.detail.kind) releasePlayer(); else if (scope.on && browser.rootName !== "") scanScope(); });
   if (navigator.mediaDevices) navigator.mediaDevices.addEventListener("devicechange", readDevices);
   el("pl-pick").addEventListener("click", pickOutput);
 
