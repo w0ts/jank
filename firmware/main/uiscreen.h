@@ -26,5 +26,9 @@ int uis_lead_get(void);              /* LINK TRANSPORT FOLLOW+LEAD (1) / FOLLOW 
 int uis_started_get(void);           /* the user's last Start (1) / Stop (0) of the outputs, as stored (read at boot) */
 void uis_started_set(int on);        /* the user pressed Start (1) / Stop (0): stored by the ui task (400 ms rule) */
 void uis_lead_set(int on);           /* set lead on|off: applied and saved (400 ms rule) by the ui task */
+int uis_sleep_get(void);             /* SCREEN OFF (0 NEVER, 1 30 S, 2 1 MIN, 3 5 MIN) and BRIGHTNESS (10..100 %), the menu's own preferences, for the control line (any task) */
+int uis_bright_get(void);
+void uis_sleep_set(int v);           /* set sleep / set bright: applied and saved (400 ms rule) by the ui task */
+void uis_bright_set(int v);
 void uis_sys(struct jk_sys *out);    /* the ABOUT screen's sampled numbers, for the control line's `about` (any task) */
 #endif

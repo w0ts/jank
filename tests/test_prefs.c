@@ -93,6 +93,25 @@ static void test_old_blob(void)
 }
 
 /* the user's Start / Stop (bit 7 of the SCREEN OFF byte): round trip, the sleep value untouched, an old blob = stopped (power-on) */
+/* a SCREEN OFF / BRIGHTNESS write (the menu's and the control line's `set sleep` / `set bright`) keeps the started bit, and the other way round */
+static void test_display_keeps_started(void)
+{
+    struct jk_prefs p, q;
+    uint8_t b[JK_PREFS_SIZE];
+    jk_prefs_defaults(&p);
+    p.started = 1;
+    p.sleep = 2;
+    p.bright = 30;
+    jk_prefs_pack(&p, b, sizeof b);
+    CHECK(b[3] == (0x80u | 2u) && b[2] == 30);
+    CHECK(jk_prefs_unpack(&q, b, sizeof b) && q.started == 1 && q.sleep == 2 && q.bright == 30);
+    q.sleep = 3;                                                  /* a sleep write */
+    q.bright = 10;
+    jk_prefs_pack(&q, b, sizeof b);
+    CHECK(b[3] == (0x80u | 3u) && b[2] == 10);
+    CHECK(jk_prefs_unpack(&p, b, sizeof b) && p.started == 1 && p.sleep == 3 && p.bright == 10);
+}
+
 static void test_started(void)
 {
     static const uint8_t OLD[10] = {1, 1, 100, 3, 2, 1, 80, 0, 0, 0};
@@ -149,6 +168,7 @@ int main(void)
 {
     test_every_field();
     test_old_blob();
+    test_display_keeps_started();
     test_started();
     test_save_timing();
     printf("prefs: %d checks, %d failed\n", checks, fails);
