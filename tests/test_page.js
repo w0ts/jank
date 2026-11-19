@@ -58,14 +58,18 @@ ok(!/id="home"|id="h-|id="t-(tempo|set|play|up|down)"|id="n-(beat|ms)/.test(html
 for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the stick's menu has it, the page does not");
 for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "scan", "groups", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
   ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
-ok(!/id="pl-file"|id="pl-prev"|id="pl-reset"|dragover|type="file" accept/.test(html), "no single-file button, no Previous, no drag and drop");
+ok(!/id="pl-file"|id="pl-reset"|dragover|type="file" accept/.test(html), "no single-file button, no drag and drop");
 ok(/id="pl-folder"[^>]*aria-label="Music folder"[^>]*><svg/.test(html) && /id="pl-then"[^>]*><svg/.test(html) && /id="pl-help"/.test(html), "the music folder and the after-track mode are icon buttons, the help toggle is there");
 ok(/id="pl-play"[^>]*><svg/.test(html) && /id="pl-next"[^>]*><svg/.test(html) && !/>Play<\/button>|>Next<\/button>/.test(html), "Play and Next are icon buttons, no text");
 ok(!/id="pl-pitch-num"/.test(html) && !/<select id="pl-then"/.test(html), "no pitch number box, no 'then' select");
 ok(html.indexOf('id="pl-folder"') > html.indexOf('id="pl-next"') && html.indexOf('id="pl-folder"') < html.indexOf('id="pl-crumbs"'), "the folder button sits in the folder row, before the path, below the toolbar");
 const playerUi = html.match(/<script id="player-ui">([\s\S]*?)<\/script>/)[1];
-ok(!/analyser\.connect/.test(playerUi), "the meter's analyser is only listened to: it feeds no output");
-ok(/id="pl-meter"/.test(html) && /id="pl-status"/.test(html), "the player card shows a level meter and a status line");
+ok(!/analyser|pl-meter|class="meter"[^>]*><i id="pl-meter"/i.test(playerUi) && !/id="pl-meter"/.test(html) && /id="pl-status"/.test(html), "the player card has no level meter (no analyser, no bar) and keeps its status line");
+ok(/id="pl-prev"[^>]*aria-label="Previous track"[^>]*><svg/.test(html) && /id="pl-prev"[^>]*title="Plays the previous track you heard\. Pressed more than 3 seconds into a track, it restarts that track\."/.test(html), "the Previous button is an icon button with its label and tip");
+ok(html.indexOf('id="pl-prev"') < html.indexOf('id="pl-play"') && html.indexOf('id="pl-play"') < html.indexOf('id="pl-next"') && html.indexOf('id="pl-next"') < html.indexOf('id="pl-then"'), "the buttons run Previous, Play, Next, after-track mode");
+ok(html.indexOf('id="pl-pos"') > html.indexOf('id="pl-name"') && html.indexOf('id="pl-pos"') < html.indexOf('id="pl-seek"') && html.indexOf('id="pl-scope"') > html.indexOf('id="pl-folder"') && html.indexOf('id="pl-scope"') < html.indexOf('id="pl-crumbs"'), "the time sits right of the file name above the scrub bar; all folders sits next to the folder button");
+ok(html.indexOf('id="pl-bpm"') > html.indexOf('id="pl-pitchval"') && html.indexOf('id="pl-bpm"') < html.indexOf('id="pl-pitch"'), "the tag BPM text sits in the Pitch row");
+ok(!/files in scope/.test(html + playerUi) && /id="pl-rescan"/.test(html), "no 'files in scope' count text, the rescan link stays");
 ok(/id="pl-bpm"/.test(html) && /Player\.expectedBpm\(/.test(html), "the player shows the tag BPM times the pitch through Player.expectedBpm");
 ok(/id="pl-monitor"[^>]*aria-pressed="true"/.test(html) && /id="pl-monitor"[^>]*mutes only your speakers/.test(html), "the monitor is an icon toggle, on by default, its tip says it mutes only the speakers");
 ok(/params\.get\("screen"\) === "oled" \? "2\.42" : "lcd2"/.test(html) && !/board === "lcd2"|params\.get\("scale"\)/.test(html), "the face shows the colour lcd2 screen by default for every board; only ?screen=oled gives the 2.42 in OLED; no ?scale= any more");
@@ -75,6 +79,7 @@ ok(!/<nav id="home-links"[\s\S]*?target=/.test(html.split("</nav>")[0]), "the tw
 ok(!/https?:\/\//.test(withoutLinks), "the page loads nothing external");
 ok(/<nav id="home-links" class="hide"/.test(html) && /location\.protocol === "file:"\) \$\("home-links"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub links are hidden unless the page is opened from a file");
 ok(/Audio works better on the GitHub hosted page/.test(html), "the hosted page link's tip says audio works better there");
+ok(/navigator\.mediaSession\.setActionHandler\("previoustrack", \(\) => \{ if \(!el\("pl-prev"\)\.disabled\) previous\(\); \}\)/.test(html), "the media key previous track does what the Previous button does");
 ok(/navigator\.mediaSession\.setActionHandler\("nexttrack", \(\) => \{ if \(!el\("pl-next"\)\.disabled\) skip\(\); \}\)/.test(html), "the media key next track does what the Next button does");
 ok(!/<script[^>]+src=/.test(html) && !/<link/.test(html), "no script or style from elsewhere");
 ok(/<title>jank<\/title>/.test(html), "title");
