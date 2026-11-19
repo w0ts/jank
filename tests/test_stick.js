@@ -76,6 +76,7 @@ const b = Stick.ctx(state({ get: g2 }), 1000);
 eq([get.lead, a.ltMode], ['on', 2], 'the get transcript has lead=on: transport link + lead -> FOLLOW+LEAD (2)');
 eq([[{ ...get, lead: 'off' }, { ...get, lead: 'on' }, { ...get, lead: 'off', transport: 'auto' }, { ...get, lead: 'on', transport: 'auto' }].map(x => Stick.ctx(state({ get: x }), 1000).ltMode), Stick.ctx(state({ get: { ...get, lead: undefined } }), 1000).ltMode], [[1, 2, 0, 0], 2], 'ltMode as the firmware: auto 0, else lead 2 / FOLLOW 1; no lead key (older jank): 2');
 eq([b.th, b.confStop, b.ltMode, b.inSrc, b.usbMidi, b.autoBar, b.net.mode, b.net.ssid, b.net.pass, b.gain, b.inOff, b.usbRole], [55, false, 0, 2, 1, 2, 1, 'HomeNet', '********', 3, -4, 1], 'get: the other values');
+eq([a.pauseDb, Stick.ctx(state({ get: { ...get, pause_db: '-35' } }), 1000).pauseDb], [undefined, -35], 'get: PAUSE LEVEL (pause_db; an older jank: none, the screen draws its default)');
 const st = Stick.ctx(state({ status: { ...status, gated: '1', bar: 'locked', bar_lead: '1.00', link_ip: '10.0.0.5', fold_manual: '0' }, statusAt: 1000 }), 1500);
 eq([st.gated, st.bar, st.net.ip], [true, { state: 'locked', conf: 0.5 }, '10.0.0.5'], 'status: the gate, the bar estimator, the address');
 eq(Stick.ctx(state({ status: { ...status, gated: '1' }, statusAt: 0 }), 9000).gated, false, 'a status older than 5 s is not used');
@@ -102,6 +103,7 @@ eq([airOld.airLost, airOld.airRetry, airOld.rssiMin, airOld.rssiMax], [null, nul
 const F = Stick.fieldCommands;
 eq([F('threshold', 55), F('threshold', 200), F('group', 1), F('gain', 3), F('gain', 50), F('inoff', -4)].map(r => r.commands[0]),
    ['set threshold 55', 'set threshold 100', 'set group 2', 'set line_gain 3', 'set line_gain 12', 'set lat_trim -4'], 'numbers: clamped, the group index is 0-based');
+eq([F('pause', -40), F('pause', -90), F('pause', -5)].map(r => r.commands[0]), ['set pause_db -40', 'set pause_db -70', 'set pause_db -20'], 'PAUSE LEVEL: clamped to -70..-20 dBFS');
 eq([0, 1, 2, 3].map(v => F('insrc', v).commands[0]), ['set source auto', 'set source line', 'set source usb', 'set source link'], 'SOURCE');
 eq([F('lowconf', 0).commands[0], F('lowconf', 1).commands[0]], ['set lowconf run', 'set lowconf stop'], 'LOW CONFIDENCE: KEEP RUNNING / STOP START');
 eq([0, 1, 2].map(v => F('autobar', v).commands[0]), ['set autobar off', 'set autobar start', 'set autobar always'], 'AUTO BAR');

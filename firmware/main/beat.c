@@ -701,7 +701,10 @@ static void follow_conf(const struct jk_cfg *cfg)
                     s_gated = 0;
                     s_conf_ran = 1;
                 }
-                jl_hold_back(&s_lost, jre_holds(&s_resume, mark));
+                if (!s_lost.quiet_run)
+                    jre_sound(&s_resume, now);
+                jl_hold_back(&s_lost, jre_holds(&s_resume, mark, now));
+                jl_set_pause_db(&s_lost, (double)cfg->pause_db);
                 lost = (uint8_t)jl_step(&s_lost, jw_strong(&s_weak), s_weak.n_strong, s_kick, has_bpm && has, tb, period,
                                         now, s_conf_ran, s_song && cfg->newsong && js_new(s_song), &back);
                 if (back) {
@@ -752,7 +755,7 @@ static void follow_conf(const struct jk_cfg *cfg)
          * them, LOST does (and silence, the follower giving up); the threshold decides the start */
         if (cfg->lowconf == JCF_STOP && cfg->threshold && !was && s_conf_ran)
             s_gated = 0;
-        if (jre_holds(&s_resume, mark))
+        if (jre_holds(&s_resume, mark, now))
             s_gated = 1;                /* after a pause the old grid does not come back by itself (RESUME) */
         if (lost)
             s_gated = 1;

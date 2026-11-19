@@ -289,7 +289,7 @@ for (const [conf, n] of [[0, 0], [50, 62], [100, 124]]) {
 
 // ---- the INPUT VU meter: the ramp, the fill, the colour of every column, the notch ----
 const VUB = L.barX, VT = NB.rowIN + 2;                                              // the bar's x and first row (10 rows)
-const IN_NOTCH = Math.round((L.barW - 2) * 40 / 90);                               // -50 dBFS on a -90..0 scale: column 54 of the bar (2 px wide)
+const IN_NOTCH = Math.round((L.barW - 2) * 50 / 90);                               // the PAUSE LEVEL, -40 dBFS by default, on a -90..0 scale (2 px wide)
 const levelCase = (levelDb, peakDb, max) => drawn(ctxOf({ home: { level: levelDb, levelMax: max === undefined ? levelDb : max }, ctx: { peakDb } }));
 const levelIds = d => [idsIn(d, ...R.inValue).filter(v => v !== 0), idsIn(d, L.barX, NB.rowIN + 2, L.barW, 10).filter(v => v < OLED.VU.ink0 && v !== 0)];
 const colId = i => OLED.VU.ink0 + Math.floor(OLED.VU.steps * i / L.barW);
@@ -321,7 +321,11 @@ eq(isText(levelCase(-20, -12), '-20dB', rightText('-20dB'), NB.rowIN, null), tru
   }
   const colAt = (d, x) => [...Array(14).keys()].map(k => d.fb[(NB.rowIN + k) * 320 + x]);
   eq(colAt(levelCase(-45, null, -45), VUB), [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0], 'the bar is 10 rows high (y + 2..y + 11), no outline, no track');
-  eq(colAt(col(-90).d, VUB + IN_NOTCH), Array(14).fill(1), 'the -50 dBFS notch is a 14 px column, 2 px wide, at bar column ' + IN_NOTCH + ' (even over an empty bar)');
+  eq(colAt(col(-90).d, VUB + IN_NOTCH), Array(14).fill(1), 'the PAUSE LEVEL notch (-40 dBFS by default) is a 14 px column, 2 px wide, at bar column ' + IN_NOTCH + ' (even over an empty bar)');
+  {
+    const d = drawn(ctxOf({ home: { level: -90, levelMax: -90 }, ctx: { pauseDb: -60 } })), at = Math.round((L.barW - 2) * 30 / 90);
+    eq([colAt(d, VUB + at), colAt(d, VUB + IN_NOTCH)], [Array(14).fill(1), Array(14).fill(0)], 'PAUSE LEVEL -60 dBFS: the notch moves to bar column ' + at);
+  }
   eq(colAt(col(-20).d, VUB + IN_NOTCH), [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], 'through a lit bar the notch cuts a gap and leaves a stub above and below');
   eq(idsIn(col(-90).d, VUB + IN_NOTCH, NB.rowIN, 2, 14), [0], 'the notch is neutral');
   eq(litIn(levelCase(-30, -12), VUB + 104, VT, 1, 10).length, 0, 'nothing is drawn beyond the bar\'s end (no peak tick)');

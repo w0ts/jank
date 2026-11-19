@@ -9,7 +9,9 @@
  *             mean): which peak is the beat, and the off-beat's (hats, an off-beat bass) beside it. No time limit.
  *   arm       silence or near silence (jank_conf.h's gate, jb_lost.h's QUIET) stopped the outputs: the old phase is
  *             thrown away. While armed, neither the gate nor LOST's own return brings the old grid back (jre_holds),
- *             until RESUME finds the song or the follower locks or jumps on a grid of its own (the music changed).
+ *             until RESUME finds the song, the follower locks or jumps on a grid of its own (the music changed), or the
+ *             sound has been back JRE_WAIT_S without a match (measured: one of 200 tracks otherwise stayed stopped 100 s
+ *             after a quiet part RESUME did not recognise).
  *   find      at each step the last JRE_LINES periods of activation, folded at the remembered period, are cross-correlated
  *             with the shape over all JRE_BINS shifts: the best shift is the new phase when its Pearson r reaches
  *             JRE_CORR (its beat looks like the song's) and JRE_SOUND of the periods, the newest among them, have a peak of
@@ -34,6 +36,7 @@
 #define JRE_PEAK 0.2                   /* a period's highest point to count as sound (the activation, 0..1) */
 #define JRE_SOUND 4                    /* periods of the window with a peak, the newest among them */
 #define JRE_FOLD_PEAK 0.15             /* the folded window's highest point: the peaks line up at one phase */
+#define JRE_WAIT_S 4.0                 /* sound back this long without a match: the normal return is allowed again */
 #define JRE_PRIOR_S 8.0                /* the DBN's tempo prior held this long after a resync */
 
 struct jb_resume {
@@ -41,6 +44,7 @@ struct jb_resume {
     float shape[JRE_BINS];             /* the beat's shape, bin 0 on the line */
     uint8_t has, armed;
     uint32_t mark;                     /* the follower's seeds + jumps when armed (jre_holds) */
+    double sound_since;                /* the first step with sound after it was armed; < 0: none yet */
     float last_r;                      /* the last correlation tried */
     uint32_t resumes;                  /* since the init */
 };
@@ -51,8 +55,11 @@ void jre_init(struct jb_resume *r);
 void jre_remember(struct jb_resume *r, double period, double t_line, const float *ring, uint32_t cap, int64_t act_n);
 /* silence or near silence stopped the outputs (nothing without a remembered tempo); mark: the follower's seeds + jumps */
 void jre_arm(struct jb_resume *r, uint32_t mark);
-/* 1 while armed and the follower has not locked or jumped since (mark unchanged): the old grid may not come back */
-int jre_holds(const struct jb_resume *r, uint32_t mark);
+/* a step with sound (no silence, no near silence) at now */
+void jre_sound(struct jb_resume *r, double now);
+/* 1 while armed, the follower has not locked or jumped since (mark unchanged) and the sound has not been back JRE_WAIT_S:
+ * the old grid may not come back by itself (after that, a song RESUME does not recognise comes back as before) */
+int jre_holds(const struct jb_resume *r, uint32_t mark, double now);
 /* the outputs run again (or the tracker restarted): stop watching */
 void jre_disarm(struct jb_resume *r);
 /* while armed: 1 when the song is back (then disarmed), *t_line its newest beat (s) */

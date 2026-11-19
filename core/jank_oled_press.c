@@ -229,7 +229,7 @@ void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx
     case JO_MENU: press_menu(ui, b, d, c); break;
     case JO_SUB:
         if (d)
-            ui->ocur = (uint8_t)jo_clampi(ui->ocur - d, 0, jo_subs[ui->sub].n - 1);
+            ui->ocur = (uint8_t)jo_clampi(ui->ocur - d, 0, (c->layout_lcd2 ? jo_subs[ui->sub].n : jo_subs[ui->sub].n_oled) - 1);
         else if (b == JO_NO)
             ui->screen = JO_MENU;
         else

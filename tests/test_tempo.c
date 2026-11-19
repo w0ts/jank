@@ -190,8 +190,11 @@ static void tick(struct run *r, int silent)
                 r->gated = 0;
                 r->was_running = 1;
             }
-            if (r->use_resume)
-                jl_hold_back(&r->lost, jre_holds(&r->res, mark));
+            if (r->use_resume) {
+                if (!r->lost.quiet_run)
+                    jre_sound(&r->res, now);
+                jl_hold_back(&r->lost, jre_holds(&r->res, mark, now));
+            }
             r->is_lost = (uint8_t)jl_step(&r->lost, jw_strong(&r->w), r->w.n_strong, r->kick, r->has_bpm && r->has_grid, r->t0,
                                           r->p, now, r->was_running, 0, &back);
             if (back) {
@@ -212,7 +215,7 @@ static void tick(struct run *r, int silent)
         r->gated = jcf_gate(r->gated, r->c, JCF_STOP, THRESHOLD);
         if (r->use_lost && !was && r->was_running)
             r->gated = 0;               /* (beat.c: once running, the confidence no longer stops the outputs; LOST does) */
-        if (r->use_resume && jre_holds(&r->res, mark))
+        if (r->use_resume && jre_holds(&r->res, mark, now))
             r->gated = 1;               /* (beat.c: after a pause the old grid does not come back by itself) */
     }
     if (r->is_lost)
@@ -467,7 +470,7 @@ static void test_weak_confidence(void)
 /* LOST on a synthetic track at 120 BPM (beats every 0.5 s from 1.0 s). Audio: a pad (330 Hz, -23 dBFS) and a kick (60 Hz,
  * 50 ms decay) on the beats; the activation 0.8 on the beats, 0.01 between. From `from` to `to` the passage KIND:
  *   DROP  no kick, activation 0.01 (the DBN keeps ticking on the grid from its tempo model): a drop of the same song
- *   QUIET everything 40 dB down (over the -60 dBFS silence gate, under the song by more than JL_QUIET_REL)
+ *   QUIET everything 40 dB down (-63 dBFS: under the PAUSE LEVEL, -40 dBFS)
  *   WEAK  the kick plays, the activation is 0.01 (the online network deaf to it, as on Rhyw - Driptych)
  * Fed as beat.c does: the samples to the kick band, the activation per frame, a beat 3 frames late, the coast, the step
  * every 0.25 s and after each beat. stop / back: the first stop at or after `from`, the first run again after it (-1:
@@ -714,7 +717,11 @@ static void test_resume(void)
     jre_remember(&r, 0.5, 9.17, ring, 1024, 1000);
     CHECK(r.has && r.shape[0] > 0.45f && r.shape[10] > 0.75f);
     jre_arm(&r, 7);
-    CHECK(r.armed && jre_holds(&r, 7) && !jre_holds(&r, 8));
+    CHECK(r.armed && jre_holds(&r, 7, 100.0) && !jre_holds(&r, 8, 100.0));
+    jre_sound(&r, 100.0);                                  /* sound back: held JRE_WAIT_S at most */
+    CHECK(jre_holds(&r, 7, 100.0 + JRE_WAIT_S - 0.01) && !jre_holds(&r, 7, 100.0 + JRE_WAIT_S));
+    jre_disarm(&r);
+    jre_arm(&r, 7);
     for (int k = 0; k < 1000; k++)
         ring[k] = 0.01f;                                   /* the pause: nothing */
     CHECK(!jre_find(&r, ring, 1024, 1000, &t));

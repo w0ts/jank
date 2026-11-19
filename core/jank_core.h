@@ -188,6 +188,9 @@ struct jk_cfg {
     /* ... and since M2i: the advanced beat follow's spectral rate (core/beat/jb_rate.h) */
     uint8_t rate;                     /* 1 (default): a pitch move read from the spectrum steers the follower; 0: the beats alone
                                          (CPU: the rate costs ~0.4 % of core 0 while it runs) */
+    /* ... and since 2026-11-19 (its 9th byte): PAUSE LEVEL (core/beat/jb_lost.h, jb_resume.h) */
+    int8_t pause_db;                  /* dBFS: the input under it for 2 beats is a pause (the outputs stop; RESUME finds the new
+                                         phase after it); JK_PAUSE_DB_MIN..JK_PAUSE_DB_MAX, the INPUT bar's notch */
     /* Stored in their own blob (store.c, key "lat1") since M2d: beat_latency per audio source (core/jank_lat.h) */
     struct jla lat;
     struct jla_key lat_key;           /* the source beat_latency_ms belongs to now (not stored: usbrole.c follows it) */
@@ -197,6 +200,9 @@ void jk_cfg_defaults(struct jk_cfg *c);
 int jk_cfg_set_name(struct jk_cfg *c, const char *name);     /* 0 ok, -1 empty, too long or not printable ASCII */
 /* what store.c keeps: the release's blob (everything up to the bench settings) and, apart, usb and source */
 #define JK_CFG_STORED offsetof(struct jk_cfg, beat)
+#define JK_PAUSE_DB_DEFAULT (-40)
+#define JK_PAUSE_DB_MIN (-70)
+#define JK_PAUSE_DB_MAX (-20)
 /* the audio source the tracker hears now (usbrole.c): beat_latency_ms becomes that source's value (jank_lat.h). 1 changed */
 int jk_lat_select(struct jk_cfg *c, const struct jla_key *k);
 /* the current source's auto base (`set beat_latency`, the player's Auto latency), stored; its AUDIO SHIFT kept on top */
