@@ -460,8 +460,8 @@ static void about(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
     title_bar(fb, "ABOUT", NULL);
     jo_about_rows(c, rows);
     for (int k = 0; k < JO_ABOUT_VIS_LCD2 && ui->ascroll + k < JO_ABOUT_ROWS; k++) {
-        jo_text(fb, rows[ui->ascroll + k].label, 8, 36 + k * 24, 1, 1);
-        jo_text_r(fb, rows[ui->ascroll + k].val, W - 8, 36 + k * 24, 1, 1);
+        jo_text(fb, rows[ui->ascroll + k].label, 8, 36 + k * 22, 1, 1);
+        jo_text_r(fb, rows[ui->ascroll + k].val, W - 8, 36 + k * 22, 1, 1);
     }
 }
 

@@ -1640,7 +1640,7 @@ const OLED = (() => {
     });
   }
   // the ABOUT screen: its rows as { label, val } (label left, value right aligned), "-" for what is not known (null / undefined in the ctx); the repo is shortened on the OLED, the lcd2 layout adds the PSRAM
-  const ABOUT_ROWS = 12, ABOUT_VIS_OLED = 5, ABOUT_VIS_LCD2 = 8;
+  const ABOUT_ROWS = 12, ABOUT_VIS_OLED = 5, ABOUT_VIS_LCD2 = 9;
   const known = v => v !== null && v !== undefined;
   const aboutRows = (c, lcd) => {
     const num = (label, v, unit) => ({ label, val: known(v) && v >= 0 ? v + unit : '-' });
@@ -1968,7 +1968,7 @@ const OLED = (() => {
     });
   }
   function drawInfoLcd2(fb, ui, c) {
-    if (ui.page === 'about') { titleBarLcd2(fb, 'ABOUT'); aboutRows(c, true).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_LCD2).forEach((r, k) => { text(fb, r.label, 8, 36 + k * 24, 1, 1); textR(fb, r.val, W - 8, 36 + k * 24, 1, 1); }); return; }
+    if (ui.page === 'about') { titleBarLcd2(fb, 'ABOUT'); aboutRows(c, true).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_LCD2).forEach((r, k) => { text(fb, r.label, 8, 36 + k * 22, 1, 1); textR(fb, r.val, W - 8, 36 + k * 22, 1, 1); }); return; }
     titleBarLcd2(fb, 'BATTERY');
     const rows = [];
     if (!c.fitted) rows.push('NO CELL FITTED', 'POWER ' + (c.usb ? 'USB' : 'NONE'));
