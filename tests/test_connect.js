@@ -271,6 +271,20 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   eq([p.el('adv-link').textContent, p.el('adv-air').textContent, p.el('adv-batt').textContent].map(String), ['2', '0', '64 %'], 'the HOME information moved here');
   const polls = p.intervals();
   ok(polls.length >= 1, 'the diag poll is an interval');
+  eq([p.el('adv-panic').classList.contains('hide'), p.el('adv-panic').textContent], [true, ''], 'no panic keys in diag: no "Last panic" line');
+  // after a panic: diag carries panic_* keys, the line shows the task, the address and the uptime
+  midi.text.diag = 'boots=3\nreset=panic\npanic_pc=0x4200abcd\npanic_cause=28\npanic_task=loopTask\npanic_up_ms=12345\npanic_msg=<b>x</b>\nsave_pending=0\nok';
+  for (const [, tick] of p.intervals()) tick();
+  await settle();
+  eq([p.el('adv-panic').classList.contains('hide'), p.el('adv-panic').textContent], [false, 'Last panic: loopTask at 0x4200abcd (up 12 s)'], 'panic keys: "Last panic: <task> at <pc> (up n s)" under the boots line');
+  midi.text.diag = 'boots=3\nreset=panic\npanic_pc=0x4200abcd\npanic_task=<img src=x>\npanic_up_ms=400\nok';
+  for (const [, tick] of p.intervals()) tick();
+  await settle();
+  eq(p.el('adv-panic').textContent, 'Last panic: <img src=x> at 0x4200abcd (up 400 ms)', 'the task is text only (textContent), a short uptime in ms');
+  midi.text.diag = 'boots=3\nreset=poweron\nsave_pending=0\nlink_settled=1\nlink_drift_ppb=12\nlink_last_err_us=3\nlink_far=0\nlink_partner_rtt_us=800\ndrive=ok\nok';
+  for (const [, tick] of p.intervals()) tick();
+  await settle();
+  eq(p.el('adv-panic').classList.contains('hide'), true, 'no panic keys again: the line hides');
   // a restart of the stick: boots changes between two polls
   midi.text.diag = 'boots=4\nreset=sw\nsave_pending=1\nlink_settled=0\nlink_drift_ppb=0\nlink_last_err_us=0\nlink_far=0\nlink_partner_rtt_us=0\ndrive=ok\nok';
   eq(p.el('adv-restart').classList.contains('hide'), true, 'no restart notice while the boots stay the same');

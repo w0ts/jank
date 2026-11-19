@@ -340,7 +340,7 @@ static void sys_sample(uint32_t now)
 void uis_sys(struct jk_sys *out)
 {
     *out = (struct jk_sys){1, s_sys.temp_c, s_sys.heap_kb, s_sys.psram_kb, s_sys.heap_min_kb, s_sys.uptime_s, s_sys.flash_kb, s_sys.app_used_kb,
-                           s_sys.app_kb, s_sys.clk_late_us, s_sys.ui_loop_us, s_sys.beat_loop_us, ""};
+                           s_sys.app_kb, s_sys.clk_late_us, s_sys.ui_loop_us, s_sys.beat_loop_us, "", panic_info_brief()};
     snprintf(out->reset, sizeof out->reset, "%s", reset_name());
 }
 
@@ -435,6 +435,7 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     sys_sample(now);
     c->version = JK_VERSION;
     c->reset = reset_name();
+    c->panic = panic_info_brief();
     c->temp_c = s_sys.temp_c;
     c->cpu_pct = jk_cpu_pct(b->core0_idle_x10);     /* core 0 (the beat, UI and radio core): what its idle task leaves, as beat.c measures it */
     c->cpu1_pct = jk_cpu1_pct(b->core1_busy_x10, b->core1_ok);   /* core 1: the MIDI clock interrupt's share (midi.c) */

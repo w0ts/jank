@@ -8,6 +8,7 @@ gone at the next restart. Files here:
   README.txt   this text
   jank.html    the control page
   UPDATE.TXT   what happened at the last firmware update (after one)
+  PANIC.TXT    the last crash since the jank lost power (after one): task, addresses, how to decode them
 
 CONTROL PAGE
 ------------

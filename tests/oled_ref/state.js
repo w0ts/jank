@@ -14,9 +14,9 @@ function baseState() {
   };
 }
 
-const ABOUT_KEYS = ['version', 'tempC', 'cpuPct', 'cpu1Pct', 'heapKb', 'psramKb', 'flashKb', 'appUsedKb', 'appKb', 'uptimeS', 'heapMinKb', 'reset', 'clkLateUs', 'uiLoopUs', 'beatLoopUs'];
+const ABOUT_KEYS = ['version', 'tempC', 'cpuPct', 'cpu1Pct', 'heapKb', 'psramKb', 'flashKb', 'appUsedKb', 'appKb', 'uptimeS', 'heapMinKb', 'reset', 'clkLateUs', 'uiLoopUs', 'beatLoopUs', 'panic'];
 // what the ABOUT cases show: every number known
-const ABOUT_FULL = { version: '0.1.0', tempC: 41, cpuPct: 37, cpu1Pct: 3, heapKb: 123, psramKb: 7936, flashKb: 8192, appUsedKb: 1260, appKb: 3072, uptimeS: 3725, heapMinKb: 98, reset: 'POWERON', clkLateUs: 12, uiLoopUs: 4210, beatLoopUs: 8800 };
+const ABOUT_FULL = { version: '0.1.0', tempC: 41, cpuPct: 37, cpu1Pct: 3, heapKb: 123, psramKb: 7936, flashKb: 8192, appUsedKb: 1260, appKb: 3072, uptimeS: 3725, heapMinKb: 98, reset: 'POWERON', clkLateUs: 12, uiLoopUs: 4210, beatLoopUs: 8800, panic: 'loopTask@0x4200abcd' };
 const ABOUT_NONE = Object.fromEntries(ABOUT_KEYS.map(k => [k, null]));
 
 function dumpState(out, s) {

@@ -531,16 +531,19 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   d = drawn(batt, { ui: infoUi }); noInk(d, 'the BATTERY info screen');
   ok(litIn(d, 8, 184, 304, 14).length > 200, '... with its level bar across the width');
   const aboutUi = { ...OLED.create(), screen: 'info', page: 'about' };
-  const about = { tempC: 41, cpuPct: 37, cpu1Pct: 3, heapKb: 123, psramKb: 7936, flashKb: 8192, appUsedKb: 1260, appKb: 3072, uptimeS: 3725, heapMinKb: 98, reset: 'POWERON', version: '0.1.0', clkLateUs: 12, uiLoopUs: 4210, beatLoopUs: 8800 };
+  const about = { tempC: 41, cpuPct: 37, cpu1Pct: 3, heapKb: 123, psramKb: 7936, flashKb: 8192, appUsedKb: 1260, appKb: 3072, uptimeS: 3725, heapMinKb: 98, reset: 'POWERON', version: '0.1.0', clkLateUs: 12, uiLoopUs: 4210, beatLoopUs: 8800, panic: 'loopTask@0x4200abcd' };
   d = drawn({ ...batt, ...about }, { ui: aboutUi }); noInk(d, 'the ABOUT info screen');
   const ab = (d, label, val, y) => isText(d, label, 8, y, null) && isText(d, val, 312 - textW(val), y, null);      // a label at the left, its value right aligned to x 312 (the list rows' margin)
-  ok(ab(d, 'VERSION', '0.1.0', 36) && ab(d, 'REPO', 'github.com/w0ts/jank', 36 + 22) && !isText(d, 'NAME', 8, 36, null) && ab(d, 'TEMP', '41 C', 36 + 88) && ab(d, 'MEMORY', '123K PSRAM 7936K', 36 + 132), '... its rows from y 36, 22 px apart (9 of 12 show, no NAME row), the label at x 8 and the value right aligned to x 312');
+  ok(ab(d, 'VERSION', '0.1.0', 36) && ab(d, 'REPO', 'github.com/w0ts/jank', 36 + 22) && !isText(d, 'NAME', 8, 36, null) && ab(d, 'TEMP', '41 C', 36 + 88) && ab(d, 'MEMORY', '123K PSRAM 7936K', 36 + 132), '... its rows from y 36, 22 px apart (9 of 13 show, no NAME row), the label at x 8 and the value right aligned to x 312');
   ok(8 + textW('MEMORY') + 12 < 312 - textW('123K PSRAM 7936K') && 8 + textW('REPO') + 12 < 312 - textW('github.com/w0ts/jank'), '... label and value never overlap (the widest pairs, MEMORY and REPO)');
   ok(ab(d, 'CPU', '37/3%', 36 + 110), '... CPU shows core 0 / core 1: 37/3%');
   d = drawn({ ...batt, ...about }, { ui: { ...aboutUi, ascroll: 9 } });
-  ok(ab(d, 'CLOCK LATE', '12 US', 36) && ab(d, 'BEAT LOOP', '8800 US', 36 + 44) && !isText(d, 'TEMP', 8, 36 + 176, null) && litIn(d, 0, 36 + 66, 320, 100).length === 0, '... page 2 (rows 9 to 12): the last 3 rows from the top, no row of page 1 repeated, nothing below them');
+  ok(ab(d, 'CLOCK LATE', '12 US', 36) && ab(d, 'BEAT LOOP', '8800 US', 36 + 44) && ab(d, 'PANIC', 'loopTas 0x4200abcd', 36 + 66) && !isText(d, 'TEMP', 8, 36 + 176, null) && litIn(d, 0, 36 + 88, 320, 100).length === 0, '... page 2 (rows 9 to 12): the last 4 rows from the top (PANIC: the task cut to 7 characters, the address whole), no row of page 1 repeated, nothing below them');
+  ok(8 + textW('PANIC') + 12 < 312 - textW('loopTas 0x4200abcd'), '... PANIC label and value never overlap');
   d = drawn({ ...batt, ...Object.fromEntries(Object.keys(about).map(k => [k, null])) }, { ui: aboutUi });
   ok(ab(d, 'VERSION', '-', 36) && ab(d, 'TEMP', '-', 36 + 88) && ab(d, 'CPU', '-/-%', 36 + 110), '... "-" for what is not known');
+  d = drawn({ ...batt, ...Object.fromEntries(Object.keys(about).map(k => [k, null])) }, { ui: { ...aboutUi, ascroll: 9 } });
+  ok(ab(d, 'PANIC', '-', 36 + 66), '... PANIC "-" when there was none');
   const sc = (k, c) => { const u = { ...OLED.create(), screen: 'info', page: 'about' }; for (const b of k) OLED.press(u, b, 0, c); return u.ascroll; };
   eq([sc(['down'], { ...batt, layout: 'lcd2' }), sc(['down', 'down'], { ...batt, layout: 'lcd2' }), sc(['down', 'up'], { ...batt, layout: 'lcd2' }), sc(['down', 'down', 'down'], batt), sc(['down', 'down', 'down', 'up'], batt), sc(['up'], batt)], [9, 9, 0, 10, 5, 0], 'ABOUT: DOWN / UP move one page (9 rows on lcd2: pages start at 0 and 9; 5 on the OLED: 0, 5, 10), no row on two pages, stopped at the ends');
   for (const screen of ['netinfo', 'confirm']) { d = drawn(batt, { ui: { ...OLED.create(), screen, ncur: 0 } }); noInk(d, 'the ' + screen + ' screen'); }

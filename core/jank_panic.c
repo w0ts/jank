@@ -73,3 +73,76 @@ size_t jk_panic_text(const jk_panic_t *r, char *out, size_t cap)
     }
     return (size_t)n;
 }
+
+void jk_panic_task(const jk_panic_t *r, char out[JK_PANIC_TASK]) { printable(out, r->task, JK_PANIC_TASK); }
+
+size_t jk_panic_brief(const jk_panic_t *r, char *out, size_t cap)
+{
+    char task[JK_PANIC_TASK];
+    int n;
+    if (!cap)
+        return 0;
+    out[0] = 0;
+    if (!r)
+        return 0;
+    jk_panic_task(r, task);
+    n = snprintf(out, cap, "%s@0x%08x", task, (unsigned)r->pc);
+    if (n < 0 || (size_t)n >= cap) {
+        out[0] = 0;
+        return 0;
+    }
+    return (size_t)n;
+}
+
+/* the common ESP32-S3 (Xtensa) EXCCAUSE values; "" for the others */
+static const char *cause_name(uint32_t c)
+{
+    switch (c) {
+    case 0: return " (IllegalInstruction)";
+    case 2: return " (InstrFetchError)";
+    case 3: return " (LoadStoreError)";
+    case 6: return " (IntegerDivideByZero)";
+    case 9: return " (LoadStoreAlignment)";
+    case 20: return " (InstrProhibited)";
+    case 28: return " (LoadProhibited)";
+    case 29: return " (StoreProhibited)";
+    default: return "";
+    }
+}
+
+size_t jk_panic_file(const jk_panic_t *r, const char *version, char *out, size_t cap)
+{
+    char task[JK_PANIC_TASK], msg[JK_PANIC_MSG];
+    int n;
+    if (!cap)
+        return 0;
+    out[0] = 0;
+    if (!r)
+        return 0;
+    jk_panic_task(r, task);
+    printable(msg, r->msg, sizeof msg);
+    n = snprintf(out, cap,
+                 "JANK PANIC\r\n"
+                 "The last panic since the jank lost power.\r\n"
+                 "\r\n"
+                 "when      %u ms after the start\r\n"
+                 "task      %s (core %u)\r\n"
+                 "cause     %u%s\r\n"
+                 "pc        0x%08x\r\n"
+                 "a0        0x%08x\r\n"
+                 "sp        0x%08x\r\n"
+                 "vaddr     0x%08x\r\n"
+                 "message   %s\r\n"
+                 "firmware  %s\r\n"
+                 "\r\n"
+                 "To see where it was, run this with the jank.elf of the build that made the firmware now on the jank.\r\n"
+                 "The elf must belong to exactly this firmware; another build gives wrong lines without any error.\r\n"
+                 "xtensa-esp32s3-elf-addr2line -pfiaC -e jank.elf 0x%08x 0x%08x\r\n",
+                 (unsigned)r->up_ms, task, (unsigned)r->core, (unsigned)r->cause, cause_name(r->cause), (unsigned)r->pc, (unsigned)r->a0,
+                 (unsigned)r->sp, (unsigned)r->vaddr, msg, version ? version : "?", (unsigned)r->pc, (unsigned)r->a0);
+    if (n < 0 || (size_t)n >= cap) {
+        out[0] = 0;
+        return 0;
+    }
+    return (size_t)n;
+}

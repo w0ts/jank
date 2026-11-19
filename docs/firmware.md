@@ -103,7 +103,7 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   `app_part_kb` (its partition), `clock_late_us` (the MIDI clock alarm's worst lateness since boot), `ui_loop_us` and `beat_loop_us` (the longest pass
   of the UI task / the beat task since boot). The firmware's own sampler (`firmware/main/uiscreen.c`, at most every 2 s in the ui task, never on the beat, clock
   or audio path) fills them; the screen and `about` read the same values, nothing is sampled for the reply (`uis_sys`). Unknown: `-1`, `temp_c=-999`,
-  `reset=` empty (the screen's own unknowns; the page shows `-`). The name and version are not in it (`get` has `version=`). It is a second reply because
+  `reset=` empty (the screen's own unknowns; the page shows `-`). `panic=<task>@0x4200abcd` (after `reset`) is the last panic since power was lost (the task and the faulting address), empty when there was none; the ABOUT screen's PANIC row shows it. The name and version are not in it (`get` has `version=`). It is a second reply because
   `status` has no room for it: the answer buffer is `JK_CTL_OUT_MAX` = 2040 bytes (under usb.c's 2048; the SysEx layer chunks any length into 30-character
   frames), the longest `status` is 1894 bytes (`tests/test_ctl.c` prints it) and `about` is up to 273. The page asks for `about` only while its simulated
   screen shows ABOUT (every 1.5 s, one at a time), so its other polling is unchanged; a jank without the command answers `err unknown command`, and the
@@ -266,6 +266,13 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   `panic_vaddr=0x...` (EXCVADDR), `panic_a0=0x...` (return address), `panic_sp=0x...`, `panic_core`, `panic_task` (the
   task that ran), `panic_up_ms` (uptime at the panic) and `panic_msg` (the panic text, first 39 characters; for an abort()
   its message). None of them appear when nothing panicked. `reset=panic` (or `int_wdt`, `task_wdt`) goes with them.
+  **Where the saved panic can be read** (all from the same record, kept until power is lost): (1) the file `PANIC.TXT` on the JANK drive,
+  rebuilt at every boot (`drive.c`, `jk_panic_file` in `core/jank_panic.c`; it exists only when a panic is recorded): the uptime at the panic, the
+  task and core, `EXCCAUSE` (with its name when it is a common one), `pc` / `a0` / `sp` / `vaddr`, the message, the firmware version and the decode
+  line `xtensa-esp32s3-elf-addr2line -pfiaC -e jank.elf <pc> <a0>` (the elf must belong to exactly this firmware); (2) the page's Advanced card, a
+  line `Last panic: <task> at 0x4200abcd (up 12 s)` under `boots n · reset: x`, shown only when `diag` has the `panic_*` keys; (3) the ABOUT
+  screen's last row `PANIC`: `-` when none, else `<task> 0x4200abcd` (the task cut to 3 characters on the OLED, 7 on the colour screen, the address
+  whole). The ABOUT screen has 13 rows (the colour layout pages by 9: rows 9 to 12 on page 2; the OLED by 5: 0, 5, 10).
   **Decoding an address**: with the toolchain on the PATH (`<scratch>/espressif/tools/xtensa-esp-elf/<version>/xtensa-esp-elf/bin`, today `esp-14.2.0_20260121`),
   `xtensa-esp32s3-elf-addr2line -pfiaC -e <build>/jank.elf 0x4200abcd` (do it for `panic_pc` and `panic_a0`: the
   function, file and line). The elf must be the one of the image that crashed: the build directory of the flashed

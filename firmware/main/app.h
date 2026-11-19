@@ -123,6 +123,8 @@ int bridge_is_playing(void);
 void bridge_diag(char *out, size_t cap);             /* the Link clock filter, for `diag` */
 void panic_info_take(void);                         /* at boot: the last panic's record moves out of RTC memory (panic_info.c) */
 size_t panic_info_text(char *out, size_t cap);      /* its `diag` lines, nothing when there was none */
+const char *panic_info_brief(void);                 /* "<task>@0x4200abcd" for the ABOUT screen and `about`; "" when there was none (stays valid) */
+size_t panic_info_file(char *out, size_t cap);      /* PANIC.TXT's text (JK_PANIC_FILE_MAX is enough); 0 and "" when there was none */
 void app_diag(char *out, size_t cap);                /* restarts and the last reset's reason, for `diag` */
 /* fn on the Link peer, with the bridge's lock held and the host time now (the beat tracker steers the session through it) */
 void bridge_with_peer(void (*fn)(struct jank_peer *p, int64_t now, void *ctx), void *ctx);

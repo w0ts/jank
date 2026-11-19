@@ -570,7 +570,7 @@ const OLED = (() => {
     });
   }
   // the ABOUT screen: its rows as { label, val } (label left, value right aligned), "-" for what is not known (null / undefined in the ctx); the repo is shortened on the OLED, the lcd2 layout adds the PSRAM
-  const ABOUT_ROWS = 12, ABOUT_VIS_OLED = 5, ABOUT_VIS_LCD2 = 9;
+  const ABOUT_ROWS = 13, ABOUT_VIS_OLED = 5, ABOUT_VIS_LCD2 = 9;
   const known = v => v !== null && v !== undefined;
   const aboutRows = (c, lcd) => {
     const num = (label, v, unit) => ({ label, val: known(v) && v >= 0 ? v + unit : '-' });
@@ -579,10 +579,13 @@ const OLED = (() => {
     const heap = !known(c.heapKb) || c.heapKb < 0 ? '-' : c.heapKb + 'K' + (lcd && known(c.psramKb) && c.psramKb >= 0 ? ' PSRAM ' + c.psramKb + 'K' : '');
     const flash = !known(c.flashKb) || c.flashKb < 0 ? '-' : Math.trunc(c.flashKb / 1024) + 'M ' + (known(c.appUsedKb) && c.appUsedKb >= 0 && known(c.appKb) && c.appKb >= 0
       ? (c.appUsedKb / 1024).toFixed(1) + '/' + (c.appKb / 1024).toFixed(1) + 'M' : '-');
+    // PANIC: "-" when none, else "<task> 0x4200abcd" from "<task>@0x4200abcd"; the task is cut to what fits beside the label (3 characters on the OLED, 7 on the colour layout), the address stays whole
+    const pAt = known(c.panic) ? c.panic.lastIndexOf('@') : -1;
+    const panic = !known(c.panic) || c.panic === '' ? '-' : pAt < 0 ? c.panic : c.panic.slice(0, Math.min(pAt, lcd ? 7 : 3)) + (pAt > 0 ? ' ' : '') + c.panic.slice(pAt + 1);
     return [{ label: 'VERSION', val: known(c.version) ? c.version : '-' }, { label: 'REPO', val: lcd ? 'github.com/w0ts/jank' : 'w0ts/jank' },
             { label: 'UPTIME', val: up }, { label: 'RESET', val: known(c.reset) ? c.reset : '-' }, { label: 'TEMP', val: known(c.tempC) ? c.tempC + ' C' : '-' },
             { label: 'CPU', val: (known(c.cpuPct) && c.cpuPct >= 0 ? c.cpuPct : '-') + '/' + (known(c.cpu1Pct) && c.cpu1Pct >= 0 ? c.cpu1Pct : '-') + '%' }, { label: 'MEMORY', val: heap }, num('MIN HEAP', c.heapMinKb, 'K'), { label: 'FLASH', val: flash },
-            num('CLOCK LATE', c.clkLateUs, ' US'), num('UI LOOP', c.uiLoopUs, ' US'), num('BEAT LOOP', c.beatLoopUs, ' US')];
+            num('CLOCK LATE', c.clkLateUs, ' US'), num('UI LOOP', c.uiLoopUs, ' US'), num('BEAT LOOP', c.beatLoopUs, ' US'), { label: 'PANIC', val: panic }];
   };
   function drawInfo(fb, ui, c) {
     if (ui.page === 'about') { titleBar(fb, 'ABOUT'); aboutRows(c, false).slice(ui.ascroll || 0, (ui.ascroll || 0) + ABOUT_VIS_OLED).forEach((r, k) => { text(fb, r.label, 4, 13 + k * 9, 1, 1); textR(fb, r.val, W - 4, 13 + k * 9, 1, 1); }); return; }

@@ -210,7 +210,7 @@ for (const [b, usb, fitted] of [[100, true, true], [37, false, true], [0, true, 
   scenario('battery info ' + b + ' ' + usb + ' ' + fitted, s => { s.batt = b; s.usb = usb; s.fitted = fitted; },
            [...presses(['no', ...down8, 'yes']), draw(20)]);
 
-// ---- ABOUT: the system rows, 5 of 12 on the OLED (UP / DOWN scroll), "-" for what is not known ----
+// ---- ABOUT: the system rows, 5 of 13 on the OLED (UP / DOWN scroll), "-" for what is not known ----
 const down9 = Array(9).fill('down');
 scenario('about', s => Object.assign(s, ABOUT_FULL), [...presses(['no', ...down9, 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down', 'down', 'down', 'down', 'down', 'down', 'down'], 30), ['press', 'up', 400], draw(401), ['press', 'yes', 402], draw(403)]);
 scenario('about unknown', s => Object.assign(s, ABOUT_NONE), [...presses(['no', ...down9, 'yes']), draw(20), ...walk(['down', 'down', 'down', 'down', 'down', 'down', 'down', 'down'], 30)]);

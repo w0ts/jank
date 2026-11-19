@@ -31,7 +31,7 @@ static uint32_t get32(const uint8_t *p) { return (uint32_t)p[0] | (uint32_t)p[1]
 
 static uint32_t clusters_of(uint32_t size) { return (size + JV_SECTOR - 1u) / JV_SECTOR; }
 
-void jv_init(struct jv *d, const uint8_t *html, uint32_t html_size, const char *note, const char *readme, uint32_t serial,
+void jv_init(struct jv *d, const uint8_t *html, uint32_t html_size, const char *note, const char *panic, const char *readme, uint32_t serial,
              uint32_t slot_size, jv_alloc_fn alloc, void *alloc_ctx)
 {
     uint32_t next = 2;
@@ -50,6 +50,13 @@ void jv_init(struct jv *d, const uint8_t *html, uint32_t html_size, const char *
         d->file[1].data = (const uint8_t *)note;
         d->file[1].size = (uint32_t)strlen(note);
         d->nfiles = 2;
+    }
+    if (panic && panic[0]) {
+        struct jv_file *f = &d->file[d->nfiles];
+        memcpy(f->sfn, "PANIC   TXT", 11);
+        f->data = (const uint8_t *)panic;
+        f->size = (uint32_t)strlen(panic);
+        d->nfiles++;
     }
     if (readme && readme[0]) {
         struct jv_file *f = &d->file[d->nfiles];

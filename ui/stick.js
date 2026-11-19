@@ -82,7 +82,7 @@ const Stick = (() => {
        xiao: true, fold: foldOf(h), foldAuto: !!st && st.fold_manual === '0' && foldOf(h) !== 1,
       beatN: h && pos !== null && playing ? Math.floor(pos) : null, beatMs: 0,
       peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0, tempC: num(ab.temp_c) === null || num(ab.temp_c) === -999 ? null : num(ab.temp_c), cpuPct: abNum('cpu_pct'), cpu1Pct: abNum('cpu1_pct'), heapKb: abNum('heap_kb'), psramKb: abNum('psram_kb'), heapMinKb: abNum('heap_min_kb'),
-      uptimeS: abNum('uptime_s'), flashKb: abNum('flash_kb'), appUsedKb: abNum('app_used_kb'), appKb: abNum('app_part_kb'), reset: ab.reset ? ab.reset : null, version: g.version ? g.version : null,
+      uptimeS: abNum('uptime_s'), flashKb: abNum('flash_kb'), appUsedKb: abNum('app_used_kb'), appKb: abNum('app_part_kb'), reset: ab.reset ? ab.reset : null, panic: ab.panic ? ab.panic : null, version: g.version ? g.version : null,
       clkLateUs: abNum('clock_late_us'), uiLoopUs: abNum('ui_loop_us'), beatLoopUs: abNum('beat_loop_us'),
       lineIn: g.source === 'line' || (!!st && st.audio_source === 'line'), bright: num(g.bright) === null ? 100 : num(g.bright), sleep: Math.max(0, SLEEP.indexOf(g.sleep)), inOff: num(g.lat_trim) || 0, offs: [0, 0, 0], rate: 2,
       boot: false, splash: false, wifi: wifiBars, wifiQ: null, groupPeers: h ? h.air : 0, setup: false, saved: false,

@@ -183,6 +183,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
     <section>
       <h2>Advanced</h2>
       <p id="adv-boots" class="adv-boots">boots - &middot; reset: -</p>
+      <p id="adv-panic" class="note hide"></p>
       <p id="adv-restart" class="note hide"></p>
       <div class="grid">
         <div class="stat"><b id="adv-net">-</b><span>network</span></div>
@@ -1144,6 +1145,10 @@ autoConnect();
       el("adv-boots").classList.add("restarted");
     }
     if (Number.isFinite(boots)) lastBoots = boots;
+    // the last panic since power was lost (the diag panic_* keys, only after one): task, address, uptime at the panic
+    const up = Number(v.panic_up_ms);
+    el("adv-panic").classList.toggle("hide", v.panic_pc === undefined);
+    if (v.panic_pc !== undefined) el("adv-panic").textContent = "Last panic: " + dash(v.panic_task) + " at " + v.panic_pc + (Number.isFinite(up) && v.panic_up_ms !== "" ? " (up " + (up < 1000 ? up + " ms" : Math.round(up / 1000) + " s") + ")" : "");
     el("adv-settled").textContent = v.link_settled === "1" ? "yes" : v.link_settled === "0" ? "no" : "-";
     el("adv-drift").textContent = dash(v.link_drift_ppb);
     el("adv-rtt").textContent = dash(v.link_partner_rtt_us);
@@ -1169,6 +1174,7 @@ autoConnect();
     timer = 0;
     lastBoots = null;
     el("adv-restart").classList.add("hide");
+    el("adv-panic").classList.add("hide");
     el("adv-boots").classList.remove("restarted");
     el("adv-boots").textContent = "boots - · reset: -";
   }

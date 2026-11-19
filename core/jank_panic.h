@@ -34,4 +34,13 @@ int jk_panic_valid(const jk_panic_t *r);
  * the length; the text always ends in a whole line. */
 size_t jk_panic_text(const jk_panic_t *r, char *out, size_t cap);
 
+/* The task name as printable ASCII (anything else becomes '?'), at most JK_PANIC_TASK - 1 characters. */
+void jk_panic_task(const jk_panic_t *r, char out[JK_PANIC_TASK]);
+/* The short form for the `about` line: "<task>@0x4200abcd" (the pc). Returns the length; 0 when it does not fit. */
+size_t jk_panic_brief(const jk_panic_t *r, char *out, size_t cap);
+/* PANIC.TXT on the drive: plain text with CR LF line ends (when, task, EXCCAUSE and its name, pc / a0 / sp / vaddr, the message,
+ * the firmware version, the addr2line line). Returns the length; 0 for NULL or when it does not fit (JK_PANIC_FILE_MAX is enough). */
+#define JK_PANIC_FILE_MAX 768u
+size_t jk_panic_file(const jk_panic_t *r, const char *version, char *out, size_t cap);
+
 #endif

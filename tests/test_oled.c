@@ -155,16 +155,16 @@ static void parse_num(const char *v, uint8_t *has, double *out)
     *out = *has ? strtod(v, NULL) : 0.0;
 }
 
-/* "c about ...": the ABOUT screen's 15 numbers (state.js ABOUT_KEYS order), "null" = not known */
+/* "c about ...": the ABOUT screen's 15 numbers and the last panic (state.js ABOUT_KEYS order), "null" = not known */
 static void parse_about(struct jo_ctx *c, const char *v)
 {
-    static char version[24], reset[24];
-    char t[15][24];
+    static char version[24], reset[24], panic[32];
+    char t[16][32];
     int *f[] = {&c->temp_c, &c->cpu_pct, &c->cpu1_pct, &c->heap_kb, &c->psram_kb, &c->flash_kb, &c->app_used_kb, &c->app_kb, &c->uptime_s, &c->heap_min_kb,
                 NULL, &c->clk_late_us, &c->ui_loop_us, &c->beat_loop_us};
-    int n = sscanf(v, "%23s %23s %23s %23s %23s %23s %23s %23s %23s %23s %23s %23s %23s %23s %23s", t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], t[10],
-                   t[11], t[12], t[13], t[14]);
-    CHECK(n == 15, "about: %d of 15 fields", n);
+    int n = sscanf(v, "%31s %31s %31s %31s %31s %31s %31s %31s %31s %31s %31s %31s %31s %31s %31s %31s", t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], t[10],
+                   t[11], t[12], t[13], t[14], t[15]);
+    CHECK(n == 16, "about: %d of 16 fields", n);
     snprintf(version, sizeof version, "%s", t[0]);
     c->version = strcmp(t[0], "null") ? version : NULL;
     snprintf(reset, sizeof reset, "%s", t[11]);
@@ -175,6 +175,8 @@ static void parse_about(struct jo_ctx *c, const char *v)
         *f[i] = strcmp(s, "null") ? atoi(s) : (f[i] == &c->temp_c ? JO_TEMP_UNKNOWN : JO_UNKNOWN);
     }
     c->reset = strcmp(t[11], "null") ? reset : NULL;
+    snprintf(panic, sizeof panic, "%s", t[15]);
+    c->panic = strcmp(t[15], "null") ? panic : NULL;
 }
 
 /* "c key value": the state gen_cases.js dumped */

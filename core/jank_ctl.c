@@ -319,8 +319,8 @@ static void cmd_about(const struct jk_snapshot *s, struct writer *w)
 {
     struct jk_sys x = s->sys;
     if (!x.known)
-        x = (struct jk_sys){0, JK_TEMP_UNKNOWN, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, ""};
-    put(w, "uptime_s=%d\nreset=%s\ntemp_c=%d\ncpu_pct=%d\ncpu1_pct=%d\n", (int)x.uptime_s, x.reset, (int)x.temp_c, jk_cpu_pct(s->beat.core0_idle_x10), jk_cpu1_pct(s->beat.core1_busy_x10, s->beat.core1_ok));
+        x = (struct jk_sys){0, JK_TEMP_UNKNOWN, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, "", ""};
+    put(w, "uptime_s=%d\nreset=%s\npanic=%s\ntemp_c=%d\ncpu_pct=%d\ncpu1_pct=%d\n", (int)x.uptime_s, x.reset, x.panic ? x.panic : "", (int)x.temp_c, jk_cpu_pct(s->beat.core0_idle_x10), jk_cpu1_pct(s->beat.core1_busy_x10, s->beat.core1_ok));
     put(w, "heap_kb=%d\nheap_min_kb=%d\npsram_kb=%d\nflash_kb=%d\napp_used_kb=%d\napp_part_kb=%d\n", (int)x.heap_kb, (int)x.heap_min_kb, (int)x.psram_kb, (int)x.flash_kb, (int)x.app_used_kb, (int)x.app_kb);
     put(w, "clock_late_us=%d\nui_loop_us=%d\nbeat_loop_us=%d\nok\n", (int)x.clk_late_us, (int)x.ui_loop_us, (int)x.beat_loop_us);
 }
