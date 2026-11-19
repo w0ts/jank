@@ -90,6 +90,7 @@ uint32_t midi_late_max_us(void);                    /* the clock alarm's worst l
 uint32_t midi_busy_cycles(void);                   /* running count of CPU cycles spent in the MIDI clock interrupt (core 1), wraps at 2^32 */
 int64_t midi_now_us_isr(void);                       /* the same, from an IRAM interrupt with the cache off; -1 before midi_start */
 void midi_set_quantum(uint32_t quantum);
+void midi_set_clk_rate(unsigned rate);                  /* the CLK RATE setting 0..4 for the CLK jack (mini 3; no effect elsewhere) */
 void midi_publish(const struct jc_map *m);
 void midi_want(int play);
 int midi_start_pending(void);                        /* a MIDI start waits for its bar line */

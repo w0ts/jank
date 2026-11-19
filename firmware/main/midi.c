@@ -17,9 +17,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/uart_ll.h"
-#ifdef BOARD_BENCH_CLK_GPIO
+#if defined(BOARD_BENCH_CLK_GPIO) || BOARD_CLK_GPIO >= 0
 #include "hal/gpio_ll.h"
 #include "soc/gpio_struct.h"
+#endif
+#if BOARD_CLK_GPIO >= 0
+#include "jank_clockout.h"
 #endif
 #include "soc/uart_periph.h"
 
@@ -71,6 +74,79 @@ static esp_err_t bench_pins_up(void)
 }
 #endif
 
+#if BOARD_CLK_GPIO >= 0
+/* The mini 3's CLK / RST jacks (board.h BOARD_CLK_GPIO / BOARD_RST_GPIO; the buffer U21 does not invert: two inverters in
+ * series): a short pulse, high in the tick's interrupt and low JCO_PULSE_US later. What goes high is core/jank_clockout.c's
+ * decision. The fall comes from a second hardware timer used as a one-shot, armed from inside on_alarm: no task, no polling,
+ * and not the clock's own timer, so the next MIDI alarm is never touched. Its interrupt is core 1's too, one level under the
+ * clock's (a tick can preempt it; ticks are 2.5 ms apart at the fastest tempo, the pulse is 1 ms, so they never meet). */
+static gptimer_handle_t s_low_timer;
+static DRAM_ATTR struct jco s_jco;
+static volatile uint8_t s_clk_rate = 2;      /* the CLK RATE setting (jank_oled_menu.c RATES), one byte from core 0 */
+
+void midi_set_clk_rate(unsigned rate) { s_clk_rate = (uint8_t)rate; }
+
+/* the pulse's end: both pins low (a register write; a pin already low stays low) */
+static bool IRAM_ATTR on_low(gptimer_handle_t timer, const gptimer_alarm_event_data_t *ev, void *ctx)
+{
+    (void)timer;
+    (void)ev;
+    (void)ctx;
+    gpio_ll_set_level(&GPIO, BOARD_CLK_GPIO, 0);
+    gpio_ll_set_level(&GPIO, BOARD_RST_GPIO, 0);
+    return false;
+}
+
+/* in on_alarm, after the UART has the byte: the pins that go high now, and the timer that brings them down */
+static void IRAM_ATTR pulse_pins(const struct jc_fire *f)
+{
+    const struct jco_out o = jco_fire(&s_jco, f->bytes, f->n, s_clk_rate);
+    if (!(o.clk | o.rst))
+        return;
+    if (o.clk)
+        gpio_ll_set_level(&GPIO, BOARD_CLK_GPIO, 1);
+    if (o.rst)
+        gpio_ll_set_level(&GPIO, BOARD_RST_GPIO, 1);
+    gptimer_alarm_config_t a = {.alarm_count = JCO_PULSE_US};
+    gptimer_set_raw_count(s_low_timer, 0);   /* the free-running counter restarts: the alarm is JCO_PULSE_US from now */
+    gptimer_set_alarm_action(s_low_timer, &a);
+}
+
+/* the pins stay outputs, low: power_early_init made them so at the first line of boot. Level before direction, so that this
+ * cannot glitch them. */
+static esp_err_t pulse_pins_up(void)
+{
+    const int pins[] = {BOARD_CLK_GPIO, BOARD_RST_GPIO};
+    esp_err_t e = ESP_OK;
+    for (unsigned i = 0; i < 2 && e == ESP_OK; i++) {
+        e = gpio_set_level((gpio_num_t)pins[i], 0);
+        if (e == ESP_OK)
+            e = gpio_set_direction((gpio_num_t)pins[i], GPIO_MODE_OUTPUT);
+        if (e == ESP_OK)
+            e = gpio_set_level((gpio_num_t)pins[i], 0);
+    }
+    jco_init(&s_jco);
+    return e;
+}
+
+/* on core 1 (start_on_core1), like the clock's timer: the interrupt belongs to the core that allocates it */
+static esp_err_t low_timer_up(void)
+{
+    gptimer_config_t c = {.clk_src = GPTIMER_CLK_SRC_DEFAULT, .direction = GPTIMER_COUNT_UP, .resolution_hz = 1000000, .intr_priority = 2};
+    gptimer_event_callbacks_t cb = {.on_alarm = on_low};
+    esp_err_t e = gptimer_new_timer(&c, &s_low_timer);
+    if (e == ESP_OK)
+        e = gptimer_register_event_callbacks(s_low_timer, &cb, NULL);
+    if (e == ESP_OK)
+        e = gptimer_enable(s_low_timer);
+    if (e == ESP_OK)
+        e = gptimer_start(s_low_timer);      /* free-running, no alarm until the first pulse arms one */
+    return e;
+}
+#else
+void midi_set_clk_rate(unsigned rate) { (void)rate; }
+#endif
+
 /* core 1's load: the cycles spent in on_alarm, summed (one writer, the interrupt; read from core 0 as a running count) */
 static volatile uint32_t s_busy_cyc;
 uint32_t midi_busy_cycles(void) { return s_busy_cyc; }
@@ -101,6 +177,9 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
     uart_ll_write_txfifo(UART_LL_GET_HW(MIDI_UART), f.bytes, f.n);
 #ifdef BOARD_BENCH_CLK_GPIO
     bench_pins(&f);                      /* right after the UART starts the byte: the edge sits with the start bit */
+#endif
+#if BOARD_CLK_GPIO >= 0
+    pulse_pins(&f);                      /* the same place: the edge sits with the start bit; the fall is a second timer's */
 #endif
     woken = usb_midi_isr(f.bytes, f.n);
     arm(timer, f.next - CLK_LEAD_US, now);
@@ -190,11 +269,23 @@ static esp_err_t timer_up(void)
     return e;
 }
 
+/* the fall's timer first, so that it exists before the clock's first alarm can fire into pulse_pins */
+static esp_err_t low_timer_first(void)
+{
+#if BOARD_CLK_GPIO >= 0
+    return low_timer_up();
+#else
+    return ESP_OK;
+#endif
+}
+
 /* the interrupt belongs to the core that allocates it */
 static void start_on_core1(void *arg)
 {
     TaskHandle_t parent = arg;
-    esp_err_t e = timer_up();
+    esp_err_t e = low_timer_first();
+    if (e == ESP_OK)
+        e = timer_up();
     if (e != ESP_OK)
         ESP_LOGE(TAG, "timer: %s", esp_err_to_name(e));
     xTaskNotify(parent, (uint32_t)e, eSetValueWithOverwrite);
@@ -210,6 +301,10 @@ esp_err_t midi_start(void)
 #ifdef BOARD_BENCH_CLK_GPIO
     if (e == ESP_OK)
         e = bench_pins_up();             /* before the timer: its interrupt drives them from the first tick */
+#endif
+#if BOARD_CLK_GPIO >= 0
+    if (e == ESP_OK)
+        e = pulse_pins_up();             /* before the timers: their interrupts drive them from the first tick */
 #endif
     if (e != ESP_OK)
         return e;
