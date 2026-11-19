@@ -116,6 +116,9 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
 .dev-bar #c-ports-box { margin: 0; }
 #dev-bar #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
 #dev-bar #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+#c-midi .eject { display: none; vertical-align: -2px; }
+#c-midi[aria-pressed="true"] .eject { display: inline-block; }
+#c-midi[aria-pressed="true"] .connect-text { display: none; }
 #face-box svg { width: 100%; height: auto; }
 </style>
 </head>
@@ -131,7 +134,7 @@ details.more > summary { cursor: pointer; color: var(--dim); font-size: 13px; fo
   <p id="msg"></p>
 
   <div id="connect-slot">
-    <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected disconnects and turns that off.">MIDI port (USB, iPhone app)</button>
+    <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button>
     <p id="c-waiting" class="note hide" style="margin:8px 0 0">waiting for the jank...</p>
   </div>
 
@@ -802,6 +805,7 @@ function placeConnect(kind) {
 function setConnected(kind) {
   S.kind = kind;
   $("c-midi").setAttribute("aria-pressed", String(kind === "midi"));
+  $("c-midi").setAttribute("aria-label", kind === "midi" ? "Disconnect" : "Connect");
   placeConnect(kind);
   $("live").classList.toggle("hide", !kind);
   paintAdvanced();
