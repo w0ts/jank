@@ -725,7 +725,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     wp.el('c-midi').click();
     await settle();
     for (let k = 0; k < 2; k++) { for (const [id, fn] of wp.timeouts()) { wp.box.clearTimeout(id); fn(); } await settle(); }
-    eq(wp.el('msg').textContent, 'The jank did not answer (jank). Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port; if the browser asks, allow SysEx for this page.', 'no answer: one plain message naming the port, with the SysEx hint at connect');
+    eq(wp.el('msg').textContent, 'The jank did not answer (jank). Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port; if the browser asks, allow SysEx for this page. Still nothing: quit Chrome completely (Cmd+Q) and open the page again. After the jank restarted or was replugged, a Chrome that was already open can keep a stale MIDI connection.', 'no answer: one plain message naming the port, with the SysEx hint at connect and the stale Chrome hint');
     ok(!/get|home|status/.test(wp.el('msg').textContent.replace('MIDI port','')), 'no command name in the message');
   }
 
