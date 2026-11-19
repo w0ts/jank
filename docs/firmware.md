@@ -146,9 +146,10 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   |---|---|---|
   | stopped (power-on, `stop`) | anything | stopped; only the user's `play` ends it |
   | started | open | run (from the session's bar line once the tracker is locked) |
-  | started | gate closed (conf < threshold) | stopped; open again at threshold + 5: run again, no new Start |
+  | started, not yet running | gate closed (conf < threshold) | stopped; open at threshold + 5: run, no new Start |
+  | started, running | conf < threshold (tuned follower, STOP / START) | keeps running: once the outputs run only LOST, silence or the follower giving up stop them (a drop of the same song holds, 2026-11-19) |
   | started | silence (0.5 s under -60 dBFS) | stopped at once; ends a Start's override: the next music waits for the gate |
-  | started | LOST: a bar of grid lines with no strong beat (docs/beat.md) | stopped (the gate closes); 4 strong beats on the grid: run again |
+  | started | LOST (docs/beat.md): 2 near-silent lines, 2 bars of strong beats off the grid, or (`set newsong on`) a new song's beat-less intro | stopped (the gate closes); 3 strong beats or kicks on the grid: run again |
   | `play` | gate closed | the Start forces the gate open until the confidence has reached threshold + 5 once |
 
   `status` says `hold=0|1` and `outputs=stopped|armed|running` (the
@@ -178,6 +179,10 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   `get`: `lowconf=`, `threshold=`; the transport icon (`outputs=`) is `stopped` while gated, `armed` once the gate opens
   until the bar line. The screen's top-left icon: triangle = running, blinking triangle = armed, square = the user's Stop (`hold=1`, either mode),
   two bars (pause) = not running, not armed and `hold=0` (the machine layer holds the outputs: no bpm yet, gate, silence, LOST). The HOME line's `conf` is the new confidence.
+  **NEW SONG** (`set newsong on|off`, default off, not stored; `get` says `newsong=`; the tuned follower with STOP /
+  START): LOST also stops the outputs when, after 4 grid lines with no strong beat or kick, the harmony of the last 6 s
+  is not the song's (core/beat/jb_song.h: catches about half of the cuts to a beat-less intro, but trips in ~1 drop in 7
+  of the same song: an option).
   **The confidence SHOWN is graded** (`set graded on|off`, default on, not stored: on again at every start; both followers; `get`
   and `status` say `graded=`): the CONFIDENCE bar, HOME's and `status`'s `conf` are the graded value (docs/beat.md "The graded
   confidence") instead of the gate's, which is about 100 % whenever the follower is locked and 0 % when not. The gate itself is

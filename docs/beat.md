@@ -174,24 +174,40 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   - `beat`: `weak`, `weak_holds`, `coasts`, `weak_beats`, `fast_jumps`. Cost (estimate): +0.16-0.24 % of core 0 (host
     time scaled by ModeBpm's QEMU-measured soft-double cost; ~0.05 % if it ran like float code). RAM: ~0.3 KB internal,
     7.3 KB PSRAM; without PSRAM, M2i's follow.
-- **LOST: stop when it does not know** (2026-11-18, the user: "it should stop sooner when it does not know";
-  `core/beat/jb_lost.c`, in `follow_conf`, the tuned follower with STOP / START). Once the outputs ran, the weak
-  confidence counted a line as hit by any tracked beat, and through a breakdown the online DBN keeps emitting beats from
-  its own tempo model, right on the lines: the confidence stayed near 100 % with no beat in the music (the follower gives
-  up only after 30 s). Now each line of the published grid, a period after it, needs a STRONG beat (jb_weak's test)
-  within 10 % of a period: 4 lines in a row (a bar) without one close the gate; 4 in a row with one open it again at once,
-  on the held grid (from the next bar line, as any gate opening). A Start pressed while LOST keeps the outputs running
-  until strong beats are back (`conf_open` is 0 while LOST). Silence, LINK mode, KEEP RUNNING, a threshold of 0 and the
-  robust follower: off.
-  - Measured offline (`worktrees/beat-stop-scratch`, not in git: the firmware's C tracker and this chain on the user's
-    Traktor mp3s; 795 tracks, 34 left out where Traktor's grid sits off the audible beat; 43 h of clear beat; ~1900
-    passages of 8+ grid beats where the network hears no beat on Traktor's grid, median 9.7 s): median stop 29 s → 2.7 s;
-    stopped within 4 s 17 % → 63 %; never stopped before the beat came back 48 % → 24 % (mostly breakdowns with an
-    occasional kick on the grid); back 2.6 s → 3.3 s after the beat returns. Cost: stops in short fills (a 1-bar kick
-    drop) 9.4 → 14.0 an hour of music; stops on a clear beat 6.0 → 3.8 an hour. Rejected: small salient peaks as
-    evidence (never fires: hats in breakdowns); "at most 2 of the last 8 lines" (doubles the stops on half-time beats);
-    back after 2 lines (1.3 s, but 16.8 fill stops an hour). The ground truth is the network's activation on Traktor's
-    grid, not hand-marked beats.
-  - `tests/test_tempo.c` pins it: a 20 s breakdown on a synthetic 120 BPM track ran through before; now stopped 2.78 s
-    after the last strong beat (a bar + a period + 50 ms, the next 0.25 s step), running again 2.28 s after the first one
-    back, no stop on a 3-line fill. Cost: per step a search of the strong beats for the one or two lines judged. RAM: 16 bytes.
+- **LOST: when the outputs stop once they run** (`core/beat/jb_lost.c`, `jb_kick.c`, `jb_song.c`, in `follow_conf`, the
+  tuned follower with STOP / START; silence, LINK mode, KEEP RUNNING, a threshold of 0 and the robust follower: off).
+  History: the first LOST (2026-11-18, "it should stop sooner when it does not know") stopped after a bar of grid lines
+  with no strong beat. On the user's tracks it stopped with the kick plainly there (Rhyw - Driptych: the online network's
+  activation 0.12-0.35 on a full four-on-the-floor kick, 6 stops, 102 s of the music; Gary Beck - Mango Circus: the
+  tracked beats slid a third of a beat off a right grid). The user's rule since (2026-11-19): "if this looks like the
+  same song but there is no beat, try to stick to it" (drops of 16-32 beats); stop on (near) silence for more than 2
+  beats; beats at another tempo: match them or stop; a new song with a beat-less intro: an option.
+  - Each line of the published grid, a period after it: FIT when a strong beat (jb_weak's test) or a KICK (the input
+    under 120 Hz: a transient within 10 % of a period of the line, 15 dB over the band between the lines, within 20 dB
+    of its loudest of the last 8 s) is on it; OFF when no fit and a strong beat lies 10-50 % of a period from it;
+    QUIET when the input over its period is under -55 dBFS or 30 dB under the fitted lines' running level. Neither:
+    a beat-less line of the song, it holds. LOST: 2 quiet lines in a row; 8 off lines since the last fit (the
+    follower's jumps and the spectral rate did not take those beats); with `set newsong on`, 4 lines with no fit and
+    jb_song's NEW (the harmony of the last 6 s, 400 Hz-4 kHz folded to 12 pitch classes, against the 90 s before:
+    1 - r >= 0.8). Back: 3 fits in a row with sound, at once, on the grid. A Start pressed while LOST keeps the outputs
+    running until then (`conf_open` 0 while LOST).
+  - **Once the outputs run, the confidence no longer stops them** (beat.c, STOP / START): only LOST, silence (-60 dBFS
+    for 0.5 s) or the follower giving up (30 s with no fit). The threshold decides the start. (In a drop the DBN's
+    wandering beats pull the weak confidence down, and a fast jump clears its lines: it read 0 and closed the gate.)
+  - Measured offline (the firmware's C tracker and these modules, beat.c's chain, from the audio of the user's 795
+    Traktor tracks, threshold 55; 49 h of clear beat; ground truth: a Traktor grid beat has the beat when the kick band
+    shows a transient on it or the network's activation peaks there; 80 synthetic cuts from one track into another).
+    LOST off / the first LOST / now: drops of the same song held through 54 / 25 / 69 %; stops on a clear beat 13.2 /
+    10.6 / 2.4 an hour; clear-beat time stopped 2.0 / 4.5 / 0.3 %; all stops 35 / 40 / 13 an hour; back after a stop
+    0.8 / 4.2 / 0.2 s median; running off Traktor's grid while the beat plays 5.0 / 3.8 / 5.9 %; after a cut, the
+    lines on the new track's grid 91 / 85 / 86 %; a cut to a beat-less intro stopped before its beat 4 / 12 / 3 of 12
+    (with `newsong on` 4 of 12; the new-song check alone, offline: half the beat-less intros within 8 s, but ~1 drop
+    in 7 of the same song trips it). Driptych: no stop in the music; Mango Circus: one, 3:48-3:52, where the follower's
+    grid sits 0.17 s off the kick. Rejected: the network's activation on the line as evidence (wrong stops 9.7 -> 8.1
+    an hour only); the spectral shape for the new song (cuts 39 %, drops 34 %); evidence reopening a gate closed by
+    the confidence (it flapped every 0.5 s).
+  - `tests/test_tempo.c` pins it on synthetic audio (a 60 Hz kick on the beats over a pad, 120 BPM): a 20 s drop holds;
+    near silence stops 1.53 s after it begins (2 lines, judged a period + 50 ms after the 2nd), back 1.78 s after the
+    beat returns (3 lines); the kick with a deaf network holds; the kick band, the off count and the new-song check on
+    their own. Cost: per sample a few float multiply-adds; per hop two log10; per line judged ~50 frames read; the
+    new-song check (when on) ~40 adds a frame. RAM: ~7.3 KB PSRAM (jb_kick 2.2 KB, jb_song 5 KB), 24 bytes internal.
