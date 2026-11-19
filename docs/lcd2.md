@@ -25,7 +25,7 @@ stage 2 (2026-11-17) draws it in the approved colour design (on its own 160 x 12
 | Backlight | 1 | SCH row IO1 "LCD_BL"; LCD block: LCD_BL, R12 1 k, base of T1 SS8050 (NPN) whose collector pulls LEDK to GND, LEDA from 3V3 through R11 6.8 R. **Active high**: 1 = on. Demo `EXAMPLE_PIN_NUM_BK_LIGHT 1`, `gpio_set_level(..., 1)` (and LEDC PWM on the same pin in `03_lvgl_brightness`) |
 | BOOT button | 0 | SCH row IO0 "Other: BOOT"; BOOT-button block (Key2 net "BOOT"). jank's NO button |
 | USB D- / D+ | 19 / 20 | SCH rows IO19 "USB_N", IO20 "USB_P"; TYPE C block: USB_P / USB_N through R23 / R26 22 R to the 16-pin USB-C (H1). Native USB, the same pins as the XIAO |
-| UART0 TXD / RXD | 43 / 44 | SCH rows IO43 "U0_TXD", IO44 "U0_RXD"; header P2 pins 3 and 4. jank's MIDI TX stays GPIO43, as on the XIAO |
+| UART0 TXD / RXD | 43 / 44 | SCH rows IO43 "U0_TXD", IO44 "U0_RXD"; header P2 pins 3 and 4. the early plan kept jank's MIDI TX on GPIO43, as on the XIAO; the mini 3 uses GPIO13 / GPIO9 (table below) |
 | IMU I2C SCL / SDA | 47 / 48 | SCH rows IO47 / IO48 (also "TP_SCL" / "TP_SDA" in the LCD column); header P2 pins 5 and 6. IMU INT1 is IO3 |
 | Battery ADC | 5 | SCH row IO5 "BAT_ADC": R19 200 k / R20 100 k from VBAT (BAT block); demo `04_lvgl_battery` `ADC_CHANNEL_4` (ADC1 channel 4 is GPIO5). Not used by this firmware yet |
 | Octal PSRAM (not usable) | 33 .. 37 | SCH GPIO table lists IO33 .. IO37 with no function (shown in a different colour), U2 pins crossed out; PSRAM clock / CS in the demo's sdkconfig: `SPIRAM_CLK_IO 30`, `SPIRAM_CS_IO 26` |
@@ -43,39 +43,39 @@ board has no user LED (`BOARD_LED_MONO_GPIO` is -1; the screen is the language).
 | jank signal (XIAO / mini 2.2, firmware/main/board.h) | On the lcd2 |
 |---|---|
 | USB D- / D+ GPIO19 / GPIO20 | same pins, on the board's own USB-C |
-| MIDI TX GPIO43 (XIAO; the mini 2.2 uses 21) | the lcd2 uses GPIO15 (mini 3 map below); GPIO43 stays free (console is off: `CONFIG_ESP_CONSOLE_NONE`) |
+| MIDI TX GPIO43 (XIAO; the mini 2.2 uses 21) | the lcd2 uses GPIO13 (MIDI OUT 2 on GPIO9, mini 3 map below); GPIO43 stays free (console is off: `CONFIG_ESP_CONSOLE_NONE`) |
 | BOOT button GPIO0 | same pin |
 | XIAO LED GPIO21 | GPIO21 is header P1.7, no LED there |
 | bench CLK / RST GPIO2 / GPIO1 (XIAO only) | not defined on the lcd2: GPIO1 is the backlight |
-| UI bench D-pad GPIO4 / 7 / 8 / 9 and I2C 5 / 6 | not used: the lcd2 D-pad is on 12 / 18 / 14 and NO2 on 9 (mini 3 map below); GPIO5 is the battery divider |
+| UI bench D-pad GPIO4 / 7 / 8 / 9 and I2C 5 / 6 | not used: the lcd2 D-pad is UP 11 / DOWN 6 / YES 16 and NO2 21 (mini 3 map below); GPIO5 is the battery divider |
 | mini 2.2 pins GPIO35, 36, 37 (LEDs, D-pad), 38, 39, 42 (VBUS sense, CC INT, host enable) | **taken on the lcd2**: 35 .. 37 by the PSRAM, 38 / 39 / 42 by the LCD |
 | mini 2.2's GPIO10, 11, 12, 16, 21, 4, 9 | free on the headers (P1: 10, 16, 21, 4; P2: 11, 12, 9) |
 
-### jank mini 3 pin map (from the jank-mini-3 session, final 2026-11-18, provisional until the board is ordered)
+### jank mini 3 pin map (from the jank-mini-3 session, 2026-11-19, re-mapped with the board's round-4 layout; provisional until the board is ordered)
 
-Source of truth: `hardware/jank-mini-3/parts.py` GPIO. The board routes clean with it (DRC 0 violations, pin rules pass).
-`firmware/main/board.h` (lcd2) uses the first block; the second block has no firmware use yet and is not defined there.
+Source of truth: `hardware/jank-mini-3/parts.py` GPIO (chosen by `tools/gpio_opt.py` for length, crossings and
+straightness). `firmware/main/board.h` (lcd2) uses the first block; the second has no firmware use yet.
 
 | In board.h (lcd2) | GPIO |
 |---|---|
-| BTN_UP | 12 |
-| BTN_DOWN (to GND; GPIO21 has the LCD-2's own 4.7 k pull-up, which a button does not mind) | 21 |
-| BTN_YES | 14 |
-| BTN_NO (`BOARD_BTN_NO2_GPIO`, beside BOOT) | 9 |
-| MIDI TX | 15 |
+| BTN_UP (internal pull-up) | 11 |
+| BTN_DOWN (internal pull-up) | 6 |
+| BTN_YES (the LCD-2's own 4.7 k pull-up, R4) | 16 |
+| BTN_NO (`BOARD_BTN_NO2_GPIO`, beside BOOT; the LCD-2's 4.7 k pull-up, R5) | 21 |
+| MIDI TX, OUT 1 (`BOARD_MIDI_TX_INVERT`: the board's AO3400A sinks need TX idle LOW) | 13 |
+| MIDI TX, OUT 2 (`BOARD_MIDI_TX_MORE_GPIOS`: the same UART TX) | 9 |
+| HOST_EN (defined; nothing drives it on the lcd2 yet, so host mode stays off) | 17 |
 
 | Not used by the firmware yet | GPIO |
 |---|---|
-| V5_EN (5 V aux boost enable, output, idles low) | 2 |
-| RST out | 4 |
-| LINE_SENSE (ADC1) | 7 |
-| LINE_IN (ADC1) | 8 |
-| VBUS_SENSE (ADC1) | 10 |
-| MIDI_TX2 | 11 |
-| CLK out | 13 |
-| HOST_EN (output, idles low) | 17 |
-| LIN_DET (line in plug detect; moved off 21: the LCD-2's 4.7 k pull-up overpowered its divider) | 18 |
-| spares | 6, 16, 47, 48 |
+| V5_EN (5 V aux boost enable; R131 holds the boost ON until the firmware drives it) | 4 |
+| RST out | 2 |
+| LINE_IN (ADC1) | 7 |
+| LINE_SENSE (ADC1) | 8 |
+| VBUS_SENSE (ADC1; 10k / 15k divider: 3.0 V at 5 V) | 10 |
+| CLK out | 15 |
+| LIN_DET (line in plug detect) | 18 |
+| free | 12, 14 (no pad), 47, 48 (J20's pads, the IMU bus) |
 
 The buttons are plain inputs to GND with the internal pull-ups. On the bare Waveshare board nothing is wired to these pins,
 so the menus can only be walked with BOOT (NO) until the buttons are fitted.

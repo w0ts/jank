@@ -32,6 +32,7 @@ def uid(*key):
 PAS = "passive"
 SYMBOLS = {
     "R": ([("1", "~", PAS)], [("2", "~", PAS)], "R", 2.54),
+    "F": ([("1", "~", PAS)], [("2", "~", PAS)], "F", 2.54),   # (jank-mini-3: the cells' fuses)
     "C": ([("1", "~", PAS)], [("2", "~", PAS)], "C", 2.54),
     "CP": ([("1", "+", PAS)], [("2", "-", PAS)], "C", 2.54),
     "L": ([("1", "~", PAS)], [("2", "~", PAS)], "L", 2.54),
@@ -52,6 +53,11 @@ SYMBOLS = {
               ("B6", "DP2", PAS), ("A7", "DN1", PAS), ("B7", "DN2", PAS)],
              [("A8", "SBU1", PAS), ("B8", "SBU2", PAS), ("A1B12", "GND", PAS), ("B1A12", "GND", PAS), ("13", "SHELL", PAS),
               ("14", "SHELL", PAS)], "J", 7.62),
+    "usbcm": ([("A4", "VBUS", PAS), ("B9", "VBUS", PAS), ("A9", "VBUS", PAS), ("B4", "VBUS", PAS), ("A5", "CC1", PAS),
+               ("B5", "CC2", PAS), ("A6", "DP1", PAS), ("B6", "DP2", PAS), ("A7", "DN1", PAS), ("B7", "DN2", PAS)],
+              [("A8", "SBU1", PAS), ("B8", "SBU2", PAS), ("A1", "GND", PAS), ("B12", "GND", PAS), ("B1", "GND", PAS),
+               ("A12", "GND", PAS), ("25", "SHELL", PAS), ("26", "SHELL", PAS), ("27", "SHELL", PAS), ("28", "SHELL", PAS)],
+              "J", 10.16),
     "esd": ([("1", "IO1", PAS), ("6", "IO1", PAS), ("3", "IO2", PAS), ("4", "IO2", PAS)],
             [("5", "VBUS", PAS), ("2", "GND", PAS)], "U", 7.62),
     "flag": ([], [("1", "pwr", "power_out")], "#FLG", 2.54),
@@ -72,7 +78,7 @@ _chip_r = ([(str(5 + g), f"GPIO{g}", "bidirectional") for g in range(15)]
 SYMBOLS["chip"] = (_chip_l, _chip_r, "U", 12.7)
 SYMBOLS["xtal"] = ([("1", "X1", PAS), ("3", "X2", PAS)], [("2", "GND", PAS), ("4", "GND", PAS)], "Y", 5.08)
 SYMBOLS["ant"] = ([("1", "FEED", PAS)], [("2", "END", PAS)], "AE", 5.08)
-SYMBOLS["din"] = ([("2", "DIN4", PAS), ("4", "DIN5", PAS), ("3", "DIN2", PAS)],
+SYMBOLS["din"] = ([("2", "DIN5", PAS), ("4", "DIN4", PAS), ("3", "DIN2", PAS)],
                   [("1", "DIN1", PAS), ("5", "DIN3", PAS), ("6", "SHELL", PAS), ("7", "SHELL", PAS)], "J", 5.08)
 SYMBOLS["nfet"] = ([("1", "G", "input")], [("3", "D", PAS), ("2", "S", PAS)], "Q", 5.08)
 SYMBOLS["ufl"] = ([("1", "SIG", PAS)], [("2", "GND", PAS), ("3", "GND", PAS)], "J", 5.08)
@@ -147,7 +153,7 @@ SYMBOLS["buf"] = ([("2", "A", "input"), ("1", "~{OE}", "input")], [("4", "Y", "o
 # LCD-2 add-on: the 1 x 14 socket (the LCD-2's P1 / P2) and the spare pads
 SYMBOLS["hdr14"] = ([(str(i), str(i), PAS) for i in range(1, 8)], [(str(i), str(i), PAS) for i in range(8, 15)], "J", 5.08)
 SYMBOLS["usba"] = ([("1", "VBUS", PAS), ("2", "D-", PAS), ("3", "D+", PAS)], [("4", "GND", PAS), ("5", "SHELL", PAS)], "J", 5.08)
-SYMBOLS["pads4a"] = ([("1", "IO6", PAS), ("2", "IO16", PAS)], [("3", "3V3", PAS), ("4", "GND", PAS)], "J", 5.08)   # (jank-mini-3: J17, by P1)
+SYMBOLS["pads4a"] = ([("1", "IO6", PAS), ("2", "GND", PAS)], [("3", "3V3", PAS), ("4", "GND", PAS)], "J", 5.08)   # (jank-mini-3: J17, by P1)
 SYMBOLS["pads4b"] = ([("1", "IO47", PAS), ("2", "IO48", PAS)], [("3", "3V3", PAS), ("4", "GND", PAS)], "J", 5.08)   # (J20, by P2)
 SYMBOLS["pads6s"] = ([("1", "IO2", PAS), ("2", "IO4", PAS), ("3", "3V3", PAS)], [("4", "GND", PAS), ("5", "IO47", PAS),
                      ("6", "IO48", PAS)], "J", 5.08)
@@ -243,10 +249,10 @@ def schematic():
             elif typ != "no_connect":
                 out.append(f'(no_connect (at {lx} {ly}) (uuid "{uid(ref, "nc", num)}"))')
     notes = [
-        "jank LCD-2 add-on (worktrees/lcd2-addon-scratch). The Waveshare ESP32-S3-LCD-2 plugs into J15 (its P1) / J16 (its P2): +3V3, VBAT, VBUS_B (its USB-C VBUS) and 14 GPIOs (parts.GPIO).",
-        "5 V aux: VIN_B from VBUS_B through D3, or from VBAT through Q1 (off while VBUS_B is up); U18 TPS61023 -> V5A 4.79 V (R134 / R135+R154+R136); U19 clamp 5.56 V behind R145; JP8 MIDI, JP9 CV.",
-        "USB: J1 IN (USB-C, the outside loop cable from the LCD-2's own USB-C; VBUS / CC open) -> D+ / D- -> J4 OUT (USB-A), U5 ESD; J4's VBUS = the host signal (HOST5 from U21, R93, D16) + C28.",
-        "MIDI OUT 1 (IO15) / 2 (IO13): jack + DIN each, own 220 / 220 loops from V5M, AO3400A sinks, SRV05-4 at the pins. CLOCK (IO11) / RESET (IO12): 74AHCT04 on V5C, BAV99, 1k. LINE IN: IO8 / IO7 matched networks, LIN_DET IO10.",
+        "jank-mini-3. The Waveshare ESP32-S3-LCD-2 joins J15 (its P1) / J16 (its P2) through the bridge strips: +3V3, VBAT (its cell, on its own MX1.25 connector; no cell on this board), VBUS_B (its USB-C VBUS) and 14 GPIOs (parts.GPIO).",
+        "5 V aux: VIN_B from VBUS_B through D3, or from VBAT through Q1 (off while VBUS_B is up); U18 TPS61023 -> V5A 5.00 V (R134 / R135+R154+R136); U19 clamp 5.83 V behind R145; JP8 MIDI, JP9 CV.",
+        "USB: J1 TO ESP (USB-C, the outside loop cable from the LCD-2's own USB-C; VBUS / CC open) -> D+ / D- -> J4 TO DEVICE (USB-C), U5 ESD at J4; J4's VBUS (pads A4 / B9) = the host signal (HOST5 from U21, R93, D16) + C28; Rp 56k on CC.",
+        "MIDI OUT 1 (IO13) / 2 (IO9): jack + DIN each, own loops from V5M, AO3400A sinks (UART TX inverted), SRV05-4 at the pins. CLOCK (IO15) / RESET (IO2): 74AHCT04 on V5C, BAV99, 1k. LINE IN: IO7 / IO8 matched networks, LIN_DET IO18.",
     ]
     for i, t in enumerate(notes):
         out.append(f'(text "{t}" (exclude_from_sim no) (at 20.32 {12.7 + 3.81 * i} 0) (effects (font (size 1.5 1.5))'

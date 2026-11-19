@@ -3,6 +3,7 @@
 the board exported to Specctra DSN, the power nets given their own widths, GND left to the two pours; rounds until no
 signal connection is open; then the pours filled, GND stitching vias (hardware/pcb/lib/stitch.py), and a GND via by
 every top-side SMD ground pad that the pour alone does not reach.   KiCad's python: route.py lcd2.kicad_pcb"""
+import math
 import os
 import re
 import subprocess
@@ -20,8 +21,10 @@ JAR = os.path.join(HERE, ".freerouting", "freerouting-2.5.0.jar")   # (sh fetch_
 MM = pcbnew.FromMM
 # widths in um (clearance 200): the cell's and the boost's currents (~0.25 A), USB VBUS, the 5 V rails (V5_SW 0.3:
 # the SOT-563's 0.5 mm pitch; the track is ~1 mm long)
-PWR = {"GND": 300, "VBAT": 1000, "VIN_B": 400, "V5_SW": 300, "VB_D3": 500, "VBUS_B": 400, "VB_D1": 400, "V5A": 300,
-       "V5M": 300, "V5C": 300, "+3V3": 300}
+PWR = {   # (mots, 2026-11-19: the cell on the LCD-2's own MX1.25 (adapter lead): VBAT only feeds our 5 V boost, ~0.2 A)
+       #  path: review mini3-A R1 / B W1, it had been routed at signal width)
+       "GND": 300, "VBAT": 500, "VIN_B": 400, "V5_SW": 300, "VB_D3": 500, "VBUS_B": 400, "VB_D1": 400, "V5A": 300,
+       "V5M": 300, "V5C": 300}   # (+3V3 at signal width since round 3: here it feeds only uA-mA loads (U5 REF, pull-ups, LINE IN bias); the 0.3 mm track left 4 links open)
 # the LINE IN analogue nets: a wider clearance from everything (0.3 mm): the brief's "away from MIDI / CLK"
 QUIET = ["LINE_IN", "LINE_SENSE", "LIN_A1", "LIN_A2", "LIN_B1", "LIN_B2", "LIN_VB", "LIN_VBL"]
 # the nets LINE IN keeps 1.0 mm from (check_board.py's LOUD; the power ones are in PWR and keep their own class)
@@ -30,7 +33,12 @@ LOUD = {"MIDI_TX", "MIDI_TX2", "MO_R", "MO_T", "MO_K", "MD_R", "MD_T", "MD_K", "
         "HOST5", "HOST5G", "HOST_M", "UDP", "UDN"}
 ROUNDS = 3   # (rounds after the first rarely close anything on jank-mini-3: congestion, not counting)
 KICAD_CLI = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-FIRST = {"VBAT", "VBUS_B"}   # (jank-mini-3: the two wide tracks that go far, routed alone first; adding the USB pair made it far worse: 2 -> 35 left)
+FIRST = {"VBAT", "VBUS_B"}   # (jank-mini-3: the wide tracks,
+#  routed alone first; adding the USB pair made it far worse: 2 -> 35 left)
+# pins left out of their net's power-first round: the DW01A's ground pins sit on BNEG but must be a thin TAP, never in
+# series with the cells' current (review mini3-A R1 / B W1: the current ran along U22's VSS pad)
+FIRST_SKIP = {}   # (was the DW01A's taps on BNEG / VBAT; the protector left the board, mots 2026-11-19)
+POWER_VIA = "Via[0-1]_1000:600_um"   # (the power nets' via: 0.6 mm drill, about twice a 0.3 mm drill's current)
 
 
 def net_class(name, nets, width, clearance, via):
@@ -42,22 +50,31 @@ def bare(n):
     return n.lstrip("/")
 
 
-def patch_dsn(text):
+def patch_dsn(text, thin=()):
+    """`thin`: power nets routed at the default width this round (after round 0 their wide tracks are locked: only a
+    tap such as the DW01A's ground pins is left, which a 1 mm class cannot reach)"""
     via = re.search(r'\(use_via "([^"]+)"\)', text).group(1)
     m = re.search(r"\(class kicad_default (.*?)\(circuit", text, re.S)
     nets = m.group(1).split()
     key = {n: bare(n.strip('"')) for n in nets}
+    PWR = {n: w for n, w in globals()["PWR"].items() if n not in thin}
     rest = [n for n in nets if key[n] not in PWR and key[n] not in QUIET]
     tail = text[m.end():]
     end = tail.index("\n    )\n") + len("\n    )\n")
-    extra = [net_class(f"pwr{w}", [n for n in nets if PWR.get(key[n]) == w], w, 200, via) for w in sorted(set(PWR.values()))]
+    extra = [net_class(f"pwr{w}", [n for n in nets if PWR.get(key[n]) == w], w, 200, POWER_VIA if w >= 800 else via)
+             for w in sorted(set(PWR.values())) if any(PWR.get(key[n]) == w for n in nets)]
     extra.append(net_class("quiet", [n for n in nets if key[n] in QUIET], 200, 300, via))
     loud = [n for n in rest if key[n] in LOUD]
     if loud:   # (check_board's rule: LINE IN copper >= 1.0 mm from these; given to Freerouting as a class pair)
         rest = [n for n in rest if key[n] not in LOUD]
         extra.append(net_class("loud", loud, 200, 200, via))
         extra.append("    (class_class (classes quiet loud)\n      (rule (clearance 1050))\n    )\n")
-    return text[:m.start()] + "(class kicad_default " + " ".join(rest) + "\n      (circuit" + tail[:end] + "".join(extra) + tail[end:]
+    out = text[:m.start()] + "(class kicad_default " + " ".join(rest) + "\n      (circuit" + tail[:end] + "".join(extra) + tail[end:]
+    # the power via: its padstack in the library and in the structure's via list
+    d = int(POWER_VIA.split("_")[1].split(":")[0])
+    pad = f'    (padstack "{POWER_VIA}"\n      (shape (circle F.Cu {d}))\n      (shape (circle B.Cu {d}))\n      (attach off)\n    )\n'
+    out = out.replace(f'    (padstack "{via}"', pad + f'    (padstack "{via}"', 1)
+    return out.replace(f'(via "{via}")', f'(via "{via}" "{POWER_VIA}")', 1)
 
 
 def open_nets(board):
@@ -88,10 +105,15 @@ def unconnected(board):
 
 
 def only_nets(text, keep):
-    """round 0: every net but `keep` cut to its first pin (a one-pin net has nothing to route; its pads stay obstacles)"""
+    """round 0: every net but `keep` cut to its first pin (a one-pin net has nothing to route; its pads stay obstacles);
+    a kept net drops its FIRST_SKIP pins (they join in the next round)"""
     def cut(m):
         name, pins = m.group(1), m.group(2).split()
-        return m.group(0) if bare(name.strip('"')) in keep else m.group(0).replace(m.group(2), pins[0])
+        b = bare(name.strip('"'))
+        if b in keep:
+            skip = FIRST_SKIP.get(b, set())
+            return m.group(0).replace(m.group(2), " ".join(q for q in pins if q not in skip))
+        return m.group(0).replace(m.group(2), pins[0])
     return re.sub(r"\(net (\S+)\s+\(pins ([^)]*)\)", cut, text)
 
 
@@ -108,7 +130,7 @@ def route_round(board, k, only=None):
     dsn, ses, log = (os.path.join(work, f"round{k}.{e}") for e in ("dsn", "ses", "log"))
     if not pcbnew.ExportSpecctraDSN(board, dsn):
         sys.exit("DSN export failed")
-    text = patch_dsn(open(dsn).read())
+    text = patch_dsn(open(dsn).read(), thin=FIRST if k >= 1 else ())
     if only:
         text = only_nets(text, only)
     open(dsn, "w").write(text)
@@ -372,7 +394,8 @@ def main():
     """stages, each its own process (a board reloaded inside one process came back broken from SWIG):
       route.py BOARD          pours set aside, Freerouting rounds (GND routed like any net), saved (and .routed.kicad_pcb)
       route.py BOARD --clean  one pass: one-sided signal vias and dangling tracks removed (run until it prints 0)
-      route.py BOARD --pours  the pours back (make_board.pours), filled, GND stitching"""
+      route.py BOARD --pours  the pours back (make_board.pours), filled, GND stitching
+      route.py BOARD --unpour / --repair   a routed board's pours set aside / one more round on its open nets"""
     path = sys.argv[1]
     if "--vias" in sys.argv:
         board = pcbnew.LoadBoard(path)
@@ -397,6 +420,36 @@ def main():
         print(f"fix: {widen(board)} neck-downs widened to 0.10 mm; {space_vias(board)} vias moved apart (drills >= 0.5 mm)")
         board.Save(path)
         return
+    if "--unpour" in sys.argv:   # (repair, step 1, its own process: the pours and the stitching vias set aside)
+        board = pcbnew.LoadBoard(path)
+        zones = [z for z in board.Zones() if not z.GetIsRuleArea()]
+        ends = {(t.GetStart().x, t.GetStart().y) for t in board.GetTracks() if t.Type() == pcbnew.PCB_TRACE_T}
+        ends |= {(t.GetEnd().x, t.GetEnd().y) for t in board.GetTracks() if t.Type() == pcbnew.PCB_TRACE_T}
+        lone = [t for t in board.GetTracks() if t.Type() == pcbnew.PCB_VIA_T and bare(t.GetNetname()) == "GND"
+                and not t.IsLocked() and (t.GetPosition().x, t.GetPosition().y) not in ends]
+        for z in zones:
+            board.Remove(z)
+        for v in lone:
+            board.Remove(v)
+        board.Save(path)
+        print(f"unpour: {len(zones)} pours and {len(lone)} stitching vias set aside")
+        return
+    if "--repair" in sys.argv:   # (repair, step 2: one Freerouting round, every track kept and locked, every net whole)
+        # (not only_nets: cutting the other nets to one pin left their tracks ending on net-less pins, ~450 "clearance
+        #  violations" in Freerouting's eyes, and it routed next to nothing; whole nets + locked tracks: it adds copper
+        #  only where a connection is open)
+        board = pcbnew.LoadBoard(path)
+        still = open_nets(board)
+        if still:
+            free = [float(v) for v in os.environ.get("REPAIR_FREE", "").split(",") if v]   # (x, y, r in board mm)
+            for t in board.GetTracks():
+                near = free and t.Type() == pcbnew.PCB_TRACE_T and not (bare(t.GetNetname()) in FIRST) and min(
+                    math.dist((pcbnew.ToMM(e.x), pcbnew.ToMM(e.y)), free[:2]) for e in (t.GetStart(), t.GetEnd())) < free[2]
+                t.SetLocked(not near)   # (REPAIR_FREE: the tracks round a stuck gap may move; FIRST power never)
+            left = route_round(board, 9)
+            print(f"repair ({', '.join(sorted(still))}): Freerouting left {left}")
+        board.Save(path)
+        return
     if "--pours" in sys.argv:
         board = pcbnew.LoadBoard(path)
         import make_board
@@ -405,8 +458,8 @@ def main():
         gnd = board.FindNet("/GND")
 
         def add_via(x, y):
-            c = make_board.CUT     # (jank-mini-3: no via in the LCD-2's cut-out or within 1 mm of its edge)
-            if c and c[0] - 1.0 < x - make_board.OX < c[2] + 1.0 and c[1] - 1.0 < y - make_board.OY < c[3] + 1.0:
+            bx, by = x - make_board.OX, y - make_board.OY   # (jank-mini-3: no via in a notch or within 1 mm of its edge)
+            if make_board.in_notch(bx, by, bx, by, 1.0):
                 return
             v = pcbnew.PCB_VIA(board)
             v.SetPosition(pcbnew.VECTOR2I(MM(x), MM(y)))

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""USB: the hot plug on the LCD-2's own USB-C (VBUS_B), the host signal on J4 (OUT, USB-A), ESD on J4's VBUS.
+"""USB: the hot plug on the LCD-2's own USB-C (VBUS_B), the host signal on J4 (USB-C TO DEVICE), ESD on J4's VBUS.
 ngspice, generic models (spice.py).
  A. a stiff computer / charger (5.25 / 5.5 V, cable 0.7 / 1 uH, 50 mohm) hot-plugged into the LCD-2's USB-C: its trace
     to the 5V pin (ASSUMED 20 nH) -> VBUS_B with the LCD-2's C26 1u, D1 -> VCC (C33 10u, its 150 mA), our C27 22u (12u
-    derated) + R151 1, R50 / R88+R89 / its R25, R157 1 + D3 -> VIN_B (10u derated). VIN_B against the TPS61023's
+    derated) + R151 1, R50 / R88+R89 (10k + 15k) / its R25, R157 1 + D3 (+ R167 4.7k) -> VIN_B (10u derated). VIN_B against the TPS61023's
     5.5 V recommended / 7 V abs max (SLVSF14B 6.1 / 6.3); "before the fix": C27 10u, no R157.
- B. host mode: HOST5 = V5C 4.79 V (74AHCT04, ~50 ohm), R93 2.2k, D16 onto VUSB (C28 1u): VUSB for device loads.
+ B. host mode: HOST5 = V5C 5.00 V (74AHCT04, ~50 ohm), R93 680, D16 onto VUSB (C28 1u): VUSB for device loads.
  C. ESD, IEC 61000-4-2 contact +8 kV (150 pF / 330 ohm) on J4's VBUS: with C28 1u and without.
 Writes host.txt.   python3 sim/host.py"""
 import os
@@ -25,10 +25,13 @@ RVCC VCC 0 33
 R151 VBUS_B vbd1 1
 {c27path}
 R50 VBUS_B 0 100k
-R8889 VBUS_B 0 200k
+R88 VBUS_B io10 10k
+R89 io10 0 15k
+C29 io10 0 10n
 R25L VBUS_B 0 10k
 RD3 VBUS_B vd3 {rd3}
 D3 vd3 VIN_B SS34
+R167 vd3 0 4.7k
 CVIN VIN_B 0 10u
 """
 _D = "D17 vbd1 vbc SS34\nC27 vbc 0 12u\nR158 vbc 0 10k"

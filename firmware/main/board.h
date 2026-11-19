@@ -109,12 +109,13 @@
 #elif CONFIG_JANK_BOARD_LCD2
 /* Waveshare ESP32-S3-LCD-2 (sku 30306, ESP32-S3R8, 16 MB flash), pins from the board's schematic (docs/lcd2.md has the
  * sources and what is not verified). The screen is the 240 x 320 ST7789 on SPI, drawn in landscape (lcd.c); no I2C OLED.
- * NO is the BOOT button, and the D-pad and MIDI TX are on header pins chosen from the jank mini 3 board layout (the
- * jank-mini-3 session's final table, hardware/jank-mini-3/parts.py GPIO, routed clean 2026-11-18; provisional until the
- * board is ordered). The board has no LED on a GPIO (its two LEDs are the charger's and the 3V3 rail's).
- * The mini 3's other pins have no firmware use yet and stay undefined here: GPIO2 V5_EN (5 V aux boost enable, idles
- * low), 4 RST out, 7 LINE_SENSE (ADC1), 8 LINE_IN (ADC1), 10 VBUS_SENSE (ADC1), 11 MIDI_TX2, 13 CLK out, 17 HOST_EN
- * (idles low), 18 LIN_DET (line in plug detect; GPIO21 has the LCD-2's own 4.7 k pull-up, so it carries a button, not a detect); spares 6, 16, 47, 48. */
+ * NO is the BOOT button (and GPIO21, beside it); the D-pad, MIDI TX and HOST_EN are on header pins chosen from the jank
+ * mini 3 board layout (hardware/jank-mini-3/parts.py GPIO, the source of truth; docs/lcd2.md has the table; provisional
+ * until the board is ordered). The board has no LED on a GPIO (its two LEDs are the charger's and the 3V3 rail's).
+ * The mini 3's other pins have no firmware use yet and stay undefined here: GPIO4 V5_EN (5 V aux boost enable; R131
+ * holds the boost ON until the firmware drives it), 2 RST out, 15 CLK out, 7 LINE_IN (ADC1), 8 LINE_SENSE (ADC1),
+ * 10 VBUS_SENSE (ADC1, 3.0 V at 5 V), 18 LIN_DET (line in plug detect); free: 12, 14 (no pad), 47, 48 (pads, the IMU
+ * bus). */
 #define BOARD_NAME "lcd2"
 #define BOARD_LCD 1
 #define BOARD_LCD_MOSI_GPIO 38
@@ -128,19 +129,23 @@
 #define BOARD_LED_RGB_GPIO (-1)
 #define BOARD_LED_MONO_GPIO (-1)
 #define BOARD_LED_COUNT 0
-#define BOARD_MIDI_TX_GPIO 15
+#define BOARD_MIDI_TX_GPIO 13                     /* the mini 3's MIDI OUT 1 (J16.8) */
+#define BOARD_MIDI_TX_MORE_GPIOS {9}              /* the mini 3's MIDI OUT 2 (J16.12): the same UART TX, routed to both */
+#define BOARD_MIDI_TX_INVERT 1                    /* the mini 3 sinks the loop through AO3400A gates: the line idles LOW */
 #define BOARD_MIDI_SOURCE_GPIO (-1)
 #define BOARD_I2C_SDA_GPIO (-1)
 #define BOARD_I2C_SCL_GPIO (-1)
-#define BOARD_BTN_UP_GPIO 12
-#define BOARD_BTN_DOWN_GPIO 21
-#define BOARD_BTN_YES_GPIO 14
-#define BOARD_BTN_NO2_GPIO 9                      /* a second NO, beside BOOT (BTN_NO of the mini 3) */
+#define BOARD_BTN_UP_GPIO 11                      /* the mini 3: GPIO 11, J16.9 */
+#define BOARD_BTN_DOWN_GPIO 6                     /* the mini 3: GPIO 6, J15.3 */
+#define BOARD_BTN_YES_GPIO 16                     /* the mini 3: GPIO 16, J15.4 */
+#define BOARD_BTN_NO2_GPIO 21                     /* a second NO, beside BOOT (BTN_NO of the mini 3: GPIO 21, J15.7) */
 #define BOARD_OLED 0
 #define BOARD_CC_SCL_GPIO (-1)
 #define BOARD_CC_SDA_GPIO (-1)
 #define BOARD_CC_INT_GPIO (-1)
-#define BOARD_HOST_EN_GPIO (-1)
+#define BOARD_HOST_EN_GPIO 17                     /* the mini 3: high = the 5 V presence signal + Rp on J4. No lcd2 code drives it
+                                                     yet (only usbport_tusb320.c, off here), so host mode stays off: R91 and the
+                                                     LCD-2's R6 hold it low */
 #define BOARD_VBUS_SENSE_GPIO (-1)
 #define BOARD_LINE_DETECT_GPIO (-1)
 #define BOARD_PUMP_GPIO (-1)

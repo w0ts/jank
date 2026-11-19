@@ -23,7 +23,7 @@ fault -12 V step on the tip: node would reach -1.80 V, held at -0.50 V by the pi
 plug detect: no plug -> J7's ring switch (3) on the ring (2), R37 100k down vs R38 1M up: LIN_DET = 0.30 V (low); a plug opens it: 3.3 V through 1M (high)
 
 ## Buttons
-- UP (IO16) / DOWN (IO21): the LCD-2's 4.7k pull-ups (R4 / R5): pressed 0.70 mA, released 3.3 V; NO (IO6) / YES (IO18): the S3's internal pull-up (~45 k, ESP32-S3 datasheet): pressed ~73 uA. No RC fitted (C80..C83 DNP pads): the firmware debounces. A button shorts only its GPIO to GND: a GPIO driven high by a firmware fault into a pressed button is limited by the S3's drive (~40 mA, drive strength 2), a fault, not a damage case at the default drive.
+- YES (IO16) / NO (IO21): the LCD-2's 4.7k pull-ups (R4 / R5): pressed 0.70 mA, released 3.3 V; UP (IO11) / DOWN (IO6): the S3's internal pull-up (~45 k, ESP32-S3 datasheet): pressed ~73 uA. No RC fitted (C80..C83 DNP pads): the firmware debounces. A button shorts only its GPIO to GND: a GPIO driven high by a firmware fault into a pressed button is limited by the S3's drive (~40 mA, drive strength 2), a fault, not a damage case at the default drive.
 - ESD: the TS-1187A's actuator is plastic and its contacts sit inside; the case covers the frame. No exposed metal on the button nets, so no ESD part (the connectors below are the exposed paths).
 
 ## ESD, +8 kV contact (150 pF / 330 ohm) on each connector pin (peak at the protected node)
@@ -32,7 +32,7 @@ plug detect: no plug -> J7's ring switch (3) on the ring (2), R37 100k down vs R
 | MIDI ring (no array: through R14 into V5M) | v5m | 0.1 V | 0.0 V |
 | MIDI tip -> R15 -> the array on the FET drain | k | 4.9 V | 0.0 V |
 | CLOCK tip -> U21 output | n | 1.2 V | 0.0 V |
-| LINE IN tip -> GPIO8 | a | 0.5 V | 0.0 V |
+| LINE IN tip -> GPIO7 | a | 0.5 V | 0.0 V |
 | USB D+ -> the S3 | a | 1.9 V | 1.2 V |
 
 ## MIDI jacks mis-patched with a modular output (V5A held by the clamp at <= 6.05 V + 10 ohm x I)

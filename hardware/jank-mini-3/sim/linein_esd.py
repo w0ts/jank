@@ -108,7 +108,7 @@ def esd_deck(path):
     elif path == "CLOCK tip -> U21 output":
         body = (f"{gun}C89 x 0 2.2n\nR75 x n 1k\nDA 0 n BAV99\nDB n v5c BAV99\nC5C v5c 0 20u\nRO n d 50\nVD d 0 0\n")
         probe = "n"
-    elif path == "LINE IN tip -> GPIO8":
+    elif path == "LINE IN tip -> GPIO7":
         body = (f"{gun}D7a x z 0 DZ18\nD7b 0 z DZ18\nR30 x a1 20k\nC30 a1 a 1u\nR32 a vb 12k\nC32 a 0 2.2n\nVB vb 0 1.47\n"
                 "DP1 a v33 DPIN\nDP2 0 a DPIN\n" + rail + pin + ".model DZ18 D(IS=1e-12 N=1 RS=1 BV=18 IBV=1m)\n")
         body = body.replace("D7a x z 0 DZ18\nD7b 0 z DZ18\n", "D7a x z DZ18\nD7b 0 z DZ18\n")
@@ -131,8 +131,8 @@ def main():
     out = ["# linein_esd.py: LINE IN, buttons, ESD paths", ""]
     linein(out)
     out.append("\n## Buttons")
-    out.append("- UP (IO16) / DOWN (IO21): the LCD-2's 4.7k pull-ups (R4 / R5): pressed 0.70 mA, released 3.3 V;"
-               " NO (IO6) / YES (IO18): the S3's internal pull-up (~45 k, ESP32-S3 datasheet): pressed ~73 uA."
+    out.append("- YES (IO16) / NO (IO21): the LCD-2's 4.7k pull-ups (R4 / R5): pressed 0.70 mA, released 3.3 V;"
+               " UP (IO11) / DOWN (IO6): the S3's internal pull-up (~45 k, ESP32-S3 datasheet): pressed ~73 uA."
                " No RC fitted (C80..C83 DNP pads): the firmware debounces. A button shorts only its GPIO to GND: a GPIO"
                " driven high by a firmware fault into a pressed button is limited by the S3's drive (~40 mA, drive"
                " strength 2), a fault, not a damage case at the default drive.")
@@ -142,7 +142,7 @@ def main():
     out.append("| path | node | peak | min |")
     out.append("|---|---|---|---|")
     for path in ("MIDI ring (no array: through R14 into V5M)", "MIDI tip -> R15 -> the array on the FET drain",
-                 "CLOCK tip -> U21 output", "LINE IN tip -> GPIO8", "USB D+ -> the S3"):
+                 "CLOCK tip -> U21 output", "LINE IN tip -> GPIO7", "USB D+ -> the S3"):
         deck, probe = esd_deck(path)
         m = run(deck, "esd")
         out.append(f"| {path} | {probe} | {m['vpk']:.1f} V | {m['vmin']:.1f} V |")

@@ -2,8 +2,8 @@
 """JLC's assembly files from lcd2.kicad_pcb: fab/lcd2-bom.csv (Comment, Designator, Footprint, LCSC) and
 fab/lcd2-cpl.csv (Designator, Mid X, Mid Y, Layer, Rotation). Every footprint is JLC's own (EasyEDA) for its LCSC
 code, so the CPL position and rotation are the footprint's origin and KiCad rotation (as mini 2.2's make_assembly.py).
-Fitted parts only (parts.DNP left out). jank-mini-3 (Henri, 2026-11-18): JLC assembles the TOP only; every part under
-the board (the DINs, the jacks, the male rows J15 / J16, the cell sockets) is hand-soldered by Henri and goes to
+Fitted parts only (parts.DNP left out). jank-mini-3 (mots, 2026-11-18): JLC assembles the TOP only; every part under
+the board (the DINs, the jacks, the male rows J15 / J16, the cell sockets) is hand-soldered by mots and goes to
 fab/lcd2-hand.csv instead (ref, value, LCSC, joints; "TO PICK" where no part is chosen yet). Older layouts: the
 through-hole parts on the BOM too (JLC hand-solders them). Writes fab/summary.json (codes, counts, joints).
 KiCad's python: make_assembly.py"""
@@ -20,11 +20,13 @@ sys.path.insert(0, HERE)
 import parts as P
 import make_board as B
 
-OX = OY = 100.0
-
 
 def main():
     board = pcbnew.LoadBoard(os.path.join(HERE, "lcd2.kicad_pcb"))
+    org = board.GetDesignSettings().GetAuxOrigin()   # (the Gerbers' origin, make_fab.sh --use-drill-file-origin)
+    ox, oy = pcbnew.ToMM(org.x), pcbnew.ToMM(org.y)
+    if (ox, oy) == (0.0, 0.0):
+        sys.exit("make_assembly: lcd2.kicad_pcb has no aux origin; the CPL would not match the Gerbers")
     part = {p[0]: p for p in P.PARTS}
     rows, bom, joints, tht_joints, hand = [], {}, 0, 0, []
     for f in board.GetFootprints():
@@ -32,12 +34,12 @@ def main():
         if r not in part or not P.fitted(r) or not (part[r][4] or (B.MINI3 and f.IsFlipped())):
             continue
         _r, _k, value, fp, lcsc, _pins = part[r]
-        if B.MINI3 and f.IsFlipped():   # (Henri solders it: the hand list, not JLC's files)
-            hand.append([r, value, P.FP[fp], "TO PICK (male 1x14 header)" if r in ("J15", "J16") else lcsc,
+        if B.MINI3 and f.IsFlipped():   # (mots solders it: the hand list, not JLC's files)
+            hand.append([r, value, P.FP[fp], "C44526 (1x40, cut to 1x14)" if r in ("J15", "J16") else lcsc,
                          len([p for p in f.Pads() if p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH])])
             continue
         pos = f.GetPosition()
-        rows.append([r, f"{pcbnew.ToMM(pos.x) - OX:.4f}", f"{-(pcbnew.ToMM(pos.y) - OY):.4f}",
+        rows.append([r, f"{pcbnew.ToMM(pos.x) - ox:.4f}", f"{-(pcbnew.ToMM(pos.y) - oy):.4f}",
                      "Bottom" if f.IsFlipped() else "Top", f"{f.GetOrientationDegrees() % 360:.0f}"])
         key = (value, P.FP[fp], lcsc)
         bom.setdefault(key, []).append(r)
@@ -61,7 +63,12 @@ def main():
             w = csv.writer(fh)
             w.writerow(["Designator", "Value", "Footprint", "LCSC", "Joints"])
             w.writerows(sorted(hand))
-        print(f"hand-soldered by Henri: {len(hand)} parts, {sum(h[4] for h in hand)} joints (fab/lcd2-hand.csv)")
+            # (review 5B: the bridge strips too, per unit: 2 strip PCBs (strip/), each one 1x14 socket soldered on the
+            #  strip and our 14 long pins (J15 / J16) through its plated holes: 28 joints a strip)
+            w.writerow(["STRIP x2", "bridge strip PCB (strip/fab)", "strip.kicad_pcb", "", 0])
+            w.writerow(["STRIP-J1 x2", "1x14 F socket 8.5 mm", "HDR-TH_14P-P2.54-V-F", "C2905420", 28])
+            w.writerow(["STRIP-J2 x2", "our J15 / J16 pins through the strip's holes", "", "", 28])
+        print(f"hand-soldered by mots: {len(hand)} parts, {sum(h[4] for h in hand)} joints (fab/lcd2-hand.csv)")
     qty = {}
     for (_v, _f, lcsc), refs in bom.items():
         qty[lcsc] = qty.get(lcsc, 0) + len(refs)
