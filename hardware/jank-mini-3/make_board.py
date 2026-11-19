@@ -23,7 +23,7 @@ OX = OY = 100.0
 CELL = os.environ.get("LCD2_CELL", "floor")    # "floor": jank-mini-3 (mots, 2026-11-18; see MINI3 below); older
                                                # studies: "under", "top", "edge"
 MINI3 = CELL == "floor"
-W = float(os.environ.get("LCD2_W", 95.5 if os.environ.get("LCD2_CELL", "floor") == "floor" else 93.0))   # (mini-3: +2.5, the mid-mount USB-C pair 13 mm apart, mots 2026-11-18)
+W = float(os.environ.get("LCD2_W", 95.5 if os.environ.get("LCD2_CELL", "floor") == "floor" else 93.0))   # (mini-3: +2.5 for the USB-C pair 13 mm apart, mots 2026-11-18; kept for the through-hole USB4085)
 H = float(os.environ.get("LCD2_H", 82.0 if MINI3 else 62.6))   # (mini-3: 82 = 74 + 4 mm each side, mots 2026-11-18: the bands beside the LCD-2; LCD-2 centred)
 
 # the LCD-2, landscape, its USB-C at the left wall: front coordinates (fx across its 35.01, fy along its 48.21 with the
@@ -110,6 +110,9 @@ USB_NOTCH = (4.65, 6.75)  # (a mid-mount USB-C's notch: +-4.65 mm across, 6.75 d
                           #  floor's corners (a milled inner corner is round): along the floor, not sideways, where a
                           #  dog-bone reached the shell legs' pads)
 USB_RELIEF = 0.45
+# (mots, 2026-11-19: the USB-Cs are the through-hole GCT USB4085 now, on top at the edge: no notches, no drawn fan-out.
+#  USB_MID = True brings back the mid-mount C2906290 layout: notches, T-bones, usb_fan / usb_pair.)
+USB_MID = False
 
 
 def in_notch(x0, y0, x1, y1, m=0.0):
@@ -212,7 +215,8 @@ if MINI3:
     if "M" in sw:
         PLACE["J13"], PLACE["J14"] = (None, H / 2 + 10.0, "+x"), (None, H / 2 - 10.0, "+x")
     assert all(PLACE[r][2] == "-y" for r in ("J1", "J4")), "the USB-C notches are drawn in the top edge only"
-    NOTCHES = [CUT] + [(PLACE[r][0] - USB_NOTCH[0], 0.0, PLACE[r][0] + USB_NOTCH[0], USB_NOTCH[1]) for r in ("J1", "J4")]
+    NOTCHES = [CUT] + ([(PLACE[r][0] - USB_NOTCH[0], 0.0, PLACE[r][0] + USB_NOTCH[0], USB_NOTCH[1]) for r in ("J1", "J4")]
+                       if USB_MID else [])
 
 
 def _unconnected():
@@ -283,7 +287,8 @@ def put(fp, x, y, rot):
 # nose on pin 1's side; PJ-320A: the nose on pad B's side; USB-C: the mouth away from its signal pads (A6 ...).
 # (Was: the courtyard's longest reach; a DIN is wider (21.3) than deep (16.6), so on the right wall a SIDE faced it.)
 MOUTH = {"CONN-TH_DIN-504B-M10": ("6", 1), "AUDIO-TH_PJ307C": ("1", 1), "AUDIO-TH_PJ-320A-4P-DIP": ("B", 1),
-         "USB-C-SMD_TYPE-C-16PIN-2MD-073": ("A6", -1), "USB-C-SMD_SHOU_TYPE-C-16P-CB1.6": ("A6", -1)}
+         "USB-C-SMD_TYPE-C-16PIN-2MD-073": ("A6", -1), "USB-C-SMD_SHOU_TYPE-C-16P-CB1.6": ("A6", -1),
+         "USB-C-TH_GCT_USB4085-GF-A": ("B6+B7", 1)}   # (the B row's middle pair: on the centre line, the mouth side)
 # the courtyard's front edge past the wall: 0.3 mm, except a mid-mount USB-C, whose notch ends at the board's edge
 FRONT = {"USB-C-SMD_SHOU_TYPE-C-16P-CB1.6": 0.0}
 WALL_DIR = {"-x": (-1, 0), "+x": (1, 0), "-y": (0, -1), "+y": (0, 1)}
@@ -295,8 +300,9 @@ def mouth_dir(fp):
     pads = [p for p in fp.Pads() if p.GetNumber()]
     cx = sum(p.GetPosition().x for p in pads) / len(pads)
     cy = sum(p.GetPosition().y for p in pads) / len(pads)
-    q = next(p for p in pads if p.GetNumber() == ref).GetPosition()
-    return sign * (q.x - cx), sign * (q.y - cy)
+    qs = [next(p for p in pads if p.GetNumber() == n).GetPosition() for n in ref.split("+")]   # ("A+B": their middle)
+    qx, qy = sum(q.x for q in qs) / len(qs), sum(q.y for q in qs) / len(qs)
+    return sign * (qx - cx), sign * (qy - cy)
 
 
 def face(fp, wall, x, y, bottom=False):
@@ -856,7 +862,7 @@ def main():
             # (no paste on a part that is not fitted, review mini3-4B N3: parts.py gives them the R0402_NP / C0603_NP
             #  footprints, which have none; editing the pads here made KiCad call them library mismatches)
     draw(board, fps)
-    if MINI3:
+    if MINI3 and USB_MID:   # (the mid-mount USB-C's drawn fan-out; the through-hole USB4085 is routed as it is)
         for r in ("J1", "J4"):
             usb_fan(board, fps, r)
         usb_pair(board, fps)

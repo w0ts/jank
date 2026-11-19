@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>/Users/mots/GitHub/jank/hardware/jank-mini-3/lcd2.kicad_sch</source>
-    <date>2026-11-19T09:49:35</date>
+    <date>2026-11-19T14:23:39</date>
     <tool>Eeschema 10.0.8</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -759,15 +759,15 @@
     </comp>
     <comp ref="J1">
       <value>USB-C TO ESP (loop)</value>
-      <footprint>chip:USB-C-SMD_SHOU_TYPE-C-16P-CB1.6</footprint>
+      <footprint>chip:USB-C-TH_GCT_USB4085-GF-A</footprint>
       <fields>
-        <field name="LCSC">C2906290</field>
-        <field name="Footprint">chip:USB-C-SMD_SHOU_TYPE-C-16P-CB1.6</field>
+        <field name="LCSC">C7095263</field>
+        <field name="Footprint">chip:USB-C-TH_GCT_USB4085-GF-A</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
-      <libsource lib="chip" part="usbcm" description="jank chip: usbcm"/>
-      <property name="LCSC" value="C2906290"/>
+      <libsource lib="chip" part="usbth" description="jank chip: usbth"/>
+      <property name="LCSC" value="C7095263"/>
       <property name="Sheetname" value="lcd2"/>
       <property name="Sheetfile" value="lcd2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -791,10 +791,7 @@
             <pin num="B12"/>
             <pin num="B1"/>
             <pin num="A12"/>
-            <pin num="25"/>
-            <pin num="26"/>
-            <pin num="27"/>
-            <pin num="28"/>
+            <pin num="S1"/>
           </pins>
         </unit>
       </units>
@@ -855,15 +852,15 @@
     </comp>
     <comp ref="J4">
       <value>USB-C TO DEVICE (host)</value>
-      <footprint>chip:USB-C-SMD_SHOU_TYPE-C-16P-CB1.6</footprint>
+      <footprint>chip:USB-C-TH_GCT_USB4085-GF-A</footprint>
       <fields>
-        <field name="LCSC">C2906290</field>
-        <field name="Footprint">chip:USB-C-SMD_SHOU_TYPE-C-16P-CB1.6</field>
+        <field name="LCSC">C7095263</field>
+        <field name="Footprint">chip:USB-C-TH_GCT_USB4085-GF-A</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
-      <libsource lib="chip" part="usbcm" description="jank chip: usbcm"/>
-      <property name="LCSC" value="C2906290"/>
+      <libsource lib="chip" part="usbth" description="jank chip: usbth"/>
+      <property name="LCSC" value="C7095263"/>
       <property name="Sheetname" value="lcd2"/>
       <property name="Sheetfile" value="lcd2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -887,10 +884,7 @@
             <pin num="B12"/>
             <pin num="B1"/>
             <pin num="A12"/>
-            <pin num="25"/>
-            <pin num="26"/>
-            <pin num="27"/>
-            <pin num="28"/>
+            <pin num="S1"/>
           </pins>
         </unit>
       </units>
@@ -1033,16 +1027,16 @@
       </units>
     </comp>
     <comp ref="J15">
-      <value>LCD-2 P1 1x14 M 11.5 mm (cut from C44526)</value>
+      <value>LCD-2 P1 1x14 M 2.54 (C2905490)</value>
       <footprint>chip:HDR-TH_14P-P2.54-V-F</footprint>
       <fields>
-        <field name="LCSC"/>
+        <field name="LCSC">C2905490</field>
         <field name="Footprint">chip:HDR-TH_14P-P2.54-V-F</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="hdr14" description="jank chip: hdr14"/>
-      <property name="LCSC" value=""/>
+      <property name="LCSC" value="C2905490"/>
       <property name="Sheetname" value="lcd2"/>
       <property name="Sheetfile" value="lcd2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -1069,16 +1063,16 @@
       </units>
     </comp>
     <comp ref="J16">
-      <value>LCD-2 P2 1x14 M 11.5 mm (cut from C44526)</value>
+      <value>LCD-2 P2 1x14 M 2.54 (C2905490)</value>
       <footprint>chip:HDR-TH_14P-P2.54-V-F</footprint>
       <fields>
-        <field name="LCSC"/>
+        <field name="LCSC">C2905490</field>
         <field name="Footprint">chip:HDR-TH_14P-P2.54-V-F</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
       <libsource lib="chip" part="hdr14" description="jank chip: hdr14"/>
-      <property name="LCSC" value=""/>
+      <property name="LCSC" value="C2905490"/>
       <property name="Sheetname" value="lcd2"/>
       <property name="Sheetfile" value="lcd2.kicad_sch"/>
       <sheetpath names="/" tstamps="/"/>
@@ -3690,20 +3684,16 @@
         <pin num="3" name="3" type="passive"/>
       </pins>
     </libpart>
-    <libpart lib="chip" part="usbcm">
-      <description>jank chip: usbcm</description>
+    <libpart lib="chip" part="usbth">
+      <description>jank chip: usbth</description>
       <fields>
         <field name="Reference">J</field>
-        <field name="Value">usbcm</field>
+        <field name="Value">usbth</field>
         <field name="Footprint"/>
         <field name="Datasheet"/>
-        <field name="Description">jank chip: usbcm</field>
+        <field name="Description">jank chip: usbth</field>
       </fields>
       <pins>
-        <pin num="25" name="SHELL" type="passive"/>
-        <pin num="26" name="SHELL" type="passive"/>
-        <pin num="27" name="SHELL" type="passive"/>
-        <pin num="28" name="SHELL" type="passive"/>
         <pin num="A1" name="GND" type="passive"/>
         <pin num="A4" name="VBUS" type="passive"/>
         <pin num="A5" name="CC1" type="passive"/>
@@ -3720,6 +3710,7 @@
         <pin num="B8" name="SBU2" type="passive"/>
         <pin num="B9" name="VBUS" type="passive"/>
         <pin num="B12" name="GND" type="passive"/>
+        <pin num="S1" name="SHELL" type="passive"/>
       </pins>
     </libpart>
   </libparts>
@@ -3768,12 +3759,12 @@
     </net>
     <net code="6" name="/CC1O" class="Default">
       <node ref="J4" pin="A5" pinfunction="CC1_A5" pintype="passive"/>
-      <node ref="R160" pin="2" pintype="passive"/>
+      <node ref="R161" pin="2" pintype="passive"/>
       <node ref="U5" pin="4" pinfunction="IO3_4" pintype="passive"/>
     </net>
     <net code="7" name="/CC2O" class="Default">
       <node ref="J4" pin="B5" pinfunction="CC2_B5" pintype="passive"/>
-      <node ref="R161" pin="2" pintype="passive"/>
+      <node ref="R160" pin="2" pintype="passive"/>
       <node ref="U5" pin="6" pinfunction="IO4_6" pintype="passive"/>
     </net>
     <net code="8" name="/CLK_B" class="Default">
@@ -3828,28 +3819,22 @@
       <node ref="D11" pin="1" pinfunction="A1_1" pintype="passive"/>
       <node ref="D14" pin="3" pinfunction="3_3" pintype="passive"/>
       <node ref="D7" pin="3" pinfunction="3_3" pintype="passive"/>
-      <node ref="J1" pin="25" pinfunction="SHELL_25" pintype="passive"/>
-      <node ref="J1" pin="26" pinfunction="SHELL_26" pintype="passive"/>
-      <node ref="J1" pin="27" pinfunction="SHELL_27" pintype="passive"/>
-      <node ref="J1" pin="28" pinfunction="SHELL_28" pintype="passive"/>
       <node ref="J1" pin="A1" pinfunction="GND_A1" pintype="passive"/>
       <node ref="J1" pin="A12" pinfunction="GND_A12" pintype="passive"/>
       <node ref="J1" pin="B1" pinfunction="GND_B1" pintype="passive"/>
       <node ref="J1" pin="B12" pinfunction="GND_B12" pintype="passive"/>
+      <node ref="J1" pin="S1" pinfunction="SHELL_S1" pintype="passive"/>
       <node ref="J15" pin="13" pinfunction="13_13" pintype="passive"/>
       <node ref="J16" pin="13" pinfunction="13_13" pintype="passive"/>
       <node ref="J16" pin="2" pinfunction="2_2" pintype="passive"/>
       <node ref="J2" pin="1" pinfunction="S_1" pintype="passive"/>
       <node ref="J20" pin="4" pinfunction="GND_4" pintype="passive"/>
       <node ref="J3" pin="1" pinfunction="S_1" pintype="passive"/>
-      <node ref="J4" pin="25" pinfunction="SHELL_25" pintype="passive"/>
-      <node ref="J4" pin="26" pinfunction="SHELL_26" pintype="passive"/>
-      <node ref="J4" pin="27" pinfunction="SHELL_27" pintype="passive"/>
-      <node ref="J4" pin="28" pinfunction="SHELL_28" pintype="passive"/>
       <node ref="J4" pin="A1" pinfunction="GND_A1" pintype="passive"/>
       <node ref="J4" pin="A12" pinfunction="GND_A12" pintype="passive"/>
       <node ref="J4" pin="B1" pinfunction="GND_B1" pintype="passive"/>
       <node ref="J4" pin="B12" pinfunction="GND_B12" pintype="passive"/>
+      <node ref="J4" pin="S1" pinfunction="SHELL_S1" pintype="passive"/>
       <node ref="J5" pin="3" pinfunction="DIN2_3" pintype="passive"/>
       <node ref="J5" pin="6" pinfunction="SHELL_6" pintype="passive"/>
       <node ref="J5" pin="7" pinfunction="SHELL_7" pintype="passive"/>

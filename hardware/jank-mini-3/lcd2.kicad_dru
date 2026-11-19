@@ -1,6 +1,7 @@
 (version 1)
-# The mid-mount USB-C's signal pads (C2906290): the maker's layout starts them AT the notch's floor; ours start 0.075 mm
-# from it (review 5B R1: at 0.2 mm the leads landed on only 0.3 mm of pad; JLC may ask about copper near the edge). Only J1's / J4's own pads, only to the board edge.
-(rule "USB-C pads to their notch"
-  (condition "A.Type == 'Pad' && (A.Parent == 'J1' || A.Parent == 'J4')")
-  (constraint edge_clearance (min 0.07mm)))
+# The through-hole USB-C (GCT USB4085-GF-A, J1 / J4): GCT's recommended layout (drawing USB4085 rev B, sheet 2: 16 x
+# 0.40 mm holes, 0.65 mm pads, 0.85 mm pitch) leaves 0.45 mm between neighbouring holes; JLC's general rule is 0.5 mm for
+# different nets, but JLC stocks and wave-solders this part (C7095263) on this layout. Only between J1's / J4's own holes.
+(rule "USB4085 holes per GCT's layout"
+  (condition "A.Type == 'Pad' && B.Type == 'Pad' && A.Parent == B.Parent && (A.Parent == 'J1' || A.Parent == 'J4')")
+  (constraint hole_to_hole (min 0.44mm)))

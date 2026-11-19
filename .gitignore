@@ -18,3 +18,8 @@ hardware/pcb/mockup*.scad
 
 # esp_tinyusb with the audio class on, made by scripts/patch_tinyusb.sh at build time
 third_party/esp_tinyusb/
+
+# the JLCONE quote scripts' Playwright and their screenshots
+scripts/jlcone/node_modules/
+scripts/jlcone/package-lock.json
+scripts/jlcone/out/
