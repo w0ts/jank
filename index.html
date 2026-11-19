@@ -1790,7 +1790,7 @@ const OLED = (() => {
     topH: 26, iconY: 2, iconH: 22, playX: 4, ltX: 28, foldX: 62, nameXR: 187, nameMaxW: 90, linkX: 195, linkW: 49, peersX: 220, plugX: 246, battX: 268, battW: 48,
     chainW: 19, chainH: 14,
     tempoY: 32, linkTempoY: 38,
-    boxGap: 8, boxBorder: 2, boxY: 110, audioBox: { w: 72, h: 56, gap: 8 }, rowGap: 2, stateY: 226,
+    boxGap: 8, boxBorder: 2, boxY: 110, audioBox: { w: 72, h: 56, gap: 8 }, rowGap: 4, stateY: 226,
     linkBoxSide: 72, linkBoxY: 146,
     labelX: 4, valueXR: 316, barX: 128, barW: 124, lineH: 6, vuH: 10,
   };
@@ -1951,8 +1951,8 @@ const OLED = (() => {
     drawStateLcd2(fb, c);
   }
 
-  // ---- the lists: a title bar of 22 px, rows of 18 px from y 26 (12 rows: the whole MENU fits), full width, neutral, the selected row inverted
-  const L2_ROW0 = 26, L2_PITCH = 18, L2_ROWS = 12;
+  // ---- the lists: a title bar of 22 px, rows of 19 px from y 26 (11 rows: the whole MENU fits), full width, neutral, the selected row inverted
+  const L2_ROW0 = 26, L2_PITCH = 19, L2_ROWS = 11;
   const titleBarLcd2 = (fb, title, right) => { rect(fb, 0, 0, W, 22, 1); text(fb, title, 6, 4, 1, 0); if (right) textR(fb, right, W - 6, 4, 1, 0); };
   const boxedLcd2 = (fb, x, y, w, h) => { rect(fb, x, y, w, h, 1); frame(fb, x + 4, y + 4, w - 8, h - 8, 0); };       // a lit box with a 1 px dark line inside
   const barLcd2 = (fb, x, y, w, frac) => { frame(fb, x, y, w, 14, 1); rect(fb, x + 1, y + 1, Math.round((w - 2) * clamp(frac, 0, 1)), 12, 1); };
