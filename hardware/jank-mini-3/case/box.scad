@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // jank-mini-3 box, STAGE 1 (Claude, 2026-11-19, for mots's approval): a TOP SHELL (the face and all four walls, full
 // depth) and a flat BOTTOM LID screwed into it, plus one printed cross D-pad cap. FDM, PETG, 0.4 mm nozzle, 0.2 mm layers.
-//   shell: printed FACE DOWN (the face on the bed; walls, bosses and corner towers grow up; the USB-C window's lower
-//          edge prints as a 25.8 mm bridge)
-//   lid:   printed OUTSIDE DOWN (the strip rails, the cell's L and the tongues grow straight up: no bridges)
-//   cap:   printed FLANGE DOWN (its flat underside, which rests on the four switches, on the bed)
-// The board screws to the shell from below (4 x M2 into heat-set inserts in bosses on the face); the lid screws to the
-// shell from below (4 x M3 countersunk into heat-set inserts in four towers at the outside corners: the board drops in
-// from below and fills the whole inside, so nothing of the shell may sit under it).
+//   shell: printed FACE DOWN (the face on the bed; walls and bosses grow up; the USB-C window's lower edge prints as a
+//          25.8 mm bridge; the side screws' countersinks and the hook window are small holes in the walls)
+//   lid:   printed OUTSIDE DOWN (the strip rails, the cell's L, the screw tabs, the hook and the tongues grow up)
+//   cap:   printed TOP DOWN (its chamfered top on the bed; the flange a 2.75 mm ledge; the pivot nub and pads up)
+// The board screws to the shell from below (4 x M2 into heat-set inserts in bosses on the face); the lid is held by
+// 3 x M3 countersunk screws sideways through the walls into heat-set inserts in tabs on the lid, and a hook on the right
+// (mots: no corner towers; the board drops in from below and fills the whole inside, so nothing of the shell may sit
+// under it).
 //
 // Coordinates: BOARD mm as make_board.py (x right, y DOWN from the board's top-left corner); z = 0 is OUR BOARD'S TOP
 // (its bottom is z -1.6). In OpenSCAD space Y = -y (so the top wall is at +Y, the pictures read like the board).
@@ -84,8 +85,8 @@ L_left_len = 36.0;             // the left arm, from the L's outer corner (y 19.
 // the power switch (mots, 2026-11-19): YIZHI KCD1-106S-B (LCSC C52125269), a round snap-in rocker in the LEFT wall
 // below the LCD-2's notch, in the cell's red lead (cell -> switch -> the LCD-2's MX1.25): no board connection.
 // Its datasheet drawing was not read: every size ASSUMED (mots measured the cap ~16 across)
-psw_y = 71.5;              // its centre, board y: the cap (y 63.25-79.75) 0.75 short of the bottom-left tower's fillet
-                           //  (from y 80.5 on the wall's outside), the body (y 64.0-79.0) 0.85 past the lower strip (y 63.15)
+psw_y = 72.9;              // its centre, board y: the cap (y 64.65-81.15) ends 0.25 before the corner's rounding (flat
+                           //  wall face to y 81.4), the thinned patch (to y 82.4) fits; body y 65.4-80.4
 psw_z = -13.0;             // its centre height: body z -20.5..-5.5 (lid top -23.0, H2's screw head down to -3.2)
 psw_hole = 15.0;           // ASSUMED: the panel hole (the "15mm" in its name)
 psw_cap = [16.5, 2.0];     // ASSUMED: the round cap's diameter, proud of the wall's outside
@@ -121,24 +122,55 @@ tongue_clr = 0.2;          // the lid's tongues in the wall slots (a side)
 m2_ins = [3.2, 5.0];       // M2 x 4.0 insert (OD ~3.6): hole d 3.2, 5.0 deep (into the face 0.6)
 boss_d = 6.0;              // board bosses (wall 1.4 round the hole)
 m2_head = [4.0, 1.6];      // ISO 7045 M2 pan head under the board (screws M2 x 5)
-m3_ins = [4.0, 6.5];       // M3 x 5.7 insert (OD ~4.6): hole d 4.0, 6.5 deep
-col_d = 7.5;               // the lid screws' towers (wall 1.75 round the insert)
-lid_pad = [6.0, 1.0];      // a pad on the lid under each tower: the lid is 3.0 thick under the countersunk head
-pad_clr = 0.2;             // the pad's recess in the tower (a side)
-m3_cs = [3.4, 6.4, 1.7];   // ISO 10642 M3 countersink: hole, head d, head depth (screws M3 x 8)
-// the lid screws: the board drops in from below and fills the whole inside, so nothing of the shell may sit under it:
-// four towers OUTSIDE the board's corners, their centres just far enough out that they clear the inside's corner
-tw_c = col_d / 2 / sqrt(2) + 0.2;
-TOWERS = [[-fit - tw_c, -fit - tw_c], [W + fit + tw_c, -fit - tw_c], [W + fit + tw_c, H + fit + tw_c],
-          [-fit - tw_c, H + fit + tw_c]];
+// the lid's fixing (mots, 2026-11-19: no corner towers, the outline a plain rectangle): tabs rise from the lid just
+// inside the walls, M3 countersunk screws go sideways through the walls into heat-set inserts in the tabs, heads flush.
+// The board drops in from below and fills the whole inside, so the tabs (on the lid, fitted after it) stay LOW: under
+// every bottom part they pass (the jacks hang to z -7.1, the strips' tails to -15.7 elsewhere)
+m3_ins = [4.0, 5.0];       // M3 x 4.0 insert (OD ~4.6): hole d 4.0, 5.0 deep, pressed in from the tab's wall side
+m3_cs = [3.4, 6.4, 1.5];   // ISO 10642 M3 in the 2.0 wall: hole, seat d at the outside, cone depth (0.5 of straight
+                           //  wall stays); screws M3 x 6 countersunk (2.0 wall + 0.2 gap, ~3.8 into the insert)
+tab = [8.0, 6.0, 8.0];     // a screw tab: along the wall, inward (insert 5.0 + 1.0), height over the lid's top
+tab_clr = 0.2;             // tab -> the wall's inner face (the screw pulls it tight)
+tab_screw_h = 4.0;         // the screw's axis over the lid's top (2.0 of tab above the insert hole, the head 0.8
+                           //  above the wall's bottom edge)
+// [wall, position along it (board mm)]: free low wall, clear of slots, the DINs, the switch, the cell's rubber, the L,
+// the strip rails: top x 23.1-51.65 (between J3's slot and the DIN window), bottom x 34-57.4 (J7's slot to the cell's
+// rubber), left y 0-34.6 (above the LCD-2's USB-C slot; J2 hangs only to z -7.1 over it)
+LID_SCREWS = [["top", 37.0], ["bottom", 46.0], ["left", 10.0]];
+// the right wall has no room for a screw (the DIN J6 reaches the floor to y 15.19, the cell's rubber starts at y 22.4,
+// J13 / J14 slots): a HOOK there instead, a thin tab with a barb that catches in a small window in the right wall
+// (fit the lid right side first, tilted, then swing it up and screw the other three)
+hook_y = (15.19 + 22.4) / 2;   // 18.8: centred in the free 7.2 mm
+hook = [5.0, 1.6, 9.0];    // along the wall, thickness, height over the lid
+hook_barb = [1.0, 1.2, 1.0];   // into the wall, flat catching face height, the 45 deg lead-in above it
+hook_clr = 0.3;            // the window round the barb
 
 // the D-pad cap (mots: 24 mm cross, 8 mm arms)
 cap_L = 24.0;  cap_A = 8.0;
-cap_clr = 0.4;             // face opening a side
-cap_flange = 1.2;          // retaining flange beyond the cross (keep-out is cross + 1.0: BOARD DPAD_KEEP)
-cap_play = 0.15;           // flange top -> face underside
+cap_clr = 0.6;             // face opening a side (generous PETG; a full diagonal press shifts the cross <= 0.48 at the
+                           //  face's top, 0.34 along each axis)
+// the retaining lips beyond the cross (mots: 2.5-3 mm, as wide as the parts round the D-pad allow, checked against
+// the top parts with the cap tilted by a full press): [side, end] per arm, OpenSCAD directions +x (YES, SW5), -x (NO,
+// SW1), +y (board up: UP, SW3), -y (board down: DOWN, SW4). Narrow where a part sits just past the keep-out: U21 and
+// D10 / D11 (CLOCK / RESET) at the +x arm's end and sides, Q13 beyond the UP arm's end; a wide lip there would land
+// on them when a press tilts the cap toward that side
+cap_lips = [[1.2, 1.2], [2.75, 2.75], [2.75, 1.2], [2.75, 2.75]];
+cap_play = 1.3;            // flange top -> face underside: a full diagonal press lifts the far flange corner 1.07
 cap_proud = 2.0;           // above the face
 cap_chamfer = 0.6;
+cap_pivot_r = 1.75;        // the pivot nub: d 3.5 with a ball end, the only contact at rest (the board bare there)
+cap_preload_gap = 0.15;    // each pad over its switch at rest
+cap_pad = [3.0, 0.5];      // the pads under the arms over the actuators: diameter, height under the flange
+sw_travel = 0.25;          // ASSUMED: TS-1187A-B-A-B travel (typical for 5.1 mm tact switches; datasheet not read)
+// the symbols on the cap (mots, 2026-11-19): a second colour, multi-material, inlaid flush in the top face
+sym_depth = 0.6;           // 3 layers of 0.2 (printed top down: the first 3 layers)
+sym_r = 8.7;               // centre on the arm, between the pad (r 8) and the arm's end; the flat top ends at r 11.4
+sym_tri = [5.0, 4.0];      // the UP / DOWN triangles: wide, tall (mots: solid, ~4.5-5 x 4, no stem)
+sym_tri_r = 0.3;           // their corners rounded
+sym_x = 4.6;               // the X's square
+sym_bold = 1.7;            // the X's and the tick's strokes (mots: ~1.6-1.8, as heavy as the triangles)
+sym_tick = [[-2.0, 0.1], [-0.6, -1.3], [1.7, 1.5]];   // the tick's points (its stroke's centre line)
+sym_tick_c = [0.12, 0.26];  // its outline (4.96 x 4.6) centred
 
 // the cell pushed into the corner (the walls' inner faces less the rubber), the L's two arms as boxes
 cell_x1 = W + fit - rubber_gap;  cell_y1 = H + fit - rubber_gap;
@@ -187,7 +219,8 @@ module grp_pcb(g = 0) {
     bx(grow(LCD_PCB, g));
 }
 module grp_top(g = 0) for (p = BOARD_PARTS) if (p[1] == "F" && p[2] != "SW-SMD") bx(grow([for (i = [3:8]) p[i]], g));
-module grp_sw(g = 0) for (p = BOARD_PARTS) if (p[2] == "SW-SMD") bx(grow([for (i = [3:8]) p[i]], g));
+module grp_sw(g = 0) for (p = BOARD_PARTS) if (p[2] == "SW-SMD" && (ck_ref == "" || p[0] == ck_ref)) bx(grow([for (i = [3:8]) p[i]], g));
+ck_ref = "";               // (check only: one switch of grp_sw)
 module grp_bottom(g = 0) for (p = BOARD_PARTS) if (p[1] == "B") bx(grow([for (i = [3:8]) p[i]], g));
 module grp_lcd2(g = 0) {
     bx(grow(LCD_BL, g));
@@ -245,15 +278,38 @@ module shell_body() {
         }
     }
 }
-// the outside: the walls' rounded rectangle and the four towers, filleted where they meet
-module outline2d() offset(r = -1.0) offset(r = 1.0) {
-    rrect(OUT[0], OUT[1], OUT[2], OUT[3], corner_r);
-    for (t = TOWERS) at(t) circle(d = col_d);
+// the outside: the walls' rounded rectangle, nothing sticking out
+module outline2d() rrect(OUT[0], OUT[1], OUT[2], OUT[3], corner_r);
+// the lid's side screws through the walls (countersunk from outside, flush) and the hook's window in the right wall
+HOOK_VB = lid_z1 + hook[2] - 0.8 - hook_barb[2] - hook_barb[1];   // the barb's flat catching face (z)
+module lid_screw_holes() {
+    for (s = LID_SCREWS) {
+        multmatrix(wall_m(s[0], fit - 0.2)) translate([s[1], lid_z1 + tab_screw_h, 0]) cylinder(d = m3_cs[0], h = wall + 1.2);
+        multmatrix(wall_m(s[0], fit + wall - m3_cs[2])) translate([s[1], lid_z1 + tab_screw_h, 0])
+            cylinder(d1 = m3_cs[0], d2 = m3_cs[1], h = m3_cs[2] + 0.01);
+    }
+    through_wall("right") translate([hook_y - hook[0] / 2 - hook_clr, HOOK_VB - hook_clr])
+        square([hook[0] + 2 * hook_clr, hook_barb[1] + hook_barb[2] + 2 * hook_clr]);
 }
-module tower_holes() for (t = TOWERS) {
-    at(t, lid_z1 - 0.01) cylinder(d = lid_pad[0] + 2 * pad_clr, h = lid_pad[1] + 0.01);     // the lid pad's recess
-    at(t, lid_z1 + lid_pad[1] - 0.01) cylinder(d = m3_ins[0], h = m3_ins[1]);                 // the M3 insert
+// the lid's screw tabs (an M3 insert pressed in from the wall side) and the hook with its barb
+module lid_tabs() {
+    for (s = LID_SCREWS) multmatrix(wall_m(s[0], fit - tab_clr - tab[1])) difference() {
+        translate([s[1] - tab[0] / 2, lid_z1 - 0.01, 0]) cube([tab[0], tab[2] + 0.01, tab[1]]);
+        translate([s[1], lid_z1 + tab_screw_h, tab[1] - m3_ins[1]]) cylinder(d = m3_ins[0], h = m3_ins[1] + 0.01);
+    }
+    multmatrix(wall_m("right", fit - tab_clr - hook[1]))
+        translate([hook_y - hook[0] / 2, lid_z1 - 0.01, 0]) cube([hook[0], hook[2] + 0.01, hook[1]]);
+    multmatrix(wall_m("right", fit - tab_clr)) hull() {
+        translate([hook_y - hook[0] / 2, HOOK_VB, -0.01]) cube([hook[0], hook_barb[1], hook_barb[0] + tab_clr + 0.01]);
+        translate([hook_y - hook[0] / 2, HOOK_VB + hook_barb[1] + hook_barb[2], -0.01]) cube([hook[0], 0.01, 0.01]);
+    }
 }
+// the rectangles the tabs and the hook take on the floor (board coordinates; floor_map.py draws them)
+function wall_rect(w, u, a, d0, d1) = w == "top" ? [u - a / 2, -d1, u + a / 2, -d0] :
+                                     w == "bottom" ? [u - a / 2, H + d0, u + a / 2, H + d1] :
+                                     w == "left" ? [-d1, u - a / 2, -d0, u + a / 2] : [W + d0, u - a / 2, W + d1, u + a / 2];
+TAB_RECTS = concat([for (s = LID_SCREWS) wall_rect(s[0], s[1], tab[0], fit - tab_clr - tab[1], fit - tab_clr)],
+                   [wall_rect("right", hook_y, hook[0], fit - tab_clr - hook[1], fit - tab_clr)]);
 
 // wall openings: 2D shapes in (u along the wall, z)
 module jack_slot(u, d) { translate([u, jack_axis]) circle(d = d); translate([u - d / 2, lid_z1 - 2]) square([d, jack_axis - lid_z1 + 2]); }
@@ -316,7 +372,7 @@ module labels2d() for (l = LABELS, i = [0 : len(l[2]) - 1])
     at([l[0], l[1] + (i - (len(l[2]) - 1) / 2) * lab_h * 1.35])
         text(l[2][i], size = lab_h, font = lab_font, halign = "center", valign = "center");
 
-module shell() difference() { shell_body(); openings(); face_cuts(); tower_holes(); }
+module shell() difference() { shell_body(); openings(); face_cuts(); lid_screw_holes(); }
 module label_fill() translate([0, 0, face_top - lab_depth + 0.02]) linear_extrude(0.01) labels2d();   // (pictures only)
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -325,7 +381,8 @@ module lid() {
     difference() {
         union() {
             translate([0, 0, lid_z0]) linear_extrude(lid_t) outline2d();
-            for (t = TOWERS) at(t, lid_z1 - 0.01) cylinder(d = lid_pad[0], h = lid_pad[1] + 0.01);
+            // the side screws' tabs and the right wall's hook
+            lid_tabs();
             // tongues: close the wall slots under the jacks and the LCD-2's USB-C (flush with the walls)
             in_wall("top", fit, wall) { jack_tongue(J2X); jack_tongue(J3X); }
             in_wall("right", fit, wall) { jack_tongue(J13Y); jack_tongue(J14Y); }
@@ -339,26 +396,72 @@ module lid() {
             // the L on the cell's top-left corner: keeps the cell (with the rubber) in the corner, backs our board
             for (b = [L_TOP, L_LEFT]) bx(b);
         }
-        for (t = TOWERS) at(t, lid_z0 - 0.01) {
-            cylinder(d = m3_cs[0], h = lid_t + lid_pad[1] + 1);
-            cylinder(d1 = m3_cs[1], d2 = m3_cs[0], h = (m3_cs[1] - m3_cs[0]) / 2);
-        }
     }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// the D-pad cap: a flat flange resting on the four plungers, the cross through the face, chamfered on top
-module cap() {
-    ztop = face_top + cap_proud;
-    at([DPX, DPY]) {
-        translate([0, 0, SW_H]) linear_extrude(face_z0 - cap_play - SW_H) offset(delta = cap_flange) cross2d(cap_L, cap_A);
+// the D-pad cap (mots, 2026-11-19: a centre pivot): it stands on a ball-ended nub at the D-pad centre on our board's
+// bare top; a pad under each arm floats cap_preload_gap over its switch; pressing an arm tilts the cap about the nub so
+// only that pad lands on its switch. The flange (under the face) keeps it in; the cross through the face keeps it
+// from turning. Printed TOP DOWN (the chamfered top on the bed; the lips a 1.2-2.75 mm ledge, the nub and pads up).
+CAP_FB = SW_H + cap_preload_gap + cap_pad[1];        // the flange's underside (z, at rest)
+// the flange: each arm with its own side and end lips (cap_lips), the arms' rectangles from the centre out
+module flange2d() for (i = [0 : 3]) rotate([0, 180, 90, 270][i])
+    translate([0, -cap_A / 2 - cap_lips[i][0]]) square([cap_L / 2 + cap_lips[i][1], cap_A + 2 * cap_lips[i][0]]);
+CAP_FT = face_z0 - cap_play;                         // the flange's top
+// cap_tilt = [press direction x, y (OpenSCAD axes), degrees]: the cap turned about the nub's contact point
+CAP_TOP = face_top + cap_proud;
+module cap(tilt = [1, 0, 0]) difference() {
+    cap_body(tilt);
+    at([DPX, DPY]) rotate(a = tilt[2], v = [-tilt[1], tilt[0], 0])
+        translate([0, 0, CAP_TOP - sym_depth]) linear_extrude(sym_depth + 0.01) cap_symbols2d();
+}
+// the symbols as their own body, filling the cuts exactly (the second colour: the same origin as the cap's STL)
+module cap_symbols(tilt = [1, 0, 0]) at([DPX, DPY]) rotate(a = tilt[2], v = [-tilt[1], tilt[0], 0])
+    translate([0, 0, CAP_TOP - sym_depth]) linear_extrude(sym_depth) cap_symbols2d();
+// the symbols (mots, 2026-11-19), cap coordinates (OpenSCAD axes: +x YES, -x NO, +y UP, -y DOWN; parts.py SW5 YES,
+// SW1 NO, SW3 UP, SW4 DOWN, as silk.py's labels), each centred sym_r out on its arm, upright as the face is read
+module cap_symbols2d() {
+    translate([0, sym_r]) sym_arrow();
+    translate([0, -sym_r]) mirror([0, 1]) sym_arrow();
+    translate([-sym_r, 0]) sym_cross();
+    translate([sym_r, 0]) sym_check();
+}
+module sym_arrow() {           // pointing +y: a solid triangle (mots: as jank's page D-pad), no stem, its corners
+    offset(r = sym_tri_r) offset(delta = -sym_tri_r)   //  rounded so the tip prints (>= 2 nozzle widths across)
+        polygon([[-sym_tri[0] / 2, -sym_tri[1] / 2], [sym_tri[0] / 2, -sym_tri[1] / 2], [0, sym_tri[1] / 2]]);
+}
+// the X and the tick in the triangles' family (mots): bold sym_bold strokes, flat / mitred ends, no round caps
+module sym_cross() intersection() {   // an X: two bars cut flush by its sym_x square
+    for (a = [45, -45]) rotate(a) square([sym_x * 2, sym_bold], center = true);
+    square(sym_x, center = true);
+}
+// a tick: a sym_bold stroke along p0 -> p1 -> p2, its ends cut square, a mitred corner at p1
+module sym_check() translate(sym_tick_c) {
+    p = sym_tick;  h = sym_bold / 2;
+    d1 = (p[1] - p[0]) / norm(p[1] - p[0]);  d2 = (p[2] - p[1]) / norm(p[2] - p[1]);
+    n1 = [-d1[1], d1[0]] * h;  n2 = [-d2[1], d2[0]] * h;
+    m = (n1 + n2) / (1 + d1 * d2);            // the mitre's offset at p1
+    polygon([p[0] + n1, p[1] + m, p[2] + n2, p[2] - n2, p[1] - m, p[0] - n1]);
+}
+module cap_body(tilt) {
+    ztop = CAP_TOP;
+    at([DPX, DPY]) rotate(a = tilt[2], v = [-tilt[1], tilt[0], 0]) {
+        translate([0, 0, CAP_FB]) linear_extrude(CAP_FT - CAP_FB) flange2d();
         for (d = [[cap_L, cap_A], [cap_A, cap_L]]) hull() {
-            translate([-d[0] / 2, -d[1] / 2, face_z0 - cap_play - 0.01]) cube([d[0], d[1], ztop - cap_chamfer - face_z0 + cap_play]);
+            translate([-d[0] / 2, -d[1] / 2, CAP_FT - 0.01]) cube([d[0], d[1], ztop - cap_chamfer - CAP_FT]);
             translate([-d[0] / 2 + cap_chamfer, -d[1] / 2 + cap_chamfer, ztop - 0.01])
                 cube([d[0] - 2 * cap_chamfer, d[1] - 2 * cap_chamfer, 0.01]);
         }
+        // the pads over the four switches, and the pivot nub (its ball end touches the board at z 0)
+        for (a = [0, 90, 180, 270]) rotate(a) translate([SW_OFF, 0, SW_H + cap_preload_gap])
+            cylinder(d = cap_pad[0], h = cap_pad[1] + 0.01);
+        translate([0, 0, cap_pivot_r]) { sphere(r = cap_pivot_r); cylinder(r = cap_pivot_r, h = CAP_FB - cap_pivot_r + 0.01); }
     }
 }
+// the tilt of one full press on an arm (its pad down gap + travel at r SW_OFF) and on the diagonal between two arms
+TILT_ARM = atan((cap_preload_gap + sw_travel) / SW_OFF);
+TILT_DIAG = atan((cap_preload_gap + sw_travel) / (SW_OFF / sqrt(2)));
 
 // ---------------------------------------------------------------------------------------------------------------
 // the power switch as boxes / cylinders: its cap outside the wall, its body and tabs inside (the part in the hole
@@ -375,11 +478,11 @@ module kcd1(g = 0) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // the check: intersection of one case part with one board group grown by ck_grow (empty = clearance >= ck_grow)
-ck_part = "shell";  ck_group = "top";  ck_grow = 0.0;  ck_drop = 0.0;  ck_psw = 0.0;
+ck_part = "shell";  ck_group = "top";  ck_grow = 0.0;  ck_drop = 0.0;  ck_psw = 0.0;  ck_tilt = [1, 0, 0];
 module ck_case() {
     if (ck_part == "shell") shell();
     if (ck_part == "lid") translate([0, 0, -ck_drop]) lid();   // (ck_drop: off the faces it only touches)
-    if (ck_part == "cap") cap();
+    if (ck_part == "cap") cap(ck_tilt);   // (ck_tilt: a press, [direction x, y, degrees])
     if (ck_part == "switch") kcd1(ck_psw);    // (the power switch against the board groups / the shell / the lid)
 }
 module ck_board() {
@@ -400,6 +503,7 @@ module assembly(e = 0) {
     color("lightgray") translate([0, 0, e]) shell();
     color("black") translate([0, 0, e]) label_fill();
     color("orange") translate([0, 0, 1.5 * e]) cap();
+    color("#111111") translate([0, 0, 1.5 * e]) cap_symbols();
     board();
     color("slategray") translate([0, 0, -0.8 * e]) lid();
     color("#222222") translate([0, 0, e]) kcd1();
@@ -431,24 +535,27 @@ if (part == "exploded") assembly(40);
 if (part == "shell") shell();
 if (part == "lid") lid();
 if (part == "cap") cap();
+if (part == "cap_symbols") cap_symbols();
+if (part == "cap_view") { color("orange") cap(); color("#111111") cap_symbols(); }
 if (part == "board") board();
 if (part == "inside") { color("slategray") lid(); color("silver") grp_bottom(); color("teal") grp_strips(); color("royalblue") grp_cell();
                          color("dimgray") grp_screws(); color("#222222") kcd1(); }   // the shell, our board and the LCD-2 off
 if (part == "left_wall") { color("lightgray") shell(); color("#222222") kcd1(); color("slategray") lid(); board(); }
 if (part == "section_switch") section("y", psw_y);
-if (part == "top") { color("lightgray") shell(); color("black") label_fill(); color("orange") cap(); board(); }
-if (part == "section_din") section("x", J5X);
+if (part == "top") { color("lightgray") shell(); color("black") label_fill(); color("orange") cap(); color("#111111") cap_symbols(); board(); }
+if (part == "section_din") section("x", DPX);   // (through J5's DIN and the D-pad centre: the nub, the UP / DOWN pads)
 if (part == "section_screen") section("y", DPY);
 if (part == "check") intersection() { ck_case(); ck_board(); }
 
 // the numbers BOX.md quotes (openscad -o x.echo box.scad)
-echo(outside_x = W + 2 * (fit + tw_c + col_d / 2), outside_y = H + 2 * (fit + tw_c + col_d / 2),
+echo(outside_x = W + 2 * (fit + wall), outside_y = H + 2 * (fit + wall),
      walls_x = W + 2 * (fit + wall), walls_y = H + 2 * (fit + wall), height = face_top - lid_z0,
      with_cap = face_top + cap_proud - lid_z0, face_top = face_top, lid_z1 = lid_z1, cell_top = cell_top,
      usb_din_web = DIN_U[0][0] - USB_U[1], din_merged = DIN_MERGE, window = [AA[0] - win_bezel, AA[1] - win_bezel,
-     AA[2] + win_bezel, AA[3] + win_bezel], tower_c = tw_c);
+     AA[2] + win_bezel, AA[3] + win_bezel], cap_fb = CAP_FB, cap_ft = CAP_FT, tilt_arm = TILT_ARM, tilt_diag = TILT_DIAG,
+     hook_vb = HOOK_VB, tab_rects = TAB_RECTS);
 // the numbers floor_map.py draws (it runs: openscad -o x.echo box.scad, and reads this line)
 echo(floor = [W, H, din_depth, -T - lid_z1, [cell_x0, cell_y0, cell_x1, cell_y1, cell[2]], rubber_gap,
      [L_TOP[0], L_TOP[1], L_TOP[3], L_TOP[4]], [L_LEFT[0], L_LEFT[1], L_LEFT[3], L_LEFT[4]], CUT, [DPX, DPY, SW_OFF],
      MOUNT, ROW_X, strip_L, strip_W, strip_y,
-     [psw_y, psw_z, psw_body[0], PSW_IN, PSW_TAB, psw_tabs[0], PSW_OUT - psw_cap[1], psw_cap[0]]]);
+     [psw_y, psw_z, psw_body[0], PSW_IN, PSW_TAB, psw_tabs[0], PSW_OUT - psw_cap[1], psw_cap[0]], TAB_RECTS]);

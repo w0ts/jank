@@ -30,7 +30,7 @@ def box_numbers() -> list:
 
 
 (W, H, DIN, FREE, CELL, GAP, L_TOP, L_LEFT, CUT, (DPX, DPY, SWO), HOLES, ROW_X, STRIP_L, STRIP_W,
- STRIPS, PSW) = box_numbers()
+ STRIPS, PSW, TABS) = box_numbers()
 PSW_Y, PSW_Z, PSW_D, PSW_XIN, PSW_XTAB, PSW_TAB_W, PSW_XCAP, PSW_CAP = PSW
 
 
@@ -64,7 +64,7 @@ for m in re.finditer(r'\["(\w+)", "B", "(\w+)", ([-\d.]+), ([-\d.]+), ([^,]+), (
     p[2], p[3] = max(p[2], float(x1)), max(p[3], float(y1))
     p[4] = max(p[4], depth)
 
-out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{2 * M + W * S:.0f}" height="{2 * M + H * S + 220:.0f}">',
+out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{2 * M + W * S:.0f}" height="{2 * M + H * S + 250:.0f}">',
        '<rect width="100%" height="100%" fill="white"/>']
 out.append(rect(0, 0, W, H, "#e8f0e8"))
 out.append(rect(*CUT, "#c9d6ef", "#4466aa"))
@@ -83,6 +83,10 @@ for yc in STRIPS:
 for ref, (x0, y0, x1, y1, d) in sorted(parts.items()):
     out.append(rect(x0, y0, x1, y1, "#d06060" if d > 10 else "#e7a0a0", "#802020", 0.8))
     out.append(text((x0 + x1) / 2, (y0 + y1) / 2 + 1.5, f"{ref} {d:g}", 11))
+# the lid's screw tabs (an M3 insert each, the screw through the wall) and the right wall's hook
+for i, b in enumerate(TABS):
+    out.append(rect(*b, "#6a3d9a", "#3a1d6a", 0.85))
+    out.append(text((b[0] + b[2]) / 2, b[3] + 3.2 if b[1] < 1 else b[1] - 1.0, "hook" if i == len(TABS) - 1 else "M3 tab", 10, color="#3a1d6a"))
 # the L (lid to 0.2 under the board)
 for b in (L_TOP, L_LEFT):
     out.append(rect(*b, "#1a5a1a", "#1a5a1a", 0.85))
@@ -132,6 +136,7 @@ out.append(text(0, ly + 16, f"Power switch (dark grey) in the left wall, centre 
                 f"red cell -> switch {RED_A:.0f} mm,", 12, "start"))
 out.append(text(0, ly + 20, f"switch -> MX1.25 {RED_B:.0f} mm (red {RED_A + RED_B:.0f} mm in all), black cell -> MX1.25 {BLACK:.0f} mm; "
                 "add the slack for the plugs and bends.", 12, "start"))
+out.append(text(0, ly + 24, "Purple: the lid's M3 screw tabs (side screws through the walls) and the hook on the right wall, 8 mm (hook 9) high over the lid.", 12, "start"))
 out.append("</svg>")
 svg = os.path.join(HERE, "floor-map-corner.svg")
 open(svg, "w").write("\n".join(out))

@@ -47,6 +47,14 @@ def main() -> None:
     jobs += [("switch", g, ()) for g in ("pcb", "top", "bottom", "lcd2", "strips", "screws", "lid")]
     jobs += [("switch", "cell", ("ck_cell_lift=3",))]
     once += [("switch", "shell", ("ck_psw=-0.01",))]
+    # the D-pad cap pressed: on each arm (its pad down gap + travel) and on each diagonal between two arms, turned about
+    # its pivot nub: against the top parts and the shell (the face must not stop the tilt), and switch by switch (the
+    # pressed pad reaches into its switch's box by the travel: OVERLAP means that switch is pressed)
+    tilts = [f"ck_tilt=[{x},{y},TILT_ARM]" for x, y in ((1, 0), (-1, 0), (0, 1), (0, -1))]
+    tilts += [f"ck_tilt=[{x},{y},TILT_DIAG]" for x, y in ((1, 1), (1, -1), (-1, 1), (-1, -1))]
+    jobs += [("cap", "top", (t,)) for t in tilts]
+    once += [("cap", "shell", (t,)) for t in tilts]
+    once += [("cap", "sw", (t, f'ck_ref="{r}"')) for t in tilts for r in ("SW1", "SW3", "SW4", "SW5")]
     os.makedirs(os.path.join(HERE, "..", ".t"), exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="box-check-", dir=os.path.join(HERE, "..", ".t")) as tmp:
 
@@ -66,7 +74,7 @@ def main() -> None:
 
         with cf.ThreadPoolExecutor(max_workers=WORKERS) as ex:
             for (part, group, more), res in list(ex.map(scan, jobs)) + list(ex.map(one, once)):
-                print(f"{part:6s} vs {group:7s} {' '.join(more):18s}: {res}", flush=True)
+                print(f"{part:6s} vs {group:7s} {' '.join(more):34s}: {res}", flush=True)
 
 
 if __name__ == "__main__":
