@@ -43,13 +43,16 @@ ILCD VCC 0 {ilcd}
 VCELL cell 0 {vbat}
 RCELL cell VBATL 0.15
 VQ1 VBATL VBATQ 0
-* ours: R50, R88 + R89, C27 / R151, D3, Q1 (drain VBAT, source VIN_B, gate VBUS_B), C99 + C104 (derated), the boost
+* ours: R50, R88 / R89 / C29 (VBUS_SENSE on io10), C27 / R151, D3 + R167, Q1 (drain VBAT, source VIN_B, gate VBUS_B), C99 + C104 (derated), the boost
 R50 VBUS_B 0 100k
-R8889 VBUS_B 0 200k
+R88 VBUS_B io10 10k
+R89 io10 0 15k
+C29 io10 0 10n
 R151 VBUS_B vbd1 1
 {C27_PATH[c27]}
 R157 VBUS_B vbd3 1
 D3 vbd3 VIN_B SS34
+R167 vbd3 0 4.7k
 MQ1 VBATQ VBUS_B VIN_B AO3401
 C99 VIN_B 0 7u
 C104 VIN_B 0 3u

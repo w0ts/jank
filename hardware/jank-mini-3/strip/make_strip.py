@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""jank-mini-3's bridge strip (Henri, 2026-11-18): a small 2-layer PCB with two 1 x 14 female sockets (C2905420,
-8.5 mm) 3.81 mm apart, each socket pin joined straight across to its partner. Pushed up from below onto the LCD-2's
-pins and our male row beside them; 2 per unit (identical: the same strip serves both rows). No screws, no other parts.
-Writes strip.kicad_pcb next to this file.   KiCad's python: make_strip.py"""
+"""jank-mini-3's bridge strip (mots, 2026-11-18; round 4, review mini3-4B W1): a small 2-layer PCB, ONE 1 x 14 female
+socket (C2905420, 8.5 mm) for the LCD-2's pins, and beside it, 3.81 mm away, a row of 14 plated holes (1.15 mm) for OUR
+male row's long pins (J15 / J16: C44526, 11.5 mm below their plastic), each socket pin joined straight across to its
+hole. mots seats the LCD-2 in its socket first, then solders our pins in the holes from below (they stand ~1.4 mm
+under the strip): the LCD-2 stays removable, the strip is fixed to our board. (Was: two sockets, at the same height;
+our pins end ~6 mm deeper than the LCD-2's, so its pins would barely enter theirs.) 2 per unit, identical: turned
+180 degrees, the same strip serves the other row. Writes strip.kicad_pcb.   KiCad's python: make_strip.py"""
 import os
 import sys
 
@@ -44,6 +47,27 @@ def socket(board, ref, y):
     return fp
 
 
+def holes(board, ref, y, beside):
+    """14 plated holes straight across from the socket's pins: 1.15 mm drill, 1.9 mm pads (a 0.64 mm square pin is 0.905 mm across; review 5B R4: 1.0 left 0.015 mm at JLC's -0.08)"""
+    fp = pcbnew.FOOTPRINT(board)
+    fp.SetReference(ref)
+    fp.SetValue("our row: plated holes")
+    fp.Reference().SetVisible(False)
+    fp.Value().SetVisible(False)
+    board.Add(fp)
+    for p in beside.Pads():
+        pad = pcbnew.PAD(fp)
+        pad.SetNumber(p.GetNumber())
+        pad.SetAttribute(pcbnew.PAD_ATTRIB_PTH)
+        pad.SetShape(pcbnew.PAD_SHAPE_RECT if p.GetNumber() == "1" else pcbnew.PAD_SHAPE_CIRCLE)
+        pad.SetSize(pcbnew.VECTOR2I(MM(1.9), MM(1.9)))
+        pad.SetDrillSize(pcbnew.VECTOR2I(MM(1.15), MM(1.15)))
+        pad.SetLayerSet(pcbnew.PAD.PTHMask())
+        fp.Add(pad)
+        pad.SetPosition(pcbnew.VECTOR2I(p.GetPosition().x, MM(OY + y)))
+    return fp
+
+
 def main() -> None:
     board = pcbnew.BOARD()
     board.SetFileName(os.path.join(HERE, "strip.kicad_pcb"))
@@ -51,7 +75,8 @@ def main() -> None:
     for a, b in (((0, 0), (L, 0)), ((L, 0), (L, W)), ((L, W), (0, W)), ((0, W), (0, 0))):
         seg(board, *a, *b, pcbnew.Edge_Cuts, 0.1)
     y_a, y_b = W / 2 - D / 2, W / 2 + D / 2
-    fa, fb = socket(board, "J1", y_a), socket(board, "J2", y_b)
+    fa = socket(board, "J1", y_a)             # (the LCD-2's row)
+    fb = holes(board, "J2", y_b, fa)          # (our row: plated holes for the long pins, soldered from below)
     for k in range(1, N + 1):
         n = pcbnew.NETINFO_ITEM(board, f"P{k}")
         board.Add(n)
@@ -69,8 +94,23 @@ def main() -> None:
             t.SetLayer(layer)
             t.SetNet(n)
             board.Add(t)
+    # (review mini3-3B R5: fab files need an origin and a legible part: the pin-1 end marked on both sides, a name)
+    board.GetDesignSettings().SetAuxOrigin(pcbnew.VECTOR2I(MM(OX), MM(OY + W)))
+    p1 = next(p for p in fa.Pads() if p.GetNumber() == "1").GetPosition()
+    x1 = pcbnew.ToMM(p1.x) - OX
+    for layer, mirror in ((pcbnew.F_SilkS, False), (pcbnew.B_SilkS, True)):
+        for text, x in (("1", 0.7 if x1 < L / 2 else L - 0.7), ("14", L - 0.7 if x1 < L / 2 else 0.7)):
+            t = pcbnew.PCB_TEXT(board)
+            t.SetText(text)
+            t.SetLayer(layer)
+            t.SetTextSize(pcbnew.VECTOR2I(MM(1.0), MM(1.0)))   # (JLC minimum 1.0, review 5B)
+            t.SetTextThickness(MM(0.15))
+            t.SetTextAngleDegrees(90)
+            t.SetMirrored(mirror)
+            t.SetPosition(pcbnew.VECTOR2I(MM(OX + x), MM(OY + W / 2)))
+            board.Add(t)
     board.Save(board.GetFileName())
-    print(f"strip {L:.2f} x {W:.2f} mm, 2 x 1x14 sockets {D} mm apart, {N} pins joined straight across")
+    print(f"strip {L:.2f} x {W:.2f} mm: one 1x14 socket (the LCD-2) and 14 plated holes (our pins) {D} mm apart, {N} pins joined straight across")
 
 
 if __name__ == "__main__":

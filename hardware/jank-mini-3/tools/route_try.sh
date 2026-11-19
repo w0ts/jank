@@ -23,6 +23,7 @@ nice -n 19 "$KP" route.py "$T" --fix 2>&1 | Q
 nice -n 19 "$KP" route.py "$T" --drcvias 2>&1 | Q
 for i in 1 2 3; do nice -n 19 "$KP" route.py "$T" --clean 2>&1 | Q; done
 nice -n 19 "$KP" route.py "$T" --pours 2>&1 | Q
+nice -n 19 "$KP" tools/widen_hot.py "$T" 2>&1 | Q | grep -v "^ "
 nice -n 19 "$KP" silk.py "$T" --trim 2>&1 | Q
 nice -n 19 "$KP" silk.py "$T" --labels 2>&1 | Q
 nice -n 19 "$KC" pcb drc --severity-all --schematic-parity -o "$D/try-$N.drc.rpt" "$T" 2>&1 | Q >/dev/null

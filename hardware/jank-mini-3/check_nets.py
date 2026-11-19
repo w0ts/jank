@@ -46,9 +46,12 @@ for ref, row in rows.items():
         if what in ("IO19", "IO20") and net:
             errors.append(f"{ref}.{pin}: USB {what} carries {net} (the S3's USB goes through its own USB-C)")
 # 2b. nothing of ours may drive the LCD-2's VBUS: J1's VBUS / CC pins open, VBUS_B only on loads, D3's anode side, Q1's gate
-for p_ in ("A4B9", "B4A9", "A5", "B5"):
-    if want.get(("J1", p_)):
-        errors.append(f"J1.{p_} carries {want[('J1', p_)]}: the loop cable would join it to the LCD-2's USB-C")
+# (the mid-mount part, C2906290: four VBUS pads A4 / B9 / A9 / B4 on two open nets of their own, one per touching pair;
+#  CC A5 / B5 open. Was: the top-mount part's merged pads "A4B9" / "B4A9", which no longer exist; review mini3-3A)
+for p_ in ("A4", "B9", "A9", "B4", "A5", "B5"):
+    n_ = want.get(("J1", p_))
+    if n_ and (n_ not in ("J1_VBUS1", "J1_VBUS2") or any(k[0] != "J1" for k, v in want.items() if v == n_)):
+        errors.append(f"J1.{p_} carries {n_}: the loop cable would join it to the LCD-2's USB-C")
 # 3. pin rules (ESP32-S3 datasheet v2.2 Tables 2-1 / 2-2; the LCD-2's own pulls, parts.LCD2_PULL)
 for name, (gpio, _at) in P.GPIO.items():
     if gpio in P.STRAPPING:
@@ -62,6 +65,10 @@ for name in P.OUTPUTS:
         errors.append(f"{name} on GPIO{g}: not a low-glitch pin")
     if "up" in P.LCD2_PULL.get(g, ""):
         errors.append(f"{name} on GPIO{g}: the LCD-2 pulls it up ({P.LCD2_PULL[g]}): high through reset")
+for name in P.WEAK:   # (inputs read through a weak external divider: no LCD-2 pull on their pin, review mini3-A W1)
+    g = P.GPIO[name][0]
+    if g in P.LCD2_PULL:
+        errors.append(f"{name} on GPIO{g}: the LCD-2 pulls it ({P.LCD2_PULL[g]}), stronger than its own divider")
 # 4. every output that must idle low has a pull-down on our side or the LCD-2's (HOST_EN: R91 and the LCD-2's R6)
 for name in ("MIDI_TX", "MIDI_TX2", "CLK_IO", "RST_IO", "HOST_EN"):
     downs = [ref for ref, kind, _v, _f, _c, pins in P.PARTS

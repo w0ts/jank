@@ -117,7 +117,9 @@ static esp_err_t tx_drive(int pin)
 
 #ifdef BOARD_MIDI_TX_MORE_GPIOS
 /* More MIDI outs: the same UART TX signal on more pads, through the GPIO matrix, exactly as uart_set_pin routes the first
- * (pad to its GPIO function, then the signal; the ROM patch enables the output after the signal is in place, no glitch).
+ * (pad to its GPIO function, then the signal. On the ESP32 / S2 the ROM patch enables the output after the signal is in
+ * place; on the S3 the ROM routine enables it first, so the pad is driven low for an instant: the MIDI FET stays off,
+ * harmless. Review mini3-6A N8, ESP-IDF v5.5 esp_rom_gpio.c.)
  * The hardware copies each bit to every pad at once: nothing in the clock path changes. */
 static esp_err_t tx_more_up(void)
 {
@@ -141,6 +143,12 @@ static esp_err_t uart_up(void)
 {
     uart_config_t c = {.baud_rate = MIDI_BAUD, .data_bits = UART_DATA_8_BITS, .parity = UART_PARITY_DISABLE, .stop_bits = UART_STOP_BITS_1, .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, .source_clk = UART_SCLK_DEFAULT};
     esp_err_t e = uart_param_config(MIDI_UART, &c);
+#ifdef BOARD_MIDI_TX_INVERT
+    /* the loop is sunk by an n-FET whose gate is the TX line: idle must be LOW. Inverted before the pin is routed, so
+       the line never pulses high once at start (review mini3-3A W1); the MORE pins carry the same inverted signal */
+    if (e == ESP_OK)
+        e = uart_set_line_inverse(MIDI_UART, UART_SIGNAL_TXD_INV);
+#endif
     if (e == ESP_OK)
         e = uart_set_pin(MIDI_UART, BOARD_MIDI_TX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 #ifdef BOARD_MIDI_TX_DRIVE
