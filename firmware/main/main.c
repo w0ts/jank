@@ -119,6 +119,7 @@ void app_main(void)
     uint8_t efuse[6], mac[6], peer_mac[6];
     power_early_init();
     count_boot();
+    panic_info_take();
     s_cfg_lock = xSemaphoreCreateMutex();
     s_set_lock = xSemaphoreCreateMutex();
     ESP_ERROR_CHECK(s_cfg_lock && s_set_lock ? ESP_OK : ESP_ERR_NO_MEM);
