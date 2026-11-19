@@ -528,8 +528,10 @@ static void set_field(void *user, enum jo_field f, int v)
     case JO_F_AUTOBAR: ctl_set("set autobar %s", v >= 0 && v < 3 ? AUTOBAR[v] : "off"); break;
     case JO_F_USBMIDI: ctl_set("set usbmidi %s", v ? "off" : "on"); break;
     default:
-        if (jk_prefs_set_field(&s_prefs, f, v))
+        if (jk_prefs_set_field(&s_prefs, f, v)) {
             jk_prefs_changed(&s_prefs_save, bridge_ms());
+            midi_set_clk_rate(s_prefs.rate);
+        }
         break;
     }
 }
@@ -569,6 +571,7 @@ uint8_t uis_contrast(void) { return (uint8_t)((s_prefs.bright * 255u + 50u) / 10
 void uis_init(void)
 {
     prefs_load();
+    midi_set_clk_rate(s_prefs.rate);
     esp_register_shutdown_handler(prefs_flush_at_restart);
 }
 
