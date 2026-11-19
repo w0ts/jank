@@ -232,6 +232,24 @@ static void test_line(void)
     CHECK(jur_line_step(&l, 0, 550) == 0);
 }
 
+/* the mini 3: LIN_DET (GPIO18, R38 1 M up, J7's switch to the ring's R37 100 k down): LOW with no plug, HIGH with a plug. Read raw
+ * (a high = a plug), debounced, and AUTO then takes the line in over USB audio; the plug out gives USB audio back */
+static void test_line_auto_mini3(void)
+{
+    struct jur_line l;
+    int lv;
+    jur_line_init(&l, 0, 0);                                        /* boot: no plug (low) */
+    CHECK(jur_source(JUR_SRC_AUTO, l.level, 1) == JUR_AUDIO_USB);
+    jur_line_step(&l, 1, 1000);                                     /* a plug goes in */
+    lv = jur_line_step(&l, 1, 1000u + JUR_LINE_DEBOUNCE_MS);
+    CHECK(lv == 1 && jur_source(JUR_SRC_AUTO, lv, 1) == JUR_AUDIO_LINE);
+    jur_line_step(&l, 0, 5000);                                     /* and out again */
+    lv = jur_line_step(&l, 0, 5000u + JUR_LINE_DEBOUNCE_MS);
+    CHECK(lv == 0 && jur_source(JUR_SRC_AUTO, lv, 1) == JUR_AUDIO_USB);
+    jur_line_init(&l, 1, 0);                                        /* booted with a plug in: the line at once */
+    CHECK(jur_source(JUR_SRC_AUTO, l.level, 0) == JUR_AUDIO_LINE);
+}
+
 static void test_source(void)
 {
     CHECK(jur_source(JUR_SRC_AUTO, 1, 1) == JUR_AUDIO_LINE);
@@ -355,6 +373,7 @@ int main(void)
     test_no_cc();
     test_setting_to_device();
     test_line();
+    test_line_auto_mini3();
     test_source();
     test_source_toggle();
     test_names();
