@@ -16,6 +16,7 @@ h1 { font-size: 36px; margin: 0; line-height: 1.1; }
 #home-links { display: flex; gap: 14px; font-size: 14px; }
 #home-links a { color: var(--accent); text-decoration: none; }
 #home-links a:hover { text-decoration: underline; }
+#home-links a { display: inline-flex; align-items: center; gap: 6px; }
 h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
@@ -128,9 +129,9 @@ header #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent
   <header>
     <div class="title-row"><h1>jank</h1>
     <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button></div>
-    <nav id="home-links" class="hide" aria-label="Links">
-      <a href="https://github.com/w0ts/jank" title="The jank's source code and documentation on GitHub.">GitHub</a>
-      <a href="https://w0ts.github.io/jank/" title="Audio works better on the GitHub hosted page than on this page opened from the jank's drive.">Open the GitHub hosted page</a>
+    <nav id="home-links" aria-label="Links">
+      <a href="https://github.com/w0ts/jank" title="The jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+      <a id="home-hosted" class="hide" href="https://w0ts.github.io/jank/" title="Audio works better on the GitHub hosted page than on this page opened from the jank's drive.">Open the GitHub hosted page</a>
     </nav>
   </header>
   <p id="msg"></p>
@@ -922,7 +923,7 @@ $("bootloader").addEventListener("click", async () => {
   disconnected("The jank restarted for flashing. Unplug it and plug it back in to run again.");
 });
 setConnected(null);
-if (location.protocol === "file:") $("home-links").classList.remove("hide");   /* opened from the jank's drive: point to the GitHub hosted page */
+if (location.protocol === "file:") $("home-hosted").classList.remove("hide");   /* opened from the jank's drive: point to the GitHub hosted page */
 S.auto = storedAutoConnect();
 autoConnect();
 </script>
