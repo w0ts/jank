@@ -36,6 +36,7 @@ ok(!/id="connect"|class="buttons"/.test(html.split('id="live"')[0]), "no connect
 ok(html.indexOf('id="connect-slot"') < html.indexOf('id="c-midi"') && html.indexOf('id="c-midi"') < html.indexOf('id="live"'), "the connect button starts in the slot under the title");
 ok(html.indexOf('id="dev-bar"') > html.indexOf('id="face"') && html.indexOf('id="c-advanced-box"') > html.indexOf('id="dev-bar"') && html.indexOf('id="c-advanced-box"') < html.indexOf('id="face-box"'), "the Advanced check box sits in the device card's top row");
 ok(/id="c-midi"[^>]*aria-pressed="false"/.test(html), "Connect: the MIDI port button, not pressed before a connection");
+ok(/id="c-midi"[^>]*><span class="connect-text">Connect<\/span><svg class="eject"/.test(html) && !/MIDI port \(USB, iPhone app\)/.test(html), "the button says Connect, and shows an eject icon while connected");
 ok(!/bluetooth|gatt|\bble\b|\bble[-_]/i.test(html), "no Bluetooth, BLE or GATT anywhere in the page");
 ok(!/id="c-sim"|>Demo<|>Simulator<|Sim\.|const Sim|sim\.js|\?sim=/.test(html), "no Demo / simulator mode left");
 ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id="c-off"/.test(html), "no Device or Connect heading, no tag, no status text, no Disconnect button");
