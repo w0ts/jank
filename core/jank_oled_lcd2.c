@@ -47,7 +47,7 @@
 #define BOX_Y 110
 #define AUDIO_BOX_W 72
 #define AUDIO_BOX_H 56
-#define ROW_GAP 2
+#define ROW_GAP 4
 #define STATE_Y 226
 #define LINK_BOX_SIDE 72
 #define LINK_BOX_Y 146
@@ -386,10 +386,10 @@ static void home(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
     state_word(fb, c);
 }
 
-/* ---- the lists: a title bar of 22 px, rows of 18 px from y 26 (12 rows: the whole MENU fits), full width, neutral, the selected row inverted ---- */
+/* ---- the lists: a title bar of 22 px, rows of 19 px from y 26 (11 rows: the whole MENU fits), full width, neutral, the selected row inverted ---- */
 #define ROW0 26
-#define PITCH 18
-#define ROWS 12
+#define PITCH 19
+#define ROWS 11
 
 static void title_bar(uint8_t *fb, const char *title, const char *right)
 {
