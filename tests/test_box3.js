@@ -29,7 +29,7 @@ eq(BOX3.labels[11].slice(0, 2).concat(BOX3.labels[11][3]), [2.8, 49, 90], 'the l
 eq(BOX3.arrows.map((a) => a[2]), [0, 0, 0, 0, 0, 0, -90, -90, 180, 90], 'ten pointing triangles: up on the top edge, right at CLK and RST, down at LINE IN, left at the left ESP');
 eq([BOX3.arrowSize.w, BOX3.arrowSize.h, BOX3.labelSize], [2.6, 2.1, 2.2], 'triangle 2.6 x 2.1, text size 2.2');
 const css = fs.readFileSync(path.join(__dirname, '..', 'ui', 'box3.css'), 'utf8');
-ok(/\.lid \{ fill:#000000;/.test(css), 'the body is black');
+ok(/\.lid \{ fill:#ffffff;/.test(css), 'the body is white');
 ok(/\.label \{ fill:#F5A3C7;/.test(css) && /\.sym \{ fill:#F5A3C7;/.test(css) && /\.label-arrow \{ fill:#F5A3C7;/.test(css), 'labels and symbols are pink #F5A3C7');
 ok(/\.cap \{ fill:#5f5f5f;/.test(css), 'the D-pad cap is grey');
 ok(/Avenir Next Condensed[^;]*sans-serif; font-weight:800/.test(css), 'the labels use the condensed heavy stack');
