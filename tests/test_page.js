@@ -69,7 +69,8 @@ ok(/id="pl-bpm"/.test(html) && /Player\.expectedBpm\(/.test(html), "the player s
 ok(/id="pl-monitor"[^>]*aria-pressed="true"/.test(html) && /id="pl-monitor"[^>]*mutes only your speakers/.test(html), "the monitor is an icon toggle, on by default, its tip says it mutes only the speakers");
 ok(/params\.get\("screen"\) === "oled" \? "2\.42" : "lcd2"/.test(html) && !/board === "lcd2"|params\.get\("scale"\)/.test(html), "the face shows the colour lcd2 screen by default for every board; only ?screen=oled gives the 2.42 in OLED; no ?scale= any more");
 // the only web addresses in the page are the two links shown when it is opened from the jank's drive (file:); nothing is loaded from them
-const withoutLinks = html.replace(/<a href="https:\/\/(github\.com\/w0ts\/jank|w0ts\.github\.io\/jank\/)" target="_blank"/g, "");
+const withoutLinks = html.replace(/<a href="https:\/\/(github\.com\/w0ts\/jank|w0ts\.github\.io\/jank\/)"/g, "");
+ok(!/<nav id="home-links"[\s\S]*?target=/.test(html.split("</nav>")[0]), "the two links open in the same tab");
 ok(!/https?:\/\//.test(withoutLinks), "the page loads nothing external");
 ok(/<nav id="home-links" class="hide"/.test(html) && /location\.protocol === "file:"\) \$\("home-links"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub links are hidden unless the page is opened from a file");
 ok(/Audio works better on the GitHub hosted page/.test(html), "the hosted page link's tip says audio works better there");
