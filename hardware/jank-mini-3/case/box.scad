@@ -109,6 +109,13 @@ lid_z1 = -T - din_depth - floor_gap;   // the lid's top surface (-23.0 at din_de
 lid_t = 2.0;
 lid_z0 = lid_z1 - lid_t;
 board_gap = 0.2;           // the cell's L -> our board's underside
+// the DIN lock on the lid (mots, 2026-11-19: "there should be a rail to lock the din so that the effort is not on the
+// pcb"): a rail behind both DIN bodies takes the push of a plug going in; a tongue in the DIN window, in front of the
+// DIN plates' lower edge, takes the pull of a plug coming out
+din_rail_clr = 0.2;        // DIN bodies' back (y 15.185) -> the rail
+din_rail_y1 = 19.4;        // the rail's back face: the L's top arm (y 19.4-22.4), so the two join
+din_rail_hook_clr = 1.5;   // the rail's right end -> the hook's tab (the tab flexes inward 1.0 + 0.3 as it snaps)
+din_lock_h = 1.5;          // ASSUMED: the tongue covers the DIN plates' lowest 1.5 mm (below the plug opening). MEASURE
 
 // openings
 plug_d = 8.0;              // ASSUMED: TRS plug body <= 7.2 + 0.4 a side
@@ -183,7 +190,15 @@ L_LEFT = [L_X0, L_Y0, lid_z1 - 0.01, cell_x0 - rubber_gap, L_Y0 + L_left_len, -T
 // the screen window
 win_bezel = 0.5;           // a side beyond the active area
 win_chamfer = 1.6;         // 45 deg, from the top
-lab_h = 2.2;  lab_depth = 0.6;  lab_font = "Liberation Sans:style=Bold";
+// the face labels, inlaid in a second colour (multi-material; the shell prints face down: the labels are its first 3
+// layers). Font: Avenir Next Condensed Heavy, a macOS system font (/System/Library/Fonts/Avenir Next Condensed.ttc;
+// OpenSCAD finds it through fontconfig; elsewhere it falls back to another font: check the picture). Measured with a
+// morphological test: at 5.4 mm with -0.05 mm thinning every stroke is >= 0.9 mm and every gap >= 0.55 mm. mots
+// (2026-11-19): "too big ! make the text half size", then "a bit smaller": 2.2 mm, thinning -0.02, so strokes about
+// >= 0.37 and gaps >= 0.22 (scaled from the 5.4 mm test, not re-measured)
+lab_h = 2.2;  lab_depth = 0.6;  lab_font = "Avenir Next Condensed:style=Heavy";
+lab_spacing = 1.1;         // letter spacing: the gaps between letters >= 0.55
+lab_thin = -0.02;          // thins the strokes a little (the 5.4 mm setting scaled with the size)
 
 include <board_model.scad>   // BOARD_PARTS: every part of lcd2.kicad_pcb as a box (board_model.py writes it)
 
@@ -327,6 +342,12 @@ module lcd2_usb_tongue() translate([lcd2_usb_y - usb_om_w / 2 - om_clr + tongue_
 USB_U = [J1X - usb_om_w / 2 - om_clr, J4X + usb_om_w / 2 + om_clr];
 DIN_U = [[J5X - din_w / 2 - din_clr, J5X + din_w / 2 + din_clr], [J6X - din_w / 2 - din_clr, J6X + din_w / 2 + din_clr]];
 DIN_MERGE = DIN_U[1][0] - DIN_U[0][1] < min_web;
+DIN_BACK = 15.185;            // BOARD: the DIN bodies' back (y)
+DIN_RAIL = [DIN_U[0][0] + din_clr, DIN_BACK + din_rail_clr, lid_z1 - 0.01,
+            W + fit - tab_clr - hook[1] - din_rail_hook_clr, din_rail_y1, -T - board_gap];
+// the tongue: the DIN window's width less tongue_clr a side, from the lid's top to din_lock_h over the DIN bottoms
+module din_tongue() for (d = DIN_MERGE ? [[DIN_U[0][0], DIN_U[1][1]]] : DIN_U)
+    translate([d[0] + tongue_clr, lid_z1 - 0.01]) square([d[1] - d[0] - 2 * tongue_clr, floor_gap + din_lock_h + 0.01]);
 module din_windows() {
     zt = -T - din_top_lip;
     if (DIN_MERGE) translate([DIN_U[0][0], lid_z1 - 2]) square([DIN_U[1][1] - DIN_U[0][0], zt - lid_z1 + 2]);
@@ -364,16 +385,36 @@ module face_cuts() {
     for (p = MOUNT) at(p, -0.01) cylinder(d = m2_ins[0], h = m2_ins[1]);
 }
 
-// the labels: [x, y (board), lines]; TO ESP / TO DEVICE sit 13 mm apart: two lines each
-LABELS = [[J2X, 4.5, ["MIDI 1"]], [J3X, 4.5, ["MIDI 2"]], [J1X, 4.5, ["TO", "ESP"]], [J4X, 4.5, ["TO", "DEVICE"]],
-          [J5X, 4.5, ["MIDI 1"]], [J6X, 4.5, ["MIDI 2"]], [J7X, H - 4.0, ["LINE IN"]],
-          [W - 5.5, J13Y, ["CLK"]], [W - 5.5, J14Y, ["RST"]]];
-module labels2d() for (l = LABELS, i = [0 : len(l[2]) - 1])
-    at([l[0], l[1] + (i - (len(l[2]) - 1) / 2) * lab_h * 1.35])
-        text(l[2][i], size = lab_h, font = lab_font, halign = "center", valign = "center");
+// the labels (mots, 2026-11-19: a second colour, inlaid like the cap's symbols): [x, y (board), text]. Half size
+// (mots: "make the text half size"), with a small triangle like the cap's pointing at each socket (mots: "use our
+// triangle to point at the socket"). Top edge, from the wall in: the triangles, then the sockets' names with MIDI
+// between its 1 and 2 (mots: "move midi between 1 and 2, remove 'to'"). Right side: CLK / RST with the triangle
+// between it and the wall; bottom: LINE IN with the triangle below it
+LAB_ROWS = [2.4, 5.2];          // the top edge's rows (centres, board y): triangles, names
+lab_tri = [2.6, 2.1];           // the socket triangles (the cap's 5.0 x 4.0 shape, about half)
+lab_tri_r = 0.2;                // their corners rounded
+lab_left_x = 0.4;               // the left edge's band (face edge x -2.4, the window's chamfer from x 3.3)
+LABELS = [[J2X, LAB_ROWS[1], "1"], [(J2X + J3X) / 2, LAB_ROWS[1], "MIDI"], [J3X, LAB_ROWS[1], "2"],
+          [J1X, LAB_ROWS[1], "ESP"], [J4X, LAB_ROWS[1], "DEVICE"],
+          [J5X, LAB_ROWS[1], "1"], [(J5X + J6X) / 2, LAB_ROWS[1], "MIDI"], [J6X, LAB_ROWS[1], "2"],
+          [J7X, H - 5.0, "LINE IN"], [W - 7.0, J13Y, "CLK"], [W - 7.0, J14Y, "RST"],
+          // the LCD-2's own USB-C in the left wall (mots: "we miss the esp socket on the left"): only ~5.7 mm between
+          // the face's edge and the screen window's chamfer, so the word runs up the edge, below the triangle
+          [lab_left_x, lcd2_usb_y + 5.6, "ESP", 90]];
+// [x, y (board), direction: 0 = up (the top wall), -90 = right, 180 = down]
+LAB_ARROWS = [for (x = [J2X, J3X, J1X, J4X, J5X, J6X]) [x, LAB_ROWS[0], 0],
+              [W - 2.2, J13Y, -90], [W - 2.2, J14Y, -90], [J7X, H - 1.8, 180], [lab_left_x, lcd2_usb_y, 90]];
+module lab_arrow() offset(r = lab_tri_r) offset(delta = -lab_tri_r)
+    polygon([[-lab_tri[0] / 2, -lab_tri[1] / 2], [lab_tri[0] / 2, -lab_tri[1] / 2], [0, lab_tri[1] / 2]]);
+module labels2d() {
+    for (l = LABELS) at([l[0], l[1]]) rotate(len(l) > 3 ? l[3] : 0) offset(delta = lab_thin)
+        text(l[2], size = lab_h, font = lab_font, spacing = lab_spacing, halign = "center", valign = "center");
+    for (a = LAB_ARROWS) at([a[0], a[1]]) rotate(a[2]) lab_arrow();
+}
 
 module shell() difference() { shell_body(); openings(); face_cuts(); lid_screw_holes(); }
-module label_fill() translate([0, 0, face_top - lab_depth + 0.02]) linear_extrude(0.01) labels2d();   // (pictures only)
+// the labels as their own body, filling the face's cuts exactly (the second colour: the same origin as the shell's STL)
+module face_labels() translate([0, 0, face_top - lab_depth]) linear_extrude(lab_depth) labels2d();
 
 // ---------------------------------------------------------------------------------------------------------------
 // the lid
@@ -395,6 +436,9 @@ module lid() {
                     strip_z0 - strip_post_gap]);
             // the L on the cell's top-left corner: keeps the cell (with the rubber) in the corner, backs our board
             for (b = [L_TOP, L_LEFT]) bx(b);
+            // the DIN lock: the rail behind both DIN bodies (up to under our board, like the L) and the tongue in front
+            bx(DIN_RAIL);
+            in_wall("top", fit, wall) din_tongue();
         }
     }
 }
@@ -501,7 +545,7 @@ module ck_board() {
 // ---------------------------------------------------------------------------------------------------------------
 module assembly(e = 0) {
     color("lightgray") translate([0, 0, e]) shell();
-    color("black") translate([0, 0, e]) label_fill();
+    color("#111111") translate([0, 0, e]) face_labels();
     color("orange") translate([0, 0, 1.5 * e]) cap();
     color("#111111") translate([0, 0, 1.5 * e]) cap_symbols();
     board();
@@ -542,7 +586,8 @@ if (part == "inside") { color("slategray") lid(); color("silver") grp_bottom(); 
                          color("dimgray") grp_screws(); color("#222222") kcd1(); }   // the shell, our board and the LCD-2 off
 if (part == "left_wall") { color("lightgray") shell(); color("#222222") kcd1(); color("slategray") lid(); board(); }
 if (part == "section_switch") section("y", psw_y);
-if (part == "top") { color("lightgray") shell(); color("black") label_fill(); color("orange") cap(); color("#111111") cap_symbols(); board(); }
+if (part == "top") { color("lightgray") shell(); color("#111111") face_labels(); color("orange") cap(); color("#111111") cap_symbols(); board(); }
+if (part == "shell_labels") face_labels();
 if (part == "section_din") section("x", DPX);   // (through J5's DIN and the D-pad centre: the nub, the UP / DOWN pads)
 if (part == "section_screen") section("y", DPY);
 if (part == "check") intersection() { ck_case(); ck_board(); }
