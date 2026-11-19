@@ -5,7 +5,7 @@
 
 void jk_prefs_defaults(struct jk_prefs *p)
 {
-    *p = (struct jk_prefs){JK_PREFS_VERSION, 1, 100, 0, 2, 1, 80, 0, 0, 0};
+    *p = (struct jk_prefs){JK_PREFS_VERSION, 1, 100, 0, 2, 1, 80, 0, 0, 0, 0};
 }
 
 size_t jk_prefs_pack(const struct jk_prefs *p, uint8_t *out, size_t cap)
@@ -15,7 +15,7 @@ size_t jk_prefs_pack(const struct jk_prefs *p, uint8_t *out, size_t cap)
     out[0] = p->version;
     out[1] = p->lead;
     out[2] = p->bright;
-    out[3] = p->sleep;
+    out[3] = (uint8_t)(p->sleep | (p->started ? 0x80u : 0u));
     out[4] = p->rate;
     out[5] = p->conf_stop;
     out[6] = p->th;
@@ -30,7 +30,7 @@ int jk_prefs_unpack(struct jk_prefs *p, const uint8_t *in, size_t n)
     struct jk_prefs q;
     if (n != JK_PREFS_SIZE)
         return 0;
-    q = (struct jk_prefs){in[0], in[1], in[2], in[3], in[4], in[5], in[6], (int8_t)in[7], (int8_t)in[8], (int8_t)in[9]};
+    q = (struct jk_prefs){in[0], in[1], in[2], (uint8_t)(in[3] & 0x7Fu), in[4], in[5], in[6], (uint8_t)(in[3] >> 7), (int8_t)in[7], (int8_t)in[8], (int8_t)in[9]};
     if (q.version != JK_PREFS_VERSION || q.bright < 10 || q.bright > 100 || q.sleep >= 4 || q.rate >= 5 || q.th > 100)
         return 0;
     *p = q;

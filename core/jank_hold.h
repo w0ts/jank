@@ -20,8 +20,8 @@
  * (the mode itself is automatic: the sound coming and going), through everything automatic: the gate, silence and sound,
  * a re-lock, AUTO BAR, a fold, the session of its own ending and starting again, a peer joining or starting the session,
  * a USB audio stream restart. Nothing but jho_set / jho_link_play / jho_link_stop (the user's commands, bridge_play)
- * writes it. Power-on is stopped (M2h, the user: "come up with manual state: stopped"; jho_init, a constant: nothing
- * stored, no flash write). The AUTOMATIC layer (LOW CONFIDENCE's gate, the silence) stops and starts the outputs only
+ * writes it. Power-on is stopped (M2h, the user: "come up with manual state: stopped"; jho_init) unless the user's
+ * last press was Start: that press is stored (core/jank_prefs.h `started`) and bridge_start does it again at boot. The AUTOMATIC layer (LOW CONFIDENCE's gate, the silence) stops and starts the outputs only
  * while the user layer says started, and never changes the user layer. The outputs run only when user = started AND
  * automatic = open:
  *

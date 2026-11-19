@@ -92,6 +92,27 @@ static void test_old_blob(void)
     }
 }
 
+/* the user's Start / Stop (bit 7 of the SCREEN OFF byte): round trip, the sleep value untouched, an old blob = stopped (power-on) */
+static void test_started(void)
+{
+    static const uint8_t OLD[10] = {1, 1, 100, 3, 2, 1, 80, 0, 0, 0};
+    struct jk_prefs p, q;
+    uint8_t b[JK_PREFS_SIZE];
+    jk_prefs_defaults(&p);
+    CHECK(p.started == 0);
+    CHECK(jk_prefs_unpack(&p, OLD, sizeof OLD) && p.started == 0 && p.sleep == 3);
+    p.started = 1;                                                /* the user pressed Start */
+    q = round_trip(&p);
+    CHECK(q.started == 1 && q.sleep == 3 && !memcmp(&p, &q, sizeof p));
+    jk_prefs_pack(&p, b, sizeof b);
+    CHECK(b[3] == (0x80u | 3u) && !memcmp(b, OLD, 3) && !memcmp(b + 4, OLD + 4, 6));
+    p.started = 0;                                                /* then Stop */
+    q = round_trip(&p);
+    CHECK(q.started == 0 && q.sleep == 3);
+    b[3] = 0x84u;                                                 /* sleep 4 is still invalid with the bit set */
+    CHECK(!jk_prefs_unpack(&q, b, sizeof b));
+}
+
 static void test_save_timing(void)
 {
     struct jk_prefs_save s;
@@ -128,6 +149,7 @@ int main(void)
 {
     test_every_field();
     test_old_blob();
+    test_started();
     test_save_timing();
     printf("prefs: %d checks, %d failed\n", checks, fails);
     return fails != 0;

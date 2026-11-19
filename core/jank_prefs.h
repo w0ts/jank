@@ -16,6 +16,7 @@
 
 struct jk_prefs {
     uint8_t version, lead, bright, sleep, rate, conf_stop, th;
+    uint8_t started;            /* the user's last Start (1) / Stop (0) of the outputs (HOME's YES, `play` / `stop`): bit 7 of the SCREEN OFF byte; 0 in an old blob = the power-on Stop */
     int8_t out1, out2, gain;
 };
 

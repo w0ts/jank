@@ -128,7 +128,10 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   sound, a re-lock, AUTO BAR, a fold, AUDIO <-> LINK mode with the sound, the session of its own ending and restarting, a
   peer joining or starting the session, an audio stream restart); the gate and the silence stop and start the outputs
   only while the user's layer is started, and never change it. **Power-on is stopped** (M2h, the user: "come up with
-  manual state: stopped"; a constant, nothing stored): the outputs wait for the user's Start (`play`, the page's Start,
+  manual state: stopped") **unless the user's last press was Start**: that press (HOME's YES, `play` / `stop`, a click; never the gate's or
+  the silence's stop) is stored in the `ui1` blob (bit 7 of the SCREEN OFF byte, the usual 400 ms rule, flushed at a restart), and a
+  jank that comes up with a stored Start does that Start at boot (nothing is sent to a Link session). An old blob has no such bit: stopped.
+  Stopped, the outputs wait for the user's Start (`play`, the page's Start,
   a click of a screenless unit's button: with the user's layer stopped a click is that Start, otherwise the resync); a
   session already playing is not stopped for it. The outputs run only when user = started AND automatic = open:
 
