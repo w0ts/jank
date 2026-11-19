@@ -259,6 +259,17 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   stopped (`drive_image=done, installed once stopped`). A new image confirms itself once stopped. A changed setting is
   saved once stopped (`diag` says `save_pending=1` until then; a restart saves it first; **unplugging while it is
   pending loses it**). `set usb` is saved at once: its restart follows.
+- `diag` after a panic: the chip has no console and no core dump, so `main/panic_info.c` wraps ESP-IDF's panic handler
+  (`-Wl,--wrap=esp_panic_handler`; the real handler still runs) and keeps a 92-byte record in RTC memory (survives the
+  restart, not power loss; magic word and checksum, garbage is dropped). The next boot moves it out of RTC memory, and
+  `diag` then carries, until the next restart: `panic_pc=0x4200abcd` (the faulting address), `panic_cause=<EXCCAUSE>`,
+  `panic_vaddr=0x...` (EXCVADDR), `panic_a0=0x...` (return address), `panic_sp=0x...`, `panic_core`, `panic_task` (the
+  task that ran), `panic_up_ms` (uptime at the panic) and `panic_msg` (the panic text, first 39 characters; for an abort()
+  its message). None of them appear when nothing panicked. `reset=panic` (or `int_wdt`, `task_wdt`) goes with them.
+  **Decoding an address**: with the toolchain on the PATH (`<scratch>/espressif/tools/xtensa-esp-elf/<version>/xtensa-esp-elf/bin`, today `esp-14.2.0_20260121`),
+  `xtensa-esp32s3-elf-addr2line -pfiaC -e <build>/jank.elf 0x4200abcd` (do it for `panic_pc` and `panic_a0`: the
+  function, file and line). The elf must be the one of the image that crashed: the build directory of the flashed
+  jank.bin (the coordinator keeps it); an elf of another build gives wrong lines without any error.
 - `diag intr` lists the interrupts in use on each core (`c<core> <int> L<level> Used: <source>`): core 1 should have the
   MIDI clock's timer alone.
 

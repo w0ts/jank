@@ -5,3 +5,10 @@
 archive: libmain.a
 entries:
     jank_line:jl_parse (noflash)
+
+# the last panic's record is packed by the panic hook (panic_info.c), which runs after a crash: no flash
+[mapping:jank_panic]
+archive: libmain.a
+entries:
+    jank_panic:jk_panic_pack (noflash)
+    jank_panic:jk_panic_valid (noflash)

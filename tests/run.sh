@@ -42,6 +42,8 @@ fi
 "$CC" $FLAGS "$HERE/tests/test_net.c" "$HERE/core/jank_net.c" -o "$OUT/test_net"
 "$CC" $FLAGS "$HERE/tests/test_ota.c" "$HERE/core/jank_ota.c" -o "$OUT/test_ota"
 "$OUT/test_ota"
+"$CC" $FLAGS "$HERE/tests/test_panic.c" "$HERE/core/jank_panic.c" -o "$OUT/test_panic"
+"$OUT/test_panic"
 "$CC" $FLAGS "$HERE/tests/ota_replay.c" "$HERE/core/jank_ota.c" -o "$OUT/ota_replay"
 python3 "$HERE/tests/test_ota.py" "$OUT/ota_replay" "$OUT/ota"
 "$OUT/test_net"

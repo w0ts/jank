@@ -64,6 +64,7 @@ static void run_diag(void)
     size_t n;
     app_diag(s_out, sizeof s_out);
     n = strlen(s_out);
+    n += panic_info_text(s_out + n, sizeof s_out - n);
     bridge_diag(s_out + n, sizeof s_out - n);
     n = strlen(s_out);
     drive_state(s_out + n, sizeof s_out - n);
