@@ -136,6 +136,14 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   bit for bit the same with it (tests/test_graded.c: the tuned chain on tests/beat_ref and tests/robust_ref with and without it;
   and the same trace from the previous core). The first 5.5 s after a lock the tempo part is 0 (the comb needs that much
   activation), so the value ramps up. The graded value is a measurement: no HOLD easing, `conf_hold=0` while it is shown.
+  **Fixed 2026-11-19** (the user: "before the confidence was 0 or 100, now 0 or 72 or 73"): the comb was asked to end at the
+  stream clock, ~2 frames past the tracker's newest frame (a frame needs 1024 samples after its centre), and `jc_curve`
+  refuses that: the tempo part was always 0 on the jank and the value shown never passed 75 %. `jg_tuned_step` now ends the
+  comb at the newest frame. Replayed from the audio of 39 of the user's tracks (the firmware's code, threshold 55): the
+  tempo part while running 0.00 -> 1.00 (median), the value shown 71 -> 96 (Rhyw - Driptych 70 -> 94, Gary Beck - Mango
+  Circus 71 -> 96). tests/test_graded.c checks it at the device's clock. Open: the robust follower's refresh and its
+  ratio check (`jb_robust.c`) ask the same way, so its tempo part and the ratio check never ran either; not changed, as
+  that changes when the robust follower locks (to be measured first).
 - **ADVANCED FOLLOW** (M2i; beat-listener `studies/advanced-follow`, golden vectors in `tests/follow_ref`). Three parts,
   each a port checked against the Python:
   - the **glide** (`core/beat/jb_follow.c`, `eval/follow_bpm.py`): ModeBpm locks; then a 3-state Kalman filter (phase,
