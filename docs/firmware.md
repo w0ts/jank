@@ -149,7 +149,8 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   | started, not yet running | gate closed (conf < threshold) | stopped; open at threshold + 5: run, no new Start |
   | started, running | conf < threshold (tuned follower, STOP / START) | keeps running: once the outputs run only LOST, silence or the follower giving up stop them (a drop of the same song holds, 2026-11-19) |
   | started | silence (0.5 s under -60 dBFS) | stopped at once; ends a Start's override: the next music waits for the gate |
-  | started | LOST (docs/beat.md): 2 near-silent lines, 2 bars of strong beats off the grid, or (`set newsong on`) a new song's beat-less intro | stopped (the gate closes); 3 strong beats or kicks on the grid: run again |
+  | started | LOST (docs/beat.md): 2 lines under the PAUSE LEVEL (`set pause_db`, -40 dBFS, stored), 2 bars of strong beats off the grid, or (`set newsong on`) a new song's beat-less intro | stopped (the gate closes); 3 strong beats or kicks on the grid: run again |
+  | started | after a pause (silence or LOST's near silence) | the old grid is not taken back; RESUME (docs/beat.md) finds the song's new phase by cross-correlation and runs at once (~1.5 s after the music returns), or the follower locks anew |
   | `play` | gate closed | the Start forces the gate open until the confidence has reached threshold + 5 once |
 
   `status` says `hold=0|1` and `outputs=stopped|armed|running` (the

@@ -292,7 +292,7 @@ static void line_row(uint8_t *fb, int y, const char *label, const char *value, d
 }
 
 /* the INPUT row: a continuous VU meter 10 px high on 124 px, every column the ramp id of its position on the dBFS scale, and a notch (14 px tall,
- * 2 wide, XOR-ed) at the tracker's -50 dBFS. The number carries the level rule's ink. */
+ * 2 wide, XOR-ed) at the PAUSE LEVEL (c->pause_db: the input under it for 2 beats is a pause). The number carries the level rule's ink. */
 static void vu_row(uint8_t *fb, int y, const struct jo_ctx *c)
 {
     char value[16];
@@ -304,7 +304,7 @@ static void vu_row(uint8_t *fb, int y, const struct jo_ctx *c)
     jo_rect(fb, BAR_X, top, n, VU_H, 1);
     for (int i = 0; i < n; i++)
         tag(vu_ink(i), BAR_X + i, top, 1, VU_H);
-    xor_cols(fb, bar_tick_x(db_frac(QUIET_DB)), 2, y, y + 13);
+    xor_cols(fb, bar_tick_x(db_frac((double)c->pause_db)), 2, y, y + 13);
 }
 
 /* the BAR row: AUTO BAR's state word and a 1 px outlined bar (124 x 10, the fill inside it), neutral, no tick */

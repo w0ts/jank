@@ -43,6 +43,7 @@ enum jo_field {
     JO_F_USBROLE,       /* 0 DEVICE, 1 HOST */
     JO_F_AUTOBAR,       /* 0 OFF, 1 ON (YES on ON again: picked again); the lcd2 layout: 0 OFF, 1 AT START, 2 ALWAYS */
     JO_F_USBMIDI,       /* the lcd2 layout's menu only: USB MIDI CLOCK, 0 ON, 1 OFF */
+    JO_F_PAUSE,         /* AUDIO > PAUSE LEVEL, dBFS -70..-20 (`set pause_db`; the INPUT bar's notch) */
     JO_F_EDITS,
     JO_F_SSID = JO_F_EDITS,
     JO_F_PASS,
@@ -104,6 +105,7 @@ struct jo_ctx {
     int th, gain;
     uint8_t conf_stop;
     double level_db, level_min, level_max;   /* the input meter, dBFS */
+    int pause_db;                         /* PAUSE LEVEL, dBFS: the INPUT bar's notch (the input under it for 2 beats is a pause) */
     uint8_t running, armed;               /* the transport icon */
     uint8_t held;                         /* the user's hold (Stop pressed, either mode): not running and not armed shows a square when held, a pause when not */
     uint8_t tracker_leads;                /* AUDIO with the tracker owning tempo and transport: UP / DOWN / YES only say so */

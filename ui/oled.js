@@ -194,6 +194,7 @@ const OLED = (() => {
             help: [['1 PULSE PER BEAT', 'ON CLK OUT'], ['2 PULSES PER BEAT', 'ON CLK OUT'], ['4 PULSES PER BEAT', 'ON CLK OUT'],
                    ['8 PULSES PER BEAT', 'ON CLK OUT'], ['24 PULSES PER BEAT', 'ON CLK OUT']] },
     threshold: { title: 'THRESHOLD', lo: 0, hi: 100, step: 5, unit: '%', get: c => c.th, help: ['BELOW IT: STOP', '(LOW CONFIDENCE)'] },
+    pause: { title: 'PAUSE LEVEL', lo: -70, hi: -20, step: 1, unit: ' dB', get: c => pauseDb(c), help: ['UNDER IT: A PAUSE', 'THEN RESYNC'] },   // `set pause_db`: the INPUT bar's notch
     gain: { title: 'LEVEL', lo: -12, hi: 12, step: 1, unit: ' dB', get: c => c.gain, help: ['INPUT LEVEL', '- CUT   + BOOST'] },   // before the tracker
     ltmode: { title: 'LINK TRANSPORT', opts: LT_MODES, get: c => c.ltMode,      // LINK mode only: the session's start / stop
               help: [['CLOCKS RUN ON LINK', 'TEMPO, OWN START'], ['CLOCKS START + STOP', 'WITH THE SESSION'],
@@ -230,11 +231,14 @@ const OLED = (() => {
     { name: 'ABOUT', info: 'about' },
   ];
   // sub-menus: a title and the EDITS they list
-  const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
+  // (PAUSE LEVEL is the colour layout's only: the OLED layout lists a sub-menu's rows without it)
+  const subRows = (sub, c) => (c && c.layout === 'lcd2' ? SUBS[sub].rows : SUBS[sub].rows.filter(f => f !== 'pause'));
+  const SUBS = { audio: { title: 'AUDIO', rows: ['insrc', 'gain', 'lowconf', 'threshold', 'pause'] }, offsets: { title: 'OFFSET', rows: ['inoff', 'out0', 'out1', 'out2'] },
                  display: { title: 'DISPLAY', rows: ['bright', 'sleep'] } };
   const VISIBLE = 6;
   const OVERLAY_MS = 1000;
-  const METER_MIN_DB = -90, SILENCE_DB = -60;
+  const METER_MIN_DB = -90, SILENCE_DB = -60, PAUSE_DB_DEFAULT = -40;   // (the OLED layout's INPUT notch stays at the silence gate: PAUSE LEVEL is the colour layout's)
+  const pauseDb = c => (Number.isFinite(c.pauseDb) ? c.pauseDb : PAUSE_DB_DEFAULT);   // PAUSE LEVEL, dBFS (`get` pause_db; an older jank: the default)
   const sgn = v => (v > 0 ? '+' : '') + v;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -326,7 +330,7 @@ const OLED = (() => {
         else { ui.screen = 'info'; ui.page = it.info; ui.ascroll = 0; }
       }
     } else if (ui.screen === 'sub') {
-      const rows = SUBS[ui.sub].rows;
+      const rows = subRows(ui.sub, c);
       if (d) ui.ocur = clamp(ui.ocur - d, 0, rows.length - 1);
       else if (btn === 'no') ui.screen = 'menu';
       else startEdit(ui, rows[ui.ocur], c);
@@ -565,7 +569,7 @@ const OLED = (() => {
   function drawSub(fb, ui, c) {
     const sub = SUBS[ui.sub];
     titleBar(fb, sub.title);
-    sub.rows.forEach((f, i) => {
+    subRows(ui.sub, c).forEach((f, i) => {
       const y = 14 + i * 11, sel = i === ui.ocur, v = sel ? 0 : 1, sp = EDITS[f];
       if (sel) rect(fb, 0, y - 2, W, 11, 1);
       text(fb, sp.title, 4, y, 1, v); textR(fb, sp.opts ? (f === 'lowconf' ? (sp.get(c) ? 'STOP' : 'RUN') : sp.opts[sp.get(c)]) : editText(sp, sp.get(c)), W - 4, y, 1, v);
@@ -688,7 +692,7 @@ const OLED = (() => {
   //   HOME (AUDIO)  y 2..23    top bar: transport icon, LINK TRANSPORT icon, fold label (left); GRP n, the chain icon + peers, the plug (only while charging) and the battery (right)
   //                 y 32..101  the TEMPO in the NORMAL digits (70 rows; the digit after the dot is 46 rows), centred on the 320 columns
   //                 y 110..165 four beat boxes 72 x 56 (gap 8, x 4..315)
-  //                 then the info rows INPUT (VU meter, notch at the tracker's -50 dBFS), CONFIDENCE (line, notch at the stop threshold), BAR (AUTO BAR's
+  //                 then the info rows INPUT (VU meter, notch at the PAUSE LEVEL), CONFIDENCE (line, notch at the stop threshold), BAR (AUTO BAR's
   //                 state, only with AUTO BAR on), 2 rows apart, as one block centred between the boxes and the state line (GATED / HOLD / COAST /
   //                 STOPPED / SILENT, centred, empty otherwise; its row y 226..239 is always reserved)
   //   HOME (LINK)   the same top bar; the tempo in the LARGE digits (94 rows, y 38..131), centred; four square beat boxes 72 x 72, centred as a row; no audio rows
@@ -815,14 +819,14 @@ const OLED = (() => {
     const x = barTickX(tickFrac); xorCols(fb, x, 2, y + 2, y + 11); tag(ink, x, y + 2, 2, 10);
   }
   // the INPUT row: a continuous VU meter 10 px high on 124 px: round(124 x level) columns, no segments and no gaps. Every column has the ramp id of its
-  // position on the dBFS scale (green quiet, red hot). A notch (14 px tall, 2 wide, XOR-ed) marks the tracker's -50 dBFS. The number carries the level rule's ink.
+  // position on the dBFS scale (green quiet, red hot). A notch (14 px tall, 2 wide, XOR-ed) marks the PAUSE LEVEL (under it for 2 beats: a pause). The number carries the level rule's ink.
   function vuRow(fb, y, c) {
     const value = Math.round(c.levelDb) + 'dB', top = y + 2, n = barFillWidth(dbFrac(c.levelDb));
     rowText(fb, y, 'INPUT', value);
     tag(levelInk(c), L2.valueXR - textW(value, 1), y, textW(value, 1), 14);
     rect(fb, L2.barX, top, n, L2.vuH, 1);
     for (let i = 0; i < n; i++) tag(vuInk(i), L2.barX + i, top, 1, L2.vuH);
-    xorCols(fb, barTickX(dbFrac(QUIET_DB)), 2, y, y + 13);
+    xorCols(fb, barTickX(dbFrac(pauseDb(c))), 2, y, y + 13);
   }
   // the BAR row: the label and AUTO BAR's state (the 10 character label column), a 1 px outlined bar (124 x 10, the fill inside, so the fill is
   // round(122 x confidence)); neutral, no tick

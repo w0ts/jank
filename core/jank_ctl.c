@@ -27,6 +27,7 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->usbmidi = 1;                    /* on: the clock went over USB-MIDI before there was a setting (see jk_cfg) */
     c->lowconf = JCF_STOP;             /* the emulator's default: STOP / START at 80 % (player.py DEFAULT_MIN_CONFIDENCE) */
     c->threshold = JCF_THRESHOLD_DEFAULT;
+    c->pause_db = JK_PAUSE_DB_DEFAULT;    /* (the user, 2026-11-19: "40 sounds about right") */
     c->rate = 1;                       /* the spectral rate on (M2i) */
     c->graded = 1;                     /* the graded confidence is the one shown (core/beat/jb_graded.h), on both followers */
     jla_init(&c->lat);                 /* (lat_key: the computer, which beat_latency_ms above is) */
@@ -48,7 +49,7 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b)
 {
     return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source || a->autobar != b->autobar
-           || a->usbmidi != b->usbmidi || a->lowconf != b->lowconf || a->threshold != b->threshold || a->rate != b->rate
+           || a->usbmidi != b->usbmidi || a->lowconf != b->lowconf || a->threshold != b->threshold || a->rate != b->rate || a->pause_db != b->pause_db
            || !jla_same(&a->lat, &b->lat);
 }
 
@@ -157,8 +158,8 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
     put_lat(c, w);
     put(w, "beat_latency_src=%s\nautobar=%s\n", jla_name(&c->lat_key, src), autobar_name(c->autobar));
     put(w, "usbmidi=%s\n", on_off(c->usbmidi));
-    put(w, "lowconf=%s\nthreshold=%u\nrate=%s\nfollower=%s\nskip=%s\ngraded=%s\nnewsong=%s\n", lowconf_name(c->lowconf), c->threshold,
-        on_off(c->rate), c->follower ? "robust" : "tuned", SKIP_NAME[c->skip < 3u ? c->skip : 0u], on_off(c->graded), on_off(c->newsong));
+    put(w, "lowconf=%s\nthreshold=%u\npause_db=%d\nrate=%s\nfollower=%s\nskip=%s\ngraded=%s\nnewsong=%s\n", lowconf_name(c->lowconf), c->threshold,
+        c->pause_db, on_off(c->rate), c->follower ? "robust" : "tuned", SKIP_NAME[c->skip < 3u ? c->skip : 0u], on_off(c->graded), on_off(c->newsong));
     put(w, "usb=%s\nsource=%s\nline_gain=%d\n", jur_usb_name(c->usb), jur_src_name(c->source), c->line_gain_db);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
     put_mac(w, "mac", s->b.mac, "\n");
@@ -421,6 +422,8 @@ static int set_number(struct jk_cfg *c, const char *key, const char *val)
         c->offset_10us = (int16_t)v;
     else if (!strcmp(key, "threshold") && !parse_int(val, 0, 100, &v))
         c->threshold = (uint8_t)v;         /* LOW CONFIDENCE's THRESHOLD, percent (0: never gated) */
+    else if (!strcmp(key, "pause_db") && !parse_int(val, JK_PAUSE_DB_MIN, JK_PAUSE_DB_MAX, &v))
+        c->pause_db = (int8_t)v;           /* PAUSE LEVEL, dBFS (core/beat/jb_lost.h) */
     else if (!strcmp(key, "beat_latency") && !parse_int(val, JK_BEAT_LATENCY_MIN_MS, JK_BEAT_LATENCY_MAX_MS, &v))
         jk_lat_set(c, (int)v);             /* the auto base of the source heard now (the player's Auto latency) */
     else if (!strcmp(key, "lat_trim") && !parse_int(val, JK_BEAT_LATENCY_MIN_MS - JK_BEAT_LATENCY_MAX_MS, JK_BEAT_LATENCY_MAX_MS - JK_BEAT_LATENCY_MIN_MS, &v))
@@ -770,7 +773,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         else
             put(&w, "err home line too long\n");
     } else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|lead|sleep|bright|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|newsong|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|lead|sleep|bright|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|pause_db|rate|follower|skip|graded|newsong|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;
