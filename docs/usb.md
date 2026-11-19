@@ -108,6 +108,27 @@ Where the role comes from (`core/jank_usbrole.c`, host-tested):
   (Try.SNK), so a computer always gets the control line. A different stack is a restart (about a second; the clock stops
   for it); a stack runs at least 3 s before the next one. The setting DEVICE keeps the port a sink: never 5 V, the charger
   always charges. The usb order (no TUSB320) behaves as the XIAO.
+- **jank mini 3** (lcd2 board, `main/usbport_mini3.c`, `core/jank_usbhost.c`, host-tested in `tests/test_usbhost.c`): no
+  CC chip. **A computer or a charger on the LCD-2's own USB-C (VBUS sense, GPIO10, high) always wins**: the device stack,
+  HOST_EN low. Only with the setting HOST and VBUS sense low does the board act as a host on the OUT port (J4, TO DEVICE):
+  HOST_EN (GPIO17) high puts a 680 ohm "5 V present" signal and Rp 56 k on J4's VBUS / CC, no power (bus-powered gear needs
+  its own supply or a powered hub). Gear on J4 cannot be seen without a CC chip, so the host stack simply waits with the
+  signal on. The rules, in this order of importance:
+  - HOST_EN is low from the first line of boot (`power_early_init`), in `open()` again, on every `vbus_on(0)`, on a change of
+    the setting to DEVICE, and in a shutdown handler before any restart.
+  - HOST_EN **falls in the same step** in which VBUS sense reads high (steps are 20 ms), with no debounce.
+  - HOST_EN **rises only** with all of: the setting HOST; VBUS sense low without a break for 500 ms (`JUH_DEBOUNCE_MS`); the
+    5 V rail (V5_EN) on for 100 ms (`JUH_V5_SETTLE_MS`, counted from the HAL's `open()`); the role core asking for it.
+    A flapping VBUS cannot chatter it: at most one rise per quiet 500 ms, and a rise needs 500 ms of calm first.
+  - A start with VBUS high is a device; one with VBUS low starts the host stack (setting HOST), HOST_EN rising 500 ms after
+    the start. A computer plugged in while hosting: HOST_EN down at once, then the role core restarts into the device stack
+    (at least 3 s after the last start). Unplugged: after 500 ms the role core restarts into the host stack.
+  - `status` shows `usb_cc` `host` for "a computer or a charger" and `device` for "nothing there" (the name is the port
+    chip's vocabulary; this board has no chip).
+  - A pin that reads wrong: VBUS sense stuck high or floating high: the board stays a device, HOST_EN low. Stuck low (a wrong
+    pin map) with a computer plugged in: HOST_EN could rise; it is the 680 ohm signal onto J4 only (nothing of ours drives
+    the LCD-2's VBUS: J1's VBUS and CC are open), but the host stack would then share D+ / D- with the computer. HOST_EN
+    itself on a wrong pin is a different pin: R91 and the LCD-2's R6 hold the real one low.
 - The port chip sits behind a small HAL (`main/usbport.h`: attach state and orientation, set role, prepare and switch
   VBUS out): another chip (a power-bank IC with its own role logic) is another file, the role logic stays as it is.
 

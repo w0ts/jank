@@ -117,6 +117,6 @@ static const struct usbport PORT = {
 };
 
 const struct usbport *usbport_board(void) { return &PORT; }
-#else
+#elif !BOARD_USBPORT_MINI3
 const struct usbport *usbport_board(void) { return NULL; }
 #endif
