@@ -86,6 +86,23 @@ Flash writes run in the control task; a sector erase stalls the CPU for tens of 
 interrupt (IRAM) goes on but the clock bytes reach USB late: do not update during a performance.
 Beat-follow bench build only: the device is also a UAC2 speaker, an OUT endpoint, see [beat.md](beat.md).
 
+## The EP0 SETUP crash (found with the panic recorder)
+
+About one in three first boots of a new image, the jank panicked 450 ms after boot and the update rolled back. `diag` after
+the rollback showed `panic_task=IDLE0`, `panic_msg=LoadProhibited`, `panic_cause=28`, `panic_vaddr=0x00000000`, `panic_pc` in the ROM and
+`panic_a0=0x82032ec5` (windowed ABI: the top two bits of a0 are the window increment, the address is `0x42032ec5`). addr2line of that
+address on the elf of the flashed image gave `dcd_event_setup_received` inlined by `handle_epout_dma` (`dcd_dwc2.c`, the `setup_phase_done`
+branch): the USB interrupt reading the SETUP packet through a null pointer. The branch takes the pointer from `DOEPDMA0 - 8` ("the
+last valid SETUP data", programming guide 9.1.2.1) and copies 8 bytes from it. With `DOEPDMA0` = 8 (the pointer never armed with the setup
+buffer when the host's first SETUP after a bus reset arrived, which is when a host re-enumerates a restarted jank) that is address 0.
+Only the timing of the host decides, so it is intermittent.
+
+`third_party/esp_tinyusb-dwc2-setup-guard.patch` (applied by `scripts/patch_tinyusb.sh`) checks that the pointer lies inside the
+setup buffer; if not it drops the event, calls `dma_setup_prepare` and returns. The host then repeats its request (a lost SETUP is
+retried by the host). Not proven on the jank: the cause of the stale pointer is read from the code, the crash is intermittent, and only
+several first flashes in a row show that it is gone. The slave (FIFO) path has no such pointer (it reads the setup buffer itself), so it
+is not patched. The decode recipe is in docs/firmware.md ("Decoding an address").
+
 ## Host mode
 
 The setting `usb` (`set usb device|host`, the menu's USB: DEVICE / HOST later; stored, default `device`) chooses.
