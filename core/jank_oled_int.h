@@ -14,7 +14,7 @@ void jo_fixed(double x, int digits, char *out, size_t cap);
 /* the ABOUT screen: its JO_ABOUT_ROWS rows as text, and how many show at once (JO_ABOUT_VIS_OLED, JO_ABOUT_VIS_LCD2) */
 #define JO_ABOUT_ROWS 12
 #define JO_ABOUT_VIS_OLED 5
-#define JO_ABOUT_VIS_LCD2 8
+#define JO_ABOUT_VIS_LCD2 9
 struct jo_about_row {
     char label[16];                 /* drawn at the left */
     char val[32];                   /* drawn right aligned; "-" when not known */
