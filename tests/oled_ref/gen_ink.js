@@ -25,7 +25,6 @@ function extraState(s) {
   out.push('c peakDb ' + num(s.peakDb));
   for (const k of ['airLost', 'airRetry', 'rssiMin', 'rssiMax']) out.push('c ' + k + ' ' + num(s[k]));
   for (const k of ['confKnown', 'silent', 'gated', 'confHold']) out.push('c ' + k + ' ' + (s[k] ? 1 : 0));
-  if (s.confGraded) { out.push('c confGraded 1'); out.push('c confGate ' + s.confGate); }     // (only when set: the other cases keep their lines)
   out.push('c autoBar ' + OLED.autoBarIndex(s.autoBar));
   out.push('c fold ' + s.fold);
   out.push('c usbMidi ' + s.usbMidi);
@@ -117,11 +116,9 @@ scenario('cf silent', audio({ silent: true, conf: 0.3 }), [draw(0)]);
 scenario('cf gated', audio({ gated: true, conf: 0.4 }), [draw(0)]);
 scenario('cf hold', audio({ confHold: true, conf: 0.55 }), [draw(0)]);
 scenario('cf coast', audio({ conf: 0.5, running: true }), [draw(0)]);
-// the graded value is shown (confGraded): no notch; the colour, COAST and the state word judge the gate's own value (confGate)
-scenario('cf graded 40 gate 90', audio({ conf: 0.4, confGraded: true, confGate: 0.9, th: 70, running: true }), [draw(0)]);
-scenario('cf graded 95 gate 50', audio({ conf: 0.95, confGraded: true, confGate: 0.5, th: 70, running: true }), [draw(0)]);
-scenario('cf graded 75 gate 75 amber', audio({ conf: 0.75, confGraded: true, confGate: 0.75, th: 70, running: true }), [draw(0)]);
-scenario('cf graded silent', audio({ conf: 0.3, confGraded: true, confGate: 0.9, silent: true }), [draw(0)]);
+scenario('cf 40 below 70', audio({ conf: 0.4, th: 70, running: true }), [draw(0)]);
+scenario('cf 95 above 70', audio({ conf: 0.95, th: 70, running: true }), [draw(0)]);
+scenario('cf 75 amber 70', audio({ conf: 0.75, th: 70, running: true }), [draw(0)]);
 scenario('cf low but stopped', audio({ conf: 0.5, running: false, armed: false, beatN: null }), [draw(0)]);
 scenario('cf gated beats hold', audio({ gated: true, confHold: true, conf: 0.5 }), [draw(0)]);
 scenario('cf coast unknown conf', audio({ confKnown: false, conf: 0.2, running: true }), [draw(0)]);

@@ -7,7 +7,7 @@
  *   jitter  1 - clip(cv of the last 16 beat intervals / 0.15): how even the beats are
  *   tempo   the activation comb's agreement with the follower's period (jb_robust.h v_tempo, refreshed every 0.5 s)
  *   dbn     the DBN's tempo mass near the follower's tempo (jb_robust.h v_dbn)
- * Display only (the CF bar, HOME, status): nothing gates on it.
+ * Shown AND judged (the CF bar, HOME, status, the threshold, the gate, COAST, the colour, the LED): the one number (beat.c follow_conf).
  *
  * On the TUNED follower (the default) all four parts exist with data it already has: the beats it was fed (jw_seen), the
  * published lines, the DBN it runs every frame (its forward mass near the follower's tempo) and the activation ring the robust

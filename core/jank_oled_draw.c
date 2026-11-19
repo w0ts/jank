@@ -62,8 +62,7 @@ static void value_bar(uint8_t *fb, int y, double frac, double tick_frac, const c
 {
     uint8_t tmp[JO_FB_BYTES];
     jo_rect(fb, 3, y + 1, jo_iround(122 * jo_clampd(frac, 0.0, 1.0)), 9, 1);
-    if (tick_frac >= 0.0)                              /* (< 0: no tick: the graded confidence has no threshold) */
-        jo_xor_col(fb, 2 + jo_iround(123 * tick_frac), y - 1, y + 11);
+    jo_xor_col(fb, 2 + jo_iround(123 * tick_frac), y - 1, y + 11);
     memset(tmp, 0, sizeof tmp);
     jo_text(tmp, label, 5, y + 2, 1, 1);
     for (size_t i = 0; i < sizeof tmp; i++)
@@ -257,7 +256,7 @@ static void home(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
     jo_xor_col(fb, 3 + jo_iround(121 * jo_clampd((c->level_min - METER_MIN_DB) / -METER_MIN_DB, 0.0, 1.0)), 32, 41);
     jo_xor_col(fb, 3 + jo_iround(121 * jo_clampd((c->level_max - METER_MIN_DB) / -METER_MIN_DB, 0.0, 1.0)), 32, 41);
     snprintf(s, sizeof s, "CF %d%%", jo_iround(c->conf * 100));
-    value_bar(fb, 44, c->conf, c->conf_graded ? -1.0 : c->th / 100.0, s);
+    value_bar(fb, 44, c->conf, c->th / 100.0, s);
     status_line(fb, c, now, 57);
 }
 

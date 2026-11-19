@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "jank_prefs.h"
 #include <string.h>
+#include "jank_conf.h"
 #include "jank_core.h"
 
 void jk_prefs_defaults(struct jk_prefs *p)
 {
-    *p = (struct jk_prefs){JK_PREFS_VERSION, 1, 100, 0, 2, 1, 80, 0, 0, 0};
+    *p = (struct jk_prefs){JK_PREFS_VERSION, 1, 100, 0, 2, 1, JCF_THRESHOLD_DEFAULT, 0, 0, 0};
 }
 
 size_t jk_prefs_pack(const struct jk_prefs *p, uint8_t *out, size_t cap)

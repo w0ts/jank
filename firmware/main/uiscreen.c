@@ -361,11 +361,9 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->silent = audio ? b->silent : 0;
     c->gated = audio ? b->gated : 0;
     c->conf_hold = audio ? b->conf_hold : 0;
-    c->conf_graded = audio ? b->conf_graded : 0;                                  /* the shown value is graded: the gate's own is what COAST, the colour and the LED judge */
-    c->conf_gate = c->conf_graded ? b->conf_gate_pct / 100.0 : c->conf;
     c->fold_exp = audio ? b->fold_exp : 0;
     c->usb_midi = cfg.usbmidi ? 0 : 1;                                              /* ON, OFF */
-    c->th = s_prefs.th;
+    c->th = cfg.threshold;
     c->gain = s_prefs.gain;
     c->conf_stop = s_prefs.conf_stop;
     c->level_db = s_meter.bar;
@@ -473,6 +471,7 @@ static void set_field(void *user, enum jo_field f, int v)
             jk_prefs_changed(&s_prefs_save, bridge_ms());
         }
         break;
+    case JO_F_THRESHOLD: ctl_set("set threshold %d", v); break;   /* the gate's own threshold (cfg.threshold), the number the bar is judged by */
     case JO_F_GROUP: ctl_set("set group %d", v + 1); break;
     case JO_F_INSRC: ctl_set("set source %s", v >= 0 && v < 4 ? SRC[v] : "auto"); break;
     case JO_F_USBROLE: ctl_set("set usb %s", v ? "host" : "device"); break;
@@ -602,7 +601,7 @@ static void step(uint32_t now, struct uis_led *led)
     led->armed = c->armed;
     led->running = c->running;
     led->joined = s_snap.mpb > 0;
-    led->low_conf = !c->link && (c->conf_graded ? c->conf_gate : c->conf) * 100.0 < c->th;
+    led->low_conf = !c->link && c->conf * 100.0 < c->th;
     led->bar_locked = !c->link && c->bar_state == JO_BAR_LOCKED;
     led->batt_pct = s_snap.batt_pct;
     led->on_usb = c->usb;
