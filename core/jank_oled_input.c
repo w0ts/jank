@@ -2,7 +2,7 @@
 /* The four buttons as the emulator's host turns them into presses (player.html btnDown, btnUp, armHint, comboStep):
  * NO and YES on HOME act on release, and only when no combo was used while they were held; NO + UP/DOWN nudges the beat
  * half a beat (no repeat), YES + UP/DOWN the AUDIO IN offset 1 ms (repeats); a 400 ms hold of NO or YES on HOME shows
- * what UP / DOWN will do; UP / DOWN repeat after 400 ms, then every 120 ms; the first press on a dark screen only wakes it. */
+ * what UP / DOWN will do, and its release then does nothing; UP / DOWN repeat after 400 ms, then every 120 ms; the first press on a dark screen only wakes it. */
 #include "jank_oled_int.h"
 #include <stdio.h>
 #include <string.h>
@@ -82,6 +82,7 @@ void jo_input_down(struct jo_input *in, struct jo_ui *ui, enum jo_btn b, uint32_
     mod = in->held[JO_NO] ? JO_NO : in->held[JO_YES] ? JO_YES : -1;
     if ((b == JO_NO || b == JO_YES) && jo_on_home(ui, c)) {   /* decided on release */
         in->combo = 0;
+        in->shown[b] = 0;
         in->deferred[b] = 1;
         in->hint_on = 1;                              /* armHint: one timer, the last NO / YES */
         in->hint_btn = (uint8_t)b;
@@ -91,6 +92,7 @@ void jo_input_down(struct jo_input *in, struct jo_ui *ui, enum jo_btn b, uint32_
     in->rep_mod[b] = -1;
     if (ud && mod >= 0 && in->deferred[mod] && jo_on_home(ui, c)) {   /* the modifier was pressed on HOME too */
         in->combo = 1;
+        in->shown[mod] = 1;                           /* that hold is used up: its release does nothing, even after another NO / YES */
         in->rep_mod[b] = (int8_t)mod;
         if (mod == JO_NO) {                           /* a beat at a time: no auto-repeat */
             act(in, ui, b, now, h);
@@ -124,7 +126,7 @@ void jo_input_up(struct jo_input *in, struct jo_ui *ui, enum jo_btn b, uint32_t 
         return;
     in->deferred[b] = 0;
     c = ctx_of(h, now);
-    if (jo_on_home(ui, c) && !in->combo)
+    if (jo_on_home(ui, c) && !in->combo && !in->shown[b])
         jo_press(ui, b, now, c, h->ops);
 }
 
@@ -152,8 +154,10 @@ void jo_input_tick(struct jo_input *in, struct jo_ui *ui, uint32_t now, const st
         if (which == JO_BTNS) {
             const struct jo_ctx *c = ctx_of(h, due);
             in->hint_on = 0;
-            if (in->held[in->hint_btn] && !in->combo && !c->link && jo_on_home(ui, c))
+            if (in->held[in->hint_btn] && !in->combo && !c->link && jo_on_home(ui, c)) {
                 ui->hint = (int8_t)in->hint_btn;
+                in->shown[in->hint_btn] = 1;          /* looking at the hint is harmless: the release does not act */
+            }
         } else {
             in->rep_due[which] = due + JO_REPEAT_EVERY_MS;
             act(in, ui, (enum jo_btn)which, due, h);
