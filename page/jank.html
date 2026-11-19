@@ -706,8 +706,9 @@ async function session(command, done) {
 /* HOME and the details by polling */
 /* the one message for a command that got no answer: the port, what to try. Polled commands repeat every few hundred ms: it is shown once
    per episode and cleared when an answer comes again */
+const STALE_HINT = " Still nothing: quit Chrome completely (Cmd+Q) and open the page again. After the jank restarted or was replugged, a Chrome that was already open can keep a stale MIDI connection.";
 function noAnswerText(withSysex) {
-  return NO_ANSWER + (S.portName ? " (" + S.portName + ")" : "") + ". Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port" + (withSysex ? "; if the browser asks, allow SysEx for this page." : ".");
+  return NO_ANSWER + (S.portName ? " (" + S.portName + ")" : "") + ". Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port" + (withSysex ? "; if the browser asks, allow SysEx for this page." : ".") + STALE_HINT;
 }
 function pollFailed(e) {
   if (!e.noAnswer) { say(e.message, true); return; }
