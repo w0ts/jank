@@ -15,6 +15,7 @@ void jl_clear(struct jb_lost *l)
     l->level = JBK_NONE;
     l->lost = l->cause = 0;
     l->fit_run = l->quiet_run = l->off_n = l->unfit_run = 0;
+    l->hold_back = 0;
 }
 
 static uint8_t inc(uint8_t v) { return v < 255u ? (uint8_t)(v + 1u) : v; }
@@ -86,7 +87,7 @@ int jl_step(struct jb_lost *l, const double *strong, size_t n_strong, const stru
     uint8_t b = 0;
     judge(l, strong, n_strong, kick, has_grid, t0, period, now);
     if (l->lost) {
-        if (l->fit_run >= JL_BACK_LINES && l->quiet_run == 0) {
+        if (l->fit_run >= JL_BACK_LINES && l->quiet_run == 0 && !l->hold_back) {
             l->lost = 0;
             l->cause = JLO_NONE;
             b = 1;
