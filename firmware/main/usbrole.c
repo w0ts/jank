@@ -203,7 +203,7 @@ static void role_task(void *arg)
         int woke = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(STEP_MS)) != 0;
         t = now_ms();
         app_cfg_get(&cfg);
-        if (s_port && (woke || (s_port->irq_gpio >= 0 && pin_level(s_port->irq_gpio) == 0) || t - last_read >= POLL_PORT_MS)) {
+        if (s_port && (woke || (s_port->irq_gpio >= 0 && pin_level(s_port->irq_gpio) == 0) || t - last_read >= (s_port->poll_ms ? s_port->poll_ms : POLL_PORT_MS))) {
             last_read = t;
             if (s_port->read(&st) != 0) {
                 st.cc = JUR_CC_NONE;   /* the chip unreadable: no 5 V on a guess */

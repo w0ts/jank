@@ -277,4 +277,9 @@ void jo_about_rows(const struct jo_ctx *c, struct jo_about_row rows[JO_ABOUT_ROW
     about_num(&rows[10], "UI LOOP", c->ui_loop_us, " US");
     about_num(&rows[11], "BEAT LOOP", c->beat_loop_us, " US");
     about_panic(&rows[12], c->panic, c->layout_lcd2);
+    if (c->layout_lcd2 && c->panic && c->panic[0]) {   /* colour layout: a panic on record puts its row first, the others follow */
+        struct jo_about_row p = rows[12];
+        memmove(&rows[1], &rows[0], 12 * sizeof rows[0]);
+        rows[0] = p;
+    }
 }

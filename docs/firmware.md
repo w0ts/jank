@@ -281,7 +281,7 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   whole). The ABOUT screen has 13 rows (the colour layout pages by 9: rows 9 to 12 on page 2; the OLED by 5: 0, 5, 10).
   **Decoding an address**: with the toolchain on the PATH (`<scratch>/espressif/tools/xtensa-esp-elf/<version>/xtensa-esp-elf/bin`, today `esp-14.2.0_20260121`),
   `xtensa-esp32s3-elf-addr2line -pfiaC -e <build>/jank.elf 0x4200abcd` (do it for `panic_pc` and `panic_a0`: the
-  function, file and line). The elf must be the one of the image that crashed: the build directory of the flashed
+  function, file and line; a `panic_a0` of the form `0x8...` is the windowed ABI: replace the leading 8 by 4). The elf must be the one of the image that crashed: the build directory of the flashed
   jank.bin (the coordinator keeps it); an elf of another build gives wrong lines without any error.
 - `diag intr` lists the interrupts in use on each core (`c<core> <int> L<level> Used: <source>`): core 1 should have the
   MIDI clock's timer alone.
