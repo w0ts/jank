@@ -123,6 +123,8 @@ static void prefs_save(void)
 }
 
 static volatile int8_t s_play_req = -1;   /* the user's Start / Stop (bridge_play) the ui task has not stored yet: 1 / 0, -1 none */
+static volatile int8_t s_sleep_req = -1;  /* a `set sleep` / `set bright` the ui task has not applied yet: -1 none */
+static volatile int16_t s_bright_req = -1;
 static volatile int8_t s_lead_req = -1;   /* a `set lead` the ui task has not applied yet: 0 / 1, -1 none */
 
 /* the flash rule of the settings (jank_core.h jk_save_due): not while playing; and once the edits have settled (JK_PREFS_SETTLE_MS) */
@@ -141,6 +143,22 @@ static void prefs_step(uint32_t now)
         s_play_req = -1;
         if (s_prefs.started != (uint8_t)req) {
             s_prefs.started = (uint8_t)req;
+            jk_prefs_changed(&s_prefs_save, now);
+        }
+    }
+    int8_t sl = s_sleep_req;
+    int16_t br = s_bright_req;
+    if (sl >= 0) {                       /* `set sleep` / `set bright`: the same preferences the menu writes (s_prefs.sleep / bright; the started bit is kept apart) */
+        s_sleep_req = -1;
+        if (s_prefs.sleep != (uint8_t)sl) {
+            s_prefs.sleep = (uint8_t)sl;
+            jk_prefs_changed(&s_prefs_save, now);
+        }
+    }
+    if (br >= 0) {
+        s_bright_req = -1;
+        if (s_prefs.bright != (uint8_t)br) {
+            s_prefs.bright = (uint8_t)br;
             jk_prefs_changed(&s_prefs_save, now);
         }
     }
@@ -342,6 +360,21 @@ int uis_lead_get(void)
 }
 
 void uis_lead_set(int on) { s_lead_req = on ? 1 : 0; }
+
+int uis_sleep_get(void)
+{
+    int8_t req = s_sleep_req;
+    return req >= 0 ? req : s_prefs.sleep;
+}
+
+int uis_bright_get(void)
+{
+    int16_t req = s_bright_req;
+    return req >= 0 ? req : s_prefs.bright;
+}
+
+void uis_sleep_set(int v) { s_sleep_req = (int8_t)v; }
+void uis_bright_set(int v) { s_bright_req = (int16_t)v; }
 
 /* the user's last Start (1) / Stop (0) of the outputs: read once at boot (bridge_start), written by every user press (bridge_play) */
 int uis_started_get(void) { return s_prefs.started; }

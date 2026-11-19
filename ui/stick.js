@@ -84,7 +84,7 @@ const Stick = (() => {
       peers: h ? h.link : 0, usb: true, fitted: !!h && h.battery !== null, batt: h && h.battery !== null ? h.battery : 0, tempC: num(ab.temp_c) === null || num(ab.temp_c) === -999 ? null : num(ab.temp_c), cpuPct: abNum('cpu_pct'), cpu1Pct: abNum('cpu1_pct'), heapKb: abNum('heap_kb'), psramKb: abNum('psram_kb'), heapMinKb: abNum('heap_min_kb'),
       uptimeS: abNum('uptime_s'), flashKb: abNum('flash_kb'), appUsedKb: abNum('app_used_kb'), appKb: abNum('app_part_kb'), reset: ab.reset ? ab.reset : null, version: g.version ? g.version : null,
       clkLateUs: abNum('clock_late_us'), uiLoopUs: abNum('ui_loop_us'), beatLoopUs: abNum('beat_loop_us'),
-      lineIn: g.source === 'line' || (!!st && st.audio_source === 'line'), bright: 100, sleep: 0, inOff: num(g.lat_trim) || 0, offs: [0, 0, 0], rate: 2,
+      lineIn: g.source === 'line' || (!!st && st.audio_source === 'line'), bright: num(g.bright) === null ? 100 : num(g.bright), sleep: Math.max(0, SLEEP.indexOf(g.sleep)), inOff: num(g.lat_trim) || 0, offs: [0, 0, 0], rate: 2,
       boot: false, splash: false, wifi: wifiBars, wifiQ: null, groupPeers: h ? h.air : 0, setup: false, saved: false,
       net: { mode: net, prev: net, group: num(g.group) || 1, ssid: g.ssid || '', pass: g.pass === 'set' ? '********' : '', appass: '', apName: '',
              status: h && h.net && h.net.kind === 'wifi' ? (h.net.up ? 'CONNECTED' : 'LOOKING') : 'NO NETWORK', ip: st && st.link_ip && st.link_ip !== '0.0.0.0' ? st.link_ip : '-',
@@ -101,18 +101,22 @@ const Stick = (() => {
   const NO_STICK_SETTING = {
     out0: 'the stick has one clock offset (Advanced), not one per output', out1: 'the stick has one clock offset (Advanced), not one per output',
     out2: 'the stick has one clock offset (Advanced), not one per output', rate: 'the stick has no clock rate setting',
-    bright: 'the stick has no screen to dim', sleep: 'the stick has no screen to switch off',
     ssid: 'set the Wi-Fi name under Settings (Save and restart)', pass: 'set the Wi-Fi password under Settings (Save and restart)',
     apname: 'the stick has no own-network mode', appass: 'the stick has no own-network mode',
     netmode: 'change the network under Settings (Join, Save and restart): it restarts the stick',
     usbrole: 'the USB role restarts the stick: not changed from here',
   };
+  const SLEEP = ['never', '30s', '1min', '5min'];   // the menu's SCREEN OFF names, as the control line's `sleep` says them
   const WORDS = { insrc: SRC, autobar: AUTOBAR, lowconf: ['run', 'stop'], usbmidi: ['on', 'off'] };
   const KEYS = { insrc: 'source', autobar: 'autobar', lowconf: 'lowconf', usbmidi: 'usbmidi' };
   // an OLED edit (field, value as the OLED holds it) -> { commands: [...] } or { refuse: 'why' }. hasLead: the jank's `get` has the `lead` key (default yes);
   // an older firmware has not: FOLLOW+LEAD is then `set transport link` only, and FOLLOW is refused
-  function fieldCommands(field, val, hasLead = true) {
+  function fieldCommands(field, val, hasLead = true, hasDisplay = true) {
     if (NO_STICK_SETTING[field]) return refuse(NO_STICK_SETTING[field]);
+    if (field === 'bright' || field === 'sleep') {   // an older jank has neither key in `get`: refused
+      if (!hasDisplay) return refuse('this jank has no screen setting');
+      return field === 'bright' ? cmds('set bright ' + clamp(Math.round(val), 10, 100)) : SLEEP[val] ? cmds('set sleep ' + SLEEP[val]) : refuse('SCREEN OFF has no such value');
+    }
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));
     if (field === 'group') return cmds('set group ' + (val + 1));
     if (field === 'gain') return cmds('set line_gain ' + clamp(Math.round(val), -12, 12));

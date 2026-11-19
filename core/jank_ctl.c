@@ -145,12 +145,14 @@ static void put_ip(struct writer *w, const char *key, uint32_t ip)
     put(w, "%s=%u.%u.%u.%u\n", key, (unsigned)(ip >> 24), (unsigned)(ip >> 16 & 255u), (unsigned)(ip >> 8 & 255u), (unsigned)(ip & 255u));
 }
 
+static const char *const SLEEP_NAME[4] = {"never", "30s", "1min", "5min"};   /* the menu's SCREEN OFF (ui/oled.js SLEEP_NAMES) */
+
 static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct writer *w)
 {
     put(w, "group=%u\nchannel=%u\nname=%s\nfilter=%s\n", c->group, jk_channel(c->group), c->name, c->filter == JK_FILTER_ALL ? "all" : "link");
     put(w, "peer=%s\ntransport=%s\nquantum=%u\noffset=%s%d.%02d\n", on_off(c->peer), c->transport == JK_TRANSPORT_AUTO ? "auto" : "link", c->quantum, c->offset_10us < 0 ? "-" : "", abs(c->offset_10us) / 100, abs(c->offset_10us) % 100);
     char src[16];
-    put(w, "lead=%s\n", on_off(s->lead));
+    put(w, "lead=%s\nsleep=%s\nbright=%u\n", on_off(s->lead), SLEEP_NAME[s->sleep & 3u], (unsigned)s->bright);
     put(w, "beat=%s\n", on_off(c->beat));
     put_lat(c, w);
     put(w, "beat_latency_src=%s\nautobar=%s\n", jla_name(&c->lat_key, src), autobar_name(c->autobar));
@@ -605,6 +607,39 @@ int jk_ctl_lead(const char *line, int *on)
     return 0;
 }
 
+int jk_ctl_display(const char *line, int *bright, int *v)
+{
+    char buf[32], *s = trim(line, buf, sizeof buf);
+    if (!s)
+        return -1;
+    if (!strncmp(s, "set sleep ", 10)) {
+        for (int i = 0; i < 4; i++)
+            if (!strcmp(s + 10, SLEEP_NAME[i])) {
+                *bright = 0;
+                *v = i;
+                return 0;
+            }
+        return -1;
+    }
+    if (!strncmp(s, "set bright ", 11)) {
+        char *e = s + 11;
+        long n = 0;
+        if (!*e || strlen(e) > 3)
+            return -1;
+        for (; *e; e++) {
+            if (*e < '0' || *e > '9')
+                return -1;
+            n = n * 10 + (*e - '0');
+        }
+        if (n < 10 || n > 100)
+            return -1;
+        *bright = 1;
+        *v = (int)n;
+        return 0;
+    }
+    return -1;
+}
+
 int jk_ctl_fold(const char *line, int *dir)
 {
     char buf[32], *s = trim(line, buf, sizeof buf);
@@ -691,6 +726,15 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         put(&w, "ok\n");
         return JK_CTL_LEAD;
     }
+    else if ((!strncmp(s, "set sleep", 9) && (!s[9] || s[9] == ' ')) || (!strncmp(s, "set bright", 10) && (!s[10] || s[10] == ' '))) {
+        int br, v;
+        if (jk_ctl_display(s, &br, &v)) {
+            put(&w, "err bad setting\n");
+            return JK_CTL_NONE;
+        }
+        put(&w, "ok\n");
+        return JK_CTL_DISPLAY;
+    }
     else if (!strncmp(s, "set ", 4))
         return cmd_set(s + 4, cfg, &w);
     else if (!strcmp(s, "scan"))
@@ -724,7 +768,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         else
             put(&w, "err home line too long\n");
     } else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|lead|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|lead|sleep|bright|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|rate|follower|skip|graded|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;
