@@ -89,8 +89,6 @@ static uint8_t s_follower;             /* the one running: 0 tuned (M2j, today's
 static struct jb_skip s_skip;          /* SKIP (core/beat/jb_skip.h): off with the tuned follower; ACT / PAT on the robust one */
 static uint8_t s_skip_mode;            /* enum jsk_mode running */
 static struct jg_tuned s_gtuned;       /* the tuned follower's graded confidence (jb_graded.h jg_tuned_step) */
-static uint8_t s_conf_graded;          /* the shown confidence at the last step is the graded one (the gate value is s_conf_gate_pct) */
-static uint8_t s_conf_gate_pct;        /* the gate's confidence at the last step, percent: what STOP / START, COAST, the LED and the notch judge */
 static uint8_t s_graded, s_coast;      /* the shown confidence is the graded one (display only); the outputs run under the threshold */
 static int s_last_jumps;               /* the follower's jumps at the last confidence step (a jump since is `jumped`) */
 static uint32_t s_conf_cycles;         /* follow_conf's work this second ... */
@@ -569,8 +567,6 @@ static void publish(enum jb_mode_kind mode, double bpm, const struct jk_cfg *cfg
     b.peak_db = s_peak_db;
     b.act_pct = s_act_pct;
     b.conf_pct = s_conf_pct;
-    b.conf_gate_pct = s_conf_gate_pct;
-    b.conf_graded = s_conf_graded;
     b.conf_hold = s_conf_hold;
     b.gated = s_gated;
     b.silent = s_conf.silent;
@@ -682,23 +678,18 @@ static void follow_conf(const struct jk_cfg *cfg)
         s_last_jumps = s_follow.m.jumps;
         conf = o.gconf;
         s_coast = o.coasting;
-        if (s_graded && !in.silent) {
-            /* the graded confidence (jb_graded.h) is shown instead; the gate above keeps judging the agreement */
-            conf_shown = jg_graded(has ? jg_soft_f(jw_seen(&s_weak), s_weak.n_seen, s_conf.line, s_conf.lines, period, now) : 0.0,
-                                   jg_jitter(jw_seen(&s_weak), s_weak.n_seen), s_robust.v_tempo, s_robust.v_dbn);
-            use_graded = 1;
-        }
     } else {
+        if (s_graded && s_audio_live && !s_conf.silent) {
+            /* the tuned follower's graded confidence (jb_graded.h): the one number, shown AND judged by the gate */
+            conf_shown = jg_tuned_step(&s_gtuned, &s_robust, &s_b.dbn, jw_seen(&s_weak), s_weak.n_seen, s_conf.line, s_conf.lines,
+                                       has, period, now);
+            use_graded = 1;
+            conf = conf_shown;
+        }
         s_gated = jcf_gate(s_gated, conf, cfg->lowconf, cfg->threshold);
         if (lost)
             s_gated = 1;
         s_coast = 0;
-        if (s_graded && s_audio_live && !s_conf.silent) {
-            /* the tuned follower's graded confidence (jb_graded.h) is shown instead; the gate above is unchanged */
-            conf_shown = jg_tuned_step(&s_gtuned, &s_robust, &s_b.dbn, jw_seen(&s_weak), s_weak.n_seen, s_conf.line, s_conf.lines,
-                                       has, period, now);
-            use_graded = 1;
-        }
     }
     if (use_graded) {
         s_conf_shown = conf_shown;      /* a measurement: no HOLD easing */
@@ -711,8 +702,6 @@ static void follow_conf(const struct jk_cfg *cfg)
     }
     s_conf_at = now;
     s_conf_pct = jcf_pct(s_conf_shown);
-    s_conf_gate_pct = jcf_pct(conf);
-    s_conf_graded = (uint8_t)use_graded;
     /* (a closed gate's test: open at threshold + 5; never while LOST, whose confidence the DBN's own beats can fill: a
      * Start keeps the outputs running until strong beats are back) */
     s_conf_open = (uint8_t)(!lost && !jcf_gate(1, conf, JCF_STOP, cfg->threshold));

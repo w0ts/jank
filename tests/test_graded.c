@@ -1,11 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The tuned follower's graded confidence (core/beat/jb_graded.h jg_tuned_step): the shown value beside the unchanged gate.
+/* The tuned follower's graded confidence (core/beat/jb_graded.h jg_tuned_step): the ONE number shown and judged (firmware/main/beat.c
+ * follow_conf: the gate, threshold, hysteresis, COAST, colour and LED all judge it; graded off: the gate's value).
  *   - the parts on synthetic beat sequences: a clean steady beat is high, a jittery one in the middle, beats off the lines
  *     low, and the value falls as the jitter grows
  *   - the tuned chain of firmware/main/beat.c (activation -> DBN -> weak follower -> lines -> gate) replayed on the real
- *     activations of tests/beat_ref and the synthetic tracks of tests/robust_ref, twice: with the graded value computed at
- *     every step and without; the gate's confidence, the gate, the tempo, the grid and the lines must be bit for bit the same
- *   - `test_graded DIR... --report`: the distribution of the gate's value and of the graded one (percent at 0, at 100, between)
+ *     activations of tests/beat_ref and the synthetic tracks of tests/robust_ref, twice: gated on the old gate value at 80 and on
+ *     the graded value at the new default 60; the graded gate must follow the rule (closed under the threshold, open again at
+ *     threshold + 5) at every step
+ *   - `test_graded DIR... --report`: the distribution of the gate's value and of the graded one (percent at 0, at 100, between),
+ *     seconds from the first lock to the outputs running, stops per hour of music, old versus new
  * Exit status: the number of failed checks. */
 #include <dirent.h>
 #include <math.h>
@@ -19,7 +22,7 @@
 #include "jb_robust.h"
 #include "jb_weak.h"
 
-static int fails, checks, report, dump;     /* dump: the gate's trace as text (compare two builds of the core: -DOLD_CORE builds without the graded value) */
+static int fails, checks, report;
 #define CHECK(c)                                                  \
     do {                                                          \
         checks++;                                                 \
@@ -93,7 +96,8 @@ static void test_parts(void)
 #define MAX_STEPS 4000
 #define BEAT_DEFER JW_STRONG_HALF
 #define STEP_EVERY 25
-#define THRESHOLD 80
+#define OLD_THRESHOLD 80
+#define NEW_THRESHOLD 60
 
 static float s_act[MAX_FRAMES];
 static int s_n_act;
@@ -102,7 +106,7 @@ static struct jrb_store s_rst;
 
 struct rec {                            /* what the gate and the follower decided at a step */
     double now, bpm, period, tb, conf;
-    int has_bpm, has_grid, jumps, gated, lines;
+    int has_bpm, has_grid, jumps, gated, ran, lines;
     double lines_sum;
 };
 
@@ -112,16 +116,15 @@ struct trace {
     int n;
 };
 
-static void run_chain(struct trace *tr, int with_graded)
+/* judge_graded 0: the gate on the gate value at OLD_THRESHOLD (before); 1: on the graded value at NEW_THRESHOLD (now) */
+static void run_chain(struct trace *tr, int judge_graded)
 {
     static struct jb_dbn dbn;
     struct jb_follow f;
     struct jb_weak w;
     struct jb_robust rb;
     struct jcf cf;
-#ifndef OLD_CORE
     struct jg_tuned g;
-#endif
     uint8_t gated = 0, ran = 0, pend = 0;
     int64_t pend_index = 0;
     double pend_t = 0.0;
@@ -130,9 +133,7 @@ static void run_chain(struct trace *tr, int with_graded)
     jcf_init(&cf);
     jw_init(&w, &s_wst, NULL, 0, 1);
     jrb_init(&rb, &s_rst);              /* (its ring only: no attach, no tick: the tuned follower) */
-#ifndef OLD_CORE
     jg_tuned_reset(&g);
-#endif
     CHECK(jb_dbn_init(&dbn, 90.0, 180.0, 100.0) == 0);
     for (int k = 0; k < s_n_act; k++) {
         double now = (double)k / 100.0, t = 0.0;
@@ -172,7 +173,18 @@ static void run_chain(struct trace *tr, int with_graded)
         double weak = jcf_weak_confidence(jw_strong(&w), w.n_strong, jw_seen(&w), w.n_seen, jw_weak(&w), w.n_weak, cf.line,
                                           cf.lines, has, period, now, JW_MIN_OBS, &w.last_conf, &held);
         conf = jcf_weak_pick(strict, weak, gated, ran);
-        gated = jcf_gate(gated, conf, JCF_STOP, THRESHOLD);
+        double graded = jg_tuned_step(&g, &rb, &dbn, jw_seen(&w), w.n_seen, cf.line, cf.lines, has, period, now);
+        uint8_t thr = judge_graded ? NEW_THRESHOLD : OLD_THRESHOLD, prev = gated;
+        double judged = judge_graded ? graded : conf;
+        gated = jcf_gate(gated, judged, JCF_STOP, thr);
+        if (judge_graded) {             /* the rule, at every step: closed under the threshold, open again at threshold + 5, else unchanged */
+            if (judged < thr / 100.0)
+                CHECK(gated);
+            else if (judged >= thr / 100.0 + JCF_HYST_PCT / 100.0)
+                CHECK(!gated);
+            else
+                CHECK(gated == prev);
+        }
         ran = (uint8_t)(has_bpm && !gated);
         if (tr->n < MAX_STEPS) {
             struct rec *r = &tr->r[tr->n];
@@ -180,31 +192,29 @@ static void run_chain(struct trace *tr, int with_graded)
             for (size_t i = 0; i < cf.lines; i++)
                 ls += cf.line[i];
             *r = (struct rec){.now = now, .bpm = has_bpm ? bpm : 0.0, .period = period, .tb = tb, .conf = conf, .has_bpm = has_bpm,
-                              .has_grid = has, .jumps = f.m.jumps, .gated = gated, .lines = (int)cf.lines, .lines_sum = ls};
-#ifndef OLD_CORE
-            tr->graded[tr->n] = with_graded
-                ? jg_tuned_step(&g, &rb, &dbn, jw_seen(&w), w.n_seen, cf.line, cf.lines, has, period, now) : 0.0;
-#else
-            tr->graded[tr->n] = 0.0;
-            (void)with_graded;
-#endif
+                              .has_grid = has, .jumps = f.m.jumps, .gated = gated, .ran = ran, .lines = (int)cf.lines, .lines_sum = ls};
+            tr->graded[tr->n] = graded;
             tr->n++;
         }
     }
 }
 
-static int same(const struct trace *a, const struct trace *b)
+/* the gate judges the shown number: open, closes at the threshold, reopens at threshold + 5, graded off = the gate's value */
+static void test_gate_rule(void)
 {
-    if (a->n != b->n)
-        return 0;
-    for (int i = 0; i < a->n; i++)
-        if (memcmp(&a->r[i].now, &b->r[i].now, sizeof(double)) || memcmp(&a->r[i].bpm, &b->r[i].bpm, sizeof(double))
-            || memcmp(&a->r[i].period, &b->r[i].period, sizeof(double)) || memcmp(&a->r[i].tb, &b->r[i].tb, sizeof(double))
-            || memcmp(&a->r[i].conf, &b->r[i].conf, sizeof(double)) || a->r[i].has_bpm != b->r[i].has_bpm
-            || a->r[i].has_grid != b->r[i].has_grid || a->r[i].jumps != b->r[i].jumps || a->r[i].gated != b->r[i].gated
-            || a->r[i].lines != b->r[i].lines || memcmp(&a->r[i].lines_sum, &b->r[i].lines_sum, sizeof(double)))
-            return 0;
-    return 1;
+    uint8_t g = 0;
+    CHECK(JCF_THRESHOLD_DEFAULT == 60);
+    g = jcf_gate(g, 0.60, JCF_STOP, 60);
+    CHECK(g == 0);                      /* at the threshold: open */
+    g = jcf_gate(g, 0.59, JCF_STOP, 60);
+    CHECK(g == 1);                      /* under it: closed */
+    g = jcf_gate(g, 0.64, JCF_STOP, 60);
+    CHECK(g == 1);                      /* in the band: stays closed */
+    g = jcf_gate(g, 0.65, JCF_STOP, 60);
+    CHECK(g == 0);                      /* threshold + 5: open again */
+    g = jcf_gate(g, 0.62, JCF_STOP, 60);
+    CHECK(g == 0);                      /* in the band: stays open */
+    CHECK(jcf_gate(1, 0.10, JCF_RUN, 60) == 0 && jcf_gate(1, 0.10, JCF_STOP, 0) == 0);   /* KEEP RUNNING / threshold 0: never gated */
 }
 
 /* ---- inputs ---- */
@@ -241,20 +251,35 @@ static int read_track(const char *path)
     return s_n_act > 500;
 }
 
-struct dist { long n, g0, g100, gmid, v0, v100, vmid, lo, mid, hi, top; };   /* graded: under 50, 50..79, 80..89, 90 and over */
+struct dist { double secs; long stops_a, stops_b; long n, g0, g100, gmid, v0, v100, vmid, lo, mid, hi, top; };   /* graded: under 50, 50..79, 80..89, 90 and over */
 
 /* the steps after the first lock only: the gate is judged while the outputs are or could be running */
 static void run_one(const char *name, struct dist *all, int *runs)
 {
     static struct trace a, b;
-    run_chain(&a, 1);
-    run_chain(&b, 0);
-    if (dump)
-        for (int i = 0; i < b.n; i++)
-            printf("%s %.17g %d %.17g %.17g %.17g %.17g %d %d %d %.17g\n", name, b.r[i].now, b.r[i].has_bpm, b.r[i].bpm, b.r[i].period, b.r[i].tb,
-                   b.r[i].conf, b.r[i].gated, b.r[i].jumps, b.r[i].lines, b.r[i].lines_sum);
-    CHECK(a.n > 20);
-    CHECK(same(&a, &b));                 /* the graded value touches nothing the gate and the follower decide */
+    run_chain(&a, 1);                    /* now: graded, 60 */
+    run_chain(&b, 0);                    /* before: the gate value, 80 */
+    CHECK(a.n > 20 && a.n == b.n);
+    if (report && a.n > 20) {
+        double secs = a.r[a.n - 1].now, la = -1.0, lb = -1.0, da = -1.0, db = -1.0;
+        int sa = 0, sb = 0;
+        for (int i = 0; i < a.n; i++) {
+            sa += i && a.r[i - 1].ran && !a.r[i].ran;
+            sb += i && b.r[i - 1].ran && !b.r[i].ran;
+            if (a.r[i].has_bpm && la < 0.0)
+                la = a.r[i].now;
+            if (la >= 0.0 && a.r[i].ran && da < 0.0)
+                da = a.r[i].now - la;
+            if (b.r[i].has_bpm && lb < 0.0)
+                lb = b.r[i].now;
+            if (lb >= 0.0 && b.r[i].ran && db < 0.0)
+                db = b.r[i].now - lb;
+        }
+        printf("RUN %-16s lock->running s: gate@80 %6.1f  graded@60 %6.1f | stops: gate@80 %d  graded@60 %d | music %.0f s\n", name, db, da, sb, sa, secs);
+        all->stops_a += sa;
+        all->stops_b += sb;
+        all->secs += secs;
+    }
     struct dist d = {0};
     double gsum = 0.0, vsum = 0.0, vmin = 1.0, vmax = 0.0;
     int locked = 0;
@@ -328,14 +353,13 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--report"))
             report = 1;
-        else if (!strcmp(argv[i], "--dump"))
-            dump = 1;
         else if (!real_dir || i == 1)
             real_dir = argv[i];
         else
             synth_dir = argv[i];
     }
     test_parts();
+    test_gate_rule();
     test_dir(real_dir, 0, &real, &runs_real);
     test_dir(synth_dir, 1, &synth, &runs_synth);
     CHECK(runs_real >= 3 && runs_synth >= 10);
@@ -350,6 +374,13 @@ int main(int argc, char **argv)
                        nm[i], t[i].n, 100 * t[i].g0 / t[i].n, 100 * t[i].g100 / t[i].n, 100 * t[i].gmid / t[i].n,
                        100 * t[i].v0 / t[i].n, 100 * t[i].v100 / t[i].n, 100 * t[i].vmid / t[i].n, 100 * t[i].lo / t[i].n,
                        100 * t[i].mid / t[i].n, 100 * t[i].hi / t[i].n, 100 * t[i].top / t[i].n);
+    }
+    if (report) {
+        struct dist t[2] = {real, synth};
+        for (int i = 0; i < 2; i++)
+            if (t[i].secs > 0.0)
+                printf("STOPS PER HOUR %-6s gate@80 %.1f  graded@60 %.1f  (%.0f s of music)\n", i ? "SYNTH" : "REAL",
+                       (double)t[i].stops_b * 3600.0 / t[i].secs, (double)t[i].stops_a * 3600.0 / t[i].secs, t[i].secs);
     }
     printf("graded: %d checks, %d failed\n", checks, fails);
     return fails;
