@@ -506,6 +506,20 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
     for (let j = 40; j < 120; j++) { let lo = -1, hi = -1; for (let i = 0; i < LW; i++) if (d.fb[j * LW + i]) { if (lo < 0) lo = i; hi = i; } if (lo >= 0 && hi - lo > 60) box.push([lo, hi]); }
     ok(box.length > 0 && Math.abs(box[0][0] - (LW - 1 - box[0][1])) <= 1, 'the edit value box is centred on the 320 px width (x ' + (box[0] || []) + ')');
   }
+  {                                                                // the THRESHOLD edit screen: the CONFIDENCE line + notch, NOW, THRESHOLD; no help lines, no number on the bar row
+    const th = withUi(ctxOf({ home: { conf: 72 } }), ['no', 'yes', 'down', 'down', 'down', 'yes'], 'lcd2');
+    ok(th.ui.screen === 'edit' && th.ui.edit.field === 'threshold' && th.ui.edit.val === 70, 'the THRESHOLD edit screen opens at 70');
+    const t = drawn(th.c, { ui: th.ui }), yb = 60;
+    ok(isText(t, 'CONFIDENCE', 4, yb, null) && isText(t, 'NOW', 4, yb + 24, null) && isText(t, '72%', rightText('72%'), yb + 24, INK.WARN) && isText(t, 'THRESHOLD', 4, yb + 48, null) && isText(t, '70%', rightText('70%'), yb + 48, INK.NONE), 'rows: CONFIDENCE (bar), NOW 72% (amber: within 10 of 70) and THRESHOLD 70% (neutral) right aligned, 24 px apart from y ' + yb);
+    eq(litIn(t, 150, yb + 48 + 14, 170, 240 - yb - 62).length + litIn(t, 0, 22, 320, yb - 22).length, 0, 'no help lines, nothing else on the screen');
+    eq(litIn(t, 260, yb, 60, 14).length, 0, 'no number at the end of the bar row');
+    const nx = 128 + Math.round(122 * 0.7);
+    eq([t.fb[(yb + 6) * LW + 127 + 89], t.fb[(yb + 6) * LW + 128 + 89], t.fb[(yb + 2) * LW + nx], t.fb[(yb + 6) * LW + nx]], [1, 0, 1, 0], 'the bar is the live confidence (72%: 89 px of 124), the notch at 70% is a stub above the line and a gap in it');
+    const up = withUi(ctxOf({ home: { conf: 72 } }), ['no', 'yes', 'down', 'down', 'down', 'yes', 'up'], 'lcd2'), u = drawn(up.c, { ui: up.ui });
+    ok(isText(u, '75%', rightText('75%'), yb + 48, INK.NONE) && isText(u, '72%', rightText('72%'), yb + 24, INK.BAD), 'UP moves the THRESHOLD row and the notch together to 75% (NOW 72% turns red)');
+    const un = withUi(ctxOf({ home: { conf: null } }), ['no', 'yes', 'down', 'down', 'down', 'yes'], 'lcd2'), n = drawn(un.c, { ui: un.ui });
+    ok(isText(n, '-', rightText('-'), yb + 24, null), 'NOW shows - when the confidence is unknown');
+  }
   const batt = { ...ctxOf(), tempoStep: () => null, setField() {}, setHold() {}, linkStartStop() {} };
   const infoUi = { ...OLED.create(), screen: 'info', page: 'battery' };
   d = drawn(batt, { ui: infoUi }); noInk(d, 'the BATTERY info screen');

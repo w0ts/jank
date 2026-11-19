@@ -121,14 +121,16 @@ static int level_ink(const struct jo_ctx *c)
     return c->level_db < QUIET_DB ? JO_INK_WARN : JO_INK_NONE;
 }
 
-static int conf_ink(const struct jo_ctx *c)
+static int conf_ink_at(const struct jo_ctx *c, int th)
 {
     int pct;
     if (c->conf_unknown || c->silent)
         return JO_INK_DIM;
     pct = jo_iround((c->conf_graded ? c->conf_gate : c->conf) * 100);   /* the colour is the gate's judgment, also while the graded value is shown */
-    return pct < c->th ? JO_INK_BAD : pct <= c->th + CONF_WARN_MARGIN ? JO_INK_WARN : JO_INK_GOOD;
+    return pct < th ? JO_INK_BAD : pct <= th + CONF_WARN_MARGIN ? JO_INK_WARN : JO_INK_GOOD;
 }
+
+static int conf_ink(const struct jo_ctx *c) { return conf_ink_at(c, c->th); }
 
 static const char *fold_label(int8_t exp)
 {
@@ -490,12 +492,36 @@ static void info(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
         jo_text(fb, rows[i], 8, 36 + i * 24, 1, 1);
 }
 
-static void edit(uint8_t *fb, const struct jo_ui *ui)
+/* THRESHOLD: the CONFIDENCE line with the notch at the threshold being edited (no number on the row), then NOW (the live confidence, its ink judged
+ * against the edited threshold) and THRESHOLD (the edited value, neutral), rows of 24 px like the sub menus; no help lines */
+static void threshold_edit(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
+{
+    const struct jo_spec *sp = jo_spec_l(ui->edit.field, 1);
+    int y = 60, ink = conf_ink_at(c, ui->edit.val);
+    char s[24];
+    title_bar(fb, sp->title, NULL);
+    line_row(fb, y, "CONFIDENCE", "", c->conf_unknown ? 0.0 : c->conf, ui->edit.val / 100.0, ink);
+    if (c->conf_unknown)
+        snprintf(s, sizeof s, "-");
+    else
+        snprintf(s, sizeof s, "%d%%", jo_iround(c->conf * 100));
+    row_text(fb, y + 24, "NOW", s);
+    if (!c->conf_unknown)
+        tag(ink, VALUE_XR - jo_text_w(s, 1), y + 24, jo_text_w(s, 1), TEXT_H);
+    jo_edit_text(sp, ui->edit.val, s, sizeof s);
+    row_text(fb, y + 48, "THRESHOLD", s);
+}
+
+static void edit(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
     const struct jo_spec *sp = jo_spec_l(ui->edit.field, 1);
     const char *h1, *h2;
     char s[24];
     int sc, w, h, x;
+    if (ui->edit.field == JO_F_THRESHOLD) {
+        threshold_edit(fb, ui, c);
+        return;
+    }
     title_bar(fb, sp->title, NULL);
     jo_edit_text(sp, ui->edit.val, s, sizeof s);
     sc = jo_text_w(s, 2) + 32 <= W - 8 ? 2 : 1;       /* the value in the biggest of two sizes that fits */
@@ -748,7 +774,7 @@ static void screen(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c, 
         case JO_MENU: menu(fb, ui, c); break;
         case JO_SUB: sub(fb, ui, c); break;
         case JO_INFO: info(fb, ui, c); break;
-        case JO_EDIT: edit(fb, ui); break;
+        case JO_EDIT: edit(fb, ui, c); break;
         default: break;
         }
     overlays(fb, ui, now);
