@@ -1768,10 +1768,10 @@ const OLED = (() => {
   }
   // the gate's own confidence: the graded value (confGraded) is what is shown, the colour, COAST and the notch's meaning stay the gate's
   const gateConf = c => (c.confGraded && typeof c.confGate === 'number' ? c.confGate : c.conf);
-  function confInk(c) {
+  function confInk(c, th = c.th) {
     if (c.confKnown === false || c.silent) return INK.DIM;
     const pct = Math.round(gateConf(c) * 100);
-    return pct < c.th ? INK.BAD : pct <= c.th + CONF_WARN_MARGIN ? INK.WARN : INK.GOOD;
+    return pct < th ? INK.BAD : pct <= th + CONF_WARN_MARGIN ? INK.WARN : INK.GOOD;
   }
   const battInk = pct => (pct < BATT_BAD_PCT ? INK.BAD : pct < BATT_WARN_PCT ? INK.WARN : INK.NONE);      // neutral while healthy
   const charging = c => !!c.usb && !!c.fitted && c.batt < 100;       // the BATTERY info screen's inference: on USB and not full
@@ -1979,8 +1979,19 @@ const OLED = (() => {
     }
     rows.forEach((r, i) => text(fb, r, 8, 36 + i * 24, 1, 1));
   }
-  function drawEditLcd2(fb, ui) {
+  // THRESHOLD: the CONFIDENCE line with the notch at the threshold being edited (no number on the row), then NOW (the live confidence, its ink judged
+  // against the edited threshold) and THRESHOLD (the edited value, neutral), rows of 24 px like the sub menus; no help lines
+  function drawThresholdEditLcd2(fb, ui, c) {
+    const e = ui.edit, known = c.confKnown !== false, ink = confInk(c, e.val), y = 60;
+    titleBarLcd2(fb, EDITS.threshold.title);
+    lineRow(fb, y, 'CONFIDENCE', '', known ? c.conf : 0, e.val / 100, ink);
+    rowText(fb, y + 24, 'NOW', known ? Math.round(c.conf * 100) + '%' : '-');
+    if (known) { const w = textW(Math.round(c.conf * 100) + '%', 1); tag(ink, L2.valueXR - w, y + 24, w, 14); }
+    rowText(fb, y + 48, 'THRESHOLD', editText(EDITS.threshold, e.val));
+  }
+  function drawEditLcd2(fb, ui, c) {
     const e = ui.edit, sp = EDITS[e.field];
+    if (e.field === 'threshold') { drawThresholdEditLcd2(fb, ui, c); return; }
     titleBarLcd2(fb, sp.title);
     const s = editText(sp, e.val), sc = textW(s, 2) + 32 <= W - 8 ? 2 : 1;      // the value in the biggest of two sizes that fits
     const w = textW(s, sc) + 32, h = 14 * sc + 16, x = Math.round((W - w) / 2);
@@ -2093,7 +2104,7 @@ const OLED = (() => {
     else if (ui.screen === 'menu') drawMenuLcd2(fb, ui, c);
     else if (ui.screen === 'sub') drawSubLcd2(fb, ui, c);
     else if (ui.screen === 'info') drawInfoLcd2(fb, ui, c);
-    else if (ui.screen === 'edit') drawEditLcd2(fb, ui);
+    else if (ui.screen === 'edit') drawEditLcd2(fb, ui, c);
     drawOverlaysLcd2(fb, ui, now);
     if (c.saved) { boxedLcd2(fb, 70, 84, 180, 68); untag(70, 84, 180, 68); textC(fb, 'SAVED', 104, 2, 0); }
   }
