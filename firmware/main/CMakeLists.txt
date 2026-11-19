@@ -18,7 +18,7 @@ idf_component_register(
          "panic_info.c" "${core}/jank_panic.c" "board_i2c.c" ${screen_srcs} "uiscreen.c" "${core}/jank_led.c"
          "${core}/jank_oled_gfx.c" "${core}/jank_oled_menu.c" "${core}/jank_oled_press.c" "${core}/jank_oled_draw.c" "${core}/jank_oled_qr.c" "${core}/jank_oled_input.c"
          "${core}/jank_usbrole.c" "${core}/jank_tusb320.c" "${core}/jank_uacdesc.c" "${core}/jank_pcm.c" "${core}/jank_midiq.c"
-         "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c" "${core}/jank_start.c"
+         "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_clockout.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c" "${core}/jank_start.c"
          "${core}/jank_home.c" "${core}/jank_vdrive.c" "${core}/jank_live.c" "${core}/jank_hold.c" "${core}/jank_fold.c" "${core}/jank_lat.c" "${core}/jank_conf.c" "${core}/jank_prefs.c"
          "${beat}/jb_beat.c" "${beat}/jb_dbn.c" "${beat}/jb_fe.c" "${beat}/jb_fft_r22.c" "${beat}/jb_lstm.c" "${beat}/jb_lstm_q16.c" "${beat}/jb_mode.c" "${beat}/beat_model.c"
          "${beat}/jb_down.c" "${beat}/down_model.c" "${beat}/jb_follow.c" "${beat}/jb_rate.c" "${beat}/jb_weak.c" "${beat}/jb_lost.c" "${beat}/jb_kick.c" "${beat}/jb_song.c" "${beat}/jb_comb.c" "${beat}/jb_robust.c" "${beat}/jb_skip.c" "${beat}/jb_graded.c"
