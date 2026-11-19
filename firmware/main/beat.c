@@ -53,6 +53,7 @@
 #include "jb_graded.h"
 #include "jb_kick.h"
 #include "jb_lost.h"
+#include "jb_resume.h"
 #include "jb_song.h"
 #include "jb_robust.h"
 #include "jb_skip.h"
@@ -115,6 +116,11 @@ static struct jb_kick *s_kick;         /* the kick band and the input level per 
                                           PSRAM); NULL: no RAM, LOST on strong beats alone */
 static struct jb_song *s_song;         /* NEW SONG (core/beat/jb_song.h, `set newsong`; PSRAM); NULL: no RAM, off */
 static uint8_t s_song_on;              /* the setting as last read (the beat task) */
+static struct jb_resume s_resume;      /* RESUME (core/beat/jb_resume.h): a paused song back on the beat at once */
+static uint8_t s_resume_now;           /* RESUME seeded the follower at s_resume_at: the next step opens the gate */
+static double s_resume_at, s_resume_fired = -1e9;
+static float s_resume_prior[JB_DBN_MAX_INTERVALS];   /* the DBN's tempo prior on the remembered tempo (jb_dbn.h) */
+static uint8_t s_resume_prior_on;
 static uint8_t s_conf_hold;            /* M2k: the weak confidence holds its last value (no evidence): shown eased */
 static double s_conf_shown, s_conf_at; /* the confidence shown (jcf_show_step) and the stream time of its step */
 static struct jbl s_jbl;
@@ -399,6 +405,10 @@ static void restart_tracker(void)
     /* (the user's PHASE stays: the automatic layer never changes it, M2h) */
     s_bar_now = 1;
     jb_beat_reset(&s_b);
+    jre_disarm(&s_resume);             /* (the tempo stays remembered) */
+    s_resume_now = 0;
+    s_resume_prior_on = 0;             /* (jb_beat_reset: the DBN without a prior) */
+    jb_dbn_set_prior(&s_b.dbn, NULL);
     if (s_kick)
         jbk_reset(s_kick);             /* (its hops are the tracker's frames) */
     if (s_song)
@@ -649,7 +659,27 @@ static void follow_conf(const struct jk_cfg *cfg)
     double conf_shown = 0.0;
     int has_bpm = 0, has = 0, use_graded = 0;
     uint8_t weak_picked = 0, held = 0, lost = 0;
+    const uint32_t mark = s_follow.seeds + (uint32_t)s_follow.m.jumps;    /* (RESUME: has the follower locked anew?) */
+    if (!s_follower && s_resume.has) {
+        /* the DBN held on the remembered tempo while RESUME waits and JRE_PRIOR_S after it resynced: after a pause its own
+         * tempo drifts (measured: 140 -> 93 BPM after 10 min of -40 dB noise) and its beats would drag the grid off */
+        const uint8_t want = (uint8_t)(s_resume.armed || now - s_resume_fired < JRE_PRIOR_S);
+        if (want && !s_resume_prior_on)
+            jrb_tempo_prior(&s_b.dbn, 60.0 / s_resume.period, JRB_PRIOR_WIDTH, JRB_PRIOR_FLOOR, s_resume_prior);
+        if (want != s_resume_prior_on)
+            jb_dbn_set_prior(&s_b.dbn, want ? s_resume_prior : NULL);
+        s_resume_prior_on = want;
+    }
     if (s_audio_live && !s_conf.silent) {
+        double t_res;
+        if (!s_follower && s_resume.armed
+            && jre_find(&s_resume, s_robust_store ? s_robust_store->ring : NULL, JRB_ACT_RING, s_robust.act_n, &t_res)) {
+            jre_seed(&s_follow, t_res, s_resume.period);  /* the song again, at its remembered tempo, on the new phase */
+            jcf_clear_lines(&s_conf);
+            s_resume_now = 1;
+            s_resume_at = t_res;
+            s_resume_fired = now;
+        }
         has = jb_follow_grid(&s_follow, &tb, &period);
         has_bpm = jb_follow_bpm_at(&s_follow, now, &bpm);
         jcf_line_tick(&s_conf, has_bpm ? has : 0, tb, period, now);
@@ -664,12 +694,22 @@ static void follow_conf(const struct jk_cfg *cfg)
              * the gate; a drop of the same song holds it; beats or kicks on the held grid again open it at once */
             if (!s_follower && cfg->lowconf == JCF_STOP && cfg->threshold) {
                 uint8_t back = 0;
+                if (s_resume_now) {     /* RESUME: run at once, LOST judging the lines from the resumed beat on */
+                    s_resume_now = 0;
+                    jl_clear(&s_lost);
+                    s_lost.next_line = s_resume_at;
+                    s_gated = 0;
+                    s_conf_ran = 1;
+                }
+                jl_hold_back(&s_lost, jre_holds(&s_resume, mark));
                 lost = (uint8_t)jl_step(&s_lost, jw_strong(&s_weak), s_weak.n_strong, s_kick, has_bpm && has, tb, period,
                                         now, s_conf_ran, s_song && cfg->newsong && js_new(s_song), &back);
                 if (back) {
                     s_gated = 0;
                     s_conf_ran = 1;
                 }
+                if (lost && s_lost.cause == JLO_QUIET)
+                    jre_arm(&s_resume, mark);
             } else
                 jl_clear(&s_lost);
             weak_picked = (uint8_t)(!s_gated && s_conf_ran);
@@ -679,6 +719,8 @@ static void follow_conf(const struct jk_cfg *cfg)
         jl_clear(&s_lost);              /* silence or LINK mode: what comes next is new music */
         if (s_song)
             js_reset(s_song);
+        if (s_audio_live && !s_follower)
+            jre_arm(&s_resume, mark);   /* (silence: RESUME watches the beats that come back) */
     }
     /* shown: a hold eases toward the threshold instead of a frozen value (M2k); the gate below takes the real one */
     s_conf_hold = (uint8_t)(weak_picked && held);
@@ -710,6 +752,8 @@ static void follow_conf(const struct jk_cfg *cfg)
          * them, LOST does (and silence, the follower giving up); the threshold decides the start */
         if (cfg->lowconf == JCF_STOP && cfg->threshold && !was && s_conf_ran)
             s_gated = 0;
+        if (jre_holds(&s_resume, mark))
+            s_gated = 1;                /* after a pause the old grid does not come back by itself (RESUME) */
         if (lost)
             s_gated = 1;
         s_coast = 0;
@@ -739,6 +783,11 @@ static void follow_conf(const struct jk_cfg *cfg)
     if (weak_picked && !s_gated && cfg->lowconf == JCF_STOP && strict < (double)cfg->threshold / 100.0)
         s_weak_holds++;
     s_conf_ran = (uint8_t)(s_audio_live && has_bpm && !s_gated && !s_conf.silent);
+    if (s_conf_ran) {
+        jre_disarm(&s_resume);
+        if (!s_follower && jb_follow_state(&s_follow, now) == JF_GLIDE && jb_follow_trusted(&s_follow))
+            jre_remember(&s_resume, period, tb, s_robust_store ? s_robust_store->ring : NULL, JRB_ACT_RING, s_robust.act_n);
+    }
 }
 
 /* the tracker's work on one pass's samples; the time it took is the figure for the CPU */
@@ -1139,6 +1188,7 @@ esp_err_t beat_start(void)
     s_weak_store = heap_caps_malloc(sizeof *s_weak_store, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     jw_init(&s_weak, s_weak_store, NULL, 0, 1);
     jl_init(&s_lost);
+    jre_init(&s_resume);
     s_kick = heap_caps_malloc(sizeof *s_kick, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (s_kick)
         jbk_init(s_kick);

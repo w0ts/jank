@@ -22,6 +22,7 @@
 #include "jb_follow.h"
 #include "jb_kick.h"
 #include "jb_lost.h"
+#include "jb_resume.h"
 #include "jb_song.h"
 #include "jb_weak.h"
 
@@ -115,6 +116,13 @@ struct run {
     struct jb_lost lost;
     const struct jb_kick *kick;         /* LOST's kick band and level (NULL: none) */
     uint8_t use_lost;                   /* LOST as beat.c (the golden runs: 0, as the Python) */
+    uint8_t use_resume;                 /* RESUME as beat.c (with LOST) */
+    struct jb_resume res;
+    uint8_t resume_now;
+    double resume_at;
+    const float *ring;                  /* RESUME's activation (beat.c: the robust follower's 10 s ring) */
+    uint32_t ring_cap;
+    int64_t ring_n;
     uint8_t gated, was_running, is_lost;
     double now;
     /* the last tick's */
@@ -148,8 +156,15 @@ static void beat(struct run *r, double t)
 /* chain._replay's tick after its beats: coast, then the confidence (conf "weak") and the gate */
 static void tick(struct run *r, int silent)
 {
-    double now = r->now;
+    double now = r->now, t_res;
+    const uint32_t mark = r->f.seeds + (uint32_t)r->f.m.jumps;
     jw_coast(&r->w, &r->f, now);
+    if (r->use_resume && !silent && jre_find(&r->res, r->ring, r->ring_cap, r->ring_n, &t_res)) {   /* (beat.c follow_conf) */
+        jre_seed(&r->f, t_res, r->res.period);
+        jcf_clear_lines(&r->conf);
+        r->resume_now = 1;
+        r->resume_at = t_res;
+    }
     r->has_bpm = jb_follow_bpm_at(&r->f, now, &r->bpm);
     r->has_grid = jb_follow_grid(&r->f, &r->t0, &r->p);
     if (!r->has_bpm)
@@ -168,12 +183,23 @@ static void tick(struct run *r, int silent)
                                          JCF_WINDOW_S, JCF_DELAY_S, JCF_TOL);
         if (r->use_lost) {
             uint8_t back = 0;
+            if (r->resume_now) {        /* (beat.c follow_conf) */
+                r->resume_now = 0;
+                jl_clear(&r->lost);
+                r->lost.next_line = r->resume_at;
+                r->gated = 0;
+                r->was_running = 1;
+            }
+            if (r->use_resume)
+                jl_hold_back(&r->lost, jre_holds(&r->res, mark));
             r->is_lost = (uint8_t)jl_step(&r->lost, jw_strong(&r->w), r->w.n_strong, r->kick, r->has_bpm && r->has_grid, r->t0,
                                           r->p, now, r->was_running, 0, &back);
             if (back) {
                 r->gated = 0;
                 r->was_running = 1;
             }
+            if (r->use_resume && r->is_lost && r->lost.cause == JLO_QUIET)
+                jre_arm(&r->res, mark);
         }
         r->c = jcf_weak_pick(r->strict, r->loose, r->gated, r->was_running);
     }
@@ -186,11 +212,18 @@ static void tick(struct run *r, int silent)
         r->gated = jcf_gate(r->gated, r->c, JCF_STOP, THRESHOLD);
         if (r->use_lost && !was && r->was_running)
             r->gated = 0;               /* (beat.c: once running, the confidence no longer stops the outputs; LOST does) */
+        if (r->use_resume && jre_holds(&r->res, mark))
+            r->gated = 1;               /* (beat.c: after a pause the old grid does not come back by itself) */
     }
     if (r->is_lost)
         r->gated = 1;
     r->running = r->has_bpm && !r->gated && !silent;
     r->was_running = (uint8_t)r->running;
+    if (r->use_resume && r->running) {
+        jre_disarm(&r->res);
+        if (jb_follow_state(&r->f, now) == JF_GLIDE && jb_follow_trusted(&r->f))
+            jre_remember(&r->res, r->p, r->t0, r->ring, r->ring_cap, r->ring_n);
+    }
 }
 
 /* s kf mode t p d jumps misses in_a_row manoeuvres follow_beats strong weak_hits coasted fast_jumps lines */
@@ -591,6 +624,112 @@ static void test_song_unit(void)
     CHECK(!any && s.n_blocks == JS_BLOCKS);
 }
 
+/* RESUME: 40 s of the song (kick and activation on the beats, 120 BPM), a pause of `pause_s` at -40 dB (the pad and
+ * everything 40 dB down, no beat), then the song again, its beats `shift` s later than the old grid would have them.
+ * Returns the seconds from the first beat back to the outputs running (-1: not within 20 s); *on_phase: the grid then
+ * within 10 % of a period of the new beats. */
+static double resume_run(int use_resume, double pause_s, double shift, int *on_phase)
+{
+    static struct run r;
+    memset(&r, 0, sizeof r);
+    jb_follow_init(&r.f);
+    jcf_init(&r.conf);
+    jw_init(&r.w, &s_store, NULL, 0, 1);
+    jl_init(&r.lost);
+    jre_init(&r.res);
+    jbk_init(&s_kick);
+    r.kick = &s_kick;
+    r.use_lost = 1;
+    r.use_resume = (uint8_t)use_resume;
+    static float ring[1024];
+    r.ring = ring;
+    r.ring_cap = 1024;
+    const double stop = 40.25, back = stop + pause_s;
+    const int64_t first_back = (int64_t)lrint((back + shift) * JW_FPS), end = first_back + 2000;
+    int64_t pend = -1;
+    double last_step = 0.0, kick_t = -1.0, ran = -1.0;
+    int16_t x[441];
+    *on_phase = 0;
+    for (int64_t k = 0; k < end; k++) {
+        const double now = (double)k / JW_FPS;
+        const int beat_frame = k < first_back ? k >= 100 && k < (int64_t)(stop * JW_FPS) && (k - 100) % 50 == 0
+                                              : (k - first_back) % 50 == 0;
+        const int paused = now >= stop && k < first_back - 25;
+        if (beat_frame)
+            kick_t = now;
+        synth_hop(x, now, kick_t, paused ? 0.01 : 1.0);
+        jbk_push_s16(&s_kick, x, 441);
+        jw_act(&r.w, k, beat_frame ? 0.8f : 0.01f);
+        ring[k % 1024] = beat_frame ? 0.8f : 0.01f;
+        r.ring_n = k + 1;
+        if (beat_frame)
+            pend = k;
+        int fed = 0;
+        if (pend >= 0 && k >= pend + JW_STRONG_HALF) {
+            beat(&r, (double)pend / JW_FPS);
+            pend = -1;
+            fed = 1;
+        }
+        jw_coast(&r.w, &r.f, now);
+        if (!fed && now - last_step < 0.25)
+            continue;
+        last_step = now;
+        r.now = now;
+        tick(&r, 0);
+        if (k >= first_back && ran < 0 && r.running) {
+            ran = now - (double)first_back / JW_FPS;
+            const double e = remainder(r.t0 - (double)first_back / JW_FPS, r.p);
+            *on_phase = fabs(e) <= 0.1 * r.p;
+        }
+    }
+    return ran;
+}
+
+static void test_resume(void)
+{
+    /* after 5 s, 2 min and 10 min of near silence, the song back 0.17 s off the old grid: running on the new beats once
+     * JRE_LINES periods of activation are in (the 4th peak + JRE_HALF frames, the next 0.25 s step: within 1.5 + 0.02 + 0.25
+     * s), whatever the tracker's beats do */
+    const double pauses[3] = {5.0, 120.0, 600.0};
+    for (int i = 0; i < 3; i++) {
+        int ph_on = 0, ph_off = 0;
+        const double on = resume_run(1, pauses[i], 0.17, &ph_on), off = resume_run(0, pauses[i], 0.17, &ph_off);
+        printf("resume: a %.0f s pause: back %.2f s after the first beat on the new phase %d (without RESUME %.2f s, %d)\n",
+               pauses[i], on, ph_on, off, ph_off);
+        CHECK(on >= 0.0 && on <= 3 * 0.5 + 0.02 + 0.25 && ph_on);
+    }
+    /* the module: the beat's shape learnt on a song whose off-beat peaks HIGHER than its beat (0.8 at +0.25 s, 0.5 on the
+     * beat, 120 BPM, beats on 0.17 + 0.5 k): after a pause the song back 0.21 s later in phase (beats on 0.38 + 0.5 k):
+     * found on the beat, not on the stronger off-beat */
+    static float ring[1024];
+    struct jb_resume r;
+    double t = 0.0;
+    jre_init(&r);
+    jre_arm(&r, 0);
+    CHECK(!r.armed && !jre_find(&r, ring, 1024, 1000, &t));
+    for (int k = 0; k < 1000; k++) {
+        const int f = (k - 17 + 5000) % 50;
+        ring[k] = f == 0 ? 0.5f : f == 25 ? 0.8f : 0.02f;
+    }
+    jre_remember(&r, 0.5, 9.17, ring, 1024, 1000);
+    CHECK(r.has && r.shape[0] > 0.45f && r.shape[10] > 0.75f);
+    jre_arm(&r, 7);
+    CHECK(r.armed && jre_holds(&r, 7) && !jre_holds(&r, 8));
+    for (int k = 0; k < 1000; k++)
+        ring[k] = 0.01f;                                   /* the pause: nothing */
+    CHECK(!jre_find(&r, ring, 1024, 1000, &t));
+    for (int k = 0; k < 1000; k++) {
+        const int f = (k - 38 + 5000) % 50;
+        ring[k] = f == 0 ? 0.5f : f == 25 ? 0.8f : 0.02f;
+    }
+    CHECK(jre_find(&r, ring, 1024, 1000, &t) && fabs(remainder(t - 0.38, 0.5)) < 0.015 && !r.armed && r.resumes == 1);
+    /* one beat back is not enough: JRE_SOUND periods with a peak */
+    jre_arm(&r, 7);
+    for (int k = 0; k < 1000; k++)
+        ring[k] = k == 990 ? 0.8f : 0.01f;
+    CHECK(!jre_find(&r, ring, 1024, 1000, &t) && r.armed);
+}
+
 static void test_lost(void)
 {
     /* a 20 s drop of the same song after the last beat at 39.5 s: held through */
@@ -613,6 +752,7 @@ static void test_lost(void)
     test_kick_unit();
     test_lost_unit();
     test_song_unit();
+    test_resume();
 }
 
 int main(int argc, char **argv)

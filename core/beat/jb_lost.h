@@ -49,6 +49,7 @@ struct jb_lost {
     double level;                      /* the fitted lines' running level, dBFS; JBK_NONE: none yet */
     uint8_t lost, cause;               /* enum jl_cause of the current LOST */
     uint8_t fit_run, quiet_run, off_n, unfit_run;   /* capped */
+    uint8_t hold_back;                 /* the caller holds the return (jl_hold_back) */
     uint32_t losts[4];                 /* LOST begun since the init, by cause */
 };
 
@@ -59,6 +60,8 @@ void jl_init(struct jb_lost *l);
  * while LOST (the caller closes the gate); *back (may be NULL) is 1 at the step LOST ended (the caller opens it). */
 int jl_step(struct jb_lost *l, const double *strong, size_t n_strong, const struct jb_kick *kick, int has_grid, double t0,
             double period, double now, int running, int song_new, uint8_t *back);
+/* LOST's own return held back (RESUME's match comes first, jb_resume.h jre_holds): 1 while held */
+static inline void jl_hold_back(struct jb_lost *l, int hold) { l->hold_back = (uint8_t)(hold != 0); }
 /* silence, a restart: no lines, not lost, the level forgotten */
 void jl_clear(struct jb_lost *l);
 

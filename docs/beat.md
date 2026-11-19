@@ -182,6 +182,29 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   - `beat`: `weak`, `weak_holds`, `coasts`, `weak_beats`, `fast_jumps`. Cost (estimate): +0.16-0.24 % of core 0 (host
     time scaled by ModeBpm's QEMU-measured soft-double cost; ~0.05 % if it ran like float code). RAM: ~0.3 KB internal,
     7.3 KB PSRAM; without PSRAM, M2i's follow.
+- **RESUME: back on the beat after a pause** (2026-11-19, the user: "a pause can resume the music in a completely
+  different phase, so we need to find the new phase ... one second, 10 seconds, 10 minutes or even 2 years"; a drop with
+  sound keeps the grid, LOST above). `core/beat/jb_resume.c`, in `follow_conf`, the tuned follower with STOP / START.
+  While the outputs run on a trusted glide the period and the SHAPE of the song's beat are remembered (the activation
+  folded at the period from the published lines, 20 points: which peak is the beat and which the off-beat), no time
+  limit. Silence or LOST's near silence arms it: the old phase is thrown away, neither the gate nor LOST's own return may
+  bring the old grid back until RESUME matches or the follower locks or jumps on a grid of its own. Each step the last 4
+  periods of activation (all 4 with a peak of 0.2) are folded at the remembered period and cross-correlated with the shape
+  over 20 shifts; Pearson r >= 0.6: the follower is seeded on the new phase with the remembered period (a clean ModeBpm fed
+  the grid as beats) and the outputs run at once; the DBN's tempo prior (jb_dbn.h, the robust follower's) is held on the
+  remembered tempo while armed and 8 s after (its own tempo drifts in a pause: 140 -> 93 BPM after 10 min of -40 dB
+  noise, and its beats dragged the grid off).
+  - Measured (the firmware's code from the audio of 30 of the user's tracks, a pause of white noise at -40 dBFS, the song
+    back where it stopped, threshold 55; today / RESUME, time to running after the music returns / the next 10 s on the
+    grid): 5 s 2.0 s, 44 % / 1.4 s, 74 %; 30 s 2.4 s, 65 % / 1.4 s, 100 %; 2 min 8.3 s / 1.6 s; 10 min 17.3 s / 1.7 s
+    (100 % on the grid both). The 5 s misses: on some tracks a -40 dB gap is not 30 dB under the song (LOST's QUIET), so
+    there is no pause; and a few resumes half a beat off. 200 whole tracks, normal play: the same 83 stops, 560 -> 515 s
+    stopped, 16 resumes after quiet passages, no track worse. Rejected: waiting for the tracker's beats (after a pause its
+    DBN comes back at a wrong tempo); a band-profile fingerprint (57-69 % of other songs looked the same); a comb of the
+    activation alone (it took the off-beat on house tracks); the kick band to choose beat or off-beat (worse).
+  - `tests/test_tempo.c`: after 5 s, 2 min and 10 min of near silence the song back 0.17 s off the old grid: running on
+    the new phase 1.53 s after its first beat (4 beats in); the shape found on the beat when the off-beat peaks higher; one beat back is
+    not enough. RAM: ~110 bytes + the 40-float prior. Cost: per step 80 activation reads, when armed 20 correlations of 20.
 - **LOST: when the outputs stop once they run** (`core/beat/jb_lost.c`, `jb_kick.c`, `jb_song.c`, in `follow_conf`, the
   tuned follower with STOP / START; silence, LINK mode, KEEP RUNNING, a threshold of 0 and the robust follower: off).
   History: the first LOST (2026-11-18, "it should stop sooner when it does not know") stopped after a bar of grid lines
