@@ -47,17 +47,23 @@ flush: cut 0.6 deep (`sym_depth`, 3 layers of 0.2) into the cap's top face; `box
   L's top arm and stops 1.5 short of the hook's tab so the tab can flex) takes a plug's push; a **tongue** in the DIN
   window (its width less 0.2 a side) rises 2.0 over the lid, in front of the DIN plates' lowest 1.5 mm, and takes a
   plug's pull. ASSUMED: the DIN-504B's plug opening starts more than 1.5 mm above its bottom (`din_lock_h`): **measure**.
-- **The lid's fixing** (mots, 2026-11-19: no corner towers): SIDE SCREWS. Three tabs rise from the lid just inside
+- **The USB-C panel** (mots, 2026-11-20, after the first print: the shell's wall under the USB-C window broke; it hung
+  from a 2.45 mm strip and a 0.3 mm sliver; "it should be attached to the bottom instead"): the wall from J3's slot to
+  the DIN window (x 23.1-51.65), from the box's bottom edge up to the USB-C window's lower edge (z -1.8, just under our
+  board), is now a **panel on the lid**, one wall with J3's tongue (joined below the plug's axis) and the DIN tongue
+  (joined under the shell's 0.6 lip over the DIN window): no slits, 0.2 clear of the shell only where the shell remains. The USB-C window reaches the DIN window
+  (no sliver). The top screw that went through that wall is gone (it would only join the lid to itself).
+- **The lid's fixing** (mots, 2026-11-19: no corner towers): SIDE SCREWS. Two tabs rise from the lid just inside
   the walls; an M3 countersunk screw goes sideways through the wall into an M3 heat-set insert in each tab, its head
   flush in a countersink in the wall. The right wall has no free stretch for a screw (J6's DIN reaches the floor to
   y 15.19, the cell's rubber starts at y 22.4, then the CLK / RST slots and the cell), so it gets a **hook**: a thin
   tab whose barb catches in a small window in the right wall. Fitting: hook the lid's right side in first (tilted),
-  swing the left side up, then the three screws.
+  swing the left side up, then the two screws. The top edge is held by the USB-C panel in its slot, the
+  left screw (y 10) and the hook (y 18.8), and stiffened by the panel and the DIN rail.
 
   | | wall | position (board mm) | screw axis height | tab (along x inward x high) |
   |---|---|---|---|---|
-  | screw 1 | top | x 37.0 (between J3's slot, x <= 23.1, and the DIN window, x >= 51.65) | z -19.0: 4.0 over the lid's top, 6.0 over the box's bottom | 8.0 x 6.0 x 8.0, at y -0.2..5.8 |
-  | screw 2 | bottom | x 46.0 (between J7's slot, x <= 34, and the cell's rubber, x >= 57.4) | z -19.0 | 8.0 x 6.0 x 8.0, at y 76.2..82.2 |
+  | screw 2 | bottom | x 46.0 (between J7's slot, x <= 34, and the cell's rubber, x >= 57.4) | z -19.0: 4.0 over the lid's top, 6.0 over the box's bottom | 8.0 x 6.0 x 8.0, at y 76.2..82.2 |
   | screw 3 | left | y 10.0 (above the LCD-2's USB-C slot, y >= 34.6; J2's body hangs over it only to z -7.1) | z -19.0 | 8.0 x 6.0 x 8.0, at x -0.2..5.8 |
   | hook | right | y 18.8 (centred in the free 7.2 mm between J6 and the cell's rubber) | barb's catching face z -17.0, window 5.6 x 2.8 through the wall | 5.0 x 1.6 x 9.0, barb 1.0 into the wall |
 
@@ -152,7 +158,7 @@ Heights about our board's top (z 0): face top 6.8, face underside 4.4, board bot
 | LINE IN (J7) | bottom wall, x 30, axis z -4.1 | d 8.0 slot, lid tongue |
 | the LCD-2's USB-C | left wall, y 34.6-47.4, z -6.9..+0.4 | its plug's overmold (12.0 x 6.5 + 0.4) about its axis (z -3.2, ASSUMED), slot to the bottom edge, lid tongue |
 | the power switch | left wall, centre y 72.9, z -13.0 | a closed round hole d 15.0 (ASSUMED), the wall thinned to 1.6 in a d 19 patch inside |
-| lid screws | top x 37, bottom x 46, left y 10; z -19.0 | d 3.4 with a 90 deg countersink d 6.4 |
+| lid screws | bottom x 46, left y 10; z -19.0 (top x 37 removed 2026-11-20) | d 3.4 with a 90 deg countersink d 6.4 |
 | the hook's window | right wall, y 15.99-21.59, z -17.3..-14.5 | 5.6 x 2.8 through the wall |
 
 **Face labels** (mots, 2026-11-19: a second colour, multi-material): inlaid like the cap's symbols, cut 0.6 deep (3
@@ -222,7 +228,7 @@ DRAWING = Waveshare ESP32-S3-LCD-2-20250122.pdf; README = this board's README; A
 | `cell` | EEMB LP103454, 34.5 x 56 x 10.6; x 59.4-93.9, y 24.4-80.4, lead end -y | DATASHEET; position mots |
 | `rubber_gap` | 2.0 on every held side (walls, the L) | mots |
 | `L_top_t`, `L_left_w`, `L_top_len`, `L_left_len` | 3.0, 4.4, 20.0, 36.0 | design (mots: arms not the cell's whole length) |
-| `LID_SCREWS` | top x 37, bottom x 46, left y 10 | design (free low wall, see the table above) |
+| `LID_SCREWS` | bottom x 46, left y 10 (top removed: USB-C panel) | design (free low wall, see the table above) |
 | `m3_ins`, `m3_cs`, `tab`, `tab_clr`, `tab_screw_h` | d 4.0 x 5.0; d 3.4 / 6.4 / 1.5; 8 x 6 x 8; 0.2; 4.0 | DATASHEET (typical M3 x 4 insert, ISO 10642) / design |
 | `hook_y`, `hook`, `hook_barb`, `hook_clr` | 18.8; 5.0 x 1.6 x 9.0; 1.0 deep, 1.2 catch, 1.0 lead-in; 0.3 | design |
 | `psw_y`, `psw_z` | 72.9, -13.0 (left wall) | design (mots: left wall, bottom-left) |

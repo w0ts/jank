@@ -143,7 +143,10 @@ tab_screw_h = 4.0;         // the screw's axis over the lid's top (2.0 of tab ab
 // [wall, position along it (board mm)]: free low wall, clear of slots, the DINs, the switch, the cell's rubber, the L,
 // the strip rails: top x 23.1-51.65 (between J3's slot and the DIN window), bottom x 34-57.4 (J7's slot to the cell's
 // rubber), left y 0-34.6 (above the LCD-2's USB-C slot; J2 hangs only to z -7.1 over it)
-LID_SCREWS = [["top", 37.0], ["bottom", 46.0], ["left", 10.0]];
+// (the top screw at x 37 is gone: the wall piece it went through, under the USB-C window, broke on the first print,
+// hanging from a 2.45 mm strip and a 0.3 mm sliver; mots, 2026-11-20: "it should be attached to the bottom instead",
+// so that piece is now a panel on the lid, and a screw from it into the lid would hold nothing)
+LID_SCREWS = [["bottom", 46.0], ["left", 10.0]];
 // the right wall has no room for a screw (the DIN J6 reaches the floor to y 15.19, the cell's rubber starts at y 22.4,
 // J13 / J14 slots): a HOOK there instead, a thin tab with a barb that catches in a small window in the right wall
 // (fit the lid right side first, tilted, then swing it up and screw the other three)
@@ -348,6 +351,25 @@ DIN_RAIL = [DIN_U[0][0] + din_clr, DIN_BACK + din_rail_clr, lid_z1 - 0.01,
 // the tongue: the DIN window's width less tongue_clr a side, from the lid's top to din_lock_h over the DIN bottoms
 module din_tongue() for (d = DIN_MERGE ? [[DIN_U[0][0], DIN_U[1][1]]] : DIN_U)
     translate([d[0] + tongue_clr, lid_z1 - 0.01]) square([d[1] - d[0] - 2 * tongue_clr, floor_gap + din_lock_h + 0.01]);
+// the wall under the USB-C window, from J3's slot to the DIN window, is the lid's (mots, 2026-11-20): the shell is
+// open there from its bottom edge to the window, and the lid's panel fills it, its top edge the window's lower edge
+USB_PANEL_U = [J3X + plug_d / 2, DIN_U[0][0]];     // 23.1 .. 51.65
+USB_PANEL_TOP = usb_om_z[0] - om_clr;              // -1.8: the USB-C window's lower edge (under our board, -1.6)
+module usb_panel_slot() translate([USB_PANEL_U[0], lid_z1 - 2]) square([USB_PANEL_U[1] - USB_PANEL_U[0], USB_PANEL_TOP - lid_z1 + 2 + 0.01]);
+// one wall with J3's tongue and the DIN tongue (mots: "why the slit on left and right?": no shell left between them):
+// on the left it joins J3's tongue below the plug's axis (the round opening cut out); on the right it reaches the DIN tongue under
+// the shell's 0.6 lip over the DIN window (z -2.2), tongue_clr below it
+module usb_panel() difference() {
+    union() {
+        translate([USB_PANEL_U[0] + tongue_clr, lid_z1 - 0.01])          // the panel (the shell above J3's opening:
+            square([USB_PANEL_U[1] - USB_PANEL_U[0] - 2 * tongue_clr, USB_PANEL_TOP - lid_z1 + 0.01]);   // tongue_clr)
+        translate([J3X + plug_d / 2 - tongue_clr, lid_z1 - 0.01])          // joined to J3's tongue below the plug's axis
+            square([2 * tongue_clr + 0.02, jack_axis - lid_z1 + 0.01]);
+        translate([USB_PANEL_U[1] - tongue_clr - 0.01, lid_z1 - 0.01])
+            square([2 * tongue_clr + 0.02, -T - din_top_lip - tongue_clr - lid_z1 + 0.01]);
+    }
+    translate([J3X, jack_axis]) circle(d = plug_d + 0.01);
+}
 module din_windows() {
     zt = -T - din_top_lip;
     if (DIN_MERGE) translate([DIN_U[0][0], lid_z1 - 2]) square([DIN_U[1][1] - DIN_U[0][0], zt - lid_z1 + 2]);
@@ -356,8 +378,9 @@ module din_windows() {
 module openings() {
     through_wall("top") {
         jack_slot(J2X, plug_d);  jack_slot(J3X, plug_d);
-        translate([USB_U[0], usb_om_z[0] - om_clr]) offset(1) offset(-1)
-            square([USB_U[1] - USB_U[0], usb_om_z[1] - usb_om_z[0] + 2 * om_clr]);
+        translate([USB_U[0], usb_om_z[0] - om_clr]) offset(1) offset(-1)   // (to the DIN window: no 0.3 mm sliver)
+            square([DIN_U[0][0] + 1 - USB_U[0], usb_om_z[1] - usb_om_z[0] + 2 * om_clr]);
+        usb_panel_slot();
         din_windows();
     }
     through_wall("right") { jack_slot(J13Y, plug_d); jack_slot(J14Y, plug_d); }
@@ -438,7 +461,7 @@ module lid() {
             for (b = [L_TOP, L_LEFT]) bx(b);
             // the DIN lock: the rail behind both DIN bodies (up to under our board, like the L) and the tongue in front
             bx(DIN_RAIL);
-            in_wall("top", fit, wall) din_tongue();
+            in_wall("top", fit, wall) { din_tongue(); usb_panel(); }
         }
     }
 }
