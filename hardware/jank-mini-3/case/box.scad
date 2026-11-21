@@ -605,6 +605,15 @@ if (part == "cap") cap();
 if (part == "cap_symbols") cap_symbols();
 if (part == "cap_view") { color("orange") cap(); color("#111111") cap_symbols(); }
 if (part == "board") board();
+// mock-ups to print or drop into a slicer next to the box (mots, 2026-11-20: "pcb: with all the connectors
+// basically"), same origin as the box's STLs: the PCB with the LCD-2, the connectors (J*: USB-C, TRS and PJ-320A jacks,
+// DINs, headers), the strips and the D-pad switches (for the cap), as their bounding boxes; and the cell
+function is_conn(r) = (r[0] == "J" && r[1] != "P") || (r[0] == "S" && r[1] == "W");
+if (part == "board_mock") {
+    grp_pcb(); grp_lcd2(); grp_strips();
+    for (p = BOARD_PARTS) if (is_conn(p[0])) bx([for (i = [3:8]) p[i]]);
+}
+if (part == "cell_mock") grp_cell();
 if (part == "inside") { color("slategray") lid(); color("silver") grp_bottom(); color("teal") grp_strips(); color("royalblue") grp_cell();
                          color("dimgray") grp_screws(); color("#222222") kcd1(); }   // the shell, our board and the LCD-2 off
 if (part == "left_wall") { color("lightgray") shell(); color("#222222") kcd1(); color("slategray") lid(); board(); }
