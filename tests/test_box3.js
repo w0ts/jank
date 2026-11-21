@@ -30,7 +30,7 @@ eq(BOX3.arrows.map((a) => a[2]), [0, 0, 0, 0, 0, 0, -90, -90, 180, 90], 'ten poi
 eq([BOX3.arrowSize.w, BOX3.arrowSize.h, BOX3.labelSize], [2.6, 2.1, 2.2], 'triangle 2.6 x 2.1, text size 2.2');
 const css = fs.readFileSync(path.join(__dirname, '..', 'ui', 'box3.css'), 'utf8');
 ok(/\.lid \{ fill:#ffffff;/.test(css), 'the body is white');
-ok(/\.label \{ fill:#F5A3C7;/.test(css) && /\.sym \{ fill:#F5A3C7;/.test(css) && /\.label-arrow \{ fill:#F5A3C7;/.test(css), 'labels and symbols are pink #F5A3C7');
+ok(/\.label \{ fill:#A06CF0;/.test(css) && /\.sym \{ fill:#A06CF0;/.test(css) && /\.label-arrow \{ fill:#A06CF0;/.test(css), 'labels and symbols are purple #A06CF0');
 ok(/\.cap \{ fill:#5f5f5f;/.test(css), 'the D-pad cap is grey');
 ok(/Avenir Next Condensed[^;]*sans-serif; font-weight:800/.test(css), 'the labels use the condensed heavy stack');
 const keys = ['up', 'down', 'no', 'yes'], X = BOX3.cross, hh = X.span / 2, aa = X.arm / 2;

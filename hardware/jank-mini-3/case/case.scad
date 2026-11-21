@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// jank LCD-2 add-on: a tray and a lid (and 4 button plungers) to the 93 x 62.6 board (Henri, 2026-11-18: MIDI on the
+// jank LCD-2 add-on: a tray and a lid (and 4 button plungers) to the 93 x 62.6 board (mots, 2026-11-18: MIDI on the
 // top wall, CLOCK / RESET on the right, the USB-C and LINE IN on the left, 2 cells on edge along the bottom wall).
 // Board coordinates from make_board.py (x right, y DOWN from the board's top-left corner); here y_scad = H - y_board.
 // Heights: ASSUMED from the datasheets / Waveshare's drawing where named, else estimates (marked EST): every wall
@@ -15,7 +15,7 @@ ZT = ZB + BOARD;                  // board top
 LCD_GAP = 11.0;                   // board top -> the LCD-2's PCB (8.5 socket + 2.5 header plastic, ASSUMED)
 ZLCD = ZT + LCD_GAP;              // the LCD-2's PCB bottom
 GLASS = 16.8;                     // board top -> the LCD-2's glass (KiCad render with Waveshare's STEP, 2026-11-18)
-DIN_H = 20.9;                     // the DIN-504B on top of the board (HOOYA drawing; JLC's model 19.6): Henri's option 1
+DIN_H = 20.9;                     // the DIN-504B on top of the board (HOOYA drawing; JLC's model 19.6): mots's option 1
 ZTOP = ZT + DIN_H + 0.6;          // the lid's underside: 0.6 mm over the DINs; the screen sits ZTOP - ZT - GLASS = 4.7 mm
                                   // under it (the window's walls)
 OUT_W = W + 2 * (GAP + WALL); OUT_D = H + 2 * (GAP + WALL);
@@ -48,7 +48,7 @@ module tray() {
     difference() {
         translate([-GAP - WALL, -GAP - WALL, 0]) cube([OUT_W, OUT_D, ZTOP]);
         translate([-GAP, -GAP, FLOOR]) cube([W + 2 * GAP, H + 2 * GAP, ZTOP]);
-        // left wall (Henri, 2026-11-18): our USB-C OUT (J4, y LY + 12) and IN (J1, y LY + 23) under the LCD-2, its own
+        // left wall (mots, 2026-11-18): our USB-C OUT (J4, y LY + 12) and IN (J1, y LY + 23) under the LCD-2, its own
         // USB-C (LY + 17.5) above them: the plugs' overmolds (EST 11 x 6.5) would leave a 0.3 mm web between the three
         // windows, so they are one opening; and LINE IN (PJ-307C, y H - 6.9, axis EST 2.8 up) below the LCD-2
         hull() {

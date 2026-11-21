@@ -7,47 +7,18 @@
 <title>jank</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Cg transform='translate(2.7 6.2) scale(1.4)' fill='none' stroke='%23A06CF0' stroke-width='2'%3E%3Crect x='1' y='1' width='10' height='6' rx='1.5'/%3E%3Crect x='8' y='7' width='10' height='6' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
 <style>
-:root { --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --dim: #6b6a64; --line: #dddbd3; --accent: #0b6e4f; --warn: #a33b20; --beat: #0b6e4f; --off: #e6e4dc; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; --beat: #4cc497; --off: #2c2c2a; } }
-:root[data-theme="dark"] { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --accent: #4cc497; --warn: #e8835f; --beat: #4cc497; --off: #2c2c2a; }
-* { box-sizing: border-box; }
-body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
-main { max-width: 1100px; margin: 0 auto; }
-h1 { font-size: 36px; margin: 0; line-height: 1.1; }
-#home-links { display: flex; gap: 14px; font-size: 14px; }
-#home-links a { color: var(--accent); text-decoration: none; }
+<!--@include ui/common.css-->
+:root { --accent: #9770c6; --accent-text-l: #8253ba; --accent-text-d: #a380d0; }
+/* jank's own: */
+#home-links { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+#home-links a { color: var(--accent-text); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 #home-links a:hover { text-decoration: underline; }
-#home-links a { display: inline-flex; align-items: center; gap: 6px; }
-h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
-section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 14px; }
-.stat b { display: block; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.stat.wide { grid-column: span 2; }
-.stat span { color: var(--dim); font-size: 12px; }
-label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--dim); }
-select, input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; width: 100%; min-height: 40px; }
-button { font: inherit; color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 9px 14px; cursor: pointer; min-height: 40px; }
-button.quiet { color: var(--ink); background: transparent; border: 1px solid var(--line); }
-button:disabled { opacity: .45; cursor: default; }
-.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-.note { font-size: 13px; color: var(--dim); }
-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
-th, td { text-align: left; padding: 3px 8px 3px 0; }
-th { color: var(--dim); font-weight: 500; font-size: 12px; }
 td button { padding: 4px 12px; min-height: 32px; }
-details.sec > summary { cursor: pointer; color: var(--dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 2px; }
 .row { display: flex; gap: 8px; align-items: end; }
 .row input { width: 7em; }
-.meter { height: 8px; border-radius: 4px; background: var(--off); overflow: hidden; margin-top: 6px; }
-.meter i { display: block; height: 100%; width: 0; background: var(--accent); }
-.meter { position: relative; }
-.meter b.tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
 #msg { color: var(--dim); min-height: 1.4em; margin: 0 0 12px; }
-#msg.bad { color: var(--warn); }
+#msg.bad { color: var(--err); }
 #msg:empty { display: none; }
-.hide { display: none !important; }
-[hidden] { display: none !important; }
 <!--@include ui/box3.css-->
 .live-row { display: flex; gap: 12px; align-items: flex-start; }
 .live-row > #face { flex: 1 1 0; min-width: 0; }
@@ -70,7 +41,7 @@ details.sec > summary { cursor: pointer; color: var(--dim); font-size: 13px; fon
 #player .pl-folder-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 4px; }
 #player .pl-folder-row .quiet-file { margin-top: 0; }
 #player button.small { margin-top: 6px; }
-#player button.link { min-height: 0; padding: 0 2px; background: none; border: 0; color: var(--accent); text-decoration: underline; }
+#player button.link { min-height: 0; padding: 0 2px; }
 #player input[type="range"].thin { width: 100%; padding: 0; min-height: 18px; margin: 2px 0 0; }
 #player input[type="checkbox"] { width: auto; min-height: 0; }
 #player select { width: auto; max-width: 100%; }
@@ -92,20 +63,17 @@ details.sec > summary { cursor: pointer; color: var(--dim); font-size: 13px; fon
 #pl-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 0; flex: 1 1 auto; min-width: 0; }
 #pl-crumbs button { min-height: 24px; padding: 1px 6px; }
 #pl-crumbs .folder { font-size: 12px; color: var(--dim); margin-right: 4px; }
-#pl-list { height: 232px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
-#pl-list button { display: block; width: 100%; text-align: left; min-height: 0; height: 28px; padding: 2px 8px; font-size: 12px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#pl-list button.dir { font-weight: 600; }
-#pl-list button.playing { color: var(--accent); }
+#pl-list { height: 232px; }
 .adv-boots { font-size: 20px; font-weight: 650; margin: 0 0 8px; }
-.adv-boots.restarted { color: var(--warn); }
-.check { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
-.check input { width: auto; min-height: 0; }
+.adv-boots.restarted { color: var(--err); }
 #connect-slot { margin: 4px 0 12px; }
-.title-row { display: flex; align-items: center; gap: 12px; }
+.title-row { display: flex; align-items: center; gap: 12px; flex: 1 1 280px; min-width: 0; }
+.title-row .titlebar { flex: 1 1 0; min-width: 120px; margin: 0; }
+.title-row #c-midi { flex: none; }
 .dev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .dev-bar #c-ports-box { margin: 0; }
 header #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
-header #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent); border-color: var(--accent); }
 #c-midi .eject { display: none; vertical-align: -2px; }
 #c-midi[aria-pressed="true"] .eject { display: inline-block; }
 #c-midi[aria-pressed="true"] .connect-text { display: none; }
@@ -114,8 +82,8 @@ header #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent
 </head>
 <body>
 <main>
-  <header>
-    <div class="title-row"><h1>jank</h1>
+  <header class="site">
+    <div class="title-row"><div class="titlebar"><h1>jank</h1></div>
     <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button></div>
     <nav id="home-links" aria-label="Links">
       <a href="https://github.com/w0ts/jank" title="The jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
@@ -195,7 +163,7 @@ header #c-midi[aria-pressed="true"] { color: var(--bg); background: var(--accent
           <div id="pl-crumbs" class="pl-crumbs"></div>
         </div>
         <div id="pl-browser" class="hide">
-          <div id="pl-list"></div>
+          <div id="pl-list" class="list"></div>
         </div>
       </section>
   </details>
@@ -1216,7 +1184,7 @@ autoConnect();
   let probe = null;                                      // a default-sink context, only to read the monitor's output latency (captureStream path)
   const browser = { rootName: "", names: [], handles: [], tree: null, entries: [], shown: Player.MAX_ROWS };
 
-  const note = (text, bad) => { el("pl-note").textContent = text; el("pl-note").style.color = bad ? "var(--warn)" : ""; };
+  const note = (text, bad) => { el("pl-note").textContent = text; el("pl-note").style.color = bad ? "var(--err)" : ""; };
   const errorText = (err) => (err && err.message ? err.message : String(err));
   // storage can be blocked (private windows, some file:// setups): then nothing is remembered, the player still works
   const store = {
@@ -1292,7 +1260,7 @@ autoConnect();
       hasFile: url !== null, paused: audio.paused, position: audio.ended ? 0 : audio.currentTime, length: audio.duration,
       monitor: monitorOn(), jank: jank.id ? jank.label : "", jankError: jank.error, volumePct: Number(el("pl-vol").value), error,
     });
-    el("pl-status").style.color = error ? "var(--warn)" : "";
+    el("pl-status").style.color = error ? "var(--err)" : "";
   }
   const setError = (text) => { error = text; paintStatus(); };
   const paintPlay = () => {

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Henri's cells in parallel behind one protector: 2 or 3 x 1S LiPo (450 / 550 mAh, 4.2 V full), each on its own
+"""mots's cells in parallel behind one protector: 2 or 3 x 1S LiPo (450 / 550 mAh, 4.2 V full), each on its own
 PH2.0 socket through R_S = 0.33 ohm into BAT+ (= VBAT, the LCD-2's header pin P2.14); the cells' minus pins joined into
 B-; DW01A (PUOLOP, LCSC C351410) + FS8205A (TECH PUBLIC, C2830320) between B- and the board's GND (P-).
 Monte Carlo, Python (the paths are resistive; the time constants are minutes).

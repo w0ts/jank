@@ -2,7 +2,7 @@
 """Sign-off stage 2 (2026-11-17, worktrees/mini22-review-scratch/REVIEW.md): the approved fixes applied to the ROUTED
 board in place, not by a new Freerouting run (the routed board carries review fixes no generator holds):
   R1  C72 / C92 (2 x 100 uF) from VSYS to VREG, after the power switch, fitted in both orders (parts.py), behind
-      R155 1 ohm (VREG_B: the usb order's inrush, Henri's pick);
+      R155 1 ohm (VREG_B: the usb order's inrush, mots's pick);
   R6  C104 (10 uF 0402) at U18's VIN / GND; the bottom under U2's loops (U2, C3, C5, L4) kept free of tracks (VBUS);
   C2  C97 / C103 (100 nF) at LED2 / LED4: one per LED;
   R5  CC2 and the USB pair's / CC1's vias out from under J1's shell: TRIED, NOT DONE. With the shell kept free (the
@@ -10,7 +10,7 @@ board in place, not by a new Freerouting run (the routed board carries review fi
       via below it, and the pair's A6 / B6 crossover needs a via between 0.5 mm-pitch escapes (a 0.6 mm via does not
       fit). Two layers and this receptacle leave them where they are (tented, as review 2 accepted).
 Signoff3 (round 3, worktrees/mini22-round3-scratch/REVIEW3.md), the same way: C3 0603 -> 0805 (R4) replaced in place,
-R155 moved 1.6 mm in from the edge (R10) and R156 beside it (R155 // R156 = 0.5 ohm, Henri's), up to 3 vias at each layer change of BAT_P / BAT_C / BAT_N (R3: stitch_vias;
+R155 moved 1.6 mm in from the edge (R10) and R156 beside it (R155 // R156 = 0.5 ohm, mots's), up to 3 vias at each layer change of BAT_P / BAT_C / BAT_N (R3: stitch_vias;
 fatten.py widens their copper); R136, Q10..Q13 and R10 / R11 are value / part changes only (parts.py).
 Run it ONCE on the board it starts from (signoff3: tag mini2.2-signoff2's mini2.kicad_pcb), then fatten.py: a second
 pass on its own output re-trims and adds stitching vias where fatten.py's wider copper changed the room.
