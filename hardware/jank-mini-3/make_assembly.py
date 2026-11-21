@@ -2,8 +2,8 @@
 """JLC's assembly files from lcd2.kicad_pcb: fab/lcd2-bom.csv (Comment, Designator, Footprint, LCSC) and
 fab/lcd2-cpl.csv (Designator, Mid X, Mid Y, Layer, Rotation). Every footprint is JLC's own (EasyEDA) for its LCSC
 code, so the CPL position and rotation are the footprint's origin and KiCad rotation (as mini 2.2's make_assembly.py).
-Fitted parts only (parts.DNP left out). jank-mini-3 (Henri, 2026-11-18): JLC assembles the TOP only; every part under
-the board (the DINs, the jacks, the male rows J15 / J16, the cell sockets) is hand-soldered by Henri and goes to
+Fitted parts only (parts.DNP left out). jank-mini-3 (mots, 2026-11-18): JLC assembles the TOP only; every part under
+the board (the DINs, the jacks, the male rows J15 / J16, the cell sockets) is hand-soldered by mots and goes to
 fab/lcd2-hand.csv instead (ref, value, LCSC, joints; "TO PICK" where no part is chosen yet). Older layouts: the
 through-hole parts on the BOM too (JLC hand-solders them). Writes fab/summary.json (codes, counts, joints).
 KiCad's python: make_assembly.py"""
@@ -32,7 +32,7 @@ def main():
         if r not in part or not P.fitted(r) or not (part[r][4] or (B.MINI3 and f.IsFlipped())):
             continue
         _r, _k, value, fp, lcsc, _pins = part[r]
-        if B.MINI3 and f.IsFlipped():   # (Henri solders it: the hand list, not JLC's files)
+        if B.MINI3 and f.IsFlipped():   # (mots solders it: the hand list, not JLC's files)
             hand.append([r, value, P.FP[fp], "TO PICK (male 1x14 header)" if r in ("J15", "J16") else lcsc,
                          len([p for p in f.Pads() if p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH])])
             continue
@@ -61,7 +61,7 @@ def main():
             w = csv.writer(fh)
             w.writerow(["Designator", "Value", "Footprint", "LCSC", "Joints"])
             w.writerows(sorted(hand))
-        print(f"hand-soldered by Henri: {len(hand)} parts, {sum(h[4] for h in hand)} joints (fab/lcd2-hand.csv)")
+        print(f"hand-soldered by mots: {len(hand)} parts, {sum(h[4] for h in hand)} joints (fab/lcd2-hand.csv)")
     qty = {}
     for (_v, _f, lcsc), refs in bom.items():
         qty[lcsc] = qty.get(lcsc, 0) + len(refs)

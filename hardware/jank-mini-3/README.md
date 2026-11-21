@@ -22,18 +22,18 @@ cd hardware/jank-mini-3 && python3 make_schematic.py && kicad-cli sch erc --seve
 cd hardware/jank-mini-3/sim && for s in power clamp host midi_cv linein_esd; do python3 $s.py > /dev/null || echo FAIL $s; done
 ```
 
-USB (Henri, 2026-11-17): the LCD-2's own USB-C sits at the case's side wall and is used directly for a computer or a
+USB (mots, 2026-11-17): the LCD-2's own USB-C sits at the case's side wall and is used directly for a computer or a
 charger. For host mode a standard short cable outside the box joins it to J1 (IN, USB-C, VBUS and CC open); D+ / D-
 run straight to J4 (OUT, USB-A female), whose VBUS carries only the host signal (R93 / D16 from U21).
 
-OUT gives hosted gear only a 680 ohm host signal on VBUS, never power (Henri, 2026-11-17: the small cell is not drained). Bus-powered gear needs its own power or a powered hub.
+OUT gives hosted gear only a 680 ohm host signal on VBUS, never power (mots, 2026-11-17: the small cell is not drained). Bus-powered gear needs its own power or a powered hub.
 
-## jank-mini-3 layout (Henri, 2026-11-18: placed, not routed)
+## jank-mini-3 layout (mots, 2026-11-18: placed, not routed)
 
 Board 93 x 72 mm with a cut-out for the LCD-2 (its PCB level with ours, LCD-2 centred). Two bridge strips (small
 PCBs, two 1 x 14 female sockets 3.81 mm apart, not drawn yet) join its pins to our two 1 x 14 male rows J15 / J16,
 mounted under the board 3.81 mm outside its rows. No screws: 4 pegs under the lid press its corners down. The 2 cells
-lie flat on the case floor under it (2.3 mm spare under the strips). Under the board, hand-soldered by Henri: the
+lie flat on the case floor under it (2.3 mm spare under the strips). Under the board, hand-soldered by mots: the
 DINs, the jacks, J15 / J16, the cell sockets J18 / J19 (side-entry PH2.0, part not picked). On top, by JLC: the
 USB-Cs and every SMD part. Walls: MIDI (2 DINs + 2 TRS) top, our USB-Cs left (J4 above, J1 below the LCD-2's own),
 CLOCK / RESET right, LINE IN bottom.
@@ -44,9 +44,9 @@ cd hardware/jank-mini-3 && BOARD=$PWD/.t/mini3.kicad_pcb /Applications/KiCad/KiC
 
 Not done yet: the bridge strip board, the case (cut-out, lid pegs, lower wall openings), routing.
 
-## Cells (proposal, 2026-11-18, waiting for Henri's pick)
+## Cells (proposal, 2026-11-18, waiting for mots's pick)
 
-Henri's 1S LiPo cells (3.7 V, 4.2 V full; 450 or 550 mAh, 6 x 17 x 60 mm, PH2.0 lead), 2 of them standing on their long edge (12 x 17 tall x 60) along the bottom wall.
+mots's 1S LiPo cells (3.7 V, 4.2 V full; 450 or 550 mAh, 6 x 17 x 60 mm, PH2.0 lead), 2 of them standing on their long edge (12 x 17 tall x 60) along the bottom wall.
 They plug into 2 PH2.0 sockets on this board (J18, J19; always both cells, never 1: the LCD-2 charges at 2 A), each through its own 0.33 ohm 2 W,
 joined to VBAT (the LCD-2's header pin; its J4 stays empty). One DW01A + FS8205A protects the joined cells (sim/cells.txt).
 - **Never plug in cells at different voltages.** Charge them to the same state first, all full or all on the unit. The 0.33 ohm per socket only limits the current between cells (~1.5 A at a 1 V difference) if this is forgotten.

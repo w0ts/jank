@@ -20,16 +20,16 @@ MM = pcbnew.FromMM
 LIB = os.path.join(HERE, "lib", "chip.pretty")
 NAME = "lcd2"
 OX = OY = 100.0
-CELL = os.environ.get("LCD2_CELL", "floor")    # "floor": jank-mini-3 (Henri, 2026-11-18; see MINI3 below); older
+CELL = os.environ.get("LCD2_CELL", "floor")    # "floor": jank-mini-3 (mots, 2026-11-18; see MINI3 below); older
                                                # studies: "under", "top", "edge"
 MINI3 = CELL == "floor"
 W = float(os.environ.get("LCD2_W", 93.0))
-H = float(os.environ.get("LCD2_H", 74.0 if MINI3 else 62.6))   # (mini-3: 74 = 72 for the TRS jacks + 2 so it routes, Henri "a few mm"; LCD-2 centred)
+H = float(os.environ.get("LCD2_H", 74.0 if MINI3 else 62.6))   # (mini-3: 74 = 72 for the TRS jacks + 2 so it routes, mots "a few mm"; LCD-2 centred)
 
 # the LCD-2, landscape, its USB-C at the left wall: front coordinates (fx across its 35.01, fy along its 48.21 with the
 # USB-C at fy = 48.21) -> board (LX + 48.21 - fy, LY + fx). Its P1 row at fx = 32.745, P2 at fx = 2.265 (seen from the
 # screen side; Waveshare's pictures show the back), pin 1 at fy = 7.60, pitch 2.54.
-LX, LY = 0.5, float(os.environ.get("LCD2_LY", (H - 35.01) / 2))   # (Henri, 2026-11-18: the LCD-2 centred vertically, its USB-C at the left wall)
+LX, LY = 0.5, float(os.environ.get("LCD2_LY", (H - 35.01) / 2))   # (mots, 2026-11-18: the LCD-2 centred vertically, its USB-C at the left wall)
 
 
 def lcd(fx, fy):
@@ -42,16 +42,16 @@ HOLE_D, HOLE_KEEP = 2.2, 2.6
 MOUNT = ([(W - 4.0, H - 4.0), (52.5, H - 4.0)] if CELL == "under"
          else [(W - 3.5, 30.5), (51.5, 20.0)])   # the board's own M2 holes to the case (the right part; the LCD-2's
                                                #  four screws hold the left part through the case floor)
-# (Henri, 2026-11-18: the cell lies in the ~11 mm gap between this board and the LCD-2's back, between its socket rows;
+# (mots, 2026-11-18: the cell lies in the ~11 mm gap between this board and the LCD-2's back, between its socket rows;
 #  its lead plugs straight into the LCD-2's J4 in that gap: no slot through this board any more.) No parts there.
 DPX = 49.0 + (W - 13.0 - 49.0) / 2           # the D-pad's centre x: between the LCD-2 and the right-wall jacks
-# CELL "under": one flat cell in the gap under the LCD-2 (no parts there); "top": Henri's 6 x 17 x 60 cells, 1-3
+# CELL "under": one flat cell in the gap under the LCD-2 (no parts there); "top": mots's 6 x 17 x 60 cells, 1-3
 # stacked, on top along the bottom wall; "edge": 2 cells on their long edge along the bottom wall
 if CELL == "under":
     CELL_KEEP = [(LX, LY, LX + 48.21, LY + 35.01)]
 else:   # the stack's 17.5 x 60.5 pad (right of LINE IN) + a strip for the 3 PH2.0 sockets at its left end
     CELL_KEEP = [(W - 61.0, H - 18.0, W - 0.5, H - 0.5), (W - 23.0, H - 24.0, W - 0.5, H - 18.0)]
-if CELL == "edge":   # (Henri, 2026-11-18) 2 cells standing on their long edge along the bottom wall: a 12.6 x 60.6 pad
+if CELL == "edge":   # (mots, 2026-11-18) 2 cells standing on their long edge along the bottom wall: a 12.6 x 60.6 pad
     CELL_KEEP = [(W - 61.1, H - 13.1, W - 0.5, H - 0.5)]
 LCD_RECT = (LX - 0.5, LY - 0.5, LX + 48.21 + 0.5, LY + 35.01 + 0.5)
 TALL = {"J18", "J19"}   # (PH2.0 sockets, 8 mm + the plug: never under the LCD-2)
@@ -60,8 +60,8 @@ TALL = {"J18", "J19"}   # (PH2.0 sockets, 8 mm + the plug: never under the LCD-2
 # rotation in degrees for the others
 PLACE = {
     "J15": (ROW_X, LY + 32.745, 180), "J16": (ROW_X, LY + 2.265, 180),
-    # (Henri, 2026-11-18, by wall) LEFT: our two USB-C, OUT above and IN below the LCD-2's own USB-C
-    # (edge: Henri: both under the LCD-2, beside its own USB-C (LY + 17.5), between its screws; its USB-C hangs to 7 mm
+    # (mots, 2026-11-18, by wall) LEFT: our two USB-C, OUT above and IN below the LCD-2's own USB-C
+    # (edge: mots: both under the LCD-2, beside its own USB-C (LY + 17.5), between its screws; its USB-C hangs to 7 mm
     #  over our board, our receptacles are 3.2 mm tall)
     "J4": (None, 6.5 if not CELL == "edge" else LY + 12.0, "-x"), "J1": (None, H - 6.5 if not CELL == "edge" else LY + 23.0, "-x"),
     # TOP = MIDI: the two TRS MIDI jacks above the LCD-2, both DINs on the right part
@@ -101,14 +101,14 @@ GAP = {r: 0.9 for r in ("R30", "C30", "R31", "C31", "R32", "C32", "R65", "C65", 
                          "RT33", "R34", "RT34", "R153", "C33")}   # (the LINE IN network: room for its own tracks)
 GAP.update({"R162": 0.6, "R163": 0.6})   # (the two 2512s: their silk outlines touched at 0.4)
 GAP.update({"R164": 1.0})   # (jank-mini-3: VBAT's 1 mm track must reach its pad 1; packed tight it could not)
-BOTTOM = set()   # (Henri, 2026-11-18, option 1: every part on top, Economic single-sided, the lid raised over the DINs)     # mm: parts under the LCD-2 must stay lower (its back parts hang ~3.5 mm into the 11 mm gap)
+BOTTOM = set()   # (mots, 2026-11-18, option 1: every part on top, Economic single-sided, the lid raised over the DINs)     # mm: parts under the LCD-2 must stay lower (its back parts hang ~3.5 mm into the 11 mm gap)
 CUT = None       # the LCD-2's cut-out (jank-mini-3 only)
 DPAD_KEEP = []   # the D-pad cross where no part may sit (jank-mini-3 only)
 
-# ---- jank-mini-3 (Henri, 2026-11-18): the LCD-2 drops into a cut-out, its PCB level with ours. Two bridge strips (small
+# ---- jank-mini-3 (mots, 2026-11-18): the LCD-2 drops into a cut-out, its PCB level with ours. Two bridge strips (small
 # PCBs, 2 x 1x14 female sockets 3.81 mm apart) join its pins to our two 1x14 male rows, mounted under the board 3.81 mm
 # outside its rows. No screws: 4 pegs under the lid press its corners down. The 2 cells (6 x 17 x 60) lie flat on the
-# case floor under it. Under the board, hand-soldered by Henri: DINs, jacks, the male rows, the cell sockets
+# case floor under it. Under the board, hand-soldered by mots: DINs, jacks, the male rows, the cell sockets
 # (side-entry PH2.0). On top, by JLC: the USB-Cs and every SMD part. Walls: MIDI (DINs + TRS) top, our USB-Cs left
 # above / below the LCD-2's own, CLOCK / RESET right, LINE IN bottom.
 if MINI3:
@@ -121,21 +121,21 @@ if MINI3:
     TALL = set()
     BOTTOM = {"J2", "J3", "J5", "J6", "J7", "J13", "J14", "J15", "J16", "J18", "J19"}
     DPX = 49.0 + (W - 15.0 - 49.0) / 2
-    # (Henri, 2026-11-18: NO part where the D-pad cap rests) the 24 mm cross, 8 mm arms, + 1 mm: only SW1/3/4/5 there,
+    # (mots, 2026-11-18: NO part where the D-pad cap rests) the 24 mm cross, 8 mm arms, + 1 mm: only SW1/3/4/5 there,
     # on top; no through-hole joint from below either (check_board.py checks both)
     DPAD_KEEP = [(DPX - 13.0, H / 2 - 5.0, DPX + 13.0, H / 2 + 5.0), (DPX - 5.0, H / 2 - 13.0, DPX + 5.0, H / 2 + 13.0)]
     PLACE = {
         # our male rows under the board (pin k across from the LCD-2's pin k: main() checks pin 1's x)
         "J15": (ROW_X, LY + 32.745 + D_ROW, 180), "J16": (ROW_X, LY + 2.265 - D_ROW, 180),
-        # TOP wall, left part (Henri, 2026-11-18: the two USB-C side by side, away from LINE IN): J1 (IN, data only) then J4
+        # TOP wall, left part (mots, 2026-11-18: the two USB-C side by side, away from LINE IN): J1 (IN, data only) then J4
         # (OUT + its host circuit), left of the TRS jacks, clear of the upper strip; the LCD-2's own USB-C stays at the left wall
         "J1": (6.0, None, "-y"), "J4": (17.5, None, "-y"),
         # TOP = MIDI: the TRS jacks above the LCD-2 (clear of the upper strip), the DINs on the right part
         "J2": (29.8, None, "-y"), "J3": (42.6, None, "-y"), "J5": (W - 33.0, None, "-y"), "J6": (W - 10.9, None, "-y"),
-        # RIGHT = modular; BOTTOM = audio: LINE IN right of the two USB-C, under its LCD-2 pins P1.8-P1.10 (Henri, 2026-11-18)
+        # RIGHT = modular; BOTTOM = audio: LINE IN right of the two USB-C, under its LCD-2 pins P1.8-P1.10 (mots, 2026-11-18)
         "J13": (None, H / 2 - 10.0, "+x"), "J14": (None, H / 2 + 10.0, "+x"),
         "J7": (30.0, None, "+y"),
-        # the D-pad between the LCD-2 and CLOCK / RESET: one 24 mm cross cap (8 mm arms) rocking on 4 switches at +/-8 (Henri)
+        # the D-pad between the LCD-2 and CLOCK / RESET: one 24 mm cross cap (8 mm arms) rocking on 4 switches at +/-8 (mots)
         "SW3": (DPX, H / 2 - 8.0, 0), "SW4": (DPX, H / 2 + 8.0, 0), "SW1": (DPX - 8.0, H / 2, 0), "SW5": (DPX + 8.0, H / 2, 0),
         # the cells' sockets under the board below the D-pad, mouths toward the cells' end (x 61)
         "J18": (DPX - 2.0, H / 2 + 16.0, 270), "J19": (DPX - 2.0, H / 2 + 23.2, 270),

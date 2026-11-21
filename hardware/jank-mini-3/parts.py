@@ -11,13 +11,13 @@ PARTS: (ref, symbol, value, footprint, lcsc, {pad: net}). A pad left out is not 
 Refs: mini 2.2's ref for every circuit taken over unchanged; new parts get new numbers.
 """
 
-# the USB path (Henri, 2026-11-17): the LCD-2's own USB-C sits at the case's side wall, reachable. Device mode / charging:
+# the USB path (mots, 2026-11-17): the LCD-2's own USB-C sits at the case's side wall, reachable. Device mode / charging:
 # a computer or a charger straight into it. Host mode: a standard short cable OUTSIDE the box from the LCD-2's USB-C
-# into J1 (IN, USB-C, beside it on the same wall); D+ / D- go straight to J4 (OUT, USB-C too: Henri, 2026-11-18).
+# into J1 (IN, USB-C, beside it on the same wall); D+ / D- go straight to J4 (OUT, USB-C too: mots, 2026-11-18).
 # J1's VBUS and CC are left open: nothing of ours can ever drive the LCD-2's VBUS (its 5V net is an input only: no
 # boost, no OTG, R25 10k down). J4 is a host-side receptacle: Rp 56k ("Default USB Power") from HOST5 on CC1 / CC2,
 # so a device on a C-to-C cable sees a source only while host mode is on; its VBUS carries only our host signal
-# (HOST5 -> R93 -> D16), never power (Henri).
+# (HOST5 -> R93 -> D16), never power (mots).
 
 FP = {   # JLC / EasyEDA footprint names (mini 2.2's lib/chip.pretty where it had them)
     "usbc": "USB-C-SMD_TYPE-C-16PIN-2MD-073", "sot236bl1": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL-1",
@@ -43,7 +43,7 @@ LCD2_PULL = {16: "up 4.7k (R4, camera SCL)", 21: "up 4.7k (R5, camera SDA)", 17:
              47: "up 4.7k (R30, IMU SCL)", 48: "up 4.7k (R29, IMU SDA)"}
 
 # jank function -> (GPIO, connector.pin). check_nets.py proves that the connector pin carries that GPIO (LCD2_P1 / P2)
-GPIO = {   # (jank-mini-3, Henri 2026-11-18: assigned from the LAYOUT by tools/gpio_opt.py, the shortest legal map)
+GPIO = {   # (jank-mini-3, mots 2026-11-18: assigned from the LAYOUT by tools/gpio_opt.py, the shortest legal map)
     "BTN_NO": (9, "J16.12"), "BTN_UP": (12, "J16.10"), "HOST_EN": (17, "J15.5"), "BTN_YES": (14, "J16.11"),
     "BTN_DOWN": (18, "J15.6"), "LINE_IN": (8, "J15.8"), "LINE_SENSE": (7, "J15.9"), "LIN_DET": (21, "J15.7"),
     "MIDI_TX": (15, "J16.7"), "MIDI_TX2": (11, "J16.9"), "CLK_IO": (13, "J16.8"), "RST_IO": (4, "J15.2"),
@@ -62,13 +62,13 @@ J16 = {"1": "+3V3", "2": "GND", "5": "SPARE_IO47", "6": "SPARE_IO48", "7": "MIDI
 DNP = set()
 
 PARTS = [
-    # ---- the LCD-2's sockets (through hole: Henri, or JLC's hand soldering; JOIN.md option a)
+    # ---- the LCD-2's sockets (through hole: mots, or JLC's hand soldering; JOIN.md option a)
     ("J15", "hdr14", "LCD-2 P1 1x14 F", "fhdr14", "C2905420", J15),
     ("J16", "hdr14", "LCD-2 P2 1x14 F", "fhdr14", "C2905420", J16),
     ("C60", "C", "10u", "c0603", "C19702", {"1": "+3V3", "2": "GND"}),
     ("C61", "C", "100n", "c0402", "C1525", {"1": "+3V3", "2": "GND"}),
     # spare GPIOs to pads (no part): IO2 / IO4 (ADC1) and the LCD-2's I2C (IO47 / 48, the IMU's 4.7k pull-ups on it)
-    # (jank-mini-3, Henri 2026-11-18: the spare pads split, one set by each LCD-2 row: no long run across the board)
+    # (jank-mini-3, mots 2026-11-18: the spare pads split, one set by each LCD-2 row: no long run across the board)
     ("J17", "pads4a", "SPARE pads P1", "pads4", "", {"1": "SPARE_IO6", "2": "SPARE_IO16", "3": "+3V3", "4": "GND"}),
     ("J20", "pads4b", "SPARE pads P2", "pads4", "", {"1": "SPARE_IO47", "2": "SPARE_IO48", "3": "+3V3", "4": "GND"}),
 
@@ -87,7 +87,7 @@ PARTS = [
     # C28 at J4's VBUS (sim/host.py: +8 kV contact ESD on VBUS -> ~2 V with it); the host signal's 2.2 ms rise
     ("C28", "C", "1u 50V", "c0603", "C15849", {"1": "VUSB", "2": "GND"}),
     # the host signal (mini 2.2's): U21's spare pair drives HOST5 = V5C when HOST_EN is high; R93 limits it (a short
-    # on J4's VBUS: ~2 mA), D16 blocks any way back. Signal only, never power (Henri: the small cell is not drained): bus-powered gear needs its own power or a powered hub
+    # on J4's VBUS: ~2 mA), D16 blocks any way back. Signal only, never power (mots: the small cell is not drained): bus-powered gear needs its own power or a powered hub
     ("JP13", "sj2", "HOST5 link", "sj2c", "", {"1": "HOST5G", "2": "HOST5"}),
     # (review A W1: 2.2k left a self-powered device's ~10k VBUS-detect at 3.7 V, under the 4.0..4.4 V "VBUS valid" of
     #  many chips; 680 ohm: ~4.2 V into 10k, a short takes 6.6 mA from U21 (8 mA recommended), never power)
@@ -247,13 +247,13 @@ PARTS += _cv("CLK", "CLK_IO", "D10", 70) + _cv("RST", "RST_IO", "D11", 76) + [
     ("R121", "R", "100", "r0402", "C25076", {"1": "RST_S", "2": "GND"}),
 ]
 
-# ---- the cells (Henri, 2026-11-18): 2 x 1S LiPo (4.2 V, 450 / 550 mAh, 6 x 17 x 60, PH2.0 leads) in parallel. Each on
+# ---- the cells (mots, 2026-11-18): 2 x 1S LiPo (4.2 V, 450 / 550 mAh, 6 x 17 x 60, PH2.0 leads) in parallel. Each on
 #      its own socket through 0.33 ohm into VBAT (= the LCD-2's VBAT through P2.14; its J4 stays empty): the resistor
 #      limits the current between two cells plugged in at different voltages (sim/cells.py). One protector for both:
 #      DW01A + FS8205A in the minus leg, B- (the cells' minus) -> the two FETs -> GND. B- is NOT GND.
 #      CHECK each cell's PH2.0 polarity before plugging (pin 1 = +, as silk-marked; leads vary).
 PARTS += [
-    # (jank-mini-3, Henri 2026-11-18: through hole, side entry, UNDER the board, hand-soldered by Henri; part not picked yet)
+    # (jank-mini-3, mots 2026-11-18: through hole, side entry, UNDER the board, hand-soldered by mots; part not picked yet)
     ("J18", "ph2m", "CELL 1", "ph2th", "", {"1": "CELL1", "2": "BNEG"}),
     ("J19", "ph2m", "CELL 2", "ph2th", "", {"1": "CELL2", "2": "BNEG"}),
     ("R162", "R", "0.33 2W", "r2512", "C393076", {"1": "CELL1", "2": "VBAT"}),
@@ -268,7 +268,7 @@ PARTS += [
 ]
 
 # the copper-only parts (solder jumpers, hatch lands, pads): DNP (not in the JLC BOM / CPL)
-# (jank-mini-3, Henri 2026-11-18: the through-hole parts sit UNDER the board and Henri solders them: the DINs, the jacks,
+# (jank-mini-3, mots 2026-11-18: the through-hole parts sit UNDER the board and mots solders them: the DINs, the jacks,
 #  the male rows J15 / J16 and the cell sockets go to fab/lcd2-hand.csv, not to JLC; JLC assembles the top only.
 #  Earlier, stage 2 of the brief: JLC hand-soldered them on top.)
 DNP |= {"J17", "J20", "JP8", "JP9", "JP10", "JP13", "R123", "R126", "R127", "R128", "R129", "C80", "C81", "C82", "C83"}

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""jank-mini-3's bridge strip (Henri, 2026-11-18): a small 2-layer PCB with two 1 x 14 female sockets (C2905420,
+"""jank-mini-3's bridge strip (mots, 2026-11-18): a small 2-layer PCB with two 1 x 14 female sockets (C2905420,
 8.5 mm) 3.81 mm apart, each socket pin joined straight across to its partner. Pushed up from below onto the LCD-2's
 pins and our male row beside them; 2 per unit (identical: the same strip serves both rows). No screws, no other parts.
 Writes strip.kicad_pcb next to this file.   KiCad's python: make_strip.py"""

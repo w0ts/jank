@@ -108,7 +108,7 @@ def main():
         bx0, by0, bx1, by1 = B.courtyard(fps[r], pads=False)
         d = {"-x": bx0, "-y": by0, "+y": B.H - by1, "+x": B.W - bx1}[wall]
         (notes if abs(d) <= 1.0 else errors).append(f"{r} front {d:+.2f} mm from its wall ({wall})")
-    # 6 (jank-mini-3, Henri: no part where the D-pad cap rests): only the 4 switches in the cross, on top; no
+    # 6 (jank-mini-3, mots: no part where the D-pad cap rests): only the 4 switches in the cross, on top; no
     #   through-hole pad of a bottom part there either
     for k in B.DPAD_KEEP:
         for r, f in fps.items():

@@ -611,14 +611,14 @@ SPARES = [
     #  dumped 80 uF through the switch's wires into VREG's 2 x 10 uF at every switch-on: VREG rang to 5.2 .. 7.9 V
     #  (the TPS63802's VIN abs max 6 V); the usb order's hot plug reached 5.93 / 6.23 V. On VREG: <= 5.59 V
     #  (worktrees/mini22-review-scratch/REVIEW.md). Cost: ~1000 uC more USB inrush in the usb order (accepted, C4))
-    # (the same day, Henri's pick for the usb order's inrush: R155 1 ohm in series with the bulk only (VREG -> VREG_B).
+    # (the same day, mots's pick for the usb order's inrush: R155 1 ohm in series with the bulk only (VREG -> VREG_B).
     #  Sim: VREG <= 5.16 V at switch-on and hot plug (bulk 3 mohm: 5.40), the host port's own rail dips 0.94 V (1.63);
     #  R155 carries 4.9 A peak, 1.0 mJ per plug (0.62 mJ at switch-on from a cell): an 0805, not the 0402 (no pulse
     #  curve in Uniroyal's sheet; adiabatic estimate ~10 K in an 0805's film vs ~65 K in an 0402's))
     ("C72", "C", "100u", "c1206", "C15008", {"1": "VREG_B", "2": "GND"}),
     ("C92", "C", "100u", "c1206", "C15008", {"1": "VREG_B", "2": "GND"}),
     ("R155", "R", "1", "r0805", "C25271", {"1": "VREG", "2": "VREG_B"}),
-    # (signoff3, Henri's "R155 2x1": R156, the same 1 ohm 0805, in parallel: 0.5 ohm. Round 3's stiff corner (5.5 V, 1 uH,
+    # (signoff3, mots's "R155 2x1": R156, the same 1 ohm 0805, in parallel: 0.5 ohm. Round 3's stiff corner (5.5 V, 1 uH,
     #  50 mohm cable, derated ceramics) rang VREG to 5.77 V with 1 ohm (5.85 V with C3 22 uF); 0.5 ohm damps it to ~5.25 V.
     #  No Basic sub-ohm part at JLC; each resistor takes half the pulse)
     ("R156", "R", "1", "r0805", "C25271", {"1": "VREG", "2": "VREG_B"}),
