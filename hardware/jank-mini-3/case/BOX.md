@@ -3,7 +3,8 @@
 `box.scad` (parametric OpenSCAD), the board as boxes in `board_model.scad` (written from `../lcd2.kicad_pcb` by
 `board_model.py`, KiCad's python), pictures by `make_renders.sh`, the floor map by `floor_map.py`, the collision check
 `box_check.py`. The older `case.scad` (93 x 62.6 layout) is untouched. STLs: `box-shell.stl` + `box-shell-labels.stl`
-(the face's inlaid labels, second colour, same origin), `box-lid.stl`, `box-cap.stl` + `box-cap-symbols.stl` (the
+(the face's inlaid labels, second colour, same origin), `box-lid.stl`, mock-ups `box-board-mock.stl` (the PCB, the LCD-2, the connectors, strips and D-pad switches as
+bounding boxes) and `box-cell-mock.stl` (the cell), `box-cap.stl` + `box-cap-symbols.stl` (the
 cap's inlaid symbols, second colour, same origin), exported in the ASSEMBLY orientation (turn them in the slicer:
 shell face down, lid outside down, cap top down; load each part with its inlays as one multi-part object so they stay
 aligned).
