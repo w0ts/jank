@@ -73,6 +73,13 @@ nav.site .sep { width: 1px; height: 18px; background: var(--line); }
 nav.site svg { flex: none; }
 footer.site { margin-top: var(--sp-6); padding-top: var(--sp-3); border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); }
 
+/* ---- title bar: the page title on a solid accent block that fades out to the right (the block holds the text, so contrast is dark --on on --accent in both modes, and a long title wraps inside it) */
+.titlebar { display: flex; align-items: stretch; margin: 0 0 var(--sp-3); }
+.titlebar::after { content: ""; flex: 1 1 32px; min-width: 32px; background: linear-gradient(90deg, var(--accent), transparent); }
+.titlebar > h1 { flex: 0 1 auto; max-width: calc(100% - 32px); min-width: 0; margin: 0; padding: 8px 18px 8px 16px; background: var(--accent); color: var(--on);
+  border-radius: var(--r) 0 0 var(--r); font-size: 28px; line-height: 1.15; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .titlebar > h1 { font-size: 21px; padding: 7px 12px; } }
+
 /* ---- cards: section or .card, with an h2 title. .card.accent: a selected / primary card. .card.inset: a card inside a card */
 section, .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; margin-bottom: 12px; min-width: 0; }
 .card.accent { border-left: 3px solid var(--accent); }
