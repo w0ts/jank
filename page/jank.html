@@ -18,10 +18,10 @@
 
 /* ---- tokens */
 :root, [data-theme="light"] { --bg: #f6f5f1; --panel: #fff; --ink: #1d1d1b; --dim: #6b6a64; --line: #dddbd3; --off: #e6e4dc;
-  --err: #a33b20; --warn: #8a5a00; color-scheme: light; }
+  --err: #a33b20; --warn: #55544e; color-scheme: light; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633;
-  --off: #2c2c2a; --err: #e8835f; --warn: #e8b94a; color-scheme: dark; } }
-[data-theme="dark"] { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --off: #2c2c2a; --err: #e8835f; --warn: #e8b94a; color-scheme: dark; }
+  --off: #2c2c2a; --err: #e8835f; --warn: #b9b8b0; color-scheme: dark; } }
+[data-theme="dark"] { --bg: #171716; --panel: #212120; --ink: #eeede8; --dim: #9c9b94; --line: #363633; --off: #2c2c2a; --err: #e8835f; --warn: #b9b8b0; color-scheme: dark; }
 [data-theme] { background: var(--bg); color: var(--ink); }
 :root { --accent: #4cc497; --accent-text-l: #0b6e4f; --accent-text-d: #4cc497; --on: #171716;
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -31,7 +31,7 @@
 /* derived shades: re-resolved on a scoped [data-theme] / [data-accent] too (a var() is substituted where it is defined) */
 :root, [data-accent], [data-theme] { --hover: color-mix(in srgb, var(--ink) 8%, transparent); --press: color-mix(in srgb, var(--ink) 14%, transparent);
   --accent-hi: color-mix(in srgb, var(--accent) 82%, #fff); --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
-  --warn-soft: color-mix(in srgb, var(--warn) 16%, transparent); --err-soft: color-mix(in srgb, var(--err) 14%, transparent); }
+  --warn-soft: color-mix(in srgb, var(--ink) 7%, transparent); --err-soft: color-mix(in srgb, var(--err) 14%, transparent); }
 /* the small-text shade; light-dark() is evaluated where used, so a scoped data-theme works. [data-accent] re-resolves it for a page holding several accents */
 :root, [data-accent] { --accent-text: light-dark(var(--accent-text-l), var(--accent-text-d)); }
 @supports not (color: light-dark(red, red)) { :root, [data-accent] { --accent-text: var(--accent-text-l); } }
@@ -80,6 +80,24 @@ nav.site a:hover, nav.site a[aria-current="page"] { text-decoration: underline; 
 nav.site a[aria-current="page"] { color: var(--ink); font-weight: 600; }
 nav.site .sep { width: 1px; height: 18px; background: var(--line); }
 nav.site svg { flex: none; }
+/* canonical page header, placed inside <main>: <header class="site"><div class="titlebar"><h1>..</h1></div><nav class="site">..</nav></header>
+   one row, title on the left, tabs on the right, in the content's width; the title's fade runs toward the tabs; on a phone the tabs wrap under the title, still right-aligned.
+   A header placed directly in <body> takes main's width and centring. */
+body > header.site { max-width: 1100px; margin-left: auto; margin-right: auto; }
+/* the bar (accent block + fade) runs across the full content width; the tabs sit on its right end, over the faded part */
+header.site:has(> .titlebar) { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0; }
+header.site > .titlebar { grid-area: 1 / 1 / 2 / 3; margin: 0; }
+header.site > .titlebar::after { background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 22%, transparent)); }
+header.site > nav.site { grid-area: 1 / 2; margin: 0; padding: 0 var(--sp-3); justify-content: flex-end; z-index: 1; }
+header.site > nav.site a { color: var(--ink); }
+header.site > nav.site a:hover, header.site > nav.site a[aria-current="page"] { text-decoration: underline; }
+/* narrow: the bar keeps the full width, the tabs wrap below it, right-aligned */
+@media (max-width: 760px) {
+  header.site > .titlebar { grid-area: 1 / 1 / 2 / 3; }
+  header.site > nav.site { grid-area: 2 / 1 / 3 / 3; padding: var(--sp-2) 0 0; }
+  header.site > nav.site a { color: var(--accent-text); }
+  header.site > nav.site a[aria-current="page"] { color: var(--ink); }
+}
 footer.site { margin-top: var(--sp-6); padding-top: var(--sp-3); border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); }
 
 /* ---- title bar: the page title on a solid accent block that fades out to the right (the block holds the text, so contrast is dark --on on --accent in both modes, and a long title wraps inside it) */
@@ -334,9 +352,11 @@ td button { padding: 4px 12px; min-height: 32px; }
 .adv-boots { font-size: 20px; font-weight: 650; margin: 0 0 8px; }
 .adv-boots.restarted { color: var(--err); }
 #connect-slot { margin: 4px 0 12px; }
-.title-row { display: flex; align-items: center; gap: 12px; flex: 1 1 280px; min-width: 0; }
-.title-row .titlebar { flex: 1 1 0; min-width: 120px; margin: 0; }
-.title-row #c-midi { flex: none; }
+/* the shared header with the nav row UNDER the full-width title bar at every width (mots, 2026-11-21: "tabs below the
+   title bar, nicer"): the shared narrow layout, kept on wide screens too; the connect button leads the row */
+header.site > nav.site { grid-area: 2 / 1 / 3 / 3; padding: var(--sp-2) 0 0; align-items: center; }
+header.site > nav.site a { color: var(--accent-text); }
+header.site > nav.site #c-midi { flex: none; }
 .dev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .dev-bar #c-ports-box { margin: 0; }
 header #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
@@ -350,9 +370,9 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
 <body>
 <main>
   <header class="site">
-    <div class="title-row"><div class="titlebar"><h1>jank</h1></div>
-    <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button></div>
+    <div class="titlebar"><h1>jank</h1></div>
     <nav id="home-links" class="site" aria-label="Links">
+      <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button>
       <a href="https://github.com/w0ts/jank" title="The jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
       <a id="home-hosted" class="hide" href="https://w0ts.github.io/jank/" title="Audio works better on the GitHub hosted page than on this page opened from the jank's drive.">Open the GitHub hosted page</a>
     </nav>
