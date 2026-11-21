@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Copyright (C) 2026 Henri David (hdavid), Optimist (github.com/w0ts/optimist); the protocol: Ableton Link, Copyright 2016 Ableton AG */
+/* Copyright (C) 2026 w0ts, Optimist (github.com/w0ts/optimist); the protocol: Ableton Link, Copyright 2016 Ableton AG */
 /* Ableton Link, the tempo / beat / start-stop part (no Link Audio), as a peer on one IPv4 network
  * (docs/LINK-DESIGN.md). A C port of the protocol of Ableton's Link library (github.com/Ableton/link,
  * GPL-2.0-or-later, Copyright 2016 Ableton AG): its discovery (_asdp_v 1), its measurement (_link_v 1) and its

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Copyright (C) 2026 Henri David (hdavid), Optimist (github.com/w0ts/optimist); the protocol: Ableton Link, Copyright 2016 Ableton AG */
+/* Copyright (C) 2026 w0ts, Optimist (github.com/w0ts/optimist); the protocol: Ableton Link, Copyright 2016 Ableton AG */
 /* Ableton Link peer (link.h; docs/LINK-DESIGN.md). Follows Ableton's library (include/ableton/discovery,
  * include/ableton/link; GPL-2.0-or-later): the file each rule comes from is named where it is used.
  *
