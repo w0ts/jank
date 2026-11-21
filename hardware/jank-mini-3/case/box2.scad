@@ -12,8 +12,8 @@
 // Assembly: the cell (with its rubber) into the bottom part, between the L and its own wall; our board into the top
 // part; the bottom part on (its inner lip rises inside the top part's outer skirt: alignment); four M2 x 6 screws from
 // under the box, up the screw tubes at H1-H4: each head sits on its tube's shoulder, the screw goes through our board
-// into the face boss's insert, so it holds the bottom part, our board and the top part together. H2's screw goes in with
-// the power switch out (the switch's body lies across H2's tube); the switch snaps in last.
+// into the face boss's insert, so it holds the bottom part, our board and the top part together. The power switch
+// snaps into the bottom wall last.
 // (mots, 2026-11-21: "we can slide the battery left a bit, enough to let the pole fit. and we move the wall and make a
 // double wall on the right of the battery": the cell moved left, its own wall on its right, H4's tube between that wall
 // and the box's right wall, H4's old short screw from below gone)
@@ -36,7 +36,7 @@ W = 95.5;  H = 82.0;  T = 1.6;                    // BOARD: 95.5 x 82, 1.6 mm (R
 LX = 0.5;  LY = (H - 35.01) / 2;                  // BOARD: the LCD-2's PCB corner in the notch
 CUT = [0, LY - 0.3, LX + 48.21 + 0.3, LY + 35.01 + 0.3];   // BOARD: the notch, open to the left edge
 MOUNT = [[3.0, 17.6], [3.0, H - 17.5], [40.5, H - 3.0], [W - 4.0, H / 2]];   // BOARD: H1..H4, M2
-HOLE_D = 2.2;                                     // BOARD: HOLE_M2_2.2
+HOLE_D = 2.4;                                     // BOARD: HOLE_M2_2.4
 DPX = 49.0 + (W - 15.0 - 49.0) / 2;  DPY = H / 2; // BOARD: the D-pad centre (64.75, 41)
 SW_OFF = 8.0;                                     // BOARD: SW1/3/4/5 at +/-8 around it
 SW_H = 1.55;                                      // MODEL: TS-1187A plunger top above the board (lib/3d, 1.55)
@@ -92,16 +92,18 @@ L_left_w = 4.4;                // the left arm's width: from the rubber gap left
 L_top_len = 20.0;              // the top arm, from the L's outer corner (x 53.0 .. 73.0)
 L_left_len = 36.0;             // the left arm, from the L's outer corner (y 19.4 .. 55.4: past SW4's y 49 + 6.4)
 
-// the power switch (mots, 2026-11-19): YIZHI KCD1-106S-B (LCSC C52125269), a round snap-in rocker in the LEFT wall
-// below the LCD-2's notch, in the cell's red lead (cell -> switch -> the LCD-2's MX1.25): no board connection.
+// the power switch (mots, 2026-11-19): YIZHI KCD1-106S-B (LCSC C52125269), a round snap-in rocker in the BOTTOM wall's
+// left part (mots, 2026-11-21: moved from the left wall, so H2's screw tube is whole), in the cell's red lead
+// (cell -> switch -> the LCD-2's MX1.25): no board connection.
 // Its datasheet drawing was not read: every size ASSUMED (mots measured the cap ~16 across)
-psw_y = 72.9;              // its centre, board y: the cap (y 64.65-81.15) ends 0.25 before the corner's rounding (flat
-                           //  wall face to y 81.4), the thinned patch (to y 82.4) fits; body y 65.4-80.4
-psw_z = -13.0;             // its centre height: body z -20.5..-5.5 (lid top -23.0, H2's screw head down to -3.2)
+psw_x = 11.5;              // its centre, board x: the mirror of the left wall's spot (x 9.1) + 2.4, so the tabs (x
+                           //  7.5-15.5) clear H2's tube (x <= 7.0) by 0.5; cap x 3.25-19.75, patch x 2.0-21.0, the
+                           //  LINE IN hole (J7, x 26-34) 5 mm away; body x 4.0-19.0, y 68.8-82.8, J7's body x >= 24
+psw_z = -13.0;             // its centre height: body z -20.5..-5.5 (lid top -23.0; the parting line -4.1)
 psw_hole = 15.0;           // ASSUMED: the panel hole (the "15mm" in its name)
 psw_cap = [16.5, 2.0];     // ASSUMED: the round cap's diameter, proud of the wall's outside
 psw_body = [15.0, 14.0];   // ASSUMED: the body's diameter, its depth behind the panel
-psw_tabs = [8.0, 4.0, 8.0];   // ASSUMED: the 2 solder tabs' envelope behind the body (y wide, deep, z tall)
+psw_tabs = [8.0, 4.0, 8.0];   // ASSUMED: the 2 solder tabs' envelope behind the body (x wide, deep, z tall)
 psw_panel = 1.6;           // the clips grip 1.0-2.0 (ASSUMED): the 2.0 wall thinned to 1.6 from the inside
 psw_thin_d = 19.0;         // ASSUMED: the thinned patch round the hole, where the clips sit
 
@@ -182,11 +184,10 @@ tube_bore = 4.4;           // the screw head (d 4.0) + 0.4; a PH1 screwdriver go
 tube_shoulder = 1.5;       // under our board (>= 1.2)
 tube_hole = 2.4;           // M2 clearance through the shoulder
 cw_t = 1.6;                // the cell's own wall (below): 4 perimeters
-tube_sw_clr = 0.3;         // H2's tube stops this far from the power switch's body (it lies across the tube)
 TUBES = [[3.0, 17.6, [[-fit, 14.4, 5.77, 22.9],     // H1: J2's body ends at y 14.1, the upper strip starts at x 6.07 /
                       [-fit, 14.4, 7.0, 18.55]]],   //  y 18.855, J16 at x 6.82, the notch at y 23.195
          [3.0, 64.5, [[-fit, 59.1, 5.77, 67.6],     // H2: the notch ends at y 58.805, the lower strip x 6.07 / y 63.145,
-                      [-fit, 63.45, 7.0, 67.6]]],   //  J15 x 6.82; the power switch's body cut out (+0.3)
+                      [-fit, 63.45, 7.0, 67.6]]],   //  J15 x 6.82; the power switch's tabs x >= 7.5, y >= 64.8
          [40.5, 79.0, [[36.5, 75.0, 44.5, H + fit]]],    // H3: J7's body ends at x 36.0; joined to the bottom wall
          [W - 4.0, H / 2, [[W - 4.0 - tube_bore / 2 - cw_t, H / 2 - 4.4, W + fit, H / 2 + 4.4]]]];   // H4: from the cell's wall (its left side,
                                //  x 87.7) to the right wall; J13 / J14's bodies end at y 34.06 / start at 47.94 (MODEL)
@@ -380,20 +381,20 @@ module wall_holes2d(w) {
             translate([d[0], DIN_Z0]) square([d[1] - d[0], -T - din_top_lip - DIN_Z0]);
     }
     if (w == "right") for (y = [J13Y, J14Y]) translate([y, jack_axis]) circle(d = plug_d);
-    if (w == "bottom") translate([J7X, jack_axis]) circle(d = plug_d);
-    if (w == "left") { lcd2_usb_open(); translate([psw_y, psw_z]) circle(d = psw_hole); }
+    if (w == "bottom") { translate([J7X, jack_axis]) circle(d = plug_d); translate([psw_x, psw_z]) circle(d = psw_hole); }
+    if (w == "left") lcd2_usb_open();
 }
 module openings() {
     for (w = ["top", "right", "bottom", "left"]) through_wall(w) wall_holes2d(w);
     // the power switch's patch: the wall thinned from the inside to psw_panel round its hole, below the parting line
     // only (the bottom part's; the lip above it stays whole)
     // (its top flat at the parting line across its whole width: a round top left a thin wedge of wall under the lip)
-    in_wall("left", fit - 0.01, wall - psw_panel + 0.01) intersection() {
+    in_wall("bottom", fit - 0.01, wall - psw_panel + 0.01) intersection() {
         hull() {
-            translate([psw_y, psw_z]) circle(d = psw_thin_d);
-            translate([psw_y - psw_thin_d / 2 + 0.2, pz_at("left", psw_y) - 1]) square([psw_thin_d - 0.4, 1]);
+            translate([psw_x, psw_z]) circle(d = psw_thin_d);
+            translate([psw_x - psw_thin_d / 2 + 0.2, pz_at("bottom", psw_x) - 1]) square([psw_thin_d - 0.4, 1]);
         }
-        translate([psw_y - 20, lid_z0 - 1]) square([40, pz_at("left", psw_y) - lid_z0 + 1]);
+        translate([psw_x - 20, lid_z0 - 1]) square([40, pz_at("bottom", psw_x) - lid_z0 + 1]);
     }
 }
 // the lip (the bottom part's), stopped lip_gap short of every hole
@@ -410,23 +411,15 @@ module lip() difference() {
     in_wall("top", fit - 0.5, wall + 1.5) translate([DIN_U[1][1], DIN_Z0]) square([20, -T - DIN_Z0]);
 }
 // the screw tubes: the solid (the tube and its web to the wall), and what is taken out (the bore from under the box up
-// to the shoulder, the screw's hole through the shoulder; for H2 the power switch's body + tube_sw_clr)
+// to the shoulder, the screw's hole through the shoulder)
 module tube_solid(t) for (b = t[2]) bx([b[0], b[1], lid_z1 - 0.01, b[2], b[3], -T]);
 module tube_void(t) {
     at([t[0], t[1]], lid_z0 - 1) cylinder(d = tube_bore, h = -T - tube_shoulder - lid_z0 + 1);
     at([t[0], t[1]], lid_z0 - 1) cylinder(d = tube_hole, h = -T - lid_z0 + 2);
 }
-// H2's tube and the power switch: below the switch body's top (+ tube_sw_clr) the tube stops at the body's nearest y,
-// and its bore opens toward the switch as a slot as wide as the bore (straight walls, no thin crescents)
-PSW_TUBE_Z = psw_z + psw_body[0] / 2 + tube_sw_clr;     // -5.2
-PSW_TUBE_Y = psw_y - psw_body[0] / 2 - tube_sw_clr;     // 65.1
 module tubes() difference() {
     for (t = TUBES) tube_solid(t);
     for (t = TUBES) tube_void(t);
-    let(t = TUBES[1]) {
-        bx([-fit - 1, PSW_TUBE_Y, lid_z1 - 1, t[0] + 10, PSW_TUBE_Y + 10, PSW_TUBE_Z]);
-        bx([t[0] - tube_bore / 2, t[1], lid_z0 - 1, t[0] + tube_bore / 2, PSW_TUBE_Y + 1, PSW_TUBE_Z]);
-    }
 }
 // the M2 heads: H1-H4 under their tube's shoulder
 function head_z1(i) = -T - tube_shoulder;
@@ -596,14 +589,15 @@ TILT_DIAG = atan((cap_preload_gap + sw_travel) / (SW_OFF / sqrt(2)));
 // ---------------------------------------------------------------------------------------------------------------
 // the power switch as boxes / cylinders: its cap outside the wall, its body and tabs inside (the part in the hole
 // left out); g grows it (the check's shell test shrinks it 0.01 off the faces it sits on)
-PSW_IN = -(fit + wall - psw_panel);       // the thinned panel's inner face (board x; the left wall)
-PSW_OUT = -(fit + wall);                  // the wall's outer face
-PSW_TAB = PSW_IN + psw_body[1] + psw_tabs[1];   // the tabs' far end (board x)
+PSW_IN = H + fit + wall - psw_panel;      // the thinned panel's inner face (board y; the bottom wall)
+PSW_OUT = H + fit + wall;                 // the wall's outer face
+PSW_TAB = PSW_IN - psw_body[1] - psw_tabs[1];   // the tabs' far end (board y)
 module kcd1(g = 0) {
-    at([PSW_IN - g, psw_y], psw_z) rotate([0, 90, 0]) cylinder(d = psw_body[0] + 2 * g, h = psw_body[1] + 2 * g);
-    bx(grow([PSW_IN + psw_body[1], psw_y - psw_tabs[0] / 2, psw_z - psw_tabs[2] / 2,
-             PSW_TAB, psw_y + psw_tabs[0] / 2, psw_z + psw_tabs[2] / 2], g));
-    at([PSW_OUT - psw_cap[1] - g, psw_y], psw_z) rotate([0, 90, 0]) cylinder(d = psw_cap[0] + 2 * g, h = psw_cap[1] + 2 * g);
+    // (rotate([-90, 0, 0]): the cylinder runs toward OpenSCAD +Y, i.e. board y DOWN from where at() puts it)
+    at([psw_x, PSW_IN + g], psw_z) rotate([-90, 0, 0]) cylinder(d = psw_body[0] + 2 * g, h = psw_body[1] + 2 * g);
+    bx(grow([psw_x - psw_tabs[0] / 2, PSW_TAB, psw_z - psw_tabs[2] / 2,
+             psw_x + psw_tabs[0] / 2, PSW_IN - psw_body[1], psw_z + psw_tabs[2] / 2], g));
+    at([psw_x, PSW_OUT + psw_cap[1] + g], psw_z) rotate([-90, 0, 0]) cylinder(d = psw_cap[0] + 2 * g, h = psw_cap[1] + 2 * g);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
