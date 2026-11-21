@@ -913,11 +913,11 @@
 			)
 		)
 	)
-	(footprint "chip:HOLE_M2_2.2"
+	(footprint "chip:HOLE_M2_2.4"
 		(layer "F.Cu")
 		(uuid "0876cd68-6901-4e8b-b43c-4bb1987903b8")
 		(at 140.5 179)
-		(descr "M2 clearance hole, 2.2 mm NPTH, for the LCD-2's screws (no copper within 2.6 mm: a rule area in make_board.py)")
+		(descr "M2 clearance hole, 2.4 mm NPTH (ISO 273 medium), for the case's screws (no copper within 2.6 mm: a rule area in make_board.py)")
 		(property "Reference" "H3"
 			(at 0 -3 0)
 			(layer "F.SilkS")
@@ -979,8 +979,8 @@
 		)
 		(pad "" np_thru_hole circle
 			(at 0 0)
-			(size 2.2 2.2)
-			(drill 2.2)
+			(size 2.4 2.4)
+			(drill 2.4)
 			(layers "*.Cu" "*.Mask")
 			(uuid "9b6ad805-0fad-4ee8-a561-9a1e44989e9a")
 		)
@@ -3147,11 +3147,11 @@
 			)
 		)
 	)
-	(footprint "chip:HOLE_M2_2.2"
+	(footprint "chip:HOLE_M2_2.4"
 		(layer "F.Cu")
 		(uuid "1e609c75-ab14-4a4d-8460-2ceb60d3a6a8")
 		(at 103 164.5)
-		(descr "M2 clearance hole, 2.2 mm NPTH, for the LCD-2's screws (no copper within 2.6 mm: a rule area in make_board.py)")
+		(descr "M2 clearance hole, 2.4 mm NPTH (ISO 273 medium), for the case's screws (no copper within 2.6 mm: a rule area in make_board.py)")
 		(property "Reference" "H2"
 			(at 0 -3 0)
 			(layer "F.SilkS")
@@ -3213,18 +3213,18 @@
 		)
 		(pad "" np_thru_hole circle
 			(at 0 0)
-			(size 2.2 2.2)
-			(drill 2.2)
+			(size 2.4 2.4)
+			(drill 2.4)
 			(layers "*.Cu" "*.Mask")
 			(uuid "f2a04116-4cac-406d-823a-a5f91888c319")
 		)
 		(embedded_fonts no)
 	)
-	(footprint "chip:HOLE_M2_2.2"
+	(footprint "chip:HOLE_M2_2.4"
 		(layer "F.Cu")
 		(uuid "1f100bc0-63b8-40ea-b832-bc3ae9d33909")
 		(at 191.5 141)
-		(descr "M2 clearance hole, 2.2 mm NPTH, for the LCD-2's screws (no copper within 2.6 mm: a rule area in make_board.py)")
+		(descr "M2 clearance hole, 2.4 mm NPTH (ISO 273 medium), for the case's screws (no copper within 2.6 mm: a rule area in make_board.py)")
 		(property "Reference" "H4"
 			(at 0 -3 0)
 			(layer "F.SilkS")
@@ -3286,8 +3286,8 @@
 		)
 		(pad "" np_thru_hole circle
 			(at 0 0)
-			(size 2.2 2.2)
-			(drill 2.2)
+			(size 2.4 2.4)
+			(drill 2.4)
 			(layers "*.Cu" "*.Mask")
 			(uuid "6f9cd8ca-d86f-4ae9-8052-8501c4aa1a9b")
 		)
@@ -12395,11 +12395,11 @@
 			)
 		)
 	)
-	(footprint "chip:HOLE_M2_2.2"
+	(footprint "chip:HOLE_M2_2.4"
 		(layer "F.Cu")
 		(uuid "a559b667-625d-46fd-a81e-999c338dfd53")
 		(at 103 117.6)
-		(descr "M2 clearance hole, 2.2 mm NPTH, for the LCD-2's screws (no copper within 2.6 mm: a rule area in make_board.py)")
+		(descr "M2 clearance hole, 2.4 mm NPTH (ISO 273 medium), for the case's screws (no copper within 2.6 mm: a rule area in make_board.py)")
 		(property "Reference" "H1"
 			(at 0 -3 0)
 			(layer "F.SilkS")
@@ -12461,8 +12461,8 @@
 		)
 		(pad "" np_thru_hole circle
 			(at 0 0)
-			(size 2.2 2.2)
-			(drill 2.2)
+			(size 2.4 2.4)
+			(drill 2.4)
 			(layers "*.Cu" "*.Mask")
 			(uuid "5354899b-60fb-4154-baa7-8ad8b4b814dd")
 		)

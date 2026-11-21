@@ -39,6 +39,8 @@ def lcd(fx, fy):
 ROW_X = LX + 48.21 - (7.60 + 40.62) / 2         # the sockets' centre x (pin 1 at +16.51 with rotation 180)
 HOLES = [lcd(fx, fy) for fx, fy in ((3.0, 3.0), (32.01, 3.0), (3.0, 45.2), (32.01, 45.2))]
 HOLE_D, HOLE_KEEP = 2.2, 2.6
+HOLE_FP = "HOLE_M2_2.4" if MINI3 else "HOLE_M2_2.2"   # (mini-3: 2.4, ISO 273 medium: the four case screws find their
+#  printed inserts through PLA shrink and a heat-set insert off by a little; mots 2026-11-21)
 MOUNT = ([(W - 4.0, H - 4.0), (52.5, H - 4.0)] if CELL == "under"
          else [(W - 3.5, 30.5), (51.5, 20.0)])   # the board's own M2 holes to the case (the right part; the LCD-2's
                                                #  four screws hold the left part through the case floor)
@@ -665,9 +667,9 @@ def outline(board):
 
 
 def hole(board, i, x, y):
-    fp = pcbnew.FootprintLoad(LIB, "HOLE_M2_2.2")
+    fp = pcbnew.FootprintLoad(LIB, HOLE_FP)
     fp.SetReference(f"H{i}")
-    fp.SetFPID(pcbnew.LIB_ID("chip", "HOLE_M2_2.2"))   # (an empty name broke KiCad's Specctra session import)
+    fp.SetFPID(pcbnew.LIB_ID("chip", HOLE_FP))   # (an empty name broke KiCad's Specctra session import)
     board.Add(fp)
     fp.SetPosition(pcbnew.VECTOR2I(MM(OX + x), MM(OY + y)))
 
