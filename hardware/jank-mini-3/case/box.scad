@@ -28,7 +28,7 @@ W = 95.5;  H = 82.0;  T = 1.6;                    // BOARD: 95.5 x 82, 1.6 mm (R
 LX = 0.5;  LY = (H - 35.01) / 2;                  // BOARD: the LCD-2's PCB corner in the notch
 CUT = [0, LY - 0.3, LX + 48.21 + 0.3, LY + 35.01 + 0.3];   // BOARD: the notch, open to the left edge
 MOUNT = [[3.0, 17.6], [3.0, H - 17.5], [40.5, H - 3.0], [W - 4.0, H / 2]];   // BOARD: H1..H4, M2
-HOLE_D = 2.2;                                     // BOARD: HOLE_M2_2.2
+HOLE_D = 2.4;                                     // BOARD: HOLE_M2_2.4
 DPX = 49.0 + (W - 15.0 - 49.0) / 2;  DPY = H / 2; // BOARD: the D-pad centre (64.75, 41)
 SW_OFF = 8.0;                                     // BOARD: SW1/3/4/5 at +/-8 around it
 SW_H = 1.55;                                      // MODEL: TS-1187A plunger top above the board (lib/3d, 1.55)
