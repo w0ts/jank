@@ -7,9 +7,9 @@ const JANK_NAME = /(^|[^a-z])jank([^a-z]|$)/i;
 function jankPortName(name) {
   return JANK_NAME.test(name || "");
 }
-/* the jank among the ports, the USB one ("jank" exactly) first; never any other port */
+/* the jank among the ports, the USB one ("Jank" or, before 2026-11-21, "jank": the plain name, any case) first; never any other port */
 function jankPorts(inputs) {
-  return inputs.filter((p) => jankPortName(p.name)).sort((a, b) => (b.name === "jank") - (a.name === "jank"));
+  return inputs.filter((p) => jankPortName(p.name)).sort((a, b) => (String(b.name).toLowerCase() === "jank") - (String(a.name).toLowerCase() === "jank"));
 }
 function outputFor(input, outputs) {
   return outputs.find((o) => o.name === input.name) || outputs.find((o) => jankPortName(o.name)) || null;

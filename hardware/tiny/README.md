@@ -1,9 +1,9 @@
-# jank tiny: a small board anyone orders assembled from JLCPCB
+# Jank tiny: a small board anyone orders assembled from JLCPCB
 
-Part of the **[jank device](../../README.md)** · the study behind it: [docs/dongle.md](../../docs/dongle.md) · the
+Part of the **[Jank device](../../README.md)** · the study behind it: [docs/dongle.md](../../docs/dongle.md) · the
 bigger board: [hardware/pcb](../pcb/README.md)
 
-One board, two uses. **With a computer on USB-C it is the jank stick** (network adapter, USB-MIDI, the drive).
+One board, two uses. **With a computer on USB-C it is the Jank stick** (network adapter, USB-MIDI, the drive).
 **Alone, plugged into a piece of gear's MIDI OUT or THRU, it runs from that output's few milliamps** and sends jank's
 MIDI clock into the gear's MIDI IN. An ESP32-S3-MINI-1-N8 module, a USB-C on the top edge, a 3.5 mm TRS jack on each side
 (left: MIDI OUT, right: POWER IN, both via TRS-to-DIN type A adaptors), one button, one LED, a 4.4 mF reservoir and a

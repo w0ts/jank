@@ -1,14 +1,14 @@
 JANK
 ====
 
-This drive is the jank stick. It is made up by the stick each time it starts:
+This drive is the Jank stick. It is made up by the stick each time it starts:
 nothing on it is stored, and what you add (other than a firmware image) is
 gone at the next restart. Files here:
 
   README.txt   this text
   jank.html    the control page
   UPDATE.TXT   what happened at the last firmware update (after one)
-  PANIC.TXT    the last crash since the jank lost power (after one): task, addresses, how to decode them
+  PANIC.TXT    the last crash since the Jank lost power (after one): task, addresses, how to decode them
 
 CONTROL PAGE
 ------------

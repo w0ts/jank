@@ -1,20 +1,20 @@
-# jank
+# Jank
 
-**Ableton Link with no router.** jank protocol brings computers, MIDI gear and modular gear into a
-**jank** session: the group mode of [Optimist](https://github.com/w0ts/optimist), the open firmware for the FM-1 synth
+**Ableton Link with no router.** Jank protocol brings computers, MIDI gear and modular gear into a
+**Jank** session: the group mode of [Optimist](https://github.com/w0ts/optimist), the open firmware for the FM-1 synth
 (**MODE JANK**, first called jam).
 
-![the jank device](docs/img/hero.png)
+![the Jank device](docs/img/hero.png)
 
 ## No router
 
 Link normally needs every player on the same network: a Wi-Fi router or access point that somebody sets up, joins and
-keeps running. In jank there is none. The units send open Wi-Fi frames straight to each other on the group's channel,
+keeps running. In Jank there is none. The units send open Wi-Fi frames straight to each other on the group's channel,
 with no association, no password and no host; the ones set to the same GROUP (1..9) hear each other and form one Link
 session. Switch on, pick the group, play: on a stage, outdoors, wherever there is no network. How the frames look:
 [docs/air.md](docs/air.md).
 
-FM-1s running Optimist do this by themselves. **The jank device** speaks the same air format, so whatever is plugged
+FM-1s running Optimist do this by themselves. **The Jank device** speaks the same air format, so whatever is plugged
 into it joins the group too.
 
 ## What joins through it
@@ -26,7 +26,7 @@ into it joins the group too.
 - **MIDI gear.** MIDI outputs send clock, start and stop locked to the session.
 - **Modular gear.** Clock outputs, 5 V pulses.
 
-It plays no sound: it follows the group's tempo and phase and sends them on. Link is Ableton's trademark; jank is not an
+It plays no sound: it follows the group's tempo and phase and sends them on. Link is Ableton's trademark; Jank is not an
 Ableton product.
 
 ## Start and stop
@@ -47,7 +47,7 @@ Start: the device's YES, a click of the stick's button, or the control page's pl
 ## Two devices
 
 - **The stick:** a bare Seeed XIAO ESP32-S3 (about US$7.50) in a computer or any USB host that speaks MIDI clock or Link (network driver). One button, one LED.
-- **The jank box:** the same firmware on its own board, in a printed box.
+- **The Jank box:** the same firmware on its own board, in a printed box.
 
 ![Seeed XIAO ESP32-S3](https://files.seeedstudio.com/wiki/SeeedStudio-XIAO-ESP32S3/img/2.jpg)
 
@@ -64,7 +64,7 @@ The box has:
 - [Box](hardware/box/README.md)
 - [Firmware](docs/firmware.md)
 
-**Branch fw/beat-follow only: a bench build, [docs/beat.md](docs/beat.md).** The stick is also a USB speaker called jank
+**Branch fw/beat-follow only: a bench build, [docs/beat.md](docs/beat.md).** The stick is also a USB speaker called Jank
 and follows the beat of what is played to it. Its network weights are madmom's (CC BY-NC-SA 4.0): never push or ship it.
 
 Details: [on the air](docs/air.md), [USB](docs/usb.md), [MIDI clock](docs/midi.md), [boards and pins](docs/boards.md).

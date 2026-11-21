@@ -4,7 +4,7 @@
 
     python scripts/ota.py [jank.bin] [--port NAME] [--check]
 
-Finds the MIDI port named exactly "jank", reads `get`, sends the image in acknowledged chunks on the control line, waits
+Finds the MIDI port named "Jank" (older firmware: "jank"; any case), reads `get`, sends the image in acknowledged chunks on the control line, waits
 for the stick to restart into it and prints `get` again. Needs python-rtmidi (`pip install python-rtmidi`); --check only
 looks at the image and needs nothing. The protocol is documented in core/jank_ota.h; the same code runs in the tests
 against the firmware's own C logic (tests/test_ota.py).
@@ -19,7 +19,7 @@ import zlib
 
 HEAD = bytes([0xF0, 0x7D, 0x4A, 0x4B])
 CHUNK = 120                 # bytes per chunk; the device may ask for less
-PORT = "jank"
+PORT = "Jank"
 CHIP_ESP32S3 = 9
 REPLY_TIMEOUT = 2.0         # seconds for one answer
 TRIES = 6                   # sends of one chunk before giving up
@@ -139,7 +139,7 @@ class Uploader:
 
 
 class Midi:
-    """python-rtmidi, with the port named exactly PORT."""
+    """python-rtmidi, with the port named PORT (any case: firmware before 2026-11-21 says "jank")."""
 
     def __init__(self, name=PORT):
         import rtmidi
@@ -149,7 +149,8 @@ class Midi:
 
     def _find(self, port):
         names = port.get_ports()
-        return names.index(self.name) if self.name in names else None
+        lower = [n.lower() for n in names]
+        return lower.index(self.name.lower()) if self.name.lower() in lower else None
 
     def open(self):
         out, inp = self.rtmidi.MidiOut(), self.rtmidi.MidiIn()

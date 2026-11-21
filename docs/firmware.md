@@ -1,13 +1,13 @@
-# jank firmware
+# Jank firmware
 
-The firmware of the [jank device](../README.md), for the ESP32-S3 (ESP-IDF). Boards and pins: [boards.md](boards.md).
+The firmware of the [Jank device](../README.md), for the ESP32-S3 (ESP-IDF). Boards and pins: [boards.md](boards.md).
 
 ## Firmware boards
 
 | Board | Build | Notes |
 |---|---|---|
 | Seeed XIAO ESP32-S3, bare | `scripts/build.sh xiao` | The module alone: BOOT button, yellow LED; MIDI on D6, which is weak (see [boards.md](boards.md)) |
-| jank PCB | not written yet | The XIAO on the board: pins in [`hardware/pcb/README.md`](../hardware/pcb/README.md). I2C: SDA = D8 = GPIO7, SCL = D9 = GPIO8 |
+| Jank PCB | not written yet | The XIAO on the board: pins in [`hardware/pcb/README.md`](../hardware/pcb/README.md). I2C: SDA = D8 = GPIO7, SCL = D9 = GPIO8 |
 
 ## Build and flash
 
@@ -41,11 +41,11 @@ One button (`BOARD_BUTTON_GPIO`; debounce 20 ms, double-click window 350 ms, `co
 | Action | What it does |
 |---|---|
 | Click | Resync: stop now, start on the next bar line ([docs/midi.md](midi.md)) |
-| Double click | Scan the other channels and join the next group heard; none heard: stay (jank mode only). Said on the second release |
-| Held 1.5 s, let go | Switch between jank mode and the saved Wi-Fi network, with a restart. None saved: 3 red pulses |
+| Double click | Scan the other channels and join the next group heard; none heard: stay (Jank mode only). Said on the second release |
+| Held 1.5 s, let go | Switch between Jank mode and the saved Wi-Fi network, with a restart. None saved: 3 red pulses |
 | Held 10 s | Restart into download mode (`bootloader`, see below; unproven) |
 
-The LED shows the Link session's beat: in jank mode it rests off and flashes on each beat (green on an RGB LED), on a
+The LED shows the Link session's beat: in Jank mode it rests off and flashes on each beat (green on an RGB LED), on a
 Wi-Fi network it rests on and blinks off (blue). The bar's first beat flashes 150 ms, the others 80 ms, never more than
 a third of a beat. With no session it stays at rest. Over that: magenta while scanning, white N flashes on joining
 GROUP N, 3 red pulses when no other group was found. A one-colour LED shows only the timing.
@@ -70,11 +70,11 @@ set sleep never|30s|1min|5min | bright 10..100
 set quantum 1..16 | offset -100.00..100.00 (ms, 10 us steps) | net jank|wifi | ssid <name> | pass <8..63 chars>
 ```
 
-`lead` (`get` key `lead=on|off`) is LINK TRANSPORT's FOLLOW+LEAD (on) or FOLLOW (off), with `transport link`; the menu's own preference, not a setting: `set lead` and the menu both write `s_prefs.lead` (`firmware/main/uiscreen.c`, `uis_lead_get` / `uis_lead_set`; the ui task applies it and saves it by the usual 400 ms rule), `get` reads it through `struct jk_snapshot`'s `lead`, and `set lead` answers `ok` with the action `JK_CTL_LEAD` (`jk_ctl_lead` parses the value; `cfg` is untouched). The menu's three choices are therefore `set transport auto` (IGNORE), `set transport link` + `set lead off` (FOLLOW), `set transport link` + `set lead on` (FOLLOW+LEAD). An older jank has no `lead` key and answers `err bad setting`; the page then keeps the old behaviour (FOLLOW refused).
+`lead` (`get` key `lead=on|off`) is LINK TRANSPORT's FOLLOW+LEAD (on) or FOLLOW (off), with `transport link`; the menu's own preference, not a setting: `set lead` and the menu both write `s_prefs.lead` (`firmware/main/uiscreen.c`, `uis_lead_get` / `uis_lead_set`; the ui task applies it and saves it by the usual 400 ms rule), `get` reads it through `struct jk_snapshot`'s `lead`, and `set lead` answers `ok` with the action `JK_CTL_LEAD` (`jk_ctl_lead` parses the value; `cfg` is untouched). The menu's three choices are therefore `set transport auto` (IGNORE), `set transport link` + `set lead off` (FOLLOW), `set transport link` + `set lead on` (FOLLOW+LEAD). An older Jank has no `lead` key and answers `err bad setting`; the page then keeps the old behaviour (FOLLOW refused).
 
-`sleep` (`never|30s|1min|5min`, the menu's SCREEN OFF) and `bright` (10..100 %, the menu's BRIGHTNESS) are the same kind: `get` keys `sleep=` / `bright=`, `set sleep` / `set bright` write `s_prefs.sleep` / `s_prefs.bright` (the 'ui1' blob, 400 ms rule, `uis_sleep_get` / `uis_sleep_set` / `uis_bright_get` / `uis_bright_set`; the started bit in bit 7 of the sleep byte is a separate field and stays), answer `ok` with the action `JK_CTL_DISPLAY` (`jk_ctl_display` parses; `cfg` untouched), and a bad value answers `err bad setting`. The jank (XIAO) has no screen: the value is only stored and shown back by the page's menu. An older jank has neither key: the page refuses the two menu rows (`this jank has no screen setting`).
+`sleep` (`never|30s|1min|5min`, the menu's SCREEN OFF) and `bright` (10..100 %, the menu's BRIGHTNESS) are the same kind: `get` keys `sleep=` / `bright=`, `set sleep` / `set bright` write `s_prefs.sleep` / `s_prefs.bright` (the 'ui1' blob, 400 ms rule, `uis_sleep_get` / `uis_sleep_set` / `uis_bright_get` / `uis_bright_set`; the started bit in bit 7 of the sleep byte is a separate field and stays), answer `ok` with the action `JK_CTL_DISPLAY` (`jk_ctl_display` parses; `cfg` untouched), and a bad value answers `err bad setting`. The Jank (XIAO) has no screen: the value is only stored and shown back by the page's menu. An older Jank has neither key: the page refuses the two menu rows (`this jank has no screen setting`).
 `home` answers `home=h ...`, the HOME line the page polls (`core/jank_home.h`). `scan` answers one `scan=group,channel,frames,units,janks,rssi` line per group heard (or `scan=none`) and joins
-nothing. `net jank` is the protocol's name for jank mode. `tempo`, `play` and `stop` change the whole Link session, as
+nothing. `net jank` is the protocol's name for Jank mode. `tempo`, `play` and `stop` change the whole Link session, as
 any Link app may; with no settled session (joining one) they answer `err no session`. Alone the stick runs a session of
 its own in either mode (`core/jank_peer.h` jp_solo; LINK mode since M2l, as a lone Ableton Live: the last tempo known or
 120 BPM, stopped until the user's Start, which starts it on its next bar line with the MIDI clock, whatever LINK TRANSPORT
@@ -106,7 +106,7 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   `reset=` empty (the screen's own unknowns; the page shows `-`). `panic=<task>@0x4200abcd` (after `reset`) is the last panic since power was lost (the task and the faulting address), empty when there was none; the ABOUT screen's PANIC row shows it. The name and version are not in it (`get` has `version=`). It is a second reply because
   `status` has no room for it: the answer buffer is `JK_CTL_OUT_MAX` = 2040 bytes (under usb.c's 2048; the SysEx layer chunks any length into 30-character
   frames), the longest `status` is 1894 bytes (`tests/test_ctl.c` prints it) and `about` is up to 273. The page asks for `about` only while its simulated
-  screen shows ABOUT (every 1.5 s, one at a time), so its other polling is unchanged; a jank without the command answers `err unknown command`, and the
+  screen shows ABOUT (every 1.5 s, one at a time), so its other polling is unchanged; a Jank without the command answers `err unknown command`, and the
   page then leaves the screen's values as `-`.
 - **`play` starts on the next bar line** (`quantum` beats). The start goes out 150 ms before that bar, as "playing from
   bar B" (Link's isPlaying, beats B, time stamp now), so every peer starts on B: Live and LinkHut read B, the FM-1 and the
@@ -137,7 +137,7 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
   only while the user's layer is started, and never change it. **Power-on is stopped** (M2h, the user: "come up with
   manual state: stopped") **unless the user's last press was Start**: that press (HOME's YES, `play` / `stop`, a click; never the gate's or
   the silence's stop) is stored in the `ui1` blob (bit 7 of the SCREEN OFF byte, the usual 400 ms rule, flushed at a restart), and a
-  jank that comes up with a stored Start does that Start at boot (nothing is sent to a Link session). An old blob has no such bit: stopped.
+  Jank that comes up with a stored Start does that Start at boot (nothing is sent to a Link session). An old blob has no such bit: stopped.
   Stopped, the outputs wait for the user's Start (`play`, the page's Start,
   a click of a screenless unit's button: with the user's layer stopped a click is that Start, otherwise the resync); a
   session already playing is not stopped for it. The outputs run only when user = started AND automatic = open:
@@ -239,7 +239,7 @@ while alone); in AUDIO mode the tracker leads it and the MIDI clock starts on it
 - **USB MIDI CLOCK** `set usbmidi on|off`, stored (blob `usb1`'s 4th byte), on by default (the clock always went to
   USB-MIDI before; a computer's DAW ignores a clock it is not set to follow). Off: no clock, start or stop byte reaches
   USB-MIDI, in device mode (the computer) and host mode (hosted gear); turned off while running, one MIDI Stop goes out
-  first. DIN / TRS MIDI out is unaffected; the beat reports and the control line (SysEx) still use the MIDI port. jank
+  first. DIN / TRS MIDI out is unaffected; the beat reports and the control line (SysEx) still use the MIDI port. Jank
   never acts on MIDI it receives: the computer's MIDI is read only for the control line's SysEx (realtime bytes are
   dropped, `jank_sysex.c` jx_feed), hosted gear is opened OUT only (usb_midi_host.c).
 - **fw/ui note** (the device's buttons, for the integrator): NO held + UP/DOWN calls `beat_nudge(+1 / -1, &total, NULL, 0)`
@@ -306,7 +306,7 @@ FM1BASE=../optimist/fm1base tests/run.sh
 Host tests, built with address and undefined-behaviour sanitizers into `$JANK_SCRATCH/hosttest`: frame vectors, the
 filter and MAC handling, the control protocol, button and scan logic, the clock maths (no drift over an hour at any
 tempo), the Link peer, SysEx framing, the update protocol (C logic and `scripts/ota.py` against it, over a line that loses, damages and repeats lines; needs python3), the HOME line (`test_home`), the made-up JANK drive and the image streaming into a modelled slot (`test_vdrive`; `JANK_TEST_IMAGE=<jank.bin>` adds a real image) and the control page's logic (needs node). `tests/crosscheck_optimist.c` compiles
-the FM-1's own `wifi_jank.c`, `wifi_ip.c` and `link.c` from `FM1BASE` and swaps frames with jank. These prove that both
+the FM-1's own `wifi_jank.c`, `wifi_ip.c` and `link.c` from `FM1BASE` and swaps frames with Jank. These prove that both
 sides agree on bytes and logic, nothing about radios: delays in the models are made up.
 
 ## On the air (summary)

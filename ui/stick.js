@@ -114,7 +114,7 @@ const Stick = (() => {
   function fieldCommands(field, val, hasLead = true, hasDisplay = true) {
     if (NO_STICK_SETTING[field]) return refuse(NO_STICK_SETTING[field]);
     if (field === 'bright' || field === 'sleep') {   // an older jank has neither key in `get`: refused
-      if (!hasDisplay) return refuse('this jank has no screen setting');
+      if (!hasDisplay) return refuse('this Jank has no screen setting');
       return field === 'bright' ? cmds('set bright ' + clamp(Math.round(val), 10, 100)) : SLEEP[val] ? cmds('set sleep ' + SLEEP[val]) : refuse('SCREEN OFF has no such value');
     }
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));

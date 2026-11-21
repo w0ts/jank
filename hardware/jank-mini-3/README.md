@@ -211,8 +211,8 @@ Upload a folder's `gerbers.zip`, then its `bom.csv` and `cpl.csv`. Quotes (jlcpc
 
 | Variant | What JLC does | Price |
 |---|---|---|
-| jank mini 3 default, x5 | top SMD (Standard PCBA: the USB-C C2906290 is "Standard only"); mots solders `fab/default/hand.csv` | $120.18 (mid-mount USB-C, before the switch below) |
-| jank mini 3 full, x5 | also the DINs, jacks and J15 / J16 under the board (Standard, both sides) | $177.70 |
+| Jank mini 3 default, x5 | top SMD (Standard PCBA: the USB-C C2906290 is "Standard only"); mots solders `fab/default/hand.csv` | $120.18 (mid-mount USB-C, before the switch below) |
+| Jank mini 3 full, x5 | also the DINs, jacks and J15 / J16 under the board (Standard, both sides) | $177.70 |
 | strip bare, x10 | PCB only | ~$6.10 |
 | strip assembled, x10 | both sockets fitted (Economic) | $18.46 |
 
@@ -249,12 +249,12 @@ Upload a folder's `gerbers.zip`, then its `bom.csv` and `cpl.csv`. Quotes (jlcpc
 
 ## Ordering (current, 2026-11-19)
 
-What to order for 5 units (option 2, mots, 2026-11-19): JLC: jank mini 3 x5 from `fab/default/` (Economic, top
+What to order for 5 units (option 2, mots, 2026-11-19): JLC: Jank mini 3 x5 from `fab/default/` (Economic, top
 side), the strips x10 bare from `strip/fab/bare/` (1.6 mm); LCSC: the parts in `fab/default/hand.csv` plus 2 strip
 sockets C2905420 per strip (spares: +2 USB4085, +4 sockets, +2 of each jack, DIN and header). Assembled strips instead:
 `strip/fab/assembled/` (Economic, 10 mm wide for JLC's 10 x 10 mm minimum).
 
-Order remarks for JLC (jank mini 3):
+Order remarks for JLC (Jank mini 3):
 - 1.6 mm, 1 oz copper (tracks down to 0.10 mm), lead-free HASL; "Confirm Production file: Yes" (10B N2: shows what
   JLC's CAM did to J1 / J4's rings and where its tooling holes go).
 - "J1 / J4 GCT USB4085: 0.40 mm holes in 0.65 mm pads and 0.44-0.45 mm hole spacing as in the maker's recommended
@@ -263,7 +263,7 @@ Order remarks for JLC (jank mini 3):
   check J1 / J4's position and rotation and every bottom part's rotation in JLC's placement preview before paying.
 
 mots's fallback (2026-11-19): if J1 / J4 do not work, USB host mode is regained with a powered USB hub on the LCD-2's
-own USB-C; the rest of jank works without them.
+own USB-C; the rest of Jank works without them.
 
 Bench steps (mots), in this order:
 - Before paying: JLC's placement preview for the polarised top parts (default variant), every part in the full one.

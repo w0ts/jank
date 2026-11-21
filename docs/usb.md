@@ -1,6 +1,6 @@
 # USB
 
-An S3 build is one USB device with three functions: a network adapter (CDC-NCM), a MIDI port called jank, and a drive
+An S3 build is one USB device with three functions: a network adapter (CDC-NCM), a MIDI port called Jank, and a drive
 (label JANK) holding `jank.html`, the control page, and taking firmware updates. The drive is made up by the firmware: a
 FAT16 volume of 4 MB that is stored nowhere (`core/jank_vdrive.h`, `main/drive.c`).
 
@@ -88,25 +88,25 @@ Beat-follow bench build only: the device is also a UAC2 speaker, an OUT endpoint
 
 ## The EP0 SETUP crash (found with the panic recorder)
 
-About one in three first boots of a new image, the jank panicked 450 ms after boot and the update rolled back. `diag` after
+About one in three first boots of a new image, the Jank panicked 450 ms after boot and the update rolled back. `diag` after
 the rollback showed `panic_task=IDLE0`, `panic_msg=LoadProhibited`, `panic_cause=28`, `panic_vaddr=0x00000000`, `panic_pc` in the ROM and
 `panic_a0=0x82032ec5` (windowed ABI: the top two bits of a0 are the window increment, the address is `0x42032ec5`). addr2line of that
 address on the elf of the flashed image gave `dcd_event_setup_received` inlined by `handle_epout_dma` (`dcd_dwc2.c`, the `setup_phase_done`
 branch): the USB interrupt reading the SETUP packet through a null pointer. The branch takes the pointer from `DOEPDMA0 - 8` ("the
 last valid SETUP data", programming guide 9.1.2.1) and copies 8 bytes from it. With `DOEPDMA0` = 8 (the pointer never armed with the setup
-buffer when the host's first SETUP after a bus reset arrived, which is when a host re-enumerates a restarted jank) that is address 0.
+buffer when the host's first SETUP after a bus reset arrived, which is when a host re-enumerates a restarted Jank) that is address 0.
 Only the timing of the host decides, so it is intermittent.
 
 `third_party/esp_tinyusb-dwc2-setup-guard.patch` (applied by `scripts/patch_tinyusb.sh`) checks that the pointer lies inside the
 setup buffer; if not it drops the event, calls `dma_setup_prepare` and returns. The host then repeats its request (a lost SETUP is
-retried by the host). Not proven on the jank: the cause of the stale pointer is read from the code, the crash is intermittent, and only
+retried by the host). Not proven on the Jank: the cause of the stale pointer is read from the code, the crash is intermittent, and only
 several first flashes in a row show that it is gone. The slave (FIFO) path has no such pointer (it reads the setup buffer itself), so it
 is not patched. The decode recipe is in docs/firmware.md ("Decoding an address").
 
 ## Host mode
 
 The setting `usb` (`set usb device|host`, the menu's USB: DEVICE / HOST later; stored, default `device`) chooses.
-**DEVICE**: always a device, as above. **HOST**: jank hosts self-powered USB gear:
+**DEVICE**: always a device, as above. **HOST**: Jank hosts self-powered USB gear:
 
 - **MIDI**: the clock (the same ticks, starts on the bar line and stops as MIDI OUT) to every USB-MIDI device's first
   MIDI OUT port, up to 4, through a hub too (`main/usb_midi_host.c`).
@@ -119,13 +119,13 @@ The setting `usb` (`set usb device|host`, the menu's USB: DEVICE / HOST later; s
 Where the role comes from (`core/jank_usbrole.c`, host-tested):
 - **XIAO** (no CC chip): with HOST it starts as a device; when no computer configured it within 3 s it restarts once as
   host (as before), so a clock on a charger starts about 3 s late. `set usb device` from a computer brings it back.
-- **jank mini 2.2, battery order** (TUSB320LI, `main/usbport_tusb320.c`): a device on the cable -> the host stack and
+- **Jank mini 2.2, battery order** (TUSB320LI, `main/usbport_tusb320.c`): a device on the cable -> the host stack and
   the 5 V signal (pump, then HOST_EN); a computer or a charger -> HOST_EN low at once and the device stack; nothing -> the
-  host stack, waiting. Against another dual-role port (a USB-C laptop, tablet or power bank) jank takes the sink side
+  host stack, waiting. Against another dual-role port (a USB-C laptop, tablet or power bank) Jank takes the sink side
   (Try.SNK), so a computer always gets the control line. A different stack is a restart (about a second; the clock stops
   for it); a stack runs at least 3 s before the next one. The setting DEVICE keeps the port a sink: never 5 V, the charger
   always charges. The usb order (no TUSB320) behaves as the XIAO.
-- **jank mini 3** (lcd2 board, `main/usbport_mini3.c`, `core/jank_usbhost.c`, host-tested in `tests/test_usbhost.c`): no
+- **Jank mini 3** (lcd2 board, `main/usbport_mini3.c`, `core/jank_usbhost.c`, host-tested in `tests/test_usbhost.c`): no
   CC chip. **A computer or a charger on the LCD-2's own USB-C (VBUS sense, GPIO10, high) always wins**: the device stack,
   HOST_EN low. Only with the setting HOST and VBUS sense low does the board act as a host on the OUT port (J4, TO DEVICE):
   HOST_EN (GPIO17) high puts a 680 ohm "5 V present" signal and Rp 56 k on J4's VBUS / CC, no power (bus-powered gear needs
@@ -154,7 +154,7 @@ audio when a stream is open (the computer's in device mode, the hosted device's 
 tracker on boards with one (docs/linein.md; the XIAO only with its bench option). Host mode has no network adapter, drive or USB control
 line.
 
-jank does not switch power to the device. On a bare XIAO the 5V pin is the USB-C socket's VBUS with nothing between
+Jank does not switch power to the device. On a bare XIAO the 5V pin is the USB-C socket's VBUS with nothing between
 them (v1.2 schematic), so 5 V on that pin powers the device, or a powered hub does. The XIAO presents 5.1 k on both CC
 pins (a sink): USB-A gear behind an adapter does not care; USB-C gear plugged straight in may not power up.
 

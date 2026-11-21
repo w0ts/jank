@@ -4,10 +4,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>jank</title>
+<title>w0ts / Jank · control page</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Cg transform='translate(2.7 6.2) scale(1.4)' fill='none' stroke='%23A06CF0' stroke-width='2'%3E%3Crect x='1' y='1' width='10' height='6' rx='1.5'/%3E%3Crect x='8' y='7' width='10' height='6' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
 <style>
-/* common.css: the one style of the three sites (jank, Optimist, DN2 wishes). Tokens + shared components, neutral names.
+/* common.css: the one style of the three sites (w0ts: Jank, Optimist, DN2 Wishes, Track Kommander). Tokens + shared components, neutral names.
    A site sets only its accent, three variables (and adds the few things that are truly its own):
      :root { --accent: #da92cc; --accent-text-l: #b13c9a; --accent-text-d: #da92cc; }
    Light and dark follow the system; data-theme="light"|"dark" on <html> (or on any element) forces one.
@@ -99,6 +99,9 @@ footer.site { margin-top: var(--sp-6); padding-top: var(--sp-3); border-top: 1px
 .titlebar > h1 { flex: 0 1 auto; max-width: calc(100% - 32px); min-width: 0; margin: 0; padding: 8px 18px 8px 16px; background: var(--accent); color: var(--on);
   border-radius: var(--r) 0 0 var(--r); font-size: 28px; line-height: 1.15; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .titlebar > h1 { font-size: 21px; padding: 7px 12px; } }
+/* "w0ts / App": the w0ts link back to the root page, in the title's own colour */
+.titlebar > h1 a { color: inherit; text-decoration: none; }
+.titlebar > h1 a:hover { text-decoration: underline; text-underline-offset: 4px; }
 
 /* ---- cards: section or .card, with an h2 title. .card.accent: a selected / primary card. .card.inset: a card inside a card */
 section, .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; margin-bottom: 12px; min-width: 0; }
@@ -278,7 +281,7 @@ dialog::backdrop { background: color-mix(in srgb, var(--bg) 70%, transparent); }
 .icons figure { margin: 0; text-align: center; font-size: 12px; color: var(--dim); } .icons img { image-rendering: pixelated; display: block; margin: 0 auto 4px; }
 .prose { max-width: 760px; } .prose p, .prose li { margin: 6px 0; }
 :root { --accent: #9770c6; --accent-text-l: #8253ba; --accent-text-d: #a380d0; }
-/* jank's own: */
+/* Jank's own: */
 td button { padding: 4px 12px; min-height: 32px; }
 .row { display: flex; gap: 8px; align-items: end; }
 .row input { width: 7em; }
@@ -361,24 +364,24 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
 <body>
 <main>
   <header class="site">
-    <div class="titlebar"><h1>jank</h1></div>
+    <div class="titlebar"><h1><a href="https://w0ts.github.io/">w0ts</a> / Jank</h1></div>
     <nav id="home-links" class="site" aria-label="Links">
-      <button id="c-midi" aria-pressed="false" title="Connects to the jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button>
-      <a href="https://github.com/w0ts/jank" title="The jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
-      <a id="home-hosted" class="hide" href="https://w0ts.github.io/jank/" title="Audio works better on the GitHub hosted page than on this page opened from the jank's drive.">Open the GitHub hosted page</a>
+      <button id="c-midi" aria-pressed="false" title="Connects to the Jank over USB MIDI (SysEx). Later visits connect by itself once the browser remembers the permission; a file:// page always asks. Pressing it while connected (the eject icon) disconnects and turns that off." aria-label="Connect"><span class="connect-text">Connect</span><svg class="eject" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2l6.5 7.5h-13zM1.5 11.5h13V14h-13z" fill="currentColor"/></svg></button>
+      <a id="home-hosted" class="hide" href="https://w0ts.github.io/jank/" title="Audio works better on the GitHub hosted page than on this page opened from the Jank's drive.">Open the GitHub hosted page</a>
+      <a href="https://github.com/w0ts/jank" aria-label="GitHub" title="The Jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
     </nav>
   </header>
   <p id="msg"></p>
 
   <div id="connect-slot">
-    <p id="c-waiting" class="note hide" style="margin:8px 0 0">waiting for the jank...</p>
+    <p id="c-waiting" class="note hide" style="margin:8px 0 0">waiting for the Jank...</p>
   </div>
 
   <div id="live" class="hide">
     <div class="live-row">
       <section id="face" class="device">
         <div id="dev-bar" class="dev-bar">
-          <label id="c-ports-box" class="hide" title="Picks which jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
+          <label id="c-ports-box" class="hide" title="Picks which Jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
         </div>
         <div id="face-box">
 <svg id="dev" viewBox="0 0 100 81" tabindex="0" aria-label="jank mini 3, top view, 1 unit = 1 mm">
@@ -410,9 +413,9 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
         <label title="The Wi-Fi network's name (up to 32 characters), used when Join is a Wi-Fi network. Sent with Save and restart.">Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
         <label title="8 to 63 characters, sent over USB only; empty keeps the saved one. The stick keeps it in its flash, unencrypted, and never sends it back.">Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
       </div>
-      <p class="note" id="net-note">2.4 GHz only. The jank keeps the password in its flash, unencrypted, and never sends it back.</p>
+      <p class="note" id="net-note">2.4 GHz only. The Jank keeps the password in its flash, unencrypted, and never sends it back.</p>
       <div class="buttons">
-        <button id="net-apply" disabled title="Sends the Join choice (jank mode, or the Wi-Fi name and password) to the stick and restarts it; give it a few seconds. Kept after the restart.">Save and restart</button>
+        <button id="net-apply" disabled title="Sends the Join choice (Jank mode, or the Wi-Fi name and password) to the stick and restarts it; give it a few seconds. Kept after the restart.">Save and restart</button>
       </div>
     </section>
 
@@ -478,7 +481,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
         <label title="Whether the stick's beat tracker steers the Link session's tempo and beat. Changes the stick now; not kept after a restart (back to on).">Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
         <label title="Which beat follower the stick runs: tuned or robust (an A/B variant). Changes the stick now; not kept after a restart (back to tuned).">Follower <select id="c-follower"><option value="tuned">Tuned</option><option value="robust">Robust</option></select></label>
         <label title="Skip mode of the robust follower: Off, ACT or PAT. Changes the stick now; not kept after a restart (back to Off).">Skip <select id="c-skip"><option value="off">Off</option><option value="act">ACT</option><option value="pat">PAT</option></select></label>
-        <label title="On: the confidence shown on the jank moves with how well the beats fit (display only; the stop and start decisions keep using the gate's own value). Off: the gate's value is shown. Not kept after a restart (back to On).">Graded confidence <select id="c-graded"><option value="off">Off</option><option value="on">On</option></select></label>
+        <label title="On: the confidence shown on the Jank moves with how well the beats fit (display only; the stop and start decisions keep using the gate's own value). Off: the gate's value is shown. Not kept after a restart (back to On).">Graded confidence <select id="c-graded"><option value="off">Off</option><option value="on">On</option></select></label>
         <label title="Lets a pitch move read from the spectrum steer the beat follower; Off uses the beats alone. Changes the stick; kept after a restart.">Spectral rate <select id="c-rate"><option value="on">On</option><option value="off">Off</option></select></label>
         <label title="Shifts when the stick puts its beat out, -600 to 600 ms, on top of the auto latency (+ is later). Kept per audio source on the stick. Fine-tune by ear.">Audio shift, ms <input id="c-lat_trim" type="number" min="-600" max="600" inputmode="numeric"></label>
         <label title="The auto base of the audio source the stick hears now, -300 to 300 ms. The page's Auto latency overwrites it; Audio shift adds on top. Kept per source on the stick.">Auto latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
@@ -532,8 +535,8 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
     <section>
       <h3>Firmware</h3>
       <p id="s-version" class="note">-</p>
-      <p class="note">Update: copy jank.bin onto the JANK drive; it installs as it lands and the jank restarts. Download mode restarts
-      the jank so esptool can reach it.</p>
+      <p class="note">Update: copy jank.bin onto the JANK drive; it installs as it lands and the Jank restarts. Download mode restarts
+      the Jank so esptool can reach it.</p>
       <button id="bootloader" class="quiet" disabled title="Restarts the stick into the ROM's download mode so esptool can flash it over USB. Unplug and replug it afterwards to run again.">Download mode</button>
     </section>
   </details>
@@ -659,7 +662,7 @@ function isEnd(line) {
 
 /* The control line over any transport: write(text) puts text on it (as frames), receive(message) takes each whole SysEx that
    comes back. One command at a time; its answer is the lines up to ok or err. */
-const NO_ANSWER = "The jank did not answer";
+const NO_ANSWER = "The Jank did not answer";
 class LineClient {
   constructor(write, timers) {
     this.write = write;
@@ -722,7 +725,7 @@ function audioView(v) {
 }
 
 
-/* a setting's command, or null when the value is not one the jank takes */
+/* a setting's command, or null when the value is not one the Jank takes */
 function setCommand(key, raw) {
   const value = String(raw).trim();
   if (key === "offset") {        /* ms, 10 us steps */
@@ -768,7 +771,7 @@ function latNote(src, v) {
 /* the error answers of the nudges, in words */
 function nudgeError(message) {
   return { "err link mode": "The nudges are for AUDIO mode (music heard).", "err no beat yet": "No beat to nudge yet: the tracker has not locked.",
-           "err busy": "The jank is busy: try again." }[message]
+           "err busy": "The Jank is busy: try again." }[message]
     || (/^err nudge beat at its limit/.test(message) ? "The beat is nudged 3 beats already: that is the limit." : message);
 }
 </script>
@@ -783,9 +786,9 @@ const JANK_NAME = /(^|[^a-z])jank([^a-z]|$)/i;
 function jankPortName(name) {
   return JANK_NAME.test(name || "");
 }
-/* the jank among the ports, the USB one ("jank" exactly) first; never any other port */
+/* the jank among the ports, the USB one ("Jank" or, before 2026-11-21, "jank": the plain name, any case) first; never any other port */
 function jankPorts(inputs) {
-  return inputs.filter((p) => jankPortName(p.name)).sort((a, b) => (b.name === "jank") - (a.name === "jank"));
+  return inputs.filter((p) => jankPortName(p.name)).sort((a, b) => (String(b.name).toLowerCase() === "jank") - (String(a.name).toLowerCase() === "jank"));
 }
 function outputFor(input, outputs) {
   return outputs.find((o) => o.name === input.name) || outputs.find((o) => jankPortName(o.name)) || null;
@@ -864,7 +867,7 @@ async function change(key) {
   try {
     await send(command);
     showSettings(await send("get"));
-    say("Saved on the jank.");
+    say("Saved on the Jank.");
   } catch (e) {
     say(e.message, true);
   }
@@ -883,7 +886,7 @@ async function session(command, done) {
 /* HOME and the details by polling */
 /* the one message for a command that got no answer: the port, what to try. Polled commands repeat every few hundred ms: it is shown once
    per episode and cleared when an answer comes again */
-const STALE_HINT = " Still nothing: quit Chrome completely (Cmd+Q) and open the page again. After the jank restarted or was replugged, a Chrome that was already open can keep a stale MIDI connection.";
+const STALE_HINT = " Still nothing: quit Chrome completely (Cmd+Q) and open the page again. After the Jank restarted or was replugged, a Chrome that was already open can keep a stale MIDI connection.";
 function noAnswerText(withSysex) {
   return NO_ANSWER + (S.portName ? " (" + S.portName + ")" : "") + ". Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port" + (withSysex ? "; if the browser asks, allow SysEx for this page." : ".") + STALE_HINT;
 }
@@ -928,7 +931,7 @@ async function pollAbout() {
     S.aboutAt = performance.now();
     pollAnswered();
   } catch (e) {
-    if (e.message === "err unknown command") S.aboutOff = true;     /* a jank without `about`: the screen keeps its dashes, nothing is asked again */
+    if (e.message === "err unknown command") S.aboutOff = true;     /* a Jank without `about`: the screen keeps its dashes, nothing is asked again */
     else pollFailed(e);
   } finally {
     S.aboutBusy = false;
@@ -953,7 +956,7 @@ function paintAdvanced() {
   document.dispatchEvent(new CustomEvent("jank-advanced", { detail: { visible } }));
 }
 
-/* the page connects to a jank by itself (USB MIDI) unless the user left it: pressing the active MIDI button turns it off, pressing it again on */
+/* the page connects to a Jank by itself (USB MIDI) unless the user left it: pressing the active MIDI button turns it off, pressing it again on */
 const AUTOCONNECT_KEY = "jank.autoconnect";
 function storedAutoConnect() {
   try { return localStorage.getItem(AUTOCONNECT_KEY) !== "0"; } catch (e) { return true; }     /* storage blocked: on */
@@ -1018,7 +1021,7 @@ async function started(line, kind, drop, portName) {
   S.timers.push(setInterval(pollStatus, STATUS_EVERY_MS));
 }
 
-/* Web MIDI: the jank's USB port. Calls kept to what the apps' polyfills take:
+/* Web MIDI: the Jank's USB port. Calls kept to what the apps' polyfills take:
    one .then(ok, fail) on requestMIDIAccess, forEach over the ports, onmidimessage, send in a try */
 function midiAccess() {
   return new Promise((resolve, reject) => {
@@ -1042,7 +1045,7 @@ function attachMidi(access, input) {
   };
   access.onstatechange = () => {
     if (portList(access.inputs).some((p) => p.id === input.id)) return;
-    disconnected("The jank's MIDI port went away.");
+    disconnected("The Jank's MIDI port went away.");
     if (S.auto) waitForJank(access, true);
   };
   started(line, "midi", () => { input.onmidimessage = null; access.onstatechange = null; }, input.name || "the MIDI port");
@@ -1059,24 +1062,24 @@ function stopWaiting() {
 
 window.addEventListener("pagehide", stopWaiting);
 
-/* a jank input with its output next to it, or null: the only port the page ever attaches to */
+/* a Jank input with its output next to it, or null: the only port the page ever attaches to */
 function readyJank(access) {
   const outputs = portList(access.outputs);
   return jankPorts(portList(access.inputs)).find((input) => outputFor(input, outputs)) || null;
 }
 
 function noJankText(access) {
-  return "No MIDI port named jank. Plug it in (USB). MIDI ports I see: " + portNames(portList(access.inputs));
+  return "No MIDI port named \"jank\". Plug the Jank in (USB). MIDI ports I see: " + portNames(portList(access.inputs));
 }
 
 /* no jank port yet: keep the MIDIAccess and its statechange and connect once when one shows up. Pressed by hand: for JANK_WAIT_MS, then it says
-   it stopped. Automatic (silent): no limit and no error line, only the quiet "waiting for the jank..." line; it is also how a port that went
+   it stopped. Automatic (silent): no limit and no error line, only the quiet "waiting for the Jank..." line; it is also how a port that went
    away (unplugged, restarted after a flash) is picked up again */
 function waitForJank(access, silent) {
   stopWaiting();
   const timer = silent ? null : setTimeout(() => {
     stopWaiting();
-    say("Stopped waiting for a jank port after " + JANK_WAIT_MS / 1000 + " s. Press MIDI port to try again. MIDI ports I see: " + portNames(portList(access.inputs)), true);
+    say("Stopped waiting for a Jank port after " + JANK_WAIT_MS / 1000 + " s. Press MIDI port to try again. MIDI ports I see: " + portNames(portList(access.inputs)), true);
   }, JANK_WAIT_MS);
   S.waiting = { access, timer };
   $("c-waiting").classList.toggle("hide", !silent);
@@ -1084,7 +1087,7 @@ function waitForJank(access, silent) {
     const input = readyJank(access);
     if (!input) return;
     stopWaiting();
-    say("jank found: connecting");
+    say("Jank found: connecting");
     try { attachMidi(access, input); } catch (e) { disconnected(e.message); }
   };
 }
@@ -1147,17 +1150,17 @@ $("net-apply").addEventListener("click", async () => {
   try {
     for (const command of commands) await send(command);
     $("net-pass").value = "";
-    say("The jank is restarting. Give it a few seconds.");
+    say("The Jank is restarting. Give it a few seconds.");
   } catch (e) {
     say(e.message, true);
   }
 });
 $("bootloader").addEventListener("click", async () => {
   try { await send("bootloader"); } catch (e) { say(e.message, true); }
-  disconnected("The jank restarted for flashing. Unplug it and plug it back in to run again.");
+  disconnected("The Jank restarted for flashing. Unplug it and plug it back in to run again.");
 });
 setConnected(null);
-if (location.protocol === "file:") $("home-hosted").classList.remove("hide");   /* opened from the jank's drive: point to the GitHub hosted page */
+if (location.protocol === "file:") $("home-hosted").classList.remove("hide");   /* opened from the Jank's drive: point to the GitHub hosted page */
 S.auto = storedAutoConnect();
 autoConnect();
 </script>
@@ -2778,7 +2781,7 @@ const Stick = (() => {
   function fieldCommands(field, val, hasLead = true, hasDisplay = true) {
     if (NO_STICK_SETTING[field]) return refuse(NO_STICK_SETTING[field]);
     if (field === 'bright' || field === 'sleep') {   // an older jank has neither key in `get`: refused
-      if (!hasDisplay) return refuse('this jank has no screen setting');
+      if (!hasDisplay) return refuse('this Jank has no screen setting');
       return field === 'bright' ? cmds('set bright ' + clamp(Math.round(val), 10, 100)) : SLEEP[val] ? cmds('set sleep ' + SLEEP[val]) : refuse('SCREEN OFF has no such value');
     }
     if (field === 'threshold') return cmds('set threshold ' + clamp(Math.round(val), 0, 100));
@@ -3365,7 +3368,7 @@ const Player = (() => {
   }
   // the screen is shown at 1x: one canvas pixel is one css pixel (320 x 240 colour; the old 128 x 64 black and white one also 1:1), so no pixel is
   // dropped or doubled unevenly; the drawing is therefore not exactly to scale in mm. Narrower than the card, it shrinks to fit (the browser scales
-  // the whole drawing). Called every frame: the card is hidden until a jank is connected, and its width changes with the window
+  // the whole drawing). Called every frame: the card is hidden until a Jank is connected, and its width changes with the window
   function snapDevice() {
     const row = svg.closest(".live-row"), box = svg.parentElement;
     if (!box || !row || !row.clientWidth) return;

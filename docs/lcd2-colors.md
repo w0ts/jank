@@ -1,4 +1,4 @@
-# jank on the Waveshare ESP32-S3-LCD-2: the colour screen at its own 320 x 240 pixels (v14)
+# Jank on the Waveshare ESP32-S3-LCD-2: the colour screen at its own 320 x 240 pixels (v14)
 
 The variant uses a 2.0 inch 240 x 320 ST7789 colour LCD **in landscape** (320 x 240), no touch, no RGB LEDs. Until v13 the lcd2 layout had its
 own 160 x 120 grid painted as 2 x 2 blocks. **From v14 (owner, 2026-11-18) it is drawn at the panel's true 320 x 240 pixels**: one frame pixel is
@@ -73,7 +73,7 @@ Every item is a fixed slot, nothing moves when a value changes; icons are 22 row
 Gaps: 8 px between GRP n and the chain (x 187..194), 2 between the chain slot and the plug (x 244..245), 4 between the plug and the battery (x 264..267). Free width without a fold label: x 54..127 between the LINK
 icon and `GRP 1`; with one x 93..127. Right edge: the nub ends at x 315 (4 px margin). The plug slot is always reserved, so nothing moves when charging starts or stops.
 
-**Charging** is not reported by the jank; the lcd2 layout uses exactly the inference of the BATTERY info screen (`CHARGING`): `usb` and a cell fitted and under 100 %
+**Charging** is not reported by the Jank; the lcd2 layout uses exactly the inference of the BATTERY info screen (`CHARGING`): `usb` and a cell fitted and under 100 %
 (`charging(c)` in `ui/oled.js`); at 100 % with USB the info screen says FULL and no plug is drawn. `Stick.ctx` sets `usb` to true always, so on the page this reads as charging whenever the
 battery is under 100 %; on a unit running from the cell it would be wrong until the firmware reports USB power. With no cell fitted nothing is drawn.
 
@@ -116,11 +116,11 @@ At most one word, centred (`left = floor((320 - width) / 2)`), the first that ap
 
 | word | when | colour |
 |---|---|---|
-| `GATED` | the jank says the outputs stopped for low confidence (`gated`) | red |
+| `GATED` | the Jank says the outputs stopped for low confidence (`gated`) | red |
 | `HOLD` | the confidence holds (`confHold`) | grey |
 | `COAST` | running, the confidence known and under the threshold, not holding | amber |
 | `STOPPED` | not running (`running` false; the armed, blinking icon counts as not running yet) | grey |
-| `SILENT` | running, and nothing is heard (`silent`: level under -60 dBFS or the jank says so) | grey |
+| `SILENT` | running, and nothing is heard (`silent`: level under -60 dBFS or the Jank says so) | grey |
 | (nothing) | otherwise: running with sound and confidence | |
 
 ### The big digits (`ui/bigfont.js`)
@@ -185,11 +185,11 @@ Value, line and notch carry the same ink id.
 **With the graded confidence shown** (`confGraded`, the jank's `graded=on`, the default): the length and the value are the graded number, which has no
 threshold, so the notch is **not drawn** (the line is the whole of the row). The ink (red / amber / green) and the state word's COAST keep judging the
 jank's gate value (`confGate`, `status` `conf_gate`), so a good-looking line does not hide a gate that is about to stop the outputs. With `graded=off`
-(or an older jank) everything is as above. The same on the mono OLED's `CF` bar (no tick).
+(or an older Jank) everything is as above. The same on the mono OLED's `CF` bar (no tick).
 
 | value | rule |
 |---|---|
-| confidence | red below the jank's threshold; amber from it up to +10 points; green above; grey when the jank reports no value (`--`, no line) or there is silence |
+| confidence | red below the jank's threshold; amber from it up to +10 points; green above; grey when the Jank reports no value (`--`, no line) or there is silence |
 
 The BAR row keeps the outlined bar (124 x 10, a 1 px outline, the fill inside it: round(122 x confidence), neutral, no tick). The value is at the right end of the row
 because `CONFIDENCE` (119 px, x 4..122) fills the label column: `CONFIDENCE`, bar, `90%`.
@@ -197,9 +197,9 @@ because `CONFIDENCE` (119 px, x 4..122) fills the label column: `CONFIDENCE`, ba
 ### The NETWORK screen's SIGNAL row
 
 A read-only row under the screen's rows (TYPE, GROUP, PEERS in JANK mode: y 80; TYPE and 3 more in the Wi-Fi modes: y 98; that is 26 + 18 x the number of rows), label x 8, never inverted, never selectable, no new menu item:
-`SIGNAL` on the left; on the right the dBm and a word, right-aligned to x 311: `-55dBm GOOD`. The dBm is the best jank peer's (`rssi`), or the router's in Wi-Fi mode (`wifi_rssi`).
+`SIGNAL` on the left; on the right the dBm and a word, right-aligned to x 311: `-55dBm GOOD`. The dBm is the best Jank peer's (`rssi`), or the router's in Wi-Fi mode (`wifi_rssi`).
 The word is coloured by the rule the bars had: `GOOD` green (>= -67 dBm), `FAIR` amber (-80..-68), `POOR` red (< -80), `NONE` grey (nothing heard, 0: no dBm shown); `-`
-alone when the jank does not report it. The `NETWORK` screen's existing `STATUS` row is a connection state, not a signal, so it was not used. The word is the
+alone when the Jank does not report it. The `NETWORK` screen's existing `STATUS` row is a connection state, not a signal, so it was not used. The word is the
 only ink on the SIGNAL row. The OLED layout's NETWORK screen is unchanged.
 
 ### The NETWORK screen's air rows (MODE JANK only)
@@ -215,7 +215,7 @@ mode the screen is unchanged (SIGNAL only: there is no peer traffic to measure).
 
 `RX RETRY` is the peers' retries seen here, not this device's own (a group frame is never acknowledged, so the device cannot count its own).
 
-## What the jank reports for each coloured item
+## What the Jank reports for each coloured item
 
 | element | colour rule | reported today |
 |---|---|---|

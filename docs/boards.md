@@ -12,7 +12,7 @@ shows). MIDI: 3V3 through 33 ohm to ring / pin 4, D6 (GPIO43) through 10 ohm to 
 loop carries about 2.3 mA instead of about 6.4 mA (a calculation, not measured): below CA-033 and likely too little for
 some receivers. GPIO43 also carries the ROM's boot log. `board.h` still uses it; the PCB uses GPIO1, 2, 5, 4 instead.
 
-## The jank PCB (no firmware entry yet)
+## The Jank PCB (no firmware entry yet)
 
 The XIAO on the board in `hardware/pcb`: four outputs, MIDI IN on OUT1, a button ladder, an encoder, two RGB LEDs and
 a power cut. Its pin table and the board.h block it needs are in `hardware/pcb/README.md`, "The pin table".

@@ -1,6 +1,6 @@
 # On the air
 
-jank speaks the FM-1's group mode (shown as MODE JANK on FM-1 firmware from before the rename) and carries Ableton
+Jank speaks the FM-1's group mode (shown as MODE JANK on FM-1 firmware from before the rename) and carries Ableton
 Link unchanged.
 
 ## The frame format
@@ -15,8 +15,8 @@ Open data frames at 1 Mb/s, as the FM-1 sends them:
   beacon, no key.
 - Group frames are not acknowledged; unicast is (whether the ESP acknowledges in this mode is unmeasured).
 
-An FM-1 and a jank look the same on the air. The only tell is the MAC: a jank's starts `02:6A:6B`, so a jank whose
-computer overrode the MAC counts as a unit, not a jank.
+An FM-1 and a Jank look the same on the air. The only tell is the MAC: a jank's starts `02:6A:6B`, so a Jank whose
+computer overrode the MAC counts as a unit, not a Jank.
 
 ## The bridge (`core/jank_core.c`)
 
@@ -24,7 +24,7 @@ No routing, NAT or DHCP: the computer gives itself a 169.254.x.y address.
 
 - **The MAC.** `esp_wifi_80211_tx` can send a chosen addr2 (from a disassembly of IDF 5.5.6's
   `ieee80211_raw_frame_sanity_check`: it refuses Protected and QoS frames and checks addr2 only when associated, and
-  jank never associates). The limit is the receive filter, which acknowledges only the radio's own address. So the
+  Jank never associates). The limit is the receive filter, which acknowledges only the radio's own address. So the
   stick offers its radio's MAC in the NCM descriptor, the computer's adapter takes it, and no address is rewritten. If
   a computer overrides that MAC, the stick adopts the new one and restarts the radio (host-tested only).
 - **The filter.** At 1 Mb/s a byte costs 8 us, so by default only ARP, IPv4 unicast and Link's multicast go out.
@@ -46,7 +46,7 @@ bar line, the MIDI clock with it); the sound coming or going keeps it, its tempo
 
 ## Group scan
 
-- **Automatic (2026-11-11):** in jank mode, once nobody has been heard on the home channel for 5 s (`JS_ALONE_MS`),
+- **Automatic (2026-11-11):** in Jank mode, once nobody has been heard on the home channel for 5 s (`JS_ALONE_MS`),
   the stick sweeps the other channels every 5 s (`JS_AUTO_EVERY_MS`) until it hears a group, then joins it and keeps it
   (the same pick as the button). The LED flashes magenta for each sweep, nothing else; a sweep costs nothing while alone.
   The logic is `js_auto_step` (core/jank_ui.c), host-tested. Untested on hardware.

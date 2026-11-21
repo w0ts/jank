@@ -250,7 +250,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   midi.access.inputs.delete('in');
   midi.access.onstatechange();
   eq([pressed(p), hidden(p), p.timers.size, p.frames.size, midi.input.onmidimessage, p.box.S.line], [['false'], [false], 0, 0, null, null], 'the port went away: face gone, nothing pressed, no timer, no frame, the input released');
-  eq(p.el('msg').textContent, "The jank's MIDI port went away.", 'and it says so');
+  eq(p.el('msg').textContent, "The Jank's MIDI port went away.", 'and it says so');
   const afterGone = midi.sent.length;
   tap(p, 'ArrowUp');
   eq(midi.sent.length, afterGone, 'the keys do nothing any more');
@@ -666,7 +666,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     // (a) Digitone + FM1 only: nothing attached, nothing sent, the error names the ports, the buttons stay usable
     let c = await open(['Digitone Audio+MIDI Elektron Digitone II', 'FM1-E040'], false);
     eq([c.frames(), c.midi.sent.length, c.page.box.S.line], [0, 0, null], '(a) no jank port: no byte sent to any port, nothing attached');
-    eq(c.page.el('msg').textContent, "No MIDI port named jank. Plug it in (USB). MIDI ports I see: Digitone Audio+MIDI Elektron Digitone II, FM1-E040", '(a) the line names what the browser sees');
+    eq(c.page.el('msg').textContent, "No MIDI port named \"jank\". Plug the Jank in (USB). MIDI ports I see: Digitone Audio+MIDI Elektron Digitone II, FM1-E040", '(a) the line names what the browser sees');
     eq([c.page.el('msg').classList.contains('bad'), shown(c.page, 'c-ports-box'), shown(c.page, 'live'), pressed(c.page), c.page.el('c-midi').disabled], [true, false, false, ['false'], false], '(a) an error, no chooser, no face, the connection button usable');
     eq(c.page.timeouts().length, 1, '(a) one wait timer (the 15 s) is running');
     c.page.box.disconnected();
@@ -697,7 +697,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     // (d) 15 s without a jank: stop listening, say so, no late auto-connect
     c = await open(['FM1-E040'], false);
     for (const [, fn] of c.page.timeouts()) fn();
-    eq(c.page.el('msg').textContent.startsWith('Stopped waiting for a jank port after 15 s. Press MIDI port to try again. MIDI ports I see: FM1-E040'), true, '(d) after 15 s it says it stopped');
+    eq(c.page.el('msg').textContent.startsWith('Stopped waiting for a Jank port after 15 s. Press MIDI port to try again. MIDI ports I see: FM1-E040'), true, '(d) after 15 s it says it stopped');
     eq([c.access.onstatechange, c.page.timers.size], [null, 0], '(d) no listener, no timer left');
     addJank(c);
     await settle();
@@ -715,14 +715,14 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
       const q = await connected();
       const realSend = q.page.box.S.line.send.bind(q.page.box.S.line);
       let silent = true;
-      q.page.box.S.line.send = (command, ms) => (silent ? Promise.reject(Object.assign(new Error('The jank did not answer'), { noAnswer: true })) : realSend(command, ms));
+      q.page.box.S.line.send = (command, ms) => (silent ? Promise.reject(Object.assign(new Error('The Jank did not answer'), { noAnswer: true })) : realSend(command, ms));
       for (const [, tick] of q.page.intervals()) tick();
       await settle();
       const first = q.page.el('msg').textContent;
       q.page.el('msg').textContent = 'marker';
       for (const [, tick] of q.page.intervals()) tick();
       await settle();
-      eq([first.startsWith('The jank did not answer ('), q.page.el('msg').textContent], [true, 'marker'], 'a repeated timeout of the polling does not say it again');
+      eq([first.startsWith('The Jank did not answer ('), q.page.el('msg').textContent], [true, 'marker'], 'a repeated timeout of the polling does not say it again');
       silent = false;
       for (const [, tick] of q.page.intervals()) tick();
       await settle();
@@ -739,7 +739,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     wp.el('c-midi').click();
     await settle();
     for (let k = 0; k < 2; k++) { for (const [id, fn] of wp.timeouts()) { wp.box.clearTimeout(id); fn(); } await settle(); }
-    eq(wp.el('msg').textContent, 'The jank did not answer (jank). Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port; if the browser asks, allow SysEx for this page. Still nothing: quit Chrome completely (Cmd+Q) and open the page again. After the jank restarted or was replugged, a Chrome that was already open can keep a stale MIDI connection.', 'no answer: one plain message naming the port, with the SysEx hint at connect and the stale Chrome hint');
+    eq(wp.el('msg').textContent, 'The Jank did not answer (jank). Close other programs that use its MIDI port (like the simulator), wait a few seconds if it just restarted, or unplug and replug it, then press MIDI port; if the browser asks, allow SysEx for this page. Still nothing: quit Chrome completely (Cmd+Q) and open the page again. After the Jank restarted or was replugged, a Chrome that was already open can keep a stale MIDI connection.', 'no answer: one plain message naming the port, with the SysEx hint at connect and the stale Chrome hint');
     ok(!/get|home|status/.test(wp.el('msg').textContent.replace('MIDI port','')), 'no command name in the message');
   }
 

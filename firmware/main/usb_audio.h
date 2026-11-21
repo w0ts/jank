@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The USB audio speaker (BEAT-FOLLOW BENCH BUILD): a UAC2 output called "jank", 44.1 kHz, 16-bit, MONO, isochronous OUT
+/* The USB audio speaker (BEAT-FOLLOW BENCH BUILD): a UAC2 output called "Jank", 44.1 kHz, 16-bit, MONO, isochronous OUT
  * on endpoint 5, adaptive, with no feedback endpoint (the IN endpoints are all used: usb.c). What the computer plays to it
  * goes into a ring buffer for the beat tracker (beat.c); it is never played. The player sends the mid, (L + R) / 2.
  *

@@ -81,7 +81,7 @@ static struct jk_snapshot s_snap;
 #define FRAME_BYTES JO_FB_BYTES
 static uint8_t s_fb[FRAME_BYTES];       /* the frame drawn (the driver keeps its own copy) */
 #endif
-static char s_ap_name[JO_SSID_MAX + 1] = "jank", s_ap_pass[JO_TEXT_MAX + 1] = "";
+static char s_ap_name[JO_SSID_MAX + 1] = "Jank", s_ap_pass[JO_TEXT_MAX + 1] = "";
 
 struct meter_step {
     uint32_t t;

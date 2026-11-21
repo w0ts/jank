@@ -1,4 +1,4 @@
-# A MIDI-powered jank (study, 2026-11-10)
+# A MIDI-powered Jank (study, 2026-11-10)
 
 The idea: a small board anyone orders assembled from JLCPCB, in a printed case. Two 3.5 mm jacks, plugged with TRS-to-DIN
 adaptors: one into the gear's MIDI IN (jank's clock goes in), one into its MIDI OUT or THRU (power taken from it). One
@@ -20,21 +20,21 @@ MIDI-powered box). Budget: **under 5 mA average**. Measure the user's gear first
 
 ## The radio only listens
 
-jank keeps the Wi-Fi receiver on (60-90 mA): 10 to 20 times the budget. The dongle instead listens a few ms around a
+Jank keeps the Wi-Fi receiver on (60-90 mA): 10 to 20 times the budget. The dongle instead listens a few ms around a
 **sync frame** and free-runs on its crystal in between, with the drift learned (`third_party/link`'s filter):
 
 - A new frame on the air, beside today's (older units ignore it): session id, sequence number, tempo, and the session's
   beat when the frame really left. The sender learns that moment only after the channel was free (TX done), so it puts
   it in its next frame for the previous sequence number (two steps, as PTP). The receiver takes its own hardware receive
   timestamp (`rx_ctrl.timestamp`, us). One-way over air: microseconds of delay, known from the frame length.
-- Sent on every beat by any jank in a session (FM-1s once Optimist adds it): the dongle needs one sender in the group.
+- Sent on every beat by any Jank in a session (FM-1s once Optimist adds it): the dongle needs one sender in the group.
 - The dongle transmits rarely (2026-11-11, the user: "it would be nice if it could be counted as a peer"): one short
   "here" frame about once a second (its node id, the session id; a tap tempo from the button rides on it), ~1 ms at
-  ~300 mA from the capacitor bank (a ~0.15 V dip on 2 mF), **~0.3 mA on average** (*estimate*). Any jank or FM-1 on
+  ~300 mA from the capacitor bank (a ~0.15 V dip on 2 mF), **~0.3 mA on average** (*estimate*). Any Jank or FM-1 on
   USB (a bridge, running Link) hears it and sends Link's ALIVE for the dongle under its node id. Link keeps a peer for
   the ttl in its ALIVE (5 s, discovery/PeerGateway.hpp; third_party/link LK_TTL), so a frame a second keeps the dongle
   in Live's peer count. A Link peer that wants to measure the dongle's session reaches the bridge's endpoint (same
-  session clock). Without a bridge the dongles count each other through the jank frames only. It can also lead: a sync
+  session clock). Without a bridge the dongles count each other through the Jank frames only. It can also lead: a sync
   frame on every beat (2 a second at 120 BPM), ~0.5-1 mA (*estimate*). Not a Link peer itself on MIDI power: Link keeps
   the receiver on and answers at any time (70+ mA).
 - Otherwise the radio only listens: it wakes for about 10 ms a second (*estimate*: Wi-Fi wake from light sleep is not
@@ -105,5 +105,5 @@ of ~1.8 ms at 13-22 mA, ~1.1-1.9 mA; light sleep ~0.2 mA: **about 2-3 mA**. Stil
 the 500 mA allotted), and the user's gear: each MIDI OUT's current into ~330 ohm (or a 3.3 V load) between pin 4 and
 pin 2, and pin 5 to pin 2, on 2-3 devices.
 
-Then: the sync frame in jank and Optimist, the board (S3-MINI-1, two PJ-320 jacks, one button, USB-C, the buck, the
+Then: the sync frame in Jank and Optimist, the board (S3-MINI-1, two PJ-320 jacks, one button, USB-C, the buck, the
 cap bank), the case.

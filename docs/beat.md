@@ -4,7 +4,7 @@
 image of this build.** Our own network will replace that file. The build says so at configure time, in the boot log, in
 the `beat` answer (`beat_weights=`) and on the control page.
 
-The stick is a USB speaker called **jank**. What the computer plays to it goes to a beat tracker on core 0 (madmom's
+The stick is a USB speaker called **Jank**. What the computer plays to it goes to a beat tracker on core 0 (madmom's
 online tracker in C: `core/beat/`), and the tracker is the Link session's master: its tempo, beat grid and stop/start go
 into the session (`core/jank_beatlink.c`). Core 1 stays the MIDI clock's alone.
 
@@ -27,10 +27,10 @@ the old image back (`main/ota.c`, `main/usb.c`).
 
 ## Test with a Mac
 
-1. Plug the stick in. Audio MIDI Setup lists an output **jank**: 1 ch, 16-bit, 44100 Hz (the only format).
+1. Plug the stick in. Audio MIDI Setup lists an output **Jank**: 1 ch, 16-bit, 44100 Hz (the only format).
 2. Play to it: beat-listener's player with `--xiao` (a second output stream with the mid of the track, besides the
-   speakers), or set the Mac's output to jank (silent, tracker only), or make a **Multi-Output Device** of the speakers
-   and jank, 44.1 kHz, the speakers as the clock source and drift correction on for jank.
+   speakers), or set the Mac's output to Jank (silent, tracker only), or make a **Multi-Output Device** of the speakers
+   and Jank, 44.1 kHz, the speakers as the clock source and drift correction on for Jank.
 3. Live (or any Link app) with Link on joins over the stick's network adapter as usual. Within some beats the session's
    tempo follows the track, the stick's LED flashes on the beat and Live's Link beat lines up with what is heard. When
    the music stops, Link stops; when it starts again, Link starts on the next bar (quantum 4).
@@ -58,7 +58,7 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
 
 | Key | Meaning |
 |---|---|
-| `audio` | 1 while the computer streams to jank |
+| `audio` | 1 while the computer streams to Jank |
 | `mode`, `bpm` | the tracker's mode (stopped, steady, speeding_up, slowing_down) and tempo |
 | `heap_free`, `heap_min`, `heap_largest` | internal heap now, lowest since boot, largest block; Wi-Fi, Link, USB and the tracker running |
 | `stack_free` | bytes the tracker task's stack never used |
@@ -131,14 +131,14 @@ the page, send `beat` on the control line (SysEx on the MIDI port, [jank_sysex.h
   8 KB (PSRAM, allocated at boot; `jrb_act` now runs with every frame, one store, on both followers). Only the comb is new work:
   `jg_tuned_step` (`core/beat/jb_graded.c`) refreshes all four once a second (no grid: 0) and keeps the mean in between;
   estimated 0.3 .. 0.5 M cycles/s on the S3 from the operation counts (about 200 autocorrelation lags of 800 products per
-  refresh, soft F's 8 s window), no heap, 16 bytes of DRAM; NOT measured on the jank. The robust follower keeps its own 0.5 s
+  refresh, soft F's 8 s window), no heap, 16 bytes of DRAM; NOT measured on the Jank. The robust follower keeps its own 0.5 s
   refresh of the tempo and DBN parts and the per-step soft F. The gate, the lock and jump decisions, the tempo and the lines are
   bit for bit the same with it (tests/test_graded.c: the tuned chain on tests/beat_ref and tests/robust_ref with and without it;
   and the same trace from the previous core). The first 5.5 s after a lock the tempo part is 0 (the comb needs that much
   activation), so the value ramps up. The graded value is a measurement: no HOLD easing, `conf_hold=0` while it is shown.
   **Fixed 2026-11-19** (the user: "before the confidence was 0 or 100, now 0 or 72 or 73"): the comb was asked to end at the
   stream clock, ~2 frames past the tracker's newest frame (a frame needs 1024 samples after its centre), and `jc_curve`
-  refuses that: the tempo part was always 0 on the jank and the value shown never passed 75 %. `jg_tuned_step` now ends the
+  refuses that: the tempo part was always 0 on the Jank and the value shown never passed 75 %. `jg_tuned_step` now ends the
   comb at the newest frame. Replayed from the audio of 39 of the user's tracks (the firmware's code, threshold 55): the
   tempo part while running 0.00 -> 1.00 (median), the value shown 71 -> 96 (Rhyw - Driptych 70 -> 94, Gary Beck - Mango
   Circus 71 -> 96). tests/test_graded.c checks it at the device's clock. Open: the robust follower's refresh and its

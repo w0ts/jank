@@ -31,7 +31,7 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->rate = 1;                       /* the spectral rate on (M2i) */
     c->graded = 1;                     /* the graded confidence is the one shown (core/beat/jb_graded.h), on both followers */
     jla_init(&c->lat);                 /* (lat_key: the computer, which beat_latency_ms above is) */
-    strcpy(c->name, "jank");
+    strcpy(c->name, "Jank");
 }
 
 int jk_cfg_set_name(struct jk_cfg *c, const char *name)

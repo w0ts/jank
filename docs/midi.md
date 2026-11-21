@@ -69,7 +69,7 @@ measurements.
 **The jam chain** (2026-11-10, MODE JANK, Live on the stick's USB, an FM-1 on the air playing a hit each beat into the
 same recording; 2 min after 2 min of settling, 240 FM-1 hits, 960 Live pulses):
 
-| | Link's method (both) | the filtered Link clock (both: jank 26ddb7c, fm1-base d26193e) |
+| | Link's method (both) | the filtered Link clock (both: Jank 26ddb7c, fm1-base d26193e) |
 |---|---|---|
 | FM-1's sound - the stick's MIDI | sd 227 to 349 us | sd 27 us (p1 .. p99: -396 .. -291 us) |
 | FM-1's sound - Live | sd 140 to 480 us (30 s ramps and steps) | sd 66 us (-408 .. -159 us) |

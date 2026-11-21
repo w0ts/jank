@@ -1,4 +1,4 @@
-# jank on the Waveshare ESP32-S3-LCD-2 (board `lcd2`)
+# Jank on the Waveshare ESP32-S3-LCD-2 (board `lcd2`)
 
 Stage 1 (2026-11-17): the firmware builds for the board (`scripts/build.sh lcd2`); nothing has run on hardware. The screen
 is the same UI as the OLED's, drawn in landscape (320 x 240). Stage 1 drew it in one foreground colour;
@@ -38,9 +38,9 @@ P2 pins 1 to 14: 3V3, GND, IO43, IO44, IO47, IO48, IO15, IO13, IO11, IO12, IO14,
 LEDs (SCH): LED1 is the charger's STAT indicator (ETA6098), LED2 the 3V3 rail's power LED. **No LED is on a GPIO**: the
 board has no user LED (`BOARD_LED_MONO_GPIO` is -1; the screen is the language).
 
-### Conflicts with what jank uses
+### Conflicts with what Jank uses
 
-| jank signal (XIAO / mini 2.2, firmware/main/board.h) | On the lcd2 |
+| Jank signal (XIAO / mini 2.2, firmware/main/board.h) | On the lcd2 |
 |---|---|
 | USB D- / D+ GPIO19 / GPIO20 | same pins, on the board's own USB-C |
 | MIDI TX GPIO43 (XIAO; the mini 2.2 uses 21) | the lcd2 uses GPIO13 (MIDI OUT 2 on GPIO9, mini 3 map below); GPIO43 stays free (console is off: `CONFIG_ESP_CONSOLE_NONE`) |
@@ -51,7 +51,7 @@ board has no user LED (`BOARD_LED_MONO_GPIO` is -1; the screen is the language).
 | mini 2.2 pins GPIO35, 36, 37 (LEDs, D-pad), 38, 39, 42 (VBUS sense, CC INT, host enable) | **taken on the lcd2**: 35 .. 37 by the PSRAM, 38 / 39 / 42 by the LCD |
 | mini 2.2's GPIO10, 11, 12, 16, 21, 4, 9 | free on the headers (P1: 10, 16, 21, 4; P2: 11, 12, 9) |
 
-### jank mini 3 pin map (from the jank-mini-3 session, 2026-11-19, re-mapped with the board's round-4 layout; provisional until the board is ordered)
+### Jank mini 3 pin map (from the jank-mini-3 session, 2026-11-19, re-mapped with the board's round-4 layout; provisional until the board is ordered)
 
 Source of truth: `hardware/jank-mini-3/parts.py` GPIO (chosen by `tools/gpio_opt.py` for length, crossings and
 straightness). `firmware/main/board.h` (lcd2) uses the first block; the second has no firmware use yet.

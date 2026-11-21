@@ -1,6 +1,6 @@
 # LINE IN into the beat tracker
 
-The board's line input (jank mini 2.2: the LMV321 summer into GPIO9) goes to the beat tracker the same way USB audio does.
+The board's line input (Jank mini 2.2: the LMV321 summer into GPIO9) goes to the beat tracker the same way USB audio does.
 Code: `firmware/main/linein.c`, `core/jank_line.c`, the resampler `jp_cr` in `core/jank_pcm.c`; host tests `tests/test_line.c`.
 The design follows the timing study (`worktrees/timing-scratch/TIMING.md`, section 5).
 

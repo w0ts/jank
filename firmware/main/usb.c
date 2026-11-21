@@ -42,7 +42,7 @@
 /* tusb_get_mac_string_id() with CDC off and MSC on: esp_tinyusb writes the MAC there, so STR_MAC has to be that index */
 /* esp_tinyusb takes at most 8 strings (USB_STRING_DESCRIPTOR_ARRAY_SIZE, include_private/descriptors_control.h): more and
  * tinyusb_driver_install fails ("String descriptors exceed limit"), usb_start returns an error and the start aborts. The
- * speaker is named by STR_MIDI's "jank", which is what it is called anyway. */
+ * speaker is named by STR_MIDI's "Jank", which is what it is called anyway. */
 enum { STR_LANG, STR_MAKER, STR_PRODUCT, STR_SERIAL, STR_DISK, STR_NET, STR_MAC, STR_MIDI, STR_COUNT };
 _Static_assert(STR_COUNT <= 8, "esp_tinyusb takes at most 8 string descriptors");
 enum { ITF_NET, ITF_NET_DATA, ITF_MIDI, ITF_MIDI_STREAM, ITF_DISK, ITF_AUDIO, ITF_AUDIO_STREAM, ITF_TOTAL };
@@ -50,8 +50,8 @@ enum { EP_NET_NOTIF = 1, EP_NET_DATA, EP_MIDI, EP_DISK, EP_AUDIO };
 #define CONFIG_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_NCM_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_MSC_DESC_LEN + UAC_DESC_LEN)
 
 static const char *STRINGS[STR_COUNT] = {
-    [STR_LANG] = "\x09\x04", [STR_MAKER] = "jank", [STR_PRODUCT] = "jank", [STR_SERIAL] = NULL,
-    [STR_DISK] = "jank page", [STR_NET] = "jank network", [STR_MAC] = "", [STR_MIDI] = "jank",
+    [STR_LANG] = "\x09\x04", [STR_MAKER] = "Jank", [STR_PRODUCT] = "Jank", [STR_SERIAL] = NULL,
+    [STR_DISK] = "Jank page", [STR_NET] = "Jank network", [STR_MAC] = "", [STR_MIDI] = "Jank",
 };
 
 static const uint8_t CONFIG_DESC[] = {

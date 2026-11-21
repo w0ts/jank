@@ -50,7 +50,7 @@ static int ends(const char *s, const char *tail)
 static void test_defaults(void)
 {
     setup();
-    CHECK(cfg.group == 1 && cfg.filter == JK_FILTER_LINK && !strcmp(cfg.name, "jank"));
+    CHECK(cfg.group == 1 && cfg.filter == JK_FILTER_LINK && !strcmp(cfg.name, "Jank"));
 }
 
 static void test_get(void)
@@ -58,7 +58,7 @@ static void test_get(void)
     setup();
     CHECK(run("get") == JK_CTL_NONE);
     CHECK(strstr(out, "group=1\n") && strstr(out, "channel=1\n"));
-    CHECK(strstr(out, "name=jank\n") && strstr(out, "filter=link\n"));
+    CHECK(strstr(out, "name=Jank\n") && strstr(out, "filter=link\n"));
     CHECK(strstr(out, "mac=02:11:22:33:44:55\n"));
     CHECK(strstr(out, "board=lcd2\nversion=" JK_VERSION "\nok\n"));
     strcpy(snap.board, "xiao");
