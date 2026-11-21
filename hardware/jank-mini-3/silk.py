@@ -10,7 +10,7 @@ import pcbnew
 MM = pcbnew.FromMM
 OX = OY = 100.0
 # (text, x, y, size, layer) in board mm; the LCD-2's rows: pin 1 marks
-LABELS = [   # (connector names only: warnings live in the README, Henri 2026-11-18)
+LABELS = [   # (connector names only: warnings live in the README, mots 2026-11-18)
     ("OUT", 9.5, 13.6, 0.9, "F"), ("IN", 9.5, 49.6, 0.9, "F"),
     ("LINE IN", 16.0, 15.0, 0.9, "F"), ("MIDI 1", 30.0, 15.0, 0.9, "F"), ("MIDI 2", 44.0, 15.0, 0.9, "F"),
     ("CLK", 55.5, 15.0, 0.9, "F"), ("RST", 64.0, 15.0, 0.9, "F"),

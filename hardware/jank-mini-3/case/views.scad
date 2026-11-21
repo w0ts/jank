@@ -1,6 +1,6 @@
 // check views: the tray with the placed board (KiCad's 3D models: kicad-cli pcb export stl -o ../.t/board.stl), the
 // LCD-2 (Waveshare's STEP as STL: ../.t/lcdm/m.stl, its PCB bottom at model z -2.0, 11 mm over our board) and the cell
-// (Henri's 2 x 6 x 17 x 60 LiPo cells, on their long edge along the bottom wall). make_views.sh renders it.
+// (mots's 2 x 6 x 17 x 60 LiPo cells, on their long edge along the bottom wall). make_views.sh renders it.
 use <case.scad>
 BOARD_STL = "../.t/edge.stl";
 W = 93; H = 62.6; FLOOR = 2.0; STANDOFF = 2.5; ZB = FLOOR + STANDOFF; ZT = ZB + 1.6;
