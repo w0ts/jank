@@ -44,8 +44,11 @@ html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; padding: var(--sp-4); background: var(--bg); color: var(--ink); font: var(--fs-3)/1.45 var(--font-ui); }
 main, .page { max-width: 1100px; margin: 0 auto; }
 h1 { font-size: var(--fs-6); margin: 0; line-height: 1.1; }
-h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-h3 { font-size: var(--fs-4); margin: 18px 0 6px; }
+/* heading scale, the same on every site: h1 = the title bar's title (36px, 28px on the bar); h2 = a section title (21px bold); h3 = a sub-section (16px semibold); h4 = a small label (13px, capitals, dim) */
+h2 { font-size: 21px; line-height: 1.2; font-weight: 700; color: var(--ink); margin: var(--sp-5) 0 10px; }
+h3 { font-size: 16px; line-height: 1.25; font-weight: 600; color: var(--ink); margin: var(--sp-4) 0 6px; }
+h4 { font-size: 13px; line-height: 1.3; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; margin: var(--sp-3) 0 6px; }
+:is(h2, h3, h4):first-child { margin-top: 0; }
 p { margin: 8px 0; }
 a { color: var(--accent-text); }
 ::selection { background: var(--accent); color: var(--on); }
@@ -84,20 +87,10 @@ nav.site svg { flex: none; }
    one row, title on the left, tabs on the right, in the content's width; the title's fade runs toward the tabs; on a phone the tabs wrap under the title, still right-aligned.
    A header placed directly in <body> takes main's width and centring. */
 body > header.site { max-width: 1100px; margin-left: auto; margin-right: auto; }
-/* the bar (accent block + fade) runs across the full content width; the tabs sit on its right end, over the faded part */
-header.site:has(> .titlebar) { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0; }
-header.site > .titlebar { grid-area: 1 / 1 / 2 / 3; margin: 0; }
-header.site > .titlebar::after { background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 22%, transparent)); }
-header.site > nav.site { grid-area: 1 / 2; margin: 0; padding: 0 var(--sp-3); justify-content: flex-end; z-index: 1; }
-header.site > nav.site a { color: var(--ink); }
-header.site > nav.site a:hover, header.site > nav.site a[aria-current="page"] { text-decoration: underline; }
-/* narrow: the bar keeps the full width, the tabs wrap below it, right-aligned */
-@media (max-width: 760px) {
-  header.site > .titlebar { grid-area: 1 / 1 / 2 / 3; }
-  header.site > nav.site { grid-area: 2 / 1 / 3 / 3; padding: var(--sp-2) 0 0; }
-  header.site > nav.site a { color: var(--accent-text); }
-  header.site > nav.site a[aria-current="page"] { color: var(--ink); }
-}
+/* the bar (accent block + fade) runs across the full content width; the tabs sit on the row under it, right-aligned, at every width */
+header.site:has(> .titlebar) { display: block; }
+header.site > .titlebar { margin: 0; }
+header.site > nav.site { margin: 0; padding: var(--sp-2) 0 0; justify-content: flex-end; }
 footer.site { margin-top: var(--sp-6); padding-top: var(--sp-3); border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); }
 
 /* ---- title bar: the page title on a solid accent block that fades out to the right (the block holds the text, so contrast is dark --on on --accent in both modes, and a long title wraps inside it) */
@@ -352,11 +345,11 @@ td button { padding: 4px 12px; min-height: 32px; }
 .adv-boots { font-size: 20px; font-weight: 650; margin: 0 0 8px; }
 .adv-boots.restarted { color: var(--err); }
 #connect-slot { margin: 4px 0 12px; }
-/* the shared header with the nav row UNDER the full-width title bar at every width (mots, 2026-11-21: "tabs below the
-   title bar, nicer"): the shared narrow layout, kept on wide screens too; the connect button leads the row */
-header.site > nav.site { grid-area: 2 / 1 / 3 / 3; padding: var(--sp-2) 0 0; align-items: center; }
-header.site > nav.site a { color: var(--accent-text); }
+header.site > nav.site { align-items: center; }
 header.site > nav.site #c-midi { flex: none; }
+/* the heading scale (mots, 2026-11-21: "h1 and h2, possibly h3"): h1 the title bar, h2 each fold-out section's title
+   (in its summary), h3 the cards inside */
+details.sec > summary > h2 { display: inline; margin: 0; text-transform: none; letter-spacing: normal; }
 .dev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .dev-bar #c-ports-box { margin: 0; }
 header #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
@@ -406,13 +399,13 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
       </section>
     </div>
 
-  <details id="sec-settings" class="sec"><summary title="Shows or hides the settings: the name and the Wi-Fi. Only this page.">Settings</summary>
+  <details id="sec-settings" class="sec"><summary title="Shows or hides the settings: the name and the Wi-Fi. Only this page."><h2>Settings</h2></summary>
     <section id="menu">
       <div class="grid">
         <label title="The stick's name, up to 23 printable characters. Changes the stick; kept after a restart.">Name <input id="c-name" maxlength="23"></label>
       </div>
 
-      <h2 style="margin-top:14px">Network</h2>
+      <h3>Network</h3>
       <p id="net-state" class="note">-</p>
       <div class="grid">
         <label title="Jank mode or a Wi-Fi network. Nothing changes until Save and restart.">Join <select id="net-mode"><option value="jank">MODE JANK</option><option value="wifi">A Wi-Fi network</option></select></label>
@@ -426,7 +419,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
     </section>
 
   </details>
-  <details id="sec-player" class="sec" open><summary title="Shows or hides the player. Hiding it does not stop the sound. Only this page.">Player</summary>
+  <details id="sec-player" class="sec" open><summary title="Shows or hides the player. Hiding it does not stop the sound. Only this page."><h2>Player</h2></summary>
       <section id="player" tabindex="-1">
         <div class="pl-title"><button id="pl-help" class="link" type="button" aria-expanded="false" title="Shows or hides the help text of the player. Only this page.">?</button></div>
         <p id="pl-help-text" class="note hide">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first time, choose the stick's output once in the browser's own output chooser (no microphone is used); it is remembered. The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card. After a reload the remembered folder needs one click (Play or Open) to be allowed again; on the https address Chrome 122 and later offers "Allow on every visit" in that prompt, which makes this step silent.</p>
@@ -465,7 +458,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
         </div>
       </section>
   </details>
-  <details id="sec-advanced" class="sec"><summary title="Shows or hides the advanced settings and details: tuning, signal, Link, peers and firmware. Only this page.">Advanced</summary>
+  <details id="sec-advanced" class="sec"><summary title="Shows or hides the advanced settings and details: tuning, signal, Link, peers and firmware. Only this page."><h2>Advanced</h2></summary>
     <section>
       <p id="adv-boots" class="adv-boots">boots - &middot; reset: -</p>
       <p id="adv-panic" class="note hide"></p>
@@ -482,7 +475,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
         <div class="stat"><b id="adv-save">-</b><span>settings save pending</span></div>
       </div>
       <p id="adv-diag-note" class="note"></p>
-      <h2 style="margin-top:14px">Beat follow and tuning</h2>
+      <h3>Beat follow and tuning</h3>
       <div class="grid">
         <label title="Whether the stick's beat tracker steers the Link session's tempo and beat. Changes the stick now; not kept after a restart (back to on).">Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
         <label title="Which beat follower the stick runs: tuned or robust (an A/B variant). Changes the stick now; not kept after a restart (back to tuned).">Follower <select id="c-follower"><option value="tuned">Tuned</option><option value="robust">Robust</option></select></label>
@@ -496,7 +489,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
         <label title="Beats in a bar (1 to 16) for the MIDI start, so a receiver starts on the session's downbeat. Changes the stick; kept after a restart.">Beats a bar <input id="c-quantum" type="number" min="1" max="16" inputmode="numeric"></label>
         <label title="Moves the MIDI clock against the Link session, -100 to 100 ms, for gear that lags. Changes the stick; kept after a restart.">Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01" inputmode="decimal"></label>
       </div>
-      <h2 style="margin-top:14px">Beat display</h2>
+      <h3>Beat display</h3>
       <div class="grid">
         <label title="Delays (+) or advances (-) the beat boxes this page draws, -400 to 400 ms. Changes only this page, never the stick's settings.">Beat display delay, ms <input id="bd-num" type="number" min="-400" max="400" step="5" inputmode="numeric"></label>
         <label>&nbsp;<input id="bd-slider" type="range" min="-400" max="400" step="5" value="0" aria-label="Beat display delay, ms" title="Beat display delay in ms: delays (+) or advances (-) the beat boxes this page draws. Changes only this page, never the stick's settings."></label>
@@ -507,7 +500,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
       </div>
       monitor's output latency minus the stick path's minus the stick's own beat_latency (so it is 0 once Auto latency has set that), to 5 ms: the page cannot see the stick's USB audio buffering (the stick's beat_latency covers that), so set the
       rest by ear.</p>
-      <h2 style="margin-top:14px">Auto latency</h2>
+      <h3>Auto latency</h3>
       <div class="buttons">
         <label class="check"><input id="al-on" type="checkbox" checked title="On: while the player plays through the stick over USB, the page sets the stick's auto latency from the two output paths. Remembered in this browser; off sends nothing."> Auto latency</label>
         <button id="al-resend" class="quiet" type="button" title="Sends the page's auto latency suggestion to the stick again now, ignoring the 3 ms and 5 s limits. Overwrites the stick's auto base; only while playing through the stick over USB.">Re-send</button>
@@ -516,7 +509,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
       The page cannot see the stick's USB buffering or the capture chain's, so finish by ear with Audio shift (the manual layer, above).</p>
     </section>
     <section>
-      <h2>Air and Link</h2>
+      <h3>Air and Link</h3>
       <div class="grid">
         <div class="stat"><b id="s-rssi">-</b><span>best signal, dBm</span></div>
         <div class="stat"><b id="s-channel">-</b><span>channel</span></div>
@@ -532,14 +525,14 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
       </div>
     </section>
     <section>
-      <h2>Peers heard</h2>
+      <h3>Peers heard</h3>
       <table>
         <thead><tr><th>Address</th><th>dBm</th><th>ms ago</th><th>Frames</th></tr></thead>
         <tbody id="units"></tbody>
       </table>
     </section>
     <section>
-      <h2>Firmware</h2>
+      <h3>Firmware</h3>
       <p id="s-version" class="note">-</p>
       <p class="note">Update: copy jank.bin onto the JANK drive; it installs as it lands and the jank restarts. Download mode restarts
       the jank so esptool can reach it.</p>
