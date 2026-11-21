@@ -39,7 +39,7 @@ ok(html.indexOf('id="dev-bar"') > html.indexOf('id="face"') && !/id="c-advanced|
   const at = (s) => html.indexOf(s);
   const order = ['id="face"', 'id="sec-settings"', 'id="sec-player"', 'id="sec-advanced"'].map(at);
   ok(order.every((n, i) => n > 0 && (i === 0 || n > order[i - 1])), "after the device card: the Settings, Player and Advanced sections, in that order");
-  ok(/<details id="sec-settings"[^>]*><summary[^>]*>Settings<\/summary>/.test(html) && /<details id="sec-player"[^>]* open><summary[^>]*>Player<\/summary>/.test(html) && /<details id="sec-advanced"[^>]*><summary[^>]*>Advanced<\/summary>/.test(html), "each section is a <details> with its title; only the Player starts open");
+  ok(/<details id="sec-settings"[^>]*><summary[^>]*><h2>Settings<\/h2><\/summary>/.test(html) && /<details id="sec-player"[^>]* open><summary[^>]*><h2>Player<\/h2><\/summary>/.test(html) && /<details id="sec-advanced"[^>]*><summary[^>]*><h2>Advanced<\/h2><\/summary>/.test(html), "each section is a <details> with its h2 title; only the Player starts open");
   ok(!/id="face"[^>]*><details|<details[^>]*id="face"/.test(html), "the device card is not collapsible");
   const inAdv = html.slice(at('id="sec-advanced"'), at('</main>'));
   ok(['adv-boots', 'bd-num', 'al-on', 's-rssi', 'units', 's-version', 'bootloader'].every((id) => inAdv.includes('id="' + id + '"')), "Advanced holds the stats, the tuning, the beat display, Auto latency, Air and Link, Peers heard and Firmware");
@@ -51,7 +51,7 @@ ok(/id="c-midi"[^>]*aria-pressed="false"/.test(html), "Connect: the MIDI port bu
 ok(/id="c-midi"[^>]*><span class="connect-text">Connect<\/span><svg class="eject"/.test(html) && !/MIDI port \(USB, iPhone app\)/.test(html), "the button says Connect, and shows an eject icon while connected");
 ok(!/bluetooth|gatt|\bble\b|\bble[-_]/i.test(html), "no Bluetooth, BLE or GATT anywhere in the page");
 ok(!/id="c-sim"|>Demo<|>Simulator<|Sim\.|const Sim|sim\.js|\?sim=/.test(html), "no Demo / simulator mode left");
-ok(!/face-stick|face-sim|face-bar|face-tag|<h2>Device|<h2>Connect|link-state|id="c-off"/.test(html), "no Device or Connect heading, no tag, no status text, no Disconnect button");
+ok(!/face-stick|face-sim|face-bar|face-tag|<h[23]>Device|<h[23]>Connect|link-state|id="c-off"/.test(html), "no Device or Connect heading, no tag, no status text, no Disconnect button");
 ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
 ok(!/<summary[^>]*>Details<\/summary>/.test(html), "the separate Details section is merged into Advanced");
 ok(/id="live" class="hide"/.test(html), "the face and the three sections (inside it) start hidden");
