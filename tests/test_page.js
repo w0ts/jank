@@ -33,7 +33,7 @@ ok(html === expandedTemplate, "page/jank.html is the expansion of page/src/jank.
 ok(!/<!--@include/.test(html), "no include marker left");
 ok(/<script id="face-ui">/.test(html) && /<script id="advanced-ui">/.test(html) && /const Stick = /.test(html) && /const Face = /.test(html), "the face's, Advanced's and the player's scripts are in the page");
 ok(!/id="connect"|class="buttons"/.test(html.split('id="live"')[0]), "no connection card: nothing but the title, the message and the connect button above the face");
-ok(/<div class="title-row"><h1>jank<\/h1>\s*<button id="c-midi"/.test(html) && html.indexOf('id="c-midi"') < html.indexOf('id="connect-slot"') && !/placeConnect/.test(html), "the connect / eject button sits in the title row, right after the jank title, and stays there");
+ok(/<div class="title-row"><div class="titlebar"><h1>jank<\/h1><\/div>\s*<button id="c-midi"/.test(html) && html.indexOf('id="c-midi"') < html.indexOf('id="connect-slot"') && !/placeConnect/.test(html), "the connect / eject button sits in the title row, right after the jank title, and stays there");
 ok(html.indexOf('id="dev-bar"') > html.indexOf('id="face"') && !/id="c-advanced|storedAdvanced|rememberAdvanced/.test(html), "the Advanced check box is gone from the device card and from the code");
 {
   const at = (s) => html.indexOf(s);
