@@ -91,7 +91,7 @@ ok(!/<nav id="home-links"[\s\S]*?target=/.test(html.split("</nav>")[0]), "the tw
 const withoutNs = withoutLinks.replace("xmlns='http://www.w3.org/2000/svg'", "");   // the favicon's SVG namespace is a name, not a load
 ok(!/https?:\/\//.test(withoutNs), "the page loads nothing external");
 ok(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,/.test(html), "the page has its own favicon, inline");
-ok(/<nav id="home-links" aria-label="Links">/.test(html) && /<a id="home-hosted" class="hide"/.test(html) && /location\.protocol === "file:"\) \$\("home-hosted"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub link (with its icon) always shows; the hosted page link only when the page is opened from a file");
+ok(/<nav id="home-links" class="site" aria-label="Links">/.test(html) && /<a id="home-hosted" class="hide"/.test(html) && /location\.protocol === "file:"\) \$\("home-hosted"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub link (with its icon) always shows; the hosted page link only when the page is opened from a file");
 ok(/<a href="https:\/\/github\.com\/w0ts\/jank"[^>]*><svg class="gh"/.test(html), "the GitHub link carries the GitHub icon");
 ok(/Audio works better on the GitHub hosted page/.test(html), "the hosted page link's tip says audio works better there");
 ok(/navigator\.mediaSession\.setActionHandler\("previoustrack", \(\) => \{ if \(!el\("pl-prev"\)\.disabled\) previous\(\); \}\)/.test(html), "the media key previous track does what the Previous button does");
