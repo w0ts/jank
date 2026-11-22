@@ -1280,12 +1280,13 @@ autoConnect();
     el("pl-next").disabled = Player.skipTrack(thenMode(), queue.entries.length, queue.index, () => 0) < 0;
   };
 
-  function load(file) {
+  function load(file, path) {
     if (!file) return;
     if (url) URL.revokeObjectURL(url);
     url = URL.createObjectURL(file);
     audio.src = url;
     el("pl-name").textContent = file.name;
+    el("pl-name").title = [browser.rootName, ...(path || [file.name])].filter(Boolean).join("/");
     error = "";
     showTagBpm(file);
     el("pl-play").disabled = false;
@@ -1444,6 +1445,7 @@ autoConnect();
     tagBpm = undefined;
     paintBpm();
     el("pl-name").textContent = "No track";
+    el("pl-name").title = "";
     tap.url = null;
     queue.current = "";
     if (tap.context) tap.context.suspend().catch((err) => note("Cannot suspend the audio path: " + errorText(err), true));
@@ -1497,7 +1499,7 @@ autoConnect();
     queue.current = Player.pathKey(queue.entries[index].path);
     paintSteps();
     paintList();
-    try { load(await entryFile(queue.entries[index])); } catch (err) { setError("cannot open that file: " + errorText(err)); return; }
+    try { load(await entryFile(queue.entries[index]), queue.entries[index].path); } catch (err) { setError("cannot open that file: " + errorText(err)); return; }
     await play();
   }
   // Previous: restart the playing track after 3 s, else the track played before it (the history of started tracks, random mode too)
