@@ -46,7 +46,7 @@ extern const struct board *g_board;
 
 /* first thing in app_main: the auto build tells the boards apart (board.c); the others keep their one table */
 void board_init(void);
-/* how the board was chosen: "built for it", "motion sensor", "flash size", "default" (the status and the log) */
+/* how the board was chosen: "built for it", "flash 16 MB", "flash 8 MB", "default" (the log) */
 const char *board_how(void);
 
 #define BOARD_NAME (g_board->name)

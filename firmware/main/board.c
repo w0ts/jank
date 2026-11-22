@@ -2,7 +2,6 @@
 /* The boards' pin tables and, in the auto build, which board this is (board.h). The values are the ones board.h held
  * per build until 2026-11-22; their sources stay in the comments. */
 #include "board.h"
-#include "driver/i2c_master.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
 #include "esp_log.h"
@@ -34,7 +33,9 @@ static DRAM_ATTR const struct board XIAO = {
     .lcd = 0, .lcd_mosi_gpio = -1, .lcd_sclk_gpio = -1, .lcd_cs_gpio = -1, .lcd_dc_gpio = -1, .lcd_rst_gpio = -1, .lcd_bl_gpio = -1,
     .cc_scl_gpio = -1, .cc_sda_gpio = -1, .cc_int_gpio = -1,
     .host_en_gpio = -1, .vbus_sense_gpio = -1, .line_detect_gpio = -1, .pump_gpio = -1,
-    .usbport_tusb320 = 0, .usbport_mini3 = 0, .bridge_slots_psram = 0,
+    .usbport_tusb320 = 0, .usbport_mini3 = 0,
+    .bridge_slots_psram = 1,              /* (2026-11-22: with both boards' drivers in one image the 30 KB no longer fit in
+                                             internal RAM: ui_start failed with ESP_ERR_NO_MEM, measured with `diag`) */
 #if CONFIG_JANK_LINEIN_BENCH
     .has_linein = 1, .linein_gpio = 4,
 #else
@@ -112,44 +113,23 @@ const char *board_how(void)
 }
 
 #if CONFIG_JANK_BOARD_AUTO
-/* The LCD-2's motion sensor (a QMI8658: 0x6B, or 0x6A with SA0 low) on its own I2C, SCL GPIO47 / SDA GPIO48 (docs/lcd2.md,
- * the LCD-2's schematic). The XIAO has nothing there. A probe only: no register is written. */
-#define IMU_SCL 47
-#define IMU_SDA 48
-static int imu_answers(void)
-{
-    i2c_master_bus_config_t bc = {
-        .i2c_port = -1, .sda_io_num = IMU_SDA, .scl_io_num = IMU_SCL, .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7, .flags.enable_internal_pullup = true,
-    };
-    i2c_master_bus_handle_t bus;
-    if (i2c_new_master_bus(&bc, &bus) != ESP_OK)
-        return -1;
-    int found = 0;
-    for (uint16_t a = 0x6A; a <= 0x6B && !found; ++a)
-        found = i2c_master_probe(bus, a, 20) == ESP_OK;
-    i2c_del_master_bus(bus);
-    return found;
-}
-
+/* The two boards differ in their flash chip: the LCD-2 has a 16 MB W25Q128 (docs/lcd2.md, its schematic U5), the XIAO 8 MB
+ * (one measured 2026-11-22: GigaDevice c8 4017, 8 MB). The chip says its own size: no pin is touched. (A first version
+ * probed the LCD-2's motion sensor on GPIO47 / 48; on the XIAO that hung the start, measured 2026-11-22.) A XIAO "Plus"
+ * (16 MB) would be taken for the LCD-2: it is not a supported board. */
 void board_init(void)
 {
     uint32_t flash = 0;
-    const int imu = imu_answers();
     if (esp_flash_get_physical_size(NULL, &flash) != ESP_OK)
         flash = 0;
-    if (imu == 1) {
+    if (flash >= 16u * 1024u * 1024u) {
         g_board = &LCD2;
-        s_how = "motion sensor";
-    } else if (flash >= 16u * 1024u * 1024u) {
-        g_board = &LCD2;                   /* the LCD-2 has 16 MB, the XIAO 8 MB; the sensor did not answer */
-        s_how = "flash size";
+        s_how = "flash 16 MB";
     } else {
         g_board = &XIAO;
-        s_how = imu < 0 ? "default" : "no motion sensor";
+        s_how = flash ? "flash 8 MB" : "default";
     }
-    ESP_LOGI(TAG, "%s (%s; flash %lu MB, sensor %s)", g_board->name, s_how, (unsigned long)(flash >> 20),
-             imu == 1 ? "answered" : imu == 0 ? "silent" : "not probed");
+    ESP_LOGI(TAG, "%s (%s; flash %lu MB)", g_board->name, s_how, (unsigned long)(flash >> 20));
 }
 #else
 void board_init(void)

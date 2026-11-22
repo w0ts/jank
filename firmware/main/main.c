@@ -11,8 +11,21 @@
 #include "freertos/semphr.h"
 #include "nvs_flash.h"
 #include "board.h"
+#include "jank_panic.h"
 
 static const char *TAG = "jank";
+
+/* app_main's checks: a failure aborts with "main:<line> <error>", which the crash record keeps (panic_info.c, `diag`): the
+ * chip has no console, so this is how a start that fails names its step */
+static char s_why[JK_PANIC_MSG];
+#define MUST(x) must((x), __LINE__)
+static void must(esp_err_t e, int line)
+{
+    if (e == ESP_OK)
+        return;
+    snprintf(s_why, sizeof s_why, "main:%d %s", line, esp_err_to_name(e));
+    esp_system_abort(s_why);
+}
 static SemaphoreHandle_t s_cfg_lock;
 static SemaphoreHandle_t s_set_lock;   /* app_cfg_set and app_cfg_flush: one save at a time, in order */
 static struct jk_cfg s_cfg;
@@ -123,18 +136,18 @@ void app_main(void)
     panic_info_take();
     s_cfg_lock = xSemaphoreCreateMutex();
     s_set_lock = xSemaphoreCreateMutex();
-    ESP_ERROR_CHECK(s_cfg_lock && s_set_lock ? ESP_OK : ESP_ERR_NO_MEM);
-    ESP_ERROR_CHECK(esp_register_shutdown_handler(flush_at_restart));
-    ESP_ERROR_CHECK(nvs_up());
+    MUST(s_cfg_lock && s_set_lock ? ESP_OK : ESP_ERR_NO_MEM);
+    MUST(esp_register_shutdown_handler(flush_at_restart));
+    MUST(nvs_up());
     store_load(&s_cfg);
     usb_midi_clock(s_cfg.usbmidi);
-    ESP_ERROR_CHECK(esp_efuse_mac_get_default(efuse));
+    MUST(esp_efuse_mac_get_default(efuse));
     jk_mac_from_efuse(efuse, mac);
     memcpy(peer_mac, mac, 6);
     peer_mac[0] ^= 0x04u;                /* (stays unicast, locally administered) */
-    ESP_ERROR_CHECK(ctl_start());
-    ESP_ERROR_CHECK(ui_screen_early());  /* the screen's panel on while the radio is still off (the 2.42"'s rule) */
-    ESP_ERROR_CHECK(bridge_start(&s_cfg, mac, peer_mac));
-    ESP_ERROR_CHECK(ui_start());
+    MUST(ctl_start());
+    MUST(ui_screen_early());  /* the screen's panel on while the radio is still off (the 2.42"'s rule) */
+    MUST(bridge_start(&s_cfg, mac, peer_mac));
+    MUST(ui_start());
     ota_validate_start();
 }

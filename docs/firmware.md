@@ -6,7 +6,7 @@ The firmware of the [Jank device](../README.md), for the ESP32-S3 (ESP-IDF). Boa
 
 | Board | Build | Notes |
 |---|---|---|
-| **Seeed XIAO ESP32-S3 or jank mini 3, one image** | `scripts/build.sh auto` | The release image. The board is told apart at the start (`firmware/main/board.c`): the LCD-2's motion sensor on GPIO47 / 48 answers (QMI8658 at 0x6A / 0x6B), else a 16 MB flash, else the XIAO. The status line says `board=` and the log how it was chosen |
+| **Seeed XIAO ESP32-S3 or jank mini 3, one image** | `scripts/build.sh auto` | The release image. The board is told apart at the start (`firmware/main/board.c`) by its flash chip's own size, no pin touched: 16 MB the LCD-2, else the XIAO (a 16 MB XIAO "Plus" is not supported). The status line says `board=` and the log how it was chosen |
 | Seeed XIAO ESP32-S3, bare | `scripts/build.sh xiao` | The XIAO alone (and its bench options): BOOT button, yellow LED; MIDI on D6, which is weak (see [boards.md](boards.md)) |
 | jank mini 3 (Waveshare ESP32-S3-LCD-2) | `scripts/build.sh lcd2` | The mini 3 alone ([lcd2.md](lcd2.md)) |
 | Jank PCB | not written yet | The XIAO on the board: pins in [`hardware/pcb/README.md`](../hardware/pcb/README.md). I2C: SDA = D8 = GPIO7, SCL = D9 = GPIO8 |
