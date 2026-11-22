@@ -209,7 +209,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   await settle();
   eq(midi.sent.slice(before, before + 1), ['fold x2'], 'UP in AUDIO mode: `fold x2`, through the page\'s command function');
   ok(midi.sent.slice(before).includes('home'), 'and the home line is read again');
-  eq(p.el('msg').textContent, 'Tempo doubled (x2).', 'the page says what it did');
+  ok(!/Tempo/.test(p.el('msg').textContent), 'the page adds no line for a tempo change: the device screen shows it');
   tap(p, 'Enter');
   await settle();
   ok(midi.sent.slice(before).includes('stop'), 'YES on HOME while running: `stop`');
@@ -230,11 +230,11 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   ({ page: p, midi } = await connected({ 'fold x2': 'err link mode' }));
   tap(p, 'ArrowUp');
   await settle();
-  eq([p.el('msg').textContent, p.el('msg').classList.contains('bad')], ['x2 and ÷2 are for AUDIO mode (music heard).', true], 'err link mode: shown as the page shows errors');
+  ok(!p.el('msg').classList.contains('bad') && !/AUDIO mode|err/.test(p.el('msg').textContent), 'err link mode: no line on the page (the device screen shows the state)');
   ({ page: p, midi } = await connected({ 'fold x2': 'err fold x2, /2 or 1' }));
   tap(p, 'ArrowUp');
   await settle();
-  eq([p.el('msg').textContent, p.el('msg').classList.contains('bad')], ['err fold x2, /2 or 1', true], 'another err reply: its text, as an error');
+  ok(!p.el('msg').classList.contains('bad') && !/err/.test(p.el('msg').textContent), 'another err reply: no line on the page either');
 
   // an action the stick cannot take does nothing, visibly, with a one-line reason
   ({ page: p, midi } = await connected());
