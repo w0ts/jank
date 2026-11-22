@@ -32,7 +32,7 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
     <h2>Flash from the browser</h2>
     <p>Chrome or Edge on a computer, a USB-C cable that carries data. One firmware for both devices: it finds out at the start which one it runs on. Its settings are kept.</p>
     <ul>
-      <li><b>It runs Jank already:</b> plug it in as always and press <b>Update over USB MIDI</b>. Chrome asks once to let the page use MIDI. The new firmware goes into the device's second slot; if it does not start, the old one comes back by itself. Keep the device plugged in until the page says done.</li>
+      <li><b>It runs Jank already:</b> plug it in as always and press <b>Update Jank over USB MIDI</b>. Chrome asks once to let the page use MIDI. The new firmware goes into the device's second slot; if it does not start, the old one comes back by itself. Keep the device plugged in until the page says done.</li>
       <li><b>A new device</b> (or one that does not start): put it in download mode first: unplug it, hold BOOT (the XIAO's B button) while plugging it in, then release. Press <b>Flash a new device</b> and pick the port the browser lists. When it is done, unplug it and plug it back in.</li>
     </ul>
     <div class="row">
@@ -49,7 +49,7 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
 
   <section>
     <h2>Flash</h2>
-    <div class="row"><button id="fw-midi" type="button" disabled>Update over USB MIDI</button><button id="fw-flash" class="quiet" type="button" disabled>Flash a new device</button><span id="fw-note" class="note">Looking for releases...</span></div>
+    <div class="row"><button id="fw-midi" type="button" disabled>Update Jank over USB MIDI</button><button id="fw-flash" class="quiet" type="button" disabled>Install Jank on a fresh device</button><span id="fw-note" class="note">Looking for releases...</span></div>
     <progress id="fw-progress" class="hide" max="1" value="0"></progress>
     <p>The releases and their notes: <a href="https://github.com/w0ts/jank/releases">github.com/w0ts/jank/releases</a>.</p>
   </section>
