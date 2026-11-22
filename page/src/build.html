@@ -177,7 +177,7 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
     <p>Three parts: the <b>shell</b> (the face and the four walls), the flat <b>lid</b> underneath, and the <b>D-pad cap</b>. The face's labels and the cap's symbols are inlaid in a second colour (a multi-material printer).</p>
     <div class="pics">
       <img src="img/mini3/box-assembly.webp" alt="The closed case, rendered, seen from the front left: the screen window, the D-pad cap, the sockets in the walls" width="1600" height="1200" loading="lazy">
-      <img src="img/mini3/box-exploded.webp" alt="The case taken apart, rendered: the shell with the cap above it, our board, the lid with its rails and the cell below" width="1600" height="1200" loading="lazy">
+      <img src="img/mini3/box-exploded.webp" alt="The case taken apart, rendered: the top part with the cap above it, our board, the bottom part with the strips, the cell and the power switch" width="1600" height="1200" loading="lazy">
     </div>
     <h3>Bambu Studio projects (ready to slice)</h3>
     <ul>
@@ -214,7 +214,7 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
         <div class="msg PHOTO-TODO">Photo to come: the board screwed into the shell, seen from below</div></li>
       <li><b>The power switch</b> snaps into the round hole in the left wall.</li>
       <li><b>The cell</b> lies on the lid in the corner under the right part, pushed against the L-shaped wall, with ~2 mm of rubber or foam on its four held sides. The lead: both wires leave the cell's top end, run left in the channel between the DIN sockets and the L's top arm, and down the gap between the strips and the L's left arm; the black goes on under the LCD-2 to its MX1.25, the red to the switch and up along the left wall to the MX1.25. Plug it into the LCD-2 (polarity checked).
-        <img src="img/mini3/box-inside.webp" alt="The lid with the parts under the board, rendered: the strip rails, the cell in its corner behind the L, the screw tabs, the hook and the power switch" width="1600" height="1200" loading="lazy">
+        <img src="img/mini3/box-inside.webp" alt="The bottom part with the parts under the board, rendered: the strips in their rails, the cell in its corner behind its own wall, the screw tubes" width="1600" height="1200" loading="lazy">
         <img src="img/mini3/floor-map.webp" alt="The case floor from above, drawn: the parts under the board, the strips, the cell with its rubber gap, the L, the screw tabs, the hook, the power switch and the cell's lead route with its lengths" width="844" height="986" loading="lazy">
         <div class="msg PHOTO-TODO">Photo to come: the cell in its corner and the lead routed to the switch and the LCD-2</div></li>
       <li><b>Close it.</b> Hook the lid's right side in first (tilted), swing the left side up, then the two M3 x 6 countersunk screws sideways through the walls (one in the bottom wall, one in the left wall).
@@ -224,7 +224,7 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
 
   <section id="firmware">
     <h2>The firmware</h2>
-    <p>On the <a href="install.html">Install</a> page, choose <b>jank mini 3</b> and flash from the browser. Then run and watch it on the <a href="device.html">Device</a> page.</p>
+    <p>On the <a href="install.html">Install</a> page, flash from the browser: one firmware for both devices, it finds out at the start which one it runs on. Then run and watch it on the <a href="device.html">Device</a> page.</p>
     <p>USB: the LCD-2's own USB-C (left wall, labelled ESP) is for a computer or a charger. For gear with a USB port (host mode), a short USB-C cable outside the box joins the LCD-2's USB-C to J1 (top wall, ESP), and the gear goes into J4 (DEVICE). J4 gives that gear no power: bus-powered gear needs its own power or a powered hub.</p>
   </section>
 
