@@ -261,7 +261,7 @@ for (const [conf, id, why] of [[60, INK.BAD, 'below'], [69, INK.BAD, 'below'], [
   eq([val, bar], [[id], [id]], 'CONFIDENCE ' + conf + ' against 70 (' + why + '): the value and the line are the same colour id (' + id + ')');
 }
 eq(isText(confCase(87), '87%', rightText('87%'), NB.rowCF, INK.GOOD), true, 'the value "87%" is right-aligned to x 315');
-eq(idsIn(confCase(75, {}, { threshold: '50', lowconf: 'stop' }), ...R.cfValue), [INK.GOOD], 'the threshold is the stick\'s: 75 against 50 is green');
+eq(idsIn(confCase(75, {}, { threshold: '50', lowconf: 'stop' }), ...R.cfValue), [INK.GOOD], 'the threshold is the device\'s: 75 against 50 is green');
 eq(idsIn(confCase(75, {}, { threshold: '90', lowconf: 'run' }), ...R.cfValue), [INK.BAD], '... against 90 red, also with KEEP RUNNING');
 eq(idsIn(confCase(30, { ctx: { silent: true } }), ...R.cfValue), [INK.DIM], 'silence: the number is grey, not red (nothing to track)');
 eq(idsIn(drawn(ctxOf({ home: { conf: null } })), ...R.cfValue), [INK.DIM], 'no confidence reported: the dashes are grey');
@@ -284,7 +284,7 @@ for (const [conf, n] of [[0, 0], [50, 62], [100, 124]]) {
   const e = confCase(40);
   eq([col(e, x), col(e, x + 1), idsIn(e, x, NB.rowCF, 2, 14)], [[0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0], [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0], [INK.BAD]], 'over the empty part the notch is a 10 px line, in red');
   const t2 = confCase(60, {}, { threshold: '30', lowconf: 'stop' }), x2 = L.barX + Math.round((L.barW - 2) * 0.3);
-  ok(t2.fb[(NB.rowCF + 2) * t2.w + x2] === 1 && t2.ink[(NB.rowCF + 2) * t2.w + x2] === INK.GOOD, 'the notch follows the stick\'s threshold (30 %: x ' + x2 + ')');
+  ok(t2.fb[(NB.rowCF + 2) * t2.w + x2] === 1 && t2.ink[(NB.rowCF + 2) * t2.w + x2] === INK.GOOD, 'the notch follows the device\'s threshold (30 %: x ' + x2 + ')');
 }
 
 // ---- the INPUT VU meter: the ramp, the fill, the colour of every column, the notch ----
@@ -619,7 +619,7 @@ const qr = { size: 25, mod: Array.from({ length: 25 }, (_, y) => Array.from({ le
   const keys = n => ['no', ...Array(n).fill('down')];
   const oledM = withUi(ctxOf(), keys(15)), lcdM = withUi(ctxOf(), keys(15), 'lcd2');
   eq([oledM.ui.cursor, lcdM.ui.cursor], [10, 10], 'the OLED and the lcd2 menu have 11 items (the cursor stops at 10)');
-  eq([Stick.fieldCommands('beatflash', 1), Object.keys(Lcd2).filter(k => /flash|ledlit/i.test(k))], [{ refuse: 'the stick does not take beatflash from here' }, []], 'BEAT FLASH is gone: the control line refuses it, ui/lcd2.js has no flash members');
+  eq([Stick.fieldCommands('beatflash', 1), Object.keys(Lcd2).filter(k => /flash|ledlit/i.test(k))], [{ refuse: 'the device does not take beatflash from here' }, []], 'BEAT FLASH is gone: the control line refuses it, ui/lcd2.js has no flash members');
 }
 
 // ---- the stick feeds the ctx: nothing made up ----
@@ -631,7 +631,7 @@ eq(fed({ link: 3 }, null).peers, 3, 'the Link peer count is the HOME line\'s');
 {
   const c = fed({}, { rssi: '-58' }), model = Stick.create(() => ({ ...c, tempoStep: () => null, setField() {}, setHold() {}, linkStartStop() {} }), () => {});
   const lcd = Stick.screen(model, NOW, 'lcd2'), oled = Stick.screen(model, NOW);
-  eq([lcd.w, lcd.h, lcd.fb.length, lcd.ink.length, lcd.ink.some(v => v !== 0)], [320, 240, 76800, 76800, true], 'Stick.screen(model, now, "lcd2"): the 320 x 240 frame buffer and its ink plane, made by the stick');
+  eq([lcd.w, lcd.h, lcd.fb.length, lcd.ink.length, lcd.ink.some(v => v !== 0)], [320, 240, 76800, 76800, true], 'Stick.screen(model, now, "lcd2"): the 320 x 240 frame buffer and its ink plane, made by the device');
   eq([oled.w, oled.h, oled.ink, Buffer.from(oled.fb).equals(Buffer.from(Stick.framebuffer(model, NOW)))], [128, 64, null, true], 'Stick.screen without a layout, and Stick.framebuffer: the OLED\'s 128 x 64, no ink');
 }
 

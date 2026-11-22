@@ -55,19 +55,19 @@ ok(!/face-stick|face-sim|face-bar|face-tag|<h[23]>Device|<h[23]>Connect|link-sta
 ok(!/>Connected\.|say\("Connected\.|>not connected<|Details \(USB\)/.test(html), "no 'Connected.' message, no 'not connected' label, no 'Details (USB)'");
 ok(!/<summary[^>]*>Details<\/summary>/.test(html), "the separate Details section is merged into Advanced");
 ok(/id="live" class="hide"/.test(html), "the face and the three sections (inside it) start hidden");
-ok(!/face-hint|The stick has no screen: this is a virtual screen of its state/.test(html), "no key-hint line and no 'no screen' note around the device");
+ok(!/face-hint|The device has no screen: this is a virtual screen of its state/.test(html), "no key-hint line and no 'no screen' note around the device");
 ok(!/class="lbl|class="brand|<text[^>]*class="lbl/.test(html) && !/max-width: 520px/.test(html), "the new drawing has no edge labels and no caption (no text but the keys' marks); the drawing is not capped at 520 px");
 ok(/Box3\.build\(svg\)/.test(html) && !/setAttribute\("viewBox"/.test(html) && /card\.title = Stick\.KEY_HINT/.test(html) && /id="dev"/.test(html) && !/id="ledView"|id="pwr"|class="brand"/.test(html), "the box is drawn by Box3.build from its table (view box from the table), no LEDs, no power switch, the keys are a tooltip");
 ok(/<g id="dpad"><\/g>/.test(html) && /<foreignObject id="oledFO"[^>]*><canvas id="oled" width="320" height="240">/.test(html), "the drawing shell: the D-pad group, the screen canvas of 320 x 240");
-ok(!/pl-test|testStick|Test stick output|createOscillator/.test(html), "no 'Test stick output': no link, no handler, no tone generator");
-ok(/id="pl-out-row" class="note pl-out hide"/.test(html), "the 'stick output' line starts hidden: it shows only when something needs the user");
+ok(!/pl-test|testStick|Test device output|createOscillator/.test(html), "no 'Test device output': no link, no handler, no tone generator");
+ok(/id="pl-out-row" class="note pl-out hide"/.test(html), "the 'device output' line starts hidden: it shows only when something needs the user");
 ok(/Allow on every visit/.test(html), "the ? help says what 'Allow on every visit' does");
 const faceUi = html.match(/<script id="face-ui">([\s\S]*?)<\/script>/)[1];
 ok(!/id="ledView"|id="seamGlow"/.test(html) && !/makeLeds|paintLed|Stick\.leds/.test(faceUi), "the control page shows no LED dots and draws none (the Mac simulator still does)");
 ok(!/lastBeat|takeBeat|parseBeat/.test(html), "the page keeps no beat-report code any more: only the LEDs used it");
 ok(/Stick\.phaseFeed/.test(faceUi) && /id="bd-num"/.test(html) && /id="bd-slider"/.test(html), "the beat boxes run on the smooth phase, with the display delay row under Advanced");
 ok(!/id="home"|id="h-|id="t-(tempo|set|play|up|down)"|id="n-(beat|ms)/.test(html), "the HOME card is gone");
-for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the stick's menu has it, the page does not");
+for (const id of ["c-group", "c-transport", "c-usbmidi", "c-lowconf", "c-threshold", "c-autobar", "c-source"]) ok(!new RegExp('id="' + id + '"').test(html), id + ": the device's menu has it, the page does not");
 for (const id of ["c-name", "net-mode", "net-ssid", "net-pass", "net-apply", "c-beat", "c-follower", "c-skip", "c-graded", "c-rate", "c-lat_trim", "c-beat_latency", "c-filter", "c-peer", "c-quantum", "c-offset"])
   ok((html.match(new RegExp('id="' + id + '"', "g")) || []).length === 1, id + " on the page once");
 ok(!/id="pl-file"|id="pl-reset"|dragover|type="file" accept/.test(html), "no single-file button, no drag and drop");
@@ -337,7 +337,7 @@ eq(box.setCommand("pass", "secret12"), null);         // not through the setting
   eq(titles.filter(([, v]) => !v.trim() || v.length > 240).map(([id, v]) => id + " (" + v.length + ")"), []);
   const tipOf = (id) => (html.match(new RegExp('<[a-z]+ [^>]*id="' + id + '"[^>]*>')) || [""])[0];
   for (const id of ["c-midi", "pl-play", "pl-vol", "bd-slider", "al-on", "net-apply", "bootloader"]) ok(/\stitle="[^"]+"/.test(tipOf(id)), id + " has a tooltip of its own");
-  ok(/Pitch[^"]*tempo the stick tracks/.test(tipOf("pl-pitch")) && /mutes only your speakers/.test(html) && /restarts it/.test(tipOf("net-apply")), "the tooltips carry the side effects: pitch moves the tracked tempo, monitor off mutes only the speakers, Save and restart restarts the stick");
+  ok(/Pitch[^"]*tempo the device tracks/.test(tipOf("pl-pitch")) && /mutes only your speakers/.test(html) && /restarts it/.test(tipOf("net-apply")), "the tooltips carry the side effects: pitch moves the tracked tempo, monitor off mutes only the speakers, Save and restart restarts the device");
 }
 
 // the ABOUT screen's numbers: `about` is asked only from the draw loop while that screen is open (no timer of its own), at most every 1.5 s, one at a time

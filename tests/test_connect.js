@@ -182,12 +182,12 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   p.box.disconnected();
   ({ page: p, midi } = await connected());
   eq(shown(p, 'live'), true, 'USB: Settings, Player and Advanced appear with the connection');
-  ok(midi.sent.includes('get') && midi.sent.includes('home'), 'the page read get and home from the stick');
-  eq([p.box.S.lastHome.bpm, p.box.S.lastHome.audio, p.box.S.lastGet.group], [120, true, '1'], "the HOME line and get of the stick are held");
+  ok(midi.sent.includes('get') && midi.sent.includes('home'), 'the page read get and home from the device');
+  eq([p.box.S.lastHome.bpm, p.box.S.lastHome.audio, p.box.S.lastGet.group], [120, true, '1'], "the HOME line and get of the device are held");
   ok(p.frames.size === 1, 'the face draws frames while connected');
   p.runFrame();
   const lit = [...p.el('oled').lastImage.data].filter((v, i) => i % 4 === 0 && v > 100).length;
-  ok(lit > 100, 'the screen shows the stick\'s HOME (' + lit + ' lit pixels)');
+  ok(lit > 100, 'the screen shows the device\'s HOME (' + lit + ' lit pixels)');
   eq([p.el('oled').width, p.el('oled').height, p.el('oled').lastImage.width], [320, 240, 320], 'the default screen is the colour lcd2 landscape (320 x 240), for every board');
   p.box.disconnected();
   eq(hidden(p), [false], 'after a disconnect the sections are hidden again');
@@ -220,7 +220,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   tap(p, 'ArrowUp');                                                 // AUTO -> LINE IN: a live edit
   await settle();
   eq(midi.sent.slice(mark, mark + 1), ['set source line'], 'a menu edit: `set source line`');
-  ok(midi.sent.slice(mark).includes('get'), 'and get is read back to show what the stick has');
+  ok(midi.sent.slice(mark).includes('get'), 'and get is read back to show what the device has');
   tap(p, 'ArrowLeft');
   tap(p, 'ArrowLeft');
   tap(p, 'ArrowLeft');
@@ -241,7 +241,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   const n0 = midi.sent.length;
   for (const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'Enter', 'ArrowUp']) tap(p, k);      // MENU > USB > a step of the role
   await settle();
-  eq([p.el('msg').textContent, p.el('msg').classList.contains('bad')], ['Not from here: the USB role restarts the stick: not changed from here.', true], 'USB role from the menu: refused with the reason, shown as an error');
+  eq([p.el('msg').textContent, p.el('msg').classList.contains('bad')], ['Not from here: the USB role restarts the device: not changed from here.', true], 'USB role from the menu: refused with the reason, shown as an error');
   eq(midi.sent.slice(n0).filter(c => c.startsWith('set ')), [], 'and nothing was sent');
 
   // ---- the port goes away: back to nothing shown ----
@@ -402,7 +402,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   let dev = fakeDevices(true);
   ({ page: p, midi } = await connected(undefined, dev.opts));
   await settle();
-  eq([shown(p, 'pl-pick'), p.el('pl-pick').textContent, p.el('pl-pick-help').textContent], [true, "Choose the stick's output", "Choose the stick's output (jank) once."], 'no stick output chosen yet: the chooser button and its one line');
+  eq([shown(p, 'pl-pick'), p.el('pl-pick').textContent, p.el('pl-pick-help').textContent], [true, "Choose the device's output", "Choose the device's output (jank) once."], 'no device output chosen yet: the chooser button and its one line');
   eq(dev.calls, { getUserMedia: 0, selectAudioOutput: 0, enumerate: 1, stopped: 0 }, 'the card read the device list (ids, no permission) and asked for nothing');
   p.el('pl-dir').fire('change', { target: { files: [{ name: 'a.mp3', webkitRelativePath: 'Music/a.mp3', slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) }) }] } });
   await settle();
@@ -448,18 +448,18 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // saved id valid, labels absent: the context is created with the sink, read back, no extra setSinkId, source -> mono gain -> destination
   let r = await startPlayback({}, {}, { id: 'jk', label: 'jank (303a:4a4b)' });
   await play(r);
-  eq(r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), [['new', 'jk', 44100]], 'saved id: the stick context is created with sinkId and 44.1 kHz');
-  eq(shown(r.page, 'pl-out-row'), false, 'resolved automatically and routed without an error: the whole "stick output" line is hidden');
+  eq(r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), [['new', 'jk', 44100]], 'saved id: the device context is created with sinkId and 44.1 kHz');
+  eq(shown(r.page, 'pl-out-row'), false, 'resolved automatically and routed without an error: the whole "device output" line is hidden');
   eq(r.api.log.filter(e => e[0] === 'setSinkId'), [], 'its sinkId reads back as the saved id: no second setSinkId needed');
   eq(r.api.log.filter(e => /->/.test(e[0])).map(e => e.join('')), ['gain->destination', 'source->gain'], 'captureStream -> MediaStreamSource -> mono gain -> that context\'s destination');
-  eq([r.api.gains[0].channelCount, r.api.gains[0].channelCountMode, r.api.gains[0].channelInterpretation], [1, 'explicit', 'speakers'], 'the stick path is mixed down to one channel explicitly');
-  eq([r.api.contexts[0].state, r.api.contexts[0].sinkId, r.d.calls.getUserMedia], ['running', 'jk', 0], 'the context runs, aimed at the stick, no microphone');
-  assert.match(r.page.el('pl-output-report').textContent, /stick context: running, sinkId jk/); checks++;
+  eq([r.api.gains[0].channelCount, r.api.gains[0].channelCountMode, r.api.gains[0].channelInterpretation], [1, 'explicit', 'speakers'], 'the device path is mixed down to one channel explicitly');
+  eq([r.api.contexts[0].state, r.api.contexts[0].sinkId, r.d.calls.getUserMedia], ['running', 'jk', 0], 'the context runs, aimed at the device, no microphone');
+  assert.match(r.page.el('pl-output-report').textContent, /device context: running, sinkId jk/); checks++;
   assert.match(r.page.el('pl-status').textContent, /monitor \+ jank \(303a:4a4b\)/); checks++;
   // muting the monitor leaves the captured stream alone
   r.page.el('pl-monitor').click();
   eq(r.page.el('pl-monitor').getAttribute('aria-pressed'), 'false', 'the monitor toggle: pressed off');
-  eq([r.page.el('pl-audio').muted, r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'source disconnect').length], [true, 1, 0], 'monitor off mutes the element only: the stick path is untouched');
+  eq([r.page.el('pl-audio').muted, r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'source disconnect').length], [true, 1, 0], 'monitor off mutes the element only: the device path is untouched');
   r.page.box.disconnected();
 
   // the constructor does not take the sink (older browser): setSinkId is awaited and called with the saved id
@@ -480,14 +480,14 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   // the context exists before the device is known; choosing it later re-aims it live, with no restart of the track
   r = await startPlayback({}, {}, null);
   await play(r);
-  eq(shown(r.page, 'pl-out-row'), true, 'no stick output found: the line (and its change link) is shown');
-  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), r.api.log.filter(e => e.join('') === 'source->gain').length], [1, [['new', null, 44100]], 0], 'no output chosen: a context, nothing sent to the stick');
+  eq(shown(r.page, 'pl-out-row'), true, 'no device output found: the line (and its change link) is shown');
+  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.api.log.filter(e => e[0] === 'new' && e[2] === 44100), r.api.log.filter(e => e.join('') === 'source->gain').length], [1, [['new', null, 44100]], 0], 'no output chosen: a context, nothing sent to the device');
   const pausedBefore = r.page.media.paused;
   r.page.el('pl-pick').click();
   await settle();
   eq(r.api.log.filter(e => e[0] === 'setSinkId'), [['setSinkId', 'jk']], 'the choice re-aims the running context: setSinkId(jk)');
   eq(shown(r.page, 'pl-out-row'), false, 'after the choice routes without an error: the line is hidden again');
-  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.page.media.paused - pausedBefore, r.page.el('pl-audio').paused, r.api.log.filter(e => e[0] === 'source->').map(e => e[1])], [1, 0, false, ['gain']], 'live: same context, the track was not stopped, the source now feeds the stick path');
+  eq([r.api.contexts.filter(c => c.opts.sampleRate).length, r.page.media.paused - pausedBefore, r.page.el('pl-audio').paused, r.api.log.filter(e => e[0] === 'source->').map(e => e[1])], [1, 0, false, ['gain']], 'live: same context, the track was not stopped, the source now feeds the device path');
   r.page.box.disconnected();
 
   // a saved device that is not listed (ids shown, no match) is dropped; when it appears (devicechange) it is used, live
@@ -500,7 +500,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   r.d.extra.current = [{ kind: 'audiooutput', label: 'MacBook Speakers', deviceId: 'spk' }, { kind: 'audiooutput', label: 'jank (303a:4a4b)', deviceId: 'jk' }];
   await r.d.handlers.devicechange();
   await settle();
-  eq([r.page.el('pl-outlabel').textContent, r.api.log.filter(e => e[0] === 'setSinkId'), shown(r.page, 'pl-pick')], ['jank (303a:4a4b)', [['setSinkId', 'jk']], false], 'the stick appears (devicechange): the saved device is found again and the running context is aimed at it');
+  eq([r.page.el('pl-outlabel').textContent, r.api.log.filter(e => e[0] === 'setSinkId'), shown(r.page, 'pl-pick')], ['jank (303a:4a4b)', [['setSinkId', 'jk']], false], 'the device appears (devicechange): the saved device is found again and the running context is aimed at it');
   r.page.box.disconnected();
 
   // labels present: the explicit button reads the names; "jank (303a:4a4b)" is matched in any case
@@ -843,7 +843,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     eq(sets(a), [], 'not at load: nothing is sent before the player plays');
     await play(a);
     await tickAll(a);
-    eq(sets(a), ['set beat_latency -20'], 'playing through the stick over USB: monitor 30 - stick 50 = -20 ms is sent, once');
+    eq(sets(a), ['set beat_latency -20'], 'playing through the device over USB: monitor 30 - stick 50 = -20 ms is sent, once');
     a.page.clock.t += 1000;
     await tickAll(a);
     eq(sets(a).length, 1, 'rate limit: nothing more within 5 s');
@@ -871,7 +871,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await play(near);
     await tickAll(near);
     await tickAll(near);
-    eq(sets(near), [], 'within 3 ms of the stick lat_auto: nothing sent');
+    eq(sets(near), [], 'within 3 ms of the device lat_auto: nothing sent');
     near.page.box.disconnected();
   }
 
@@ -884,9 +884,9 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     await play(r);
     for (const [, tick] of r.page.intervals()) tick();
     await settle();
-    eq([r.page.el('bd-mon').textContent, r.page.el('bd-stick').textContent], [30, 50], 'the page shows what it knows: the monitor 10 + 20 = 30 ms, the stick path 10 + 40 = 50 ms');
+    eq([r.page.el('bd-mon').textContent, r.page.el('bd-stick').textContent], [30, 50], 'the page shows what it knows: the monitor 10 + 20 = 30 ms, the device path 10 + 40 = 50 ms');
     eq([r.page.el('bd-num').value, r.page.el('bd-slider').value, delays.at(-1)], [-45, -45, -45], 'the default is the estimate: monitor - stick - beat_latency = 30 - 50 - 25 = -45 ms');
-    eq(r.page.el('bd-beat').textContent, '25 (25 + 0)', "the stick's beat_latency, from get, with its two layers");
+    eq(r.page.el('bd-beat').textContent, '25 (25 + 0)', "the device's beat_latency, from get, with its two layers");
     const sentBefore = r.midi.sent.length;
     r.page.el('bd-slider').value = '120';
     r.page.el('bd-slider').fire('input', {});
@@ -901,7 +901,7 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
     r.page.el('pl-audio').fire('timeupdate', {});
     await settle();
     eq(r.page.el('bd-num').value, 400, 'a stored delay is not replaced by a new estimate');
-    eq(r.midi.sent.slice(sentBefore).filter(c => c.startsWith('set ') || c.startsWith('nudge')), [], 'the delay sends nothing to the stick');
+    eq(r.midi.sent.slice(sentBefore).filter(c => c.startsWith('set ') || c.startsWith('nudge')), [], 'the delay sends nothing to the device');
     r.page.el('bd-estimate').click();
     eq([r.page.el('bd-num').value, delays.at(-1), r.d.store.has('jank.beat.delay')], [-45, -45, false], 'Use the estimate: back to it, the stored value gone');
     r.page.box.disconnected();

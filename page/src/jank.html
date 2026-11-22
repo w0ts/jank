@@ -107,7 +107,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
   <details id="sec-settings" class="sec"><summary title="Shows or hides the settings: the name and the Wi-Fi. Only this page."><h2>Settings</h2></summary>
     <section id="menu">
       <div class="grid">
-        <label title="The stick's name, up to 23 printable characters. Changes the stick; kept after a restart.">Name <input id="c-name" maxlength="23"></label>
+        <label title="The device's name, up to 23 printable characters. Changes the device; kept after a restart.">Name <input id="c-name" maxlength="23"></label>
       </div>
 
       <h3>Network</h3>
@@ -115,11 +115,11 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
       <div class="grid">
         <label title="Jank mode or a Wi-Fi network. Nothing changes until Save and restart.">Join <select id="net-mode"><option value="jank">MODE JANK</option><option value="wifi">A Wi-Fi network</option></select></label>
         <label title="The Wi-Fi network's name (up to 32 characters), used when Join is a Wi-Fi network. Sent with Save and restart.">Wi-Fi name <input id="net-ssid" maxlength="32" autocomplete="off"></label>
-        <label title="8 to 63 characters, sent over USB only; empty keeps the saved one. The stick keeps it in its flash, unencrypted, and never sends it back.">Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
+        <label title="8 to 63 characters, sent over USB only; empty keeps the saved one. The device keeps it in its flash, unencrypted, and never sends it back.">Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
       </div>
       <p class="note" id="net-note">2.4 GHz only. The Jank keeps the password in its flash, unencrypted, and never sends it back.</p>
       <div class="buttons">
-        <button id="net-apply" disabled title="Sends the Join choice (Jank mode, or the Wi-Fi name and password) to the stick and restarts it; give it a few seconds. Kept after the restart.">Save and restart</button>
+        <button id="net-apply" disabled title="Sends the Join choice (Jank mode, or the Wi-Fi name and password) to the device and restarts it; give it a few seconds. Kept after the restart.">Save and restart</button>
       </div>
     </section>
 
@@ -127,27 +127,27 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
   <details id="sec-player" class="sec" open><summary title="Shows or hides the player. Hiding it does not stop the sound. Only this page."><h2>Player</h2></summary>
       <section id="player" tabindex="-1">
         <div class="pl-title"><button id="pl-help" class="link" type="button" aria-expanded="false" title="Shows or hides the help text of the player. Only this page.">?</button></div>
-        <p id="pl-help-text" class="note hide">The file plays on this computer (monitor) and on the stick's USB audio ("jank"). The first time, choose the stick's output once in the browser's own output chooser (no microphone is used); it is remembered. The stick gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card. After a reload the remembered folder needs one click (Play or Open) to be allowed again; on the https address Chrome 122 and later offers "Allow on every visit" in that prompt, which makes this step silent.</p>
+        <p id="pl-help-text" class="note hide">The file plays on this computer (monitor) and on the device's USB audio ("jank"). The first time, choose the device's output once in the browser's own output chooser (no microphone is used); it is remembered. The device gets the file at its true level: the volume knob and the monitor box only change what you hear here. Space plays / pauses while the pointer is over this card. After a reload the remembered folder needs one click (Play or Open) to be allowed again; on the https address Chrome 122 and later offers "Allow on every visit" in that prompt, which makes this step silent.</p>
         <audio id="pl-audio" preload="auto"></audio>
         <div class="pl-bar">
           <button id="pl-prev" class="icon quiet" type="button" disabled aria-label="Previous track" title="Plays the previous track you heard. Pressed more than 3 seconds into a track, it restarts that track."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class=""><path d="M19 5v14L9 12zM5 5h2.5v14H5z" fill="currentColor"/></svg></button>
-          <button id="pl-play" class="icon" type="button" disabled data-state="paused" aria-label="Play" title="Plays or pauses the file. It plays on this computer (monitor) and through the stick's USB audio, so the stick hears it too."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-play"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-pause"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg></button>
+          <button id="pl-play" class="icon" type="button" disabled data-state="paused" aria-label="Play" title="Plays or pauses the file. It plays on this computer (monitor) and through the device's USB audio, so the device hears it too."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-play"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-pause"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg></button>
           <button id="pl-next" class="icon quiet" type="button" disabled aria-label="Next track" title="Plays the next track, or a random one when the mode after a track is random."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class=""><path d="M5 5v14l10-7zM16.5 5h2.5v14h-2.5z" fill="currentColor"/></svg></button>
           <button id="pl-then" class="icon quiet" type="button" value="next" aria-label="After a track ends: next" title="After a track ends: next. Press for: random. Only this page."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-next"><path d="M3 12h13M12 7l5 5-5 5M20 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-random"><path d="M3 7h3.5c5 0 5 10 10 10H20M3 17h3.5c1.6 0 2.7-.8 3.6-2M13.5 9c.9-1.2 2-2 3.6-2H20M17.5 4l3 3-3 3M17.5 14l3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-stop"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/></svg></button>
-          <div class="pl-vol"><button id="pl-monitor" class="icon quiet" type="button" aria-pressed="true" aria-label="Monitor" title="Monitor on: you hear the file on this computer's speakers. Press to mute them; this mutes only your speakers, the stick still gets the audio."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-on"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-off"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><input id="pl-vol" class="thin grow" type="range" min="0" max="100" step="1" value="80" aria-label="Volume" title="Changes what you hear on this computer only. The stick gets the file at its true level."><span id="pl-volval" class="num">80 %</span></div>
+          <div class="pl-vol"><button id="pl-monitor" class="icon quiet" type="button" aria-pressed="true" aria-label="Monitor" title="Monitor on: you hear the file on this computer's speakers. Press to mute them; this mutes only your speakers, the device still gets the audio."><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-on"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="i-off"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><input id="pl-vol" class="thin grow" type="range" min="0" max="100" step="1" value="80" aria-label="Volume" title="Changes what you hear on this computer only. The device gets the file at its true level."><span id="pl-volval" class="num">80 %</span></div>
         </div>
                 <button id="pl-reopen" class="quiet small hide" type="button" title="Opens the remembered folder again. The browser asks once for permission to read it."></button>
         <div class="pl-name-row"><span id="pl-name" class="note">No track</span>
           <span class="num"><span id="pl-pos">0:00</span> / <span id="pl-len">0:00</span></span>
         </div>
-        <input id="pl-seek" class="thin" type="range" min="0" max="1000" value="0" step="1" disabled aria-label="Position" title="Moves the playing position in the file, on this computer and through the stick's audio.">
+        <input id="pl-seek" class="thin" type="range" min="0" max="1000" value="0" step="1" disabled aria-label="Position" title="Moves the playing position in the file, on this computer and through the device's audio.">
         <div class="pl-row wrap"><strong>Pitch</strong><span id="pl-pitchval" class="num">+0.00 %</span><span id="pl-bpm" class="bpm hide"></span></div>
-        <input id="pl-pitch" class="thin" type="range" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, varispeed" title="Pitch in percent (-8 to +8, varispeed): changes the speed and pitch you hear, so the tempo the stick tracks changes too. Double-click or double-tap resets it to 0. Not a stick setting.">
+        <input id="pl-pitch" class="thin" type="range" min="-8" max="8" step="0.01" value="0" aria-label="Pitch, varispeed" title="Pitch in percent (-8 to +8, varispeed): changes the speed and pitch you hear, so the tempo the device tracks changes too. Double-click or double-tap resets it to 0. Not a device setting.">
         <p id="pl-status" class="note">no file</p>
-        <p id="pl-out-row" class="note pl-out hide">stick output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button" title="Choose again which audio output is the stick's USB audio, in the browser's output chooser. Remembered in this browser.">change</button>
+        <p id="pl-out-row" class="note pl-out hide">device output: <span id="pl-outlabel">none</span> <button id="pl-change" class="link" type="button" title="Choose again which audio output is the device's USB audio, in the browser's output chooser. Remembered in this browser.">change</button>
 </p>
-        <select id="pl-out" class="hide" aria-label="Stick output" title="Which audio output is the stick's USB audio. None: the file plays on this computer only."><option value="">None (monitor only)</option></select>
-        <button id="pl-pick" class="quiet small hide" type="button" title="Opens the browser's output chooser for the stick's USB audio. If it asks for the microphone, that is only to read the device names; nothing is recorded."></button>
+        <select id="pl-out" class="hide" aria-label="Device output" title="Which audio output is the device's USB audio. None: the file plays on this computer only."><option value="">None (monitor only)</option></select>
+        <button id="pl-pick" class="quiet small hide" type="button" title="Opens the browser's output chooser for the device's USB audio. If it asks for the microphone, that is only to read the device names; nothing is recorded."></button>
         <p id="pl-pick-help" class="note hide"></p>
         <p id="pl-note" class="note" aria-live="polite"></p>
         <details class="pl-details"><summary title="Shows or hides the technical details of the player. Only this page.">details</summary><p id="pl-details" class="note"></p><p id="pl-output-report" class="note"></p></details>
@@ -182,36 +182,36 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
       <p id="adv-diag-note" class="note"></p>
       <h3>Beat follow and tuning</h3>
       <div class="grid">
-        <label title="Whether the stick's beat tracker steers the Link session's tempo and beat. Changes the stick now; not kept after a restart (back to on).">Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
-        <label title="Which beat follower the stick runs: tuned or robust (an A/B variant). Changes the stick now; not kept after a restart (back to tuned).">Follower <select id="c-follower"><option value="tuned">Tuned</option><option value="robust">Robust</option></select></label>
-        <label title="Skip mode of the robust follower: Off, ACT or PAT. Changes the stick now; not kept after a restart (back to Off).">Skip <select id="c-skip"><option value="off">Off</option><option value="act">ACT</option><option value="pat">PAT</option></select></label>
+        <label title="Whether the device's beat tracker steers the Link session's tempo and beat. Changes the device now; not kept after a restart (back to on).">Beat follow <select id="c-beat"><option value="on">Steers Link</option><option value="off">Off</option></select></label>
+        <label title="Which beat follower the device runs: tuned or robust (an A/B variant). Changes the device now; not kept after a restart (back to tuned).">Follower <select id="c-follower"><option value="tuned">Tuned</option><option value="robust">Robust</option></select></label>
+        <label title="Skip mode of the robust follower: Off, ACT or PAT. Changes the device now; not kept after a restart (back to Off).">Skip <select id="c-skip"><option value="off">Off</option><option value="act">ACT</option><option value="pat">PAT</option></select></label>
         <label title="On: the confidence shown on the Jank moves with how well the beats fit (display only; the stop and start decisions keep using the gate's own value). Off: the gate's value is shown. Not kept after a restart (back to On).">Graded confidence <select id="c-graded"><option value="off">Off</option><option value="on">On</option></select></label>
-        <label title="Lets a pitch move read from the spectrum steer the beat follower; Off uses the beats alone. Changes the stick; kept after a restart.">Spectral rate <select id="c-rate"><option value="on">On</option><option value="off">Off</option></select></label>
-        <label title="Shifts when the stick puts its beat out, -600 to 600 ms, on top of the auto latency (+ is later). Kept per audio source on the stick. Fine-tune by ear.">Audio shift, ms <input id="c-lat_trim" type="number" min="-600" max="600" inputmode="numeric"></label>
-        <label title="The auto base of the audio source the stick hears now, -300 to 300 ms. The page's Auto latency overwrites it; Audio shift adds on top. Kept per source on the stick.">Auto latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
-        <label title="What goes out on the Wi-Fi air: Link only (ARP, IPv4 unicast, Link multicast) or Everything. Changes the stick; kept after a restart.">Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
-        <label title="Whether the stick is a Link peer itself in its session. Changes the stick; kept after a restart.">Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
-        <label title="Beats in a bar (1 to 16) for the MIDI start, so a receiver starts on the session's downbeat. Changes the stick; kept after a restart.">Beats a bar <input id="c-quantum" type="number" min="1" max="16" inputmode="numeric"></label>
-        <label title="Moves the MIDI clock against the Link session, -100 to 100 ms, for gear that lags. Changes the stick; kept after a restart.">Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01" inputmode="decimal"></label>
+        <label title="Lets a pitch move read from the spectrum steer the beat follower; Off uses the beats alone. Changes the device; kept after a restart.">Spectral rate <select id="c-rate"><option value="on">On</option><option value="off">Off</option></select></label>
+        <label title="Shifts when the device puts its beat out, -600 to 600 ms, on top of the auto latency (+ is later). Kept per audio source on the device. Fine-tune by ear.">Audio shift, ms <input id="c-lat_trim" type="number" min="-600" max="600" inputmode="numeric"></label>
+        <label title="The auto base of the audio source the device hears now, -300 to 300 ms. The page's Auto latency overwrites it; Audio shift adds on top. Kept per source on the device.">Auto latency, ms <span class="note" id="c-beat_latency_src"></span> <input id="c-beat_latency" type="number" min="-300" max="300" inputmode="numeric"></label>
+        <label title="What goes out on the Wi-Fi air: Link only (ARP, IPv4 unicast, Link multicast) or Everything. Changes the device; kept after a restart.">Air filter <select id="c-filter"><option value="link">Link only</option><option value="all">Everything</option></select></label>
+        <label title="Whether the device is a Link peer itself in its session. Changes the device; kept after a restart.">Link peer <select id="c-peer"><option value="on">On</option><option value="off">Off</option></select></label>
+        <label title="Beats in a bar (1 to 16) for the MIDI start, so a receiver starts on the session's downbeat. Changes the device; kept after a restart.">Beats a bar <input id="c-quantum" type="number" min="1" max="16" inputmode="numeric"></label>
+        <label title="Moves the MIDI clock against the Link session, -100 to 100 ms, for gear that lags. Changes the device; kept after a restart.">Clock offset, ms <input id="c-offset" type="number" min="-100" max="100" step="0.01" inputmode="decimal"></label>
       </div>
       <h3>Beat display</h3>
       <div class="grid">
-        <label title="Delays (+) or advances (-) the beat boxes this page draws, -400 to 400 ms. Changes only this page, never the stick's settings.">Beat display delay, ms <input id="bd-num" type="number" min="-400" max="400" step="5" inputmode="numeric"></label>
-        <label>&nbsp;<input id="bd-slider" type="range" min="-400" max="400" step="5" value="0" aria-label="Beat display delay, ms" title="Beat display delay in ms: delays (+) or advances (-) the beat boxes this page draws. Changes only this page, never the stick's settings."></label>
+        <label title="Delays (+) or advances (-) the beat boxes this page draws, -400 to 400 ms. Changes only this page, never the device's settings.">Beat display delay, ms <input id="bd-num" type="number" min="-400" max="400" step="5" inputmode="numeric"></label>
+        <label>&nbsp;<input id="bd-slider" type="range" min="-400" max="400" step="5" value="0" aria-label="Beat display delay, ms" title="Beat display delay in ms: delays (+) or advances (-) the beat boxes this page draws. Changes only this page, never the device's settings."></label>
         <div class="stat"><b id="bd-mon">-</b><span>monitor output latency, ms</span></div>
-        <div class="stat"><b id="bd-stick">-</b><span>stick path output latency, ms</span></div>
-        <div class="stat"><b id="bd-beat">-</b><span>stick beat_latency, ms (auto + shift)</span></div>
-        <div class="row"><button id="bd-estimate" class="quiet" type="button" title="Goes back to the page's own estimate of the delay (monitor - stick path - the stick's beat_latency, to 5 ms) and forgets the value you set. Only this page.">Use the estimate</button></div>
+        <div class="stat"><b id="bd-stick">-</b><span>device path output latency, ms</span></div>
+        <div class="stat"><b id="bd-beat">-</b><span>device beat_latency, ms (auto + shift)</span></div>
+        <div class="row"><button id="bd-estimate" class="quiet" type="button" title="Goes back to the page's own estimate of the delay (monitor - device path - the device's beat_latency, to 5 ms) and forgets the value you set. Only this page.">Use the estimate</button></div>
       </div>
-      monitor's output latency minus the stick path's minus the stick's own beat_latency (so it is 0 once Auto latency has set that), to 5 ms: the page cannot see the stick's USB audio buffering (the stick's beat_latency covers that), so set the
+      monitor's output latency minus the device path's minus the device's own beat_latency (so it is 0 once Auto latency has set that), to 5 ms: the page cannot see the device's USB audio buffering (the device's beat_latency covers that), so set the
       rest by ear.</p>
       <h3>Auto latency</h3>
       <div class="buttons">
-        <label class="check"><input id="al-on" type="checkbox" checked title="On: while the player plays through the stick over USB, the page sets the stick's auto latency from the two output paths. Remembered in this browser; off sends nothing."> Auto latency</label>
-        <button id="al-resend" class="quiet" type="button" title="Sends the page's auto latency suggestion to the stick again now, ignoring the 3 ms and 5 s limits. Overwrites the stick's auto base; only while playing through the stick over USB.">Re-send</button>
+        <label class="check"><input id="al-on" type="checkbox" checked title="On: while the player plays through the device over USB, the page sets the device's auto latency from the two output paths. Remembered in this browser; off sends nothing."> Auto latency</label>
+        <button id="al-resend" class="quiet" type="button" title="Sends the page's auto latency suggestion to the device again now, ignoring the 3 ms and 5 s limits. Overwrites the device's auto base; only while playing through the device over USB.">Re-send</button>
       </div>
-      <code>set beat_latency</code>) as the monitor's output latency minus the stick path's, when it is more than 3 ms away from the stick's, at most once in 5 s.
-      The page cannot see the stick's USB buffering or the capture chain's, so finish by ear with Audio shift (the manual layer, above).</p>
+      <code>set beat_latency</code>) as the monitor's output latency minus the device path's, when it is more than 3 ms away from the device's, at most once in 5 s.
+      The page cannot see the device's USB buffering or the capture chain's, so finish by ear with Audio shift (the manual layer, above).</p>
     </section>
     <section>
       <h3>Air and Link</h3>
@@ -241,7 +241,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
       <p id="s-version" class="note">-</p>
       <p class="note">Update: copy jank.bin onto the JANK drive; it installs as it lands and the Jank restarts. Download mode restarts
       the Jank so esptool can reach it.</p>
-      <button id="bootloader" class="quiet" disabled title="Restarts the stick into the ROM's download mode so esptool can flash it over USB. Unplug and replug it afterwards to run again.">Download mode</button>
+      <button id="bootloader" class="quiet" disabled title="Restarts the device into the ROM's download mode so esptool can flash it over USB. Unplug and replug it afterwards to run again.">Download mode</button>
     </section>
   </details>
   </div>
@@ -862,7 +862,7 @@ autoConnect();
 (() => {
   const el = (id) => document.getElementById(id);
   const ARMS = ["up", "down", "no", "yes"];
-  const ARM_TIP = Object.fromEntries(ARMS.map((b) => [b, b.toUpperCase() + ": presses the stick's " + b.toUpperCase() + " button. The stick acts as on its own screen, so this can change its settings. Keys: " + Stick.KEY_HINT.replace(/^Keys: /, "")]));
+  const ARM_TIP = Object.fromEntries(ARMS.map((b) => [b, b.toUpperCase() + ": presses the device's " + b.toUpperCase() + " button. The device acts as on its own screen, so this can change its settings. Keys: " + Stick.KEY_HINT.replace(/^Keys: /, "")]));
   const svg = el("dev"), card = el("face");
   let model = null, frame = 0, hovered = false;
   const padButtons = new Map();
@@ -1042,7 +1042,7 @@ autoConnect();
     const boots = Number(v.boots), restarted = Number.isFinite(boots) && lastBoots !== null && boots !== lastBoots;
     el("adv-boots").textContent = "boots " + dash(v.boots) + " · reset: " + dash(v.reset);
     if (restarted) {
-      el("adv-restart").textContent = "The stick restarted: boots " + lastBoots + " → " + boots + ", reset: " + dash(v.reset) + ", at " + new Date().toTimeString().slice(0, 8) + ".";
+      el("adv-restart").textContent = "The device restarted: boots " + lastBoots + " → " + boots + ", reset: " + dash(v.reset) + ", at " + new Date().toTimeString().slice(0, 8) + ".";
       el("adv-restart").classList.remove("hide");
       el("adv-boots").classList.add("restarted");
     }
@@ -1321,7 +1321,7 @@ autoConnect();
   }
   async function aimContext(ctx, sinkId) {
     if (Player.sinkMatches(ctx.sinkId, sinkId)) return;
-    if (typeof ctx.setSinkId !== "function") throw new Error("this browser cannot choose the stick's output (AudioContext.setSinkId)");
+    if (typeof ctx.setSinkId !== "function") throw new Error("this browser cannot choose the device's output (AudioContext.setSinkId)");
     await ctx.setSinkId(sinkId);
   }
   const latencyMs = (ctx) => (ctx ? Math.round(((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000) : null);
@@ -1336,7 +1336,7 @@ autoConnect();
     if (plan.path === "captureStream" && !probe && tap.context) probe = new AudioContext({ latencyHint: "interactive" });
     if (!tap.context) {
       tap.context = makeContext(jank.id);
-      tap.mono = tap.context.createGain();                      // the stick is 1 channel: a stereo file is mixed down here, whatever the device
+      tap.mono = tap.context.createGain();                      // the device is 1 channel: a stereo file is mixed down here, whatever the device
       tap.mono.channelCount = 1;
       tap.mono.channelCountMode = "explicit";
       tap.mono.channelInterpretation = "speakers";
@@ -1345,7 +1345,7 @@ autoConnect();
       if (plan.path === "captureStream") probe = new AudioContext({ latencyHint: "interactive" });
     }
     if (probe) probe.resume().catch((err) => note("Cannot read the monitor's latency: " + errorText(err), true));
-    tap.context.resume().catch((err) => note("Cannot start the audio path to the stick: " + errorText(err), true));
+    tap.context.resume().catch((err) => note("Cannot start the audio path to the device: " + errorText(err), true));
   }
   function buildWebAudio() {
     const ctx = tap.context;
@@ -1381,7 +1381,7 @@ autoConnect();
       await aimContext(web.stickCtx, jank.id);
       await web.stickCtx.resume();
     } else {
-      throw new Error("this browser cannot choose the stick's output (no setSinkId)");
+      throw new Error("this browser cannot choose the device's output (no setSinkId)");
     }
   }
   async function routeCapture() {
@@ -1424,13 +1424,13 @@ autoConnect();
       Object.assign(tap, { source, url, routed: false });
     } catch (err) {
       tap.missing = true;
-      note("Cannot take the player's sound for the stick: " + errorText(err), true);
+      note("Cannot take the player's sound for the device: " + errorText(err), true);
       return;
     }
     routeJank();
   }
-  const MONITOR_ON_TIP = "Monitor on: you hear the file on this computer's speakers. Press to mute them; this mutes only your speakers, the stick still gets the audio.";
-  const MONITOR_OFF_TIP = "Monitor off: your speakers are muted; the stick still gets the audio. Press to hear the file here again.";
+  const MONITOR_ON_TIP = "Monitor on: you hear the file on this computer's speakers. Press to mute them; this mutes only your speakers, the device still gets the audio.";
+  const MONITOR_OFF_TIP = "Monitor off: your speakers are muted; the device still gets the audio. Press to hear the file here again.";
   const applyMonitor = () => {
     if (web.monitor) web.monitor.gain.value = monitorOn() ? 1 : 0; else audio.muted = !monitorOn();
     paintStatus();
@@ -1568,7 +1568,7 @@ autoConnect();
       if (el("pl-pick").dataset.kind === "choose") {
         const device = await navigator.mediaDevices.selectAudioOutput();
         await useOutput({ id: device.deviceId, label: device.label || "chosen output" });
-        note("The stick's output is " + jank.label + ".");
+        note("The device's output is " + jank.label + ".");
       } else {
         await allowNames();
       }
@@ -1586,8 +1586,8 @@ autoConnect();
     fillOutputs(devices);
     const saved = savedOutput(), choice = Player.resolveOutput(devices, saved && saved.id);
     await useOutput(choice);
-    note(choice.why === "default" ? "Output names unlocked. The stick's USB audio (\"jank\") is not listed: plug it in and run the firmware with the audio build. Only the monitor plays."
-      : "Output names unlocked. " + (choice.why === "jank" ? "The stick's USB audio is the second output." : "The second output is " + choice.label + "."));
+    note(choice.why === "default" ? "Output names unlocked. The device's USB audio (\"jank\") is not listed: plug it in and run the firmware with the audio build. Only the monitor plays."
+      : "Output names unlocked. " + (choice.why === "jank" ? "The device's USB audio is the second output." : "The second output is " + choice.label + "."));
   }
   async function readPermission() {
     try { state.permission = (await navigator.permissions.query({ name: "microphone" })).state; } catch (err) { state.permission = "unknown"; }

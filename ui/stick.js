@@ -1,7 +1,7 @@
 /* The face of a connected stick: the OLED module's ctx built from what the page's control line has read (the HOME line, `get`,
    `status`), the control-line commands the face's buttons and menu send, and the button logic of the D-pad.
-   No DOM, no timers: time is always passed in (ms). The plain XIAO has no screen, so this is a virtual screen of the stick's state:
-   what the stick does not report is left empty ('---', a level at the floor, no beat), never made up.
+   No DOM, no timers: time is always passed in (ms). The plain XIAO has no screen, so this is a virtual screen of the device's state:
+   what the device does not report is left empty ('---', a level at the floor, no beat), never made up.
    The commands are the ones beat/live/player.html's --xiao mode sends: `fold x2` / `fold /2` (AUDIO) or `tempo <bpm>` (LINK) on
    UP / DOWN, `play` / `stop` on YES, `set <key> <value>` for the menu's edits, `nudge beat` / `nudge ms` for NO / YES held with
    UP / DOWN (core/jank_ctl.c, docs/firmware.md). */
@@ -99,12 +99,12 @@ const Stick = (() => {
   const refuse = why => ({ refuse: why });
   const cmds = (...c) => ({ commands: c });
   const NO_STICK_SETTING = {
-    out0: 'the stick has one clock offset (Advanced), not one per output', out1: 'the stick has one clock offset (Advanced), not one per output',
-    out2: 'the stick has one clock offset (Advanced), not one per output', rate: 'the stick has no clock rate setting',
+    out0: 'the device has one clock offset (Advanced), not one per output', out1: 'the device has one clock offset (Advanced), not one per output',
+    out2: 'the device has one clock offset (Advanced), not one per output', rate: 'the device has no clock rate setting',
     ssid: 'set the Wi-Fi name under Settings (Save and restart)', pass: 'set the Wi-Fi password under Settings (Save and restart)',
-    apname: 'the stick has no own-network mode', appass: 'the stick has no own-network mode',
-    netmode: 'change the network under Settings (Join, Save and restart): it restarts the stick',
-    usbrole: 'the USB role restarts the stick: not changed from here',
+    apname: 'the device has no own-network mode', appass: 'the device has no own-network mode',
+    netmode: 'change the network under Settings (Join, Save and restart): it restarts the device',
+    usbrole: 'the USB role restarts the device: not changed from here',
   };
   const SLEEP = ['never', '30s', '1min', '5min'];   // the menu's SCREEN OFF names, as the control line's `sleep` says them
   const WORDS = { insrc: SRC, autobar: AUTOBAR, lowconf: ['run', 'stop'], usbmidi: ['on', 'off'] };
@@ -129,7 +129,7 @@ const Stick = (() => {
     if (field === 'lowconf') return cmds('set lowconf ' + (val === 1 ? 'stop' : 'run'));
     if (field === 'usbmidi') return cmds('set usbmidi ' + (val === 0 ? 'on' : 'off'));
     if (WORDS[field] && WORDS[field][val] !== undefined) return cmds('set ' + KEYS[field] + ' ' + WORDS[field][val]);
-    return refuse('the stick does not take ' + field + ' from here');
+    return refuse('the device does not take ' + field + ' from here');
   }
   // UP / DOWN on HOME: AUDIO folds the tracked tempo (x2 / /2), LINK steps the session tempo by 1 BPM. `expected` is what the
   // stick should report next (for the overlay only; the screen then shows what the stick reports), null when unknown

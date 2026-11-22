@@ -43,7 +43,7 @@ const Player = (() => {
   // the 'details' line the user can paste back: the path in use, every API with its type, and the browser
   function planDetails(plan, env, brand) {
     const apis = APIS.map(([key, name]) => name + ': ' + (env[key] === 'function' ? 'present' : 'absent (' + env[key] + ')')).join(' · ');
-    return 'path: ' + plan.path + ' · stick output: ' + plan.stick + ' · ' + apis + ' · browser: ' + brand;
+    return 'path: ' + plan.path + ' · device output: ' + plan.stick + ' · ' + apis + ' · browser: ' + brand;
   }
   // "Google Chrome 126" from navigator.userAgentData.brands (the real brand, not the GREASE one), else the start of the userAgent
   function browserBrand(userAgentData, userAgent) {
@@ -58,7 +58,7 @@ const Player = (() => {
   function routeText(r) {
     if (r.jankError) return 'jank output failed: ' + r.jankError + (r.monitor ? ', monitor only' : '');
     if (r.jank) return r.monitor ? 'monitor + ' + r.jank : r.jank + ' only (monitor off)';
-    return r.monitor ? 'no stick output chosen: monitor only' : 'no output: no stick output chosen and monitor off';
+    return r.monitor ? 'no device output chosen: monitor only' : 'no output: no device output chosen and monitor off';
   }
   // the status line of the card: { hasFile, paused, position, length, monitor, jank, jankError, volumePct, error } -> text
   function statusText(s) {
@@ -97,7 +97,7 @@ const Player = (() => {
     const named = x => (x && x.id ? id8(x.id) + (x.label ? ' "' + x.label + '"' : '') : 'none');
     const outs = outputs(s.devices).map(d => (d.label || 'no label') + ' (' + id8(d.deviceId) + ')').join(', ') || 'none listed';
     const ctx = s.ctxState ? s.ctxState + ', sinkId ' + (typeof s.ctxSinkId === 'string' ? (id8(s.ctxSinkId) === '-' ? 'default' : id8(s.ctxSinkId)) : JSON.stringify(s.ctxSinkId)) : 'none yet';
-    return ['permission: ' + (s.permission || 'unknown'), 'outputs: ' + outs, 'saved: ' + named(s.saved), 'chosen: ' + named(s.chosen), 'stick context: ' + ctx, 'last sink error: ' + (s.lastError || 'none')].join(' · ');
+    return ['permission: ' + (s.permission || 'unknown'), 'outputs: ' + outs, 'saved: ' + named(s.saved), 'chosen: ' + named(s.chosen), 'device context: ' + ctx, 'last sink error: ' + (s.lastError || 'none')].join(' · ');
   }
 
   // ---- the play scope: every audio file under the picked folder, in depth-first natural order ----
@@ -142,11 +142,11 @@ const Player = (() => {
     return s.hasSelectAudioOutput ? 'choose' : 'allow';
   }
   const OUTPUT_HELP = {
-    choose: "Choose the stick's output (jank) once.",
+    choose: "Choose the device's output (jank) once.",
     allow: "Chrome will ask for the microphone only to read the device names; nothing is recorded.",
     none: '',
   };
-  const OUTPUT_BUTTON_TEXT = { choose: "Choose the stick's output", allow: 'Allow device names (asks for the microphone)', none: '' };
+  const OUTPUT_BUTTON_TEXT = { choose: "Choose the device's output", allow: 'Allow device names (asks for the microphone)', none: '' };
 
   // the stick's output: jank first, else the remembered device when it is still there, else none (id null: monitor only)
   function resolveOutput(devices, savedId) {

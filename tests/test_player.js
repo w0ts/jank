@@ -36,7 +36,7 @@ const devices = [
   { kind: 'audiooutput', label: 'JANK USB Audio (1234:5678)', deviceId: 'jk' },
   { kind: 'videoinput', label: 'jank cam', deviceId: 'cam' },
 ];
-eq(P.pickOutput(devices), 'jk', 'finds the stick by name, any case, outputs only');
+eq(P.pickOutput(devices), 'jk', 'finds the device by name, any case, outputs only');
 eq(P.pickOutput(devices, 'speakers'), 'spk', 'another needle');
 eq(P.pickOutput([devices[0], devices[1]]), null, 'no jank output');
 eq(P.pickOutput([{ kind: 'audiooutput', label: '', deviceId: '' }]), null, 'labels empty until permission');
@@ -96,12 +96,12 @@ eq(P.statusText({ ...base, hasFile: false }), 'no file', 'status: no file');
 eq(P.statusText({ ...base, paused: true, position: 0 }), 'stopped', 'status: stopped');
 eq(P.statusText({ ...base, paused: true }), 'paused 0:12 / 3:40', 'status: paused');
 eq(P.statusText(base), 'playing 0:12 / 3:40 \u00b7 monitor + JANK USB Audio', 'status: both outputs');
-eq(P.statusText({ ...base, jank: '' }), 'playing 0:12 / 3:40 \u00b7 no stick output chosen: monitor only', 'status: no stick output chosen');
+eq(P.statusText({ ...base, jank: '' }), 'playing 0:12 / 3:40 \u00b7 no device output chosen: monitor only', 'status: no device output chosen');
 eq(P.statusText({ ...base, monitor: false }), 'playing 0:12 / 3:40 \u00b7 JANK USB Audio only (monitor off)', 'status: jank only');
-eq(P.statusText({ ...base, jank: '', monitor: false }), 'playing 0:12 / 3:40 \u00b7 no output: no stick output chosen and monitor off', 'status: nowhere');
+eq(P.statusText({ ...base, jank: '', monitor: false }), 'playing 0:12 / 3:40 \u00b7 no output: no device output chosen and monitor off', 'status: nowhere');
 eq(P.statusText({ ...base, jankError: 'NotAllowedError' }), 'playing 0:12 / 3:40 \u00b7 jank output failed: NotAllowedError, monitor only', 'status: the jank path failed, the monitor plays on');
 eq(P.statusText({ ...base, volumePct: 0 }), 'playing 0:12 / 3:40 \u00b7 monitor + JANK USB Audio \u00b7 no sound: volume is 0', 'status: volume 0 (the monitor)');
-eq(P.statusText({ ...base, volumePct: 0, monitor: false }), 'playing 0:12 / 3:40 \u00b7 JANK USB Audio only (monitor off)', 'volume 0 with the monitor off: not a "no sound" case, the stick still plays');
+eq(P.statusText({ ...base, volumePct: 0, monitor: false }), 'playing 0:12 / 3:40 \u00b7 JANK USB Audio only (monitor off)', 'volume 0 with the monitor off: not a "no sound" case, the device still plays');
 eq(P.statusText({ ...base, error: 'NotAllowedError' }), 'error: NotAllowedError', 'status: an error wins');
 
 // ---- what follows a track ----
@@ -122,14 +122,14 @@ eq(P.sortEntries([{ name: 'b10.mp3', kind: 'file' }, { name: 'b2.mp3', kind: 'fi
 
 // ---- what this browser has ----
 const env = (over) => ({ captureStream: 'function', mozCaptureStream: 'undefined', audioContext: 'function', audioContextSetSinkId: 'function', elementSetSinkId: 'function', ...over });
-eq(P.playbackPlan(env({})), { path: 'captureStream', stick: 'context', missing: ['audio.mozCaptureStream'] }, 'everything there: the captureStream path, the stick through the context');
+eq(P.playbackPlan(env({})), { path: 'captureStream', stick: 'context', missing: ['audio.mozCaptureStream'] }, 'everything there: the captureStream path, the device through the context');
 eq(P.playbackPlan(env({ captureStream: 'undefined' })).path, 'webaudio', 'no captureStream: the Web Audio path');
 eq(P.playbackPlan(env({ captureStream: 'undefined', mozCaptureStream: 'function' })), { path: 'captureStream', stick: 'context', missing: ['audio.captureStream'] }, 'mozCaptureStream counts as captureStream');
-eq(P.playbackPlan(env({ captureStream: 'undefined' })), { path: 'webaudio', stick: 'element', missing: ['audio.captureStream', 'audio.mozCaptureStream'] }, 'Web Audio path: the stick through a hidden element when it has setSinkId');
+eq(P.playbackPlan(env({ captureStream: 'undefined' })), { path: 'webaudio', stick: 'element', missing: ['audio.captureStream', 'audio.mozCaptureStream'] }, 'Web Audio path: the device through a hidden element when it has setSinkId');
 eq(P.playbackPlan(env({ captureStream: 'undefined', elementSetSinkId: 'undefined' })).stick, 'context', 'Web Audio path without element setSinkId: a second context');
-eq(P.playbackPlan(env({ captureStream: 'undefined', elementSetSinkId: 'undefined', audioContextSetSinkId: 'undefined' })).stick, 'none', 'no setSinkId anywhere: no way to the stick');
+eq(P.playbackPlan(env({ captureStream: 'undefined', elementSetSinkId: 'undefined', audioContextSetSinkId: 'undefined' })).stick, 'none', 'no setSinkId anywhere: no way to the device');
 eq(P.playbackPlan(env({ audioContextSetSinkId: 'undefined' })).path, 'webaudio', 'captureStream but a context that cannot choose its output: the Web Audio path');
-eq(P.playbackPlan(env({ audioContextSetSinkId: 'undefined' })).stick, 'element', '... which reaches the stick through the element');
+eq(P.playbackPlan(env({ audioContextSetSinkId: 'undefined' })).stick, 'element', '... which reaches the device through the element');
 eq(P.playbackPlan(env({ audioContext: 'undefined' })), { path: 'none', stick: 'none', missing: ['audio.mozCaptureStream', 'AudioContext'] }, 'no AudioContext: no path');
 eq(P.planNote(P.playbackPlan(env({}))), '', 'nothing to say when both outputs work');
 eq(P.planNote(P.playbackPlan(env({ captureStream: 'undefined' }))), '', 'the Web Audio path works too: nothing to say');
@@ -137,7 +137,7 @@ assert.match(P.planNote(P.playbackPlan(env({ captureStream: 'undefined', element
 assert.match(P.planNote(P.playbackPlan(env({ audioContext: 'undefined' }))), /no Web Audio/); checks++;
 const plan = P.playbackPlan(env({ captureStream: 'undefined' }));
 eq(P.planDetails(plan, env({ captureStream: 'undefined' }), 'Google Chrome 126'),
-   'path: webaudio · stick output: element · audio.captureStream: absent (undefined) · audio.mozCaptureStream: absent (undefined) · AudioContext: present · AudioContext.prototype.setSinkId: present · HTMLMediaElement.prototype.setSinkId: present · browser: Google Chrome 126', 'the details line names the path, every API and the browser');
+   'path: webaudio · device output: element · audio.captureStream: absent (undefined) · audio.mozCaptureStream: absent (undefined) · AudioContext: present · AudioContext.prototype.setSinkId: present · HTMLMediaElement.prototype.setSinkId: present · browser: Google Chrome 126', 'the details line names the path, every API and the browser');
 eq(P.browserBrand({ brands: [{ brand: 'Not.A/Brand', version: '8' }, { brand: 'Chromium', version: '126' }, { brand: 'Google Chrome', version: '126' }] }, 'UA'), 'Google Chrome 126', 'the real brand, not the GREASE one or Chromium');
 eq(P.browserBrand({ brands: [{ brand: 'Not;A=Brand', version: '99' }, { brand: 'Chromium', version: '126' }, { brand: 'Microsoft Edge', version: '126' }] }, 'UA'), 'Microsoft Edge 126', 'Edge');
 eq(P.browserBrand({ brands: [{ brand: 'Not.A/Brand', version: '8' }, { brand: 'Chromium', version: '126' }] }, 'UA'), 'Chromium 126', 'only Chromium');
@@ -152,7 +152,7 @@ eq([P.matchSaved(listed, { id: 'gone' }), P.matchSaved(listed, null), P.matchSav
 eq([P.outputButton({ working: true, hasSelectAudioOutput: true }), P.outputButton({ working: true, hasSelectAudioOutput: false })], ['none', 'none'], 'a chosen device that works: no button');
 eq(P.outputButton({ working: false, hasSelectAudioOutput: true }), 'choose', 'nothing chosen, the browser has an output chooser: the chooser button');
 eq(P.outputButton({ working: false, hasSelectAudioOutput: false }), 'allow', 'no chooser: only then the explicit microphone button');
-eq(P.OUTPUT_HELP.choose, "Choose the stick's output (jank) once.", 'the line that says what the click does');
+eq(P.OUTPUT_HELP.choose, "Choose the device's output (jank) once.", 'the line that says what the click does');
 ok2(/microphone only to read the device names; nothing is recorded/.test(P.OUTPUT_HELP.allow), 'the microphone button says why');
 ok2(!/microphone/i.test(P.OUTPUT_HELP.choose + P.OUTPUT_BUTTON_TEXT.choose), 'the normal path never mentions the microphone');
 
@@ -165,8 +165,8 @@ eq([P.savedStatus(dflt, { id: 'spk' }), P.savedStatus(dflt, { id: 'gone', label:
 eq(P.savedStatus([{ kind: 'audiooutput', label: '', deviceId: '' }], { id: 'jk' }), 'unknown', 'no ids listed (no permission): only tried, never dropped');
 eq([P.sinkMatches('jk', 'jk'), P.sinkMatches('', 'jk'), P.sinkMatches({ type: 'none' }, 'jk')], [true, false, false], 'AudioContext.sinkId read back');
 eq(P.outputReport({ permission: 'granted', devices: dflt, saved: { id: 'abcdef0123456789', label: 'jank (303a:4a4b)' }, chosen: { id: 'abcdef0123456789', label: 'jank (303a:4a4b)' }, ctxState: 'running', ctxSinkId: 'abcdef0123456789', lastError: '' }),
-   'permission: granted · outputs: Default - JANK USB Audio (default), MacBook Speakers (spk), jank (303a:4a4b) (abcdef01) · saved: abcdef01 "jank (303a:4a4b)" · chosen: abcdef01 "jank (303a:4a4b)" · stick context: running, sinkId abcdef01 · last sink error: none', 'the details: permission, outputs with 8 chars of the id, saved, chosen, the context, the last error');
-eq(P.outputReport({ devices: [], ctxState: '', lastError: 'NotFoundError' }), 'permission: unknown · outputs: none listed · saved: none · chosen: none · stick context: none yet · last sink error: NotFoundError', 'the details with nothing known yet');
+   'permission: granted · outputs: Default - JANK USB Audio (default), MacBook Speakers (spk), jank (303a:4a4b) (abcdef01) · saved: abcdef01 "jank (303a:4a4b)" · chosen: abcdef01 "jank (303a:4a4b)" · device context: running, sinkId abcdef01 · last sink error: none', 'the details: permission, outputs with 8 chars of the id, saved, chosen, the context, the last error');
+eq(P.outputReport({ devices: [], ctxState: '', lastError: 'NotFoundError' }), 'permission: unknown · outputs: none listed · saved: none · chosen: none · device context: none yet · last sink error: NotFoundError', 'the details with nothing known yet');
 
 (async () => {
 // ---- the play scope ----

@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jank · About</title>
-<meta name="description" content="A few-dollar ESP32-S3 USB stick that puts computers, MIDI gear and modular gear into an Ableton Link session with no router.">
+<meta name="description" content="A few-dollar ESP32-S3 device that puts computers, MIDI gear and modular gear into an Ableton Link session with no router.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Cg transform='translate(2.7 6.2) scale(1.4)' fill='none' stroke='%23A06CF0' stroke-width='2'%3E%3Crect x='1' y='1' width='10' height='6' rx='1.5'/%3E%3Crect x='8' y='7' width='10' height='6' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
 <style>
 <!--@include ui/common.css-->
@@ -13,6 +13,8 @@
 /* the info pages' own: */
 main > section h2 { margin-top: 0; }
 main img { max-width: 100%; height: auto; border-radius: var(--r-ctl); display: block; }
+main img.small { max-width: 320px; }
+main img.screen { width: 480px; max-width: 100%; image-rendering: pixelated; }
 main ul, main ol { margin: 8px 0; padding-left: 22px; }
 main li { margin: 4px 0; }
 pre { white-space: pre; }
@@ -31,43 +33,35 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
   <section>
     <h2>Ableton Link with no router</h2>
     <p>Jank brings computers, MIDI gear and modular gear into one Link session. The units send open Wi-Fi frames straight to each other on the group's channel: no router, no association, no password, no host. Units set to the same GROUP (1..9) hear each other.</p>
-    <p>It is the group mode of <a href="https://github.com/w0ts/optimist">Optimist</a>, the open firmware for the FM-1 synth. FM-1s running Optimist do this by themselves; the Jank device speaks the same air format, so whatever is plugged into it joins the group too.</p>
-    <img src="img/hero.png" alt="The Jank device" width="1600" height="1000">
+    <p>It is the group mode of <a href="https://github.com/w0ts/optimist">Optimist</a>, the open firmware for the FM-1 synth. FM-1s running Optimist do this by themselves; the Jank device speaks the same air format, so whatever is plugged into it joins the group too. The air format: <a href="https://github.com/w0ts/jank/blob/main/docs/air.md">docs/air.md</a>.</p>
+    <img src="img/jank-mini-3.png" alt="The jank mini 3: a printed box with a colour screen, a D-pad and the MIDI, clock and USB sockets" width="1600" height="1000">
   </section>
 
   <section>
-    <h2>What joins through it</h2>
+    <h2>Sync together</h2>
     <ul>
-      <li><b>A computer, over the network.</b> The computer sees a USB network adapter on the group; Live, Bitwig or any Link app joins the same session as the FM-1s.</li>
-      <li><b>A computer or a USB device, by MIDI clock.</b> USB-MIDI device for a computer, USB-MIDI host for gear with a USB port.</li>
-      <li><b>MIDI gear.</b> MIDI outputs send clock, start and stop locked to the session.</li>
+      <li><b>A computer, over the network.</b> The computer sees a USB network adapter on the device, it can join Jank groups: Live, Bitwig or any Link app joins the Jank session. Best part: the computer bridges and syncs a Jank group with a standard Link group it joins too.</li>
+      <li><b>A computer or a USB device, and MIDI gear via TRS or DIN, connect via MIDI clock.</b> USB-MIDI device for a computer, USB-MIDI host for gear with a USB port.</li>
       <li><b>Modular gear.</b> Clock outputs, 5 V pulses.</li>
     </ul>
-    <p>It plays no sound: it follows the group's tempo and phase and sends them on.</p>
+  </section>
+
+  <section>
+    <h2>Beat follow</h2>
+    <p>Play music into it and Jank follows the beat: the tempo, the beat grid, start and stop go into the Link session, so the whole group plays along with the track. When the music stops, the session stops; when it starts again, the session starts on the next bar.</p>
+    <p>The music comes in as USB audio (the computer sees a sound output called Jank) or, on the jank mini 3, through the LINE IN jack. A plug in LINE IN takes over from USB.</p>
+    <img class="screen" src="img/screen-beat.png" alt="The jank mini 3's screen following a track: 124.0 BPM, the beat, the input level, the confidence and BAR LOCKED" width="320" height="240">
+    <p>The network it runs today is madmom's beat model, for non-commercial use: the firmware does not carry it, and the <a href="install.html">Install</a> page adds it to your device at your click. Our own network will replace it. Details: <a href="https://github.com/w0ts/jank/blob/main/docs/beat.md">docs/beat.md</a>, <a href="https://github.com/w0ts/jank/blob/main/docs/linein.md">docs/linein.md</a>.</p>
   </section>
 
   <section>
     <h2>Two devices</h2>
     <ul>
-      <li><b>The stick:</b> a bare Seeed XIAO ESP32-S3 in a computer or any USB host that speaks MIDI clock or Link. One button, one LED.</li>
-      <li><b>The Jank box:</b> the same firmware on its own board, in a printed box: 3 MIDI outs, 1 MIDI in/out (TRS + DIN), 2 modular clock outs.</li>
+      <li><b>The bare device:</b> a Seeed XIAO ESP32-S3 in a computer or any USB host that speaks MIDI clock or Link. One button, one LED.</li>
+      <li><b>The jank mini 3:</b> the same firmware on a Waveshare ESP32-S3-LCD-2 with its colour screen, on our board in a printed box: 2 MIDI outs (TRS + DIN each), clock and reset outs for modular gear, a line in, a USB port for gear, a D-pad and a battery.</li>
     </ul>
-    <p>Put the firmware on a stick: <a href="install.html">Install</a>. Run and watch one: <a href="device.html">Device</a>.</p>
-  </section>
-
-  <section>
-    <h2>Start and stop</h2>
-    <p>Two layers that never touch each other: yours (Start / Stop) and the automatic one (low confidence, silence). The clock outputs run only when both say go. Start is the device's YES, a click of the stick's button, or the control page's play.</p>
-    <table>
-      <thead><tr><th>You</th><th>Automatic</th><th>Outputs</th></tr></thead>
-      <tbody>
-        <tr><td>Stopped (also at power-on)</td><td>anything</td><td>stopped, until your Start</td></tr>
-        <tr><td>Started</td><td>open</td><td>run, from a bar line</td></tr>
-        <tr><td>Started</td><td>low confidence</td><td>stopped, back on their own when the confidence returns</td></tr>
-        <tr><td>Started</td><td>silence</td><td>stopped at once; the next track waits for the confidence</td></tr>
-        <tr><td>Start pressed</td><td>low confidence</td><td>your Start wins until the confidence has been good once</td></tr>
-      </tbody>
-    </table>
+    <img class="small" src="https://files.seeedstudio.com/wiki/SeeedStudio-XIAO-ESP32S3/img/xiaoesp32s3.jpg" alt="The bare device: a Seeed XIAO ESP32-S3 (picture: Seeed Studio)" width="1400" height="1050" loading="lazy">
+    <p>Put the firmware on a device: <a href="install.html">Install</a>. Run and watch one: <a href="device.html">Device</a>.</p>
   </section>
 
   <footer class="site">Link is Ableton's trademark; Jank is not an Ableton product. Source, docs and licences: <a href="https://github.com/w0ts/jank">github.com/w0ts/jank</a>.</footer>
