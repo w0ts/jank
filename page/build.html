@@ -317,9 +317,9 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
     <h2>Build a jank mini 3</h2>
     <p>The jank mini 3 is a <a href="https://www.waveshare.com/esp32-s3-lcd-2.htm">Waveshare ESP32-S3-LCD-2</a> (the ESP32-S3 with its 2 inch colour screen) on our board, in a printed box. Our board brings the MIDI outs (TRS + DIN each), the clock and reset outs, the line in, the USB port for gear and the D-pad. The LCD-2 sits in our board's notch; two small bridge strips join its pins to ours from below. Nothing is soldered between them: the LCD-2 stays removable. A 2000 mAh LiPo cell lies on the case floor.</p>
     <div class="pics">
-      <img src="img/build/board-top.webp" alt="Our board from above, rendered: the notch for the LCD-2 on the left, the D-pad switches, the USB-C pair at the top edge" width="1568" height="1064" loading="lazy">
-      <img src="img/build/board-3d.webp" alt="Our board rendered in 3D, from above at an angle: the notch, the D-pad switches, the sockets along the edges" width="1568" height="1176" loading="lazy">
-      <img src="img/build/board-bottom.webp" alt="Our board from below, rendered: the two DIN sockets, the jacks and the two header rows J15 and J16 along the notch" width="1568" height="1064" loading="lazy">
+      <img src="img/mini3/board-top.webp" alt="Our board from above, rendered: the notch for the LCD-2 on the left, the D-pad switches, the USB-C pair at the top edge" width="1568" height="1064" loading="lazy">
+      <img src="img/mini3/board-3d.webp" alt="Our board rendered in 3D, from above at an angle: the notch, the D-pad switches, the sockets along the edges" width="1568" height="1176" loading="lazy">
+      <img src="img/mini3/board-bottom.webp" alt="Our board from below, rendered: the two DIN sockets, the jacks and the two header rows J15 and J16 along the notch" width="1568" height="1064" loading="lazy">
     </div>
     <p>The steps: buy the LCD-2 and the other parts, order our board and the strips from JLCPCB, print the case, put it together, install the firmware. The design files: <a href="https://github.com/w0ts/jank/tree/main/hardware/jank-mini-3">hardware/jank-mini-3/</a> (its <a href="https://github.com/w0ts/jank/blob/main/hardware/jank-mini-3/README.md">README</a>, the <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/lcd2-schematic.pdf">schematic</a>, the case's <a href="https://github.com/w0ts/jank/blob/main/hardware/jank-mini-3/case/BOX.md">BOX.md</a>).</p>
   </section>
@@ -361,26 +361,26 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
       <h3>Step by step</h3>
       <ol>
       <li><b>Open the quote page.</b> On <a href="https://cart.jlcpcb.com/quote">cart.jlcpcb.com/quote</a>, press <b>Add gerber file</b> and pick this way's <code>gerbers.zip</code> (as it is, do not unzip it).
-        <img class="shot" src="img/build/jlc-upload.webp" alt="JLCPCB's quote page: the Add gerber file button" width="800" height="197" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-upload.webp" alt="JLCPCB's quote page: the Add gerber file button" width="800" height="197" loading="lazy"></li>
       <li><b>Check what JLCPCB found.</b> Both sides of the board appear, and the line under them reads <i>Detected 2 layer board of 82x95.5mm</i>.
-        <img class="shot" src="img/build/jlc-detected.webp" alt="JLCPCB after the upload: both sides of the board and the line Detected 2 layer board of 82x95.5mm" width="800" height="233" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-detected.webp" alt="JLCPCB after the upload: both sides of the board and the line Detected 2 layer board of 82x95.5mm" width="800" height="233" loading="lazy"></li>
       <li><b>Layers 2, quantity 5.</b> JLCPCB fills in the layers and the size from the files. Leave Base Material at FR-4 and PCB Qty at 5.
-        <img class="shot" src="img/build/jlc-layers.webp" alt="JLCPCB's form: Base Material FR-4, Layers 2, Dimensions 95.5 by 82, PCB Qty 5" width="800" height="207" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-layers.webp" alt="JLCPCB's form: Base Material FR-4, Layers 2, Dimensions 95.5 by 82, PCB Qty 5" width="800" height="207" loading="lazy"></li>
       <li><b>Thickness 1.6 mm, Surface Finish LeadFree HASL.</b> JLCPCB picks OSP by default: change it. Leave the colour and the rest at the defaults.
-        <img class="shot" src="img/build/jlc-thickness-finish.webp" alt="JLCPCB's form: PCB Thickness 1.6mm and Surface Finish LeadFree HASL selected" width="800" height="242" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-thickness-finish.webp" alt="JLCPCB's form: PCB Thickness 1.6mm and Surface Finish LeadFree HASL selected" width="800" height="242" loading="lazy"></li>
       <li><b>Outer Copper Weight: 1 oz</b> (the default; the board's tracks go down to 0.10 mm).
-        <img class="shot" src="img/build/jlc-copper.webp" alt="JLCPCB's form: Outer Copper Weight 1 oz selected" width="800" height="52" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-copper.webp" alt="JLCPCB's form: Outer Copper Weight 1 oz selected" width="800" height="52" loading="lazy"></li>
       <li><b>Confirm Production file: Yes.</b> JLCPCB then shows you what its CAM did to J1 / J4's rings and where its tooling holes go, before it makes the boards. It asks you to confirm within 48 hours: press <b>Confirm</b>, and leave <i>Do not confirm automatically</i> unticked.
-        <img class="shot" src="img/build/jlc-confirm.webp" alt="JLCPCB's form: Confirm Production file Yes selected" width="800" height="52" loading="lazy">
-        <img class="shot" src="img/build/jlc-confirm-dialog.webp" alt="JLCPCB's Confirm Production file dialog: confirm within 48 hours, the Confirm button" width="662" height="194" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-confirm.webp" alt="JLCPCB's form: Confirm Production file Yes selected" width="800" height="52" loading="lazy">
+        <img class="shot" src="img/mini3/jlc-confirm-dialog.webp" alt="JLCPCB's Confirm Production file dialog: confirm within 48 hours, the Confirm button" width="662" height="194" loading="lazy"></li>
       <li><b>PCB Remark.</b> Open <b>Advanced Options</b>, press the pencil next to PCB Remark and paste:
         <pre>J1 / J4 GCT USB4085: 0.40 mm holes in 0.65 mm pads and 0.44-0.45 mm hole spacing as in the maker's recommended layout; please do not enlarge the pads or reduce the holes; breakout acceptable</pre>
-        <img class="shot" src="img/build/jlc-remark.webp" alt="JLCPCB's PCB Remark box with the text about J1 and J4's holes and pads" width="800" height="160" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-remark.webp" alt="JLCPCB's PCB Remark box with the text about J1 and J4's holes and pads" width="800" height="160" loading="lazy"></li>
       <li><b>Switch on PCB Assembly.</b> Then:<ul><li>tick <b>Assemble bottom side</b> too (the DINs, the jacks and J15 / J16 are underneath),</li><li><b>PCBA Type: Standard</b> (Economic cannot assemble both sides),</li><li><b>Assembly Side: Both Sides</b>,</li><li>PCBA Qty 5, Edge Rails at <i>Added by JLCPCB</i>.</li></ul>
         JLCPCB then says the board grows to 95.5 x 92 mm: it adds two 5 mm edge rails, which come off the boards after (the form offers JLCPCB's depaneling service for that).
-        <img class="shot" src="img/build/jlc-assembly-full.webp" alt="JLCPCB's PCB Assembly section: both sides ticked, PCBA Type Standard, Assembly Side Both Sides, PCBA Qty 5, and the note that the board grows to 95.5 by 92 mm with edge rails" width="800" height="544" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-assembly-full.webp" alt="JLCPCB's PCB Assembly section: both sides ticked, PCBA Type Standard, Assembly Side Both Sides, PCBA Qty 5, and the note that the board grows to 95.5 by 92 mm with edge rails" width="800" height="544" loading="lazy"></li>
       <li><b>Press NEXT and sign in.</b> The steps after this one need a JLCPCB account. (On this panel the assembly lines stay empty: the parts are priced once the BOM is in.)
-        <img class="shot" src="img/build/jlc-next.webp" alt="JLCPCB's price panel with the NEXT button" width="396" height="746" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-next.webp" alt="JLCPCB's price panel with the NEXT button" width="396" height="746" loading="lazy"></li>
       <li><b>Upload the BOM and the CPL.</b> <code>bom.csv</code> as the BOM, <code>cpl.csv</code> as the pick and place file, then <b>Process BOM &amp; CPL</b>.
         <div class="msg PHOTO-TODO">Photo to come: JLCPCB's BOM and CPL upload (fully assembled)</div></li>
       <li><b>Check the parts.</b> Every line of the BOM should find its part.
@@ -404,25 +404,25 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
       <h3>Step by step</h3>
       <ol>
       <li><b>Open the quote page.</b> On <a href="https://cart.jlcpcb.com/quote">cart.jlcpcb.com/quote</a>, press <b>Add gerber file</b> and pick this way's <code>gerbers.zip</code> (as it is, do not unzip it).
-        <img class="shot" src="img/build/jlc-upload.webp" alt="JLCPCB's quote page: the Add gerber file button" width="800" height="197" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-upload.webp" alt="JLCPCB's quote page: the Add gerber file button" width="800" height="197" loading="lazy"></li>
       <li><b>Check what JLCPCB found.</b> Both sides of the board appear, and the line under them reads <i>Detected 2 layer board of 82x95.5mm</i>.
-        <img class="shot" src="img/build/jlc-detected.webp" alt="JLCPCB after the upload: both sides of the board and the line Detected 2 layer board of 82x95.5mm" width="800" height="233" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-detected.webp" alt="JLCPCB after the upload: both sides of the board and the line Detected 2 layer board of 82x95.5mm" width="800" height="233" loading="lazy"></li>
       <li><b>Layers 2, quantity 5.</b> JLCPCB fills in the layers and the size from the files. Leave Base Material at FR-4 and PCB Qty at 5.
-        <img class="shot" src="img/build/jlc-layers.webp" alt="JLCPCB's form: Base Material FR-4, Layers 2, Dimensions 95.5 by 82, PCB Qty 5" width="800" height="207" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-layers.webp" alt="JLCPCB's form: Base Material FR-4, Layers 2, Dimensions 95.5 by 82, PCB Qty 5" width="800" height="207" loading="lazy"></li>
       <li><b>Thickness 1.6 mm, Surface Finish LeadFree HASL.</b> JLCPCB picks OSP by default: change it. Leave the colour and the rest at the defaults.
-        <img class="shot" src="img/build/jlc-thickness-finish.webp" alt="JLCPCB's form: PCB Thickness 1.6mm and Surface Finish LeadFree HASL selected" width="800" height="242" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-thickness-finish.webp" alt="JLCPCB's form: PCB Thickness 1.6mm and Surface Finish LeadFree HASL selected" width="800" height="242" loading="lazy"></li>
       <li><b>Outer Copper Weight: 1 oz</b> (the default; the board's tracks go down to 0.10 mm).
-        <img class="shot" src="img/build/jlc-copper.webp" alt="JLCPCB's form: Outer Copper Weight 1 oz selected" width="800" height="52" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-copper.webp" alt="JLCPCB's form: Outer Copper Weight 1 oz selected" width="800" height="52" loading="lazy"></li>
       <li><b>Confirm Production file: Yes.</b> JLCPCB then shows you what its CAM did to J1 / J4's rings and where its tooling holes go, before it makes the boards. It asks you to confirm within 48 hours: press <b>Confirm</b>, and leave <i>Do not confirm automatically</i> unticked.
-        <img class="shot" src="img/build/jlc-confirm.webp" alt="JLCPCB's form: Confirm Production file Yes selected" width="800" height="52" loading="lazy">
-        <img class="shot" src="img/build/jlc-confirm-dialog.webp" alt="JLCPCB's Confirm Production file dialog: confirm within 48 hours, the Confirm button" width="662" height="194" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-confirm.webp" alt="JLCPCB's form: Confirm Production file Yes selected" width="800" height="52" loading="lazy">
+        <img class="shot" src="img/mini3/jlc-confirm-dialog.webp" alt="JLCPCB's Confirm Production file dialog: confirm within 48 hours, the Confirm button" width="662" height="194" loading="lazy"></li>
       <li><b>PCB Remark.</b> Open <b>Advanced Options</b>, press the pencil next to PCB Remark and paste:
         <pre>J1 / J4 GCT USB4085: 0.40 mm holes in 0.65 mm pads and 0.44-0.45 mm hole spacing as in the maker's recommended layout; please do not enlarge the pads or reduce the holes; breakout acceptable</pre>
-        <img class="shot" src="img/build/jlc-remark.webp" alt="JLCPCB's PCB Remark box with the text about J1 and J4's holes and pads" width="800" height="160" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-remark.webp" alt="JLCPCB's PCB Remark box with the text about J1 and J4's holes and pads" width="800" height="160" loading="lazy"></li>
       <li><b>Switch on PCB Assembly</b> and keep JLCPCB's choices: <b>PCBA Type Economic</b>, <b>Assembly Side Top Side</b>, PCBA Qty 5.
-        <img class="shot" src="img/build/jlc-assembly-default.webp" alt="JLCPCB's PCB Assembly section: top side ticked, PCBA Type Economic, Assembly Side Top Side, PCBA Qty 5" width="800" height="461" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-assembly-default.webp" alt="JLCPCB's PCB Assembly section: top side ticked, PCBA Type Economic, Assembly Side Top Side, PCBA Qty 5" width="800" height="461" loading="lazy"></li>
       <li><b>Press NEXT and sign in.</b> The steps after this one need a JLCPCB account. (On this panel the assembly lines stay empty: the parts are priced once the BOM is in.)
-        <img class="shot" src="img/build/jlc-next.webp" alt="JLCPCB's price panel with the NEXT button" width="396" height="746" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-next.webp" alt="JLCPCB's price panel with the NEXT button" width="396" height="746" loading="lazy"></li>
       <li><b>Upload the BOM and the CPL.</b> <code>bom.csv</code> as the BOM, <code>cpl.csv</code> as the pick and place file, then <b>Process BOM &amp; CPL</b>.
         <div class="msg PHOTO-TODO">Photo to come: JLCPCB's BOM and CPL upload (hand-soldered way)</div></li>
       <li><b>Check the parts.</b> Every line of the BOM should find its part.
@@ -469,11 +469,11 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
     </ul>
     <ol>
       <li><b>Upload the strip's <code>gerbers.zip</code></b> on the quote page. JLCPCB reads <i>Detected 2 layer board of 10x37.06mm</i>.
-        <img class="shot" src="img/build/jlc-strip-detected.webp" alt="JLCPCB after the strip's upload: both sides of the strip with its two rows of 14 holes, Detected 2 layer board of 10x37.06mm" width="800" height="233" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-strip-detected.webp" alt="JLCPCB after the strip's upload: both sides of the strip with its two rows of 14 holes, Detected 2 layer board of 10x37.06mm" width="800" height="233" loading="lazy"></li>
       <li><b>PCB Qty 10</b>, thickness 1.6 mm. (The files name no surface finish for the strip; these screenshots use LeadFree HASL, like the board.)
-        <img class="shot" src="img/build/jlc-strip-qty.webp" alt="JLCPCB's form for the strip: Layers 2, Dimensions 37.06 by 10, PCB Qty 10" width="800" height="207" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-strip-qty.webp" alt="JLCPCB's form for the strip: Layers 2, Dimensions 37.06 by 10, PCB Qty 10" width="800" height="207" loading="lazy"></li>
       <li><b>Assembled strips only: switch on PCB Assembly</b>, Economic, Top Side, PCBA Qty 10; then NEXT, sign in, upload the strip's <code>bom.csv</code> and <code>cpl.csv</code>. Bare strips: no assembly, press SAVE TO CART.
-        <img class="shot" src="img/build/jlc-strip-assembly.webp" alt="JLCPCB's PCB Assembly section for the strip: PCBA Type Economic, Top Side, PCBA Qty 10" width="800" height="461" loading="lazy"></li>
+        <img class="shot" src="img/mini3/jlc-strip-assembly.webp" alt="JLCPCB's PCB Assembly section for the strip: PCBA Type Economic, Top Side, PCBA Qty 10" width="800" height="461" loading="lazy"></li>
     </ol>
     <div class="msg PHOTO-TODO">Photo to come: a bridge strip with its two sockets</div>
   </section>
@@ -482,8 +482,8 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
     <h2>Print the case</h2>
     <p>Three parts: the <b>shell</b> (the face and the four walls), the flat <b>lid</b> underneath, and the <b>D-pad cap</b>. The face's labels and the cap's symbols are inlaid in a second colour (a multi-material printer).</p>
     <div class="pics">
-      <img src="img/build/box-assembly.webp" alt="The closed case, rendered, seen from the front left: the screen window, the D-pad cap, the sockets in the walls" width="1600" height="1200" loading="lazy">
-      <img src="img/build/box-exploded.webp" alt="The case taken apart, rendered: the shell with the cap above it, our board, the lid with its rails and the cell below" width="1600" height="1200" loading="lazy">
+      <img src="img/mini3/box-assembly.webp" alt="The closed case, rendered, seen from the front left: the screen window, the D-pad cap, the sockets in the walls" width="1600" height="1200" loading="lazy">
+      <img src="img/mini3/box-exploded.webp" alt="The case taken apart, rendered: the shell with the cap above it, our board, the lid with its rails and the cell below" width="1600" height="1200" loading="lazy">
     </div>
     <h3>Bambu Studio projects (ready to slice)</h3>
     <ul>
@@ -499,8 +499,8 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
     </ul>
     <p>They are exported the way the parts sit in the device: turn them in the slicer (the shell face down, the lid outside down, the cap top down), and load each part with its inlays as one multi-part object so they stay aligned. The source: <a href="https://github.com/w0ts/jank/blob/main/hardware/jank-mini-3/case/box.scad"><code>box.scad</code></a> (OpenSCAD).</p>
     <div class="pics">
-      <img src="img/build/box-top.webp" alt="The case's face from above, rendered: the screen window, the D-pad, the inlaid labels MIDI, ESP, DEVICE, CLK, RST and LINE IN with their triangles" width="1600" height="1300" loading="lazy">
-      <img src="img/build/box-cap-top.webp" alt="The D-pad cap from above, rendered: the up and down triangles, the X on the left arm and the tick on the right arm" width="1200" height="1200" loading="lazy">
+      <img src="img/mini3/box-top.webp" alt="The case's face from above, rendered: the screen window, the D-pad, the inlaid labels MIDI, ESP, DEVICE, CLK, RST and LINE IN with their triangles" width="1600" height="1300" loading="lazy">
+      <img src="img/mini3/box-cap-top.webp" alt="The D-pad cap from above, rendered: the up and down triangles, the X on the left arm and the tick on the right arm" width="1200" height="1200" loading="lazy">
     </div>
     <div class="msg PHOTO-TODO">Photo to come: the printed shell, lid and cap</div>
   </section>
@@ -520,8 +520,8 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
         <div class="msg PHOTO-TODO">Photo to come: the board screwed into the shell, seen from below</div></li>
       <li><b>The power switch</b> snaps into the round hole in the left wall.</li>
       <li><b>The cell</b> lies on the lid in the corner under the right part, pushed against the L-shaped wall, with ~2 mm of rubber or foam on its four held sides. The lead: both wires leave the cell's top end, run left in the channel between the DIN sockets and the L's top arm, and down the gap between the strips and the L's left arm; the black goes on under the LCD-2 to its MX1.25, the red to the switch and up along the left wall to the MX1.25. Plug it into the LCD-2 (polarity checked).
-        <img src="img/build/box-inside.webp" alt="The lid with the parts under the board, rendered: the strip rails, the cell in its corner behind the L, the screw tabs, the hook and the power switch" width="1600" height="1200" loading="lazy">
-        <img src="img/build/floor-map.webp" alt="The case floor from above, drawn: the parts under the board, the strips, the cell with its rubber gap, the L, the screw tabs, the hook, the power switch and the cell's lead route with its lengths" width="844" height="986" loading="lazy">
+        <img src="img/mini3/box-inside.webp" alt="The lid with the parts under the board, rendered: the strip rails, the cell in its corner behind the L, the screw tabs, the hook and the power switch" width="1600" height="1200" loading="lazy">
+        <img src="img/mini3/floor-map.webp" alt="The case floor from above, drawn: the parts under the board, the strips, the cell with its rubber gap, the L, the screw tabs, the hook, the power switch and the cell's lead route with its lengths" width="844" height="986" loading="lazy">
         <div class="msg PHOTO-TODO">Photo to come: the cell in its corner and the lead routed to the switch and the LCD-2</div></li>
       <li><b>Close it.</b> Hook the lid's right side in first (tilted), swing the left side up, then the two M3 x 6 countersunk screws sideways through the walls (one in the bottom wall, one in the left wall).
         <div class="msg PHOTO-TODO">Photo to come: the finished jank mini 3</div></li>

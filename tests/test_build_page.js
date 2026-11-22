@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // The Build page (page/build.html, published as build.html): build the jank mini 3. Its tab in the site's header, the
 // work-in-progress warning at the top, no noindex, the two ways to have the board made (two in-page tabs), every picture
-// shown exists and every picture in page/img/build/ is shown, alt texts, the download links name files that exist on
+// shown exists and every picture in page/img/mini3/ is shown, alt texts, the download links name files that exist on
 // main, the hand-solder table equals fab/default/hand.csv, and the photos still to come are listed.
 'use strict';
 const assert = require('assert');
@@ -30,20 +30,20 @@ ok(/class="[^"]*\bwip\b/.test(first[2]) && /role="alert"/.test(first[2]), 'the w
 ok(/work in progress/i.test(first[3]) && /not (been )?ordered/i.test(first[3]) && /not (been )?tested/i.test(first[3]) && /own risk/i.test(first[3]), 'the warning says: work in progress, not ordered, not tested, own risk');
 
 // pictures
-const IMG = path.join(root, 'page', 'img', 'build');
+const IMG = path.join(root, 'page', 'img', 'mini3');
 const imgs = [...html.matchAll(/<img\b([^>]*)>/g)].map(m => m[1]);
 const shown = new Set();
 for (const a of imgs) {
   const src = (a.match(/\bsrc="([^"]+)"/) || [])[1];
   const alt = (a.match(/\balt="([^"]*)"/) || [])[1];
   ok(src && alt && alt.length > 15, `img ${src}: an alt text`);
-  if (!src.startsWith('img/build/')) continue;
+  if (!src.startsWith('img/mini3/')) continue;
   ok(fs.existsSync(path.join(root, 'page', src)), `${src} exists`);
   ok(/\bwidth="\d+"/.test(a) && /\bheight="\d+"/.test(a) && /loading="lazy"/.test(a), `${src}: width, height, lazy`);
   if (/\/jlc-/.test(src)) ok(/class="shot"/.test(a), `${src}: framed as a screenshot`);
   shown.add(path.basename(src));
 }
-for (const f of fs.readdirSync(IMG)) ok(shown.has(f), `page/img/build/${f} is shown on the page`);
+for (const f of fs.readdirSync(IMG)) ok(shown.has(f), `page/img/mini3/${f} is shown on the page`);
 
 // download links: raw / blob / tree on main name paths that exist in the repo
 const GH = 'https://github.com/w0ts/jank/';
@@ -81,7 +81,7 @@ const split = line => {   // one CSV line: fields, quotes removed
   }
   return [...out, cur];
 };
-const csv = fs.readFileSync(path.join(root, 'hardware/jank-mini-3/fab/default/hand.csv'), 'utf8').trim().split('\n').slice(1).map(split);
+const csv = fs.readFileSync(path.join(root, 'hardware/jank-mini-3/fab/default/hand.csv'), 'utf8').trim().split(/\r?\n/).slice(1).map(split);
 const parts = csv.filter(r => r[3]).map(r => [r[0], r[3], r[4]].join(' '));
 const table = hand.match(/<table class="hand">([\s\S]*?)<\/table>/);
 ok(table, 'the hand panel has the hand-solder table');
