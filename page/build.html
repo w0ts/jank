@@ -480,29 +480,24 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
 
   <section id="case">
     <h2>Print the case</h2>
-    <p>Three parts: the <b>shell</b> (the face and the four walls), the flat <b>lid</b> underneath, and the <b>D-pad cap</b>. The face's labels and the cap's symbols are inlaid in a second colour (a multi-material printer).</p>
+    <p>Three parts: the <b>top part</b> (the face and the walls down to the joint), the <b>bottom part</b> (the floor and the walls up to it) and the <b>D-pad cap</b>. Four screws from underneath hold the bottom part, our board and the top part together. The face's labels and the cap's symbols are inlaid in a second colour (a multi-material printer).</p>
     <div class="pics">
       <img src="img/mini3/box-assembly.webp" alt="The closed case, rendered, seen from the front left: the screen window, the D-pad cap, the sockets in the walls" width="1600" height="1200" loading="lazy">
       <img src="img/mini3/box-exploded.webp" alt="The case taken apart, rendered: the top part with the cap above it, our board, the bottom part with the strips, the cell and the power switch" width="1600" height="1200" loading="lazy">
     </div>
     <h3>Bambu Studio projects (ready to slice)</h3>
     <ul>
-      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-shell-0.2.3mf"><code>box-shell-0.2.3mf</code></a>: the shell, black, face down, the labels pink. <b>0.2 mm nozzle</b>, 0.10 mm Standard (the labels' strokes are about 0.37 mm, under a 0.4 nozzle's line).</li>
-      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-lid-cap-0.4.3mf"><code>box-lid-cap-0.4.3mf</code></a>: plate 1 the lid (black, outside down), plate 2 the D-pad cap (grey, top down, the symbols pink). <b>0.4 mm nozzle</b>, 0.20 mm Standard.</li>
+      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box2-top-0.2.3mf"><code>box2-top-0.2.3mf</code></a>: the top part, black, face down, the labels pink. <b>0.2 mm nozzle</b>, 0.10 mm Standard (the labels' strokes are finer than a 0.4 nozzle's line).</li>
+      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box2-bottom-cap-0.4.3mf"><code>box2-bottom-cap-0.4.3mf</code></a>: plate 1 the bottom part (black, outside down), plate 2 the D-pad cap (grey, top down, the symbols pink). <b>0.4 mm nozzle</b>, 0.20 mm Standard.</li>
     </ul>
     <p>Both: Bambu PLA Basic (filament 1 black, 2 pink, 3 grey), Textured PEI plate. PLA softens from about 55 °C: keep the device out of a hot car and out of the sun.</p>
-    <h3>Or the STLs, for any slicer</h3>
-    <ul>
-      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-shell.stl"><code>box-shell.stl</code></a> + <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-shell-labels.stl"><code>box-shell-labels.stl</code></a> (the labels, second colour)</li>
-      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-lid.stl"><code>box-lid.stl</code></a></li>
-      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-cap.stl"><code>box-cap.stl</code></a> + <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-cap-symbols.stl"><code>box-cap-symbols.stl</code></a> (the symbols, second colour)</li>
-    </ul>
-    <p>They are exported the way the parts sit in the device: turn them in the slicer (the shell face down, the lid outside down, the cap top down), and load each part with its inlays as one multi-part object so they stay aligned. The source: <a href="https://github.com/w0ts/jank/blob/main/hardware/jank-mini-3/case/box.scad"><code>box.scad</code></a> (OpenSCAD).</p>
+    <h3>Or STLs, for any slicer</h3>
+    <p>Export them from the source, <a href="https://github.com/w0ts/jank/blob/main/hardware/jank-mini-3/case/box2.scad"><code>box2.scad</code></a> (OpenSCAD): <code>openscad -D 'part="top_part"' -o top.stl box2.scad</code>, and the same with <code>bottom_part</code>, <code>cap</code>, <code>shell_labels</code> (the face's labels) and <code>cap_symbols</code>. They come out the way the parts sit in the device: print the top part face down, the bottom part outside down, the cap top down, and load each part with its inlays as one multi-part object so they stay aligned.</p>
     <div class="pics">
       <img src="img/mini3/box-top.webp" alt="The case's face from above, rendered: the screen window, the D-pad, the inlaid labels MIDI, ESP, DEVICE, CLK, RST and LINE IN with their triangles" width="1600" height="1300" loading="lazy">
       <img src="img/mini3/box-cap-top.webp" alt="The D-pad cap from above, rendered: the up and down triangles, the X on the left arm and the tick on the right arm" width="1200" height="1200" loading="lazy">
     </div>
-    <div class="msg PHOTO-TODO">Photo to come: the printed shell, lid and cap</div>
+    <div class="msg PHOTO-TODO">Photo to come: the printed top part, bottom part and cap</div>
   </section>
 
   <section id="together">
@@ -510,20 +505,20 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
     <ol>
       <li><b>Before the first power-up:</b> check U19 (CJ431) against LCSC's picture of its pin order (1 REF, 2 K, 3 A), and power the board the first time from a current-limited supply.</li>
       <li><b>The strips</b> (bare ones): solder the two sockets into each strip.</li>
-      <li><b>The cell's lead.</b> Solder the PH2.0 pigtail (for the cell's plug) to the MX1.25 2-pin pigtail, red to red, and heat-shrink the joints; the power switch goes in the red wire: cell, switch, MX1.25. MX1.25 pigtail colours vary: <b>meter which pin is + and check it lands on the LCD-2's pin 1 (VBAT)</b> before the first plug-in. Inside the case the red wire runs about 182 mm (cell to switch to the LCD-2), the black about 87 mm: make them long enough, with some slack.
+      <li><b>The cell's lead.</b> Solder the PH2.0 pigtail (for the cell's plug) to the MX1.25 2-pin pigtail, red to red, and heat-shrink the joints; the power switch goes in the red wire: cell, switch, MX1.25. MX1.25 pigtail colours vary: <b>meter which pin is + and check it lands on the LCD-2's pin 1 (VBAT)</b> before the first plug-in. Leave the wires long enough to reach from the cell to the switch in the bottom wall and to the LCD-2, with some slack.
         <div class="msg PHOTO-TODO">Photo to come: the adapter lead with the power switch in its red wire</div></li>
-      <li><b>The inserts.</b> 4 x M2 into the bosses under the shell's face, 2 x M3 into the lid's two screw tabs, from the wall side.
-        <div class="msg PHOTO-TODO">Photo to come: the inserts in the shell's bosses and in the lid's tabs</div></li>
+      <li><b>The inserts.</b> 4 x M2 heat-set inserts (M2 x 4) pressed from below into the bosses under the top part's face.
+        <div class="msg PHOTO-TODO">Photo to come: the inserts in the top part's bosses</div></li>
       <li><b>The LCD-2 on the board.</b> Plug the strips onto the LCD-2's pins and onto J15 / J16 (J15 takes the LCD-2's row P1, J16 the row P2, pin 14 at the USB end). The LCD-2 sits in the notch, its board level with ours.
         <div class="msg PHOTO-TODO">Photo to come: the LCD-2 on our board with the two strips</div></li>
-      <li><b>The cap, then the board, into the shell.</b> The D-pad cap goes into its cross-shaped opening from inside (its flange stays under the face). Then the board, with the LCD-2 and the strips on it, drops into the shell from below: 4 screws M2 x 5 through its holes into the bosses. Do this before the power switch is in: with the switch fitted, a screwdriver cannot reach the hole next to it.
-        <div class="msg PHOTO-TODO">Photo to come: the board screwed into the shell, seen from below</div></li>
-      <li><b>The power switch</b> snaps into the round hole in the left wall.</li>
-      <li><b>The cell</b> lies on the lid in the corner under the right part, pushed against the L-shaped wall, with ~2 mm of rubber or foam on its four held sides. The lead: both wires leave the cell's top end, run left in the channel between the DIN sockets and the L's top arm, and down the gap between the strips and the L's left arm; the black goes on under the LCD-2 to its MX1.25, the red to the switch and up along the left wall to the MX1.25. Plug it into the LCD-2 (polarity checked).
+      <li><b>The cap, then the board, into the top part.</b> The D-pad cap goes into its cross-shaped opening from inside (its flange stays under the face). Then the board, with the LCD-2 and the strips on it, goes into the top part from below, its four holes over the four bosses.
+        <div class="msg PHOTO-TODO">Photo to come: the board in the top part, seen from below</div></li>
+      <li><b>The cell</b> goes into the bottom part, in its corner: against its own wall and the bottom wall, the L at its top-left corner, with 2 mm of rubber or foam on its held sides. Route its lead to the power switch's place in the bottom wall and to the LCD-2's battery connector.
         <img src="img/mini3/box-inside.webp" alt="The bottom part with the parts under the board, rendered: the strips in their rails, the cell in its corner behind its own wall, the screw tubes" width="1600" height="1200" loading="lazy">
-        <img src="img/mini3/floor-map.webp" alt="The case floor from above, drawn: the parts under the board, the strips, the cell with its rubber gap, the L, the screw tabs, the hook, the power switch and the cell's lead route with its lengths" width="844" height="986" loading="lazy">
+        <img src="img/mini3/floor-map.webp" alt="The bottom part from above, rendered from box2.scad: the two strips (teal), the cell (blue), the power switch in the bottom wall (black), the parts under our board (grey) and the four screw tubes (dots)" width="1200" height="1100" loading="lazy">
         <div class="msg PHOTO-TODO">Photo to come: the cell in its corner and the lead routed to the switch and the LCD-2</div></li>
-      <li><b>Close it.</b> Hook the lid's right side in first (tilted), swing the left side up, then the two M3 x 6 countersunk screws sideways through the walls (one in the bottom wall, one in the left wall).
+      <li><b>Close it.</b> Put the bottom part on: its inner lip rises inside the top part's outer skirt, which aligns them. Then four M2 x 6 screws from under the box, up the four screw tubes (a PH1 screwdriver fits): each head sits on its tube's shoulder, and the screw goes through our board into the face boss's insert.</li>
+      <li><b>The power switch</b> snaps into the round hole in the bottom wall, last.
         <div class="msg PHOTO-TODO">Photo to come: the finished jank mini 3</div></li>
     </ol>
   </section>

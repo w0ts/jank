@@ -56,9 +56,11 @@ for (const l of links) {
 const raw = new Set(links.filter(l => l.includes('/raw/main/')).map(l => l.slice((GH + 'raw/main/').length)));
 for (const f of ['fab/full/gerbers.zip', 'fab/full/bom.csv', 'fab/full/cpl.csv', 'fab/default/gerbers.zip', 'fab/default/bom.csv',
   'fab/default/cpl.csv', 'fab/default/hand.csv', 'fab/default/lcsc-order.txt', 'strip/fab/bare/gerbers.zip',
-  'strip/fab/assembled/gerbers.zip', 'strip/fab/assembled/bom.csv', 'strip/fab/assembled/cpl.csv', 'case/box-shell.stl',
-  'case/box-shell-labels.stl', 'case/box-lid.stl', 'case/box-cap.stl', 'case/box-cap-symbols.stl', 'case/box-shell-0.2.3mf',
-  'case/box-lid-cap-0.4.3mf']) ok(raw.has('hardware/jank-mini-3/' + f), `a download link to ${f}`);
+  'strip/fab/assembled/gerbers.zip', 'strip/fab/assembled/bom.csv', 'strip/fab/assembled/cpl.csv',
+  'case/box2-top-0.2.3mf', 'case/box2-bottom-cap-0.4.3mf']) ok(raw.has('hardware/jank-mini-3/' + f), `a download link to ${f}`);
+// the case is box2 (top and bottom parts, screwed from below): its source is linked, the old box's files are not
+ok(html.includes('hardware/jank-mini-3/case/box2.scad'), 'the case section links box2.scad');
+ok(!/box-shell|box-lid|box\.scad/.test(html), 'no file of the old box (box.scad: shell and lid) is named');
 ok(html.includes('href="https://www.waveshare.com/esp32-s3-lcd-2.htm"'), "the LCD-2 links Waveshare's own page");
 
 // the two ways: an in-page tab list with two tabs, each with its panel and its folder's files
