@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// jank-mini-3 box, REDESIGN STAGE 1 (Claude, 2026-11-20, pictures for mots's OK; box.scad stays the current design):
+// jank-mini-3 box: THE CURRENT DESIGN (mots, 2026-11-22; box.scad, the one-piece shell and lid, is the older one, kept for reference):
 // a TOP part (the face and the walls down to a stepped parting line) and a BOTTOM part (the floor and the walls up to
 // it), screwed together, plus the printed cross D-pad cap. FDM, PLA, 0.4 mm nozzle, 0.2 mm layers.
 // mots (2026-11-20): "the join line between top and bottom at the middle of each hole (except the power switch hole)",
