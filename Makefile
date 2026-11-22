@@ -3,7 +3,7 @@
 #   make flash [IMAGE=path.bin]       build, then install the new image on the running stick: the JANK drive if mounted, else MIDI
 #                                     (ota.py). With IMAGE=path.bin: install that file, no build.
 #   make page                         expand page/src/*.html (+ ui/*) into page/: jank.html (the Device page, the file the firmware
-#                                     embeds), index.html (About), install.html
+#                                     embeds), index.html (About), install.html, build.html (Build: lists the photos still to come)
 #   make publish-page                 publish the COMMITTED pages to https://w0ts.github.io/jank/ (only gh-pages is pushed)
 #   make build                        build the XIAO firmware (scripts/build.sh xiao)
 # FW names the firmware checkout, BEAT the beat folder; both default to this checkout (main).
@@ -32,7 +32,7 @@ flash: $(FLASH_DEPS)
 build:
 	cd $(FW) && bash scripts/build.sh xiao
 
-page: page/jank.html page/index.html page/install.html
+page: page/jank.html page/index.html page/install.html page/build.html
 
 page/jank.html: page/src/jank.html $(wildcard ui/*) scripts/inline_ui.py
 	python3 scripts/inline_ui.py page/src/jank.html -o page/jank.html
@@ -42,6 +42,10 @@ page/index.html: page/src/index.html ui/common.css scripts/inline_ui.py
 
 page/install.html: page/src/install.html ui/common.css scripts/inline_ui.py
 	python3 scripts/inline_ui.py page/src/install.html -o page/install.html
+
+page/build.html: page/src/build.html $(wildcard page/src/buildparts/*) ui/common.css scripts/inline_ui.py scripts/photo_todo.py
+	python3 scripts/inline_ui.py page/src/build.html -o page/build.html
+	python3 scripts/photo_todo.py page/build.html
 
 # the committed pages to https://w0ts.github.io/jank/ (gh-pages: only the pages; main is not pushed)
 publish-page:

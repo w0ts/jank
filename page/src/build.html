@@ -1,0 +1,257 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jank · Build</title>
+<meta name="description" content="Build a jank mini 3: the Waveshare ESP32-S3-LCD-2, our board from JLCPCB, a 3D printed case.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Cg transform='translate(2.7 6.2) scale(1.4)' fill='none' stroke='%23A06CF0' stroke-width='2'%3E%3Crect x='1' y='1' width='10' height='6' rx='1.5'/%3E%3Crect x='8' y='7' width='10' height='6' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+<!--@include ui/common.css-->
+:root { --accent: #9770c6; --accent-text-l: #8253ba; --accent-text-d: #a380d0; }
+/* the info pages' own: */
+main > section h2 { margin-top: 0; }
+main img { max-width: 100%; height: auto; border-radius: var(--r-ctl); display: block; margin: 8px 0; }
+main img.shot { border: 1px solid var(--line); }
+main ul, main ol { margin: 8px 0; padding-left: 22px; }
+main li { margin: 6px 0; }
+pre { white-space: pre-wrap; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; display: block; overflow-x: auto; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--dim); font-weight: 600; font-size: 13px; }
+/* the build page's own: */
+.wip { border: 2px solid var(--err); background: var(--err-soft); border-radius: var(--r); padding: 14px 16px; margin-bottom: 12px; font-size: 16px; }
+.wip b:first-child { display: block; font-size: 20px; color: var(--err); margin-bottom: 4px; }
+.pics { display: flex; flex-wrap: wrap; gap: 12px; }
+.pics img { width: calc(50% - 6px); min-width: 260px; flex: 1 1 260px; }
+.PHOTO-TODO { border: 2px dashed currentColor; border-left-width: 2px; padding: 1.2em; margin: 8px 0; opacity: .7; border-radius: var(--r-ctl); }
+.tabs[role="tablist"] { margin: 8px 0 12px; }
+.tabs[role="tablist"] button { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <header class="site">
+    <div class="titlebar"><h1><a href="https://w0ts.github.io/">w0ts</a> / Jank</h1></div>
+    <nav class="site" aria-label="Jank pages"><a href="./">About</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="install.html">Install</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="device.html">Device</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="build.html" aria-current="page">Build</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="https://github.com/w0ts/jank" aria-label="GitHub" title="The Jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></nav>
+  </header>
+
+  <div class="wip" role="alert"><b>Work in progress</b>The jank mini 3 board has not been ordered and has not been tested yet: nobody has built one from these files. The case is a first design. Use everything on this page at your own risk.</div>
+
+  <section>
+    <h2>Build a jank mini 3</h2>
+    <p>The jank mini 3 is a <a href="https://www.waveshare.com/esp32-s3-lcd-2.htm">Waveshare ESP32-S3-LCD-2</a> (the ESP32-S3 with its 2 inch colour screen) on our board, in a printed box. Our board brings the MIDI outs (TRS + DIN each), the clock and reset outs, the line in, the USB port for gear and the D-pad. The LCD-2 sits in our board's notch; two small bridge strips join its pins to ours from below. Nothing is soldered between them: the LCD-2 stays removable. A 2000 mAh LiPo cell lies on the case floor.</p>
+    <div class="pics">
+      <img src="img/build/board-top.webp" alt="Our board from above, rendered: the notch for the LCD-2 on the left, the D-pad switches, the USB-C pair at the top edge" width="1568" height="1064" loading="lazy">
+      <img src="img/build/board-3d.webp" alt="Our board rendered in 3D, from above at an angle: the notch, the D-pad switches, the sockets along the edges" width="1568" height="1176" loading="lazy">
+      <img src="img/build/board-bottom.webp" alt="Our board from below, rendered: the two DIN sockets, the jacks and the two header rows J15 and J16 along the notch" width="1568" height="1064" loading="lazy">
+    </div>
+    <p>The steps: buy the LCD-2 and the other parts, order our board and the strips from JLCPCB, print the case, put it together, install the firmware. The design files: <a href="https://github.com/w0ts/jank/tree/main/hardware/jank-mini-3">hardware/jank-mini-3/</a> (its <a href="https://github.com/w0ts/jank/blob/main/hardware/jank-mini-3/README.md">README</a>, the <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/lcd2-schematic.pdf">schematic</a>, the case's <a href="https://github.com/w0ts/jank/blob/main/hardware/jank-mini-3/case/BOX.md">BOX.md</a>).</p>
+  </section>
+
+  <section>
+    <h2>What you need</h2>
+    <table>
+      <tr><th>What</th><th>Where</th><th>Notes</th></tr>
+      <tr><td><b>Waveshare ESP32-S3-LCD-2</b> (sku 30306)</td><td><a href="https://www.waveshare.com/esp32-s3-lcd-2.htm">Waveshare</a></td><td>The ESP32-S3 with the screen. It charges the cell.</td></tr>
+      <tr><td><b>Our board</b></td><td>JLCPCB (below)</td><td>5 boards is the order the files are set up for. Two ways: fully assembled by JLCPCB, or JLCPCB fits the small parts and you solder the USB-C and through-hole parts.</td></tr>
+      <tr><td><b>2 bridge strips</b> per device</td><td>JLCPCB (below)</td><td>Bare (plus 2 sockets each, from LCSC) or assembled.</td></tr>
+      <tr><td><b>One LiPo cell: EEMB LP103454</b>, 2000 mAh, 1S, 34.5 x 56 x 10.6 mm</td><td></td><td><b>It must have its own protection circuit (PCM):</b> nothing on the LCD-2 or on our board protects the cell. Its plug: JST PHR-02 (PH2.0).</td></tr>
+      <tr><td><b>An adapter lead</b> for the cell</td><td>made by hand</td><td>A PH2.0 pigtail that mates with the cell's plug, soldered to an MX1.25 (Molex PicoBlade 51021 type) 2-pin pigtail for the LCD-2's battery connector. See <a href="#together">Put it together</a>.</td></tr>
+      <tr><td><b>Power switch: YIZHI KCD1-106S-B</b> (LCSC C52125269)</td><td>LCSC</td><td>A round snap-in rocker, in the case's left wall, in the cell's red wire.</td></tr>
+      <tr><td><b>Brass heat-set inserts:</b> 4 x M2 x 4.0 (OD ~3.6), 2 x M3 x 4.0 (OD ~4.6)</td><td></td><td>Check the hole sizes (3.2 / 4.0 mm in the print) against the maker's sheet of the inserts you buy.</td></tr>
+      <tr><td><b>Screws:</b> 4 x M2 x 5 pan head (ISO 7045), 2 x M3 x 6 countersunk (ISO 10642)</td><td></td><td>M2: the board to the case. M3: the lid, sideways through the walls.</td></tr>
+      <tr><td><b>Filament</b></td><td></td><td>The print projects use Bambu PLA Basic in black, pink and grey (two-colour labels and symbols).</td></tr>
+      <tr><td><b>Rubber or foam strip</b>, ~2 mm</td><td></td><td>Round the cell in its corner.</td></tr>
+      <tr><td><b>A short USB-C cable</b></td><td></td><td>Only for USB host mode (gear with a USB port), outside the box: see <a href="#firmware">The firmware</a>.</td></tr>
+    </table>
+  </section>
+
+  <section id="order">
+    <h2>Order the board from JLCPCB</h2>
+    <p>Two ways to have it made. The board is the same; the files differ in what JLCPCB solders.</p>
+    <div class="tabs" role="tablist" aria-label="How the board is made">
+      <button type="button" role="tab" id="tab-full" aria-selected="true" aria-controls="way-full">Fully assembled by JLCPCB</button>
+      <button type="button" role="tab" id="tab-hand" aria-selected="false" aria-controls="way-hand" tabindex="-1">USB-C + through-hole by hand</button>
+    </div>
+
+    <div id="way-full" role="tabpanel" aria-labelledby="tab-full">
+      <p><b>JLCPCB solders everything</b>: the small parts on top, the two USB-C sockets J1 / J4, and under the board the DIN sockets, the jacks and the header rows J15 / J16 (Standard assembly, both sides). No soldering on the board for you.</p>
+      <h3>The files (folder <a href="https://github.com/w0ts/jank/tree/main/hardware/jank-mini-3/fab/full">fab/full/</a>)</h3>
+      <ul>
+        <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/fab/full/gerbers.zip"><code>gerbers.zip</code></a>: the board (upload it as it is).</li>
+        <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/fab/full/bom.csv"><code>bom.csv</code></a>: the parts list (BOM).</li>
+        <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/fab/full/cpl.csv"><code>cpl.csv</code></a>: where each part goes (pick and place, CPL).</li>
+      </ul>
+      <h3>Step by step</h3>
+      <ol>
+<!--@include page/src/buildparts/jlc-board.html-->
+      <li><b>Switch on PCB Assembly.</b> Then:<ul><li>tick <b>Assemble bottom side</b> too (the DINs, the jacks and J15 / J16 are underneath),</li><li><b>PCBA Type: Standard</b> (Economic cannot assemble both sides),</li><li><b>Assembly Side: Both Sides</b>,</li><li>PCBA Qty 5, Edge Rails at <i>Added by JLCPCB</i>.</li></ul>
+        JLCPCB then says the board grows to 95.5 x 92 mm: it adds two 5 mm edge rails, which come off the boards after (the form offers JLCPCB's depaneling service for that).
+        <img class="shot" src="img/build/jlc-assembly-full.webp" alt="JLCPCB's PCB Assembly section: both sides ticked, PCBA Type Standard, Assembly Side Both Sides, PCBA Qty 5, and the note that the board grows to 95.5 by 92 mm with edge rails" width="800" height="544" loading="lazy"></li>
+<!--@include page/src/buildparts/jlc-next.html-->
+      <li><b>Upload the BOM and the CPL.</b> <code>bom.csv</code> as the BOM, <code>cpl.csv</code> as the pick and place file, then <b>Process BOM &amp; CPL</b>.
+        <div class="msg PHOTO-TODO">Photo to come: JLCPCB's BOM and CPL upload (fully assembled)</div></li>
+      <li><b>Check the parts.</b> Every line of the BOM should find its part.
+        <div class="msg PHOTO-TODO">Photo to come: JLCPCB's parts list, every part found (fully assembled)</div></li>
+      <li><b>Check the placement of every part.</b> J1 / J4's position and rotation, and the rotation of every part under the board: those come from KiCad as they are.
+        <div class="msg PHOTO-TODO">Photo to come: JLCPCB's placement preview, the bottom side with the DINs, jacks and J15 / J16</div></li>
+      <li><b>Save to cart and order.</b> Pay, and JLCPCB makes, assembles and ships the boards.</li>
+      </ol>
+    </div><!-- /panel -->
+
+    <div id="way-hand" role="tabpanel" aria-labelledby="tab-hand" hidden>
+      <p><b>JLCPCB fits the small parts on top</b> (Economic assembly, top side). <b>You solder the through-hole parts</b>: the two USB-C sockets J1 / J4 (from below), the DIN sockets, the jacks and the header rows J15 / J16. You buy those parts from LCSC.</p>
+      <h3>The files (folder <a href="https://github.com/w0ts/jank/tree/main/hardware/jank-mini-3/fab/default">fab/default/</a>)</h3>
+      <ul>
+        <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/fab/default/gerbers.zip"><code>gerbers.zip</code></a>: the board (upload it as it is).</li>
+        <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/fab/default/bom.csv"><code>bom.csv</code></a>: the parts JLCPCB fits (BOM).</li>
+        <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/fab/default/cpl.csv"><code>cpl.csv</code></a>: where each part goes (pick and place, CPL).</li>
+        <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/fab/default/hand.csv"><code>hand.csv</code></a>: the parts you solder (the table below).</li>
+        <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/fab/default/lcsc-order.txt"><code>lcsc-order.txt</code></a>: those parts as LCSC part number, quantity: for 5 devices with bare strips, plus spares (2 USB-C, 4 sockets, 2 of each jack, DIN and header). Paste it into LCSC's Quick Order.</li>
+      </ul>
+      <h3>Step by step</h3>
+      <ol>
+<!--@include page/src/buildparts/jlc-board.html-->
+      <li><b>Switch on PCB Assembly</b> and keep JLCPCB's choices: <b>PCBA Type Economic</b>, <b>Assembly Side Top Side</b>, PCBA Qty 5.
+        <img class="shot" src="img/build/jlc-assembly-default.webp" alt="JLCPCB's PCB Assembly section: top side ticked, PCBA Type Economic, Assembly Side Top Side, PCBA Qty 5" width="800" height="461" loading="lazy"></li>
+<!--@include page/src/buildparts/jlc-next.html-->
+      <li><b>Upload the BOM and the CPL.</b> <code>bom.csv</code> as the BOM, <code>cpl.csv</code> as the pick and place file, then <b>Process BOM &amp; CPL</b>.
+        <div class="msg PHOTO-TODO">Photo to come: JLCPCB's BOM and CPL upload (hand-soldered way)</div></li>
+      <li><b>Check the parts.</b> Every line of the BOM should find its part.
+        <div class="msg PHOTO-TODO">Photo to come: JLCPCB's parts list, every part found (hand-soldered way)</div></li>
+      <li><b>Check the placement</b> of the polarised parts on top in the preview.
+        <div class="msg PHOTO-TODO">Photo to come: JLCPCB's placement preview, the top side</div></li>
+      <li><b>Save to cart and order.</b> Pay, and JLCPCB makes, assembles and ships the boards.</li>
+      </ol>
+      <h3>The parts you solder</h3>
+      <table class="hand">
+        <tr><th>Designator</th><th>Part</th><th>LCSC</th><th>Joints</th></tr>
+        <tr><td>J1</td><td>USB-C TO ESP, GCT USB4085-GF-A</td><td>C7095263</td><td>20</td></tr>
+        <tr><td>J13</td><td>CLOCK jack, PJ-320A</td><td>C18185602</td><td>4</td></tr>
+        <tr><td>J14</td><td>RESET jack, PJ-320A</td><td>C18185602</td><td>4</td></tr>
+        <tr><td>J15</td><td>LCD-2 P1, 1 x 14 male header 2.54 mm</td><td>C2905490</td><td>14</td></tr>
+        <tr><td>J16</td><td>LCD-2 P2, 1 x 14 male header 2.54 mm</td><td>C2905490</td><td>14</td></tr>
+        <tr><td>J2</td><td>MIDI OUT jack, PJ-307C</td><td>C16684</td><td>5</td></tr>
+        <tr><td>J3</td><td>MIDI OUT 2 jack, PJ-307C</td><td>C16684</td><td>5</td></tr>
+        <tr><td>J4</td><td>USB-C TO DEVICE, GCT USB4085-GF-A</td><td>C7095263</td><td>20</td></tr>
+        <tr><td>J5</td><td>MIDI OUT DIN, DIN-504B-M10</td><td>C2939346</td><td>7</td></tr>
+        <tr><td>J6</td><td>MIDI OUT 2 DIN, DIN-504B-M10</td><td>C2939346</td><td>7</td></tr>
+        <tr><td>J7</td><td>LINE IN jack, PJ-307C</td><td>C16684</td><td>5</td></tr>
+        <tr><td>STRIP-J1,J2 x2</td><td>1 x 14 female socket 8.5 mm, 2 per strip (bare strips only)</td><td>C2905420</td><td>56</td></tr>
+      </table>
+      <h3>When the boards arrive: solder</h3>
+      <ol>
+        <li><b>J1 / J4 first, from below.</b> Their signal tails end flush with the board's bottom; the front shell legs stop 0.8 mm short of it: fill those slots with solder. A fine tip and flux.
+          <div class="msg PHOTO-TODO">Photo to come: J1 and J4 soldered, seen from below</div></li>
+        <li><b>Meter them</b> before going on: J4's VUSB against GND and against CC1O, J1's VBUS pairs against GND, neighbouring pins against each other (no shorts), and D+ / D- continuity from J1 through U5 to J4.</li>
+        <li><b>The DINs and the jacks</b> (J2, J3, J5, J6, J7, J13, J14), under the board.
+          <div class="msg PHOTO-TODO">Photo to come: the board from below with the DINs and the jacks soldered</div></li>
+        <li><b>J15 / J16 with the LCD-2 as a jig.</b> Put the headers into our board from below, plug a strip and the LCD-2 on, and solder them like that: the 1.2 mm holes would let a loose header sit ~0.3 mm off its row. No cell and no USB on the LCD-2 while you do this. Trim the tails under the board after.
+          <div class="msg PHOTO-TODO">Photo to come: J15 / J16 being soldered with a strip and the LCD-2 plugged on as the jig</div></li>
+      </ol>
+    </div><!-- /panel -->
+  </section>
+
+  <section id="strips">
+    <h2>Order the bridge strips</h2>
+    <p>Each device takes two strips, the same strip twice (turned 180 degrees it serves the other row). A strip is a 37.06 x 10 mm board with two 1 x 14 sockets: one takes the LCD-2's pins, the other our J15 / J16. A separate JLCPCB order, 10 strips for 5 devices, 1.6 mm thick. Two ways again:</p>
+    <ul>
+      <li><b>Bare</b>, the PCB only: <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/strip/fab/bare/gerbers.zip"><code>strip/fab/bare/gerbers.zip</code></a>. You solder 2 sockets C2905420 into each strip (they are in <code>lcsc-order.txt</code>; with the fully assembled board, buy 2 per strip from LCSC).</li>
+      <li><b>Assembled</b>, both sockets fitted by JLCPCB (Economic): <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/strip/fab/assembled/gerbers.zip"><code>gerbers.zip</code></a>, <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/strip/fab/assembled/bom.csv"><code>bom.csv</code></a>, <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/strip/fab/assembled/cpl.csv"><code>cpl.csv</code></a> (folder <a href="https://github.com/w0ts/jank/tree/main/hardware/jank-mini-3/strip/fab/assembled">strip/fab/assembled/</a>).</li>
+    </ul>
+    <ol>
+      <li><b>Upload the strip's <code>gerbers.zip</code></b> on the quote page. JLCPCB reads <i>Detected 2 layer board of 10x37.06mm</i>.
+        <img class="shot" src="img/build/jlc-strip-detected.webp" alt="JLCPCB after the strip's upload: both sides of the strip with its two rows of 14 holes, Detected 2 layer board of 10x37.06mm" width="800" height="233" loading="lazy"></li>
+      <li><b>PCB Qty 10</b>, thickness 1.6 mm. (The files name no surface finish for the strip; these screenshots use LeadFree HASL, like the board.)
+        <img class="shot" src="img/build/jlc-strip-qty.webp" alt="JLCPCB's form for the strip: Layers 2, Dimensions 37.06 by 10, PCB Qty 10" width="800" height="207" loading="lazy"></li>
+      <li><b>Assembled strips only: switch on PCB Assembly</b>, Economic, Top Side, PCBA Qty 10; then NEXT, sign in, upload the strip's <code>bom.csv</code> and <code>cpl.csv</code>. Bare strips: no assembly, press SAVE TO CART.
+        <img class="shot" src="img/build/jlc-strip-assembly.webp" alt="JLCPCB's PCB Assembly section for the strip: PCBA Type Economic, Top Side, PCBA Qty 10" width="800" height="461" loading="lazy"></li>
+    </ol>
+    <div class="msg PHOTO-TODO">Photo to come: a bridge strip with its two sockets</div>
+  </section>
+
+  <section id="case">
+    <h2>Print the case</h2>
+    <p>Three parts: the <b>shell</b> (the face and the four walls), the flat <b>lid</b> underneath, and the <b>D-pad cap</b>. The face's labels and the cap's symbols are inlaid in a second colour (a multi-material printer).</p>
+    <div class="pics">
+      <img src="img/build/box-assembly.webp" alt="The closed case, rendered, seen from the front left: the screen window, the D-pad cap, the sockets in the walls" width="1600" height="1200" loading="lazy">
+      <img src="img/build/box-exploded.webp" alt="The case taken apart, rendered: the shell with the cap above it, our board, the lid with its rails and the cell below" width="1600" height="1200" loading="lazy">
+    </div>
+    <h3>Bambu Studio projects (ready to slice)</h3>
+    <ul>
+      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-shell-0.2.3mf"><code>box-shell-0.2.3mf</code></a>: the shell, black, face down, the labels pink. <b>0.2 mm nozzle</b>, 0.10 mm Standard (the labels' strokes are about 0.37 mm, under a 0.4 nozzle's line).</li>
+      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-lid-cap-0.4.3mf"><code>box-lid-cap-0.4.3mf</code></a>: plate 1 the lid (black, outside down), plate 2 the D-pad cap (grey, top down, the symbols pink). <b>0.4 mm nozzle</b>, 0.20 mm Standard.</li>
+    </ul>
+    <p>Both: Bambu PLA Basic (filament 1 black, 2 pink, 3 grey), Textured PEI plate. PLA softens from about 55 °C: keep the device out of a hot car and out of the sun.</p>
+    <h3>Or the STLs, for any slicer</h3>
+    <ul>
+      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-shell.stl"><code>box-shell.stl</code></a> + <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-shell-labels.stl"><code>box-shell-labels.stl</code></a> (the labels, second colour)</li>
+      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-lid.stl"><code>box-lid.stl</code></a></li>
+      <li><a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-cap.stl"><code>box-cap.stl</code></a> + <a href="https://github.com/w0ts/jank/raw/main/hardware/jank-mini-3/case/box-cap-symbols.stl"><code>box-cap-symbols.stl</code></a> (the symbols, second colour)</li>
+    </ul>
+    <p>They are exported the way the parts sit in the device: turn them in the slicer (the shell face down, the lid outside down, the cap top down), and load each part with its inlays as one multi-part object so they stay aligned. The source: <a href="https://github.com/w0ts/jank/blob/main/hardware/jank-mini-3/case/box.scad"><code>box.scad</code></a> (OpenSCAD).</p>
+    <div class="pics">
+      <img src="img/build/box-top.webp" alt="The case's face from above, rendered: the screen window, the D-pad, the inlaid labels MIDI, ESP, DEVICE, CLK, RST and LINE IN with their triangles" width="1600" height="1300" loading="lazy">
+      <img src="img/build/box-cap-top.webp" alt="The D-pad cap from above, rendered: the up and down triangles, the X on the left arm and the tick on the right arm" width="1200" height="1200" loading="lazy">
+    </div>
+    <div class="msg PHOTO-TODO">Photo to come: the printed shell, lid and cap</div>
+  </section>
+
+  <section id="together">
+    <h2>Put it together</h2>
+    <ol>
+      <li><b>Before the first power-up:</b> check U19 (CJ431) against LCSC's picture of its pin order (1 REF, 2 K, 3 A), and power the board the first time from a current-limited supply.</li>
+      <li><b>The strips</b> (bare ones): solder the two sockets into each strip.</li>
+      <li><b>The cell's lead.</b> Solder the PH2.0 pigtail (for the cell's plug) to the MX1.25 2-pin pigtail, red to red, and heat-shrink the joints; the power switch goes in the red wire: cell, switch, MX1.25. MX1.25 pigtail colours vary: <b>meter which pin is + and check it lands on the LCD-2's pin 1 (VBAT)</b> before the first plug-in. Inside the case the red wire runs about 182 mm (cell to switch to the LCD-2), the black about 87 mm: make them long enough, with some slack.
+        <div class="msg PHOTO-TODO">Photo to come: the adapter lead with the power switch in its red wire</div></li>
+      <li><b>The inserts.</b> 4 x M2 into the bosses under the shell's face, 2 x M3 into the lid's two screw tabs, from the wall side.
+        <div class="msg PHOTO-TODO">Photo to come: the inserts in the shell's bosses and in the lid's tabs</div></li>
+      <li><b>The LCD-2 on the board.</b> Plug the strips onto the LCD-2's pins and onto J15 / J16 (J15 takes the LCD-2's row P1, J16 the row P2, pin 14 at the USB end). The LCD-2 sits in the notch, its board level with ours.
+        <div class="msg PHOTO-TODO">Photo to come: the LCD-2 on our board with the two strips</div></li>
+      <li><b>The cap, then the board, into the shell.</b> The D-pad cap goes into its cross-shaped opening from inside (its flange stays under the face). Then the board, with the LCD-2 and the strips on it, drops into the shell from below: 4 screws M2 x 5 through its holes into the bosses. Do this before the power switch is in: with the switch fitted, a screwdriver cannot reach the hole next to it.
+        <div class="msg PHOTO-TODO">Photo to come: the board screwed into the shell, seen from below</div></li>
+      <li><b>The power switch</b> snaps into the round hole in the left wall.</li>
+      <li><b>The cell</b> lies on the lid in the corner under the right part, pushed against the L-shaped wall, with ~2 mm of rubber or foam on its four held sides. The lead: both wires leave the cell's top end, run left in the channel between the DIN sockets and the L's top arm, and down the gap between the strips and the L's left arm; the black goes on under the LCD-2 to its MX1.25, the red to the switch and up along the left wall to the MX1.25. Plug it into the LCD-2 (polarity checked).
+        <img src="img/build/box-inside.webp" alt="The lid with the parts under the board, rendered: the strip rails, the cell in its corner behind the L, the screw tabs, the hook and the power switch" width="1600" height="1200" loading="lazy">
+        <img src="img/build/floor-map.webp" alt="The case floor from above, drawn: the parts under the board, the strips, the cell with its rubber gap, the L, the screw tabs, the hook, the power switch and the cell's lead route with its lengths" width="844" height="986" loading="lazy">
+        <div class="msg PHOTO-TODO">Photo to come: the cell in its corner and the lead routed to the switch and the LCD-2</div></li>
+      <li><b>Close it.</b> Hook the lid's right side in first (tilted), swing the left side up, then the two M3 x 6 countersunk screws sideways through the walls (one in the bottom wall, one in the left wall).
+        <div class="msg PHOTO-TODO">Photo to come: the finished jank mini 3</div></li>
+    </ol>
+  </section>
+
+  <section id="firmware">
+    <h2>The firmware</h2>
+    <p>On the <a href="install.html">Install</a> page, choose <b>jank mini 3</b> and flash from the browser. Then run and watch it on the <a href="device.html">Device</a> page.</p>
+    <p>USB: the LCD-2's own USB-C (left wall, labelled ESP) is for a computer or a charger. For gear with a USB port (host mode), a short USB-C cable outside the box joins the LCD-2's USB-C to J1 (top wall, ESP), and the gear goes into J4 (DEVICE). J4 gives that gear no power: bus-powered gear needs its own power or a powered hub.</p>
+  </section>
+
+  <footer class="site">The board, its files and the case: <a href="https://github.com/w0ts/jank/tree/main/hardware/jank-mini-3">hardware/jank-mini-3/</a>.</footer>
+</main>
+<script>
+// the two ways to have the board made: in-page tabs (#full / #hand in the address picks one)
+(() => {
+  const tabs = [...document.querySelectorAll('[role="tablist"] [role="tab"]')];
+  const pick = (tab) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    }
+  };
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => { pick(t); history.replaceState(null, "", "#" + t.id.slice(4)); });
+    t.addEventListener("keydown", (e) => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (d) { const n = tabs[(i + d + tabs.length) % tabs.length]; pick(n); n.focus(); }
+    });
+  });
+  const want = tabs.find((t) => "#" + t.id.slice(4) === location.hash);
+  if (want) pick(want);
+})();
+</script>
+</body>
+</html>

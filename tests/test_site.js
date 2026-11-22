@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// The site's pages (page/index.html About, page/install.html Install, page/jank.html Device): the same header on each, tabs in
+// The site's pages (page/index.html About, page/install.html Install, page/jank.html Device, page/build.html Build): the same header on each, tabs in
 // order, the open one marked, the built files equal their templates, every relative link and image resolves.
 'use strict';
 const assert = require('assert');
@@ -9,8 +9,8 @@ const load = require('./load_html.js');
 const root = path.join(__dirname, '..');
 const ok = (c, m) => { assert.ok(c, m); n++; };
 let n = 0;
-const PAGES = [['index.html', 'About', 'src/index.html'], ['install.html', 'Install', 'src/install.html'], ['jank.html', 'Device', 'src/jank.html']];
-const published = { 'index.html': 'index.html', 'install.html': 'install.html', 'device.html': 'jank.html' };
+const PAGES = [['index.html', 'About', 'src/index.html'], ['install.html', 'Install', 'src/install.html'], ['jank.html', 'Device', 'src/jank.html'], ['build.html', 'Build', 'src/build.html']];
+const published = { 'index.html': 'index.html', 'install.html': 'install.html', 'device.html': 'jank.html', 'build.html': 'build.html' };
 const navOf = h => h.match(/<nav[^>]*aria-label="Jank pages"[^>]*>([\s\S]*?)<\/nav>/)[1];
 const tabsOf = h => [...navOf(h).matchAll(/<a href="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/g)].map(m => ({ href: m[1], cur: /aria-current="page"/.test(m[2]), text: m[3] }));
 for (const [file, name, src] of PAGES) {
@@ -19,7 +19,7 @@ for (const [file, name, src] of PAGES) {
   ok(html.includes(`<title>Jank · ${name}</title>`), `${file}: title`);
   ok(/<div class="titlebar"><h1><a href="https:\/\/w0ts.github.io\/">w0ts<\/a> \/ Jank<\/h1><\/div>/.test(html), `${file}: title bar`);
   const tabs = tabsOf(html);
-  ok(tabs.map(t => t.href).join() === './,install.html,device.html,https://github.com/w0ts/jank', `${file}: tab links, GitHub last`);
+  ok(tabs.map(t => t.href).join() === './,install.html,device.html,build.html,https://github.com/w0ts/jank', `${file}: tab links, GitHub last`);
   ok(tabs.filter(t => t.cur).map(t => t.text).join() === name, `${file}: only ${name} is the current tab`);
   ok(/--accent: #9770c6/.test(html), `${file}: Jank's accent`);
   ok(!/<a [^>]*href="[^"]*"[^>]*target=/.test(navOf(html)), `${file}: tabs open in the same tab`);
