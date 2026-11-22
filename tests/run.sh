@@ -157,6 +157,8 @@ if command -v node >/dev/null; then
     node "$HERE/tests/test_player.js"
     node "$HERE/tests/test_tags.js"
     node "$HERE/tests/test_connect.js"
+    node "$HERE/tests/test_site.js"
+    node "$HERE/tests/test_build_page.js"
 else
     echo "page: node not found, control page logic NOT tested"
     exit 1

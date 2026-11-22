@@ -1,6 +1,7 @@
 #!/bin/bash
 # Publishes the site to https://w0ts.github.io/jank/ : About (page/index.html -> index.html), Install (page/install.html ->
-# install.html), Device (page/jank.html, the control page the firmware embeds -> device.html) and page/img/. The gh-pages
+# install.html), Device (page/jank.html, the control page the firmware embeds -> device.html), Build (page/build.html -> build.html)
+# and page/img/. The gh-pages
 # branch holds only pages, built with git plumbing,
 # so no local branch, no worktree and no push of main. A secure (https) origin lets Chrome keep the microphone / output
 # permission and gives the page Web MIDI, which a file:// copy cannot remember.
@@ -29,7 +30,7 @@ case "$PREVIEW" in *[!a-z0-9_-]*) echo "preview name: lowercase letters, digits,
 empty_blob=$(git hash-object -w /dev/null)
 # the site's files: published name <- path in the repo
 site_entries() {   # the "mode type sha<TAB>name" lines of the site, from REF
-    local pairs="index.html:page/index.html install.html:page/install.html device.html:page/jank.html" pair
+    local pairs="index.html:page/index.html install.html:page/install.html device.html:page/jank.html build.html:page/build.html" pair
     for pair in $pairs; do
         printf '100644 blob %s\t%s\n' "$(git rev-parse "$REF:${pair#*:}")" "${pair%%:*}"
     done
@@ -42,7 +43,7 @@ kept=""
 [ -n "$parent" ] && kept=$(git ls-tree "$parent^{tree}")
 
 keep_except() { printf '%s\n' "$kept" | awk -F'\t' -v skip="$1" 'NF && $2 != skip'; }
-keep_not_site() { printf '%s\n' "$kept" | awk -F'\t' 'NF && $2 != "index.html" && $2 != "install.html" && $2 != "device.html" && $2 != "img" && $2 != ".nojekyll"'; }
+keep_not_site() { printf '%s\n' "$kept" | awk -F'\t' 'NF && $2 != "index.html" && $2 != "install.html" && $2 != "device.html" && $2 != "build.html" && $2 != "img" && $2 != ".nojekyll"'; }
 
 if [ -n "$PREVIEW" ]; then
     sub=$(site_entries | git mktree)
