@@ -2,7 +2,9 @@
 /* Firmware update over the control line (docs/usb.md, "Updating over USB MIDI"). The pure half: line parsing, base64, CRC-32
  * and the transfer's state machine. The flash writes, the restart and the clock are firmware/main/ota.c's.
  *
- *   ota begin <size> <crc32 as 8 hex>        -> ok 0 <chunk>          the image's size in bytes, its CRC-32 (zlib's)
+ *   ota begin <size> <crc32 as 8 hex> [beatw] -> ok 0 <chunk>         the image's size in bytes, its CRC-32 (zlib's); with
+ *                                                                     "beatw" the beat network's weights blob (core/beat/beat_weights.h)
+ *                                                                     into its own partition: no app header, no boot change
  *   ota d <offset> <crc32 as 8 hex> <base64> -> ok <next offset>      one chunk of at most JO_CHUNK_MAX bytes; the CRC is the chunk's
  *   ota end                                  -> ok                    size and CRC checked, then the restart
  *   ota abort                                -> ok
@@ -36,8 +38,12 @@ enum jo_err {
     JO_E_PLAYING                         /* the session or the MIDI clock plays: no flash writes now (stop first) */
 };
 
+#define JO_TARGET_APP 0u
+#define JO_TARGET_BEATW 1u              /* the weights blob: its first bytes are "JBW1" */
+
 struct jo_cmd {
     enum jo_kind kind;
+    uint8_t target;                     /* JO_TARGET_*, from begin */
     uint32_t size, crc, offset;
     size_t n;
     uint8_t data[JO_CHUNK_MAX];
@@ -45,6 +51,7 @@ struct jo_cmd {
 
 struct jo {
     uint8_t active;
+    uint8_t target;                     /* JO_TARGET_*: set by the caller after jo_begin */
     uint32_t size, crc_want, offset, crc_run, last_ms;
 };
 

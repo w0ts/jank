@@ -304,12 +304,11 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
 
   <section>
     <h2>Flash from the browser</h2>
-    <p>Chrome or Edge on a computer, a USB-C cable that carries data.</p>
-    <ol>
-      <li>Put the device in download mode. A new one: hold BOOT (the XIAO's B button) while plugging it in. One that runs Jank: on the <a href="device.html">Device</a> page, Connect, then Advanced, Firmware, Download mode.</li>
-      <li>Choose the release, press Flash and pick the port the browser lists. One firmware for both devices: it finds out at the start which one it runs on.</li>
-      <li>When it is done, unplug the device and plug it back in. Its settings are kept.</li>
-    </ol>
+    <p>Chrome or Edge on a computer, a USB-C cable that carries data. One firmware for both devices: it finds out at the start which one it runs on. Its settings are kept.</p>
+    <ul>
+      <li><b>It runs Jank already:</b> plug it in as always and press <b>Update over USB MIDI</b>. Chrome asks once to let the page use MIDI. The new firmware goes into the device's second slot; if it does not start, the old one comes back by itself. Keep the device plugged in until the page says done.</li>
+      <li><b>A new device</b> (or one that does not start): put it in download mode first: unplug it, hold BOOT (the XIAO's B button) while plugging it in, then release. Press <b>Flash a new device</b> and pick the port the browser lists. When it is done, unplug it and plug it back in.</li>
+    </ul>
     <div class="row">
       <label>Release <select id="fw-tag" disabled><option>-</option></select></label>
     </div>
@@ -324,7 +323,7 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
 
   <section>
     <h2>Flash</h2>
-    <div class="row"><button id="fw-flash" type="button" disabled>Flash</button><span id="fw-note" class="note">Looking for releases...</span></div>
+    <div class="row"><button id="fw-midi" type="button" disabled>Update over USB MIDI</button><button id="fw-flash" class="quiet" type="button" disabled>Flash a new device</button><span id="fw-note" class="note">Looking for releases...</span></div>
     <progress id="fw-progress" class="hide" max="1" value="0"></progress>
     <p>The releases and their notes: <a href="https://github.com/w0ts/jank/releases">github.com/w0ts/jank/releases</a>.</p>
   </section>
@@ -479,16 +478,122 @@ const BeatW = (() => {
 })();
 if (typeof module !== 'undefined') module.exports = BeatW;
 </script>
+<script>
+// SPDX-License-Identifier: MIT
+// Updating a running Jank over USB MIDI from the browser (the Install page), as scripts/ota.py does from a computer: the
+// control line's SysEx framing (F0 7D 'J' 'K' <7-bit text> F7, core/jank_sysex.h) and the transfer of core/jank_ota.h:
+//   ota begin <size> <crc32 hex> [beatw]  ->  ok 0 <chunk>
+//   ota d <offset> <crc32 hex> <base64>   ->  ok <next offset>   (err gap / crc <offset>: go on from there)
+//   ota end                               ->  ok, then the device restarts (an app on trial; the weights at once)
+// No DOM, no Web MIDI here: the caller passes send(text) and a line queue (MidiOta.Lines), so node can test it.
+const MidiOta = (() => {
+  'use strict';
+  const HEAD = [0xf0, 0x7d, 0x4a, 0x4b];
+  const CHUNK = 120, TRIES = 6, REPLY_MS = 2000;
+  const ANSWER = /^(ok( \d+){1,2}|err (busy|size|arg|state|gap|crc|header|short|idle|playing)( \d+)?)$/;
+  const crcTable = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  /** zlib's CRC-32 of bytes, as 8 lowercase hex digits */
+  const crcHex = (b) => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = crcTable[(c ^ b[i]) & 255] ^ (c >>> 8); return ((c ^ 0xffffffff) >>> 0).toString(16).padStart(8, '0'); };
+  const b64 = (b) => { let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s); };
+
+  /** one control line as a SysEx message */
+  function frame(text) {
+    const t = text.endsWith('\n') ? text : text + '\n';
+    const out = HEAD.slice();
+    for (let i = 0; i < t.length; i++) {
+      const c = t.charCodeAt(i);
+      if (c >= 0x80) throw new Error('control lines are 7-bit text');
+      out.push(c);
+    }
+    out.push(0xf7);
+    return out;
+  }
+
+  /** the device's SysEx frames back into lines (a frame carries part of a line) */
+  class Lines {
+    constructor() { this.buf = ''; this.lines = []; this.waiters = []; }
+    feed(msg) {
+      if (msg.length < 5 || msg[0] !== 0xf0 || msg[1] !== 0x7d || msg[2] !== 0x4a || msg[3] !== 0x4b || msg[msg.length - 1] !== 0xf7) return;
+      for (let i = 4; i < msg.length - 1; i++) this.buf += String.fromCharCode(msg[i]);
+      let k;
+      while ((k = this.buf.indexOf('\n')) >= 0) {
+        const line = this.buf.slice(0, k).trim();
+        this.buf = this.buf.slice(k + 1);
+        const w = this.waiters.shift();
+        if (w) w(line); else this.lines.push(line);
+      }
+    }
+    drop() { this.lines = []; }
+    /** the next line, or null after ms */
+    next(ms) {
+      if (this.lines.length) return Promise.resolve(this.lines.shift());
+      return new Promise((res) => {
+        const w = (l) => { clearTimeout(t); res(l); };
+        const t = setTimeout(() => { this.waiters = this.waiters.filter((x) => x !== w); res(null); }, ms);
+        this.waiters.push(w);
+      });
+    }
+  }
+
+  /** sends a line and returns its answer ("ok ..." / "err ..."), resending on silence; other lines are skipped */
+  async function ask(send, lines, text, replyMs = REPLY_MS) {
+    for (let i = 0; i < TRIES; i++) {
+      lines.drop();
+      send(text);
+      const end = Date.now() + replyMs;
+      for (;;) {
+        const left = end - Date.now();
+        if (left <= 0) break;
+        const line = await lines.next(left);
+        if (line !== null && ANSWER.test(line)) return line;
+        if (line === null) break;
+      }
+    }
+    throw new Error('no answer to "' + text.split(' ').slice(0, 2).join(' ') + '"');
+  }
+
+  /** the whole transfer; target 'app' (an ESP32-S3 app image) or 'beatw' (the weights blob). progress(done, total) */
+  async function upload(send, lines, data, target, progress = () => {}) {
+    if (target === 'app' && (data.length < 24 || data[0] !== 0xe9 || (data[12] | (data[13] << 8)) !== 9)) throw new Error('not an ESP32-S3 app image');
+    if (target === 'beatw' && !(data[0] === 0x4a && data[1] === 0x42 && data[2] === 0x57 && data[3] === 0x31)) throw new Error('not a weights blob');
+    const begin = 'ota begin ' + data.length + ' ' + crcHex(data) + (target === 'beatw' ? ' beatw' : '');
+    let a = await ask(send, lines, begin, target === 'beatw' ? 8000 : REPLY_MS);   // (the weights' erase takes about a second)
+    if (a.startsWith('err busy')) { await ask(send, lines, 'ota abort'); a = await ask(send, lines, begin, 8000); }
+    if (a.startsWith('err playing')) throw new Error('the device is playing: stop the session first');
+    if (a.startsWith('err state') && target === 'beatw') throw new Error('this device has no room for the weights (an older partition table): flash it once as a new device, with the box ticked');
+    const p = a.split(' ');
+    if (p[0] !== 'ok' || p.length < 3) throw new Error('the device refused: ' + a);
+    const chunk = Math.min(CHUNK, +p[2]);
+    let pos = 0, bad = 0;
+    while (pos < data.length) {
+      const c = data.subarray(pos, pos + chunk);
+      const r = (await ask(send, lines, 'ota d ' + pos + ' ' + crcHex(c) + ' ' + b64(c))).split(' ');
+      if (r[0] === 'ok') { pos = +r[1]; bad = 0; progress(pos, data.length); }
+      else if ((r[1] === 'gap' || r[1] === 'crc') && bad < TRIES) { pos = +r[2]; bad++; }
+      else throw new Error('the device stopped the transfer: ' + r.join(' '));
+    }
+    const e = await ask(send, lines, 'ota end', 8000);
+    if (!e.startsWith('ok')) throw new Error('the device refused the image: ' + e);
+  }
+
+  return { frame, Lines, ask, upload, crcHex };
+})();
+if (typeof module !== 'undefined') module.exports = MidiOta;
+</script>
 <script type="module">
 // The releases the site carries: firmware/index.json (scripts/publish_firmware.py), newest first:
 // { releases: [ { tag, boards: { auto: { parts: [ { path, offset } ], beatw: { offset, size } } } } ] }: one image for the
 // bare XIAO and the jank mini 3 (it tells them apart at the start, firmware/main/board.c).
 // Flashing: esptool-js over Web Serial, each part at its own address (the settings partition is not touched); with the
-// box ticked, madmom's model converted here (ui/beatw.js) goes into the beatw partition.
+// box ticked, madmom's model converted here (ui/beatw.js) goes into the beatw partition. A device that runs Jank has no
+// serial port (USB is its network adapter, MIDI, the drive and audio): it is updated over Web MIDI instead (ui/midiota.js,
+// the protocol of scripts/ota.py), the app into its second slot, then the weights into beatw.
 const ESPTOOL = "https://cdn.jsdelivr.net/npm/esptool-js@0.7.1/bundle.js";
 const $ = (id) => document.getElementById(id);
 const BOARD = "auto";
-const tag = $("fw-tag"), note = $("fw-note"), flash = $("fw-flash"), beat = $("fw-beat"), bar = $("fw-progress");
+const tag = $("fw-tag"), note = $("fw-note"), flash = $("fw-flash"), midi = $("fw-midi"), beat = $("fw-beat"), bar = $("fw-progress");
+const canMidi = "requestMIDIAccess" in navigator && window.isSecureContext;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let releases = [], busy = false;
 const chosen = () => { const r = releases.find((x) => x.tag === tag.value); return r && r.boards && r.boards[BOARD]; };
 const say = (t, bad) => { note.textContent = t; note.classList.toggle("bad", !!bad); };
@@ -496,9 +601,10 @@ const canSerial = "serial" in navigator && window.isSecureContext;
 function show() {
   const b = chosen();
   flash.disabled = busy || !b || !canSerial;
+  midi.disabled = busy || !b || !canMidi;
   if (busy) return;
   say(!releases.length ? "No release yet." : !b ? "This release has no firmware for the Install page."
-    : !canSerial ? "This browser cannot flash: use Chrome or Edge on a computer, on the https page." : "");
+    : !canSerial && !canMidi ? "This browser cannot flash: use Chrome or Edge on a computer, on the https page." : "");
 }
 function fill() {
   const list = releases.filter((r) => r.boards && r.boards[BOARD]);
@@ -526,7 +632,7 @@ async function run() {
   const b = chosen();
   if (!b) return;
   busy = true;
-  flash.disabled = true;
+  flash.disabled = midi.disabled = true;
   let transport = null;
   try {
     say("Downloading the firmware...");
@@ -552,8 +658,103 @@ async function run() {
     show();
   }
 }
+// ---- a running Jank, over Web MIDI ----
+// the Jank's MIDI ports, once connected (they go away while it restarts); null when none is there
+function jankPorts(access) {
+  let o = null, i = null;
+  access.outputs.forEach((p) => { if (/jank/i.test(p.name) && p.state === "connected") o = p; });
+  access.inputs.forEach((p) => { if (/jank/i.test(p.name) && p.state === "connected") i = p; });
+  return o && i ? { o, i } : null;
+}
+async function jankLine(access, waitMs) {
+  const end = Date.now() + waitMs;
+  for (;;) {
+    const p = jankPorts(access);
+    if (p) {
+      const lines = new MidiOta.Lines();
+      p.i.onmidimessage = (e) => lines.feed(e.data);
+      await p.i.open();
+      await p.o.open();
+      return { send: (t) => p.o.send(MidiOta.frame(t)), lines, close: () => { p.i.onmidimessage = null; } };
+    }
+    if (Date.now() >= end) return null;
+    await sleep(500);
+  }
+}
+// `get` -> { key: value } up to its "ok", or null
+async function getInfo(dev) {
+  dev.lines.drop();
+  dev.send("get");
+  const out = {}, end = Date.now() + 3000;
+  while (Date.now() < end) {
+    const l = await dev.lines.next(end - Date.now());
+    if (l === null) break;
+    if (l === "ok") return out;
+    const k = l.indexOf("=");
+    if (k > 0) out[l.slice(0, k)] = l.slice(k + 1);
+  }
+  return null;
+}
+// after a restart: the Jank back, then 25 s of talk on its control line (a new image confirms itself only then, firmware ota.c)
+async function backAndConfirm(access, what) {
+  say(what + " Restarting...");
+  await sleep(2500);
+  const dev = await jankLine(access, 60000);
+  if (!dev) throw new Error("the Jank did not come back within a minute: unplug it and plug it back in (the old firmware returns if the new one cannot start)");
+  for (let t = 0; t < 25; t += 2.5) {
+    say(what + " Confirming, keep it plugged in... " + Math.round(25 - t) + " s");
+    await getInfo(dev);
+    await sleep(2500);
+  }
+  return dev;
+}
+async function runMidi() {
+  const b = chosen();
+  if (!b) return;
+  busy = true;
+  flash.disabled = midi.disabled = true;
+  let dev = null;
+  try {
+    const appPart = b.parts.find((p) => /\/jank\.bin$/.test(p.path));
+    if (!appPart) throw new Error("this release has no app image");
+    say("Downloading the firmware...");
+    const app = await bytes(appPart.path);
+    let blob = null;
+    if (beat.checked) {
+      say("Fetching madmom's model...");
+      blob = BeatW.fromMadmom(await bytes(BeatW.MADMOM_URL));
+    }
+    say("Allow MIDI in the browser's question, then wait.");
+    const access = await navigator.requestMIDIAccess({ sysex: true });
+    dev = await jankLine(access, 3000);
+    if (!dev) throw new Error("no running Jank on USB MIDI: plug it in, or use Flash a new device");
+    const before = await getInfo(dev);
+    bar.classList.remove("hide");
+    await MidiOta.upload(dev.send, dev.lines, app, "app", (done, total) => { bar.value = done / total; say("Sending the firmware... " + Math.round(100 * done / total) + " %"); });
+    dev.close();
+    dev = await backAndConfirm(access, "Firmware sent.");
+    if (blob) {
+      bar.value = 0;
+      await MidiOta.upload(dev.send, dev.lines, blob, "beatw", (done, total) => { bar.value = done / total; say("Sending the beat model... " + Math.round(100 * done / total) + " %"); });
+      dev.close();
+      say("Beat model sent. Restarting...");
+      await sleep(2500);
+      dev = await jankLine(access, 60000);
+    }
+    const after = dev ? await getInfo(dev) : null;
+    say("Done" + (after && after.version ? ": version " + after.version + (before && before.version ? " (was " + before.version + ")" : "") : "")
+      + (blob ? ", with beat follow" : "") + ".");
+  } catch (e) {
+    say(e && e.name === "SecurityError" ? "MIDI was not allowed: allow it in the browser and press again." : "Not updated: " + (e && e.message ? e.message : e), true);
+  } finally {
+    if (dev) dev.close();
+    busy = false;
+    show();
+  }
+}
 tag.addEventListener("change", show);
 flash.addEventListener("click", run);
+midi.addEventListener("click", runMidi);
 fetch("firmware/index.json", { cache: "no-cache" })
   .then((r) => (r.ok ? r.json() : { releases: [] }))
   .catch(() => ({ releases: [] }))

@@ -6,6 +6,7 @@
 #include "app.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
+#include "esp_partition.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -22,6 +23,7 @@ static struct jo s_jo;
 static struct jo_cmd s_cmd;
 static esp_ota_handle_t s_handle;
 static const esp_partition_t *s_slot;
+static const esp_partition_t *s_wpart;   /* a weights transfer (ota begin ... beatw): the beatw partition, written in place */
 static char s_reply[48];
 
 static uint32_t now_ms(void) { return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS); }
@@ -35,6 +37,11 @@ static void say(enum jo_err e, uint32_t offset)
 
 static void drop_flash(void)
 {
+    if (s_wpart) {                     /* a weights transfer holds no app slot */
+        s_wpart = NULL;
+        jo_abort(&s_jo);
+        return;
+    }
     if (s_handle)
         esp_ota_abort(s_handle);
     s_handle = 0;
@@ -43,11 +50,45 @@ static void drop_flash(void)
     slot_give(SLOT_MIDI);
 }
 
+/* ota begin <size> <crc> beatw: the beat network's weights (core/beat/beat_weights.h) into the beatw partition. Erased
+ * first (128 KB, about a second), then written chunk by chunk; no app slot, no boot change. A device whose partition table
+ * has no beatw (an image from before 2026-11-22) answers err state: it needs one full flash. */
+static void do_begin_beatw(const struct jo_cmd *c)
+{
+    const esp_partition_t *p = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, (esp_partition_subtype_t)0x40, "beatw");
+    enum jo_err e;
+    int n;
+    if (!p) {
+        say(JO_E_STATE, 0);
+        return;
+    }
+    e = jo_begin(&s_jo, c->size, c->crc, p->size, now_ms());
+    if (e != JO_OK) {
+        say(e, s_jo.offset);
+        return;
+    }
+    s_jo.target = JO_TARGET_BEATW;
+    if (esp_partition_erase_range(p, 0, p->size) != ESP_OK) {
+        ESP_LOGE(TAG, "beatw: erase failed");
+        jo_abort(&s_jo);
+        say(JO_E_STATE, 0);
+        return;
+    }
+    s_wpart = p;
+    n = snprintf(s_reply, sizeof s_reply, "ok 0 %u\n", (unsigned)JO_CHUNK_MAX);
+    usb_serial_write(s_reply, (size_t)n);
+    ESP_LOGI(TAG, "beat weights: %lu bytes into %s", (unsigned long)c->size, p->label);
+}
+
 static void do_begin(const struct jo_cmd *c)
 {
     enum jo_err e;
     esp_err_t r;
     int n;
+    if (c->target == JO_TARGET_BEATW) {
+        do_begin_beatw(c);
+        return;
+    }
     const esp_partition_t *slot = esp_ota_get_next_update_partition(NULL);
     if (!slot) {
         say(JO_E_STATE, 0);
@@ -81,9 +122,10 @@ static void do_begin(const struct jo_cmd *c)
 
 static void do_data(const struct jo_cmd *c)
 {
+    const uint32_t at = s_jo.offset;
     enum jo_err e = jo_data(&s_jo, c, now_ms());
     if (e == JO_OK) {
-        esp_err_t r = esp_ota_write(s_handle, c->data, c->n);
+        esp_err_t r = s_wpart ? esp_partition_write(s_wpart, at, c->data, c->n) : esp_ota_write(s_handle, c->data, c->n);
         if (r != ESP_OK) {
             ESP_LOGE(TAG, "write at %lu: %s", (unsigned long)c->offset, esp_err_to_name(r));
             drop_flash();
@@ -102,6 +144,14 @@ static void do_end(void)
     if (e == JO_E_SHORT) {
         say(e, s_jo.offset);
         return;
+    }
+    if (e == JO_OK && s_wpart) {      /* the weights: written in place; the restart binds them (beat.c weights_bind) */
+        s_wpart = NULL;
+        say(JO_OK, s_jo.offset);
+        ESP_LOGI(TAG, "beat weights written, restarting");
+        drive_note(esp_ota_get_running_partition()->label, "beat weights written over MIDI, restarted");   /* (the app slot stays) */
+        vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));
+        esp_restart();
     }
     if (e == JO_OK) {
         r = esp_ota_end(s_handle);

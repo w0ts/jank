@@ -132,7 +132,12 @@ static enum jo_kind parse_begin(const char *s, struct jo_cmd *c)
     size_t a = word(s);
     const char *t = next(s, a);
     size_t b = word(t);
-    if (num(s, a, &c->size) || hex8(t, b, &c->crc) || t[b])
+    const char *u = next(t, b);
+    if (num(s, a, &c->size) || hex8(t, b, &c->crc))
+        return JO_BAD;
+    if (!strcmp(u, "beatw"))
+        c->target = JO_TARGET_BEATW;
+    else if (*u)
         return JO_BAD;
     return JO_BEGIN;
 }
@@ -214,7 +219,7 @@ enum jo_err jo_data(struct jo *j, const struct jo_cmd *c, uint32_t now_ms)
         jo_abort(j);
         return JO_E_SIZE;
     }
-    if (!j->offset && !jo_header_ok(c->data, c->n))
+    if (!j->offset && !(j->target == JO_TARGET_BEATW ? c->n >= 4u && !memcmp(c->data, "JBW1", 4) : jo_header_ok(c->data, c->n)))
         return JO_E_HEADER;
     j->crc_run = jo_crc32(j->crc_run, c->data, c->n);
     j->offset += (uint32_t)c->n;

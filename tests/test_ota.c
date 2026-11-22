@@ -57,6 +57,9 @@ static void test_parse(void)
     assert(jo_parse("ota begin 99999999999 CBF43926", &c) == JO_BAD);
     assert(jo_parse("ota begin 834000 CBF4392", &c) == JO_BAD);
     assert(jo_parse("ota begin 834000 CBF43926 x", &c) == JO_BAD);
+    assert(jo_parse("ota begin 834000 CBF43926", &c) == JO_BEGIN && c.target == JO_TARGET_APP);
+    assert(jo_parse("ota begin 117020 CBF43926 beatw", &c) == JO_BEGIN && c.target == JO_TARGET_BEATW && c.size == 117020);
+    assert(jo_parse("ota begin 117020 CBF43926 beatw x", &c) == JO_BAD);
     assert(jo_parse("ota d 240 CBF43926 Zm9vYmFy", &c) == JO_DATA && c.offset == 240 && c.n == 6 && !memcmp(c.data, "foobar", 6));
     assert(jo_parse("ota d 240 CBF43926", &c) == JO_BAD);
     assert(jo_parse("ota d 240 CBF43926 Zm9vYmF", &c) == JO_BAD);
@@ -181,6 +184,34 @@ static void test_note(void)
     assert(jo_note_at_start("ota_1", "ota_0", 0, "x", out, 8) == 1 && strlen(out) == 7);
 }
 
+/* the weights blob (JO_TARGET_BEATW): "JBW1" first, no app header asked; an app header is refused there, and the blob as an app */
+static void test_beatw(void)
+{
+    enum { SIZE = 300 };
+    static uint8_t blob[SIZE], app[SIZE];
+    struct jo j;
+    struct jo_cmd c;
+    memcpy(blob, "JBW1", 4);
+    for (int i = 4; i < SIZE; i++)
+        blob[i] = (uint8_t)(i * 7);
+    image(app, SIZE);
+    jo_init(&j);
+    assert(jo_begin(&j, SIZE, jo_crc32(0, blob, SIZE), 0x20000, 0) == JO_OK);
+    j.target = JO_TARGET_BEATW;
+    c = chunk(app, 0, 120);
+    assert(jo_data(&j, &c, 1) == JO_E_HEADER);                               /* an app image is not a weights blob */
+    for (uint32_t off = 0; off < SIZE; off += 120) {
+        size_t n = SIZE - off < 120 ? SIZE - off : 120;
+        c = chunk(blob, off, n);
+        assert(jo_data(&j, &c, 2 + off) == JO_OK);
+    }
+    assert(jo_end(&j) == JO_OK);
+    jo_init(&j);                                                            /* the app target refuses the blob */
+    assert(jo_begin(&j, SIZE, jo_crc32(0, blob, SIZE), 0x20000, 0) == JO_OK);
+    c = chunk(blob, 0, 120);
+    assert(jo_data(&j, &c, 1) == JO_E_HEADER);
+}
+
 int main(void)
 {
     test_crc();
@@ -188,6 +219,7 @@ int main(void)
     test_parse();
     test_header();
     test_transfer();
+    test_beatw();
     test_failures();
     test_reply();
     test_note();
