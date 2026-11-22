@@ -19,6 +19,7 @@
 #include <string.h>
 #include "board.h"
 #include "board_i2c.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -29,14 +30,14 @@
 #define TASK_PRIO 1                     /* the lowest above idle: everything else on core 0 comes first */
 #define TASK_STACK 3072
 
-#if BOARD_OLED
 static const char *TAG = "oled";
-#endif
 static i2c_master_dev_handle_t s_dev;
 static uint8_t s_addr;
 static SemaphoreHandle_t s_lock;
 static TaskHandle_t s_task;
-static uint8_t s_next[JO_FB_BYTES], s_shown[JO_FB_BYTES];
+/* the frame handed over, the panel's copy and the task's working frame: one heap block, made when a screen is found (the image
+ * also runs on the LCD-2, whose static RAM is short) */
+static uint8_t *s_next, *s_shown, *s_work;
 static uint8_t s_next_contrast = 0xFF, s_contrast_sent;
 static uint8_t s_valid;                 /* s_shown is what the panel holds */
 static uint32_t s_pages_sent, s_errors;
@@ -62,7 +63,6 @@ static esp_err_t page(uint8_t p, const uint8_t *data)
     return i2c_master_transmit(s_dev, b, sizeof b, TIMEOUT_MS);
 }
 
-#if BOARD_OLED
 static esp_err_t setup(uint8_t contrast)
 {
     static const uint8_t INIT[] = {
@@ -78,20 +78,18 @@ static esp_err_t setup(uint8_t contrast)
     esp_err_t e = cmds(INIT, sizeof INIT);
     if (e == ESP_OK)
         e = cmds(c, sizeof c);
-    memset(s_shown, 0, sizeof s_shown);
+    memset(s_shown, 0, JO_FB_BYTES);
     for (uint8_t p = 0; p < JO_PAGES && e == ESP_OK; p++)
         e = page(p, s_shown);           /* blank before it lights */
     return e;
 }
-#endif
 
-int oled_open(uint8_t contrast)
+int oled_i2c_open(uint8_t contrast)
 {
-#if BOARD_OLED
     i2c_master_bus_handle_t bus;
     static const uint8_t ADDRS[2] = {0x3C, 0x3D};
     uint8_t on = 0xAF;
-    if (board_i2c_bus(&bus) != ESP_OK)
+    if (!BOARD_OLED || board_i2c_bus(&bus) != ESP_OK)
         return 0;
     for (int i = 0; i < 2 && !s_addr; i++)
         if (i2c_master_probe(bus, ADDRS[i], TIMEOUT_MS) == ESP_OK)
@@ -99,6 +97,17 @@ int oled_open(uint8_t contrast)
     if (!s_addr) {
         ESP_LOGI(TAG, "no screen: the LED language");
         return 0;
+    }
+    if (!s_next) {
+        uint8_t *b = heap_caps_calloc(3, JO_FB_BYTES, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (!b) {
+            ESP_LOGE(TAG, "no RAM for the frames");
+            s_addr = 0;
+            return 0;
+        }
+        s_next = b;
+        s_shown = b + JO_FB_BYTES;
+        s_work = b + 2 * JO_FB_BYTES;
     }
     {
         i2c_device_config_t dc = {.dev_addr_length = I2C_ADDR_BIT_LEN_7, .device_address = s_addr, .scl_speed_hz = OLED_HZ};
@@ -112,13 +121,9 @@ int oled_open(uint8_t contrast)
     s_valid = 1;
     ESP_LOGI(TAG, "screen at 0x%02x", s_addr);
     return 1;
-#else
-    (void)contrast;
-    return 0;
-#endif
 }
 
-int oled_present(void) { return s_addr != 0; }
+int oled_i2c_present(void) { return s_addr != 0; }
 
 void oled_show(const uint8_t fb[JO_FB_BYTES], uint8_t contrast)
 {
@@ -133,13 +138,13 @@ void oled_show(const uint8_t fb[JO_FB_BYTES], uint8_t contrast)
 
 static void oled_task(void *arg)
 {
-    static uint8_t fb[JO_FB_BYTES];
+    uint8_t *fb = s_work;
     (void)arg;
     for (;;) {
         uint8_t contrast;
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         xSemaphoreTake(s_lock, portMAX_DELAY);
-        memcpy(fb, s_next, sizeof fb);
+        memcpy(fb, s_next, JO_FB_BYTES);
         contrast = s_next_contrast;
         xSemaphoreGive(s_lock);
         if (contrast != s_contrast_sent) {
@@ -164,7 +169,7 @@ static void oled_task(void *arg)
     }
 }
 
-esp_err_t oled_start(void)
+esp_err_t oled_i2c_start(void)
 {
     if (!s_addr)
         return ESP_OK;

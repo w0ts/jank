@@ -2,6 +2,9 @@ menu "jank"
     choice JANK_BOARD
         prompt "Board"
         default JANK_BOARD_XIAO
+        config JANK_BOARD_AUTO
+            bool "XIAO or jank mini 3 (LCD-2), told apart at the start (main/board.c): the release image"
+            depends on IDF_TARGET_ESP32S3
         config JANK_BOARD_XIAO
             bool "Seeed XIAO ESP32S3"
             depends on IDF_TARGET_ESP32S3
@@ -15,7 +18,7 @@ menu "jank"
 
     config JANK_LCD_MIRROR_X
         bool "LCD2: mirror the landscape picture left to right"
-        depends on JANK_BOARD_LCD2
+        depends on JANK_BOARD_LCD2 || JANK_BOARD_AUTO
         default y
         help
             Which of the four landscape orientations puts the picture upright for the way the board is held is not known
@@ -23,7 +26,7 @@ menu "jank"
 
     config JANK_LCD_MIRROR_Y
         bool "LCD2: mirror the landscape picture top to bottom"
-        depends on JANK_BOARD_LCD2
+        depends on JANK_BOARD_LCD2 || JANK_BOARD_AUTO
         default n
 
     config JANK_UI_BENCH

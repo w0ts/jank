@@ -4,9 +4,9 @@
 
   python3 -I scripts/publish_firmware.py TAG [--dry-run] [--no-build]
 
-HEAD must be the tag TAG and the checkout clean. For each board (xiao: the bare device; lcd2: the jank mini 3) it builds
-(scripts/build.sh), takes the parts from the build's flash_args (bootloader, partition table, otadata, app) and the
-beatw partition's place from the built partition table, and adds them to the gh-pages branch under firmware/TAG/BOARD/,
+HEAD must be the tag TAG and the checkout clean. It builds the one release image (scripts/build.sh auto: the bare XIAO or the
+jank mini 3, told apart at the start, firmware/main/board.c), takes the parts from the build's flash_args (bootloader, partition table, otadata, app) and the
+beatw partition's place from the built partition table, and adds them to the gh-pages branch under firmware/TAG/auto/,
 with firmware/index.json listing the releases, newest first. Nothing else on gh-pages changes. The images hold NO
 network weights (core/beat/beat_weights.h): the page adds madmom's only at the user's click, in the user's browser.
 
@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BOARDS = {"xiao": "Bare device (Seeed XIAO ESP32-S3)", "lcd2": "jank mini 3"}
+BOARDS = {"auto": "Bare device (Seeed XIAO ESP32-S3) or jank mini 3"}
 REMOTE = os.environ.get("PAGES_REMOTE", "origin")
 BRANCH = "gh-pages"
 BEATW_SUBTYPE = 0x40

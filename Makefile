@@ -1,22 +1,22 @@
 # jank shortcuts.
 #   make simulator [ARGS="--xiao"]   the live player / emulator page (beat/live/player.py, 127.0.0.1:8791)
-#   make flash [IMAGE=path.bin]       build, then install the new image on the running stick: the JANK drive if mounted, else MIDI
+#   make flash [IMAGE=path.bin]       build, then install the new image on the running device: the JANK drive if mounted, else MIDI
 #                                     (ota.py). With IMAGE=path.bin: install that file, no build.
 #   make page                         expand page/src/*.html (+ ui/*) into page/: jank.html (the Device page, the file the firmware
 #                                     embeds), index.html (About), install.html
 #   make publish-page                 publish the COMMITTED pages to https://w0ts.github.io/jank/ (only gh-pages is pushed)
-#   make build                        build the XIAO firmware (scripts/build.sh xiao)
+#   make build                        build the release firmware: XIAO or jank mini 3, told apart at the start (scripts/build.sh auto)
 # FW names the firmware checkout, BEAT the beat folder; both default to this checkout (main).
 
 FW     ?= .
 BEAT   ?= beat
 PY     ?= $(BEAT)/.venv/bin/python
 ARGS   ?= --xiao
-# make flash builds first and installs that fresh image (scripts/build.sh writes build-xiao/jank.bin in the scratch folder);
+# make flash builds first and installs that fresh image (scripts/build.sh writes build-auto/jank.bin in the scratch folder);
 # with IMAGE=path.bin it installs that file as it is, no build.
 SCRATCH ?= $(or $(JANK_SCRATCH),$(FW)/worktrees/jank-scratch)
 ifeq ($(origin IMAGE),undefined)
-IMAGE      := $(SCRATCH)/build-xiao/jank.bin
+IMAGE      := $(SCRATCH)/build-auto/jank.bin
 FLASH_DEPS := build
 endif
 
@@ -30,7 +30,7 @@ flash: $(FLASH_DEPS)
 	FW_DIR=$(abspath $(FW)) PY=$(abspath $(PY)) bash scripts/flash.sh $(abspath $(IMAGE))
 
 build:
-	cd $(FW) && bash scripts/build.sh xiao
+	cd $(FW) && bash scripts/build.sh auto
 
 page: page/jank.html page/index.html page/install.html
 

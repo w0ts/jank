@@ -11,11 +11,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "usb_host_mode.h"
-#if BOARD_PUMP_GPIO >= 0
 #include "driver/ledc.h"
-#endif
 
-#if BOARD_PUMP_GPIO >= 0
 #define PUMP_HZ 416666u                /* the driver's divider from this is 96 x 256 exactly; 416,667 would give 96 - 1/256 */
 #define PUMP_TIMER LEDC_TIMER_3
 #define PUMP_CHANNEL LEDC_CHANNEL_7
@@ -51,6 +48,8 @@ static esp_err_t pump_on(void)
 esp_err_t pump_hold(void)
 {
     esp_err_t e = ESP_OK;
+    if (BOARD_PUMP_GPIO < 0)
+        return ESP_ERR_NOT_SUPPORTED;
     if (!s_lock && !(s_lock = xSemaphoreCreateMutex()))
         return ESP_ERR_NO_MEM;
     xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -74,7 +73,3 @@ void pump_release(void)
     }
     xSemaphoreGive(s_lock);
 }
-#else
-esp_err_t pump_hold(void) { return ESP_ERR_NOT_SUPPORTED; }
-void pump_release(void) {}
-#endif

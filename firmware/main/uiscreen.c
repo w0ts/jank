@@ -51,13 +51,6 @@ void app_reboot(void);
 #define TEMP_MIN_C (-10)                /* the sensor's measuring range */
 #define TEMP_MAX_C 80
 #define BAR_CONF_FULL 2.0               /* the downbeat estimator's commit level: the line is full here */
-#if CONFIG_JANK_BOARD_MINI22
-#define SPLASH_MODEL "MINI 2.2"
-#elif CONFIG_JANK_BOARD_LCD2
-#define SPLASH_MODEL "LCD2"
-#else
-#define SPLASH_MODEL "XIAO"
-#endif
 
 static const char *TAG = "uiscreen";
 
@@ -74,13 +67,11 @@ static struct jo_ui s_ui;
 static struct jo_input s_in;
 static struct jo_ctx s_ctx;
 static struct jk_snapshot s_snap;
-#if BOARD_LCD
-#define FRAME_BYTES JO_LCD2_FB_BYTES
-#define s_fb lcd_frame()                /* the frame drawn: 9.6 KB, in PSRAM with the driver's frames and ink planes (lcd.c) */
-#else
-#define FRAME_BYTES JO_FB_BYTES
-static uint8_t s_fb[FRAME_BYTES];       /* the frame drawn (the driver keeps its own copy) */
-#endif
+/* the frame drawn: on the colour screen lcd.c's (9.6 KB, in PSRAM with its frames and ink planes), on an OLED our own 1 KB
+ * from the heap once the screen is found (the driver keeps its own copy) */
+static uint8_t *s_oled_fb;
+#define FRAME_BYTES ((size_t)(BOARD_LCD ? JO_LCD2_FB_BYTES : JO_FB_BYTES))
+#define s_fb (BOARD_LCD ? lcd_frame() : s_oled_fb)
 static char s_ap_name[JO_SSID_MAX + 1] = "Jank", s_ap_pass[JO_TEXT_MAX + 1] = "";
 
 struct meter_step {
@@ -467,7 +458,7 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->sleep = s_prefs.sleep;
     c->boot = s_boot;
     c->splash = s_screen && now - s_start < SPLASH_MS;
-    c->splash_model = SPLASH_MODEL;
+    c->splash_model = BOARD_MODEL;
     c->splash_fw = "FW " JK_VERSION;
     net_ctx(c, &cfg, now);
     return c;
@@ -580,6 +571,10 @@ void uis_init(void)
 int uis_open_screen(void)
 {
     s_screen = oled_open(uis_contrast());
+    if (s_screen && !BOARD_LCD && !(s_oled_fb = heap_caps_calloc(1, JO_FB_BYTES, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT))) {
+        ESP_LOGE(TAG, "no RAM for the frame: no screen");
+        s_screen = 0;
+    }
     return s_screen;
 }
 
@@ -605,28 +600,25 @@ void uis_button(enum jo_btn b, int down, uint32_t now)
 /* the frame into fb (and, on the colour screen, the ink plane lcd_ink() holds), and to the screen */
 static void draw_frame(uint8_t *fb, const struct jo_ctx *c, uint32_t now)
 {
-#if BOARD_LCD
-    jo_draw_lcd2(fb, lcd_ink(), &s_ui, c, now);
-#else
-    jo_draw(fb, &s_ui, c, now);
-#endif
+    if (BOARD_LCD)
+        jo_draw_lcd2(fb, lcd_ink(), &s_ui, c, now);
+    else
+        jo_draw(fb, &s_ui, c, now);
 }
 
 static void dark_frame(uint8_t *fb)
 {
     memset(fb, 0, FRAME_BYTES);
-#if BOARD_LCD
-    memset(lcd_ink(), 0, JO_LCD2_INK_BYTES);
-#endif
+    if (BOARD_LCD)
+        memset(lcd_ink(), 0, JO_LCD2_INK_BYTES);
 }
 
 static void show_frame(const uint8_t *fb)
 {
-#if BOARD_LCD
-    lcd_show(fb);
-#else
-    oled_show(fb, uis_contrast());
-#endif
+    if (BOARD_LCD)
+        lcd_show(fb);
+    else
+        oled_show(fb, uis_contrast());
 }
 
 void uis_boot_screen(void)

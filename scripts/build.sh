@@ -1,11 +1,12 @@
 #!/bin/bash
 # Builds in the scratch folder from a copy, so managed_components, sdkconfig and build/ never appear in the checkout.
-# Usage: scripts/build.sh [xiao|lcd2]   (the Seeed XIAO ESP32-S3; the Waveshare ESP32-S3-LCD-2, docs/lcd2.md)
+# Usage: scripts/build.sh [auto|xiao|lcd2]   (auto: the release image, XIAO or jank mini 3 told apart at the start; the Seeed
+# XIAO ESP32-S3 alone; the Waveshare ESP32-S3-LCD-2 alone, docs/lcd2.md)
 # JANK_VARIANT names the build (build-<variant>, sdkconfig.<variant>; default the board), JANK_EXTRA_DEFAULTS adds
 # sdkconfig fragments from firmware/, ';'-separated, after the board's (e.g. JANK_EXTRA_DEFAULTS=sdkconfig.mini22).
 set -eu
 BOARD="${1:-xiao}"
-case "$BOARD" in xiao | lcd2) ;; *) echo "unknown board $BOARD: xiao lcd2"; exit 2 ;; esac
+case "$BOARD" in auto | xiao | lcd2) ;; *) echo "unknown board $BOARD: auto xiao lcd2"; exit 2 ;; esac
 VARIANT="${JANK_VARIANT:-$BOARD}"
 EXTRA="${JANK_EXTRA_DEFAULTS:+;$JANK_EXTRA_DEFAULTS}"
 . "$(dirname "$0")/env.sh"

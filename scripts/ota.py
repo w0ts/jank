@@ -230,12 +230,12 @@ def show(done, total, t0=[0.0]):
 
 def default_image():
     scratch = os.environ.get("JANK_SCRATCH") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "worktrees", "jank-scratch")
-    return os.path.join(scratch, "build-xiao", "jank.bin")
+    return os.path.join(scratch, "build-auto", "jank.bin")
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Update a jank over USB MIDI.")
-    ap.add_argument("image", nargs="?", default=default_image(), help="the app image (default: build-xiao/jank.bin)")
+    ap.add_argument("image", nargs="?", default=default_image(), help="the app image (default: build-auto/jank.bin)")
     ap.add_argument("--port", default=PORT, help="the MIDI port's name (default: %(default)s)")
     ap.add_argument("--check", action="store_true", help="check the image and stop")
     args = ap.parse_args(argv)

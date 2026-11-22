@@ -6,14 +6,16 @@ The firmware of the [Jank device](../README.md), for the ESP32-S3 (ESP-IDF). Boa
 
 | Board | Build | Notes |
 |---|---|---|
-| Seeed XIAO ESP32-S3, bare | `scripts/build.sh xiao` | The module alone: BOOT button, yellow LED; MIDI on D6, which is weak (see [boards.md](boards.md)) |
+| **Seeed XIAO ESP32-S3 or jank mini 3, one image** | `scripts/build.sh auto` | The release image. The board is told apart at the start (`firmware/main/board.c`): the LCD-2's motion sensor on GPIO47 / 48 answers (QMI8658 at 0x6A / 0x6B), else a 16 MB flash, else the XIAO. The status line says `board=` and the log how it was chosen |
+| Seeed XIAO ESP32-S3, bare | `scripts/build.sh xiao` | The XIAO alone (and its bench options): BOOT button, yellow LED; MIDI on D6, which is weak (see [boards.md](boards.md)) |
+| jank mini 3 (Waveshare ESP32-S3-LCD-2) | `scripts/build.sh lcd2` | The mini 3 alone ([lcd2.md](lcd2.md)) |
 | Jank PCB | not written yet | The XIAO on the board: pins in [`hardware/pcb/README.md`](../hardware/pcb/README.md). I2C: SDA = D8 = GPIO7, SCL = D9 = GPIO8 |
 
 ## Build and flash
 
 ```
 scripts/install_idf.sh              # once: ESP-IDF v5.5.6 into the scratch folder (needs Python 3.13)
-scripts/build.sh xiao
+scripts/build.sh auto
 ```
 
 The first install of the build with two app slots (partition table, bootloader with rollback) needs download mode once;
@@ -27,7 +29,7 @@ Everything big stays in `$JANK_SCRATCH` (default `worktrees/jank-scratch/`, git-
 first, see [boards.md](boards.md)):
 
 ```
-bash -c '. scripts/env.sh && cd "$JANK_SCRATCH/build-xiao" && python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'
+bash -c '. scripts/env.sh && cd "$JANK_SCRATCH/build-auto" && python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'
 ```
 
 ## Boot order on the mini 3 (lcd2)

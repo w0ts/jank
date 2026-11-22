@@ -17,13 +17,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/uart_ll.h"
-#if defined(BOARD_BENCH_CLK_GPIO) || BOARD_CLK_GPIO >= 0
 #include "hal/gpio_ll.h"
 #include "soc/gpio_struct.h"
-#endif
-#if BOARD_CLK_GPIO >= 0
 #include "jank_clockout.h"
-#endif
 #include "soc/uart_periph.h"
 
 #define MIDI_UART UART_NUM_1
@@ -41,7 +37,9 @@ static DRAM_ATTR struct jc_map s_map;
 static DRAM_ATTR struct jc_ticker s_tick;
 static uint8_t s_running;
 static DRAM_ATTR volatile uint32_t s_late_max_us;   /* the alarm's worst lateness since boot (ABOUT screen): one compare and store per tick */
-#ifdef BOARD_BENCH_CLK_GPIO
+/* the pins the clock's interrupt drives, from the board table (midi_start); -1: none. In DRAM: the interrupt runs while the
+ * flash is written */
+static DRAM_ATTR int8_t s_bench_clk_pin = -1, s_bench_rst_pin = -1, s_clk_pin = -1, s_rst_pin = -1;
 static DRAM_ATTR uint8_t s_bench_clk;   /* the CLK pin's level: it changes on every F8 */
 static DRAM_ATTR uint8_t s_bench_rst;   /* the RST pin is high: low again at the next clock */
 
@@ -50,13 +48,13 @@ static void IRAM_ATTR bench_pins(const struct jc_fire *f)
 {
     for (unsigned i = 0; i < f->n; i++) {
         if (f->bytes[i] == JC_START) {
-            gpio_ll_set_level(&GPIO, BOARD_BENCH_RST_GPIO, 1);
+            gpio_ll_set_level(&GPIO, s_bench_rst_pin, 1);
             s_bench_rst = 2;            /* (this tick's own F8 follows: low at the one after) */
         } else if (f->bytes[i] == JC_CLOCK) {
             s_bench_clk ^= 1u;
-            gpio_ll_set_level(&GPIO, BOARD_BENCH_CLK_GPIO, s_bench_clk);
+            gpio_ll_set_level(&GPIO, s_bench_clk_pin, s_bench_clk);
             if (s_bench_rst && --s_bench_rst == 0)
-                gpio_ll_set_level(&GPIO, BOARD_BENCH_RST_GPIO, 0);
+                gpio_ll_set_level(&GPIO, s_bench_rst_pin, 0);
         }
     }
 }
@@ -72,9 +70,7 @@ static esp_err_t bench_pins_up(void)
         e = gpio_set_level(BOARD_BENCH_RST_GPIO, 0);
     return e;
 }
-#endif
 
-#if BOARD_CLK_GPIO >= 0
 /* The mini 3's CLK / RST jacks (board.h BOARD_CLK_GPIO / BOARD_RST_GPIO; the buffer U21 does not invert: two inverters in
  * series): a short pulse, high in the tick's interrupt and low JCO_PULSE_US later. What goes high is core/jank_clockout.c's
  * decision. The fall comes from a second hardware timer used as a one-shot, armed from inside on_alarm: no task, no polling,
@@ -92,8 +88,8 @@ static bool IRAM_ATTR on_low(gptimer_handle_t timer, const gptimer_alarm_event_d
     (void)timer;
     (void)ev;
     (void)ctx;
-    gpio_ll_set_level(&GPIO, BOARD_CLK_GPIO, 0);
-    gpio_ll_set_level(&GPIO, BOARD_RST_GPIO, 0);
+    gpio_ll_set_level(&GPIO, s_clk_pin, 0);
+    gpio_ll_set_level(&GPIO, s_rst_pin, 0);
     return false;
 }
 
@@ -104,9 +100,9 @@ static void IRAM_ATTR pulse_pins(const struct jc_fire *f)
     if (!(o.clk | o.rst))
         return;
     if (o.clk)
-        gpio_ll_set_level(&GPIO, BOARD_CLK_GPIO, 1);
+        gpio_ll_set_level(&GPIO, s_clk_pin, 1);
     if (o.rst)
-        gpio_ll_set_level(&GPIO, BOARD_RST_GPIO, 1);
+        gpio_ll_set_level(&GPIO, s_rst_pin, 1);
     gptimer_alarm_config_t a = {.alarm_count = JCO_PULSE_US};
     gptimer_set_raw_count(s_low_timer, 0);   /* the free-running counter restarts: the alarm is JCO_PULSE_US from now */
     gptimer_set_alarm_action(s_low_timer, &a);
@@ -143,9 +139,6 @@ static esp_err_t low_timer_up(void)
         e = gptimer_start(s_low_timer);      /* free-running, no alarm until the first pulse arms one */
     return e;
 }
-#else
-void midi_set_clk_rate(unsigned rate) { (void)rate; }
-#endif
 
 /* core 1's load: the cycles spent in on_alarm, summed (one writer, the interrupt; read from core 0 as a running count) */
 static volatile uint32_t s_busy_cyc;
@@ -175,26 +168,22 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
         probe_mark((int64_t)ev->alarm_value + CLK_LEAD_US, now);
 #endif
     uart_ll_write_txfifo(UART_LL_GET_HW(MIDI_UART), f.bytes, f.n);
-#ifdef BOARD_BENCH_CLK_GPIO
-    bench_pins(&f);                      /* right after the UART starts the byte: the edge sits with the start bit */
-#endif
-#if BOARD_CLK_GPIO >= 0
-    pulse_pins(&f);                      /* the same place: the edge sits with the start bit; the fall is a second timer's */
-#endif
+    if (s_bench_clk_pin >= 0)
+        bench_pins(&f);                  /* right after the UART starts the byte: the edge sits with the start bit */
+    if (s_clk_pin >= 0)
+        pulse_pins(&f);                  /* the same place: the edge sits with the start bit; the fall is a second timer's */
     woken = usb_midi_isr(f.bytes, f.n);
     arm(timer, f.next - CLK_LEAD_US, now);
     s_busy_cyc += esp_cpu_get_cycle_count() - c_in;     /* core 1's load: this interrupt's cycles (two counter reads and an add) */
     return woken;
 }
 
-#ifdef BOARD_MIDI_TX_DRIVE
+/* the board's drive strength on a TX pin, when it names one */
 static esp_err_t tx_drive(int pin)
 {
-    return gpio_set_drive_capability(pin, BOARD_MIDI_TX_DRIVE);
+    return BOARD_MIDI_TX_DRIVE >= 0 ? gpio_set_drive_capability(pin, (gpio_drive_cap_t)BOARD_MIDI_TX_DRIVE) : ESP_OK;
 }
-#endif
 
-#ifdef BOARD_MIDI_TX_MORE_GPIOS
 /* More MIDI outs: the same UART TX signal on more pads, through the GPIO matrix, exactly as uart_set_pin routes the first
  * (pad to its GPIO function, then the signal. On the ESP32 / S2 the ROM patch enables the output after the signal is in
  * place; on the S3 the ROM routine enables it first, so the pad is driven low for an instant: the MIDI FET stays off,
@@ -202,57 +191,48 @@ static esp_err_t tx_drive(int pin)
  * The hardware copies each bit to every pad at once: nothing in the clock path changes. */
 static esp_err_t tx_more_up(void)
 {
-    static const int pins[] = BOARD_MIDI_TX_MORE_GPIOS;
+    const int8_t *pins = g_board->midi_tx_more;
     esp_err_t e = ESP_OK;
-    for (size_t i = 0; i < sizeof pins / sizeof pins[0] && e == ESP_OK; i++) {
+    for (size_t i = 0; i < BOARD_MIDI_TX_MORE_MAX && e == ESP_OK; i++) {
+        if (pins[i] < 0)
+            continue;
         if (!GPIO_IS_VALID_OUTPUT_GPIO(pins[i]) || pins[i] == BOARD_MIDI_TX_GPIO)
             return ESP_ERR_INVALID_ARG;
         esp_rom_gpio_pad_select_gpio((uint32_t)pins[i]);
-#ifdef BOARD_MIDI_TX_DRIVE
         e = tx_drive(pins[i]);
-#endif
         if (e == ESP_OK)
             esp_rom_gpio_connect_out_signal((uint32_t)pins[i], UART_PERIPH_SIGNAL(MIDI_UART, SOC_UART_TX_PIN_IDX), false, false);
     }
     return e;
 }
-#endif
 
 static esp_err_t uart_up(void)
 {
     uart_config_t c = {.baud_rate = MIDI_BAUD, .data_bits = UART_DATA_8_BITS, .parity = UART_PARITY_DISABLE, .stop_bits = UART_STOP_BITS_1, .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, .source_clk = UART_SCLK_DEFAULT};
     esp_err_t e = uart_param_config(MIDI_UART, &c);
-#ifdef BOARD_MIDI_TX_INVERT
     /* the loop is sunk by an n-FET whose gate is the TX line: idle must be LOW. Inverted before the pin is routed, so
        the line never pulses high once at start (review mini3-3A W1); the MORE pins carry the same inverted signal */
-    if (e == ESP_OK)
+    if (e == ESP_OK && BOARD_MIDI_TX_INVERT)
         e = uart_set_line_inverse(MIDI_UART, UART_SIGNAL_TXD_INV);
-#endif
     if (e == ESP_OK)
         e = uart_set_pin(MIDI_UART, BOARD_MIDI_TX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-#ifdef BOARD_MIDI_TX_DRIVE
     if (e == ESP_OK)
         e = tx_drive(BOARD_MIDI_TX_GPIO);
-#endif
-#ifdef BOARD_MIDI_TX_MORE_GPIOS
     if (e == ESP_OK && (e = tx_more_up()) != ESP_OK)
         ESP_LOGE(TAG, "more MIDI outs: %s", esp_err_to_name(e));
-#endif
     return e;
 }
 
 static esp_err_t source_pin_up(void)
 {
-#if BOARD_MIDI_SOURCE_GPIO >= 0
+    if (BOARD_MIDI_SOURCE_GPIO < 0)
+        return ESP_OK;
     esp_err_t e = gpio_set_direction(BOARD_MIDI_SOURCE_GPIO, GPIO_MODE_OUTPUT);
     if (e == ESP_OK)
         e = gpio_set_drive_capability(BOARD_MIDI_SOURCE_GPIO, GPIO_DRIVE_CAP_3);
     if (e == ESP_OK)
         e = gpio_set_level(BOARD_MIDI_SOURCE_GPIO, 1);
     return e;
-#else
-    return ESP_OK;
-#endif
 }
 
 static esp_err_t timer_up(void)
@@ -272,11 +252,7 @@ static esp_err_t timer_up(void)
 /* the fall's timer first, so that it exists before the clock's first alarm can fire into pulse_pins */
 static esp_err_t low_timer_first(void)
 {
-#if BOARD_CLK_GPIO >= 0
-    return low_timer_up();
-#else
-    return ESP_OK;
-#endif
+    return s_clk_pin >= 0 ? low_timer_up() : ESP_OK;
 }
 
 /* the interrupt belongs to the core that allocates it */
@@ -298,14 +274,16 @@ esp_err_t midi_start(void)
     esp_err_t e = uart_up();
     if (e == ESP_OK)
         e = source_pin_up();
-#ifdef BOARD_BENCH_CLK_GPIO
-    if (e == ESP_OK)
+    if (e == ESP_OK && BOARD_BENCH_CLK_GPIO >= 0 && BOARD_BENCH_RST_GPIO >= 0) {
         e = bench_pins_up();             /* before the timer: its interrupt drives them from the first tick */
-#endif
-#if BOARD_CLK_GPIO >= 0
-    if (e == ESP_OK)
+        s_bench_clk_pin = BOARD_BENCH_CLK_GPIO;
+        s_bench_rst_pin = BOARD_BENCH_RST_GPIO;
+    }
+    if (e == ESP_OK && BOARD_CLK_GPIO >= 0 && BOARD_RST_GPIO >= 0) {
         e = pulse_pins_up();             /* before the timers: their interrupts drive them from the first tick */
-#endif
+        s_clk_pin = BOARD_CLK_GPIO;
+        s_rst_pin = BOARD_RST_GPIO;
+    }
     if (e != ESP_OK)
         return e;
 #ifdef JANK_CLOCK_PROBE

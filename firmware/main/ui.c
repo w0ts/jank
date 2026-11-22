@@ -20,7 +20,9 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "jank_led.h"
+#if BOARD_ANY_RGB_LED
 #include "led_strip.h"
+#endif
 #include "oled.h"
 #include "uiscreen.h"
 
@@ -34,8 +36,8 @@ void app_bootloader(void);
 void app_reboot(void);
 
 static const char *TAG = "ui";
-#if BOARD_LED_RGB_GPIO >= 0
-static led_strip_handle_t s_strip;
+#if BOARD_ANY_RGB_LED
+static led_strip_handle_t s_strip;       /* the RGB LEDs (BOARD_LED_RGB_GPIO >= 0) */
 #endif
 static SemaphoreHandle_t s_scanning;     /* one sweep at a time: the button's or the page's */
 static enum jl_event s_event;
@@ -46,21 +48,21 @@ static struct uis_led s_led;           /* the state the screen shows, for the LE
 /* LED1 shows it; LED2 too on USB power only (on the cell one LED at a time: the board README's 24 mA) */
 static void led_show(uint8_t r, uint8_t g, uint8_t b)
 {
-#if BOARD_LED_RGB_GPIO >= 0
-    led_strip_clear(s_strip);
-    if (r || g || b) {
-        led_strip_set_pixel(s_strip, 0, r, g, b);
-        if (BOARD_LED_COUNT > 1 && s_led.on_usb)
-            led_strip_set_pixel(s_strip, BOARD_LED_COUNT - 1, r, g, b);
+#if BOARD_ANY_RGB_LED
+    if (BOARD_LED_RGB_GPIO >= 0 && s_strip) {
+        led_strip_clear(s_strip);
+        if (r || g || b) {
+            led_strip_set_pixel(s_strip, 0, r, g, b);
+            if (BOARD_LED_COUNT > 1 && s_led.on_usb)
+                led_strip_set_pixel(s_strip, BOARD_LED_COUNT - 1, r, g, b);
+        }
+        led_strip_refresh(s_strip);
+        return;
     }
-    led_strip_refresh(s_strip);
-#elif BOARD_LED_MONO_GPIO >= 0
-    gpio_set_level(BOARD_LED_MONO_GPIO, !(r || g || b));   /* active low */
-#else
-    (void)r;                             /* no LED on a pin (the lcd2): the screen is the language */
-    (void)g;
-    (void)b;
 #endif
+    if (BOARD_LED_MONO_GPIO >= 0) {
+        gpio_set_level(BOARD_LED_MONO_GPIO, !(r || g || b));   /* active low */
+    }                                    /* else no LED on a pin (the lcd2): the screen is the language */
 }
 
 static void led_event(enum jl_event e, uint32_t group)
@@ -88,8 +90,7 @@ static void led_step(uint32_t now)
     s_event = JL_NONE;
     app_cfg_get(&cfg);
     joined = bridge_beat(&beat, &mpb);
-#if BOARD_LED_RGB_GPIO >= 0
-    {
+    if (BOARD_LED_RGB_GPIO >= 0) {
         struct jlg_state s = {now, s_led.batt_pct, s_led.on_usb, (uint8_t)joined, s_led.running, s_led.armed, s_led.low_conf,
                               s_led.bar_locked, beat, mpb, cfg.quantum};
         if (!s_led.valid)
@@ -98,7 +99,6 @@ static void led_step(uint32_t now)
         led_show(c[0], c[1], c[2]);
         return;
     }
-#endif
     lit = jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum);
     if (joined && lit != (cfg.net == JK_NET_WIFI) && beat_bar_state() == 2 && jk_led_bar_one(beat, cfg.quantum))
         led_show(JK_LED_ONE_RGB);        /* AUTO BAR locked: the bar's 1 flashes amber (the music's 1) */
@@ -192,10 +192,10 @@ static void auto_scan(uint32_t now)
         return;
     if (xSemaphoreTake(s_scanning, 0) != pdTRUE)
         return;
-#if BOARD_LED_RGB_GPIO >= 0
-    led_event(JL_SCANNING, cfg.group);   /* (a mono LED cannot show magenta: it would light for the whole sweep, a long flash every 6 s) */
-    led_step(bridge_ms() + LED_EVERY_MS);
-#endif
+    if (BOARD_LED_RGB_GPIO >= 0) {       /* (a mono LED cannot show magenta: it would light for the whole sweep, a long flash every 6 s) */
+        led_event(JL_SCANNING, cfg.group);
+        led_step(bridge_ms() + LED_EVERY_MS);
+    }
     sweep(cfg.group);
     bridge_note_scan_groups(&seen);
     next = js_pick(&seen, cfg.group, bridge_ms());
@@ -265,12 +265,7 @@ struct pad {
     uint8_t raw, level;
     uint32_t t_raw;
 };
-static struct pad s_pad[JO_BTNS] = {
-    [JO_UP] = {BOARD_BTN_UP_GPIO, 0, 0, 0},
-    [JO_DOWN] = {BOARD_BTN_DOWN_GPIO, 0, 0, 0},
-    [JO_NO] = {BOARD_BUTTON_GPIO, 0, 0, 0},
-    [JO_YES] = {BOARD_BTN_YES_GPIO, 0, 0, 0},
-};
+static struct pad s_pad[JO_BTNS];       /* the pins from the board table (ui_start) */
 
 static int pressed(int gpio) { return gpio >= 0 && !gpio_get_level(gpio); }   /* to GND, pulled up */
 
@@ -329,16 +324,18 @@ static void ui_task(void *arg)
 
 static esp_err_t led_up(void)
 {
-#if BOARD_LED_RGB_GPIO >= 0
-    led_strip_config_t strip = {.strip_gpio_num = BOARD_LED_RGB_GPIO, .max_leds = BOARD_LED_COUNT, .led_model = LED_MODEL_WS2812, .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB};
-    led_strip_rmt_config_t rmt = {.clk_src = RMT_CLK_SRC_DEFAULT, .resolution_hz = 10000000};
-    return led_strip_new_rmt_device(&strip, &rmt, &s_strip);
-#elif BOARD_LED_MONO_GPIO >= 0
-    esp_err_t e = gpio_set_direction(BOARD_LED_MONO_GPIO, GPIO_MODE_OUTPUT);
-    return e == ESP_OK ? gpio_set_level(BOARD_LED_MONO_GPIO, 1) : e;
-#else
-    return ESP_OK;
+#if BOARD_ANY_RGB_LED
+    if (BOARD_LED_RGB_GPIO >= 0) {
+        led_strip_config_t strip = {.strip_gpio_num = BOARD_LED_RGB_GPIO, .max_leds = (uint32_t)BOARD_LED_COUNT, .led_model = LED_MODEL_WS2812, .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB};
+        led_strip_rmt_config_t rmt = {.clk_src = RMT_CLK_SRC_DEFAULT, .resolution_hz = 10000000};
+        return led_strip_new_rmt_device(&strip, &rmt, &s_strip);
+    }
 #endif
+    if (BOARD_LED_MONO_GPIO >= 0) {
+        esp_err_t e = gpio_set_direction(BOARD_LED_MONO_GPIO, GPIO_MODE_OUTPUT);
+        return e == ESP_OK ? gpio_set_level(BOARD_LED_MONO_GPIO, 1) : e;
+    }
+    return ESP_OK;
 }
 
 esp_err_t ui_screen_early(void)
@@ -351,7 +348,11 @@ esp_err_t ui_screen_early(void)
 esp_err_t ui_start(void)
 {
     esp_err_t e = ESP_OK;
-    static const int PADS[] = {BOARD_BTN_UP_GPIO, BOARD_BTN_DOWN_GPIO, BOARD_BTN_YES_GPIO, BOARD_BTN_NO2_GPIO};
+    const int PADS[] = {BOARD_BTN_UP_GPIO, BOARD_BTN_DOWN_GPIO, BOARD_BTN_YES_GPIO, BOARD_BTN_NO2_GPIO};
+    s_pad[JO_UP].gpio = BOARD_BTN_UP_GPIO;
+    s_pad[JO_DOWN].gpio = BOARD_BTN_DOWN_GPIO;
+    s_pad[JO_NO].gpio = BOARD_BUTTON_GPIO;
+    s_pad[JO_YES].gpio = BOARD_BTN_YES_GPIO;
     gpio_config_t c = {.pin_bit_mask = 1ull << BOARD_BUTTON_GPIO, .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE};
     for (size_t i = 0; i < sizeof PADS / sizeof PADS[0]; i++)
         if (PADS[i] >= 0)

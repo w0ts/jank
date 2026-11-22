@@ -256,12 +256,12 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
     cfg.descriptor.full_speed_config = CONFIG_DESC;
     cfg.descriptor.string = STRINGS;
     cfg.descriptor.string_count = STR_COUNT;
-#if BOARD_VBUS_SENSE_GPIO >= 0
-    /* a board with its own power: the D+ pull-up only while VBUS is there (esp_tinyusb's VBUS monitor on VBUS_SENSE; the
-     * GPIO interrupt service is usbrole_boot's) */
-    cfg.phy.self_powered = true;
-    cfg.phy.vbus_monitor_io = BOARD_VBUS_SENSE_GPIO;
-#endif
+    if (BOARD_VBUS_SENSE_GPIO >= 0) {
+        /* a board with its own power: the D+ pull-up only while VBUS is there (esp_tinyusb's VBUS monitor on VBUS_SENSE;
+         * the GPIO interrupt service is usbrole_boot's) */
+        cfg.phy.self_powered = true;
+        cfg.phy.vbus_monitor_io = BOARD_VBUS_SENSE_GPIO;
+    }
     memcpy(net.mac_addr, mac, 6);
     e = drive_start();
     if (e != ESP_OK)                     /* the page on a web site still works: the network and MIDI go on without it */

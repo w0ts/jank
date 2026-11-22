@@ -11,6 +11,7 @@
 #define USBPORT_H
 #include <stdint.h>
 #include "esp_err.h"
+#include "board.h"
 
 struct usbport_state {
     uint8_t cc;                          /* enum jur_cc: nothing, a device (jank sources), a host or charger (jank sinks) */
@@ -29,6 +30,11 @@ struct usbport {
     void (*vbus_on)(int on);             /* jank's 5 V onto VBUS or off it: any time, at once */
 };
 
-/* the board's port, or NULL (no port chip) */
-const struct usbport *usbport_board(void);
+/* the board's port, or NULL (no port HAL): usbport_tusb320 (jank mini 2.2) or usbport_mini3 (jank mini 3), by the board table */
+const struct usbport *usbport_tusb320(void);
+const struct usbport *usbport_mini3(void);
+static inline const struct usbport *usbport_board(void)
+{
+    return BOARD_USBPORT_MINI3 ? usbport_mini3() : BOARD_USBPORT_TUSB320 ? usbport_tusb320() : NULL;
+}
 #endif

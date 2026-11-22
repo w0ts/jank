@@ -16,7 +16,6 @@
  * not readable back (an output), so the gate trusts power_early_init and refuses when the board file has no V5_EN. */
 #include "board.h"
 #include "usbport.h"
-#if BOARD_USBPORT_MINI3
 #include "app.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
@@ -124,5 +123,4 @@ static const struct usbport PORT = {
     .vbus_on = vbus_on,
 };
 
-const struct usbport *usbport_board(void) { return &PORT; }
-#endif
+const struct usbport *usbport_mini3(void) { return &PORT; }

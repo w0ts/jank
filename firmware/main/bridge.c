@@ -37,12 +37,8 @@ struct slot {
 
 static const char *TAG = "bridge";
 /* the frame slots: tasks only touch them (the Wi-Fi, TinyUSB and bridge tasks, never an interrupt), and NCM and Wi-Fi copy
- * a frame out before sending it. With BOARD_BRIDGE_SLOTS_PSRAM (the mini 3) they are allocated in PSRAM by bridge_start */
-#if BOARD_BRIDGE_SLOTS_PSRAM
-static struct slot *s_slot;
-#else
-static struct slot s_slot[SLOTS];
-#endif
+ * a frame out before sending it. Allocated by bridge_start: in PSRAM with BOARD_BRIDGE_SLOTS_PSRAM (the mini 3), else internal */
+static struct slot *s_slot;            /* SLOTS of them, from the heap (bridge_start): PSRAM on boards short of internal RAM */
 static QueueHandle_t s_free, s_work;
 static SemaphoreHandle_t s_lock;
 static struct jk_bridge s_b;
@@ -552,12 +548,11 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
 {
     esp_err_t e;
     s_cfg = *cfg;
-#if BOARD_BRIDGE_SLOTS_PSRAM
     if (!s_slot)
-        s_slot = heap_caps_calloc(SLOTS, sizeof *s_slot, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_slot = heap_caps_calloc(SLOTS, sizeof *s_slot,
+                                  (BOARD_BRIDGE_SLOTS_PSRAM ? MALLOC_CAP_SPIRAM : MALLOC_CAP_INTERNAL) | MALLOC_CAP_8BIT);
     if (!s_slot)
         return ESP_ERR_NO_MEM;
-#endif
     s_lock = xSemaphoreCreateMutex();
     s_free = xQueueCreate(SLOTS, 1);
     s_work = xQueueCreate(SLOTS, 1);

@@ -5,7 +5,6 @@
  * mode"). The usb order has no U17: open() answers 0 and the port is device only. */
 #include "board.h"
 #include "usbport.h"
-#if BOARD_USBPORT_TUSB320
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
@@ -105,10 +104,10 @@ static esp_err_t vbus_prep(int on)
     return ESP_OK;
 }
 
-static const struct usbport PORT = {
+static struct usbport PORT = {        /* irq_gpio is the board's, set by usbport_tusb320() */
     .name = "TUSB320LI",
     .prep_ms = PUMP_PREP_MS,
-    .irq_gpio = BOARD_CC_INT_GPIO,
+    .irq_gpio = -1,
     .open = open_port,
     .read = read_port,
     .set_mode = set_mode,
@@ -116,7 +115,8 @@ static const struct usbport PORT = {
     .vbus_on = vbus_on,
 };
 
-const struct usbport *usbport_board(void) { return &PORT; }
-#elif !BOARD_USBPORT_MINI3
-const struct usbport *usbport_board(void) { return NULL; }
-#endif
+const struct usbport *usbport_tusb320(void)
+{
+    PORT.irq_gpio = BOARD_CC_INT_GPIO;
+    return &PORT;
+}

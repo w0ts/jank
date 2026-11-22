@@ -307,11 +307,10 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
     <p>Chrome or Edge on a computer, a USB-C cable that carries data.</p>
     <ol>
       <li>Put the device in download mode. A new one: hold BOOT (the XIAO's B button) while plugging it in. One that runs Jank: on the <a href="device.html">Device</a> page, Connect, then Advanced, Firmware, Download mode.</li>
-      <li>Choose the device and the release, press Flash and pick the port the browser lists.</li>
+      <li>Choose the release, press Flash and pick the port the browser lists. One firmware for both devices: it finds out at the start which one it runs on.</li>
       <li>When it is done, unplug the device and plug it back in. Its settings are kept.</li>
     </ol>
     <div class="row">
-      <label>Device <select id="fw-board"><option value="xiao">Bare device (Seeed XIAO ESP32-S3)</option><option value="lcd2">jank mini 3</option></select></label>
       <label>Release <select id="fw-tag" disabled><option>-</option></select></label>
     </div>
   </section>
@@ -484,25 +483,27 @@ if (typeof module !== 'undefined') module.exports = BeatW;
 </script>
 <script type="module">
 // The releases the site carries: firmware/index.json (scripts/publish_firmware.py), newest first:
-// { releases: [ { tag, boards: { xiao: { parts: [ { path, offset } ], beatw: { offset, size } }, lcd2: ... } } ] }.
+// { releases: [ { tag, boards: { auto: { parts: [ { path, offset } ], beatw: { offset, size } } } } ] }: one image for the
+// bare XIAO and the jank mini 3 (it tells them apart at the start, firmware/main/board.c).
 // Flashing: esptool-js over Web Serial, each part at its own address (the settings partition is not touched); with the
 // box ticked, madmom's model converted here (ui/beatw.js) goes into the beatw partition.
 const ESPTOOL = "https://cdn.jsdelivr.net/npm/esptool-js@0.7.1/bundle.js";
 const $ = (id) => document.getElementById(id);
-const board = $("fw-board"), tag = $("fw-tag"), note = $("fw-note"), flash = $("fw-flash"), beat = $("fw-beat"), bar = $("fw-progress");
+const BOARD = "auto";
+const tag = $("fw-tag"), note = $("fw-note"), flash = $("fw-flash"), beat = $("fw-beat"), bar = $("fw-progress");
 let releases = [], busy = false;
-const chosen = () => { const r = releases.find((x) => x.tag === tag.value); return r && r.boards && r.boards[board.value]; };
+const chosen = () => { const r = releases.find((x) => x.tag === tag.value); return r && r.boards && r.boards[BOARD]; };
 const say = (t, bad) => { note.textContent = t; note.classList.toggle("bad", !!bad); };
 const canSerial = "serial" in navigator && window.isSecureContext;
 function show() {
   const b = chosen();
   flash.disabled = busy || !b || !canSerial;
   if (busy) return;
-  say(!releases.length ? "No release yet." : !b ? "This release has no firmware for this device."
+  say(!releases.length ? "No release yet." : !b ? "This release has no firmware for the Install page."
     : !canSerial ? "This browser cannot flash: use Chrome or Edge on a computer, on the https page." : "");
 }
 function fill() {
-  const list = releases.filter((r) => r.boards && r.boards[board.value]);
+  const list = releases.filter((r) => r.boards && r.boards[BOARD]);
   tag.replaceChildren(...(list.length ? list : [{ tag: "-" }]).map((r) => new Option(r.tag, r.tag)));
   tag.disabled = !list.length;
   show();
@@ -553,7 +554,6 @@ async function run() {
     show();
   }
 }
-board.addEventListener("change", fill);
 tag.addEventListener("change", show);
 flash.addEventListener("click", run);
 fetch("firmware/index.json", { cache: "no-cache" })

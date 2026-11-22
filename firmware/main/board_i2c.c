@@ -7,15 +7,16 @@
 #include "board.h"
 #include "esp_log.h"
 
-#if BOARD_I2C_SDA_GPIO >= 0 && BOARD_I2C_SCL_GPIO >= 0
 static i2c_master_bus_handle_t s_bus;
 static esp_err_t s_err = ESP_ERR_INVALID_STATE;
 static int s_tried;
-#endif
 
 esp_err_t board_i2c_bus(i2c_master_bus_handle_t *out)
 {
-#if BOARD_I2C_SDA_GPIO >= 0 && BOARD_I2C_SCL_GPIO >= 0
+    if (BOARD_I2C_SDA_GPIO < 0 || BOARD_I2C_SCL_GPIO < 0) {
+        *out = NULL;
+        return ESP_ERR_NOT_SUPPORTED;
+    }
     if (!s_tried) {
         i2c_master_bus_config_t bc = {
             .i2c_port = -1,
@@ -32,8 +33,4 @@ esp_err_t board_i2c_bus(i2c_master_bus_handle_t *out)
     }
     *out = s_bus;
     return s_err;
-#else
-    *out = NULL;
-    return ESP_ERR_NOT_SUPPORTED;
-#endif
 }

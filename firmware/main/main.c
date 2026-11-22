@@ -117,6 +117,7 @@ void app_diag(char *out, size_t cap)
 void app_main(void)
 {
     uint8_t efuse[6], mac[6], peer_mac[6];
+    board_init();                        /* which board, before any pin is driven (board.c) */
     power_early_init();
     count_boot();
     panic_info_take();

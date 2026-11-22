@@ -4,14 +4,11 @@ set(link "../../third_party/link")
 set(beat "${core}/beat")
 # the screen: the I2C OLED, or the lcd2's SPI colour panel behind the same interface (oled.h). PRIV_REQUIRES cannot depend on
 # the sdkconfig (it is read before it is loaded): esp_lcd and esp_driver_spi are listed for every board and linked only where used.
-if(CONFIG_JANK_BOARD_LCD2)
-    set(screen_srcs "lcd.c" "${core}/jank_lcd.c" "${core}/jank_oled_lcd2.c" "${core}/jank_bigfont.c" "${core}/jank_bigfont_tables.c")
-else()
-    set(screen_srcs "oled.c")
-endif()
+# both screen drivers in every build: the board is chosen at run time (board.c)
+set(screen_srcs "oled.c" "lcd.c" "${core}/jank_lcd.c" "${core}/jank_oled_lcd2.c" "${core}/jank_bigfont.c" "${core}/jank_bigfont_tables.c")
 # The beat network's weights are not in this image: the firmware reads them from its "beatw" partition (core/beat/beat_weights.h).
 idf_component_register(
-    SRCS "main.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c" "fft_dsp.c"
+    SRCS "main.c" "board.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c" "fft_dsp.c"
          "usb_audio.c" "beat.c" "linein.c" "${core}/jank_line.c"
          "usb_hostlib.c" "usb_uac_host.c" "usbrole.c" "usbport_tusb320.c" "pump.c" "power.c"
          "usbport_mini3.c" "${core}/jank_usbhost.c"
@@ -29,9 +26,9 @@ idf_component_register(
 )
 # the beat front end's FFT: esp-dsp's S3 assembly kernel (fft_dsp.c) instead of core/beat's scalar one (the host tests keep that one)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE JB_FFT_FAST=1)
-# the filterbank's 1428 weights (5.7 KB) copied into internal RAM once instead of read from flash every hop; not on the lcd2,
-# which has 7 KB of static RAM left (jb_fe.c)
-if(NOT CONFIG_JANK_BOARD_LCD2)
+# the filterbank's 1428 weights (5.7 KB) copied into internal RAM once instead of read from flash every hop; not on the lcd2
+# nor in the auto image (it runs on the lcd2, which has 7 KB of static RAM left; jb_fe.c)
+if(CONFIG_JANK_BOARD_XIAO OR CONFIG_JANK_BOARD_MINI22)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE JB_FB_IN_RAM=1)
 endif()
 # the last panic is kept across the restart (panic_info.c): ESP-IDF's panic handler is wrapped, the real one still runs
