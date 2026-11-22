@@ -12,6 +12,7 @@
 #include <string.h>
 #include "jb_fe.h"
 #include "jb_lstm.h"
+#include "beatw_load.h"
 
 #define PI_D 3.14159265358979323846
 #define SECONDS 20
@@ -132,6 +133,7 @@ static void test_pipeline(void)
 
 int main(void)
 {
+    beatw_load();
     test_sqrt();
     test_log10();
     test_pipeline();

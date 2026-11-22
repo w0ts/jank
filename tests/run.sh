@@ -117,12 +117,20 @@ fi
 "$CC" $FLAGS -I"$HERE/third_party/link" "$HERE/tests/test_solo.c" "$HERE/core/jank_peer.c" "$HERE/core/jank_beatlink.c" "$HERE/core/jank_hold.c" "$HERE/core/jank_clock.c" $LINK -lm -o "$OUT/test_solo"
 "$OUT/test_solo"
 
+# The beat network's weights: madmom's, never in the source (core/beat/beat_weights.h). The blob is made here from madmom's
+# model with the Install page's converter (ui/beatw.js), so the results below also check that converter. MADMOM_BEATS_PKL
+# names the model (default: the one in beat/.venv's madmom; or madmom's own repository: CPJKU/madmom_models,
+# beats/2016/beats_lstm_1.pkl).
+MADMOM_BEATS_PKL="${MADMOM_BEATS_PKL:-$(ls "$HERE"/beat/.venv/lib/python3*/site-packages/madmom/models/beats/2016/beats_lstm_1.pkl 2>/dev/null | head -1)}"
+[ -n "$MADMOM_BEATS_PKL" ] && [ -f "$MADMOM_BEATS_PKL" ] || { echo "beat: no madmom model: set MADMOM_BEATS_PKL to beats_lstm_1.pkl (madmom's models, beats/2016)"; exit 1; }
+node "$HERE/scripts/beat_weights.js" "$MADMOM_BEATS_PKL" "$OUT/beat_weights.bin" >/dev/null
+export BEAT_WEIGHTS="$OUT/beat_weights.bin"
 # The beat tracker. BEAT_WAV_DIR (mono 44.1 kHz WAVs, see test_beat.c) adds the run on audio against madmom's results.
 "$CC" $FLAGS -std=c11 -I"$HERE/core/beat" "$HERE/tests/test_beat.c" "$HERE"/core/beat/*.c -lm -o "$OUT/test_beat"
 "$OUT/test_beat" "$HERE/tests/beat_ref"
 
 # The front end's cheap stages (fast sqrt, ...) against their exact references: JB_FE_STAGES makes the stages public.
-"$CC" $FLAGS -std=c11 -DJB_FE_STAGES -I"$HERE/core/beat" "$HERE/tests/test_fe_approx.c" "$HERE/core/beat/jb_fe.c" "$HERE/core/beat/jb_lstm.c" "$HERE/core/beat/beat_model.c" -lm -o "$OUT/test_fe_approx"
+"$CC" $FLAGS -std=c11 -DJB_FE_STAGES -I"$HERE/core/beat" "$HERE/tests/test_fe_approx.c" "$HERE/core/beat/jb_fe.c" "$HERE/core/beat/jb_lstm.c" "$HERE/core/beat/beat_model.c" "$HERE/core/beat/beat_weights.c" -lm -o "$OUT/test_fe_approx"
 
 # The two-stage FFT kernel the firmware runs (core/beat/jb_fft_r22.c) against the scalar FFT and a double DFT.
 "$CC" $FLAGS -std=c11 -I"$HERE/core/beat" "$HERE/tests/test_fft_r22.c" "$HERE/core/beat/jb_fft_r22.c" "$HERE/core/beat/jb_fe.c" "$HERE/core/beat/beat_model.c" -lm -o "$OUT/test_fft_r22"

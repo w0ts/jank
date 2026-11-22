@@ -229,8 +229,12 @@ size_t jk_intr_summary(const char *dump, char *out, size_t cap);
 #define JK_CTL_OUT_MAX 2040u         /* the firmware's answer buffer (ctl.c): the longest status (1871) and `beat` with every counter at its largest (1963, M2m's profile) fit with the ok, tests/test_ctl.c; under usb.c's 2048 */
 /* the control line protocol (SysEx on the USB MIDI port: jank_sysex.h). Each answer is lines of text ending in "ok" or "err <why>". */
 /* the beat tracker's numbers, for the `beat` command (BENCH BUILD, see README) */
+#define JK_WEIGHTS_NONE 0u           /* no network weights in the "beatw" partition: no beat follow (core/beat/beat_weights.h) */
+#define JK_WEIGHTS_OK 1u
+#define JK_WEIGHTS_DAMAGED 2u        /* a blob is there but its size or check sum is wrong */
 struct jk_beat {
     uint8_t on;                       /* the setting */
+    uint8_t weights;                  /* JK_WEIGHTS_*: whether the tracker has its network weights */
     uint8_t audio;                    /* the tracker's source is open (the computer's stream, a hosted device's) */
     uint8_t audio_live;               /* ... and it has sound: AUDIO mode (core/jank_live.h); 0: LINK mode */
     int8_t fold_exp;                  /* AUDIO mode's fold, 2^fold_exp (core/jank_fold.h) */

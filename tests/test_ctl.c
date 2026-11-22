@@ -425,7 +425,11 @@ static void test_beat(void)
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .mode = 1, .bpm_x100 = 12345, .heap_min = 90000, .cpu_pct_x10 = 253, .packets = 77};
     CHECK(run("beat") == JK_CTL_NONE);
     CHECK(strstr(out, "mode=steady\n") && strstr(out, "bpm=123.45\n") && strstr(out, "heap_min=90000\n"));
-    CHECK(strstr(out, "cpu_pct=25.3\n") && strstr(out, "packets=77\n") && strstr(out, "madmom BENCH ONLY") && ends(out, "ok\n"));
+    CHECK(strstr(out, "cpu_pct=25.3\n") && strstr(out, "packets=77\n") && strstr(out, "beat_weights=none\n") && ends(out, "ok\n"));
+    snap.beat.weights = JK_WEIGHTS_OK;               /* the weights blob bound (core/beat/beat_weights.h) */
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "beat_weights=ok\n"));
+    snap.beat.weights = JK_WEIGHTS_DAMAGED;
+    CHECK(run("beat") == JK_CTL_NONE && strstr(out, "beat_weights=damaged\n"));
     /* the source open and sounding (AUDIO mode), the meter, the confidence: in beat and status alike */
     snap.beat = (struct jk_beat){.on = 1, .audio = 1, .audio_live = 1, .level_db = -21, .level_min_db = -30, .level_max_db = -14,
                                  .peak_db = -6, .conf_pct = 73};

@@ -11,11 +11,15 @@ struct layer {
     const float *w, *r, *b, *p;
 };
 
-static const struct layer LAYERS[JB_LAYERS] = {
-    {BEAT_INPUTS, beat_l0_w, beat_l0_r, beat_l0_b, beat_l0_p},
-    {H, beat_l1_w, beat_l1_r, beat_l1_b, beat_l1_p},
-    {H, beat_l2_w, beat_l2_r, beat_l2_b, beat_l2_p},
-};
+/* layer i's weights: they live in the weights blob (beat_weights.h), so they are looked up at run time */
+static struct layer layer_of(int i)
+{
+    if (i == 0)
+        return (struct layer){BEAT_INPUTS, beat_l0_w, beat_l0_r, beat_l0_b, beat_l0_p};
+    if (i == 1)
+        return (struct layer){H, beat_l1_w, beat_l1_r, beat_l1_b, beat_l1_p};
+    return (struct layer){H, beat_l2_w, beat_l2_r, beat_l2_b, beat_l2_p};
+}
 
 static float sigmoid(float x)
 {
@@ -65,7 +69,8 @@ float jb_lstm_step(struct jb_lstm *s, const float *feat)
 {
     const float *x = feat;
     for (int i = 0; i < JB_LAYERS; ++i) {
-        layer_step(&LAYERS[i], s->h[i], s->c[i], x);
+        const struct layer l = layer_of(i);
+        layer_step(&l, s->h[i], s->c[i], x);
         x = s->h[i];
     }
     float a = beat_out_b[0];

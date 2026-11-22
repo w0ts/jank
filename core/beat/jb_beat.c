@@ -1,10 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The beat tracker's pipeline (jb_beat.h). */
 #include "jb_beat.h"
+#include "beat_weights.h"
 #include <string.h>
 
 int jb_beat_init(struct jb_beat *b)
 {
+    if (!beat_weights_ready())         /* no network weights bound (beat_weights.h): no tracker */
+        return -1;
     jb_fe_init(&b->fe);
     jb_lstm_init(&b->net);
     b->q16 = 0;
@@ -16,6 +19,8 @@ int jb_beat_init(struct jb_beat *b)
 int jb_beat_init_q16(struct jb_beat *b)
 {
     int r = jb_beat_init(b);
+    if (r != 0)
+        return r;
     jb_lstm_q16_build();
     b->q16 = 1;
     return r;

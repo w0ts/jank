@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* BEAT-FOLLOW BENCH BUILD. The beat tracker's task: the computer's audio (usb_audio.c) through madmom's online beat tracker
+/* The beat tracker's task: the computer's audio (usb_audio.c) through madmom's online beat tracker
  * (core/beat/: front end, one LSTM network, DBN 90..180 BPM, ModeBpm) into the Link session as master (core/jank_beatlink.c).
- * The network's WEIGHTS ARE MADMOM'S (CC BY-NC-SA 4.0, core/beat/beat_model.c): for this bench only, never to be pushed or
- * shipped; our own network replaces them.
+ * The network's weights are NOT in this image: they come from the "beatw" partition (weights_bind below, beat_weights.h).
+ * madmom's (CC BY-NC-SA 4.0) are put there only by the user, through the Install page's builder; none: no beat follow.
  *
  * Core 0, below the Wi-Fi and Link tasks (priority 3), woken every 5 ms: it takes what the ring holds, 441 samples (one
  * 10 ms hop) at a time, so one pass of work is one frame. Core 1 stays the MIDI clock's alone.
@@ -34,9 +34,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "app.h"
+#include "beat_weights.h"
 #include "esp_cpu.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_partition.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -125,6 +127,7 @@ static uint8_t s_conf_hold;            /* M2k: the weak confidence holds its las
 static double s_conf_shown, s_conf_at; /* the confidence shown (jcf_show_step) and the stream time of its step */
 static struct jbl s_jbl;
 static TaskHandle_t s_task;
+static uint8_t s_weights = JK_WEIGHTS_NONE;   /* the network weights (weights_bind) */
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static struct jk_beat s_pub;           /* published to beat_stats, under s_mux */
 static struct jb_down s_down;          /* the downbeat estimator, the beat task's own */
@@ -1065,6 +1068,7 @@ void beat_stats(struct jk_beat *out)
     portENTER_CRITICAL(&s_mux);
     *out = s_pub;
     portEXIT_CRITICAL(&s_mux);
+    out->weights = s_weights;
     out->heap_free = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     out->heap_min = (uint32_t)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
     out->heap_largest = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
@@ -1157,8 +1161,40 @@ uint8_t beat_bar_state(void)
     return s;
 }
 
+/* The network's weights: not in this image, in the "beatw" data partition (core/beat/beat_weights.h), written by the Install
+ * page's builder at the user's click (madmom's model, CC BY-NC-SA 4.0, for the user's own device) or by our own tools.
+ * Mapped once and kept mapped: the int16 copy is built from it and the biases / peepholes are read from it. */
+#define BEATW_SUBTYPE 0x40
+
+static void weights_bind(void)
+{
+    const esp_partition_t *p = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, BEATW_SUBTYPE, "beatw");
+    if (!p) {
+        ESP_LOGW(TAG, "beat weights: no beatw partition (an older partition table: flash a full image): no beat follow");
+        return;
+    }
+    const void *m = NULL;
+    esp_partition_mmap_handle_t h;
+    if (esp_partition_mmap(p, 0, p->size, ESP_PARTITION_MMAP_DATA, &m, &h) != ESP_OK) {
+        ESP_LOGE(TAG, "beat weights: cannot map the beatw partition: no beat follow");
+        return;
+    }
+    const enum beat_weights_err e = beat_weights_bind(m, p->size);
+    if (e != BW_OK) {
+        esp_partition_munmap(h);
+        s_weights = (e == BW_COUNT || e == BW_CRC) ? JK_WEIGHTS_DAMAGED : JK_WEIGHTS_NONE;
+        ESP_LOGW(TAG, "beat weights: %s: no beat follow (the Install page adds them)", beat_weights_why(e));
+        return;
+    }
+    s_weights = JK_WEIGHTS_OK;
+    ESP_LOGI(TAG, "beat weights: %u from the beatw partition", (unsigned)BEAT_WEIGHTS_COUNT);
+}
+
 esp_err_t beat_start(void)
 {
+    weights_bind();
+    if (!beat_weights_ready())
+        return ESP_OK;                 /* no tracker; everything else runs (beat_state / beat_gate read "no audio") */
     jbl_init(&s_jbl);
     esp_register_freertos_idle_hook_for_cpu(idle_hook, 0);
     s_b.clock = cycles_now;
@@ -1215,6 +1251,5 @@ esp_err_t beat_start(void)
         ESP_LOGI(TAG, "ROBUST: %u bytes + %u bytes in PSRAM", (unsigned)sizeof s_robust, (unsigned)sizeof *s_robust_store);
     else
         ESP_LOGW(TAG, "ROBUST: no PSRAM for its ring, off");
-    ESP_LOGW(TAG, "BEAT-FOLLOW BENCH BUILD: madmom's weights, CC BY-NC-SA 4.0, never ship");
     return xTaskCreatePinnedToCore(beat_task, "beat", BEAT_STACK, NULL, BEAT_PRIO, &s_task, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

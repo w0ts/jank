@@ -1,8 +1,20 @@
-# Beat follow (bench build)
+# Beat follow
 
-**Bench only. The network weights in `core/beat/beat_model.c` are madmom's (CC BY-NC-SA 4.0): never push or ship an
-image of this build.** Our own network will replace that file. The build says so at configure time, in the boot log, in
-the `beat` answer (`beat_weights=`) and on the control page.
+**The network's weights are not in the firmware image or in this repository.** The firmware reads them from its own
+flash partition, `beatw` (128 KB at 0x620000; 0x340000 on the mini 2.2), as a blob (`core/beat/beat_weights.h`: "JBW1",
+count, CRC-32, then 29,251 float32). With no valid blob the tracker does not start and everything else runs; the `beat`
+answer says `beat_weights=none|ok|damaged`.
+
+The weights used today are madmom's beat model (`beats/2016/beats_lstm_1.pkl` of `CPJKU/madmom_models`, CC BY-NC-SA 4.0,
+non-commercial). Jank's firmware is GPL-3.0 and carries Ableton Link code under the GPL, so the two cannot be shipped in
+one image. Instead the Install page fetches madmom's model from madmom's own repository at the user's click, converts it
+in the browser (`ui/beatw.js`) and writes it to the user's device with the firmware, after the user confirms
+non-commercial use. The site never holds the model or an image with it. Our own network will replace madmom's.
+
+On the bench: `node scripts/beat_weights.js <beats_lstm_1.pkl> beat_weights.bin` makes the blob (the same converter;
+`beat/scripts/export_beat_c.py model` makes it with Python, byte for byte the same), then write it at the partition:
+`python -m esptool --chip esp32s3 write_flash 0x620000 beat_weights.bin`. The host tests make it from the madmom copy in
+`beat/.venv` (`tests/run.sh`, `MADMOM_BEATS_PKL`).
 
 The stick is a USB speaker called **Jank**. What the computer plays to it goes to a beat tracker on core 0 (madmom's
 online tracker in C: `core/beat/`), and the tracker is the Link session's master: its tempo, beat grid and stop/start go

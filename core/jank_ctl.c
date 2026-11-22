@@ -532,11 +532,13 @@ static enum jk_ctl_action cmd_set(char *args, struct jk_cfg *cfg, struct writer 
 
 static const char *const MODE_NAME[] = {"stopped", "steady", "speeding_up", "slowing_down"};
 
-/* the beat tracker's numbers (the bench build) */
+/* the beat tracker's numbers; beat_weights: none (no weights in the beatw partition: no beat follow), ok, damaged */
 static void cmd_beat(const struct jk_cfg *c, const struct jk_beat *t, struct writer *w)
 {
     uint32_t bpm = t->bpm_x100 > 0 ? (uint32_t)t->bpm_x100 : 0u;
-    put(w, "beat=%s\nbeat_weights=madmom BENCH ONLY, CC BY-NC-SA 4.0, never ship\naudio=%u\naudio_live=%u\n", on_off(t->on), t->audio, t->audio_live);
+    static const char *const WEIGHTS[] = {"none", "ok", "damaged"};
+    put(w, "beat=%s\nbeat_weights=%s\naudio=%u\naudio_live=%u\n", on_off(t->on), WEIGHTS[t->weights < 3u ? t->weights : 0u],
+        t->audio, t->audio_live);
     put(w, "rms_db=%d\nrms_min_db=%d\nrms_max_db=%d\npeak_db=%d\n", t->level_db, t->level_min_db, t->level_max_db, t->peak_db);
     put_conf(c, t, w);
     put(w, "mode=%s\nbpm=%lu.%02lu\n", MODE_NAME[t->mode & 3u], (unsigned long)(bpm / 100u), (unsigned long)(bpm % 100u));

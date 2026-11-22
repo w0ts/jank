@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Two app slots (updates by copying jank.bin onto the drive, or over USB MIDI: docs/usb.md), the rollback's otadata, and the
 # drive's FAT, 2 MB: room for an app image (the largest is a bit under 2 MB) and the host's litter.
+# beatw: the beat network's weights blob (core/beat/beat_weights.h, 117 KB), written by the Install page; empty: no beat follow.
 # Name,   Type, SubType, Offset,   Size
 nvs,      data, nvs,     0x9000,   0x6000
 otadata,  data, ota,     0xf000,   0x2000
@@ -8,3 +9,4 @@ phy_init, data, phy,     0x11000,  0x1000
 ota_0,    app,  ota_0,   0x20000,  0x200000
 ota_1,    app,  ota_1,   0x220000, 0x200000
 storage,  data, fat,     0x420000, 0x200000
+beatw,    data, 0x40,    0x620000, 0x20000

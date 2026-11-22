@@ -13,9 +13,12 @@
 
 extern const uint16_t beat_fb_start[BEAT_BANDS], beat_fb_len[BEAT_BANDS];
 extern const float beat_fb_val[BEAT_FB_NNZ];
-extern const float beat_l0_w[4 * 162 * 25], beat_l0_r[4 * 25 * 25], beat_l0_b[4 * 25], beat_l0_p[3 * 25];
-extern const float beat_l1_w[4 * 25 * 25], beat_l1_r[4 * 25 * 25], beat_l1_b[4 * 25], beat_l1_p[3 * 25];
-extern const float beat_l2_w[4 * 25 * 25], beat_l2_r[4 * 25 * 25], beat_l2_b[4 * 25], beat_l2_p[3 * 25];
-extern const float beat_out_w[25], beat_out_b[1];
+/* The network's weights are not in the source: they point into the weights blob (beat_weights.h), NULL until bound.
+ * l0_w [4][162][25], l0_r [4][25][25], l1_w / l1_r / l2_w / l2_r [4][25][25], each b [4][25], each p [3][25], out_w [25],
+ * out_b [1]. */
+extern const float *beat_l0_w, *beat_l0_r, *beat_l0_b, *beat_l0_p;
+extern const float *beat_l1_w, *beat_l1_r, *beat_l1_b, *beat_l1_p;
+extern const float *beat_l2_w, *beat_l2_r, *beat_l2_b, *beat_l2_p;
+extern const float *beat_out_w, *beat_out_b;
 
 #endif

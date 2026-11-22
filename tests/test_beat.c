@@ -14,6 +14,7 @@
 #include <string.h>
 #include <time.h>
 #include "jb_beat.h"
+#include "beatw_load.h"
 #include "jb_mode.h"
 
 #define PI_D 3.14159265358979323846
@@ -381,12 +382,43 @@ static void test_audio(const char *dir, const char *wav_dir, const char *name)
     free(r.beats);
 }
 
+/* the weights blob (beat_weights.h): no tracker without it; a bad blob is refused and binds nothing */
+static void test_weights_refused(void)
+{
+    static struct jb_beat b;
+    beat_weights_unbind();
+    CHECK(!beat_weights_ready());
+    CHECK(jb_beat_init(&b) != 0);
+    CHECK(jb_beat_init_q16(&b) != 0);
+    static float blob[(BEAT_WEIGHTS_HEADER + 4u * BEAT_WEIGHTS_COUNT) / sizeof(float)];
+    unsigned char *h = (unsigned char *)blob;
+    CHECK(beat_weights_bind(NULL, 0) == BW_SHORT);
+    CHECK(beat_weights_bind(blob, sizeof blob) == BW_MAGIC);
+    memcpy(h, BEAT_WEIGHTS_MAGIC, 4);
+    h[4] = 1;
+    CHECK(beat_weights_bind(blob, sizeof blob) == BW_COUNT);
+    h[4] = BEAT_WEIGHTS_COUNT & 255u;
+    h[5] = (BEAT_WEIGHTS_COUNT >> 8) & 255u;
+    h[6] = (BEAT_WEIGHTS_COUNT >> 16) & 255u;
+    CHECK(beat_weights_bind(blob, sizeof blob - 4) == BW_SHORT);
+    CHECK(beat_weights_bind(blob, sizeof blob) == BW_CRC);
+    const uint32_t c = beat_weights_crc32(h + BEAT_WEIGHTS_HEADER, 4u * BEAT_WEIGHTS_COUNT);
+    for (int k = 0; k < 4; ++k)
+        h[8 + k] = (unsigned char)(c >> (8 * k));
+    CHECK(beat_weights_bind(blob, sizeof blob) == BW_OK);      /* all zeros, but whole: bound */
+    CHECK(beat_weights_ready() && beat_out_b == blob + BEAT_WEIGHTS_HEADER / 4 + BEAT_WEIGHTS_COUNT - 1);
+    CHECK(beat_weights_crc32("123456789", 9) == 0xcbf43926u);  /* zlib's check value */
+    beat_weights_unbind();
+}
+
 int main(int argc, char **argv)
 {
     const char *dir = argc > 1 ? argv[1] : "tests/beat_ref";
     const char *wavs = getenv("BEAT_WAV_DIR");
     static const char *const NAMES[] = {"disco.00005", "hiphop.00010", "pop.00020"};
     printf("sizeof struct jb_beat %zu, struct jb_mode %zu\n", sizeof(struct jb_beat), sizeof(struct jb_mode));
+    test_weights_refused();
+    beatw_load();
     test_front_end();
     test_dbn();
     synthetic_modes();

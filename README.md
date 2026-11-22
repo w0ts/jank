@@ -64,8 +64,9 @@ The box has:
 - [Box](hardware/box/README.md)
 - [Firmware](docs/firmware.md)
 
-**Branch fw/beat-follow only: a bench build, [docs/beat.md](docs/beat.md).** The stick is also a USB speaker called Jank
-and follows the beat of what is played to it. Its network weights are madmom's (CC BY-NC-SA 4.0): never push or ship it.
+**Beat follow, [docs/beat.md](docs/beat.md).** The device is also a USB speaker called Jank and follows the beat of what is
+played to it. The network's weights are not in the firmware or in this repository: the Install page adds madmom's model
+(CC BY-NC-SA 4.0, non-commercial) at the user's click, from madmom's own repository, in the user's browser.
 
 Details: [on the air](docs/air.md), [USB](docs/usb.md), [MIDI clock](docs/midi.md), [boards and pins](docs/boards.md).
 
