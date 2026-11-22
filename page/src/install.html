@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jank · Install</title>
+<meta name="description" content="How to put the Jank firmware on a Seeed XIAO ESP32-S3: the first flash, then updates by copying a file onto the Jank drive or over USB MIDI.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Cg transform='translate(2.7 6.2) scale(1.4)' fill='none' stroke='%23A06CF0' stroke-width='2'%3E%3Crect x='1' y='1' width='10' height='6' rx='1.5'/%3E%3Crect x='8' y='7' width='10' height='6' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+<!--@include ui/common.css-->
+:root { --accent: #9770c6; --accent-text-l: #8253ba; --accent-text-d: #a380d0; }
+/* the info pages' own: */
+main > section h2 { margin-top: 0; }
+main img { max-width: 100%; height: auto; border-radius: var(--r-ctl); display: block; }
+main ul, main ol { margin: 8px 0; padding-left: 22px; }
+main li { margin: 4px 0; }
+pre { white-space: pre; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; display: block; overflow-x: auto; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--dim); font-weight: 600; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="site">
+    <div class="titlebar"><h1><a href="https://w0ts.github.io/">w0ts</a> / Jank</h1></div>
+    <nav class="site" aria-label="Jank pages"><a href="./">About</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="install.html" aria-current="page">Install</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="device.html">Device</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="https://github.com/w0ts/jank" aria-label="GitHub" title="The Jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></nav>
+  </header>
+
+  <section>
+    <h2>Before you start</h2>
+    <p>For the bare Seeed XIAO ESP32-S3, the stick. The firmware is built from the <a href="https://github.com/w0ts/jank">source</a>; there is no ready-made download.</p>
+    <pre><code>scripts/install_idf.sh    # once: ESP-IDF v5.5.6 (needs Python 3.13)
+scripts/build.sh xiao     # makes jank.bin</code></pre>
+    <p>Build files stay in the scratch folder <code>$JANK_SCRATCH</code> (default <code>worktrees/jank-scratch/</code>).</p>
+  </section>
+
+  <section>
+    <h2>First install</h2>
+    <p>A blank stick needs download mode once: hold BOOT while plugging it in. The first install of this build changes the partition table (two app slots) and the bootloader (rollback), so it is a full flash:</p>
+    <pre><code>bash -c '. scripts/env.sh &amp;&amp; cd "$JANK_SCRATCH/build-xiao" &amp;&amp; python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'</code></pre>
+    <p>Then unplug the stick and plug it back in. The BOOT hold is Seeed's usual way and was not tried for this page's steps.</p>
+  </section>
+
+  <section>
+    <h2>Update by copying a file</h2>
+    <p>A running stick shows a drive called JANK. No button, no download mode, no tool.</p>
+    <ol>
+      <li>Build: <code>make build</code> gives <code>jank.bin</code>. Or run <code>make flash</code>, which builds and does steps 2 and 3 for you.</li>
+      <li>Copy <code>jank.bin</code> onto the JANK drive.</li>
+      <li>The stick checks the image as it lands and restarts by itself once the computer has been quiet for 1.5 s. The drive comes back with <code>UPDATE.TXT</code>, which says what happened. macOS may say the drive was not ejected: that is normal here.</li>
+    </ol>
+    <p>A wrong or damaged image is refused and the old firmware keeps running.</p>
+  </section>
+
+  <section>
+    <h2>Update over USB MIDI</h2>
+    <p>No drive, or the copy does nothing: <code>make flash</code> falls back to this by itself, or run it directly. Needs python-rtmidi. Stop playing first, and close other programs that use the stick's MIDI port.</p>
+    <pre><code>python3 scripts/ota.py jank.bin</code></pre>
+  </section>
+
+  <section>
+    <h2>Rollback</h2>
+    <p>A new image starts on trial. If it does not talk to a computer, the old one comes back: stay connected for about 20 s after an update, and press Connect on the <a href="device.html">Device</a> page within two minutes. A crash or a power cut before that also puts the old image back.</p>
+  </section>
+
+  <footer class="site">Details: <a href="https://github.com/w0ts/jank/blob/main/docs/firmware.md">docs/firmware.md</a>, <a href="https://github.com/w0ts/jank/blob/main/docs/usb.md">docs/usb.md</a>, <a href="https://github.com/w0ts/jank/blob/main/docs/boards.md">docs/boards.md</a>.</footer>
+</main>
+</body>
+</html>

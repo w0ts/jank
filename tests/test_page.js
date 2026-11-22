@@ -33,7 +33,7 @@ ok(html === expandedTemplate, "page/jank.html is the expansion of page/src/jank.
 ok(!/<!--@include/.test(html), "no include marker left");
 ok(/<script id="face-ui">/.test(html) && /<script id="advanced-ui">/.test(html) && /const Stick = /.test(html) && /const Face = /.test(html), "the face's, Advanced's and the player's scripts are in the page");
 ok(!/id="connect"|class="buttons"/.test(html.split('id="live"')[0]), "no connection card: nothing but the title, the message and the connect button above the face");
-ok(/<div class="titlebar"><h1><a href="https:\/\/w0ts.github.io\/">w0ts<\/a> \/ Jank<\/h1><\/div>\s*<nav id="home-links" class="site" aria-label="Links">\s*<button id="c-midi"/.test(html) && html.indexOf('id="c-midi"') < html.indexOf('id="connect-slot"') && !/placeConnect/.test(html), "the title bar reads w0ts / Jank (w0ts links to the root page); the connect / eject button leads the nav row under it, and stays there");
+ok(/<div class="titlebar"><h1><a href="https:\/\/w0ts.github.io\/">w0ts<\/a> \/ Jank<\/h1><\/div>\s*<nav id="home-links" class="site" aria-label="Jank pages">\s*<button id="c-midi"/.test(html) && html.indexOf('id="c-midi"') < html.indexOf('id="connect-slot"') && !/placeConnect/.test(html), "the title bar reads w0ts / Jank (w0ts links to the root page); the connect / eject button leads the nav row under it, and stays there");
 ok(html.indexOf('id="dev-bar"') > html.indexOf('id="face"') && !/id="c-advanced|storedAdvanced|rememberAdvanced/.test(html), "the Advanced check box is gone from the device card and from the code");
 {
   const at = (s) => html.indexOf(s);
@@ -85,19 +85,19 @@ ok(!/files in scope/.test(html + playerUi) && /id="pl-rescan"/.test(html), "no '
 ok(/id="pl-bpm"/.test(html) && /Player\.expectedBpm\(/.test(html), "the player shows the tag BPM times the pitch through Player.expectedBpm");
 ok(/id="pl-monitor"[^>]*aria-pressed="true"/.test(html) && /id="pl-monitor"[^>]*mutes only your speakers/.test(html), "the monitor is an icon toggle, on by default, its tip says it mutes only the speakers");
 ok(/params\.get\("screen"\) === "oled" \? "2\.42" : "lcd2"/.test(html) && !/board === "lcd2"|params\.get\("scale"\)/.test(html), "the face shows the colour lcd2 screen by default for every board; only ?screen=oled gives the 2.42 in OLED; no ?scale= any more");
-// the only web addresses in the page are the links (w0ts in the title bar, GitHub, the hosted page only on the Jank's drive); nothing is loaded from them
-const withoutLinks = html.replace(/<a (id="home-hosted" class="hide" )?href="https:\/\/(github\.com\/w0ts\/jank|w0ts\.github\.io\/jank\/|w0ts\.github\.io\/)"/g, "");
+// the only web addresses in the page are the links (w0ts in the title bar, GitHub, the hosted page only on the Jank's drive, where the tabs are pointed at it); nothing is loaded from them
+const withoutLinks = html.replace(/<a (id="home-hosted" class="hide" )?href="https:\/\/(github\.com\/w0ts\/jank|w0ts\.github\.io\/jank\/device\.html|w0ts\.github\.io\/)"/g, "");
 ok(!/<nav id="home-links"[\s\S]*?target=/.test(html.split("</nav>")[0]), "the two links open in the same tab");
-const withoutNs = withoutLinks.replace("xmlns='http://www.w3.org/2000/svg'", "");   // the favicon's SVG namespace is a name, not a load
+const withoutNs = withoutLinks.replace('a.href = "https://w0ts.github.io/jank/"', "").replace("xmlns='http://www.w3.org/2000/svg'", "");   // the favicon's SVG namespace is a name, not a load
 ok(!/https?:\/\//.test(withoutNs), "the page loads nothing external");
 ok(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,/.test(html), "the page has its own favicon, inline");
-ok(/<nav id="home-links" class="site" aria-label="Links">/.test(html) && /<a id="home-hosted" class="hide"/.test(html) && /location\.protocol === "file:"\) \$\("home-hosted"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub link (with its icon) always shows; the hosted page link only when the page is opened from a file");
+ok(/<nav id="home-links" class="site" aria-label="Jank pages">/.test(html) && /<a id="home-hosted" class="hide"/.test(html) && /location\.protocol === "file:"\) \{[^}]*\$\("home-hosted"\)\.classList\.remove\("hide"\)/.test(html), "the GitHub link (with its icon) always shows; the hosted page link only when the page is opened from a file");
 ok(/<a href="https:\/\/github\.com\/w0ts\/jank" aria-label="GitHub"[^>]*><svg class="gh"[^>]*><path[^>]*\/><\/svg><\/a>\s*<\/nav>/.test(html), "the GitHub link is the icon alone, last in the nav (as on the other w0ts sites)");
 ok(/Audio works better on the GitHub hosted page/.test(html), "the hosted page link's tip says audio works better there");
 ok(/navigator\.mediaSession\.setActionHandler\("previoustrack", \(\) => \{ if \(!el\("pl-prev"\)\.disabled\) previous\(\); \}\)/.test(html), "the media key previous track does what the Previous button does");
 ok(/navigator\.mediaSession\.setActionHandler\("nexttrack", \(\) => \{ if \(!el\("pl-next"\)\.disabled\) skip\(\); \}\)/.test(html), "the media key next track does what the Next button does");
 ok(!/<script[^>]+src=/.test(html) && !/<link(?![^>]*rel="icon"[^>]*href="data:)/.test(html), "no script or style from elsewhere (the favicon is inline data)");
-ok(/<title>w0ts \/ Jank · control page<\/title>/.test(html), "title");
+ok(/<title>Jank · Device<\/title>/.test(html), "title");
 ok(!/innerHTML/.test(html), "device text goes in through textContent only");
 // the iPhone apps' polyfills (Web MIDI Browser's open source; MIDIWeb Browser's is closed): one .then(ok, fail) on
 // requestMIDIAccess and no chaining on it, ports through forEach, input through onmidimessage

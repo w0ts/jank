@@ -1,10 +1,12 @@
 #!/bin/bash
-# Publishes the control page to https://w0ts.github.io/jank/ : the gh-pages branch holds only pages, built with git plumbing,
+# Publishes the site to https://w0ts.github.io/jank/ : About (page/index.html -> index.html), Install (page/install.html ->
+# install.html), Device (page/jank.html, the control page the firmware embeds -> device.html) and page/img/. The gh-pages
+# branch holds only pages, built with git plumbing,
 # so no local branch, no worktree and no push of main. A secure (https) origin lets Chrome keep the microphone / output
 # permission and gives the page Web MIDI, which a file:// copy cannot remember.
-#   scripts/publish_page.sh [--dry-run] [--from REF]    page/jank.html as COMMITTED on HEAD (or on REF) -> the root (index.html)
+#   scripts/publish_page.sh [--dry-run] [--from REF]    the pages as COMMITTED on HEAD (or on REF) -> the root
 #   scripts/publish_page.sh [--dry-run] --preview NAME REF
-#                                                       page/jank.html of branch/commit REF -> /NAME/ (a preview next to
+#                                                       the pages of branch/commit REF -> /NAME/ (a preview next to
 #                                                       the main page, e.g. https://w0ts.github.io/jank/lcd2/)
 # Every other path already on gh-pages is kept. (make publish-page)
 set -euo pipefail
@@ -24,8 +26,15 @@ while [ $# -gt 0 ]; do
 done
 case "$PREVIEW" in *[!a-z0-9_-]*) echo "preview name: lowercase letters, digits, - and _ only"; exit 2 ;; esac
 
-page_blob=$(git rev-parse "$REF:page/jank.html")
 empty_blob=$(git hash-object -w /dev/null)
+# the site's files: published name <- path in the repo
+site_entries() {   # the "mode type sha<TAB>name" lines of the site, from REF
+    local pairs="index.html:page/index.html install.html:page/install.html device.html:page/jank.html" pair
+    for pair in $pairs; do
+        printf '100644 blob %s\t%s\n' "$(git rev-parse "$REF:${pair#*:}")" "${pair%%:*}"
+    done
+    printf '040000 tree %s\timg\n' "$(git rev-parse "$REF:page/img")"
+}
 
 git fetch --quiet "$REMOTE" "$BRANCH" 2>/dev/null || true
 parent=$(git rev-parse --verify --quiet "refs/remotes/$REMOTE/$BRANCH" || true)
@@ -33,14 +42,15 @@ kept=""
 [ -n "$parent" ] && kept=$(git ls-tree "$parent^{tree}")
 
 keep_except() { printf '%s\n' "$kept" | awk -F'\t' -v skip="$1" 'NF && $2 != skip'; }
+keep_not_site() { printf '%s\n' "$kept" | awk -F'\t' 'NF && $2 != "index.html" && $2 != "install.html" && $2 != "device.html" && $2 != "img" && $2 != ".nojekyll"'; }
 
 if [ -n "$PREVIEW" ]; then
-    sub=$(printf '100644 blob %s\tindex.html\n' "$page_blob" | git mktree)
+    sub=$(site_entries | git mktree)
     tree=$( { keep_except "$PREVIEW"; printf '040000 tree %s\t%s\n' "$sub" "$PREVIEW"; } | git mktree)
-    what="preview /$PREVIEW/ from $REF"
+    what="a preview /$PREVIEW/ from $REF"
 else
-    tree=$( { keep_except index.html | awk -F'\t' '$2 != ".nojekyll"'; printf '100644 blob %s\t.nojekyll\n100644 blob %s\tindex.html\n' "$empty_blob" "$page_blob"; } | git mktree)
-    what="the main page from $REF"
+    tree=$( { keep_not_site; site_entries; printf '100644 blob %s\t.nojekyll\n' "$empty_blob"; } | git mktree)
+    what="the site from $REF"
 fi
 
 if [ -n "$parent" ] && [ "$(git rev-parse "$parent^{tree}")" = "$tree" ]; then
@@ -51,7 +61,7 @@ fi
 parent_args=()
 [ -n "$parent" ] && parent_args=(-p "$parent")
 commit=$(git commit-tree "$tree" "${parent_args[@]}" \
-    -m "publish: the jank control page ($what, page ${page_blob:0:10})" \
+    -m "publish: the jank site ($what)" \
     -m "Only pages: no firmware, no weights. Built by scripts/publish_page.sh.")
 
 echo "$what -> commit ${commit:0:10} on $BRANCH$([ -n "$parent" ] && echo ", on top of ${parent:0:10}")"
