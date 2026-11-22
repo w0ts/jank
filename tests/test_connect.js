@@ -236,12 +236,12 @@ const tap = (page, k) => { page.clock.t += 60; page.key('keydown', k); page.cloc
   await settle();
   ok(!p.el('msg').classList.contains('bad') && !/err/.test(p.el('msg').textContent), 'another err reply: no line on the page either');
 
-  // an action the stick cannot take does nothing, visibly, with a one-line reason
+  // an action the device cannot take does nothing; the page adds no line (the device screen shows its state)
   ({ page: p, midi } = await connected());
   const n0 = midi.sent.length;
   for (const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'Enter', 'ArrowUp']) tap(p, k);      // MENU > USB > a step of the role
   await settle();
-  eq([p.el('msg').textContent, p.el('msg').classList.contains('bad')], ['Not from here: the USB role restarts the device: not changed from here.', true], 'USB role from the menu: refused with the reason, shown as an error');
+  ok(!p.el('msg').classList.contains('bad') && !/USB role/.test(p.el('msg').textContent), 'USB role from the menu: refused, no line on the page');
   eq(midi.sent.slice(n0).filter(c => c.startsWith('set ')), [], 'and nothing was sent');
 
   // ---- the port goes away: back to nothing shown ----

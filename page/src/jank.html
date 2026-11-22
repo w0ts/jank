@@ -451,19 +451,6 @@ function setCommand(key, raw) {
 }
 
 
-/* what the page says after a nudge's answer (values: its key=value lines). Two layers each (M2h): the PHASE (beats) on top
-   of AUTO BAR's bar, the AUDIO SHIFT (ms) on top of the auto latency; 0 is AUTO. (A firmware before M2h: no lat_trim) */
-function nudgeSaid(kind, dir, values) {
-  const sign = (x) => (x > 0 ? "+" : "") + x;
-  if (kind === "beat") {
-    const total = Number(values.nudge_beats);
-    return total ? "Phase " + sign(total) + " beats, on top of AUTO BAR's bar." : "Phase: AUTO (AUTO BAR's bar alone).";
-  }
-  if (values.lat_trim === undefined) return "Audio in offset " + sign(Number(values.beat_latency)) + " ms.";
-  const trim = Number(values.lat_trim);
-  return trim ? "Audio shift " + sign(trim) + " ms, on top of the auto " + values.lat_auto + " ms." : "Audio shift: AUTO (" + values.lat_auto + " ms).";
-}
-
 const LAT_SRC = { usb: "(the computer's)", line: "(the line in's)" };   /* beat_latency_src; a hosted device: host:VID:PID */
 /* the latency field is the auto base (`set beat_latency`); its note says the source and the AUDIO SHIFT on top */
 function latField(v) { return v.lat_auto !== undefined ? v.lat_auto : v.beat_latency; }
@@ -472,12 +459,6 @@ function latNote(src, v) {
   return (LAT_SRC[src] || "(" + src + ")") + (trim ? " + audio shift " + (trim > 0 ? "+" : "") + trim + " ms" : "");
 }
 
-/* the error answers of the nudges, in words */
-function nudgeError(message) {
-  return { "err link mode": "The nudges are for AUDIO mode (music heard).", "err no beat yet": "No beat to nudge yet: the tracker has not locked.",
-           "err busy": "The Jank is busy: try again." }[message]
-    || (/^err nudge beat at its limit/.test(message) ? "The beat is nudged 3 beats already: that is the limit." : message);
-}
 </script>
 
 <!--@include ui/ports.js-->
@@ -541,6 +522,13 @@ function showStatus({ values: v, units }) {
   $("net-state").textContent = networkLine({ ...S.lastGet, ...v });
 }
 
+/* the page's message line is for what the device cannot show: connection problems (no answer, the port gone) and the page's
+   own form checks. The device's answers and refusals ("err ...") are on its screen (mots, 2026-11-22) */
+function linkFailed(e) {
+  if (e && (e.noAnswer || !/^err /.test(e.message || "")))
+    say(e.message, true);
+}
+
 async function change(key) {
   const command = setCommand(key, $("c-" + key).value);
   if (!command) {
@@ -550,17 +538,14 @@ async function change(key) {
   try {
     await send(command);
     showSettings(await send("get"));
-    say("Saved on the Jank.");
   } catch (e) {
-    say(e.message, true);
+    linkFailed(e);
   }
 }
 
 async function session(command, done) {
   try {
     await send(command);
-    if (done)
-      say(done);
     takeHome((await send("home")).values.home);
   } catch (e) {
     /* refused (no session, LINK mode, ...): the device's own screen shows its state; the page adds no line (mots, 2026-11-22) */
@@ -815,14 +800,13 @@ for (const id of Object.keys(SECTION_OPEN)) {
   $(id).open = storedOpen(id);
   $(id).addEventListener("toggle", () => { rememberOpen(id, !!$(id).open); if (id === "sec-advanced") paintAdvanced(); });
 }
-/* the face's NO / YES held with UP / DOWN: `command` is Stick.nudgeCommand's; the answer says what moved */
+/* the face's NO / YES held with UP / DOWN: `command` is Stick.nudgeCommand's; the device screen shows what moved */
 async function nudge(kind, command) {
   try {
     const { values } = await send(command);
-    say(nudgeSaid(kind, 0, values));
     if (kind === "ms" && document.activeElement !== $("c-beat_latency")) $("c-beat_latency").value = latField(values);
   } catch (e) {
-    say(nudgeError(e.message), true);
+    linkFailed(e);
   }
 }
 $("net-apply").addEventListener("click", async () => {
@@ -877,7 +861,7 @@ autoConnect();
   document.addEventListener("jank-beat-delay", (e) => { beatDelay.ms = e.detail.ms; });
   const snapshot = () => ({ home: S.lastHome, homeAt: S.homeAt, get: S.lastGet, status: S.lastStatus, statusAt: S.statusAt, about: S.lastAbout, aboutAt: S.aboutAt, phase, delayMs: beatDelay.ms });
   const refresh = (commands) => commands.reduce((done, command) => done.then(() => send(command)), Promise.resolve());
-  const fail = (e) => say(e.message, true);
+  const fail = linkFailed;
 
   // the face's actions: everything goes out through the page's one command function (send), so the answers, the err texts and the
   // the USB timing is the page's own; what changed shows when the stick next reports it
@@ -891,12 +875,12 @@ autoConnect();
     ...Stick.ctx(snapshot(), now),
     setField(name, value) {
       const r = Stick.fieldCommands(name, value, !S.lastGet || S.lastGet.lead !== undefined, !S.lastGet || S.lastGet.sleep !== undefined);
-      if (r.refuse) { say("Not from here: " + r.refuse + ".", true); return; }
+      if (r.refuse) return;
       refresh(r.commands).then(readBack, fail);
     },
     tempoStep(d) {
       const r = Stick.tempoCommand(Stick.ctx(snapshot(), performance.now()), d);
-      if (r.refuse) { say(r.refuse + ".", true); return null; }
+      if (r.refuse) return null;
       session(r.commands[0], "");             /* (the device's own screen shows the tempo and the fold) */
       return r.expected;
     },
@@ -905,7 +889,7 @@ autoConnect();
   });
   const combo = (mod, d) => {
     const r = Stick.nudgeCommand(Stick.ctx(snapshot(), performance.now()), mod, d);
-    if (r.refuse) say(r.refuse + ".", true); else nudge(mod === "no" ? "beat" : "ms", r.commands[0]);
+    if (!r.refuse) nudge(mod === "no" ? "beat" : "ms", r.commands[0]);
   };
 
   const paintArms = () => { for (const b of ARMS) svg.querySelector("#arm-" + b).firstElementChild.classList.toggle("on", model.held[b]); };
@@ -1115,7 +1099,7 @@ autoConnect();
       AL.getAt = performance.now();
       showSettings(await send("get"));
     } catch (e) {
-      say(e.message, true);
+      linkFailed(e);
     }
   }
   function autoLatencyTick(l) {

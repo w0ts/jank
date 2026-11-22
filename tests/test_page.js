@@ -163,20 +163,12 @@ eq(box.parseHome("h 12000 w0 2 150 3 2 0 - - -").net, { kind: "wifi", up: false 
   // M2d: the USB MIDI clock setting, the nudges in AUDIO mode
   eq(box.setCommand("usbmidi", "off"), "set usbmidi off");
   eq(box.setCommand("usbmidi", "no"), null);
-  // M2h: two layers each: PHASE on top of AUTO BAR's bar, AUDIO SHIFT on top of the auto latency; 0 is AUTO
-  eq(box.nudgeSaid("beat", 1, { nudge_beats: "1.5" }), "Phase +1.5 beats, on top of AUTO BAR's bar.");
-  eq(box.nudgeSaid("beat", -1, { nudge_beats: "-0.5" }), "Phase -0.5 beats, on top of AUTO BAR's bar.");
-  eq(box.nudgeSaid("beat", -1, { nudge_beats: "0" }), "Phase: AUTO (AUTO BAR's bar alone).");
-  eq(box.nudgeSaid("ms", 1, { beat_latency: "-62", lat_auto: "-65", lat_trim: "3" }), "Audio shift +3 ms, on top of the auto -65 ms.");
-  eq(box.nudgeSaid("ms", -1, { beat_latency: "-65", lat_auto: "-65", lat_trim: "0" }), "Audio shift: AUTO (-65 ms).");
-  eq(box.nudgeSaid("ms", 1, { beat_latency: "26" }), "Audio in offset +26 ms.");           // a firmware before M2h
+  // M2h: the latency field is the auto base, its note the AUDIO SHIFT on top (the nudges' results are on the device screen)
   eq(box.latField({ beat_latency: "-62", lat_auto: "-65" }), "-65");                       // the field is the auto base
   eq(box.latField({ beat_latency: "26" }), "26");
   eq(box.latNote("usb", { lat_trim: "3" }), "(the computer's) + audio shift +3 ms");
   eq(box.latNote("usb", { lat_trim: "0" }), "(the computer's)");
   eq(box.latNote("host:1935:000c", {}), "(host:1935:000c)");
-  ok(/AUDIO mode/.test(box.nudgeError("err link mode")) && /limit/.test(box.nudgeError("err nudge beat at its limit, -3 to 3 beats in all")), "nudge errors in words");
-  eq(box.nudgeError("err odd"), "err odd");
   ok((html.match(/id="c-beat_latency_src"/g) || []).length === 1, "the latency source note on the page once");
   // M2e: LOW CONFIDENCE and THRESHOLD, the confidence meter's tick and note
   eq(box.setCommand("lowconf", "stop"), "set lowconf stop");
