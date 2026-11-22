@@ -1,5 +1,8 @@
 # Jank
 
+> ### [→ w0ts.github.io/jank](https://w0ts.github.io/jank/)
+> What Jank is, how to install it from the browser, and the device's control page. This README is for developers.
+
 **Ableton Link with no router.** Jank protocol brings computers, MIDI gear and modular gear into a
 **Jank** session: the group mode of [Optimist](https://github.com/w0ts/optimist), the open firmware for the FM-1 synth
 (**MODE JANK**, first called jam).
