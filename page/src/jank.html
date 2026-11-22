@@ -543,7 +543,7 @@ async function change(key) {
   }
 }
 
-async function session(command, done) {
+async function session(command) {
   try {
     await send(command);
     takeHome((await send("home")).values.home);
@@ -881,11 +881,11 @@ autoConnect();
     tempoStep(d) {
       const r = Stick.tempoCommand(Stick.ctx(snapshot(), performance.now()), d);
       if (r.refuse) return null;
-      session(r.commands[0], "");             /* (the device's own screen shows the tempo and the fold) */
+      session(r.commands[0]);                 /* (the device's own screen shows the tempo and the fold) */
       return r.expected;
     },
     setHold() {},
-    linkStartStop(on) { session(Stick.playCommand(on), on ? "Start sent." : "Stop sent."); },
+    linkStartStop(on) { session(Stick.playCommand(on)); },
   });
   const combo = (mod, d) => {
     const r = Stick.nudgeCommand(Stick.ctx(snapshot(), performance.now()), mod, d);
