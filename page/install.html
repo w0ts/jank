@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jank · Install</title>
-<meta name="description" content="How to put the Jank firmware on a Seeed XIAO ESP32-S3: the first flash, then updates by copying a file onto the Jank drive or over USB MIDI.">
+<meta name="description" content="Put a Jank firmware release on a bare device or a jank mini 3, from the browser.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Cg transform='translate(2.7 6.2) scale(1.4)' fill='none' stroke='%23A06CF0' stroke-width='2'%3E%3Crect x='1' y='1' width='10' height='6' rx='1.5'/%3E%3Crect x='8' y='7' width='10' height='6' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
 <style>
 /* common.css: the one style of the three sites (w0ts: Jank, Optimist, DN2 Wishes, Track Kommander). Tokens + shared components, neutral names.
@@ -303,43 +303,263 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
   </header>
 
   <section>
-    <h2>Before you start</h2>
-    <p>For the bare Seeed XIAO ESP32-S3, the stick. The firmware is built from the <a href="https://github.com/w0ts/jank">source</a>; there is no ready-made download.</p>
-    <pre><code>scripts/install_idf.sh    # once: ESP-IDF v5.5.6 (needs Python 3.13)
-scripts/build.sh xiao     # makes jank.bin</code></pre>
-    <p>Build files stay in the scratch folder <code>$JANK_SCRATCH</code> (default <code>worktrees/jank-scratch/</code>).</p>
-  </section>
-
-  <section>
-    <h2>First install</h2>
-    <p>A blank stick needs download mode once: hold BOOT while plugging it in. The first install of this build changes the partition table (two app slots) and the bootloader (rollback), so it is a full flash:</p>
-    <pre><code>bash -c '. scripts/env.sh &amp;&amp; cd "$JANK_SCRATCH/build-xiao" &amp;&amp; python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'</code></pre>
-    <p>Then unplug the stick and plug it back in. The BOOT hold is Seeed's usual way and was not tried for this page's steps.</p>
-  </section>
-
-  <section>
-    <h2>Update by copying a file</h2>
-    <p>A running stick shows a drive called JANK. No button, no download mode, no tool.</p>
+    <h2>Flash from the browser</h2>
+    <p>Chrome or Edge on a computer, a USB-C cable that carries data.</p>
     <ol>
-      <li>Build: <code>make build</code> gives <code>jank.bin</code>. Or run <code>make flash</code>, which builds and does steps 2 and 3 for you.</li>
-      <li>Copy <code>jank.bin</code> onto the JANK drive.</li>
-      <li>The stick checks the image as it lands and restarts by itself once the computer has been quiet for 1.5 s. The drive comes back with <code>UPDATE.TXT</code>, which says what happened. macOS may say the drive was not ejected: that is normal here.</li>
+      <li>Put the device in download mode. A new one: hold BOOT (the XIAO's B button) while plugging it in. One that runs Jank: on the <a href="device.html">Device</a> page, Connect, then Advanced, Firmware, Download mode.</li>
+      <li>Choose the device and the release, press Flash and pick the port the browser lists.</li>
+      <li>When it is done, unplug the device and plug it back in. Its settings are kept.</li>
     </ol>
-    <p>A wrong or damaged image is refused and the old firmware keeps running.</p>
+    <div class="row">
+      <label>Device <select id="fw-board"><option value="xiao">Bare device (Seeed XIAO ESP32-S3)</option><option value="lcd2">jank mini 3</option></select></label>
+      <label>Release <select id="fw-tag" disabled><option>-</option></select></label>
+    </div>
   </section>
 
   <section>
-    <h2>Update over USB MIDI</h2>
-    <p>No drive, or the copy does nothing: <code>make flash</code> falls back to this by itself, or run it directly. Needs python-rtmidi. Stop playing first, and close other programs that use the stick's MIDI port.</p>
-    <pre><code>python3 scripts/ota.py jank.bin</code></pre>
+    <h2>Beat follow</h2>
+    <p>Beat follow needs a trained network. Jank's firmware does not carry one: the one it runs today is the beat model of the <a href="https://github.com/CPJKU/madmom">madmom</a> project (CPJKU, Johannes Kepler University Linz), licensed <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>: non-commercial use only. For commercial use, madmom's licence names its contact.</p>
+    <p>If you tick the box, this page fetches madmom's model from <a href="https://github.com/CPJKU/madmom_models">madmom's own repository</a>, converts it here in your browser to Jank's format (the values unchanged) and writes it to your device with the firmware. Nothing is sent anywhere else, and this site never holds the model. Without it the device does everything else; beat follow stays off.</p>
+    <label class="check"><input id="fw-beat" type="checkbox"> Add madmom's beat model. I use it for non-commercial purposes only, and I will not pass on the flashed device's firmware or the model.</label>
   </section>
 
   <section>
-    <h2>Rollback</h2>
-    <p>A new image starts on trial. If it does not talk to a computer, the old one comes back: stay connected for about 20 s after an update, and press Connect on the <a href="device.html">Device</a> page within two minutes. A crash or a power cut before that also puts the old image back.</p>
+    <h2>Flash</h2>
+    <div class="row"><button id="fw-flash" type="button" disabled>Flash</button><span id="fw-note" class="note">Looking for releases...</span></div>
+    <progress id="fw-progress" class="hide" max="1" value="0"></progress>
+    <p>The releases and their notes: <a href="https://github.com/w0ts/jank/releases">github.com/w0ts/jank/releases</a>.</p>
   </section>
 
-  <footer class="site">Details: <a href="https://github.com/w0ts/jank/blob/main/docs/firmware.md">docs/firmware.md</a>, <a href="https://github.com/w0ts/jank/blob/main/docs/usb.md">docs/usb.md</a>, <a href="https://github.com/w0ts/jank/blob/main/docs/boards.md">docs/boards.md</a>.</footer>
+  <footer class="site">Building it yourself: <a href="https://github.com/w0ts/jank/blob/main/docs/firmware.md">docs/firmware.md</a>.</footer>
 </main>
+<script>
+<script>
+// SPDX-License-Identifier: GPL-3.0-only
+// The beat network's weights blob (core/beat/beat_weights.h) from madmom's beat model, in the browser or in node, no Python:
+// BeatW.fromMadmom(bytes of beats/2016/beats_lstm_1.pkl) -> Uint8Array "JBW1" + count + crc32 + 0 + float32[29251].
+// madmom's model is a Python 2 pickle (protocol 2); this reads it as data only (a fixed list of class names, nothing
+// run), and lays the weights out exactly as beat/scripts/export_beat_c.py does (checked bit for bit, tests/run.sh).
+// The weights are madmom's, CC BY-NC-SA 4.0: the Install page fetches them at the user's click, for the user's own
+// device; the site never hosts them or an image that holds them.
+const BeatW = (() => {
+  'use strict';
+  const OP = {
+    PROTO: 0x80, STOP: 0x2e, GLOBAL: 0x63, BINPUT: 0x71, LONG_BINPUT: 0x72, BINGET: 0x68, LONG_BINGET: 0x6a,
+    EMPTY_TUPLE: 0x29, EMPTY_DICT: 0x7d, EMPTY_LIST: 0x5d, MARK: 0x28, SHORT_BINSTRING: 0x55, BINSTRING: 0x54,
+    BININT: 0x4a, BININT1: 0x4b, BININT2: 0x4d, TUPLE: 0x74, TUPLE1: 0x85, TUPLE2: 0x86, TUPLE3: 0x87, NONE: 0x4e,
+    NEWTRUE: 0x88, NEWFALSE: 0x89, NEWOBJ: 0x81, REDUCE: 0x52, BUILD: 0x62, SETITEMS: 0x75, SETITEM: 0x73,
+    APPENDS: 0x65, APPEND: 0x61,
+  };
+  const MARK = Symbol('mark');
+  // the only classes the beat model may name: anything else is refused (a pickle is code in Python; here it is data only)
+  const ALLOWED = new Set(['numpy.core.multiarray _reconstruct', 'numpy ndarray', 'numpy dtype', 'madmom.ml.nn NeuralNetwork',
+    'madmom.ml.nn.layers LSTMLayer', 'madmom.ml.nn.layers Gate', 'madmom.ml.nn.layers Cell',
+    'madmom.ml.nn.layers FeedForwardLayer', 'madmom.ml.nn.activations sigmoid', 'madmom.ml.nn.activations tanh']);
+
+  /** @param {Uint8Array} bytes  @returns {any} the unpickled tree: objects as {cls, state}, arrays as {shape, data: Float32Array} */
+  function unpickle(bytes) {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const stack = [], memo = new Map();
+    let i = 0;
+    const str = (n) => { const s = bytes.subarray(i, i + n); i += n; return s; };
+    const line = () => { const e = bytes.indexOf(0x0a, i); if (e < 0) throw new Error('pickle: no newline'); const s = new TextDecoder().decode(bytes.subarray(i, e)); i = e + 1; return s; };
+    const popMark = () => { const k = stack.lastIndexOf(MARK); if (k < 0) throw new Error('pickle: no mark'); const items = stack.splice(k); items.shift(); return items; };
+    for (;;) {
+      if (i >= bytes.length) throw new Error('pickle: ends before STOP');
+      const op = bytes[i++];
+      switch (op) {
+        case OP.PROTO: if (bytes[i++] !== 2) throw new Error('pickle: protocol 2 expected'); break;
+        case OP.STOP: return stack.pop();
+        case OP.GLOBAL: { const name = line() + ' ' + line(); if (!ALLOWED.has(name)) throw new Error('pickle: refused class ' + name); stack.push({ global: name }); break; }
+        case OP.BINPUT: memo.set(bytes[i++], stack[stack.length - 1]); break;
+        case OP.LONG_BINPUT: memo.set(dv.getUint32(i, true), stack[stack.length - 1]); i += 4; break;
+        case OP.BINGET: stack.push(memo.get(bytes[i++])); break;
+        case OP.LONG_BINGET: stack.push(memo.get(dv.getUint32(i, true))); i += 4; break;
+        case OP.EMPTY_TUPLE: stack.push([]); break;
+        case OP.EMPTY_LIST: stack.push([]); break;
+        case OP.EMPTY_DICT: stack.push({}); break;
+        case OP.MARK: stack.push(MARK); break;
+        case OP.SHORT_BINSTRING: { const n = bytes[i++]; stack.push(str(n)); break; }
+        case OP.BINSTRING: { const n = dv.getInt32(i, true); i += 4; stack.push(str(n)); break; }
+        case OP.BININT: stack.push(dv.getInt32(i, true)); i += 4; break;
+        case OP.BININT1: stack.push(bytes[i++]); break;
+        case OP.BININT2: stack.push(dv.getUint16(i, true)); i += 2; break;
+        case OP.TUPLE: stack.push(popMark()); break;
+        case OP.TUPLE1: stack.push(stack.splice(-1)); break;
+        case OP.TUPLE2: stack.push(stack.splice(-2)); break;
+        case OP.TUPLE3: stack.push(stack.splice(-3)); break;
+        case OP.NONE: stack.push(null); break;
+        case OP.NEWTRUE: stack.push(true); break;
+        case OP.NEWFALSE: stack.push(false); break;
+        case OP.NEWOBJ: { const args = stack.pop(), cls = stack.pop(); stack.push({ cls: cls.global, args, state: null }); break; }
+        case OP.REDUCE: { const args = stack.pop(), fn = stack.pop(); stack.push(reduce(fn.global, args)); break; }
+        case OP.BUILD: { const state = stack.pop(); build(stack[stack.length - 1], state); break; }
+        case OP.SETITEMS: { const items = popMark(), d = stack[stack.length - 1]; for (let k = 0; k < items.length; k += 2) d[latin1(items[k])] = items[k + 1]; break; }
+        case OP.SETITEM: { const v = stack.pop(), k = stack.pop(); stack[stack.length - 1][latin1(k)] = v; break; }
+        case OP.APPENDS: { const items = popMark(); stack[stack.length - 1].push(...items); break; }
+        case OP.APPEND: { const v = stack.pop(); stack[stack.length - 1].push(v); break; }
+        default: throw new Error('pickle: opcode 0x' + op.toString(16) + ' at ' + (i - 1) + ' not supported');
+      }
+    }
+  }
+  const latin1 = (b) => (b instanceof Uint8Array ? String.fromCharCode(...b) : b);
+  function reduce(name, args) {
+    if (name === 'numpy.core.multiarray _reconstruct') return { cls: 'ndarray', state: null };
+    if (name === 'numpy dtype') return { cls: 'dtype', name: latin1(args[0]), state: null };
+    throw new Error('pickle: REDUCE of ' + name + ' not supported');
+  }
+  function build(obj, state) {
+    if (obj.cls === 'dtype') { obj.state = state; return; }
+    if (obj.cls === 'ndarray') {
+      const [, shape, dtype, fortran, raw] = state;          // (version, shape, dtype, is_fortran, raw bytes)
+      if (dtype.name !== 'f4' || latin1(dtype.state[1]) !== '<') throw new Error('ndarray: float32 little endian expected, got ' + dtype.name);
+      const n = shape.reduce((a, b) => a * b, 1);
+      if (raw.length !== 4 * n) throw new Error('ndarray: ' + raw.length + ' bytes for ' + n + ' floats');
+      const flat = new Float32Array(raw.slice().buffer);
+      obj.shape = shape;
+      obj.data = fortran ? toC(flat, shape) : flat;
+      return;
+    }
+    obj.state = state;
+  }
+  function toC(flat, shape) {                                // Fortran (column-major) order to C (row-major); 2-D is all madmom has
+    if (shape.length < 2) return flat;
+    if (shape.length !== 2) throw new Error('ndarray: Fortran order above 2-D not supported');
+    const [r, c] = shape, out = new Float32Array(flat.length);
+    for (let y = 0; y < r; y++) for (let x = 0; x < c; x++) out[y * c + x] = flat[x * r + y];
+    return out;
+  }
+
+  const GATES = ['input_gate', 'forget_gate', 'cell', 'output_gate'];
+  /** @param {Uint8Array} bytes the .pkl file  @returns {Float32Array} the weights in beat_model.c's order */
+  function madmomBeatWeights(bytes) {
+    const net = unpickle(bytes);
+    if (!net || net.cls !== 'madmom.ml.nn NeuralNetwork') throw new Error('not a madmom NeuralNetwork');
+    const layers = net.state.layers;
+    if (layers.length !== 4) throw new Error('expected 3 LSTM layers and 1 output layer, got ' + layers.length);
+    const parts = [];
+    const arr = (o, k, len) => { const a = o.state[k]; if (!a || !a.data) throw new Error('missing ' + k); if (len !== undefined && a.data.length !== len) throw new Error(k + ': ' + a.data.length + ' values, ' + len + ' expected'); return a.data; };
+    for (let li = 0; li < 3; li++) {
+      const L = layers[li];
+      if (L.cls !== 'madmom.ml.nn.layers LSTMLayer') throw new Error('layer ' + li + ' is not an LSTM');
+      const g = GATES.map((n) => L.state[n]);
+      const nIn = g[0].state.weights.shape[0];
+      for (const x of g) parts.push(arr(x, 'weights', nIn * 25));
+      for (const x of g) parts.push(arr(x, 'recurrent_weights', 625));
+      for (const x of g) parts.push(arr(x, 'bias', 25));
+      for (const k of [0, 1, 3]) parts.push(arr(g[k], 'peephole_weights', 25));
+    }
+    const ff = layers[3];
+    parts.push(arr(ff, 'weights', 25), arr(ff, 'bias', 1));
+    const out = new Float32Array(parts.reduce((a, p) => a + p.length, 0));
+    let o = 0;
+    for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+
+  const MADMOM_URL = 'https://raw.githubusercontent.com/CPJKU/madmom_models/master/beats/2016/beats_lstm_1.pkl';
+  const COUNT = 29251;                                     // beat_weights.h BEAT_WEIGHTS_COUNT
+  const crcTable = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  /** @param {Uint8Array} b @returns {number} zlib's CRC-32 */
+  const crc32 = (b) => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = crcTable[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  /** @param {Float32Array} w @returns {Uint8Array} the blob */
+  function blob(w) {
+    if (w.length !== COUNT) throw new Error('beat weights: ' + w.length + ' values, ' + COUNT + ' expected');
+    const data = new Uint8Array(w.buffer, w.byteOffset, w.byteLength);
+    if (new Uint8Array(new Uint16Array([1]).buffer)[0] !== 1) throw new Error('beat weights: a little-endian machine is needed');
+    const out = new Uint8Array(16 + data.length), dv = new DataView(out.buffer);
+    out.set([0x4a, 0x42, 0x57, 0x31]);                    // "JBW1"
+    dv.setUint32(4, COUNT, true);
+    dv.setUint32(8, crc32(data), true);
+    dv.setUint32(12, 0, true);
+    out.set(data, 16);
+    return out;
+  }
+  /** @param {Uint8Array} pkl madmom's .pkl @returns {Uint8Array} the blob */
+  const fromMadmom = (pkl) => blob(madmomBeatWeights(pkl));
+  return { MADMOM_URL, COUNT, unpickle, madmomBeatWeights, crc32, blob, fromMadmom };
+})();
+if (typeof module !== 'undefined') module.exports = BeatW;
+</script>
+</script>
+<script type="module">
+// The releases the site carries: firmware/index.json (scripts/publish_firmware.py), newest first:
+// { releases: [ { tag, boards: { xiao: { parts: [ { path, offset } ], beatw: { offset, size } }, lcd2: ... } } ] }.
+// Flashing: esptool-js over Web Serial, each part at its own address (the settings partition is not touched); with the
+// box ticked, madmom's model converted here (ui/beatw.js) goes into the beatw partition.
+const ESPTOOL = "https://cdn.jsdelivr.net/npm/esptool-js@0.7.1/bundle.js";
+const $ = (id) => document.getElementById(id);
+const board = $("fw-board"), tag = $("fw-tag"), note = $("fw-note"), flash = $("fw-flash"), beat = $("fw-beat"), bar = $("fw-progress");
+let releases = [], busy = false;
+const chosen = () => { const r = releases.find((x) => x.tag === tag.value); return r && r.boards && r.boards[board.value]; };
+const say = (t, bad) => { note.textContent = t; note.classList.toggle("bad", !!bad); };
+const canSerial = "serial" in navigator && window.isSecureContext;
+function show() {
+  const b = chosen();
+  flash.disabled = busy || !b || !canSerial;
+  if (busy) return;
+  say(!releases.length ? "No release yet." : !b ? "This release has no firmware for this device."
+    : !canSerial ? "This browser cannot flash: use Chrome or Edge on a computer, on the https page." : "");
+}
+function fill() {
+  const list = releases.filter((r) => r.boards && r.boards[board.value]);
+  tag.replaceChildren(...(list.length ? list : [{ tag: "-" }]).map((r) => new Option(r.tag, r.tag)));
+  tag.disabled = !list.length;
+  show();
+}
+async function bytes(url) {
+  const r = await fetch(url, { cache: "no-cache" });
+  if (!r.ok) throw new Error(url + ": " + r.status);
+  return new Uint8Array(await r.arrayBuffer());
+}
+async function files(b) {
+  const out = [];
+  for (const p of b.parts) out.push({ data: await bytes(p.path), address: p.offset });
+  if (beat.checked) {
+    say("Fetching madmom's model...");
+    const w = BeatW.fromMadmom(await bytes(BeatW.MADMOM_URL));
+    if (w.length > b.beatw.size) throw new Error("the model does not fit the device's beatw partition");
+    out.push({ data: w, address: b.beatw.offset });
+  }
+  return out;
+}
+async function run() {
+  const b = chosen();
+  if (!b) return;
+  busy = true;
+  flash.disabled = true;
+  let transport = null;
+  try {
+    say("Downloading the firmware...");
+    const fileArray = await files(b);
+    say("Pick the device's port in the browser's list.");
+    const port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x303a }] });
+    const { ESPLoader, Transport } = await import(ESPTOOL);
+    transport = new Transport(port, false);
+    const loader = new ESPLoader({ transport, baudrate: 921600 });
+    say("Connecting...");
+    const chip = await loader.main();
+    if (!/ESP32-S3/.test(chip)) throw new Error("this is a " + chip + ", not an ESP32-S3");
+    const total = fileArray.reduce((a, f) => a + f.data.length, 0), done = fileArray.map(() => 0);
+    bar.classList.remove("hide");
+    await loader.writeFlash({ fileArray, flashMode: "keep", flashFreq: "keep", flashSize: "keep", eraseAll: false, compress: true,
+      reportProgress: (i, written) => { done[i] = written; const n = done.reduce((a, x) => a + x, 0); bar.value = n / total; say("Writing... " + Math.round(100 * n / total) + " %"); } });
+    say("Done" + (beat.checked ? ", with beat follow" : "") + ": unplug the device and plug it back in.");
+  } catch (e) {
+    say(e && e.name === "NotFoundError" ? "No port chosen." : "Not flashed: " + (e && e.message ? e.message : e), true);
+  } finally {
+    if (transport) { try { await transport.disconnect(); } catch (e) { /* the port is already gone */ } }
+    busy = false;
+    show();
+  }
+}
+board.addEventListener("change", fill);
+tag.addEventListener("change", show);
+flash.addEventListener("click", run);
+fetch("firmware/index.json", { cache: "no-cache" })
+  .then((r) => (r.ok ? r.json() : { releases: [] }))
+  .catch(() => ({ releases: [] }))
+  .then((j) => { releases = Array.isArray(j.releases) ? j.releases : []; fill(); });
+</script>
 </body>
 </html>

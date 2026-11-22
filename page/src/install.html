@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jank · Install</title>
-<meta name="description" content="How to put the Jank firmware on a Seeed XIAO ESP32-S3: the first flash, then updates by copying a file onto the Jank drive or over USB MIDI.">
+<meta name="description" content="Put a Jank firmware release on a bare device or a jank mini 3, from the browser.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000'/%3E%3Cg transform='translate(2.7 6.2) scale(1.4)' fill='none' stroke='%23A06CF0' stroke-width='2'%3E%3Crect x='1' y='1' width='10' height='6' rx='1.5'/%3E%3Crect x='8' y='7' width='10' height='6' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
 <style>
 <!--@include ui/common.css-->
@@ -29,43 +29,116 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
   </header>
 
   <section>
-    <h2>Before you start</h2>
-    <p>For the bare Seeed XIAO ESP32-S3, the stick. The firmware is built from the <a href="https://github.com/w0ts/jank">source</a>; there is no ready-made download.</p>
-    <pre><code>scripts/install_idf.sh    # once: ESP-IDF v5.5.6 (needs Python 3.13)
-scripts/build.sh xiao     # makes jank.bin</code></pre>
-    <p>Build files stay in the scratch folder <code>$JANK_SCRATCH</code> (default <code>worktrees/jank-scratch/</code>).</p>
-  </section>
-
-  <section>
-    <h2>First install</h2>
-    <p>A blank stick needs download mode once: hold BOOT while plugging it in. The first install of this build changes the partition table (two app slots) and the bootloader (rollback), so it is a full flash:</p>
-    <pre><code>bash -c '. scripts/env.sh &amp;&amp; cd "$JANK_SCRATCH/build-xiao" &amp;&amp; python -m esptool --chip esp32s3 -b 460800 --before default_reset --after no_reset write_flash "@flash_args"'</code></pre>
-    <p>Then unplug the stick and plug it back in. The BOOT hold is Seeed's usual way and was not tried for this page's steps.</p>
-  </section>
-
-  <section>
-    <h2>Update by copying a file</h2>
-    <p>A running stick shows a drive called JANK. No button, no download mode, no tool.</p>
+    <h2>Flash from the browser</h2>
+    <p>Chrome or Edge on a computer, a USB-C cable that carries data.</p>
     <ol>
-      <li>Build: <code>make build</code> gives <code>jank.bin</code>. Or run <code>make flash</code>, which builds and does steps 2 and 3 for you.</li>
-      <li>Copy <code>jank.bin</code> onto the JANK drive.</li>
-      <li>The stick checks the image as it lands and restarts by itself once the computer has been quiet for 1.5 s. The drive comes back with <code>UPDATE.TXT</code>, which says what happened. macOS may say the drive was not ejected: that is normal here.</li>
+      <li>Put the device in download mode. A new one: hold BOOT (the XIAO's B button) while plugging it in. One that runs Jank: on the <a href="device.html">Device</a> page, Connect, then Advanced, Firmware, Download mode.</li>
+      <li>Choose the device and the release, press Flash and pick the port the browser lists.</li>
+      <li>When it is done, unplug the device and plug it back in. Its settings are kept.</li>
     </ol>
-    <p>A wrong or damaged image is refused and the old firmware keeps running.</p>
+    <div class="row">
+      <label>Device <select id="fw-board"><option value="xiao">Bare device (Seeed XIAO ESP32-S3)</option><option value="lcd2">jank mini 3</option></select></label>
+      <label>Release <select id="fw-tag" disabled><option>-</option></select></label>
+    </div>
   </section>
 
   <section>
-    <h2>Update over USB MIDI</h2>
-    <p>No drive, or the copy does nothing: <code>make flash</code> falls back to this by itself, or run it directly. Needs python-rtmidi. Stop playing first, and close other programs that use the stick's MIDI port.</p>
-    <pre><code>python3 scripts/ota.py jank.bin</code></pre>
+    <h2>Beat follow</h2>
+    <p>Beat follow needs a trained network. Jank's firmware does not carry one: the one it runs today is the beat model of the <a href="https://github.com/CPJKU/madmom">madmom</a> project (CPJKU, Johannes Kepler University Linz), licensed <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>: non-commercial use only. For commercial use, madmom's licence names its contact.</p>
+    <p>If you tick the box, this page fetches madmom's model from <a href="https://github.com/CPJKU/madmom_models">madmom's own repository</a>, converts it here in your browser to Jank's format (the values unchanged) and writes it to your device with the firmware. Nothing is sent anywhere else, and this site never holds the model. Without it the device does everything else; beat follow stays off.</p>
+    <label class="check"><input id="fw-beat" type="checkbox"> Add madmom's beat model. I use it for non-commercial purposes only, and I will not pass on the flashed device's firmware or the model.</label>
   </section>
 
   <section>
-    <h2>Rollback</h2>
-    <p>A new image starts on trial. If it does not talk to a computer, the old one comes back: stay connected for about 20 s after an update, and press Connect on the <a href="device.html">Device</a> page within two minutes. A crash or a power cut before that also puts the old image back.</p>
+    <h2>Flash</h2>
+    <div class="row"><button id="fw-flash" type="button" disabled>Flash</button><span id="fw-note" class="note">Looking for releases...</span></div>
+    <progress id="fw-progress" class="hide" max="1" value="0"></progress>
+    <p>The releases and their notes: <a href="https://github.com/w0ts/jank/releases">github.com/w0ts/jank/releases</a>.</p>
   </section>
 
-  <footer class="site">Details: <a href="https://github.com/w0ts/jank/blob/main/docs/firmware.md">docs/firmware.md</a>, <a href="https://github.com/w0ts/jank/blob/main/docs/usb.md">docs/usb.md</a>, <a href="https://github.com/w0ts/jank/blob/main/docs/boards.md">docs/boards.md</a>.</footer>
+  <footer class="site">Building it yourself: <a href="https://github.com/w0ts/jank/blob/main/docs/firmware.md">docs/firmware.md</a>.</footer>
 </main>
+<script>
+<!--@include ui/beatw.js-->
+</script>
+<script type="module">
+// The releases the site carries: firmware/index.json (scripts/publish_firmware.py), newest first:
+// { releases: [ { tag, boards: { xiao: { parts: [ { path, offset } ], beatw: { offset, size } }, lcd2: ... } } ] }.
+// Flashing: esptool-js over Web Serial, each part at its own address (the settings partition is not touched); with the
+// box ticked, madmom's model converted here (ui/beatw.js) goes into the beatw partition.
+const ESPTOOL = "https://cdn.jsdelivr.net/npm/esptool-js@0.7.1/bundle.js";
+const $ = (id) => document.getElementById(id);
+const board = $("fw-board"), tag = $("fw-tag"), note = $("fw-note"), flash = $("fw-flash"), beat = $("fw-beat"), bar = $("fw-progress");
+let releases = [], busy = false;
+const chosen = () => { const r = releases.find((x) => x.tag === tag.value); return r && r.boards && r.boards[board.value]; };
+const say = (t, bad) => { note.textContent = t; note.classList.toggle("bad", !!bad); };
+const canSerial = "serial" in navigator && window.isSecureContext;
+function show() {
+  const b = chosen();
+  flash.disabled = busy || !b || !canSerial;
+  if (busy) return;
+  say(!releases.length ? "No release yet." : !b ? "This release has no firmware for this device."
+    : !canSerial ? "This browser cannot flash: use Chrome or Edge on a computer, on the https page." : "");
+}
+function fill() {
+  const list = releases.filter((r) => r.boards && r.boards[board.value]);
+  tag.replaceChildren(...(list.length ? list : [{ tag: "-" }]).map((r) => new Option(r.tag, r.tag)));
+  tag.disabled = !list.length;
+  show();
+}
+async function bytes(url) {
+  const r = await fetch(url, { cache: "no-cache" });
+  if (!r.ok) throw new Error(url + ": " + r.status);
+  return new Uint8Array(await r.arrayBuffer());
+}
+async function files(b) {
+  const out = [];
+  for (const p of b.parts) out.push({ data: await bytes(p.path), address: p.offset });
+  if (beat.checked) {
+    say("Fetching madmom's model...");
+    const w = BeatW.fromMadmom(await bytes(BeatW.MADMOM_URL));
+    if (w.length > b.beatw.size) throw new Error("the model does not fit the device's beatw partition");
+    out.push({ data: w, address: b.beatw.offset });
+  }
+  return out;
+}
+async function run() {
+  const b = chosen();
+  if (!b) return;
+  busy = true;
+  flash.disabled = true;
+  let transport = null;
+  try {
+    say("Downloading the firmware...");
+    const fileArray = await files(b);
+    say("Pick the device's port in the browser's list.");
+    const port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x303a }] });
+    const { ESPLoader, Transport } = await import(ESPTOOL);
+    transport = new Transport(port, false);
+    const loader = new ESPLoader({ transport, baudrate: 921600 });
+    say("Connecting...");
+    const chip = await loader.main();
+    if (!/ESP32-S3/.test(chip)) throw new Error("this is a " + chip + ", not an ESP32-S3");
+    const total = fileArray.reduce((a, f) => a + f.data.length, 0), done = fileArray.map(() => 0);
+    bar.classList.remove("hide");
+    await loader.writeFlash({ fileArray, flashMode: "keep", flashFreq: "keep", flashSize: "keep", eraseAll: false, compress: true,
+      reportProgress: (i, written) => { done[i] = written; const n = done.reduce((a, x) => a + x, 0); bar.value = n / total; say("Writing... " + Math.round(100 * n / total) + " %"); } });
+    say("Done" + (beat.checked ? ", with beat follow" : "") + ": unplug the device and plug it back in.");
+  } catch (e) {
+    say(e && e.name === "NotFoundError" ? "No port chosen." : "Not flashed: " + (e && e.message ? e.message : e), true);
+  } finally {
+    if (transport) { try { await transport.disconnect(); } catch (e) { /* the port is already gone */ } }
+    busy = false;
+    show();
+  }
+}
+board.addEventListener("change", fill);
+tag.addEventListener("change", show);
+flash.addEventListener("click", run);
+fetch("firmware/index.json", { cache: "no-cache" })
+  .then((r) => (r.ok ? r.json() : { releases: [] }))
+  .catch(() => ({ releases: [] }))
+  .then((j) => { releases = Array.isArray(j.releases) ? j.releases : []; fill(); });
+</script>
 </body>
 </html>
