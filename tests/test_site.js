@@ -36,4 +36,25 @@ for (const [pub, file] of Object.entries(published)) {
 }
 const script = fs.readFileSync(path.join(root, 'scripts', 'publish_page.sh'), 'utf8');
 for (const [pub, file] of Object.entries(published)) ok(script.includes(`${pub}:page/${file}`), `publish_page.sh puts page/${file} at ${pub}`);
+// every inline script of every page parses (2026-11-22: an included .js inside an extra <script> pair broke the Install
+// page's converter in the browser, "Unexpected token '<'"); module scripts through `node --check` as a module
+const vm = require('vm');
+const { spawnSync } = require('child_process');
+for (const [file] of PAGES.concat([['build.html']])) {
+  const p = path.join(root, 'page', file);
+  if (!fs.existsSync(p)) continue;
+  const html = fs.readFileSync(p, 'utf8');
+  for (const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)) {
+    const attrs = m[1] || '', body = m[2];
+    if (/\bsrc=/.test(attrs) || !body.trim()) continue;
+    let fine = true, why = '';
+    try {
+      if (/type="module"/.test(attrs)) {
+        const r = spawnSync(process.execPath, ['--input-type=module', '--check', '-'], { input: body, encoding: 'utf8' });
+        if (r.status !== 0) throw new Error(r.stderr.split('\n').slice(0, 4).join(' '));
+      } else new vm.Script(body);
+    } catch (e) { fine = false; why = e.message; }
+    ok(fine, `${file}: an inline script parses (${why})`);
+  }
+}
 console.log(`site: ${n} checks passed`);

@@ -332,7 +332,6 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
   <footer class="site">Building it yourself: <a href="https://github.com/w0ts/jank/blob/main/docs/firmware.md">docs/firmware.md</a>.</footer>
 </main>
 <script>
-<script>
 // SPDX-License-Identifier: GPL-3.0-only
 // The beat network's weights blob (core/beat/beat_weights.h) from madmom's beat model, in the browser or in node, no Python:
 // BeatW.fromMadmom(bytes of beats/2016/beats_lstm_1.pkl) -> Uint8Array "JBW1" + count + crc32 + 0 + float32[29251].
@@ -479,7 +478,6 @@ const BeatW = (() => {
   return { MADMOM_URL, COUNT, unpickle, madmomBeatWeights, crc32, blob, fromMadmom };
 })();
 if (typeof module !== 'undefined') module.exports = BeatW;
-</script>
 </script>
 <script type="module">
 // The releases the site carries: firmware/index.json (scripts/publish_firmware.py), newest first:
