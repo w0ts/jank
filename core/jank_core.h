@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include "jank_lat.h"
 
-#define JK_VERSION "0.1.3"
+#define JK_VERSION "0.0.1"
 
 #define JK_GROUP_MIN 1u
 #define JK_GROUP_MAX 9u
