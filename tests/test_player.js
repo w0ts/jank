@@ -163,6 +163,21 @@ eq(P.pickOutput([dflt[0]]), 'default', 'when only the default entry names jank, 
 eq(P.pickOutput([{ kind: 'audiooutput', label: 'jank (303a:4a4b)', deviceId: 'x' }]), 'x', "'jank (303a:4a4b)' matches, any case");
 eq([P.savedStatus(dflt, { id: 'spk' }), P.savedStatus(dflt, { id: 'gone', label: 'nothing' }), P.savedStatus(dflt, { id: 'new', label: 'MacBook Speakers' }), P.savedStatus(dflt, null)], ['found', 'stale', 'found', 'none'], 'saved output: found by id, stale, found by label, none');
 eq(P.savedStatus([{ kind: 'audiooutput', label: '', deviceId: '' }], { id: 'jk' }), 'unknown', 'no ids listed (no permission): only tried, never dropped');
+// 2026-11-22: the device was renamed "jank" -> "Jank": Chrome gave it a new id and the saved label differed only in case, so the page
+// dropped the saved output and never sent the sound to the device (seen live: saved "jank (303a:4a4b)", listed "Jank (303a:4a4b)")
+const renamed = [{ kind: 'audiooutput', label: 'Default - MacBook Pro Speakers (Built-in)', deviceId: 'default' }, { kind: 'audiooutput', label: 'Jank (303a:4a4b)', deviceId: 'a1fc' },
+                 { kind: 'audiooutput', label: 'MacBook Pro Speakers (Built-in)', deviceId: '3ea2' }];
+const oldSave = { id: '33c0', label: 'jank (303a:4a4b)' };
+eq(P.matchSaved(renamed, oldSave), { id: 'a1fc', label: 'Jank (303a:4a4b)' }, 'the saved label is found whatever its case');
+eq(P.savedStatus(renamed, oldSave), 'found', 'so the saved output is not stale');
+eq(P.outputAtLoad(renamed, oldSave), { action: 'use', id: 'a1fc', label: 'Jank (303a:4a4b)' }, 'at load: the device under its new id and label');
+eq(P.outputAtLoad(renamed, { id: '9999', label: 'Old Name' }), { action: 'use', id: 'a1fc', label: 'Jank (303a:4a4b)' }, 'a stale save with the device listed by name: the device');
+eq(P.outputAtLoad(renamed, null), { action: 'use', id: 'a1fc', label: 'Jank (303a:4a4b)' }, 'nothing saved, the device listed by name: the device');
+eq(P.outputAtLoad([renamed[0], renamed[2]], { id: '3ea2', label: 'MacBook Pro Speakers (Built-in)' }), { action: 'use', id: '3ea2', label: 'MacBook Pro Speakers (Built-in)' }, 'no device: the saved output');
+eq(P.outputAtLoad([renamed[0], renamed[2]], oldSave), { action: 'none' }, 'no device and the save is stale: none');
+eq(P.outputAtLoad([{ kind: 'audiooutput', label: '', deviceId: 'x' }], oldSave), { action: 'none' }, 'ids but no labels, saved id gone: stale, none');
+eq(P.outputAtLoad([{ kind: 'audiooutput', label: '', deviceId: '' }], oldSave), { action: 'keep' }, 'no ids listed (no permission): keep the save, tried at Play');
+eq(P.outputAtLoad([{ kind: 'audiooutput', label: '', deviceId: '' }], null), { action: 'keep' }, 'nothing saved, nothing readable: keep');
 eq([P.sinkMatches('jk', 'jk'), P.sinkMatches('', 'jk'), P.sinkMatches({ type: 'none' }, 'jk')], [true, false, false], 'AudioContext.sinkId read back');
 eq(P.outputReport({ permission: 'granted', devices: dflt, saved: { id: 'abcdef0123456789', label: 'jank (303a:4a4b)' }, chosen: { id: 'abcdef0123456789', label: 'jank (303a:4a4b)' }, ctxState: 'running', ctxSinkId: 'abcdef0123456789', lastError: '' }),
    'permission: granted · outputs: Default - JANK USB Audio (default), MacBook Speakers (spk), jank (303a:4a4b) (abcdef01) · saved: abcdef01 "jank (303a:4a4b)" · chosen: abcdef01 "jank (303a:4a4b)" · device context: running, sinkId abcdef01 · last sink error: none', 'the details: permission, outputs with 8 chars of the id, saved, chosen, the context, the last error');
@@ -233,6 +248,25 @@ eq([picks.has(2), picks.size], [false, listLen - 1], 'random over the whole scop
   eq(folderOf(P.afterTrack('next', count3, 1)), 'B', 'a track ending in A\'s last file: next goes on into B');
   eq(folderOf(P.afterTrack('random', count3, 4, () => 0)), 'A', 'from the last file, random can go back to A');
   eq(folderOf(P.skipTrack('next', count3, 4)), 'A', 'the Next button wraps from the last folder to the first');
+
+  // ---- the free-text search over the scope's files (names and folders, every word, any case and accent) ----
+  const lib = [['Techno', 'Daft Punk - Around the World.mp3'], ['Techno', 'Aphex Twin - Xtal.flac'], ['House', 'Café del Mar', 'Énergie 124.mp3'], ['House', 'Robin S - Show Me Love.mp3']]
+    .map(p => ({ name: p[p.length - 1], path: p }));
+  eq(P.searchWords('  Daft   PUNK '), ['daft', 'punk'], 'words: trimmed, lower case, spaces collapsed');
+  eq(P.searchWords('Été'), ['ete'], 'accents dropped');
+  eq(P.searchWords(''), [], 'an empty query has no words');
+  eq(P.searchFiles(lib, '').map(f => f.name), [], 'an empty query finds nothing (the folder list shows instead)');
+  eq(P.searchFiles(lib, 'punk').map(f => f.name), ['Daft Punk - Around the World.mp3'], 'one word in a name');
+  eq(P.searchFiles(lib, 'world daft').map(f => f.name), ['Daft Punk - Around the World.mp3'], 'every word, in any order');
+  eq(P.searchFiles(lib, 'daft xtal').map(f => f.name), [], 'all words must match the same file');
+  eq(P.searchFiles(lib, 'techno').map(f => f.name), ['Daft Punk - Around the World.mp3', 'Aphex Twin - Xtal.flac'], 'a folder name finds its files, in scope order');
+  eq(P.searchFiles(lib, 'cafe energie').map(f => f.name), ['Énergie 124.mp3'], 'accents and case are ignored, folder + name');
+  eq(P.searchFiles(lib, 'house love').map(f => f.name), ['Robin S - Show Me Love.mp3'], 'folder word + name word');
+  eq(P.searchFiles(lib, '.mp3').length, 3, 'the extension is searchable too');
+  eq(P.searchFiles(null, 'x'), [], 'no files: nothing');
+  eq(P.searchLine(0, 'xyz'), 'no file matches "xyz"', 'no match: says so');
+  eq(P.searchLine(1, 'a'), '1 file', 'one');
+  eq(P.searchLine(1234, 'a'), '1,234 files', 'many, with a thousands separator');
 
   console.log('player: ' + checks + ' checks passed');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -61,6 +61,10 @@ td button { padding: 4px 12px; min-height: 32px; }
 #pl-crumbs button { min-height: 24px; padding: 1px 6px; }
 #pl-crumbs .folder { font-size: 12px; color: var(--dim); margin-right: 4px; }
 #pl-list { height: 232px; }
+#player .pl-search-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+#player #pl-search { flex: 1 1 auto; min-width: 0; }
+#pl-list .where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--dim); font-size: 11px; font-weight: 400; }
+#pl-list .what { flex: 0 1 auto; min-width: 3em; overflow: hidden; text-overflow: ellipsis; }
 .adv-boots { font-size: 20px; font-weight: 650; margin: 0 0 8px; }
 .adv-boots.restarted { color: var(--err); }
 #connect-slot { margin: 4px 0 12px; }
@@ -159,6 +163,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
           <div id="pl-crumbs" class="pl-crumbs"></div>
         </div>
         <div id="pl-browser" class="hide">
+          <div class="pl-search-row"><input id="pl-search" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search the music folder" title="Finds files by words in their name or folder, in any order; case and accents do not matter. Searches every folder under the one you picked when 'all folders' is on, else the folder shown. Esc clears it. Only this page."><span id="pl-search-line" class="num"></span></div>
           <div id="pl-list" class="list"></div>
         </div>
       </section>
@@ -1167,6 +1172,7 @@ autoConnect();
   const pending = { handle: null, busy: false };      // a remembered folder that needs its permission: Play's click is the gesture
   let probe = null;                                      // a default-sink context, only to read the monitor's output latency (captureStream path)
   const browser = { rootName: "", names: [], handles: [], tree: null, entries: [], shown: Player.MAX_ROWS };
+  const search = { query: "", shown: Player.MAX_ROWS, timer: 0, lastPaint: 0 };
 
   const note = (text, bad) => { el("pl-note").textContent = text; el("pl-note").style.color = bad ? "var(--err)" : ""; };
   const errorText = (err) => (err && err.message ? err.message : String(err));
@@ -1586,9 +1592,9 @@ autoConnect();
       state.devices = devices;
       await readPermission();
       fillOutputs(devices);
-      const saved = savedOutput(), found = Player.matchSaved(devices, saved), status = Player.savedStatus(devices, saved);
-      if (found) await useOutput({ id: found.id, label: saved.label || found.label });
-      else if (status === "stale") await useOutput({ id: "", label: "" });
+      const choice = Player.outputAtLoad(devices, savedOutput());
+      if (choice.action === "use") await useOutput({ id: choice.id, label: choice.label });
+      else if (choice.action === "none") await useOutput({ id: "", label: "" });
       paintDetails();
     } catch (err) {
       note("Cannot list the audio outputs (" + errorText(err) + ").", true);
@@ -1648,8 +1654,48 @@ autoConnect();
     if (!browser.tree) browser.handles = [...browser.handles, entry.handle];
     showFolder();
   }
+  // ---- the search box: names only, over the scope (all folders on) or the folder shown; a click plays as a click in its folder ----
+  const searching = () => Player.searchWords(search.query).length > 0;
+  const searchRow = (file) => {
+    const b = rowButton("", Player.pathKey(file.path) === queue.current ? "playing" : "", "Play this file; the player goes on as 'then' says.", () => startFound(file));
+    const what = document.createElement("span"), where = document.createElement("span");
+    what.className = "what";
+    what.textContent = file.name;
+    where.className = "where";
+    where.textContent = file.path.length > 1 ? file.path.slice(0, -1).join("/") : browser.rootName;
+    b.replaceChildren(what, where);
+    return b;
+  };
+  function searchRows() {
+    const found = Player.searchFiles(startList(), search.query);
+    const more = scope.on && scope.scanning ? " (still scanning)" : "";
+    el("pl-search-line").textContent = Player.searchLine(found.length, search.query) + more;
+    const rows = found.slice(0, Player.rowsToShow(found.length, search.shown)).map(searchRow);
+    if (found.length > search.shown) rows.push(rowButton("show more (" + (found.length - search.shown) + ")", "dir", "Shows more of the files found.", () => { search.shown += Player.MAX_ROWS; paintList(); }));
+    return rows;
+  }
+  function startFound(file) {
+    const key = Player.pathKey(file.path);
+    const list = scope.on ? scope.files : folderFiles(), at = list.findIndex((f) => Player.pathKey(f.path) === key);
+    if (at < 0) return;
+    queue.entries = list;
+    playQueued(at);
+  }
+  function setSearch(query) {
+    search.query = query;
+    search.shown = Player.MAX_ROWS;
+    paintList();
+  }
+  // while a scan runs, the found files grow: the results are repainted at most twice a second
+  function searchProgress() {
+    if (!searching() || Date.now() - search.lastPaint < 500) return;
+    search.lastPaint = Date.now();
+    paintList();
+  }
   function paintList() {
     el("pl-browser").classList.toggle("hide", browser.rootName === "");
+    if (!searching()) el("pl-search-line").textContent = "";
+    if (searching()) { el("pl-list").replaceChildren(...searchRows()); return; }
     const crumbs = Player.breadcrumbs([browser.rootName, ...browser.names]).slice(1);
     const hint = document.createElement("span");
     hint.className = "note";
@@ -1719,7 +1765,7 @@ autoConnect();
     try {
       result = await Player.scanTree({
         root, list: tree ? async (dir, path) => Player.listTree(tree, path) : (dir) => listHandle(dir.handle), shouldStop: () => token.cancelled, yieldFn,
-        onProgress: (n, found) => { if (!token.cancelled) { scope.files = found; scope.count = n; paintScope(); notifyScan(); } }, cap: Player.SCOPE_CAP,
+        onProgress: (n, found) => { if (!token.cancelled) { scope.files = found; scope.count = n; paintScope(); notifyScan(); searchProgress(); } }, cap: Player.SCOPE_CAP,
       });
     } catch (err) {
       if (!token.cancelled) note("Cannot scan the folders: " + errorText(err), true);
@@ -1732,6 +1778,7 @@ autoConnect();
     reanchor();
     paintScope();
     notifyScan();
+    if (searching()) paintList();
   }
   async function openHandle(handle, mayAsk) {
     const options = { mode: "read" };
@@ -1810,9 +1857,11 @@ autoConnect();
   el("pl-scope").addEventListener("change", () => {
     scope.on = el("pl-scope").checked;
     store.set(KEY.scope, scope.on ? "1" : "0");
-    if (scope.on) scanScope(); else { cancelScan(); reanchor(); paintScope(); paintPlayEnabled(); }
+    if (scope.on) scanScope(); else { cancelScan(); reanchor(); paintScope(); paintPlayEnabled(); paintList(); }
   });
   el("pl-rescan").addEventListener("click", scanScope);
+  el("pl-search").addEventListener("input", () => { clearTimeout(search.timer); search.timer = setTimeout(() => setSearch(el("pl-search").value), 150); });
+  el("pl-search").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); el("pl-search").value = ""; clearTimeout(search.timer); setSearch(""); } });
   el("pl-help").addEventListener("click", () => {
     const open = el("pl-help-text").classList.toggle("hide") === false;
     el("pl-help").setAttribute("aria-expanded", String(open));

@@ -88,7 +88,9 @@ const Player = (() => {
     if (!list.some(d => d.deviceId)) return 'unknown';
     return matchSavedIn(list, saved) ? 'found' : 'stale';
   }
-  const matchSavedIn = (list, saved) => list.find(d => d.deviceId === saved.id) || (saved.label ? list.find(d => d.label === saved.label) : null) || null;
+  // labels compare without case: the device's USB name went from "jank" to "Jank" (2026-11-22) and its id changed with it
+  const sameLabel = (a, b) => !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase();
+  const matchSavedIn = (list, saved) => list.find(d => d.deviceId === saved.id) || (saved.label ? list.find(d => sameLabel(d.label, saved.label)) : null) || null;
   // AudioContext.sinkId reads back as an id string, or an object ({ type: 'none' }) for no output
   const sinkMatches = (current, id) => typeof current === 'string' && current === id;
   // the 'details' text of the stick output: everything needed to see why a sound does not reach it
@@ -128,11 +130,36 @@ const Player = (() => {
   // s: { scanning, count, capped, done (a scan ran to its end), root (the picked folder's name) }
   const scopeLine = s => (s.scanning ? 'scanning: ' + s.count.toLocaleString('en-US') + ' files' : s.done && s.count === 0 ? 'no audio files under ' + (s.root || 'the folder') : s.capped ? s.count.toLocaleString('en-US') + ' files (capped)' : '');
 
+  // ---- free-text search over the play scope: names only (no file is read), every word must appear in the path, any order ----
+  // case and accents are ignored ("cafe" finds "Café"); the folders count ("techno daft" finds Techno/Daft Punk - ....mp3)
+  const fold = text => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const searchWords = query => fold(query).split(/\s+/).filter(Boolean);
+  // the folded path of a file, worked out once per file object (a scan of 100 000 names is searched again at every key)
+  const folded = new WeakMap();
+  const haystack = f => { if (!folded.has(f)) folded.set(f, fold((f.path || [f.name]).join('/'))); return folded.get(f); };
+  // files: [{ name, path: [folders..., name] }] in scope order -> the matching ones, same order ([] for an empty query)
+  function searchFiles(files, query) {
+    const words = searchWords(query);
+    if (words.length === 0) return [];
+    return (files || []).filter(f => { const hay = haystack(f); return words.every(w => hay.includes(w)); });
+  }
+  const searchLine = (count, query) => (count === 0 ? 'no file matches "' + String(query).trim() + '"' : count.toLocaleString('en-US') + (count === 1 ? ' file' : ' files'));
+
   // the output the user chose last time, found again in a device list (ids first; a label when the list has labels and the id changed)
   function matchSaved(devices, saved) {
     if (!saved || !saved.id) return null;
     const list = outputChoices(devices);
-    return list.find(c => c.id === saved.id) || (saved.label ? list.find(c => c.label === saved.label) : null) || null;
+    return list.find(c => c.id === saved.id) || (saved.label ? list.find(c => sameLabel(c.label, saved.label)) : null) || null;
+  }
+  // the device's output at page load, before any click: { action: 'use', id, label } | { action: 'none' } (the save is stale) |
+  // { action: 'keep' } (nothing readable: the save is only tried at Play). The saved output first, else the device found by its name
+  // ("jank" in the label, any case: readable once the browser shows the labels), else none when the save is stale.
+  function outputAtLoad(devices, saved) {
+    const found = matchSaved(devices, saved), hasLabels = outputs(devices).some(d => d.label);
+    if (found) return { action: 'use', id: found.id, label: hasLabels ? found.label : saved.label || found.label };
+    const jank = pickOutput(devices, 'jank');
+    if (jank !== null) return { action: 'use', id: jank, label: outputChoices(devices).find(c => c.id === jank).label };
+    return savedStatus(devices, saved) === 'stale' ? { action: 'none' } : { action: 'keep' };
   }
   // which button the card offers for the stick's output: 'none' while a chosen device works, 'choose' (the browser's own output
   // chooser, selectAudioOutput: no microphone), or 'allow' (no chooser here: the explicit button that asks for the microphone only to
@@ -419,6 +446,6 @@ const Player = (() => {
   // the BPM the stick should hear for a tag BPM at a playback rate: the plain product (the stick folds half / double, this does not)
   const expectedBpm = (tag, rate) => tag * rate;
 
-  return { MAX_TAG_BYTES, parseBpmText, id3TotalSize, parseId3, mp4Atom, parseMp4Tmpo, parseFlac, parseOgg, sniff, tagBpm, expectedBpm, PITCH_RANGE_PCT, DEFAULT_VOLUME_PCT, MAX_ROWS, AUDIO_EXT, statusText, pitchToRate, formatPitch, volumeFromPct, parseVolumePct, formatTime,
-           savedStatus, sinkMatches, outputReport, SCOPE_CAP, isJunkName, pathKey, scanTree, scopeLine, matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, firstTrack, afterTrack, skipTrack, previousTrack, pushHistory, HISTORY_MAX, RESTART_AFTER_S, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
+  return { searchWords, searchFiles, searchLine, MAX_TAG_BYTES, parseBpmText, id3TotalSize, parseId3, mp4Atom, parseMp4Tmpo, parseFlac, parseOgg, sniff, tagBpm, expectedBpm, PITCH_RANGE_PCT, DEFAULT_VOLUME_PCT, MAX_ROWS, AUDIO_EXT, statusText, pitchToRate, formatPitch, volumeFromPct, parseVolumePct, formatTime,
+           savedStatus, outputAtLoad, sinkMatches, outputReport, SCOPE_CAP, isJunkName, pathKey, scanTree, scopeLine, matchSaved, outputButton, OUTPUT_HELP, OUTPUT_BUTTON_TEXT, playbackPlan, planNote, planDetails, browserBrand, nextTrack, randomTrack, firstTrack, afterTrack, skipTrack, previousTrack, pushHistory, HISTORY_MAX, RESTART_AFTER_S, AFTER_MODES, parseAfterMode, routeText, pickOutput, outputChoices, resolveOutput, isAudioFile, sortEntries, breadcrumbs, rowsToShow, buildTree, listTree };
 })();
