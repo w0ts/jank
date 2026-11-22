@@ -23,3 +23,4 @@ third_party/esp_tinyusb/
 scripts/jlcone/node_modules/
 scripts/jlcone/package-lock.json
 scripts/jlcone/out/
+__pycache__/
