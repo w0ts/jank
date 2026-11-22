@@ -21,7 +21,7 @@ cd "$SRC/jank/firmware"
 DEFAULTS="sdkconfig.defaults;sdkconfig.usb;sdkconfig.$BOARD;sdkconfig.beat$EXTRA"
 BUILD="$JANK_SCRATCH/build-$VARIANT"
 STAMP="$BUILD/.jank-defaults-stamp"
-NEW_STAMP="$DEFAULTS $(cd "$SRC/jank/firmware" && for f in $(echo "$DEFAULTS" | tr ';' ' '); do cat "$f"; done | shasum | cut -d' ' -f1)"
+NEW_STAMP="$DEFAULTS $(cd "$SRC/jank/firmware" && for f in $(echo "$DEFAULTS" | tr ';' ' '); do cat "$f"; done | jank_sum | cut -d' ' -f1)"
 if [ ! -f "$BUILD/build.ninja" ] || [ ! -f "$JANK_SCRATCH/sdkconfig.$VARIANT" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$NEW_STAMP" ]; then
     SDKCONFIG_DEFAULTS="$DEFAULTS" idf.py -B "$BUILD" -D SDKCONFIG="$JANK_SCRATCH/sdkconfig.$VARIANT" set-target esp32s3
     echo "$NEW_STAMP" > "$STAMP"

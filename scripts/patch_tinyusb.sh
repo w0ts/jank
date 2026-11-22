@@ -10,12 +10,23 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 TREE="${1:-$HERE}"
 . "$HERE/scripts/env.sh"
 SRC="$(ls -d "$IDF_COMPONENT_CACHE_PATH"/*/espressif__esp_tinyusb_3.0.0_* 2>/dev/null | head -n 1)"
-[ -n "$SRC" ] || { echo "esp_tinyusb 3.0.0 is not in $IDF_COMPONENT_CACHE_PATH: run one build without the override first (git stash the idf_component.yml line)"; exit 1; }
+if [ -z "$SRC" ]; then
+    # not in the cache yet (a fresh checkout, CI): the registry's 3.0.0 zip, checked against the hash it had on 2026-11-22
+    URL="https://components-file.espressif.com/components/espressif/esp_tinyusb/3.0.0/espressif__esp_tinyusb-v3.0.0.zip"
+    SHA="af8bc85bc4e23ea1fc3be5b4b352f2100ed663e642aec5d62a333d4a17443b4b"
+    DL="$IDF_COMPONENT_CACHE_PATH/download"
+    mkdir -p "$DL"
+    curl -sSfL -o "$DL/esp_tinyusb-3.0.0.zip" "$URL"
+    GOT="$(jank_sum "$DL/esp_tinyusb-3.0.0.zip" | cut -d' ' -f1)"
+    [ "$GOT" = "$SHA" ] || { echo "esp_tinyusb 3.0.0 zip: sha256 $GOT, expected $SHA"; exit 1; }
+    SRC="$DL/espressif__esp_tinyusb_3.0.0_registry"
+    rm -rf "$SRC" && mkdir -p "$SRC" && (cd "$SRC" && unzip -q "$DL/esp_tinyusb-3.0.0.zip")
+fi
 DEST="$TREE/third_party/esp_tinyusb"
 # the copy is made again only when the registry's copy or a patch is not what it was made from: new files would get new
 # modification times and ninja would compile all of esp_tinyusb again on every build
 STAMP="$DEST/.jank-patch-stamp"
-NEW_STAMP="$SRC $(cat "$HERE/third_party/esp_tinyusb-uac2.patch" "$HERE/third_party/esp_tinyusb-msc-weak.patch" "$HERE/third_party/esp_tinyusb-dwc2-setup-guard.patch" | shasum | cut -d' ' -f1)"
+NEW_STAMP="esp_tinyusb-3.0.0 $(cat "$HERE/third_party/esp_tinyusb-uac2.patch" "$HERE/third_party/esp_tinyusb-msc-weak.patch" "$HERE/third_party/esp_tinyusb-dwc2-setup-guard.patch" | jank_sum | cut -d' ' -f1)"
 if [ -d "$DEST" ] && [ "$(cat "$STAMP" 2>/dev/null)" = "$NEW_STAMP" ]; then
     echo "esp_tinyusb with the audio class and weak MSC callbacks: $DEST (as it was)"
     exit 0
