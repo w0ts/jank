@@ -10,10 +10,8 @@
 <link rel="stylesheet" href="https://w0ts.github.io/site-style/common.css">
 <style>
 :root { --accent: #9770c6; --accent-text-l: #8253ba; --accent-text-d: #a380d0; }
-/* the build page's own (common.css does the rest): the photo pairs, the photos still to come, the board tabs */
-.pics { display: flex; flex-wrap: wrap; gap: 12px; }
+/* the build page's own (common.css does the rest): the photo pairs' sizes, the board tabs */
 .pics img { width: calc(50% - 6px); min-width: 260px; flex: 1 1 260px; }
-.PHOTO-TODO { border: 2px dashed currentColor; border-left-width: 2px; padding: 1.2em; margin: 8px 0; opacity: .7; border-radius: var(--r-ctl); }
 .tabs[role="tablist"] { margin: 8px 0 12px; }
 .tabs[role="tablist"] button { font-weight: 600; }
 </style>
@@ -244,7 +242,6 @@
     <p>USB: the LCD-2's own USB-C (left wall, labelled ESP) is for a computer or a charger. For gear with a USB port (host mode), a short USB-C cable outside the box joins the LCD-2's USB-C to J1 (top wall, ESP), and the gear goes into J4 (DEVICE). J4 gives that gear no power: bus-powered gear needs its own power or a powered hub.</p>
   </section>
 
-  <footer class="site">The board, its files and the case: <a href="https://github.com/w0ts/jank/tree/main/hardware/jank-mini-3">hardware/jank-mini-3/</a>.</footer>
 </main>
 <script>
 // the two ways to have the board made: in-page tabs (#full / #hand in the address picks one)
