@@ -35,6 +35,11 @@ int jlg_host_lit(uint32_t now_ms)
     return p < JLG_HOST_FLASH_MS || (p >= JLG_HOST_FLASH_MS + JLG_HOST_GAP_MS && p < 2u * JLG_HOST_FLASH_MS + JLG_HOST_GAP_MS);
 }
 
+int jlg_host_overlay(int lit, uint32_t now_ms, int host)
+{
+    return host && jlg_host_lit(now_ms) ? !lit : lit;
+}
+
 int jlg_color(const struct jlg_state *s, uint8_t rgb[3])
 {
     if (!s->on_usb && s->batt_pct >= 0 && s->batt_pct < JLG_BATT_LOW_PCT &&

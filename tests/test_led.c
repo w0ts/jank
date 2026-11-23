@@ -175,11 +175,26 @@ static void test_host_double_flash(void)
     CHECK(jlg_color(&s, c) && same(c, JLG_BATT_RGB), "low battery over the host flash");
 }
 
+/* A one-colour LED rests lit in MODE WIFI (short offs for the beat) and dark otherwise: the host flash must show against either, so inside
+ * its two windows the LED is the opposite of what it would be. */
+static void test_host_overlay(void)
+{
+    const uint32_t t0 = JLG_HOST_PERIOD_MS * 7u;
+    const uint32_t first = t0 + 10u, gap = t0 + JLG_HOST_FLASH_MS + 10u, second = t0 + JLG_HOST_FLASH_MS + JLG_HOST_GAP_MS + 10u, quiet = t0 + 1000u;
+    CHECK(jlg_host_overlay(0, first, 1) == 1 && jlg_host_overlay(1, first, 1) == 0, "host, first window: the opposite of the resting state");
+    CHECK(jlg_host_overlay(0, gap, 1) == 0 && jlg_host_overlay(1, gap, 1) == 1, "host, between the flashes: as it would be");
+    CHECK(jlg_host_overlay(0, second, 1) == 1 && jlg_host_overlay(1, second, 1) == 0, "host, second window: the opposite");
+    CHECK(jlg_host_overlay(0, quiet, 1) == 0 && jlg_host_overlay(1, quiet, 1) == 1, "host, the rest of the period: as it would be");
+    CHECK(jlg_host_overlay(0, first, 0) == 0 && jlg_host_overlay(1, first, 0) == 1, "not host: never changed");
+    CHECK(jlg_host_overlay(7, first, 1) == 0 && jlg_host_overlay(7, quiet, 1) == 7, "any non-zero lit is lit: the opposite is 0, untouched stays as given");
+}
+
 int main(void)
 {
     test_language();
     test_firmware_flags();
     test_host_double_flash();
+    test_host_overlay();
     if (s_fail) {
         fprintf(stderr, "test_led: %d of %d checks failed\n", s_fail, s_checks);
         return 1;

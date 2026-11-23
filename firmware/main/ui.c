@@ -72,6 +72,18 @@ static void led_event(enum jl_event e, uint32_t group)
     s_event_group = group;
 }
 
+/* During a host-mode flash window (flip) a lit LED goes dark and a dark one lights: the flash shows against the MODE WIFI LED that rests
+ * lit as much as against one that rests dark */
+static void led_show_host(int flip, uint8_t r, uint8_t g, uint8_t b)
+{
+    if (!flip)
+        led_show(r, g, b);
+    else if (r || g || b)
+        led_show(0, 0, 0);
+    else
+        led_show(JLG_HOST_RGB);
+}
+
 static void led_step(uint32_t now)
 {
     static uint32_t last;
@@ -79,7 +91,7 @@ static void led_step(uint32_t now)
     struct jk_cfg cfg;
     int64_t beat = 0;
     int32_t mpb = 0;
-    int joined, lit;
+    int joined, lit, flip;
     if (now - last < LED_EVERY_MS)
         return;
     last = now;
@@ -99,19 +111,16 @@ static void led_step(uint32_t now)
         led_show(c[0], c[1], c[2]);
         return;
     }
-    if (usb_is_host() && jlg_host_lit(now)) {   /* USB host mode: two short flashes every 2.4 s, over the timing (a one-colour LED just lights) */
-        led_show(JLG_HOST_RGB);
-        return;
-    }
+    flip = jlg_host_overlay(0, now, usb_is_host());   /* USB host mode: two short flashes every 2.4 s, the opposite of what the LED would show */
     lit = jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum);
     if (joined && lit != (cfg.net == JK_NET_WIFI) && beat_bar_state() == 2 && jk_led_bar_one(beat, cfg.quantum))
-        led_show(JK_LED_ONE_RGB);        /* AUTO BAR locked: the bar's 1 flashes amber (the music's 1) */
+        led_show_host(flip, JK_LED_ONE_RGB);   /* AUTO BAR locked: the bar's 1 flashes amber (the music's 1) */
     else if (!lit)
-        led_show(0, 0, 0);
+        led_show_host(flip, 0, 0, 0);
     else if (cfg.net == JK_NET_WIFI)
-        led_show(0, 0, 40);              /* (an RGB LED: blue on a network, green in MODE JANK) */
+        led_show_host(flip, 0, 0, 40);         /* (an RGB LED: blue on a network, green in MODE JANK) */
     else
-        led_show(0, 30, 0);
+        led_show_host(flip, 0, 30, 0);
 }
 
 /* MODE JANK <-> the Wi-Fi network: the radio is set up at start-up, so a restart. No network saved: red pulses */

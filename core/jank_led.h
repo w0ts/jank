@@ -46,6 +46,9 @@ struct jlg_state {
 
 /* 1: now_ms is inside one of the two host-mode flashes (the same pattern on a one-colour LED, which has no jlg_color) */
 int jlg_host_lit(uint32_t now_ms);
+/* A one-colour LED's state with the host flash on it: while hosting, inside the two flash windows, the opposite of `lit` (a lit LED goes
+ * dark, a dark one lights), else `lit` as given. The LED rests lit in MODE WIFI and dark otherwise, so only a flip shows in both. */
+int jlg_host_overlay(int lit, uint32_t now_ms, int host);
 
 /* the colour now; 1 lit */
 int jlg_color(const struct jlg_state *s, uint8_t rgb[3]);
