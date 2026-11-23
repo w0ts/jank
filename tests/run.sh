@@ -48,6 +48,7 @@ fi
 "$OUT/test_panic"
 "$CC" $FLAGS "$HERE/tests/ota_replay.c" "$HERE/core/jank_ota.c" -o "$OUT/ota_replay"
 python3 "$HERE/tests/test_ota.py" "$OUT/ota_replay" "$OUT/ota"
+python3 "$HERE/tests/test_ctl_script.py"
 "$OUT/test_net"
 "$OUT/test_sysex"
 # the HOME line and the made-up JANK drive that streams jank.bin into the spare slot
