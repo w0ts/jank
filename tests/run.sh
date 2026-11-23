@@ -72,6 +72,8 @@ fi
 "$OUT/test_uacdesc"
 "$CC" $FLAGS "$HERE/tests/test_midiq.c" "$HERE/core/jank_midiq.c" -o "$OUT/test_midiq"
 "$OUT/test_midiq"
+"$CC" $FLAGS "$HERE/tests/test_lpx.c" "$HERE/core/jank_lpx.c" -o "$OUT/test_lpx"
+"$OUT/test_lpx"
 "$CC" $FLAGS "$HERE/tests/test_pcm.c" "$HERE/core/jank_pcm.c" -lm -o "$OUT/test_pcm"
 "$OUT/test_pcm"
 # LINE IN: the ADC framing, the timestamp fit, DC / gain / level, the cell, the cubic resampler and the chain on clicks
