@@ -255,8 +255,29 @@ static void test_release_all_respects_the_room(void)
     CHECK(jla_release_all(&a, o, 2) == 0);
 }
 
+static void test_roles_by_product_name(void)
+{
+    CHECK(jla_role_from_name("Launchpad X") == JLA_LPX);
+    CHECK(jla_role_from_name("Novation Launchpad X") == JLA_LPX);
+    CHECK(jla_role_from_name("Digitone II") == JLA_DN2);
+    CHECK(jla_role_from_name("Elektron Digitone II") == JLA_DN2);
+    CHECK(jla_role_from_name("Launchpad Mini MK3") == JLA_OTHER);   /* other Launchpads have other layouts */
+    CHECK(jla_role_from_name("Launchpad Pro MK3") == JLA_OTHER);
+    CHECK(jla_role_from_name("OP-Z") == JLA_OTHER);
+    CHECK(jla_role_from_name("") == JLA_OTHER && jla_role_from_name(NULL) == JLA_OTHER);
+}
+
+static void test_midi_interface_choice(void)
+{
+    CHECK(jla_midi_interface_index(JLA_LPX) == 1);                  /* the Launchpad X's MIDI interface is its second, the first is DAW */
+    CHECK(jla_midi_interface_index(JLA_DN2) == 0);
+    CHECK(jla_midi_interface_index(JLA_OTHER) == 0);
+}
+
 int main(void)
 {
+    test_roles_by_product_name();
+    test_midi_interface_choice();
     test_pad_plays_note_on_track_channel();
     test_release_goes_to_the_note_it_started();
     test_release_goes_to_the_channel_it_started();

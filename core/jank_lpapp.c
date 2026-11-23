@@ -13,6 +13,19 @@
 #define BUTTON_RIGHT 3u
 #define BUTTON_NOTE 5u
 
+enum jla_role jla_role_from_name(const char *product)
+{
+    if (!product)
+        return JLA_OTHER;
+    if (strstr(product, "Launchpad X"))
+        return JLA_LPX;
+    if (strstr(product, "Digitone"))
+        return JLA_DN2;
+    return JLA_OTHER;
+}
+
+unsigned jla_midi_interface_index(enum jla_role r) { return r == JLA_LPX ? 1u : 0u; }
+
 void jla_init(struct jla *a, const struct jln_scale *scale, uint8_t dn2_cable)
 {
     memset(a, 0, sizeof *a);

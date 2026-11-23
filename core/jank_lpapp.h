@@ -21,6 +21,13 @@
 #define JLA_COLOR_ARROW 1u             /* dim grey */
 #define JLA_COLOR_MODE 3u              /* white */
 
+/* the hosted devices that matter here, told apart by their USB product string */
+enum jla_role { JLA_OTHER, JLA_LPX, JLA_DN2 };
+enum jla_role jla_role_from_name(const char *product);
+/* which of a device's USB-MIDI streaming interfaces is the one to use (0 = the first): the Launchpad X's first is its DAW
+ * interface, its MIDI one (Programmer mode, pads, lights) is the second */
+unsigned jla_midi_interface_index(enum jla_role r);
+
 struct jla_held {
     int16_t note;                      /* -1: the pad is up */
     uint8_t chan;                      /* the channel it was sent on: its Note Off goes there, whatever the track is by then */
