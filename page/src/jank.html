@@ -11,8 +11,6 @@
 :root { --accent: #9770c6; --accent-text-l: #8253ba; --accent-text-d: #a380d0; }
 /* Jank's own: */
 td button { padding: 4px 12px; min-height: 32px; }
-.row { display: flex; gap: 8px; align-items: end; }
-.row input { width: 7em; }
 #msg { color: var(--dim); min-height: 1.4em; margin: 0 0 12px; }
 #msg.bad { color: var(--err); }
 #msg:empty { display: none; }
@@ -70,7 +68,8 @@ td button { padding: 4px 12px; min-height: 32px; }
 #connect-slot { margin: 4px 0 12px; }
 header.site > nav.site { align-items: center; }
 header.site > nav.site #c-midi { flex: none; }
-.dev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+/* the MIDI port picker over the face: common.css .row, plus its own spacing */
+.dev-bar { justify-content: space-between; margin-bottom: 8px; }
 .dev-bar #c-ports-box { margin: 0; }
 header #c-midi { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); }
 header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent); border-color: var(--accent); }
@@ -99,7 +98,7 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
   <div id="live" class="hide">
     <div class="live-row">
       <section id="face" class="device">
-        <div id="dev-bar" class="dev-bar">
+        <div id="dev-bar" class="dev-bar row">
           <label id="c-ports-box" class="hide" title="Picks which Jank to use when the browser sees more than one. Switching disconnects and connects to the one you pick.">MIDI port <select id="c-ports"></select></label>
         </div>
         <div id="face-box">
