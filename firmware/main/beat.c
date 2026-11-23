@@ -1190,8 +1190,30 @@ static void weights_bind(void)
     ESP_LOGI(TAG, "beat weights: %u from the beatw partition", (unsigned)BEAT_WEIGHTS_COUNT);
 }
 
+/* The tracker's 16 KB task stack has to come from one block of internal RAM, and it is the last big thing to be asked for: by then USB (a
+ * host start takes a dozen tasks and buffers), the Wi-Fi radio and the bridge have cut the heap into pieces, and in host mode there was
+ * 29 KB free but no block that large (2026-11-23, hostdiag_trace, `main:166 ESP_ERR_NO_MEM`). So the block is taken first, at the start
+ * of bridge_start, and given back right before beat_start: the rest allocates around it, and the stack finds its block whole. The total
+ * demand is the same as before: only the order changes. */
+#define STACK_RESERVE (BEAT_STACK + 512u)
+static void *s_reserve;
+
+void beat_reserve(void)
+{
+    if (!s_reserve)
+        s_reserve = heap_caps_malloc(STACK_RESERVE, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+
+void beat_reserve_release(void)
+{
+    if (s_reserve)
+        heap_caps_free(s_reserve);
+    s_reserve = NULL;
+}
+
 esp_err_t beat_start(void)
 {
+    beat_reserve_release();            /* (a no-op when bridge_start already gave it back) */
     weights_bind();
     if (!beat_weights_ready())
         return ESP_OK;                 /* no tracker; everything else runs (beat_state / beat_gate read "no audio") */

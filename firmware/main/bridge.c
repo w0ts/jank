@@ -588,6 +588,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     jn_init(&s_net, mac, esp_random(), cfg->name, LK_MCAST_IP, net_out, NULL);
     if (s_on_network)
         jp_set_network(&s_peer, 0, 0, 0);
+    beat_reserve();                      /* the tracker's stack block first: USB and the radio would cut the heap up before it is asked for (beat.c) */
     e = midi_start();
     if (e != ESP_OK)
         return e;
@@ -610,6 +611,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
             usbrole_host_failed(JHD_STEP_BRIDGE, ESP_ERR_NO_MEM);
         return ESP_ERR_NO_MEM;
     }
+    beat_reserve_release();              /* the block is given back whole, right before the tracker's task asks for it */
     hostdiag_mark(JHD_STEP_BEAT);
     e = beat_start();
     if (e != ESP_OK) {

@@ -115,8 +115,9 @@ void hostdiag_mark(uint8_t step)
     if (!usb_is_host() || s_trace_magic != TRACE_MAGIC || s_trace_n >= JHD_TRACE_MAX)
         return;
     s_trace[s_trace_n].step = step;
-    s_trace[s_trace_n].free_b = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    s_trace[s_trace_n].largest_b = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+    /* byte-addressable internal RAM: what a task stack can come from (the plain INTERNAL totals also count 32-bit-only IRAM heap) */
+    s_trace[s_trace_n].free_b = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    s_trace[s_trace_n].largest_b = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     s_trace_n++;
 }
 
