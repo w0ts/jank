@@ -60,7 +60,7 @@ th { color: var(--dim); font-weight: 600; font-size: 13px; }
 <!--@include ui/beatw.js-->
 <!--@include ui/midiota.js-->
 <script type="module">
-// The releases the site carries: firmware/index.json (scripts/publish_firmware.py), newest first:
+// The releases the site carries: firmware/index.json (scripts/site_tree.py, from the releases' assets), newest first:
 // { releases: [ { tag, boards: { auto: { parts: [ { path, offset } ], beatw: { offset, size } } } } ] }: one image for the
 // bare XIAO and the jank mini 3 (it tells them apart at the start, firmware/main/board.c).
 // Flashing: esptool-js over Web Serial, each part at its own address (the settings partition is not touched); with the

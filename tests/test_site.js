@@ -34,8 +34,8 @@ for (const [pub, file] of Object.entries(published)) {
     ok(Object.keys(published).includes(there) || fs.existsSync(path.join(root, 'page', there)), `${pub}: ${t} resolves`);
   }
 }
-const script = fs.readFileSync(path.join(root, 'scripts', 'publish_page.sh'), 'utf8');
-for (const [pub, file] of Object.entries(published)) ok(script.includes(`${pub}:page/${file}`), `publish_page.sh puts page/${file} at ${pub}`);
+const script = fs.readFileSync(path.join(root, 'scripts', 'site_tree.py'), 'utf8');
+for (const [pub, file] of Object.entries(published)) ok(script.includes(`"${pub}": "page/${file}"`), `site_tree.py puts page/${file} at ${pub}`);
 // every inline script of every page parses (2026-11-22: an included .js inside an extra <script> pair broke the Install
 // page's converter in the browser, "Unexpected token '<'"); module scripts through `node --check` as a module
 const vm = require('vm');

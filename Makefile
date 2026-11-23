@@ -4,7 +4,7 @@
 #                                     (ota.py). With IMAGE=path.bin: install that file, no build.
 #   make page                         expand page/src/*.html (+ ui/*) into page/: jank.html (the Device page, the file the firmware
 #                                     embeds), index.html (About), install.html, build.html (Build: lists the photos still to come)
-#   make publish-page                 publish the COMMITTED pages to https://w0ts.github.io/jank/ (only gh-pages is pushed)
+#   make publish-page                 publish the COMMITTED pages of main to https://w0ts.github.io/jank/ (runs the Pages workflow)
 #   make build                        build the release firmware: XIAO or jank mini 3, told apart at the start (scripts/build.sh auto)
 # FW names the firmware checkout, BEAT the beat folder; both default to this checkout (main).
 
@@ -47,6 +47,7 @@ page/build.html: page/src/build.html $(wildcard page/src/buildparts/*) ui/common
 	python3 scripts/inline_ui.py page/src/build.html -o page/build.html
 	python3 scripts/photo_todo.py page/build.html
 
-# the committed pages to https://w0ts.github.io/jank/ (gh-pages: only the pages; main is not pushed)
+# the committed pages to https://w0ts.github.io/jank/: the Pages workflow (scripts/site_tree.py) on main; it also runs by
+# itself when page/ changes on main and after a release
 publish-page:
-	bash scripts/publish_page.sh
+	gh workflow run pages.yml --ref main

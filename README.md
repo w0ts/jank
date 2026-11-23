@@ -22,10 +22,12 @@ updates: [docs/firmware.md](docs/firmware.md), [docs/boards.md](docs/boards.md),
 
 ## Site and releases
 
-- `make page` expands `page/src/*.html` (+ `ui/`) into `page/`; `make publish-page` publishes the committed pages to
-  GitHub Pages (`scripts/publish_page.sh`).
-- `python3 -I scripts/publish_firmware.py TAG` (at a clean, tagged HEAD) builds the release image and adds it to the
-  site's `firmware/` for the Install page's browser flasher; it prints the `gh release upload` line for the app image.
+- `make page` expands `page/src/*.html` (+ `ui/`) into `page/`. The site is built from `main` by the Pages workflow
+  (`.github/workflows/pages.yml`, `scripts/site_tree.py`) whenever `page/` changes; `make publish-page` runs it by hand.
+  No branch holds the site.
+- A `v*` tag runs `.github/workflows/release.yml`: it builds the release image, `scripts/publish_firmware.py` writes its
+  assets (every flash part and the manifest `jank-auto-TAG.json`), the release carries them, and the Pages workflow lays
+  them out under the site's `firmware/` (with `firmware/index.json`) for the Install page's browser flasher.
 
 ## Hardware
 

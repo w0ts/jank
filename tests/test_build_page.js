@@ -101,6 +101,6 @@ const listed = execFileSync('python3', [path.join(root, 'scripts', 'photo_todo.p
 ok(listed.join('|') === todo.join('|'), 'scripts/photo_todo.py lists the same photos');
 
 // published
-const script = fs.readFileSync(path.join(root, 'scripts', 'publish_page.sh'), 'utf8');
-ok(script.includes('build.html:page/build.html'), 'publish_page.sh puts page/build.html at build.html');
+const script = fs.readFileSync(path.join(root, 'scripts', 'site_tree.py'), 'utf8');
+ok(script.includes('"build.html": "page/build.html"'), 'site_tree.py puts page/build.html at build.html');
 console.log(`build page: ${n} checks passed (${todo.length} photos to come)`);
