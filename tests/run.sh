@@ -76,6 +76,8 @@ fi
 "$OUT/test_lpx"
 "$CC" $FLAGS "$HERE/tests/test_lpnote.c" "$HERE/core/jank_lpnote.c" -o "$OUT/test_lpnote"
 "$OUT/test_lpnote"
+"$CC" $FLAGS "$HERE/tests/test_lpapp.c" "$HERE/core/jank_lpapp.c" "$HERE/core/jank_lpnote.c" "$HERE/core/jank_lpx.c" -o "$OUT/test_lpapp"
+"$OUT/test_lpapp"
 "$CC" $FLAGS "$HERE/tests/test_pcm.c" "$HERE/core/jank_pcm.c" -lm -o "$OUT/test_pcm"
 "$OUT/test_pcm"
 # LINE IN: the ADC framing, the timestamp fit, DC / gain / level, the cell, the cubic resampler and the chain on clicks
