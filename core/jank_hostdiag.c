@@ -44,7 +44,7 @@ static void clean_name(const struct jhd_dev *v, char out[JHD_NAME_MAX + 2])
 
 size_t jhd_format_failure(uint8_t step, int32_t err, char *out, size_t cap)
 {
-    static const char *const NAME[] = {"none", "hostlib", "client", "client_task", "midi_task", "role", "radio"};
+    static const char *const NAME[] = {"none", "hostlib", "client", "client_task", "midi_task", "role", "radio", "crash"};
     size_t n = 0;
     if (!cap)
         return 0;

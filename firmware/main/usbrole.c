@@ -39,6 +39,7 @@
 static const char *TAG = "usbrole";
 static RTC_NOINIT_ATTR uint32_t s_hint_magic, s_hint;
 static RTC_NOINIT_ATTR uint32_t s_host_block;
+static RTC_NOINIT_ATTR uint32_t s_host_inflight;   /* INFLIGHT_MAGIC while a host run is young (see find_host_crash) */
 
 /* A host start failed (a task or buffer that did not fit, the Wi-Fi radio after it): the reason goes to flash, the host stack is off
  * until the next power cycle, and the unit restarts as a device, so it stays reachable (Wi-Fi, USB) and `diag` says what failed.
@@ -47,11 +48,35 @@ void usbrole_host_failed(uint8_t step, esp_err_t e)
 {
     hostdiag_fail(step, e);
     s_host_block = BLOCK_MAGIC;
+    s_host_inflight = 0;               /* this restart is ours, not a crash */
     ESP_LOGE("usbrole", "host start failed at step %u: %s: restarting as a device", step, esp_err_to_name(e));
     esp_restart();
 }
 
 static uint8_t host_blocked(void) { return s_host_block == BLOCK_MAGIC; }
+
+/* A host run is "in flight" until it has lasted HOST_STABLE (usb.c's guard clears it). If the next start finds it still set, with a reset
+ * nothing of ours asks for (a panic, a watchdog, a brownout, a CPU lockup: not a restart, not a power-on), the run crashed: the reset
+ * reason is kept in flash as the failure (hostdiag_start= in diag), host is blocked until a power cycle, and the unit comes up as a
+ * device, reachable. A crash loop in host mode otherwise leaves nothing to read. */
+#define INFLIGHT_MAGIC 0x4A4B4946u
+
+void usbrole_host_inflight(int on) { s_host_inflight = on ? INFLIGHT_MAGIC : 0; }
+
+static void find_host_crash(void)
+{
+    esp_reset_reason_t r;
+    if (s_host_inflight != INFLIGHT_MAGIC)
+        return;
+    s_host_inflight = 0;
+    r = esp_reset_reason();
+    if (r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT || r == ESP_RST_BROWNOUT || r == ESP_RST_PWR_GLITCH
+        || r == ESP_RST_CPU_LOCKUP) {
+        hostdiag_fail(JHD_STEP_CRASH, (esp_err_t)r);
+        s_host_block = BLOCK_MAGIC;
+        ESP_LOGE("usbrole", "the last host run ended in a reset (%d): host is off until a power cycle", (int)r);
+    }
+}
 static const struct usbport *s_port;   /* NULL: no port chip, or it did not answer */
 static TaskHandle_t s_task;
 static uint8_t s_stack, s_mode = 0xFF, s_prepared, s_prep_failed, s_computer;
@@ -108,6 +133,7 @@ uint8_t usbrole_boot(void)
     struct usbport_state st = {JUR_CC_NONE, 0};
     esp_err_t e;
     const struct usbport *p = usbport_board();
+    find_host_crash();                     /* first: it can block host for this start */
     s_port = p && p->open() ? p : NULL;    /* open() drives the port's VBUS out off first */
     e = pins_up();
     if (e != ESP_OK)
@@ -143,6 +169,7 @@ static void restart_into(uint8_t stack)
         s_port->vbus_prep(0);
     s_hint = 1u + stack;
     s_hint_magic = HINT_MAGIC;
+    s_host_inflight = 0;               /* a restart of ours (a computer came, or went): not a crash */
     ESP_LOGW(TAG, "restarting as %s", jur_usb_name(stack));
     vTaskDelay(pdMS_TO_TICKS(50));     /* the log out */
     esp_restart();

@@ -24,6 +24,9 @@ void hostdiag_fail(uint8_t step, esp_err_t e);             /* a host start faile
 void hostdiag_clear_failure(void);                         /* a host start worked: an older failure is cleared */
 uint8_t usb_midi_host_start_step(void);                    /* usb_midi_host.c: the step of its start that failed */
 uint16_t usb_midi_host_stack_free(void);                   /* its client task's stack never used, bytes */
+void usbrole_host_inflight(int on);                        /* usbrole.c: a host run is young (not yet stable): a crash in it is found at the next start */
+void usb_host_stage(uint8_t step);                         /* usb.c: which step of the host start (enum jhd_step) is under way, for the hang guard */
+void usb_host_boot_done(void);                             /* usb.c: the start-up (USB and radio) is through: the hang guard stands down */
 void usbrole_host_failed(uint8_t step, esp_err_t e);       /* usbrole.c: keeps the failure, blocks host until a power cycle, restarts as a device; does not return */
 
 /* usb_midi_host.c (its start and send are in app.h) */

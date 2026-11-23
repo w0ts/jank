@@ -612,5 +612,6 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     /* the LINE IN after the tracker (its ring is ready); not fatal: without it the rest runs on USB audio */
     if (linein_start() != ESP_OK)
         ESP_LOGE(TAG, "LINE IN task: no memory");
+    usb_host_boot_done();                /* the start-up is through: a host start's hang guard (usb.c) stands down */
     return ESP_OK;
 }

@@ -49,6 +49,10 @@ static void test_failure_text(void)
     CHECK(jhd_format_failure(JHD_STEP_CLIENT, 1, out, sizeof out) > 0 && strstr(out, "failed:client,"));
     CHECK(jhd_format_failure(JHD_STEP_MIDI_TASK, 1, out, sizeof out) > 0 && strstr(out, "failed:midi_task,"));
     CHECK(jhd_format_failure(JHD_STEP_ROLE, 1, out, sizeof out) > 0 && strstr(out, "failed:role,"));
+    /* a host run that did not last (a panic, a watchdog, a brownout, seen at the next start): err is esp_reset_reason()'s code */
+    CHECK(jhd_format_failure(JHD_STEP_CRASH, 4, out, sizeof out) > 0 && !strcmp(out, "hostdiag_start=failed:crash,err:4\n"));
+    CHECK(jhd_format_failure(JHD_STEP_CRASH, 9, out, sizeof out) > 0 && strstr(out, "failed:crash,err:9"));
+    CHECK(jhd_format_failure(JHD_STEP_NONE + 99, 5, out, sizeof out) > 0 && strstr(out, "failed:?,err:5"));   /* a step this build does not know */
     CHECK(jhd_format_failure(200, 5, out, sizeof out) > 0 && strstr(out, "failed:?,err:5"));      /* a step this build does not know */
     CHECK(jhd_format_failure(JHD_STEP_RADIO, 1, out, 12) < 12 && out[strlen(out)] == 0);          /* cut to fit, still a string */
     CHECK(jhd_format_failure(JHD_STEP_RADIO, 1, out, 0) == 0);

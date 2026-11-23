@@ -17,6 +17,7 @@
 #include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/message_buffer.h"
 #include "freertos/semphr.h"
@@ -226,6 +227,46 @@ static void midi_task(void *arg)
     }
 }
 
+/* The host start's guard. A host start that hangs (a wait that never ends, a task that never runs) or a host run that crashes leaves a
+ * unit with no Wi-Fi, no control line and nothing to read. So: a periodic timer; at HANG_TICKS (20 s) with the start-up (USB, then the
+ * radio: bridge.c) not done, the step in flight is kept in flash and the unit restarts as a device (usbrole_host_failed), reachable and
+ * saying what hung; at STABLE_TICKS (60 s) the run counts as stable and a later reset is no start-up crash (usbrole.c find_host_crash
+ * reads the same mark at the next start). No memory is needed at the moment of the failure: the timer exists from the start. */
+#define GUARD_MS 5000
+#define HANG_TICKS 4u
+#define STABLE_TICKS 12u
+
+static esp_timer_handle_t s_guard;
+static volatile uint8_t s_guard_ticks, s_boot_done, s_stage;
+
+static void guard_tick(void *arg)
+{
+    (void)arg;
+    s_guard_ticks++;
+    if (s_guard_ticks == HANG_TICKS && !s_boot_done) {
+        uint8_t step = s_stage;
+        if (step == JHD_STEP_HOSTLIB && usb_midi_host_start_step() != JHD_STEP_NONE)
+            step = usb_midi_host_start_step();       /* inside the host client's own start: which part */
+        usbrole_host_failed(step, ESP_ERR_TIMEOUT);  /* no return */
+    }
+    if (s_guard_ticks >= STABLE_TICKS) {
+        usbrole_host_inflight(0);
+        esp_timer_stop(s_guard);
+    }
+}
+
+static void guard_start(void)
+{
+    const esp_timer_create_args_t a = {.callback = guard_tick, .name = "hostguard"};
+    usbrole_host_inflight(1);
+    s_stage = JHD_STEP_HOSTLIB;
+    if (esp_timer_create(&a, &s_guard) == ESP_OK)
+        esp_timer_start_periodic(s_guard, (uint64_t)GUARD_MS * 1000u);
+}
+
+void usb_host_stage(uint8_t step) { s_stage = step; }
+void usb_host_boot_done(void) { s_boot_done = 1; }
+
 esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, usb_line_fn line_rx)
 {
     tinyusb_config_t cfg = TINYUSB_DEFAULT_CONFIG();
@@ -235,7 +276,9 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
     s_host = (uint8_t)(usbrole_boot() == JUR_STACK_HOST);
     if (s_host) {
         uint8_t step = JHD_STEP_NONE;
+        guard_start();
         e = usb_midi_host_start();
+        s_stage = JHD_STEP_MIDI_TASK;
         if (e != ESP_OK) {
             step = usb_midi_host_start_step();
         } else if (xTaskCreatePinnedToCore(midi_task, "usb_midi", 4096, NULL, MIDI_TASK_PRIO, &s_task, MIDI_TASK_CORE) != pdPASS) {
@@ -246,6 +289,7 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
             esp_err_t a = usb_uac_host_start();
             if (a != ESP_OK)            /* the clock goes on without the audio */
                 ESP_LOGE(TAG, "host audio: %s", esp_err_to_name(a));
+            s_stage = JHD_STEP_ROLE;
             e = usbrole_start();
             if (e != ESP_OK)
                 step = JHD_STEP_ROLE;
@@ -253,6 +297,7 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
         if (e != ESP_OK)
             usbrole_host_failed(step, e);   /* the reason kept, a restart as a device: the unit stays reachable and says what failed; no return */
         hostdiag_clear_failure();           /* it worked: an older failure is no longer news */
+        s_stage = JHD_STEP_RADIO;           /* the radio comes next (bridge.c), still under the guard until bridge_start is through */
         return e;
     }
     s_rx = rx;

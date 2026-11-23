@@ -21,7 +21,8 @@ enum jhd_step {
     JHD_STEP_CLIENT_TASK,              /* the client's task (its stack is internal heap) */
     JHD_STEP_MIDI_TASK,                /* usb.c's MIDI task */
     JHD_STEP_ROLE,                     /* the role task */
-    JHD_STEP_RADIO                     /* the Wi-Fi radio, which starts after the USB stack */
+    JHD_STEP_RADIO,                    /* the Wi-Fi radio, which starts after the USB stack */
+    JHD_STEP_CRASH                     /* not a step: the host run ended in a reset (panic, watchdog, brownout), found at the next start */
 };
 
 enum jhd_stack { JHD_STACK_UNKNOWN = 0, JHD_STACK_DEVICE = 1, JHD_STACK_HOST = 2 };
