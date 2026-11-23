@@ -16,6 +16,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs.h"
+#include "usb/usb_host.h"
 #include "jank_hostdiag.h"
 #include "usb_host_mode.h"
 
@@ -38,6 +39,10 @@ static void sample_mem(struct jhd *d)
     d->heap_kb = (uint16_t)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024u);
     d->heap_min_kb = (uint16_t)(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024u);
     d->client_stack_free = usb_midi_host_stack_free();
+    if (usb_hostlib_up()) {            /* the library's own count: a hub that enumerated counts, whether or not a client opened anything */
+        usb_host_lib_info_t li;
+        d->lib_devs = usb_host_lib_info(&li) == ESP_OK && li.num_devices < UINT8_MAX ? (uint8_t)li.num_devices : 0;
+    }
 }
 
 static esp_err_t save(const struct jhd *d)

@@ -86,6 +86,7 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
     out[0] = 0;
     put(out, cap, &n, "hostdiag_stack=%s\n", STACK[d->stack <= JHD_STACK_HOST ? d->stack : 0]);
     put(out, cap, &n, "hostdiag_lib=%s\n", d->lib_up ? "up" : "down");
+    put(out, cap, &n, "hostdiag_libdevs=%u\n", d->lib_devs);
     put(out, cap, &n, "hostdiag_events=new:%lu,gone:%lu,add:%lu\n", (unsigned long)d->new_dev, (unsigned long)d->gone_dev, (unsigned long)d->add_calls);
     put(out, cap, &n, "hostdiag_lp=lpx:%u,dn2:%u,programmer:%lu,pads:%lu,dn2msgs:%lu\n", d->lpx_up, d->dn2_up, (unsigned long)d->programmer_sent,
         (unsigned long)d->pads, (unsigned long)d->dn2_msgs);

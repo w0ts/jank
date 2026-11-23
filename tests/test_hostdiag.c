@@ -102,6 +102,7 @@ static void test_full_record(void)
     jhd_init(&d);
     d.stack = JHD_STACK_HOST;
     d.lib_up = 1;
+    d.lib_devs = 2;
     d.new_dev = 3;
     d.gone_dev = 1;
     d.add_calls = 3;
@@ -130,6 +131,7 @@ static void test_full_record(void)
     d.dev[1].in_last[3] = 0x7F;
     CHECK(jhd_format(&d, out, sizeof out) == strlen(out));
     CHECK(strstr(out, "hostdiag_stack=host\n") && strstr(out, "hostdiag_lib=up\n"));
+    CHECK(strstr(out, "hostdiag_lib=up\nhostdiag_libdevs=2\n"));   /* the library's own device count (a hub counts), next to its state */
     CHECK(strstr(out, "hostdiag_events=new:3,gone:1,add:3\n"));
     CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:1,pads:7,dn2msgs:9\n"));
     CHECK(strstr(out, "hostdiag_dev1=Launchpad X,1235:0103,role:lpx,ifs:2,use:1,out:0x02,in:0x82,claim:0,in_pkts:42,in_err:2,in_status:4,out_done:100,out_fail:1,last:09 90 0B 7F\n"));
