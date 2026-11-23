@@ -1,8 +1,8 @@
 # Jank
 
 > ## [→ w0ts.github.io/jank](https://w0ts.github.io/jank/)
-> **What Jank is, install it from the browser, and the device's control page are on the site.** This README is for
-> developers.
+> **What Jank is, how to install it from the browser, and the device's control page: on the site.**
+> This README is for developers.
 
 Jank brings computers, MIDI gear and modular gear into one Ableton Link session with no router: the group mode of
 [Optimist](https://github.com/w0ts/optimist), the open firmware for the FM-1 synth. Link is Ableton's trademark; Jank is
