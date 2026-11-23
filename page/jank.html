@@ -240,8 +240,8 @@ ol.phases { list-style: none; margin: 0 0 var(--sp-2); padding: 0; display: grid
 ol.phases li { counter-increment: ph; color: var(--dim); padding-top: var(--sp-1); border-top: 3px solid var(--off); overflow-wrap: anywhere; }
 ol.phases li::before { content: counter(ph) " "; }
 ol.phases li[data-st="on"] { color: var(--ink); border-top-color: var(--accent); }
-ol.phases li[data-st="done"] { color: var(--ink); border-top-color: var(--accent-text); } ol.phases li[data-st="done"]::before { content: "\2713 "; color: var(--accent-text); }
-ol.phases li[data-st="fail"] { color: var(--err); border-top-color: var(--err); } ol.phases li[data-st="fail"]::before { content: "\2717 "; }
+ol.phases li[data-st="done"] { color: var(--ink); border-top-color: var(--accent-text); } ol.phases li[data-st="done"]::before { content: "\2713\00a0"; color: var(--accent-text); }
+ol.phases li[data-st="fail"] { color: var(--err); border-top-color: var(--err); } ol.phases li[data-st="fail"]::before { content: "\2717\00a0"; }
 
 /* ---- tables and lists. table.data; .scrollbox scrolls with a sticky head; tr.sel selected; td.num right */
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
