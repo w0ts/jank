@@ -87,6 +87,11 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
     put(out, cap, &n, "hostdiag_stack=%s\n", STACK[d->stack <= JHD_STACK_HOST ? d->stack : 0]);
     put(out, cap, &n, "hostdiag_lib=%s\n", d->lib_up ? "up" : "down");
     put(out, cap, &n, "hostdiag_libdevs=%u\n", d->lib_devs);
+    /* HPRT (the DWC2 host port register): bit 0 device connected, bit 2 port enabled, bits 10-11 line state (0 SE0, 1 J, 2 K), bit 12 powered,
+     * bits 17-18 speed (0 high, 1 full, 2 low). The line state says whether anything pulls D+ / D- at all, with no library in between. */
+    put(out, cap, &n, "hostdiag_port=hprt:0x%08lx,conn:%lu,ena:%lu,lnsts:%lu,pwr:%lu,spd:%lu\n", (unsigned long)d->hprt, (unsigned long)(d->hprt & 1u),
+        (unsigned long)((d->hprt >> 2) & 1u), (unsigned long)((d->hprt >> 10) & 3u), (unsigned long)((d->hprt >> 12) & 1u),
+        (unsigned long)((d->hprt >> 17) & 3u));
     put(out, cap, &n, "hostdiag_events=new:%lu,gone:%lu,add:%lu\n", (unsigned long)d->new_dev, (unsigned long)d->gone_dev, (unsigned long)d->add_calls);
     put(out, cap, &n, "hostdiag_lp=lpx:%u,dn2:%u,programmer:%lu,pads:%lu,dn2msgs:%lu\n", d->lpx_up, d->dn2_up, (unsigned long)d->programmer_sent,
         (unsigned long)d->pads, (unsigned long)d->dn2_msgs);

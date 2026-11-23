@@ -11,7 +11,7 @@
 
 #define JHD_DEVS 4u                    /* as many as usb_midi_host.c has slots */
 #define JHD_NAME_MAX 23u               /* as JK_USB_NAME_MAX */
-#define JHD_VERSION 3u                 /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs) */
+#define JHD_VERSION 4u                 /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt) */
 
 /* the steps of a host start, in order, for the one that failed (jhd_format_failure) */
 enum jhd_step {
@@ -59,6 +59,7 @@ struct jhd {
     uint8_t lib_up;
     uint8_t lib_devs;                  /* devices the USB Host Library has enumerated right now, hubs included (usb_host_lib_info) */
     uint8_t lpx_up, dn2_up;           /* usb_lp.c has attached them */
+    uint32_t hprt;                     /* the controller's host port register as it was last read (firmware/main/hostdiag.c) */
     uint32_t new_dev, gone_dev, add_calls;
     uint32_t programmer_sent;          /* Programmer mode messages put in the Launchpad's queue */
     uint32_t pads;                     /* Launchpad pad / button events decoded */

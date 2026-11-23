@@ -17,6 +17,7 @@
 #include "freertos/task.h"
 #include "nvs.h"
 #include "usb/usb_host.h"
+#include "soc/usb_dwc_struct.h"
 #include "jank_hostdiag.h"
 #include "usb_host_mode.h"
 
@@ -42,6 +43,7 @@ static void sample_mem(struct jhd *d)
     if (usb_hostlib_up()) {            /* the library's own count: a hub that enumerated counts, whether or not a client opened anything */
         usb_host_lib_info_t li;
         d->lib_devs = usb_host_lib_info(&li) == ESP_OK && li.num_devices < UINT8_MAX ? (uint8_t)li.num_devices : 0;
+        d->hprt = USB_DWC.hprt_reg.val;    /* a plain read: only writes (write-1-to-clear bits) change this register */
     }
 }
 
