@@ -140,8 +140,6 @@ void panic_info_take(void);                         /* at boot: the last panic's
 size_t panic_info_text(char *out, size_t cap);      /* its `diag` lines, nothing when there was none */
 const char *panic_info_brief(void);                 /* "<task>@0x4200abcd" for the ABOUT screen and `about`; "" when there was none (stays valid) */
 size_t panic_info_file(char *out, size_t cap);      /* PANIC.TXT's text (JK_PANIC_FILE_MAX is enough); 0 and "" when there was none */
-void beat_reserve(void);                             /* beat.c: take the tracker's task-stack block first, before USB and Wi-Fi cut the heap up */
-void beat_reserve_release(void);                     /* ... and give it back right before beat_start (beat_start does it too) */
 void app_wipe_settings(void);                        /* `wipe settings`: every stored setting erased, then a restart (main.c) */
 void app_diag(char *out, size_t cap);                /* restarts and the last reset's reason, for `diag` */
 /* fn on the Link peer, with the bridge's lock held and the host time now (the beat tracker steers the session through it) */
