@@ -67,7 +67,8 @@
 #include "usb_audio.h"
 
 #define BEAT_PRIO 3
-#define BEAT_STACK 16384               /* measured in QEMU with a synthetic loop: 8192 left < 300 bytes free (ModeBpm, the reports) */
+#define BEAT_HOST_HEADROOM 8192u       /* host mode: free in the same block after the tracker's stack, for the UI task's (6144) that starts next */
+#define BEAT_STACK 16384              /* measured in QEMU with a synthetic loop: 8192 left < 300 bytes free (ModeBpm, the reports) */
 #define POLL_MS 5
 #define STEP_EVERY_US 250000           /* the Link session is looked after this often, and at each tracked beat */
 #define WINDOW_US 1000000              /* the CPU share is over this long */
@@ -1196,9 +1197,12 @@ esp_err_t beat_start(void)
      * In USB host mode the host stack, a dozen tasks, the Wi-Fi radio and the bridge come first and cut the heap up: measured on the XIAO
      * (hostdiag_trace, 2026-11-23) 29 KB free but no such block, and the start aborted with ESP_ERR_NO_MEM. Taking the block first made
      * device mode's own start run out instead. So: in host mode, with no block for it, run without the tracker (the state "no weights"
-     * already is: `beat_state` reads no audio, every other part runs); the Launchpad and the clock do not need it. Device mode is as it was. */
-    if (usb_is_host() && heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) < BEAT_STACK + 1024u) {
-        ESP_LOGW(TAG, "USB host mode and no %u-byte block for the tracker's stack: no beat follow", (unsigned)BEAT_STACK);
+     * already is: `beat_state` reads no audio, every other part runs); the Launchpad and the clock do not need it. Device mode is as it was.
+     * The block must also leave room for what starts after the bridge: the UI task's 6 KB stack (ui_start, main.c). Measured on the XIAO
+     * (2026-11-23, image 19e45af8): a 20480-byte block passed a "16 KB + 1 KB" test, the tracker took 16 KB of it, and ui_start then failed
+     * with ESP_ERR_NO_MEM (main:166). Hence BEAT_HOST_HEADROOM, not 1 KB. */
+    if (usb_is_host() && heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) < BEAT_STACK + BEAT_HOST_HEADROOM) {
+        ESP_LOGW(TAG, "USB host mode and no room for the tracker's %u-byte stack and the UI's after it: no beat follow", (unsigned)BEAT_STACK);
         return ESP_OK;
     }
     weights_bind();
