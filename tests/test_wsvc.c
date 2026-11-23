@@ -264,7 +264,7 @@ static void test_allowed(void)
 {
     static const char *const ok[] = {"get", "status", "about", "home", "beat", "diag", "line", "drive"};
     static const char *const no[] = {"set usb host", "set pass x", "reboot", "bootloader", "ota begin 1 2", "scan", "play", "stop", "tempo 120",
-                                     "nudge beat 1", "fold 1", "diag intr", "get ", " get", "GET", "", "get\n", "statusx", "set"};
+                                     "nudge beat 1", "fold 1", "diag intr", "get ", " get", "GET", "", "get\n", "statusx", "set", "wipe settings"};
     for (size_t i = 0; i < sizeof ok / sizeof ok[0]; i++)
         CHECK(jw_allowed(ok[i]));
     for (size_t i = 0; i < sizeof no / sizeof no[0]; i++)

@@ -784,6 +784,9 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;
+    } else if (!strcmp(s, "wipe settings")) {
+        put(&w, "ok\n");
+        return JK_CTL_WIPE;
     } else
         put(&w, "err unknown command\n");
     return JK_CTL_NONE;

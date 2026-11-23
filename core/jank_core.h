@@ -405,7 +405,8 @@ enum jk_ctl_action {
     JK_CTL_FOLD,                      /* out is empty: the caller folds (jk_ctl_fold), answers fold=<f> ok or err link mode */
     JK_CTL_LEAD,                      /* `set lead on|off`, out is "ok\n": the caller stores the menu's FOLLOW+LEAD preference (jk_ctl_lead), cfg is untouched */
     JK_CTL_DISPLAY,                   /* `set sleep <v>` / `set bright <n>`, out is "ok\n": the caller stores the menu's SCREEN OFF / BRIGHTNESS preference (jk_ctl_display), cfg is untouched */
-    JK_CTL_NUDGE                      /* out is empty: the caller nudges the beat (jk_ctl_nudge), answers nudge_beats=<b> ok or err */
+    JK_CTL_NUDGE,                     /* out is empty: the caller nudges the beat (jk_ctl_nudge), answers nudge_beats=<b> ok or err */
+    JK_CTL_WIPE                       /* `wipe settings`, out is "ok\n": the caller erases every stored setting and restarts (USB control line only) */
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
 #define JK_BPM_MIN_X100 2000u          /* the BPM the tempo command takes, hundredths: Link's own clamp, 20..999 */

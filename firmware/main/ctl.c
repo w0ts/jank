@@ -197,6 +197,10 @@ static void run_line(const char *line)
         strcpy(s_out, r ? "err no session\n" : "ok\n");   /* (AUDIO mode: play / stop are the hold, always ok) */
     }
     reply_out();
+    if (a == JK_CTL_WIPE) {
+        vTaskDelay(pdMS_TO_TICKS(100));        /* the answer goes out first */
+        app_wipe_settings();
+    }
     if (a == JK_CTL_REBOOT || a == JK_CTL_BOOTLOADER) {
         vTaskDelay(pdMS_TO_TICKS(100));        /* the answer goes out first */
         if (a == JK_CTL_REBOOT)

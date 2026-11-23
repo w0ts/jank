@@ -44,7 +44,7 @@ def check_line(line: str) -> str:
     return text
 
 
-def ask(line: str, ip: str | None = None, port: int = PORT, timeout: float = 3.0) -> dict[str, str | None]:
+def ask(line: str, ip: str | None = None, port: int = PORT, timeout: float = 3.0, retry_s: float | None = None) -> dict[str, str | None]:
     """Sends the line (to ip, or to everyone) and collects the answers by sender: the text, or None for an answer with a hole in it.
     One sender in particular: ends when its answer is whole. Not whole by half the time: the line is sent once more."""
     text = check_line(line)
@@ -55,8 +55,17 @@ def ask(line: str, ip: str | None = None, port: int = PORT, timeout: float = 3.0
     last: dict[str, int] = {}
     start = time.monotonic()
     deadline = start + timeout
+    sent_at = start
     resent = False
-    sock.sendto(text.encode("ascii"), dst)
+
+    def send() -> None:
+        """A send that fails (macOS: 'Host is down' while ARP for the address fails, 'No route to host') is a lost datagram, not the end."""
+        try:
+            sock.sendto(text.encode("ascii"), dst)
+        except OSError:
+            pass
+
+    send()
     try:
         while time.monotonic() < deadline:
             sock.settimeout(max(0.001, min(POLL_S, deadline - time.monotonic())))
@@ -64,6 +73,9 @@ def ask(line: str, ip: str | None = None, port: int = PORT, timeout: float = 3.0
                 data, addr = sock.recvfrom(2048)
             except socket.timeout:
                 data, addr = b"", None
+            except OSError:
+                data, addr = b"", None
+                time.sleep(POLL_S)
             parsed = parse_chunk(data)
             if parsed and addr:
                 index, is_last, body = parsed
@@ -73,8 +85,12 @@ def ask(line: str, ip: str | None = None, port: int = PORT, timeout: float = 3.0
             whole = [a for a in chunks if assemble(chunks[a], last.get(a)) is not None]
             if ip and whole:
                 break
-            if not resent and not whole and time.monotonic() - start > timeout / 2:
-                sock.sendto(text.encode("ascii"), dst)
+            now = time.monotonic()
+            if retry_s is not None and not whole and now - sent_at >= retry_s:
+                send()
+                sent_at = now
+            elif retry_s is None and not resent and not whole and now - start > timeout / 2:
+                send()
                 resent = True
     finally:
         sock.close()
@@ -87,9 +103,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ip", help="the unit's address (default: ask everyone on the network)")
     ap.add_argument("--port", type=int, default=PORT)
     ap.add_argument("--timeout", type=float, default=3.0, help="seconds to wait for answers")
+    ap.add_argument("--wait", type=float, help="keep asking, once a second, for up to this many seconds (a unit that restarts, or joins Wi-Fi late)")
     args = ap.parse_args(argv)
     try:
-        answers = ask(" ".join(args.line), args.ip, args.port, args.timeout)
+        if args.wait:
+            answers = ask(" ".join(args.line), args.ip, args.port, args.wait, retry_s=1.0)
+        else:
+            answers = ask(" ".join(args.line), args.ip, args.port, args.timeout)
     except ValueError as e:
         sys.stdout.write("%s\n" % e)
         return 2

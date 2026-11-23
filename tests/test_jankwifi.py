@@ -121,6 +121,50 @@ def test_silence() -> None:
         unit.close()
 
 
+def test_retries_until_it_answers() -> None:
+    """A unit that is on the network only now and then (a restart loop): the line is sent again every retry_s until an answer is whole."""
+    count = {"n": 0}
+
+    def script(line: str) -> list[bytes]:
+        count["n"] += 1
+        return [] if count["n"] <= 2 else [chunk(0, True, "boots=7\nok\n")]
+
+    unit = FakeUnit(script)
+    unit.start()
+    try:
+        got = jw.ask("diag", ip="127.0.0.1", port=unit.port, timeout=4.0, retry_s=0.3)
+        check(got == {"127.0.0.1": "boots=7\nok\n"}, "retry: the third send is answered")
+        check(len(unit.seen) >= 3 and all(s == "diag" for s in unit.seen), "retry: the same line was sent again, each time as typed")
+    finally:
+        unit.close()
+
+
+def test_send_errors_are_tolerated() -> None:
+    """macOS answers 'Host is down' (EHOSTDOWN) to a send while ARP for the address fails: that is a lost datagram, not the end."""
+    unit = FakeUnit(lambda line: [chunk(0, True, "ok\n")])
+    unit.start()
+    real_socket = socket.socket
+    failures = {"left": 2}
+
+    class Flaky(real_socket):  # type: ignore[misc, valid-type]
+        def sendto(self, data, address):  # type: ignore[no-untyped-def]
+            if failures["left"] > 0:
+                failures["left"] -= 1
+                raise OSError(64, "Host is down")
+            return super().sendto(data, address)
+
+    jw.socket.socket = Flaky
+    try:
+        got = jw.ask("get", ip="127.0.0.1", port=unit.port, timeout=4.0, retry_s=0.3)
+        check(got == {"127.0.0.1": "ok\n"}, "send errors: two failed sends, the third gets through and is answered")
+        check(failures["left"] == 0, "send errors: both failures were hit and survived")
+        failures["left"] = 10 ** 6                                           # never sends: no answer, and no exception either
+        check(jw.ask("get", ip="127.0.0.1", port=unit.port, timeout=0.6, retry_s=0.2) == {}, "send errors: only errors: nothing listed, no crash")
+    finally:
+        jw.socket.socket = real_socket
+        unit.close()
+
+
 def test_bad_lines_are_not_sent() -> None:
     for bad in ("", "   ", "x" * 121, "caf\xe9", "a\x01b"):
         try:
@@ -137,6 +181,8 @@ def main() -> None:
     test_round_trip_out_of_order_and_repeats()
     test_incomplete_answer_is_reported()
     test_silence()
+    test_retries_until_it_answers()
+    test_send_errors_are_tolerated()
     test_bad_lines_are_not_sent()
     sys.stdout.write("test_jankwifi: %d checks passed\n" % checks)
 

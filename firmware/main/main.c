@@ -90,16 +90,31 @@ void app_bootloader(void)
     usb_to_rom_download();
 }
 
+/* What this start did to the settings, for `diag` (nvs=): the only two cases in which they are erased by themselves. A flash install
+ * (a drive copy, an update over MIDI, esptool's app write) never touches them. */
+static const char *s_nvs_note = "ok";
+
 static esp_err_t nvs_up(void)
 {
     esp_err_t e = nvs_flash_init();
     if (e == ESP_ERR_NVS_NO_FREE_PAGES || e == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        s_nvs_note = e == ESP_ERR_NVS_NO_FREE_PAGES ? "erased:no_free_pages" : "erased:new_version";
         ESP_LOGW(TAG, "NVS erased: %s", esp_err_to_name(e));
         e = nvs_flash_erase();
         if (e == ESP_OK)
             e = nvs_flash_init();
     }
     return e;
+}
+
+/* `wipe settings` (the USB control line only): every stored setting erased, then a restart with the defaults. The force option; nothing
+ * else erases them but nvs_up's two cases. */
+void app_wipe_settings(void)
+{
+    esp_err_t e = nvs_flash_erase();
+    if (e != ESP_OK)
+        ESP_LOGE(TAG, "wipe: %s", esp_err_to_name(e));
+    app_reboot();
 }
 
 /* restarts since power-on and why the last one happened, for `diag` (RTC memory: survives a restart, not power-off) */
@@ -123,8 +138,8 @@ void app_diag(char *out, size_t cap)
     static const char *const why[] = {"unknown", "poweron", "ext", "sw", "panic", "int_wdt", "task_wdt", "wdt", "deepsleep",
                                       "brownout", "sdio", "usb", "jtag", "efuse", "pwr_glitch", "cpu_lockup"};
     unsigned r = (unsigned)s_reason;
-    snprintf(out, cap, "boots=%lu\nreset=%s\nsave_pending=%u\n", (unsigned long)s_boots_now, r < sizeof why / sizeof why[0] ? why[r] : "?",
-             (unsigned)s_save_pending);
+    snprintf(out, cap, "boots=%lu\nreset=%s\nsave_pending=%u\nnvs=%s\n", (unsigned long)s_boots_now, r < sizeof why / sizeof why[0] ? why[r] : "?",
+             (unsigned)s_save_pending, s_nvs_note);
 }
 
 void app_main(void)

@@ -293,6 +293,13 @@ static void test_other_lines(void)
     CHECK(run("fly") == JK_CTL_NONE && strstr(out, "err ") == out);
     CHECK(run("reboot") == JK_CTL_REBOOT && ends(out, "ok\n"));
     CHECK(run("bootloader") == JK_CTL_BOOTLOADER && ends(out, "ok\n"));
+    /* the settings are wiped only by these two words together (a force option: a flash install never touches them) */
+    CHECK(run("wipe settings") == JK_CTL_WIPE && ends(out, "ok\n"));
+    CHECK(run("wipe") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("wipe settings now") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("wipe all") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("WIPE SETTINGS") == JK_CTL_NONE && strstr(out, "err ") == out);
+    CHECK(run("settings") == JK_CTL_NONE && strstr(out, "err ") == out);
     CHECK(run("help") == JK_CTL_NONE && ends(out, "ok\n"));
     CHECK(run("  get  ") == JK_CTL_NONE && ends(out, "ok\n"));   /* spaces around, a CR from a terminal */
     CHECK(run("get\r") == JK_CTL_NONE && ends(out, "ok\n"));
