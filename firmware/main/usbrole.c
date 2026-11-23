@@ -34,8 +34,24 @@
 #define ROLE_PRIO 6                    /* over the beat tracker (3) and the control task (4): VBUS out must not wait for them */
 #define HINT_MAGIC 0x4A4B5552u         /* RTC memory across one restart: garbage after power-on is not this */
 
+#define BLOCK_MAGIC 0x4A4B4846u        /* a host start failed in this power session (RTC memory across restarts; garbage after power-on is not this) */
+
 static const char *TAG = "usbrole";
 static RTC_NOINIT_ATTR uint32_t s_hint_magic, s_hint;
+static RTC_NOINIT_ATTR uint32_t s_host_block;
+
+/* A host start failed (a task or buffer that did not fit, the Wi-Fi radio after it): the reason goes to flash, the host stack is off
+ * until the next power cycle, and the unit restarts as a device, so it stays reachable (Wi-Fi, USB) and `diag` says what failed.
+ * Without this the failure aborts the whole start, again at every boot, and nothing can say why. */
+void usbrole_host_failed(uint8_t step, esp_err_t e)
+{
+    hostdiag_fail(step, e);
+    s_host_block = BLOCK_MAGIC;
+    ESP_LOGE("usbrole", "host start failed at step %u: %s: restarting as a device", step, esp_err_to_name(e));
+    esp_restart();
+}
+
+static uint8_t host_blocked(void) { return s_host_block == BLOCK_MAGIC; }
 static const struct usbport *s_port;   /* NULL: no port chip, or it did not answer */
 static TaskHandle_t s_task;
 static uint8_t s_stack, s_mode = 0xFF, s_prepared, s_prep_failed, s_computer;
@@ -99,7 +115,7 @@ uint8_t usbrole_boot(void)
     app_cfg_get(&cfg);
     memset(&b, 0, sizeof b);
     b.has_port = (uint8_t)(s_port != NULL);
-    b.setting = jur_effective_setting(cfg.usb, cfg.usb_set, b.has_port);   /* a XIAO with no choice made acts as HOST */
+    b.setting = host_blocked() ? JUR_USB_DEVICE : jur_effective_setting(cfg.usb, cfg.usb_set, b.has_port);   /* a XIAO with no choice made acts as HOST; a failed host start keeps it a device */
     if (s_port && s_port->read(&st) == 0)
         b.cc = st.cc;
     b.vbus = (uint8_t)pin_level(BOARD_VBUS_SENSE_GPIO);
@@ -214,7 +230,7 @@ static void role_task(void *arg)
             s_computer = 1;            /* a computer's first SETUP (sticky: the XIAO's HOST setting stays a device then) */
         memset(&in, 0, sizeof in);
         in.has_port = (uint8_t)(s_port != NULL);
-        in.setting = jur_effective_setting(cfg.usb, cfg.usb_set, in.has_port);
+        in.setting = host_blocked() ? JUR_USB_DEVICE : jur_effective_setting(cfg.usb, cfg.usb_set, in.has_port);
         in.cc = st.cc;
         in.vbus = (uint8_t)pin_level(BOARD_VBUS_SENSE_GPIO);
         in.computer = s_computer;

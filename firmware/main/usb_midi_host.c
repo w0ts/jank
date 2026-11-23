@@ -29,7 +29,8 @@
 #define PACKET_MAX 64u
 #define STOP_TRIES 20                  /* 5 ms each: a transfer in flight ends when the device has gone */
 #define CLIENT_PRIO 23                 /* a sent packet's completion frees the device for the next tick: soon after it */
-#define CLIENT_STACK 6144              /* the client task runs the callbacks, usb_lp.c's frame and queues included (4096 was tight, not measured) */
+#define CLIENT_STACK 5120              /* the client task runs the callbacks, usb_lp.c's frame and queues included (4096 was thought tight, 6144 took 2 KB
+                                          of a 13 KB internal heap): the margin it leaves is reported in diag (hostdiag_mem client_stack_free) */
 #define IN_RETRIES 3                   /* a stalled or failed IN transfer is tried again this many times in a row, then given up */
 
 struct dev {
@@ -67,6 +68,8 @@ static usb_host_client_handle_t s_client;
 static SemaphoreHandle_t s_lock;
 static QueueHandle_t s_events;
 static uint32_t s_dropped;
+static uint8_t s_start_step;           /* the step of usb_midi_host_start under way, for a failure's report */
+static TaskHandle_t s_client_task;
 
 /* the probe's line for a claimed device (core/jank_hostdiag.h): lines go by arrival, so a device that was left alone keeps its own */
 static struct jhd_dev *dg(const struct dev *d) { return &g_hostdiag.dev[d->dg % JHD_DEVS]; }
@@ -404,18 +407,39 @@ esp_err_t usb_midi_host_start(void)
         .async = {.client_event_callback = on_event},
     };
     esp_err_t e;
+    s_start_step = JHD_STEP_HOSTLIB;
     s_lock = xSemaphoreCreateMutex();
     s_events = xQueueCreate(EVENTS, sizeof(struct event));
     if (!s_lock || !s_events)
         return ESP_ERR_NO_MEM;
     hostdiag_start();
+    s_start_step = JHD_STEP_HOSTLIB;
     e = usb_hostlib_start();
     g_hostdiag.lib_up = (uint8_t)(e == ESP_OK);
-    if (e == ESP_OK)
+    if (e == ESP_OK) {
+        s_start_step = JHD_STEP_CLIENT;
         e = usb_host_client_register(&client, &s_client);
+    }
     if (e != ESP_OK)
         return e;
-    return xTaskCreatePinnedToCore(client_task, "usb_midi_cl", CLIENT_STACK, NULL, CLIENT_PRIO, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    s_start_step = JHD_STEP_CLIENT_TASK;
+    if (xTaskCreatePinnedToCore(client_task, "usb_midi_cl", CLIENT_STACK, NULL, CLIENT_PRIO, &s_client_task, 0) != pdPASS)
+        return ESP_ERR_NO_MEM;
+    s_start_step = JHD_STEP_NONE;
+    return ESP_OK;
+}
+
+/* which step of usb_midi_host_start failed (JHD_STEP_NONE: none did) */
+uint8_t usb_midi_host_start_step(void) { return s_start_step; }
+
+/* the client task's stack never used, bytes (0: no task) */
+uint16_t usb_midi_host_stack_free(void)
+{
+    UBaseType_t free_bytes;
+    if (!s_client_task)
+        return 0;
+    free_bytes = uxTaskGetStackHighWaterMark(s_client_task);
+    return free_bytes > 0xFFFFu ? 0xFFFFu : (uint16_t)free_bytes;
 }
 
 /* the devices that take the clock, for `status` (names merged with the audio client's by usbrole.c) */

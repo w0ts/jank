@@ -22,7 +22,36 @@ static void test_empty_record(void)
     CHECK(jhd_format(&d, out, sizeof out) == strlen(out));
     CHECK(strstr(out, "hostdiag_stack=unknown\n"));              /* nothing reported yet */
     CHECK(strstr(out, "hostdiag_events=new:0,gone:0,add:0\n"));
+    CHECK(strstr(out, "hostdiag_mem=heap:0,heap_min:0,client_stack_free:0\n"));
     CHECK(!strstr(out, "hostdiag_dev"));                         /* no device lines for unused slots */
+}
+
+static void test_memory_line(void)
+{
+    struct jhd d;
+    char out[512];
+    jhd_init(&d);
+    d.heap_kb = 13;                                              /* internal free heap now, its minimum since boot, the client task's stack margin */
+    d.heap_min_kb = 4;
+    d.client_stack_free = 1800;
+    CHECK(jhd_format(&d, out, sizeof out) > 0);
+    CHECK(strstr(out, "hostdiag_mem=heap:13,heap_min:4,client_stack_free:1800\n"));
+}
+
+/* why a host start failed (kept apart in flash, so it outlives the restart that follows it) */
+static void test_failure_text(void)
+{
+    char out[128];
+    CHECK(jhd_format_failure(JHD_STEP_NONE, 0, out, sizeof out) == strlen(out) && !strcmp(out, "hostdiag_start=ok\n"));
+    CHECK(jhd_format_failure(JHD_STEP_CLIENT_TASK, 0x101, out, sizeof out) > 0 && !strcmp(out, "hostdiag_start=failed:client_task,err:257\n"));
+    CHECK(jhd_format_failure(JHD_STEP_RADIO, -1, out, sizeof out) > 0 && !strcmp(out, "hostdiag_start=failed:radio,err:-1\n"));
+    CHECK(jhd_format_failure(JHD_STEP_HOSTLIB, 0x103, out, sizeof out) > 0 && strstr(out, "failed:hostlib,err:259"));
+    CHECK(jhd_format_failure(JHD_STEP_CLIENT, 1, out, sizeof out) > 0 && strstr(out, "failed:client,"));
+    CHECK(jhd_format_failure(JHD_STEP_MIDI_TASK, 1, out, sizeof out) > 0 && strstr(out, "failed:midi_task,"));
+    CHECK(jhd_format_failure(JHD_STEP_ROLE, 1, out, sizeof out) > 0 && strstr(out, "failed:role,"));
+    CHECK(jhd_format_failure(200, 5, out, sizeof out) > 0 && strstr(out, "failed:?,err:5"));      /* a step this build does not know */
+    CHECK(jhd_format_failure(JHD_STEP_RADIO, 1, out, 12) < 12 && out[strlen(out)] == 0);          /* cut to fit, still a string */
+    CHECK(jhd_format_failure(JHD_STEP_RADIO, 1, out, 0) == 0);
 }
 
 static void test_full_record(void)
@@ -119,6 +148,8 @@ static void test_valid_blob(void)
 int main(void)
 {
     test_empty_record();
+    test_memory_line();
+    test_failure_text();
     test_full_record();
     test_roles_and_claim_error();
     test_truncation_and_hostile_names();

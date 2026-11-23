@@ -20,6 +20,11 @@ void usb_host_list_add(struct jk_usb *u, const char *name, int midi, int audio);
 /* hostdiag.c: what the host clients saw (core/jank_hostdiag.h), filled from the client task, saved to flash for `diag` */
 extern struct jhd g_hostdiag;
 void hostdiag_start(void);
+void hostdiag_fail(uint8_t step, esp_err_t e);             /* a host start failed at step (enum jhd_step): kept in flash now */
+void hostdiag_clear_failure(void);                         /* a host start worked: an older failure is cleared */
+uint8_t usb_midi_host_start_step(void);                    /* usb_midi_host.c: the step of its start that failed */
+uint16_t usb_midi_host_stack_free(void);                   /* its client task's stack never used, bytes */
+void usbrole_host_failed(uint8_t step, esp_err_t e);       /* usbrole.c: keeps the failure, blocks host until a power cycle, restarts as a device; does not return */
 
 /* usb_midi_host.c (its start and send are in app.h) */
 void usb_midi_host_list(struct jk_usb *u);

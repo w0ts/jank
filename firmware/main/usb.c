@@ -234,15 +234,25 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
     esp_err_t e;
     s_host = (uint8_t)(usbrole_boot() == JUR_STACK_HOST);
     if (s_host) {
+        uint8_t step = JHD_STEP_NONE;
         e = usb_midi_host_start();
-        if (e == ESP_OK && xTaskCreatePinnedToCore(midi_task, "usb_midi", 4096, NULL, MIDI_TASK_PRIO, &s_task, MIDI_TASK_CORE) != pdPASS)
+        if (e != ESP_OK) {
+            step = usb_midi_host_start_step();
+        } else if (xTaskCreatePinnedToCore(midi_task, "usb_midi", 4096, NULL, MIDI_TASK_PRIO, &s_task, MIDI_TASK_CORE) != pdPASS) {
             e = ESP_ERR_NO_MEM;
+            step = JHD_STEP_MIDI_TASK;
+        }
         if (e == ESP_OK) {
             esp_err_t a = usb_uac_host_start();
             if (a != ESP_OK)            /* the clock goes on without the audio */
                 ESP_LOGE(TAG, "host audio: %s", esp_err_to_name(a));
             e = usbrole_start();
+            if (e != ESP_OK)
+                step = JHD_STEP_ROLE;
         }
+        if (e != ESP_OK)
+            usbrole_host_failed(step, e);   /* the reason kept, a restart as a device: the unit stays reachable and says what failed; no return */
+        hostdiag_clear_failure();           /* it worked: an older failure is no longer news */
         return e;
     }
     s_rx = rx;

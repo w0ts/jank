@@ -7,6 +7,7 @@
 #include "board.h"
 #include "jank_hold.h"
 #include "uiscreen.h"
+#include "usb_host_mode.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_random.h"
@@ -596,8 +597,11 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     if (e != ESP_OK)
         return e;
     e = s_on_network ? radio_start_network(mac, cfg->ssid, cfg->pass, on_network) : radio_start(mac, s_b.channel, on_air);
-    if (e != ESP_OK)
+    if (e != ESP_OK) {
+        if (usb_is_host())               /* the radio after a host start that used the memory: a restart as a device, with the reason kept */
+            usbrole_host_failed(JHD_STEP_RADIO, e);
         return e;
+    }
     if (s_on_network)                    /* read-only diagnostics over the network (core/jank_wsvc.h); not fatal: without it the rest runs */
         (void)wsvc_start();
     if (xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) != pdPASS)

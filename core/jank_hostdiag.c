@@ -42,6 +42,20 @@ static void clean_name(const struct jhd_dev *v, char out[JHD_NAME_MAX + 2])
     out[i] = 0;
 }
 
+size_t jhd_format_failure(uint8_t step, int32_t err, char *out, size_t cap)
+{
+    static const char *const NAME[] = {"none", "hostlib", "client", "client_task", "midi_task", "role", "radio"};
+    size_t n = 0;
+    if (!cap)
+        return 0;
+    out[0] = 0;
+    if (step == JHD_STEP_NONE)
+        put(out, cap, &n, "hostdiag_start=ok\n");
+    else
+        put(out, cap, &n, "hostdiag_start=failed:%s,err:%ld\n", step < sizeof NAME / sizeof NAME[0] ? NAME[step] : "?", (long)err);
+    return n;
+}
+
 size_t jhd_format(const struct jhd *d, char *out, size_t cap)
 {
     size_t n = 0;
@@ -53,6 +67,7 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
     put(out, cap, &n, "hostdiag_events=new:%lu,gone:%lu,add:%lu\n", (unsigned long)d->new_dev, (unsigned long)d->gone_dev, (unsigned long)d->add_calls);
     put(out, cap, &n, "hostdiag_lp=lpx:%u,dn2:%u,programmer:%lu,pads:%lu,dn2msgs:%lu\n", d->lpx_up, d->dn2_up, (unsigned long)d->programmer_sent,
         (unsigned long)d->pads, (unsigned long)d->dn2_msgs);
+    put(out, cap, &n, "hostdiag_mem=heap:%u,heap_min:%u,client_stack_free:%u\n", d->heap_kb, d->heap_min_kb, d->client_stack_free);
     for (unsigned i = 0; i < JHD_DEVS; i++) {
         const struct jhd_dev *v = &d->dev[i];
         char name[JHD_NAME_MAX + 2];

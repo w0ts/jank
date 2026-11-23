@@ -11,7 +11,18 @@
 
 #define JHD_DEVS 4u                    /* as many as usb_midi_host.c has slots */
 #define JHD_NAME_MAX 23u               /* as JK_USB_NAME_MAX */
-#define JHD_VERSION 1u                 /* the record's layout: a saved record of another version is not read */
+#define JHD_VERSION 2u                 /* the record's layout: a saved record of another version is not read (2: the memory numbers) */
+
+/* the steps of a host start, in order, for the one that failed (jhd_format_failure) */
+enum jhd_step {
+    JHD_STEP_NONE = 0,
+    JHD_STEP_HOSTLIB,                  /* the USB Host Library's install */
+    JHD_STEP_CLIENT,                   /* the MIDI client's registration */
+    JHD_STEP_CLIENT_TASK,              /* the client's task (its stack is internal heap) */
+    JHD_STEP_MIDI_TASK,                /* usb.c's MIDI task */
+    JHD_STEP_ROLE,                     /* the role task */
+    JHD_STEP_RADIO                     /* the Wi-Fi radio, which starts after the USB stack */
+};
 
 enum jhd_stack { JHD_STACK_UNKNOWN = 0, JHD_STACK_DEVICE = 1, JHD_STACK_HOST = 2 };
 
@@ -38,6 +49,9 @@ struct jhd {
     uint32_t programmer_sent;          /* Programmer mode messages put in the Launchpad's queue */
     uint32_t pads;                     /* Launchpad pad / button events decoded */
     uint32_t dn2_msgs;                 /* packets from the Digitone */
+    uint16_t heap_kb;                  /* internal heap free now (task stacks and USB buffers come from it), KB */
+    uint16_t heap_min_kb;              /* its lowest since the start */
+    uint16_t client_stack_free;        /* the MIDI client task's stack never used (high-water mark), bytes */
     struct jhd_dev dev[JHD_DEVS];
 };
 
@@ -45,6 +59,9 @@ void jhd_init(struct jhd *d);
 /* the record as `key=value` lines (the style of `status`), a NUL-terminated string in out (cap bytes, cut to fit); returns its
  * length. Unused device slots print nothing; unprintable characters in a name print as '.' */
 size_t jhd_format(const struct jhd *d, char *out, size_t cap);
+/* `hostdiag_start=ok` (step 0) or `hostdiag_start=failed:<step name>,err:<esp_err_t>`: why a host start failed, kept in flash apart from the
+ * record (the restart that follows a failure must not lose it). Same cut-to-fit rules as jhd_format; returns the length */
+size_t jhd_format_failure(uint8_t step, int32_t err, char *out, size_t cap);
 /* 1: n bytes at p are a record of this layout and version (what was read back from flash) */
 int jhd_valid(const void *p, size_t n);
 #endif
