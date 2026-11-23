@@ -332,6 +332,7 @@ static void add_device(uint8_t address)
     usb_device_handle_t h;
     const usb_config_desc_t *c;
     static struct ju_dev d;               /* the worker's alone */
+    char name[JK_USB_NAME_MAX + 1];
     struct ju_pick pick;
     const struct ju_alt *a;
     esp_err_t e;
@@ -341,6 +342,14 @@ static void add_device(uint8_t address)
     }
     if (open_dev(address, &h) != ESP_OK)
         return;
+    usb_host_product_name(h, name, sizeof name);
+    if (jlapp_role_from_name(name) != JLAPP_OTHER) {
+        /* A Launchpad X and a Digitone are played over MIDI (usb_lp.c): the controller has 8 pipes (usb_hostlib.c), and a hub (2),
+         * the Launchpad (control, OUT, IN) and the Digitone (control, OUT, IN) already take all 8: no room for the Digitone's
+         * audio. Deterministic: whichever device enumerates first would otherwise win the pipes. */
+        close_dev(h);
+        return;
+    }
     if (usb_host_get_active_config_descriptor(h, &c) != ESP_OK || !ju_parse((const uint8_t *)c, c->wTotalLength, &d)) {
         close_dev(h);
         return;                          /* no audio out of it: not ours */

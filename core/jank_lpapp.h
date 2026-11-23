@@ -14,45 +14,45 @@
 #include "jank_lpnote.h"
 #include "jank_lpx.h"
 
-#define JLA_CHANNELS 16u
-#define JLA_PADS 64u
+#define JLAPP_CHANNELS 16u
+#define JLAPP_PADS 64u
 
 /* the arrow buttons' and the mode button's palette indexes */
-#define JLA_COLOR_ARROW 1u             /* dim grey */
-#define JLA_COLOR_MODE 3u              /* white */
+#define JLAPP_COLOR_ARROW 1u             /* dim grey */
+#define JLAPP_COLOR_MODE 3u              /* white */
 
 /* the hosted devices that matter here, told apart by their USB product string */
-enum jla_role { JLA_OTHER, JLA_LPX, JLA_DN2 };
-enum jla_role jla_role_from_name(const char *product);
+enum jlapp_role { JLAPP_OTHER, JLAPP_LPX, JLAPP_DN2 };
+enum jlapp_role jlapp_role_from_name(const char *product);
 /* which of a device's USB-MIDI streaming interfaces is the one to use (0 = the first): the Launchpad X's first is its DAW
  * interface, its MIDI one (Programmer mode, pads, lights) is the second */
-unsigned jla_midi_interface_index(enum jla_role r);
+unsigned jlapp_midi_interface_index(enum jlapp_role r);
 
-struct jla_held {
+struct jlapp_held {
     int16_t note;                      /* -1: the pad is up */
     uint8_t chan;                      /* the channel it was sent on: its Note Off goes there, whatever the track is by then */
 };
 
-struct jla {
+struct jlapp {
     struct jln n;
     const struct jln_scale *scale;
     uint8_t chan[JLN_TRACKS];          /* each track's MIDI channel, 0..15 */
     uint8_t dn2_cable;                 /* the cable number in the packets to the DN2 */
-    struct jla_held held[JLA_PADS];
-    uint8_t playing[JLA_CHANNELS][16]; /* from the DN2: a bit a note, per channel */
+    struct jlapp_held held[JLAPP_PADS];
+    uint8_t playing[JLAPP_CHANNELS][16]; /* from the DN2: a bit a note, per channel */
 };
 
-void jla_init(struct jla *a, const struct jln_scale *scale, uint8_t dn2_cable);
+void jlapp_init(struct jlapp *a, const struct jln_scale *scale, uint8_t dn2_cable);
 
 /* a Launchpad pad or button; the packets for the DN2 go to out (at most max_packets, one per event); returns how many */
-size_t jla_on_lpx(struct jla *a, const struct jlx_ev *ev, uint8_t *out, size_t max_packets);
+size_t jlapp_on_lpx(struct jlapp *a, const struct jlx_ev *ev, uint8_t *out, size_t max_packets);
 
 /* one 4-byte USB-MIDI packet from the DN2: Note On / Off and All Notes Off, the rest is ignored */
-void jla_on_dn2(struct jla *a, const uint8_t pkt[4]);
+void jlapp_on_dn2(struct jlapp *a, const uint8_t pkt[4]);
 
 /* a Note Off for every pad that is down (the Launchpad went away): packets for the DN2, at most max_packets; returns how many */
-size_t jla_release_all(struct jla *a, uint8_t *out, size_t max_packets);
+size_t jlapp_release_all(struct jlapp *a, uint8_t *out, size_t max_packets);
 
 /* what the Launchpad should show now */
-void jla_frame(const struct jla *a, struct jlx_frame *f);
+void jlapp_frame(const struct jlapp *a, struct jlx_frame *f);
 #endif

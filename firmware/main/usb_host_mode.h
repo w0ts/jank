@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "esp_err.h"
 #include "jank_core.h"
+#include "jank_lpapp.h"
 #include "usb/usb_host.h"
 
 /* usb_hostlib.c: the USB Host Library, installed once; its event task */
@@ -17,6 +18,15 @@ void usb_host_list_add(struct jk_usb *u, const char *name, int midi, int audio);
 
 /* usb_midi_host.c (its start and send are in app.h) */
 void usb_midi_host_list(struct jk_usb *u);
+void usb_midi_host_send_to(enum jlapp_role r, const uint8_t *packets, size_t n);   /* to the device that has that role, if any */
+size_t usb_midi_host_room(enum jlapp_role r);                                      /* packets still fitting in its queue; 0 if none */
+
+/* usb_lp.c: Launchpad X -> Digitone II, Note mode (core/jank_lpapp.h), called from usb_midi_host.c's client task only */
+void usb_lp_attach(enum jlapp_role r);
+void usb_lp_detach(enum jlapp_role r);
+void usb_lp_rx(enum jlapp_role r, const uint8_t *packets, size_t n);               /* 4-byte USB-MIDI packets the device sent */
+void usb_lp_pump(void);                                                          /* waiting packets for the Digitone, more lights: as the queues have room */
+uint32_t usb_lp_wait_ticks(void);                                                /* how long the client task may sleep (portMAX_DELAY: until an event) */
 
 /* usb_uac_host.c: one hosted device's audio into the beat tracker's ring (usb_audio.h uac_feed) */
 esp_err_t usb_uac_host_start(void);

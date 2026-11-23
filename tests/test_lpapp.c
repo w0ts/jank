@@ -16,10 +16,10 @@ static int fails, checks;
 
 static const struct jln_scale MAJOR = {"Major", 7, {0, 2, 4, 5, 7, 9, 11}};
 
-static struct jla fresh(void)
+static struct jlapp fresh(void)
 {
-    struct jla a;
-    jla_init(&a, &MAJOR, 0);
+    struct jlapp a;
+    jlapp_init(&a, &MAJOR, 0);
     return a;
 }
 
@@ -35,41 +35,41 @@ static struct jlx_ev top(uint8_t idx, uint8_t v)
     return e;
 }
 
-static size_t press(struct jla *a, struct jlx_ev e, uint8_t out[4])
+static size_t press(struct jlapp *a, struct jlx_ev e, uint8_t out[4])
 {
-    return jla_on_lpx(a, &e, out, 1);
+    return jlapp_on_lpx(a, &e, out, 1);
 }
 
-static void dn2(struct jla *a, uint8_t status, uint8_t d1, uint8_t d2)
+static void dn2(struct jlapp *a, uint8_t status, uint8_t d1, uint8_t d2)
 {
     const uint8_t p[4] = {(uint8_t)(status >> 4), status, d1, d2};
-    jla_on_dn2(a, p);
+    jlapp_on_dn2(a, p);
 }
 
-static uint8_t colour(struct jla *a, uint8_t x, uint8_t y)
+static uint8_t colour(struct jlapp *a, uint8_t x, uint8_t y)
 {
     struct jlx_frame f;
-    jla_frame(a, &f);
+    jlapp_frame(a, &f);
     return f.led[y * 8u + x].color;
 }
 
 static void test_pad_plays_note_on_track_channel(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     CHECK(press(&a, pad(0, 0, 100), o) == 1);                     /* diatonic C major, octave 3: 48 */
     CHECK(o[0] == 0x09 && o[1] == 0x90 && o[2] == 48 && o[3] == 100);
     CHECK(press(&a, pad(0, 0, 0), o) == 1);
     CHECK(o[0] == 0x08 && o[1] == 0x80 && o[2] == 48 && o[3] == 0);
     a.dn2_cable = 2;                                              /* the cable of the DN2's port */
-    jla_on_lpx(&a, &(struct jlx_ev){JLX_TOP, 0, 0, 3, 127}, o, 1);   /* right: track 2, channel 2 */
+    jlapp_on_lpx(&a, &(struct jlx_ev){JLX_TOP, 0, 0, 3, 127}, o, 1);   /* right: track 2, channel 2 */
     CHECK(press(&a, pad(1, 0, 64), o) == 1);
     CHECK(o[0] == 0x29 && o[1] == 0x91 && o[2] == 50 && o[3] == 64);
 }
 
 static void test_release_goes_to_the_note_it_started(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     press(&a, pad(1, 0, 90), o);                                  /* 50 */
     press(&a, top(0, 127), o);                                    /* octave up while the pad is held */
@@ -80,7 +80,7 @@ static void test_release_goes_to_the_note_it_started(void)
 
 static void test_release_goes_to_the_channel_it_started(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     press(&a, pad(0, 0, 90), o);                                  /* track 1, channel 1 */
     press(&a, top(3, 127), o);                                    /* track 2 */
@@ -90,7 +90,7 @@ static void test_release_goes_to_the_channel_it_started(void)
 
 static void test_same_pitch_on_two_pads(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     jln_set_layout(&a.n, JLN_CHROMATIC);                          /* (5,0) and (0,1) are both 53 */
     CHECK(press(&a, pad(5, 0, 80), o) == 1 && o[1] == 0x90);
@@ -101,7 +101,7 @@ static void test_same_pitch_on_two_pads(void)
 
 static void test_pad_outside_midi_range_is_silent(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     jln_set_layout(&a.n, JLN_CHROMATIC);
     a.n.octave = 7;                                               /* base 96: the top rows pass 127 (the buttons stop at 6) */
@@ -111,7 +111,7 @@ static void test_pad_outside_midi_range_is_silent(void)
 
 static void test_repeated_press_and_stray_release(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     CHECK(press(&a, pad(2, 2, 70), o) == 1);
     CHECK(press(&a, pad(2, 2, 70), o) == 0);                      /* a pad already down: nothing new */
@@ -122,7 +122,7 @@ static void test_repeated_press_and_stray_release(void)
 
 static void test_buttons(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     CHECK(press(&a, top(0, 127), o) == 0 && a.n.octave == 4);     /* up: octave up, no MIDI */
     press(&a, top(1, 127), o);
@@ -143,13 +143,13 @@ static void test_buttons(void)
     CHECK(a.n.track == 1 && a.n.octave == 2);
     {
         struct jlx_ev side = {JLX_SIDE, 0, 0, 4, 127};
-        CHECK(jla_on_lpx(&a, &side, o, 1) == 0);
+        CHECK(jlapp_on_lpx(&a, &side, o, 1) == 0);
     }
 }
 
 static void test_dn2_notes_light_the_pads(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     CHECK(colour(&a, 0, 0) == JLN_COLOR_ROOT);                    /* 48 is C: the root */
     CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);                /* D */
     dn2(&a, 0x90, 50, 100);                                       /* the DN2 plays D (50) on channel 1 */
@@ -164,7 +164,7 @@ static void test_dn2_notes_light_the_pads(void)
 
 static void test_dn2_notes_per_channel(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     dn2(&a, 0x91, 50, 100);                                       /* channel 2: not the current track */
     CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
@@ -176,7 +176,7 @@ static void test_dn2_notes_per_channel(void)
 
 static void test_dn2_same_pitch_lights_every_pad(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     jln_set_layout(&a.n, JLN_CHROMATIC);
     dn2(&a, 0x90, 53, 100);
     CHECK(colour(&a, 5, 0) == JLN_COLOR_PLAYING && colour(&a, 0, 1) == JLN_COLOR_PLAYING);
@@ -184,7 +184,7 @@ static void test_dn2_same_pitch_lights_every_pad(void)
 
 static void test_dn2_all_notes_off_and_noise(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     dn2(&a, 0x90, 50, 100);
     dn2(&a, 0x90, 52, 100);
     dn2(&a, 0xB0, 7, 100);                                        /* a volume CC: ignored */
@@ -195,16 +195,16 @@ static void test_dn2_all_notes_off_and_noise(void)
         const uint8_t clock[4] = {0x0F, 0xF8, 0, 0};              /* a clock byte */
         const uint8_t sysex[4] = {0x04, 0xF0, 0x7D, 0x01};
         const uint8_t pressure[4] = {0x0D, 0xD0, 50, 0};
-        jla_on_dn2(&a, clock);
-        jla_on_dn2(&a, sysex);
-        jla_on_dn2(&a, pressure);
+        jlapp_on_dn2(&a, clock);
+        jlapp_on_dn2(&a, sysex);
+        jlapp_on_dn2(&a, pressure);
     }
     CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
 }
 
 static void test_own_press_lights_the_pad(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4];
     press(&a, pad(1, 0, 100), o);
     CHECK(colour(&a, 1, 0) == JLN_COLOR_PLAYING);
@@ -214,12 +214,12 @@ static void test_own_press_lights_the_pad(void)
 
 static void test_buttons_lit(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     struct jlx_frame f;
-    jla_frame(&a, &f);
+    jlapp_frame(&a, &f);
     for (uint32_t i = 0; i < 4; i++)
-        CHECK(f.led[JLX_TOP0 + i].color == JLA_COLOR_ARROW);
-    CHECK(f.led[JLX_TOP0 + 5].color == JLA_COLOR_MODE);          /* the Note button */
+        CHECK(f.led[JLX_TOP0 + i].color == JLAPP_COLOR_ARROW);
+    CHECK(f.led[JLX_TOP0 + 5].color == JLAPP_COLOR_MODE);          /* the Note button */
     CHECK(f.led[JLX_TOP0 + 4].color == 0 && f.led[JLX_TOP0 + 6].color == 0 && f.led[JLX_TOP0 + 7].color == 0);
     for (uint32_t i = 0; i < 8; i++)
         CHECK(f.led[JLX_SIDE0 + i].color == 0);
@@ -230,48 +230,48 @@ static void test_buttons_lit(void)
 
 static void test_release_all(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4 * 8];
     uint8_t one[4];
     press(&a, pad(0, 0, 100), one);
     press(&a, pad(1, 0, 100), one);
     press(&a, top(3, 127), one);
     press(&a, pad(2, 0, 100), one);                               /* a third one, on channel 2 */
-    CHECK(jla_release_all(&a, o, 8) == 3);
+    CHECK(jlapp_release_all(&a, o, 8) == 3);
     CHECK(o[1] == 0x80 && o[2] == 48 && o[5] == 0x80 && o[6] == 50 && o[9] == 0x81 && o[10] == 52);
-    CHECK(jla_release_all(&a, o, 8) == 0);                        /* all up now */
+    CHECK(jlapp_release_all(&a, o, 8) == 0);                        /* all up now */
     CHECK(press(&a, pad(0, 0, 0), one) == 0);
 }
 
 static void test_release_all_respects_the_room(void)
 {
-    struct jla a = fresh();
+    struct jlapp a = fresh();
     uint8_t o[4 * 2], one[4];
     press(&a, pad(0, 0, 100), one);
     press(&a, pad(1, 0, 100), one);
     press(&a, pad(2, 0, 100), one);
-    CHECK(jla_release_all(&a, o, 2) == 2);
-    CHECK(jla_release_all(&a, o, 2) == 1);                        /* the rest waits for the next call */
-    CHECK(jla_release_all(&a, o, 2) == 0);
+    CHECK(jlapp_release_all(&a, o, 2) == 2);
+    CHECK(jlapp_release_all(&a, o, 2) == 1);                        /* the rest waits for the next call */
+    CHECK(jlapp_release_all(&a, o, 2) == 0);
 }
 
 static void test_roles_by_product_name(void)
 {
-    CHECK(jla_role_from_name("Launchpad X") == JLA_LPX);
-    CHECK(jla_role_from_name("Novation Launchpad X") == JLA_LPX);
-    CHECK(jla_role_from_name("Digitone II") == JLA_DN2);
-    CHECK(jla_role_from_name("Elektron Digitone II") == JLA_DN2);
-    CHECK(jla_role_from_name("Launchpad Mini MK3") == JLA_OTHER);   /* other Launchpads have other layouts */
-    CHECK(jla_role_from_name("Launchpad Pro MK3") == JLA_OTHER);
-    CHECK(jla_role_from_name("OP-Z") == JLA_OTHER);
-    CHECK(jla_role_from_name("") == JLA_OTHER && jla_role_from_name(NULL) == JLA_OTHER);
+    CHECK(jlapp_role_from_name("Launchpad X") == JLAPP_LPX);
+    CHECK(jlapp_role_from_name("Novation Launchpad X") == JLAPP_LPX);
+    CHECK(jlapp_role_from_name("Digitone II") == JLAPP_DN2);
+    CHECK(jlapp_role_from_name("Elektron Digitone II") == JLAPP_DN2);
+    CHECK(jlapp_role_from_name("Launchpad Mini MK3") == JLAPP_OTHER);   /* other Launchpads have other layouts */
+    CHECK(jlapp_role_from_name("Launchpad Pro MK3") == JLAPP_OTHER);
+    CHECK(jlapp_role_from_name("OP-Z") == JLAPP_OTHER);
+    CHECK(jlapp_role_from_name("") == JLAPP_OTHER && jlapp_role_from_name(NULL) == JLAPP_OTHER);
 }
 
 static void test_midi_interface_choice(void)
 {
-    CHECK(jla_midi_interface_index(JLA_LPX) == 1);                  /* the Launchpad X's MIDI interface is its second, the first is DAW */
-    CHECK(jla_midi_interface_index(JLA_DN2) == 0);
-    CHECK(jla_midi_interface_index(JLA_OTHER) == 0);
+    CHECK(jlapp_midi_interface_index(JLAPP_LPX) == 1);                  /* the Launchpad X's MIDI interface is its second, the first is DAW */
+    CHECK(jlapp_midi_interface_index(JLAPP_DN2) == 0);
+    CHECK(jlapp_midi_interface_index(JLAPP_OTHER) == 0);
 }
 
 int main(void)
