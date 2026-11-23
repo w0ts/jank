@@ -23,6 +23,12 @@
 #define JLG_BEAT_RGB 0, 30, 0
 #define JLG_LOWCONF_RGB 40, 0, 0
 #define JLG_BATT_RGB 40, 0, 0
+/* USB host mode: two short flashes every JLG_HOST_PERIOD_MS, over everything but the low battery's blink (a unit in host mode has
+ * no control line and no log: this is how one tells it is hosting; a one-colour LED just lights) */
+#define JLG_HOST_PERIOD_MS 2400u
+#define JLG_HOST_FLASH_MS 70u
+#define JLG_HOST_GAP_MS 90u
+#define JLG_HOST_RGB 0, 0, 40
 
 struct jlg_state {
     uint32_t now_ms;
@@ -35,7 +41,11 @@ struct jlg_state {
     int64_t beat_ub;                     /* the session's beat now, micro-beats */
     int32_t mpb;                         /* us a beat */
     uint32_t quantum;
+    uint8_t host;                        /* the USB host stack runs (the last field: the firmware fills the others by position) */
 };
+
+/* 1: now_ms is inside one of the two host-mode flashes (the same pattern on a one-colour LED, which has no jlg_color) */
+int jlg_host_lit(uint32_t now_ms);
 
 /* the colour now; 1 lit */
 int jlg_color(const struct jlg_state *s, uint8_t rgb[3]);

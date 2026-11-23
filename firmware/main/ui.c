@@ -92,11 +92,15 @@ static void led_step(uint32_t now)
     joined = bridge_beat(&beat, &mpb);
     if (BOARD_LED_RGB_GPIO >= 0) {
         struct jlg_state s = {now, s_led.batt_pct, s_led.on_usb, (uint8_t)joined, s_led.running, s_led.armed, s_led.low_conf,
-                              s_led.bar_locked, beat, mpb, cfg.quantum};
+                              s_led.bar_locked, beat, mpb, cfg.quantum, (uint8_t)usb_is_host()};
         if (!s_led.valid)
             s.batt_pct = -1;
         jlg_color(&s, c);
         led_show(c[0], c[1], c[2]);
+        return;
+    }
+    if (usb_is_host() && jlg_host_lit(now)) {   /* USB host mode: two short flashes every 2.4 s, over the timing (a one-colour LED just lights) */
+        led_show(JLG_HOST_RGB);
         return;
     }
     lit = jk_led_lit(cfg.net, joined, beat, mpb, cfg.quantum);

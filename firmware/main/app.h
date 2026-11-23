@@ -38,6 +38,8 @@ typedef void (*usb_free_fn)(void *token);
 typedef void (*usb_line_fn)(const uint8_t *data, size_t n);
 esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, usb_line_fn serial_rx);
 int usb_up(void);
+int usb_is_host(void);                                               /* the USB host stack is the one that started (the LED's double flash) */
+size_t hostdiag_text(char *out, size_t cap);                         /* hostdiag.c: what the last host session saw, for `diag` */
 int usb_host_spoke(void);                                            /* a control line came from the computer since the start */
 void usb_beat_line(const char *text, size_t n);                      /* a beat report: SysEx F0 7D 'J' 'B' 0x10 <text> F7, dropped when full */
 esp_err_t usb_send(const uint8_t *eth, size_t len, void *token);   /* tx_done(token) follows when ESP_OK */

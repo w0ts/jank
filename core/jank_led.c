@@ -29,11 +29,19 @@ static uint8_t breath(uint32_t now_ms)
     return (uint8_t)(JLG_BREATH_MAX * up / half);
 }
 
+int jlg_host_lit(uint32_t now_ms)
+{
+    uint32_t p = now_ms % JLG_HOST_PERIOD_MS;
+    return p < JLG_HOST_FLASH_MS || (p >= JLG_HOST_FLASH_MS + JLG_HOST_GAP_MS && p < 2u * JLG_HOST_FLASH_MS + JLG_HOST_GAP_MS);
+}
+
 int jlg_color(const struct jlg_state *s, uint8_t rgb[3])
 {
     if (!s->on_usb && s->batt_pct >= 0 && s->batt_pct < JLG_BATT_LOW_PCT &&
         s->now_ms % jlg_batt_period_ms(s->batt_pct) < JLG_BATT_FLASH_MS)
         return put(rgb, JLG_BATT_RGB);
+    if (s->host && jlg_host_lit(s->now_ms))
+        return put(rgb, JLG_HOST_RGB);
     if (s->running && s->joined) {
         if (!jk_led_lit(JK_NET_JANK, 1, s->beat_ub, s->mpb, s->quantum))
             return put(rgb, 0, 0, 0);

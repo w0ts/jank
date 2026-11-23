@@ -134,10 +134,52 @@ static void test_firmware_flags(void)
     CHECK(!strcmp(ui.overlay.title, "TRACKER LEADS") && ui.overlay.until == 3050u, "YES alone: TRACKER LEADS");
 }
 
+/* USB host mode shows as two short flashes every JLG_HOST_PERIOD_MS, over the rest (a unit in host mode has no screen and no
+ * control line: the LED is how one tells it is hosting) */
+static void test_host_double_flash(void)
+{
+    struct jlg_state s = base();
+    uint8_t c[3];
+    const uint32_t t0 = JLG_HOST_PERIOD_MS * 5u;                 /* a window start, whatever the uptime */
+    s.host = 1;
+    s.now_ms = t0 + 10u;
+    CHECK(jlg_color(&s, c) && same(c, JLG_HOST_RGB), "host: the first flash");
+    s.now_ms = t0 + JLG_HOST_FLASH_MS + 10u;
+    CHECK(!jlg_color(&s, c), "host: dark between the two flashes");
+    s.now_ms = t0 + JLG_HOST_FLASH_MS + JLG_HOST_GAP_MS + 10u;
+    CHECK(jlg_color(&s, c) && same(c, JLG_HOST_RGB), "host: the second flash");
+    s.now_ms = t0 + 2u * JLG_HOST_FLASH_MS + JLG_HOST_GAP_MS + 10u;
+    CHECK(!jlg_color(&s, c), "host: dark after the pair");
+    s.now_ms = t0 + 1000u;
+    CHECK(!jlg_color(&s, c), "host: quiet for the rest of the period");
+    s.host = 0;
+    s.now_ms = t0 + 10u;
+    CHECK(!jlg_color(&s, c), "not host: no flash");
+    CHECK(jlg_host_lit(t0 + 10u) && !jlg_host_lit(t0 + JLG_HOST_FLASH_MS + 10u) && jlg_host_lit(t0 + JLG_HOST_FLASH_MS + JLG_HOST_GAP_MS + 10u),
+          "jlg_host_lit: the same pattern");
+    /* over the beat: the pair shows even where the beat is dark, the beat shows outside it */
+    s.host = 1;
+    s.joined = 1;
+    s.running = 1;
+    s.now_ms = t0 + 10u;
+    s.beat_ub = 5000000 + 250000;                                /* beat 2, 125 ms in: dark */
+    CHECK(jlg_color(&s, c) && same(c, JLG_HOST_RGB), "host over a dark beat: the flash shows");
+    s.now_ms = t0 + 1000u;
+    s.beat_ub = 5000000 + 100000;                                /* 50 ms in: lit */
+    CHECK(jlg_color(&s, c) && same(c, JLG_BEAT_RGB), "host outside the pair: the beat as ever");
+    /* the low battery's red blink comes first */
+    s.on_usb = 0;
+    s.batt_pct = 10;
+    s.now_ms = 16800u;                                           /* 10 %: a blink every 840 ms; 16800 is a multiple of it and of the host period: both start */
+    CHECK(jlg_host_lit(s.now_ms), "(precondition) the host flash is lit there");
+    CHECK(jlg_color(&s, c) && same(c, JLG_BATT_RGB), "low battery over the host flash");
+}
+
 int main(void)
 {
     test_language();
     test_firmware_flags();
+    test_host_double_flash();
     if (s_fail) {
         fprintf(stderr, "test_led: %d of %d checks failed\n", s_fail, s_checks);
         return 1;

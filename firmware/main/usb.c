@@ -284,6 +284,7 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
 int usb_up(void) { return !s_host && tud_mounted(); }
 
 int usb_host_spoke(void) { return s_host_spoke; }
+int usb_is_host(void) { return s_host; }
 
 /* from the beat task; never waits: a report that does not fit is dropped (the next one comes within a second) */
 void usb_beat_line(const char *text, size_t n)

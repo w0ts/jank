@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "esp_err.h"
 #include "jank_core.h"
+#include "jank_hostdiag.h"
 #include "jank_lpapp.h"
 #include "usb/usb_host.h"
 
@@ -15,6 +16,10 @@ esp_err_t usb_hostlib_start(void);
 int usb_hostlib_up(void);
 void usb_host_product_name(usb_device_handle_t h, char *out, size_t cap);
 void usb_host_list_add(struct jk_usb *u, const char *name, int midi, int audio);
+
+/* hostdiag.c: what the host clients saw (core/jank_hostdiag.h), filled from the client task, saved to flash for `diag` */
+extern struct jhd g_hostdiag;
+void hostdiag_start(void);
 
 /* usb_midi_host.c (its start and send are in app.h) */
 void usb_midi_host_list(struct jk_usb *u);

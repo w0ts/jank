@@ -83,6 +83,8 @@ fi
 "$OUT/test_lpout"
 "$CC" $FLAGS "$HERE/tests/test_dn2rpc.c" "$HERE/core/jank_dn2rpc.c" -o "$OUT/test_dn2rpc"
 "$OUT/test_dn2rpc"
+"$CC" $FLAGS "$HERE/tests/test_hostdiag.c" "$HERE/core/jank_hostdiag.c" -o "$OUT/test_hostdiag"
+"$OUT/test_hostdiag"
 "$CC" $FLAGS "$HERE/tests/test_pcm.c" "$HERE/core/jank_pcm.c" -lm -o "$OUT/test_pcm"
 "$OUT/test_pcm"
 # LINE IN: the ADC framing, the timestamp fit, DC / gain / level, the cell, the cubic resampler and the chain on clicks

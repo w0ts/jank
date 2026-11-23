@@ -77,10 +77,12 @@ void usb_lp_attach(enum jlapp_role r)
     ensure_init();
     if (r == JLAPP_LPX) {
         s_lpx_up = 1;
+        g_hostdiag.lpx_up = 1;
         s_programmer_pending = 1;      /* sent by usb_lp_pump, when its queue has room */
         ESP_LOGI(TAG, "Launchpad X");
     } else if (r == JLAPP_DN2) {
         s_dn2_up = 1;
+        g_hostdiag.dn2_up = 1;
         jlo_clear(&s_out);
         ESP_LOGI(TAG, "Digitone");
     }
@@ -92,11 +94,13 @@ void usb_lp_detach(enum jlapp_role r)
     if (r == JLAPP_LPX) {
         uint8_t off[4 * JLAPP_PADS];
         s_lpx_up = 0;
+        g_hostdiag.lpx_up = 0;
         s_programmer_pending = 0;
         /* its pads that were down end their notes: nothing stays sounding on the Digitone */
         dn2_send(off, 4u * jlapp_release_all(&s_app, off, JLAPP_PADS));
     } else if (r == JLAPP_DN2) {
         s_dn2_up = 0;
+        g_hostdiag.dn2_up = 0;
         jlo_clear(&s_out);
         memset(s_app.playing, 0, sizeof s_app.playing);
     }
@@ -109,7 +113,10 @@ static void rx_lpx(const uint8_t p[4])
     const uint8_t msg[3] = {p[1], p[2], p[3]};
     if (cin != CIN_NOTE_ON && cin != CIN_NOTE_OFF && cin != CIN_CC)
         return;
-    if (jlx_decode(msg, &ev) && jlapp_on_lpx(&s_app, &ev, out, 1))
+    if (!jlx_decode(msg, &ev))
+        return;
+    g_hostdiag.pads++;
+    if (jlapp_on_lpx(&s_app, &ev, out, 1))
         dn2_send(out, 4);
 }
 
@@ -119,8 +126,10 @@ void usb_lp_rx(enum jlapp_role r, const uint8_t *packets, size_t n)
     for (size_t i = 0; i + 4u <= n; i += 4u) {
         if (r == JLAPP_LPX)
             rx_lpx(packets + i);
-        else if (r == JLAPP_DN2)
+        else if (r == JLAPP_DN2) {
+            g_hostdiag.dn2_msgs++;
             jlapp_on_dn2(&s_app, packets + i);
+        }
     }
 }
 
@@ -137,6 +146,7 @@ void usb_lp_pump(void)
         if (room < SYSEX_PACKETS)
             return;
         usb_midi_host_send_to(JLAPP_LPX, out, jlx_programmer(LPX_CABLE, 1, out));
+        g_hostdiag.programmer_sent++;
         s_programmer_pending = 0;
         jlx_forget(&s_shown);
         s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);

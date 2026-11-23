@@ -68,6 +68,9 @@ static void run_diag(void)
     bridge_diag(s_out + n, sizeof s_out - n);
     n = strlen(s_out);
     drive_state(s_out + n, sizeof s_out - n);
+    n = strlen(s_out);
+    if (sizeof s_out - n > 8u)         /* what the last USB host session saw (hostdiag.c); the "ok" below keeps its room */
+        hostdiag_text(s_out + n, sizeof s_out - n - 4u);
     strlcat(s_out, "ok\n", sizeof s_out);
     reply_out();
 }

@@ -44,6 +44,7 @@ struct dev {
     volatile uint8_t in_busy;          /* the IN transfer is out */
     uint8_t in_fails;                  /* IN transfers in a row that ended in an error (retried IN_RETRIES times) */
     uint8_t leaked;                    /* an IN transfer was still out when the device went: its callback still points here, the slot is not reused */
+    uint8_t dg;                        /* its line in the probe (g_hostdiag.dev) */
     enum jlapp_role role;
     struct jmq q;                      /* packets that came while the transfer was out (s_lock) */
     char name[JK_USB_NAME_MAX + 1];
@@ -55,6 +56,7 @@ struct event {
 };
 
 struct midi_eps {
+    uint8_t index;                     /* which MIDI streaming interface (0 = the first) */
     uint8_t itf, out, in;              /* the interface and its first bulk OUT and IN endpoint addresses (in 0: none) */
     uint16_t out_mps, in_mps;
 };
@@ -65,6 +67,9 @@ static usb_host_client_handle_t s_client;
 static SemaphoreHandle_t s_lock;
 static QueueHandle_t s_events;
 static uint32_t s_dropped;
+
+/* the probe's line for a claimed device (core/jank_hostdiag.h): lines go by arrival, so a device that was left alone keeps its own */
+static struct jhd_dev *dg(const struct dev *d) { return &g_hostdiag.dev[d->dg % JHD_DEVS]; }
 
 /* the waiting packets, up to mps bytes, go out in one transfer; the rest keeps waiting. s_lock held, d->busy 0 */
 static void submit_pending(struct dev *d)
@@ -86,8 +91,12 @@ static void on_sent(usb_transfer_t *t)
 {
     struct dev *d = t->context;
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    if (t->status != USB_TRANSFER_STATUS_COMPLETED)
+    if (t->status != USB_TRANSFER_STATUS_COMPLETED) {
         s_dropped += (uint32_t)(t->num_bytes / 4);
+        dg(d)->out_fail++;
+    } else {
+        dg(d)->out_done++;
+    }
     d->busy = 0;
     if (d->h)                          /* (a device being removed: nothing more) */
         submit_pending(d);
@@ -115,8 +124,12 @@ static void on_in(usb_transfer_t *t)
     usb_transfer_status_t st = t->status;
     if (st == USB_TRANSFER_STATUS_COMPLETED) {
         d->in_fails = 0;
-        if (t->actual_num_bytes >= 4)
-            usb_lp_rx(d->role, t->data_buffer, (size_t)t->actual_num_bytes & ~3u);
+        if (t->actual_num_bytes >= 4) {
+            size_t whole = (size_t)t->actual_num_bytes & ~3u;
+            dg(d)->in_packets += (uint32_t)(whole / 4u);
+            memcpy(dg(d)->in_last, t->data_buffer + whole - 4u, 4);
+            usb_lp_rx(d->role, t->data_buffer, whole);
+        }
     } else if (d->h && (st == USB_TRANSFER_STATUS_STALL || st == USB_TRANSFER_STATUS_ERROR || st == USB_TRANSFER_STATUS_OVERFLOW)
                && d->in_fails < IN_RETRIES) {
         d->in_fails++;
@@ -169,8 +182,10 @@ static int eps_of_interface(const usb_config_desc_t *c, unsigned index, struct m
             inside = 0;
             if (is_midi_streaming(cur)) {
                 inside = seen++ == index;
-                if (inside)
+                if (inside) {
                     m->itf = ((const usb_intf_desc_t *)cur)->bInterfaceNumber;
+                    m->index = (uint8_t)index;
+                }
             }
         } else if (inside && cur->bDescriptorType == USB_B_DESCRIPTOR_TYPE_ENDPOINT) {
             const usb_ep_desc_t *e = (const usb_ep_desc_t *)cur;
@@ -251,6 +266,27 @@ static esp_err_t claim(struct dev *d, usb_device_handle_t h, const struct midi_e
     return ESP_OK;
 }
 
+/* a line in the probe for a device that came: who it is and how many MIDI interfaces it has (the claim fills in the rest) */
+static struct jhd_dev *probe_begin(usb_device_handle_t h, const char *name, enum jlapp_role role, const usb_config_desc_t *c, uint8_t *idx)
+{
+    const usb_device_desc_t *dd = NULL;
+    struct jhd_dev *r;
+    *idx = (uint8_t)(g_hostdiag.add_calls++ % JHD_DEVS);
+    r = &g_hostdiag.dev[*idx];
+    memset(r, 0, sizeof *r);
+    r->used = 1;
+    r->role = (uint8_t)role;
+    r->claim_err = -1;
+    strlcpy(r->name, name, sizeof r->name);
+    if (usb_host_get_device_descriptor(h, &dd) == ESP_OK && dd) {
+        r->vid = dd->idVendor;
+        r->pid = dd->idProduct;
+    }
+    if (c)
+        r->ifs = (uint8_t)count_midi_interfaces(c);
+    return r;
+}
+
 static void add_device(uint8_t address)
 {
     usb_device_handle_t h;
@@ -259,6 +295,8 @@ static void add_device(uint8_t address)
     struct midi_eps m;
     char name[JK_USB_NAME_MAX + 1];
     enum jlapp_role role;
+    struct jhd_dev *r;
+    uint8_t idx;
     esp_err_t e = usb_host_device_open(s_client, address, &h);
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "open %u: %s", address, esp_err_to_name(e));
@@ -267,10 +305,18 @@ static void add_device(uint8_t address)
     usb_host_product_name(h, name, sizeof name);
     role = jlapp_role_from_name(name);
     e = usb_host_get_active_config_descriptor(h, &c);
-    if (e == ESP_OK && d && find_midi(c, jlapp_midi_interface_index(role), role, &m) && m.out_mps >= 4u)
+    r = probe_begin(h, name, role, e == ESP_OK ? c : NULL, &idx);
+    if (e == ESP_OK && d && find_midi(c, jlapp_midi_interface_index(role), role, &m) && m.out_mps >= 4u) {
         e = claim(d, h, &m, role);
-    else
+        r->itf_index = m.index;
+        r->out_ep = m.out;
+        r->in_ep = d->in ? m.in : 0;
+        if (e == ESP_OK)
+            d->dg = idx;
+    } else {
         e = ESP_ERR_NOT_SUPPORTED;      /* no MIDI out, or no place: not ours */
+    }
+    r->claim_err = (int32_t)e;
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "device %u left alone: %s", address, esp_err_to_name(e));
         usb_host_device_close(s_client, h);
@@ -322,12 +368,15 @@ static void on_event(const usb_host_client_event_msg_t *m, void *arg)
 {
     struct event ev = {0, NULL};
     (void)arg;
-    if (m->event == USB_HOST_CLIENT_EVENT_NEW_DEV)
+    if (m->event == USB_HOST_CLIENT_EVENT_NEW_DEV) {
         ev.address = m->new_dev.address;
-    else if (m->event == USB_HOST_CLIENT_EVENT_DEV_GONE)
+        g_hostdiag.new_dev++;
+    } else if (m->event == USB_HOST_CLIENT_EVENT_DEV_GONE) {
         ev.gone = m->dev_gone.dev_hdl;
-    else
+        g_hostdiag.gone_dev++;
+    } else {
         return;
+    }
     xQueueSend(s_events, &ev, 0);
 }
 
@@ -359,7 +408,9 @@ esp_err_t usb_midi_host_start(void)
     s_events = xQueueCreate(EVENTS, sizeof(struct event));
     if (!s_lock || !s_events)
         return ESP_ERR_NO_MEM;
+    hostdiag_start();
     e = usb_hostlib_start();
+    g_hostdiag.lib_up = (uint8_t)(e == ESP_OK);
     if (e == ESP_OK)
         e = usb_host_client_register(&client, &s_client);
     if (e != ESP_OK)
