@@ -62,8 +62,19 @@ static int printable(const uint8_t *p, size_t n)
     return 1;
 }
 
+/* where an answer may go: a host on our subnet (not the subnet's network or broadcast address, not us), a unicast MAC, a port */
+static int sender_ok(uint32_t our_ip, uint32_t our_mask, const uint8_t *src_mac, uint32_t src_ip, unsigned src_port)
+{
+    uint32_t host = src_ip & ~our_mask;
+    if (!our_mask || (src_mac[0] & 1u) || !src_port)
+        return 0;
+    if ((src_ip & our_mask) != (our_ip & our_mask) || !host || host == ~our_mask || src_ip == our_ip)
+        return 0;
+    return 1;
+}
+
 /* a clean UDP request to JW_PORT, addressed to us or to everyone -> *req */
-static int udp_input(uint32_t our_ip, const uint8_t *eth, size_t len, struct jw_req *req)
+static int udp_input(uint32_t our_ip, uint32_t our_mask, const uint8_t *eth, size_t len, struct jw_req *req)
 {
     const uint8_t *ip = eth + ETH_HDR, *udp, *pl;
     size_t ihl = (size_t)(ip[0] & 0x0Fu) * 4u, total, ulen, n;
@@ -86,22 +97,26 @@ static int udp_input(uint32_t our_ip, const uint8_t *eth, size_t len, struct jw_
         n--;
     if (!n || n > JW_LINE_MAX || !printable(pl, n))
         return JW_IGNORE;
+    if (!sender_ok(our_ip, our_mask, eth + 6, rd32(ip + 12), rd16(udp)))
+        return JW_IGNORE;
     memcpy(req->src_mac, eth + 6, 6);
     req->src_ip = rd32(ip + 12);
     req->src_port = (uint16_t)rd16(udp);
+    req->broadcast = (uint8_t)(dst == IP_BROADCAST);
     memcpy(req->line, pl, n);
     req->line[n] = 0;
     return JW_REQUEST;
 }
 
-int jw_input(const uint8_t our_mac[6], uint32_t our_ip, const uint8_t *eth, size_t len, struct jw_req *req, uint8_t *out, size_t out_cap, size_t *out_len)
+int jw_input(const uint8_t our_mac[6], uint32_t our_ip, uint32_t our_mask, const uint8_t *eth, size_t len, struct jw_req *req, uint8_t *out, size_t out_cap,
+             size_t *out_len)
 {
     *out_len = 0;
     if (!our_ip || len < ARP_LEN)
         return JW_IGNORE;
     switch (rd16(eth + 12)) {
     case TYPE_ARP: return arp_input(our_mac, our_ip, eth, out, out_cap, out_len);
-    case TYPE_IP: return udp_input(our_ip, eth, len, req);
+    case TYPE_IP: return udp_input(our_ip, our_mask, eth, len, req);
     default: return JW_IGNORE;
     }
 }
@@ -136,6 +151,8 @@ size_t jw_reply_frame(const uint8_t our_mac[6], uint32_t our_ip, const struct jw
         memcpy(udp + UDP_HDR + 1u, text, n);
     return total;
 }
+
+int jw_allowed_broadcast(const char *line) { return line && !strcmp(line, "get"); }
 
 int jw_allowed(const char *line)
 {

@@ -8,9 +8,12 @@ itself (`core/jank_wsvc.c`, host-tested with frames built by hand in `tests/test
 ## Use
 
 ```
-python scripts/jankwifi.py get                       # to everyone on the network: each jank answers
-python scripts/jankwifi.py --ip 192.168.1.10 diag    # to one
+python scripts/jankwifi.py get                       # to everyone on the network: each jank answers with the start of `get` (its name)
+python scripts/jankwifi.py --ip 192.168.1.10 diag    # to one: the whole answer
 ```
+
+A request sent to everyone (the broadcast address) is answered with one short chunk of `get` only, enough to see which units are
+there and at what address; ask one by its address for anything else.
 
 - The unit must be in MODE WIFI: over USB (`scripts/ctl.py`) `set net wifi`, with `set ssid <network>` and `set pass <password>` for
   the network (the password goes to the unit, never into this repository). MODE WIFI is read at start-up, so restart the unit after
@@ -34,11 +37,17 @@ misses a chunk asks again (`scripts/jankwifi.py` does once, at half its timeout)
 
 ## Safety
 
-Unauthenticated, for a network one trusts: read-only is the whole defence. It leaks what `get` and `status` say (the unit's name, its
-network's name, addresses; never the password: `pass=set`). One answer is at most about 2 KB, for a 120-byte request at most (and only a
-clean one), so it amplifies a little for a spoofed source on the same network. Two requests wait at a time; a third is dropped.
+Unauthenticated, for a network one trusts: read-only is the whole defence. Anyone on the network can read what `get`, `status` and `diag`
+say: the unit's name, its network's name, addresses, the last panic's text, firmware details (never the password: `pass=set`).
+
+An answer can be about 40 times the size of its request (`status`), and the sender's address in a datagram can be forged. So an answer goes
+only to a host on the unit's own subnet with an ordinary address (not the subnet's network or broadcast address, not the unit's own, a
+unicast MAC, a source port), and a request to everyone is answered with one short chunk. That limits the reflection to the local network;
+it does not stop a forged address of a neighbour. Two requests wait at a time; a third is dropped.
 
 ## Not verified on hardware
 
-Everything above is host-tested only: ARP and UDP on a real access point, the DHCP address being the one the client sees, the control
-task answering within its tick (100 ms), and the Link session keeping its timing with the extra frames.
+Everything above is host-tested only: ARP and UDP on a real access point, the DHCP address being the one the client sees, and the Link
+session keeping its timing with the extra frames. A request wakes the control task at once (it otherwise sleeps up to a second between
+passes); how fast it answers is not measured. Memory: about 4 KB of heap is taken at start-up in MODE WIFI (the queues) and a 2 KB buffer at
+the first request, not measured against the mini 3's free heap (`heap_min` in `status`).

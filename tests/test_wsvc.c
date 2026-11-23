@@ -21,6 +21,7 @@ static const uint8_t OUR_MAC[6] = {0x02, 0x6A, 0x6B, 0xA7, 0x6D, 0xE0};
 static const uint8_t PC_MAC[6] = {0xAA, 0xBB, 0xCC, 0x00, 0x11, 0x22};
 #define OUR_IP 0xC0A8010Au             /* 192.168.1.10 */
 #define PC_IP 0xC0A80164u              /* 192.168.1.100 */
+#define MASK 0xFFFFFF00u               /* 255.255.255.0 */
 
 static void wr16(uint8_t *p, unsigned v)
 {
@@ -83,7 +84,7 @@ static size_t udp_frame(uint8_t *f, uint32_t dst_ip, unsigned dst_port, const ch
 static int input(const uint8_t *f, size_t n, struct jw_req *rq, uint8_t *out, size_t *olen)
 {
     *olen = 0;
-    return jw_input(OUR_MAC, OUR_IP, f, n, rq, out, 128, olen);
+    return jw_input(OUR_MAC, OUR_IP, MASK, f, n, rq, out, 128, olen);
 }
 
 static void test_arp(void)
@@ -102,8 +103,8 @@ static void test_arp(void)
     CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* a reply, not a request */
     n = arp_frame(f, 1, OUR_IP);
     CHECK(input(f, n - 1, &rq, out, &olen) == JW_IGNORE);                  /* cut short */
-    CHECK(jw_input(OUR_MAC, 0, f, n, &rq, out, 128, &olen) == JW_IGNORE);  /* no address yet: never answers for 0.0.0.0 */
-    CHECK(jw_input(OUR_MAC, OUR_IP, f, n, &rq, out, 41, &olen) == JW_IGNORE);   /* no room for the reply */
+    CHECK(jw_input(OUR_MAC, 0, MASK, f, n, &rq, out, 128, &olen) == JW_IGNORE);  /* no address yet: never answers for 0.0.0.0 */
+    CHECK(jw_input(OUR_MAC, OUR_IP, MASK, f, n, &rq, out, 41, &olen) == JW_IGNORE);   /* no room for the reply */
 }
 
 static void test_request(void)
@@ -152,7 +153,7 @@ static void test_request_refusals(void)
     n = udp_frame(f, OUR_IP, JW_PORT, "g\xC3\xA9t", 4, 5);
     CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* not ASCII */
     n = udp_frame(f, OUR_IP, JW_PORT, "get", 3, 5);
-    CHECK(jw_input(OUR_MAC, 0, f, n, &rq, out, 128, &olen) == JW_IGNORE);  /* no address yet */
+    CHECK(jw_input(OUR_MAC, 0, MASK, f, n, &rq, out, 128, &olen) == JW_IGNORE);  /* no address yet */
     CHECK(input(f, 30, &rq, out, &olen) == JW_IGNORE);                     /* cut short */
     wr16(f + 14 + 2, 20u + 8u + 100u);                                      /* the IP length claims more than the frame holds */
     wr16(f + 14 + 10, 0);
@@ -164,6 +165,62 @@ static void test_request_refusals(void)
         wr16(other + 12, 0x86DDu);                                          /* IPv6 */
         CHECK(input(other, sizeof other, &rq, out, &olen) == JW_IGNORE);
     }
+}
+
+/* the frame's source IP replaced, the header checksum made again */
+static void set_src_ip(uint8_t *f, uint32_t ip)
+{
+    wr32(f + 14 + 12, ip);
+    wr16(f + 14 + 10, 0);
+    wr16(f + 14 + 10, (uint16_t)jn_sum(f + 14, 20));
+}
+
+static void test_source_must_be_a_neighbour(void)
+{
+    uint8_t f[300], out[128];
+    struct jw_req rq;
+    size_t olen, n = udp_frame(f, OUR_IP, JW_PORT, "get", 3, 5);
+    /* an answer goes to whoever the datagram says it is from: only a host on our own subnet, with an ordinary address, gets one
+     * (else a spoofed request aims our answer at a stranger) */
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST);
+    set_src_ip(f, 0xC0A80105u);                                              /* another host on the subnet: fine */
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST && rq.src_ip == 0xC0A80105u);
+    set_src_ip(f, 0x0A000005u);                                              /* 10.0.0.5: not our subnet */
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);
+    set_src_ip(f, 0);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                        /* 0.0.0.0 */
+    set_src_ip(f, 0xFFFFFFFFu);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                        /* the broadcast address */
+    set_src_ip(f, 0xC0A801FFu);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                        /* the subnet's broadcast address */
+    set_src_ip(f, 0xE0000001u);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                        /* multicast */
+    set_src_ip(f, OUR_IP);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                        /* our own address */
+    set_src_ip(f, 0xC0A80100u);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                        /* the subnet's network address */
+    set_src_ip(f, PC_IP);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST);
+    f[6] |= 1;                                                               /* a multicast source MAC */
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);
+    f[6] &= (uint8_t)~1u;
+    wr16(f + 14 + 20, 0);                                                    /* source port 0 */
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);
+    wr16(f + 14 + 20, 51000);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST);
+    CHECK(jw_input(OUR_MAC, OUR_IP, 0, f, n, &rq, out, 128, &olen) == JW_IGNORE);   /* no mask yet: no subnet to check against */
+}
+
+static void test_broadcast_flag(void)
+{
+    uint8_t f[300], out[128];
+    struct jw_req rq;
+    size_t olen, n = udp_frame(f, OUR_IP, JW_PORT, "get", 3, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST && rq.broadcast == 0);
+    n = udp_frame(f, 0xFFFFFFFFu, JW_PORT, "get", 3, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST && rq.broadcast == 1);  /* the answer to everyone's question is kept short */
+    CHECK(jw_allowed_broadcast("get") && !jw_allowed_broadcast("status") && !jw_allowed_broadcast("diag") && !jw_allowed_broadcast(""));
+    CHECK(!jw_allowed_broadcast(NULL) && !jw_allowed_broadcast("get "));
 }
 
 static void test_reply_frame(void)
@@ -220,6 +277,8 @@ int main(void)
     test_arp();
     test_request();
     test_request_refusals();
+    test_source_must_be_a_neighbour();
+    test_broadcast_flag();
     test_reply_frame();
     test_chunks();
     test_allowed();

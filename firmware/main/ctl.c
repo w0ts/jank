@@ -221,38 +221,60 @@ static void net_collect(const char *b, size_t n)
     s_net_n += n;
 }
 
-static void net_serve(void)
+/* one queued request, if any: 1 when there was one */
+static int net_serve_one(void)
 {
     struct jw_req rq;
     static const char refused[] = "err not allowed over wifi\n";
     size_t off = 0;
     unsigned total;
+    int ok;
     if (!wsvc_take_request(&rq))
-        return;
+        return 0;
     if (!s_net_buf)
         s_net_buf = malloc(NET_REPLY_MAX);
     if (!s_net_buf)
-        return;
+        return 1;
     s_net_n = 0;
     s_sink = net_collect;
-    if (jw_allowed(rq.line))
+    ok = rq.broadcast ? jw_allowed_broadcast(rq.line) : jw_allowed(rq.line);
+    if (ok)
         run_line(rq.line);
     else
         net_collect(refused, sizeof refused - 1u);
     s_sink = NULL;
+    if (rq.broadcast && s_net_n > JW_CHUNK)
+        s_net_n = JW_CHUNK;            /* a request to everyone gets one short chunk: where the unit is, not its whole state */
     total = jw_chunks(s_net_n);
     if (total > JW_CHUNKS_MAX + 1u)
         total = JW_CHUNKS_MAX + 1u;
     for (unsigned i = 0; i < total; i++) {
         size_t n = s_net_n - off > JW_CHUNK ? JW_CHUNK : s_net_n - off;
         if (!wsvc_put_reply(&rq, i, i + 1u == total, s_net_buf + off, n))
-            return;                    /* the queue stayed full: this answer is given up, the client asks again */
+            return 1;                  /* the queue stayed full: this answer is given up, the client asks again */
         off += n;
     }
+    return 1;
+}
+
+/* the requests that wait (the queue holds two): all of them, so the second does not wait for the next pass */
+static void net_serve(void)
+{
+    for (int k = 0; k < 2 && net_serve_one(); k++) {
+    }
+}
+
+/* wakes the control task: a byte it ignores goes into its input (the bridge task calls this when a Wi-Fi request is queued) */
+void ctl_wake(void)
+{
+    static const uint8_t wake = 0;
+    ctl_serial_rx(&wake, 1);
 }
 
 static void take(struct line_in *in, uint8_t c)
 {
+    if (c == 0)                        /* ctl_wake's byte: control lines are text, a NUL is never part of one */
+        return;
     if (c == '\n' || c == '\r') {
         in->line[in->n] = 0;
         if (in->too_long)

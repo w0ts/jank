@@ -11,8 +11,8 @@
 #include "jank_wsvc.h"
 
 #define REQUESTS 2u                    /* a third request while two wait is dropped: the client asks again */
-#define REPLIES 16u                    /* the longest control answer is 11 chunks */
-#define PUT_WAIT_MS 200                /* the control task waits this long for room for one chunk, then gives the answer up */
+#define REPLIES 12u                    /* the longest control answer is 11 chunks */
+#define PUT_WAIT_MS 50                 /* the control task waits this long for room for one chunk, then gives the answer up */
 
 static const char *TAG = "wsvc";
 
@@ -29,32 +29,35 @@ static QueueHandle_t s_req, s_rep;
 
 esp_err_t wsvc_start(void)
 {
+    QueueHandle_t req, rep;
     if (s_req)
         return ESP_OK;
-    s_req = xQueueCreate(REQUESTS, sizeof(struct jw_req));
-    s_rep = xQueueCreate(REPLIES, sizeof(struct reply));
-    if (!s_req || !s_rep) {
-        if (s_req)
-            vQueueDelete(s_req);
-        if (s_rep)
-            vQueueDelete(s_rep);
-        s_req = s_rep = NULL;
+    req = xQueueCreate(REQUESTS, sizeof(struct jw_req));
+    rep = xQueueCreate(REPLIES, sizeof(struct reply));
+    if (!req || !rep) {
+        if (req)
+            vQueueDelete(req);
+        if (rep)
+            vQueueDelete(rep);
         ESP_LOGW(TAG, "no memory: no Wi-Fi diagnostics");
         return ESP_ERR_NO_MEM;
     }
+    s_rep = rep;                       /* both made: only now does another task see them (s_req last: the control task tests it) */
+    s_req = req;
     return ESP_OK;
 }
 
-int wsvc_input(const uint8_t mac[6], uint32_t ip, const uint8_t *eth, size_t len, uint8_t *out, size_t out_cap, size_t *out_len)
+int wsvc_input(const uint8_t mac[6], uint32_t ip, uint32_t mask, const uint8_t *eth, size_t len, uint8_t *out, size_t out_cap, size_t *out_len)
 {
     struct jw_req rq;
     *out_len = 0;
     if (!s_req)
         return WSVC_NOT_OURS;
-    switch (jw_input(mac, ip, eth, len, &rq, out, out_cap, out_len)) {
+    switch (jw_input(mac, ip, mask, eth, len, &rq, out, out_cap, out_len)) {
     case JW_ARP_REPLIED: return WSVC_SEND_ARP;
     case JW_REQUEST:
-        (void)xQueueSend(s_req, &rq, 0);   /* a full queue drops it: the client asks again */
+        if (xQueueSend(s_req, &rq, 0) == pdTRUE)   /* a full queue drops it: the client asks again */
+            ctl_wake();                            /* the control task sleeps up to a second between passes */
         return WSVC_CONSUMED;
     default: return WSVC_NOT_OURS;
     }
@@ -65,6 +68,8 @@ size_t wsvc_next_frame(const uint8_t mac[6], uint32_t ip, uint8_t *out, size_t c
     struct reply r;
     struct jw_req to;
     if (!s_rep || xQueueReceive(s_rep, &r, 0) != pdTRUE)
+        return 0;
+    if (!ip)                           /* the lease is gone: a frame from 0.0.0.0 would be wrong, the chunk is dropped */
         return 0;
     memcpy(to.src_mac, r.mac, 6);
     to.src_ip = r.ip;

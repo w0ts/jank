@@ -223,9 +223,9 @@ static void handle(struct slot *s, int i)
 {
     static uint8_t eth[SLOT_BYTES];
     if (s->from == FROM_NETWORK) {
-        uint8_t arp[JW_FRAME_MAX];
+        uint8_t arp[64];                 /* an ARP reply is 42 bytes */
         size_t arp_len;
-        int pass, w = wsvc_input(s_net.mac, jn_ip(&s_net), s->data, s->len, arp, sizeof arp, &arp_len);   /* the Wi-Fi diagnostics (ARP, a UDP request) */
+        int pass, w = wsvc_input(s_net.mac, jn_ip(&s_net), jn_mask(&s_net), s->data, s->len, arp, sizeof arp, &arp_len);   /* the Wi-Fi diagnostics (ARP, a UDP request) */
         if (w != WSVC_NOT_OURS) {
             if (w == WSVC_SEND_ARP)
                 net_out(NULL, arp, arp_len);
@@ -322,8 +322,8 @@ static void follow_network(int64_t now)
     }
     jn_poll(&s_net, bridge_ms());
     jp_set_network(&s_peer, jn_ip(&s_net), jn_mask(&s_net), now);
-    for (int i = 0; i < 3; i++) {        /* the Wi-Fi diagnostics' answers, a few datagrams a pass */
-        uint8_t f[JW_FRAME_MAX];
+    for (int i = 0; i < 3; i++) {        /* the Wi-Fi diagnostics' answers, a few datagrams a pass (one buffer: only this task sends them) */
+        static uint8_t f[JW_FRAME_MAX];
         size_t n = wsvc_next_frame(s_net.mac, jn_ip(&s_net), f, sizeof f);
         if (!n)
             break;

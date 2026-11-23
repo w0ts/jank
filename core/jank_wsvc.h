@@ -4,9 +4,12 @@
  * is one control line (`get`, `status`, `diag`, ...), only the read-only ones (jw_allowed). Its answer goes back to the sender in
  * datagrams of JW_CHUNK bytes of text at most, each led by one byte: the chunk's index (0..127) and, in bit 7, "the last". A client
  * puts the text together by index (scripts/jankwifi.py). Nothing here can change a setting, update the firmware or restart the unit,
- * and a datagram that is not a clean request is not answered (nothing to amplify).
+ * and a datagram that is not a clean request is not answered.
  *
- * Unauthenticated, for a network one trusts: read-only is the whole defence. Pure (no clock, no radio), host-tested
+ * Unauthenticated, for a network one trusts: read-only is the whole defence. The answer to a request can be about 40 times its size
+ * (`status`), and the sender's address is whatever the datagram says, so two rules keep it from being aimed at a stranger: only a
+ * host on the unit's own subnet, with an ordinary address, is answered, and a request sent to everyone (the broadcast address, for
+ * finding a unit) is answered with one short chunk of `get` only (jw_allowed_broadcast). Pure (no clock, no radio), host-tested
  * (tests/test_wsvc.c) with frames built by hand. */
 #ifndef JANK_WSVC_H
 #define JANK_WSVC_H
@@ -29,12 +32,15 @@ struct jw_req {
     uint8_t src_mac[6];
     uint32_t src_ip;                   /* host order */
     uint16_t src_port;
+    uint8_t broadcast;                 /* it was sent to the broadcast address: answer it short (jw_allowed_broadcast, one chunk) */
     char line[JW_LINE_MAX + 1u];       /* the control line, no line end */
 };
 
-/* a frame from the network (eth, len); our_ip is the DHCP address in host order, 0: none yet (then nothing is answered). out takes
- * an ARP reply (out_cap bytes; 42 needed) and *out_len its length */
-int jw_input(const uint8_t our_mac[6], uint32_t our_ip, const uint8_t *eth, size_t len, struct jw_req *req, uint8_t *out, size_t out_cap, size_t *out_len);
+/* a frame from the network (eth, len); our_ip and our_mask are the DHCP address and mask in host order, 0: none yet (then nothing is
+ * answered). out takes an ARP reply (out_cap bytes; 42 needed) and *out_len its length. A request counts only from a host on our subnet
+ * (not its network or broadcast address, not ours, no multicast MAC, a port) */
+int jw_input(const uint8_t our_mac[6], uint32_t our_ip, uint32_t our_mask, const uint8_t *eth, size_t len, struct jw_req *req, uint8_t *out, size_t out_cap,
+             size_t *out_len);
 
 /* chunks needed for an answer of `len` text bytes (an empty answer is one chunk) */
 unsigned jw_chunks(size_t len);
@@ -45,4 +51,6 @@ size_t jw_reply_frame(const uint8_t our_mac[6], uint32_t our_ip, const struct jw
 
 /* 1: a control line the Wi-Fi service may run (exact words, all read-only) */
 int jw_allowed(const char *line);
+/* 1: a line it may run for a request sent to everyone: `get` alone (its first chunk names the unit) */
+int jw_allowed_broadcast(const char *line);
 #endif
