@@ -8,7 +8,7 @@ set(beat "${core}/beat")
 set(screen_srcs "oled.c" "lcd.c" "${core}/jank_lcd.c" "${core}/jank_oled_lcd2.c" "${core}/jank_bigfont.c" "${core}/jank_bigfont_tables.c")
 # The beat network's weights are not in this image: the firmware reads them from its "beatw" partition (core/beat/beat_weights.h).
 idf_component_register(
-    SRCS "main.c" "board.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "usb_lp.c" "${core}/jank_lpx.c" "${core}/jank_lpnote.c" "${core}/jank_lpapp.c" "${core}/jank_lpout.c" "hostdiag.c" "${core}/jank_hostdiag.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c" "fft_dsp.c"
+    SRCS "main.c" "board.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "usb_lp.c" "${core}/jank_lpx.c" "${core}/jank_lpnote.c" "${core}/jank_lpapp.c" "${core}/jank_lpout.c" "hostdiag.c" "${core}/jank_hostdiag.c" "wsvc.c" "${core}/jank_wsvc.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c" "fft_dsp.c"
          "usb_audio.c" "beat.c" "linein.c" "${core}/jank_line.c"
          "usb_hostlib.c" "usb_uac_host.c" "usbrole.c" "usbport_tusb320.c" "pump.c" "power.c"
          "usbport_mini3.c" "${core}/jank_usbhost.c"

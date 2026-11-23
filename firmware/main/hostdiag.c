@@ -71,12 +71,15 @@ void hostdiag_start(void)
         ESP_LOGW(TAG, "no task: the record is not saved");
 }
 
-/* the saved record as text (the control task's, one at a time) */
+/* The record as text, for `diag` (the control task's, one at a time): while the host stack runs, the live one (a Wi-Fi request
+ * sees it as it is now); otherwise what the last host session saved */
 size_t hostdiag_text(char *out, size_t cap)
 {
     static struct jhd d;
     size_t n = sizeof d;
     nvs_handle_t h;
+    if (usb_is_host())
+        return jhd_format(&g_hostdiag, out, cap);
     esp_err_t e = nvs_open(NS, NVS_READONLY, &h);
     if (e == ESP_OK) {
         e = nvs_get_blob(h, KEY, &d, &n);

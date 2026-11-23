@@ -1,0 +1,228 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Host tests of the Wi-Fi diagnostics service's frames (core/jank_wsvc.c): ARP for jank's address, a UDP request on JW_PORT, the
+ * reply datagrams. The frames are built here by hand, bytes as a router and a laptop would send them. Exit status: the number of
+ * failed checks. */
+#include <stdio.h>
+#include <string.h>
+#include "jank_net.h"
+#include "jank_wsvc.h"
+
+static int fails, checks;
+#define CHECK(c)                                                  \
+    do {                                                          \
+        checks++;                                                 \
+        if (!(c)) {                                               \
+            printf("FAIL %s:%d: %s\n", __func__, __LINE__, #c);   \
+            fails++;                                              \
+        }                                                         \
+    } while (0)
+
+static const uint8_t OUR_MAC[6] = {0x02, 0x6A, 0x6B, 0xA7, 0x6D, 0xE0};
+static const uint8_t PC_MAC[6] = {0xAA, 0xBB, 0xCC, 0x00, 0x11, 0x22};
+#define OUR_IP 0xC0A8010Au             /* 192.168.1.10 */
+#define PC_IP 0xC0A80164u              /* 192.168.1.100 */
+
+static void wr16(uint8_t *p, unsigned v)
+{
+    p[0] = (uint8_t)(v >> 8);
+    p[1] = (uint8_t)v;
+}
+
+static void wr32(uint8_t *p, uint32_t v)
+{
+    wr16(p, v >> 16);
+    wr16(p + 2, v & 0xFFFFu);
+}
+
+static unsigned rd16(const uint8_t *p) { return (unsigned)(p[0] << 8 | p[1]); }
+static uint32_t rd32(const uint8_t *p) { return (uint32_t)rd16(p) << 16 | rd16(p + 2); }
+
+/* an ARP request: who has tpa, tell spa */
+static size_t arp_frame(uint8_t *f, unsigned oper, uint32_t tpa)
+{
+    memset(f, 0xFF, 6);                                          /* broadcast */
+    memcpy(f + 6, PC_MAC, 6);
+    wr16(f + 12, 0x0806u);
+    wr16(f + 14, 1);                                             /* Ethernet */
+    wr16(f + 16, 0x0800u);
+    f[18] = 6;
+    f[19] = 4;
+    wr16(f + 20, oper);
+    memcpy(f + 22, PC_MAC, 6);
+    wr32(f + 28, PC_IP);
+    memset(f + 32, 0, 6);
+    wr32(f + 38, tpa);
+    return 42;
+}
+
+/* a UDP datagram from the laptop; ihl_words 5 = no IP options */
+static size_t udp_frame(uint8_t *f, uint32_t dst_ip, unsigned dst_port, const char *payload, size_t n, unsigned ihl_words)
+{
+    uint8_t *ip = f + 14, *udp = ip + 4u * ihl_words;
+    unsigned ihl = 4u * ihl_words;
+    memcpy(f, OUR_MAC, 6);
+    memcpy(f + 6, PC_MAC, 6);
+    wr16(f + 12, 0x0800u);
+    memset(ip, 0, ihl);
+    ip[0] = (uint8_t)(0x40u | ihl_words);
+    wr16(ip + 2, ihl + 8u + n);
+    ip[8] = 64;
+    ip[9] = 17;
+    wr32(ip + 12, PC_IP);
+    wr32(ip + 16, dst_ip);
+    wr16(ip + 10, 0);
+    wr16(ip + 10, (uint16_t)jn_sum(ip, ihl));
+    wr16(udp, 51000);
+    wr16(udp + 2, dst_port);
+    wr16(udp + 4, 8u + n);
+    wr16(udp + 6, 0);
+    memcpy(udp + 8, payload, n);
+    return 14u + ihl + 8u + n;
+}
+
+static int input(const uint8_t *f, size_t n, struct jw_req *rq, uint8_t *out, size_t *olen)
+{
+    *olen = 0;
+    return jw_input(OUR_MAC, OUR_IP, f, n, rq, out, 128, olen);
+}
+
+static void test_arp(void)
+{
+    uint8_t f[64], out[128];
+    struct jw_req rq;
+    size_t olen;
+    size_t n = arp_frame(f, 1, OUR_IP);
+    CHECK(input(f, n, &rq, out, &olen) == JW_ARP_REPLIED && olen == 42);
+    CHECK(!memcmp(out, PC_MAC, 6) && !memcmp(out + 6, OUR_MAC, 6) && rd16(out + 12) == 0x0806u);   /* to the asker, from us */
+    CHECK(rd16(out + 20) == 2 && !memcmp(out + 22, OUR_MAC, 6) && rd32(out + 28) == OUR_IP);       /* is-at: our MAC for our IP */
+    CHECK(!memcmp(out + 32, PC_MAC, 6) && rd32(out + 38) == PC_IP);
+    n = arp_frame(f, 1, OUR_IP + 1);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE && olen == 0);        /* somebody else's address */
+    n = arp_frame(f, 2, OUR_IP);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* a reply, not a request */
+    n = arp_frame(f, 1, OUR_IP);
+    CHECK(input(f, n - 1, &rq, out, &olen) == JW_IGNORE);                  /* cut short */
+    CHECK(jw_input(OUR_MAC, 0, f, n, &rq, out, 128, &olen) == JW_IGNORE);  /* no address yet: never answers for 0.0.0.0 */
+    CHECK(jw_input(OUR_MAC, OUR_IP, f, n, &rq, out, 41, &olen) == JW_IGNORE);   /* no room for the reply */
+}
+
+static void test_request(void)
+{
+    uint8_t f[300], out[128];
+    struct jw_req rq;
+    size_t olen, n = udp_frame(f, OUR_IP, JW_PORT, "get", 3, 5);
+    memset(&rq, 0, sizeof rq);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST);
+    CHECK(!strcmp(rq.line, "get") && rq.src_ip == PC_IP && rq.src_port == 51000 && !memcmp(rq.src_mac, PC_MAC, 6));
+    n = udp_frame(f, OUR_IP, JW_PORT, "status\r\n", 8, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST && !strcmp(rq.line, "status"));            /* the line end is not part of it */
+    n = udp_frame(f, 0xFFFFFFFFu, JW_PORT, "get", 3, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST && !strcmp(rq.line, "get"));               /* a broadcast finds every jank */
+    n = udp_frame(f, OUR_IP, JW_PORT, "get", 3, 6);                                              /* IP options: the UDP header moves */
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST && !strcmp(rq.line, "get"));
+}
+
+static void test_request_refusals(void)
+{
+    uint8_t f[300], out[128];
+    struct jw_req rq;
+    char big[200];
+    size_t olen, n;
+    n = udp_frame(f, OUR_IP, JW_PORT + 1, "get", 3, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* another port: not ours, it passes on */
+    n = udp_frame(f, OUR_IP + 1, JW_PORT, "get", 3, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* another host */
+    n = udp_frame(f, OUR_IP, JW_PORT, "get", 3, 5);
+    f[14 + 10] ^= 1;
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* a bad IP checksum */
+    n = udp_frame(f, OUR_IP, JW_PORT, "get", 3, 5);
+    wr16(f + 14 + 6, 0x2000u);                                              /* more fragments: not reassembled here */
+    wr16(f + 14 + 10, 0);
+    wr16(f + 14 + 10, (uint16_t)jn_sum(f + 14, 20));
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);
+    n = udp_frame(f, OUR_IP, JW_PORT, "", 0, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* nothing to run */
+    memset(big, 'a', sizeof big);
+    n = udp_frame(f, OUR_IP, JW_PORT, big, JW_LINE_MAX + 1u, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* too long: no answer, nothing to amplify */
+    n = udp_frame(f, OUR_IP, JW_PORT, big, JW_LINE_MAX, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST && strlen(rq.line) == JW_LINE_MAX);
+    n = udp_frame(f, OUR_IP, JW_PORT, "ge\x01t", 4, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* a control character */
+    n = udp_frame(f, OUR_IP, JW_PORT, "g\xC3\xA9t", 4, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* not ASCII */
+    n = udp_frame(f, OUR_IP, JW_PORT, "get", 3, 5);
+    CHECK(jw_input(OUR_MAC, 0, f, n, &rq, out, 128, &olen) == JW_IGNORE);  /* no address yet */
+    CHECK(input(f, 30, &rq, out, &olen) == JW_IGNORE);                     /* cut short */
+    wr16(f + 14 + 2, 20u + 8u + 100u);                                      /* the IP length claims more than the frame holds */
+    wr16(f + 14 + 10, 0);
+    wr16(f + 14 + 10, (uint16_t)jn_sum(f + 14, 20));
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);
+    {
+        uint8_t other[60];
+        memset(other, 0, sizeof other);
+        wr16(other + 12, 0x86DDu);                                          /* IPv6 */
+        CHECK(input(other, sizeof other, &rq, out, &olen) == JW_IGNORE);
+    }
+}
+
+static void test_reply_frame(void)
+{
+    struct jw_req to;
+    uint8_t out[300];
+    size_t n;
+    memcpy(to.src_mac, PC_MAC, 6);
+    to.src_ip = PC_IP;
+    to.src_port = 51000;
+    to.line[0] = 0;
+    n = jw_reply_frame(OUR_MAC, OUR_IP, &to, 2, 0, "name=jank\n", 10, out, sizeof out);
+    CHECK(n == 14u + 20u + 8u + 1u + 10u);
+    CHECK(!memcmp(out, PC_MAC, 6) && !memcmp(out + 6, OUR_MAC, 6) && rd16(out + 12) == 0x0800u);
+    CHECK(out[14] == 0x45 && out[23] == 17 && rd16(out + 16) == 20u + 8u + 1u + 10u && rd32(out + 26) == OUR_IP && rd32(out + 30) == PC_IP);
+    CHECK(jn_sum(out + 14, 20) == 0);                                      /* the IP header checksum holds */
+    CHECK(rd16(out + 34) == JW_PORT && rd16(out + 36) == 51000 && rd16(out + 38) == 8u + 1u + 10u && rd16(out + 40) == 0);
+    CHECK(out[42] == 2 && !memcmp(out + 43, "name=jank\n", 10));            /* chunk 2, not the last */
+    n = jw_reply_frame(OUR_MAC, OUR_IP, &to, 5, 1, "ok\n", 3, out, sizeof out);
+    CHECK(n > 0 && out[42] == (0x80 | 5) && !memcmp(out + 43, "ok\n", 3));  /* the last: bit 7 */
+    n = jw_reply_frame(OUR_MAC, OUR_IP, &to, 0, 1, "", 0, out, sizeof out);
+    CHECK(n == 14u + 20u + 8u + 1u && out[42] == 0x80);                     /* an empty last chunk is a whole datagram */
+    CHECK(jw_reply_frame(OUR_MAC, OUR_IP, &to, 0, 0, "x", JW_CHUNK + 1u, out, sizeof out) == 0);   /* too long for one datagram */
+    CHECK(jw_reply_frame(OUR_MAC, OUR_IP, &to, 128, 0, "x", 1, out, sizeof out) == 0);              /* index past 127 */
+    CHECK(jw_reply_frame(OUR_MAC, OUR_IP, &to, 0, 0, "x", 1, out, 20) == 0);                        /* no room */
+    {
+        char chunk[JW_CHUNK];
+        memset(chunk, 'z', sizeof chunk);
+        n = jw_reply_frame(OUR_MAC, OUR_IP, &to, 0, 0, chunk, sizeof chunk, out, sizeof out);
+        CHECK(n == JW_FRAME_MAX && out[43 + JW_CHUNK - 1u] == 'z');         /* the biggest chunk, whole */
+    }
+}
+
+static void test_chunks(void)
+{
+    CHECK(jw_chunks(0) == 1 && jw_chunks(1) == 1 && jw_chunks(JW_CHUNK) == 1 && jw_chunks(JW_CHUNK + 1u) == 2);
+    CHECK(jw_chunks(2040) == (2040u + JW_CHUNK - 1u) / JW_CHUNK && jw_chunks(2040) <= JW_CHUNKS_MAX);   /* the longest control answer fits */
+}
+
+static void test_allowed(void)
+{
+    static const char *const ok[] = {"get", "status", "about", "home", "beat", "diag", "line", "drive"};
+    static const char *const no[] = {"set usb host", "set pass x", "reboot", "bootloader", "ota begin 1 2", "scan", "play", "stop", "tempo 120",
+                                     "nudge beat 1", "fold 1", "diag intr", "get ", " get", "GET", "", "get\n", "statusx", "set"};
+    for (size_t i = 0; i < sizeof ok / sizeof ok[0]; i++)
+        CHECK(jw_allowed(ok[i]));
+    for (size_t i = 0; i < sizeof no / sizeof no[0]; i++)
+        CHECK(!jw_allowed(no[i]));
+    CHECK(!jw_allowed(NULL));
+}
+
+int main(void)
+{
+    test_arp();
+    test_request();
+    test_request_refusals();
+    test_reply_frame();
+    test_chunks();
+    test_allowed();
+    printf("test_wsvc: %d checks, %d failed\n", checks, fails);
+    return fails;
+}

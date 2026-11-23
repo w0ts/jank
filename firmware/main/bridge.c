@@ -223,7 +223,16 @@ static void handle(struct slot *s, int i)
 {
     static uint8_t eth[SLOT_BYTES];
     if (s->from == FROM_NETWORK) {
-        int pass = !jn_input(&s_net, s->data, s->len, bridge_ms()) && jp_input(&s_peer, s->data, s->len, JP_TO_AIR, s->at);
+        uint8_t arp[JW_FRAME_MAX];
+        size_t arp_len;
+        int pass, w = wsvc_input(s_net.mac, jn_ip(&s_net), s->data, s->len, arp, sizeof arp, &arp_len);   /* the Wi-Fi diagnostics (ARP, a UDP request) */
+        if (w != WSVC_NOT_OURS) {
+            if (w == WSVC_SEND_ARP)
+                net_out(NULL, arp, arp_len);
+            give_slot(i);
+            return;
+        }
+        pass = !jn_input(&s_net, s->data, s->len, bridge_ms()) && jp_input(&s_peer, s->data, s->len, JP_TO_AIR, s->at);
         if (pass && jn_to_computer(s->data, s->len))  /* an address for the computer, never a way out (jank_net.h) */
             to_computer(s->data, s->len, s->at);
         give_slot(i);
@@ -313,6 +322,13 @@ static void follow_network(int64_t now)
     }
     jn_poll(&s_net, bridge_ms());
     jp_set_network(&s_peer, jn_ip(&s_net), jn_mask(&s_net), now);
+    for (int i = 0; i < 3; i++) {        /* the Wi-Fi diagnostics' answers, a few datagrams a pass */
+        uint8_t f[JW_FRAME_MAX];
+        size_t n = wsvc_next_frame(s_net.mac, jn_ip(&s_net), f, sizeof f);
+        if (!n)
+            break;
+        net_out(NULL, f, n);
+    }
 }
 
 static void bridge_task(void *arg)
@@ -582,6 +598,8 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     e = s_on_network ? radio_start_network(mac, cfg->ssid, cfg->pass, on_network) : radio_start(mac, s_b.channel, on_air);
     if (e != ESP_OK)
         return e;
+    if (s_on_network)                    /* read-only diagnostics over the network (core/jank_wsvc.h); not fatal: without it the rest runs */
+        (void)wsvc_start();
     if (xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) != pdPASS)
         return ESP_ERR_NO_MEM;
     e = beat_start();

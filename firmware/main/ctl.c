@@ -46,7 +46,18 @@ void ctl_serial_rx(const uint8_t *data, size_t n)
     }
 }
 
-static void reply_out(void) { usb_serial_write(s_out, strlen(s_out)); }
+/* Where an answer goes: the USB control line, or, while a Wi-Fi request runs (net_serve), a collector. One task runs every line. */
+static void (*s_sink)(const char *b, size_t n);
+
+static void ctl_write(const char *b, size_t n)
+{
+    if (s_sink)
+        s_sink(b, n);
+    else
+        usb_serial_write(b, n);
+}
+
+static void reply_out(void) { ctl_write(s_out, strlen(s_out)); }
 
 static void run_scan(void)
 {
@@ -195,6 +206,51 @@ static void run_line(const char *line)
     }
 }
 
+/* The Wi-Fi diagnostics (core/jank_wsvc.h): a request the bridge task queued runs here, in the control task, only if it is one of
+ * the read-only lines; its answer is collected and goes back in chunks for the bridge task to send. Nothing here changes a setting. */
+#define NET_REPLY_MAX (JK_CTL_OUT_MAX + 64u)
+static char *s_net_buf;                /* allocated at the first request: nothing is held in a unit that never has one */
+static size_t s_net_n;
+
+static void net_collect(const char *b, size_t n)
+{
+    size_t room = NET_REPLY_MAX - s_net_n;
+    if (n > room)
+        n = room;
+    memcpy(s_net_buf + s_net_n, b, n);
+    s_net_n += n;
+}
+
+static void net_serve(void)
+{
+    struct jw_req rq;
+    static const char refused[] = "err not allowed over wifi\n";
+    size_t off = 0;
+    unsigned total;
+    if (!wsvc_take_request(&rq))
+        return;
+    if (!s_net_buf)
+        s_net_buf = malloc(NET_REPLY_MAX);
+    if (!s_net_buf)
+        return;
+    s_net_n = 0;
+    s_sink = net_collect;
+    if (jw_allowed(rq.line))
+        run_line(rq.line);
+    else
+        net_collect(refused, sizeof refused - 1u);
+    s_sink = NULL;
+    total = jw_chunks(s_net_n);
+    if (total > JW_CHUNKS_MAX + 1u)
+        total = JW_CHUNKS_MAX + 1u;
+    for (unsigned i = 0; i < total; i++) {
+        size_t n = s_net_n - off > JW_CHUNK ? JW_CHUNK : s_net_n - off;
+        if (!wsvc_put_reply(&rq, i, i + 1u == total, s_net_buf + off, n))
+            return;                    /* the queue stayed full: this answer is given up, the client asks again */
+        off += n;
+    }
+}
+
 static void take(struct line_in *in, uint8_t c)
 {
     if (c == '\n' || c == '\r') {
@@ -221,6 +277,7 @@ static void ctl_task(void *arg)
         size_t n;
         ++s_beats;
         app_cfg_flush(0);                      /* a change made while playing: saved once stopped */
+        net_serve();                           /* a Wi-Fi request (read-only lines), within a tick */
         n = xMessageBufferReceive(s_in, chunk, sizeof chunk, pdMS_TO_TICKS(CTL_TICK_MS));
         if (!n) {
             ota_idle();

@@ -10,6 +10,7 @@
 #include "jank_clock.h"
 #include "jank_core.h"
 #include "jank_ui.h"
+#include "jank_wsvc.h"
 
 /* power.c: the first line of app_main. On the lcd2: HOST_EN, CLK, RST low, then V5_EN high. Other boards: nothing */
 void power_early_init(void);
@@ -38,6 +39,15 @@ typedef void (*usb_free_fn)(void *token);
 typedef void (*usb_line_fn)(const uint8_t *data, size_t n);
 esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, usb_line_fn serial_rx);
 int usb_up(void);
+/* wsvc.c: the Wi-Fi diagnostics service (core/jank_wsvc.h), MODE WIFI only: the bridge task and the control task meet in its queues */
+#define WSVC_NOT_OURS 0
+#define WSVC_SEND_ARP 1                /* an ARP reply is in out (*out_len bytes): send it */
+#define WSVC_CONSUMED 2                /* a request, queued for the control task: nothing to send */
+esp_err_t wsvc_start(void);
+int wsvc_input(const uint8_t mac[6], uint32_t ip, const uint8_t *eth, size_t len, uint8_t *out, size_t out_cap, size_t *out_len);
+size_t wsvc_next_frame(const uint8_t mac[6], uint32_t ip, uint8_t *out, size_t cap);                  /* the next answer datagram's frame, 0: none */
+int wsvc_take_request(struct jw_req *rq);                                                              /* control task */
+int wsvc_put_reply(const struct jw_req *to, unsigned index, int last, const char *text, size_t n);   /* control task: 1 queued */
 int usb_is_host(void);                                               /* the USB host stack is the one that started (the LED's double flash) */
 size_t hostdiag_text(char *out, size_t cap);                         /* hostdiag.c: what the last host session saw, for `diag` */
 int usb_host_spoke(void);                                            /* a control line came from the computer since the start */

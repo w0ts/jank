@@ -49,6 +49,7 @@ fi
 "$CC" $FLAGS "$HERE/tests/ota_replay.c" "$HERE/core/jank_ota.c" -o "$OUT/ota_replay"
 python3 "$HERE/tests/test_ota.py" "$OUT/ota_replay" "$OUT/ota"
 python3 "$HERE/tests/test_ctl_script.py"
+python3 "$HERE/tests/test_jankwifi.py"
 "$OUT/test_net"
 "$OUT/test_sysex"
 # the HOME line and the made-up JANK drive that streams jank.bin into the spare slot
@@ -85,6 +86,8 @@ fi
 "$OUT/test_dn2rpc"
 "$CC" $FLAGS "$HERE/tests/test_hostdiag.c" "$HERE/core/jank_hostdiag.c" -o "$OUT/test_hostdiag"
 "$OUT/test_hostdiag"
+"$CC" $FLAGS "$HERE/tests/test_wsvc.c" "$HERE/core/jank_wsvc.c" "$HERE/core/jank_net.c" -o "$OUT/test_wsvc"
+"$OUT/test_wsvc"
 "$CC" $FLAGS "$HERE/tests/test_pcm.c" "$HERE/core/jank_pcm.c" -lm -o "$OUT/test_pcm"
 "$OUT/test_pcm"
 # LINE IN: the ADC framing, the timestamp fit, DC / gain / level, the cell, the cubic resampler and the chain on clicks
