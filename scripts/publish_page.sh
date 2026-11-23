@@ -32,7 +32,13 @@ empty_blob=$(git hash-object -w /dev/null)
 site_entries() {   # the "mode type sha<TAB>name" lines of the site, from REF
     local pairs="index.html:page/index.html install.html:page/install.html device.html:page/jank.html build.html:page/build.html" pair
     for pair in $pairs; do
-        printf '100644 blob %s\t%s\n' "$(git rev-parse "$REF:${pair#*:}")" "${pair%%:*}"
+        if [ "${pair%%:*}" = device.html ]; then
+            # the device page as the website serves it: with the w0ts project switcher. The copy the firmware embeds
+            # stays without it (it loads nothing from outside: tests/test_page.js)
+            printf '100644 blob %s\t%s\n' "$(git cat-file -p "$REF:${pair#*:}" | sed 's#</head>#<script src="https://w0ts.github.io/site-style/switcher.js" defer></script></head>#' | git hash-object -w --stdin)" "${pair%%:*}"
+        else
+            printf '100644 blob %s\t%s\n' "$(git rev-parse "$REF:${pair#*:}")" "${pair%%:*}"
+        fi
     done
     printf '040000 tree %s\timg\n' "$(git rev-parse "$REF:page/img")"
 }
