@@ -576,6 +576,28 @@ static void test_intr_summary(void)
     CHECK(jk_intr_summary("", out, sizeof out) == 3 && !strcmp(out, "ok\n"));
 }
 
+/* usb_set: whether the USB role was ever chosen. Untouched, a board with no port chip (the XIAO) acts as HOST (jur_effective_setting):
+ * nothing on a unit with no menu could set it, and the control page refuses to */
+static void test_usb_set(void)
+{
+    struct jk_cfg a, b;
+    setup();
+    CHECK(cfg.usb == JUR_USB_DEVICE && cfg.usb_set == 0);                 /* the default: no choice made */
+    CHECK(run("set usb otg") == JK_CTL_NONE && cfg.usb_set == 0);         /* a refused value is no choice */
+    CHECK(run("set usb host") == JK_CTL_CFG_CHANGED && cfg.usb == JUR_USB_HOST && cfg.usb_set == 1);
+    setup();
+    CHECK(run("set usb device") == JK_CTL_CFG_CHANGED && cfg.usb == JUR_USB_DEVICE && cfg.usb_set == 1);   /* an explicit DEVICE is a choice too: it stays */
+    run("set usb device");
+    CHECK(cfg.usb == JUR_USB_DEVICE && cfg.usb_set == 1);                  /* said again: the choice stays */
+    setup();
+    CHECK(run("set quantum 3") == JK_CTL_CFG_CHANGED && cfg.usb_set == 0); /* another setting is no choice of the USB role */
+    jk_cfg_defaults(&a);
+    b = a;
+    CHECK(!jk_cfg_stored_differs(&a, &b));
+    b.usb_set = 1;
+    CHECK(jk_cfg_stored_differs(&a, &b));                                  /* a choice made is something to save */
+}
+
 /* USB DEVICE / HOST and AUDIO > SOURCE; the port's lines in status */
 static void test_usb(void)
 {
@@ -847,6 +869,7 @@ int main(void)
     test_beat_flash_gone();
     test_button();
     test_usb();
+    test_usb_set();
     test_status_size();
     test_about();
     test_lead();

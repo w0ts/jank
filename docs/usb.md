@@ -119,6 +119,12 @@ The setting `usb` (`set usb device|host`, the menu's USB: DEVICE / HOST later; s
 Where the role comes from (`core/jank_usbrole.c`, host-tested):
 - **XIAO** (no CC chip): with HOST it starts as a device; when no computer configured it within 3 s it restarts once as
   host (as before), so a clock on a charger starts about 3 s late. `set usb device` from a computer brings it back.
+  **Until the role has been chosen** (`set usb device|host`, `scripts/ctl.py`, or the menu on a board that has one) **a XIAO acts as
+  HOST**: it has no menu and the control page cannot change the role (it restarts the device), so otherwise no one could host with it.
+  A computer on the cable still wins (it configures the device within the 3 s), and a power cycle always starts as a device first. The
+  choice is stored apart (key `usbset`, `usb_set` in `core/jank_core.h`); `get` still says `usb=device` until then and `status` says
+  what runs (`usb_role`). `set usb device` is a choice: never host. Boards with a port chip (the mini 2.2, the mini 3) keep it
+  explicit, since HOST there also drives their host port (`jur_effective_setting`, `core/jank_usbrole.c`).
 - **Jank mini 2.2, battery order** (TUSB320LI, `main/usbport_tusb320.c`): a device on the cable -> the host stack and
   the 5 V signal (pump, then HOST_EN); a computer or a charger -> HOST_EN low at once and the device stack; nothing -> the
   host stack, waiting. Against another dual-role port (a USB-C laptop, tablet or power bank) Jank takes the sink side

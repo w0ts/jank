@@ -13,6 +13,13 @@ static int cable_stack(uint8_t cc, uint8_t vbus)
     return -1;
 }
 
+uint8_t jur_effective_setting(uint8_t setting, uint8_t user_set, uint8_t has_port)
+{
+    if (!has_port && !user_set)
+        return JUR_USB_HOST;
+    return setting == JUR_USB_HOST ? JUR_USB_HOST : JUR_USB_DEVICE;
+}
+
 uint8_t jur_boot_stack(const struct jur_boot *b)
 {
     int s;

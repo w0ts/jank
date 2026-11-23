@@ -191,6 +191,10 @@ struct jk_cfg {
     /* ... and since 2026-11-19 (its 9th byte): PAUSE LEVEL (core/beat/jb_lost.h, jb_resume.h) */
     int8_t pause_db;                  /* dBFS: the input under it for 2 beats is a pause (the outputs stop; RESUME finds the new
                                          phase after it); JK_PAUSE_DB_MIN..JK_PAUSE_DB_MAX, the INPUT bar's notch */
+    /* Stored apart again (store.c, key "usbset", so no other blob changes size and an older firmware ignores it) */
+    uint8_t usb_set;                  /* 1: the USB role was chosen (`set usb ...`, the menu's USB); 0: never. Untouched, a board with no
+                                         port chip (the XIAO) acts as HOST (jank_usbrole.h jur_effective_setting): it has no menu, and the
+                                         page cannot change the role */
     /* Stored in their own blob (store.c, key "lat1") since M2d: beat_latency per audio source (core/jank_lat.h) */
     struct jla lat;
     struct jla_key lat_key;           /* the source beat_latency_ms belongs to now (not stored: usbrole.c follows it) */

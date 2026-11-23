@@ -23,6 +23,7 @@ void jk_cfg_defaults(struct jk_cfg *c)
     c->beat_latency_ms = JK_BEAT_LATENCY_DEFAULT_MS;
     c->autobar = JK_AUTOBAR_START;
     c->usb = JUR_USB_DEVICE;
+    c->usb_set = 0;
     c->source = JUR_SRC_AUTO;
     c->usbmidi = 1;                    /* on: the clock went over USB-MIDI before there was a setting (see jk_cfg) */
     c->lowconf = JCF_STOP;             /* the emulator's default: STOP / START at 80 % (player.py DEFAULT_MIN_CONFIDENCE) */
@@ -48,7 +49,7 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
 
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b)
 {
-    return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source || a->autobar != b->autobar
+    return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->usb_set != b->usb_set || a->source != b->source || a->autobar != b->autobar
            || a->usbmidi != b->usbmidi || a->lowconf != b->lowconf || a->threshold != b->threshold || a->rate != b->rate || a->pause_db != b->pause_db
            || !jla_same(&a->lat, &b->lat);
 }
@@ -506,8 +507,12 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
             c->autobar_picks++;
         return 0;
     }
-    if (!strcmp(key, "usb"))
-        return jur_usb_parse(val, &c->usb);
+    if (!strcmp(key, "usb")) {
+        int r = jur_usb_parse(val, &c->usb);
+        if (!r)
+            c->usb_set = 1;            /* said by the user: from now on the setting is taken as it is (jur_effective_setting) */
+        return r;
+    }
     if (!strcmp(key, "source"))
         return jur_src_parse(val, &c->source);
     return set_number(c, key, val);

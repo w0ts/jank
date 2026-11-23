@@ -56,6 +56,12 @@ struct jur_boot {
     uint8_t vbus;                       /* the board's VBUS is powered from outside (VBUS sense) */
     uint8_t hint;                       /* 0 none, 1 + enum jur_stack: what the last restart asked for */
 };
+/* The setting the role core is given. With no port chip (the XIAO) and no choice ever made (usb_set 0), HOST: the device stack first,
+ * the host stack when no computer has configured the device within JUR_COMPUTER_WAIT_MS. A XIAO has no menu and the control page cannot
+ * change the role, so without this no one could host with it; a computer on the cable still wins. A choice (`set usb device|host`) or a
+ * port chip (its HOST also drives 5 V onto the cable) is taken as it is; a value that is not DEVICE or HOST counts as DEVICE. */
+uint8_t jur_effective_setting(uint8_t setting, uint8_t user_set, uint8_t has_port);
+
 /* the stack to start: the hint when there is one and the setting still allows it, else from the cable */
 uint8_t jur_boot_stack(const struct jur_boot *b);
 

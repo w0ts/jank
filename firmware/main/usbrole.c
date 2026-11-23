@@ -98,8 +98,8 @@ uint8_t usbrole_boot(void)
         ESP_LOGE(TAG, "pins: %s", esp_err_to_name(e));
     app_cfg_get(&cfg);
     memset(&b, 0, sizeof b);
-    b.setting = cfg.usb;
     b.has_port = (uint8_t)(s_port != NULL);
+    b.setting = jur_effective_setting(cfg.usb, cfg.usb_set, b.has_port);   /* a XIAO with no choice made acts as HOST */
     if (s_port && s_port->read(&st) == 0)
         b.cc = st.cc;
     b.vbus = (uint8_t)pin_level(BOARD_VBUS_SENSE_GPIO);
@@ -213,8 +213,8 @@ static void role_task(void *arg)
         if (s_stack == JUR_STACK_DEVICE && tud_connected())
             s_computer = 1;            /* a computer's first SETUP (sticky: the XIAO's HOST setting stays a device then) */
         memset(&in, 0, sizeof in);
-        in.setting = cfg.usb;
         in.has_port = (uint8_t)(s_port != NULL);
+        in.setting = jur_effective_setting(cfg.usb, cfg.usb_set, in.has_port);
         in.cc = st.cc;
         in.vbus = (uint8_t)pin_level(BOARD_VBUS_SENSE_GPIO);
         in.computer = s_computer;

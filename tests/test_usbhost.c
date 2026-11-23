@@ -260,8 +260,49 @@ static void test_system(void)
     CHECK(!s.go.host_en && s.restarts == 0);
 }
 
+/* the setting the role core is given: with no port chip (the XIAO) and no choice ever made, HOST (the device first, the host stack when no
+ * computer configures it in time); a choice, or a port chip (its HOST also drives 5 V onto the cable), is the setting as it is */
+static void test_effective_setting(void)
+{
+    CHECK(jur_effective_setting(JUR_USB_DEVICE, 0, 0) == JUR_USB_HOST);      /* the XIAO's default */
+    CHECK(jur_effective_setting(JUR_USB_HOST, 0, 0) == JUR_USB_HOST);
+    CHECK(jur_effective_setting(JUR_USB_DEVICE, 1, 0) == JUR_USB_DEVICE);    /* an explicit DEVICE: never host */
+    CHECK(jur_effective_setting(JUR_USB_HOST, 1, 0) == JUR_USB_HOST);
+    CHECK(jur_effective_setting(JUR_USB_DEVICE, 0, 1) == JUR_USB_DEVICE);    /* a port chip: DEVICE until HOST is chosen */
+    CHECK(jur_effective_setting(JUR_USB_HOST, 0, 1) == JUR_USB_HOST);
+    CHECK(jur_effective_setting(JUR_USB_DEVICE, 1, 1) == JUR_USB_DEVICE);
+    CHECK(jur_effective_setting(JUR_USB_HOST, 1, 1) == JUR_USB_HOST);
+    CHECK(jur_effective_setting(7, 0, 0) == JUR_USB_HOST && jur_effective_setting(7, 1, 0) == JUR_USB_DEVICE);   /* a stray value: as DEVICE */
+}
+
+/* the whole boot on a XIAO with nothing chosen: a start with no computer ends as host after the wait, one with a computer stays a device */
+static void test_xiao_default_end_to_end(void)
+{
+    struct jur r;
+    struct jur_in in;
+    struct jur_out o;
+    struct jur_boot b = {0};
+    b.setting = jur_effective_setting(JUR_USB_DEVICE, 0, 0);
+    CHECK(jur_boot_stack(&b) == JUR_STACK_DEVICE);                           /* the device first, always */
+    jur_init(&r, JUR_STACK_DEVICE, 0, 0);
+    memset(&in, 0, sizeof in);
+    in.setting = jur_effective_setting(JUR_USB_DEVICE, 0, 0);
+    in.has_port = 0;
+    in.now_ms = JUR_COMPUTER_WAIT_MS - 1u;
+    jur_step(&r, &in, &o);
+    CHECK(o.want == JUR_STACK_DEVICE && !o.restart);                         /* still waiting for a computer */
+    in.now_ms = JUR_COMPUTER_WAIT_MS + 1u;
+    jur_step(&r, &in, &o);
+    CHECK(o.want == JUR_STACK_HOST && o.restart);                            /* none came: restart as host */
+    in.computer = 1;                                                         /* but a computer that did configure it keeps it a device */
+    jur_step(&r, &in, &o);
+    CHECK(o.want == JUR_STACK_DEVICE && !o.restart);
+}
+
 int main(void)
 {
+    test_effective_setting();
+    test_xiao_default_end_to_end();
     test_idle_low();
     test_setting_device_never();
     test_power_up_with_vbus();

@@ -13,6 +13,7 @@
 #define KEY_USB "usb1"                 /* USB DEVICE / HOST, AUDIO > SOURCE, AUTO BAR, USB MIDI CLOCK, LOW CONFIDENCE, THRESHOLD,
                                         * RATE: seven bytes, apart from the release's blob (an older, shorter one keeps the rest's
                                         * defaults) */
+#define KEY_USB_SET "usbset"           /* the USB role was chosen (jk_cfg.usb_set): its own key, so "usb1" stays the size an older firmware reads */
 #define KEY_LAT "lat1"                 /* beat_latency per audio source, the auto bases (core/jank_lat.h jla_pack) */
 #define KEY_TRIM "latt"                /* the AUDIO SHIFTs on top (jla_pack_trim, M2h): none stored (an older firmware's): 0 */
 /* what is stored is the struct up to the beat-follow bench settings: a stick flashed with this build keeps its group, name
@@ -97,6 +98,11 @@ void store_load(struct jk_cfg *c)
     } else if (e != ESP_ERR_NVS_NOT_FOUND)
         ESP_LOGW(TAG, "stored settings ignored: %s, %u bytes", esp_err_to_name(e), (unsigned)n);
     load_usb(h, c);
+    {
+        uint8_t v = 0;                        /* the USB role was chosen: absent (an older firmware wrote none) is 0 */
+        if (nvs_get_u8(h, KEY_USB_SET, &v) == ESP_OK && v <= 1u)
+            c->usb_set = v;
+    }
     load_lat(h, c);
     nvs_close(h);
 }
@@ -112,6 +118,8 @@ esp_err_t store_save(const struct jk_cfg *c)
         const uint8_t u[9] = {c->usb, c->source, c->autobar, c->usbmidi, c->lowconf, c->threshold, c->rate, 0, (uint8_t)-(int)c->pause_db};
         e = nvs_set_blob(h, KEY_USB, u, sizeof u);
     }
+    if (e == ESP_OK)
+        e = nvs_set_u8(h, KEY_USB_SET, c->usb_set);
     if (e == ESP_OK) {
         uint8_t b[JLA_PACKED];
         e = nvs_set_blob(h, KEY_LAT, b, jla_pack(&c->lat, b, sizeof b));
