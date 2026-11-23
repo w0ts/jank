@@ -306,7 +306,7 @@ dialog::backdrop { background: color-mix(in srgb, var(--bg) 70%, transparent); }
 .prose { max-width: var(--site-lead-w); } .prose p, .prose li { margin: 6px 0; }
 
 /* ---- page content (the info pages; an app's own screens set their own): pictures, lists, a readable text width,
-   tables that scroll on a phone, quotes, term lists, a row of buttons */
+   tables that scroll on a phone (in a .table-wrap), quotes, term lists, a row of buttons */
 main img { max-width: 100%; height: auto; border-radius: var(--r-ctl); display: block; }
 main img.small { max-width: 320px; }
 main img.shot { border: 1px solid var(--line); }
@@ -314,9 +314,8 @@ main ul, main ol { margin: 8px 0; padding-left: 22px; }
 main li { margin: 4px 0; }
 main > section > :is(p, ul, ol, dl, blockquote), main > section .card > :is(p, ul, ol, dl, blockquote) { max-width: 820px; }
 .card > :first-child { margin-top: 0; } .card > :last-child { margin-bottom: 0; }
-.table-wrap, :is(section, .card) > table { display: block; overflow-x: auto; margin: var(--sp-2) 0; }
-.table-wrap > table { display: table; }
-.table-wrap td, :is(section, .card) > table td { vertical-align: top; }
+.table-wrap { overflow-x: auto; margin: var(--sp-2) 0; }   /* (a wide table scrolls on a phone; a table alone keeps its full width) */
+.table-wrap td { vertical-align: top; }
 blockquote { margin: var(--sp-3) 0; padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--accent); background: var(--accent-soft);
   border-radius: 0 var(--r-ctl) var(--r-ctl) 0; }
 blockquote p { margin: 4px 0; }
