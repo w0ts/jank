@@ -42,9 +42,14 @@ static void clean_name(const struct jhd_dev *v, char out[JHD_NAME_MAX + 2])
     out[i] = 0;
 }
 
+static const char *step_name(uint8_t step)
+{
+    static const char *const NAME[] = {"none", "hostlib", "client", "client_task", "midi_task", "role", "radio", "bridge", "beat", "crash"};
+    return step < sizeof NAME / sizeof NAME[0] ? NAME[step] : "?";
+}
+
 size_t jhd_format_failure(uint8_t step, int32_t err, char *out, size_t cap)
 {
-    static const char *const NAME[] = {"none", "hostlib", "client", "client_task", "midi_task", "role", "radio", "crash"};
     size_t n = 0;
     if (!cap)
         return 0;
@@ -52,8 +57,25 @@ size_t jhd_format_failure(uint8_t step, int32_t err, char *out, size_t cap)
     if (step == JHD_STEP_NONE)
         put(out, cap, &n, "hostdiag_start=ok\n");
     else
-        put(out, cap, &n, "hostdiag_start=failed:%s,err:%ld\n", step < sizeof NAME / sizeof NAME[0] ? NAME[step] : "?", (long)err);
+        put(out, cap, &n, "hostdiag_start=failed:%s,err:%ld\n", step_name(step), (long)err);
     return n;
+}
+
+size_t jhd_format_trace(const struct jhd_mark *m, unsigned n, char *out, size_t cap)
+{
+    size_t len = 0;
+    if (!cap)
+        return 0;
+    out[0] = 0;
+    if (!n)
+        return 0;
+    if (n > JHD_TRACE_MAX)
+        n = JHD_TRACE_MAX;
+    put(out, cap, &len, "hostdiag_trace=");
+    for (unsigned i = 0; i < n; i++)
+        put(out, cap, &len, "%s%s:%lu/%lu", i ? "," : "", step_name(m[i].step), (unsigned long)m[i].free_b, (unsigned long)m[i].largest_b);
+    put(out, cap, &len, "\n");
+    return len;
 }
 
 size_t jhd_format(const struct jhd *d, char *out, size_t cap)

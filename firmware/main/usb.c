@@ -265,7 +265,12 @@ static void guard_start(void)
 }
 
 void usb_host_stage(uint8_t step) { s_stage = step; }
-void usb_host_boot_done(void) { s_boot_done = 1; }
+void usb_host_boot_done(void)
+{
+    s_boot_done = 1;
+    if (s_host)
+        hostdiag_start_saver();           /* now: after the bridge and the tracker have their memory */
+}
 
 esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, usb_line_fn line_rx)
 {
@@ -277,8 +282,11 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
     if (s_host) {
         uint8_t step = JHD_STEP_NONE;
         guard_start();
+        hostdiag_trace_reset();
+        hostdiag_mark(JHD_STEP_HOSTLIB);
         e = usb_midi_host_start();
         s_stage = JHD_STEP_MIDI_TASK;
+        hostdiag_mark(JHD_STEP_MIDI_TASK);
         if (e != ESP_OK) {
             step = usb_midi_host_start_step();
         } else if (xTaskCreatePinnedToCore(midi_task, "usb_midi", 4096, NULL, MIDI_TASK_PRIO, &s_task, MIDI_TASK_CORE) != pdPASS) {
@@ -290,6 +298,7 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
             if (a != ESP_OK)            /* the clock goes on without the audio */
                 ESP_LOGE(TAG, "host audio: %s", esp_err_to_name(a));
             s_stage = JHD_STEP_ROLE;
+            hostdiag_mark(JHD_STEP_ROLE);
             e = usbrole_start();
             if (e != ESP_OK)
                 step = JHD_STEP_ROLE;
@@ -298,6 +307,7 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
             usbrole_host_failed(step, e);   /* the reason kept, a restart as a device: the unit stays reachable and says what failed; no return */
         hostdiag_clear_failure();           /* it worked: an older failure is no longer news */
         s_stage = JHD_STEP_RADIO;           /* the radio comes next (bridge.c), still under the guard until bridge_start is through */
+        hostdiag_mark(JHD_STEP_RADIO);
         return e;
     }
     s_rx = rx;

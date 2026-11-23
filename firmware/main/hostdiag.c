@@ -88,8 +88,43 @@ void hostdiag_start(void)
     jhd_init(&g_hostdiag);
     g_hostdiag.stack = JHD_STACK_HOST;
     sample_mem(&g_hostdiag);
+}
+
+/* The saver task is made once the start-up is through (usb.c usb_host_boot_done): its 3 KB stack is not worth a failed start in a heap this
+ * small, and without it the live record still reads over Wi-Fi. A failure to make it is only logged. */
+void hostdiag_start_saver(void)
+{
     if (xTaskCreate(save_task, "hostdiag", TASK_STACK, NULL, TASK_PRIO, NULL) != pdPASS)
         ESP_LOGW(TAG, "no task: the record is not saved");
+}
+
+/* The internal heap at each stage of a host start, in RTC memory: it survives the panic or restart a failed start ends in, so `diag` can
+ * say, after the restart as a device, how much was left when it failed. Written in host mode only; a power cycle clears it. */
+#define TRACE_MAGIC 0x4A485443u
+static RTC_NOINIT_ATTR uint32_t s_trace_magic, s_trace_n;
+static RTC_NOINIT_ATTR struct jhd_mark s_trace[JHD_TRACE_MAX];
+
+void hostdiag_trace_reset(void)
+{
+    s_trace_magic = TRACE_MAGIC;
+    s_trace_n = 0;
+}
+
+void hostdiag_mark(uint8_t step)
+{
+    if (!usb_is_host() || s_trace_magic != TRACE_MAGIC || s_trace_n >= JHD_TRACE_MAX)
+        return;
+    s_trace[s_trace_n].step = step;
+    s_trace[s_trace_n].free_b = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    s_trace[s_trace_n].largest_b = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+    s_trace_n++;
+}
+
+static size_t trace_text(char *out, size_t cap)
+{
+    if (s_trace_magic != TRACE_MAGIC)
+        return 0;
+    return jhd_format_trace(s_trace, s_trace_n < JHD_TRACE_MAX ? (unsigned)s_trace_n : JHD_TRACE_MAX, out, cap);
 }
 
 /* A host start failed at `step` with `e`: kept in flash at once (the unit restarts right after, and the reason must outlive it) */
@@ -164,5 +199,6 @@ size_t hostdiag_text(char *out, size_t cap)
             len = jhd_format(&d, out, cap);
         }
     }
+    len += trace_text(out + len, cap - len);
     return len + failure_text(out + len, cap - len);
 }

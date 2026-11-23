@@ -22,8 +22,20 @@ enum jhd_step {
     JHD_STEP_MIDI_TASK,                /* usb.c's MIDI task */
     JHD_STEP_ROLE,                     /* the role task */
     JHD_STEP_RADIO,                    /* the Wi-Fi radio, which starts after the USB stack */
+    JHD_STEP_BRIDGE,                   /* the bridge task (a 6 KB stack from the internal heap) */
+    JHD_STEP_BEAT,                     /* the beat tracker's start */
     JHD_STEP_CRASH                     /* not a step: the host run ended in a reset (panic, watchdog, brownout), found at the next start */
 };
+
+/* The internal heap at each stage of a host start (free bytes, and the largest block a task stack could come from), kept in RTC memory by
+ * the firmware so that it survives the crash it explains and `diag` can print it after the restart as a device. */
+#define JHD_TRACE_MAX 12u
+struct jhd_mark {
+    uint8_t step;                      /* enum jhd_step: the stage that is about to run */
+    uint32_t free_b, largest_b;
+};
+/* `hostdiag_trace=<stage>:<free>/<largest>,...` for the first n marks (at most JHD_TRACE_MAX; m must hold n); nothing at all for n == 0 */
+size_t jhd_format_trace(const struct jhd_mark *m, unsigned n, char *out, size_t cap);
 
 enum jhd_stack { JHD_STACK_UNKNOWN = 0, JHD_STACK_DEVICE = 1, JHD_STACK_HOST = 2 };
 

@@ -39,6 +39,41 @@ static void test_memory_line(void)
 }
 
 /* why a host start failed (kept apart in flash, so it outlives the restart that follows it) */
+/* the internal heap at each stage of a host start, kept in RTC memory so that it survives the crash it explains */
+static void test_trace_text(void)
+{
+    struct jhd_mark m[4];
+    char out[200];
+    memset(m, 0, sizeof m);
+    CHECK(jhd_format_trace(m, 0, out, sizeof out) == 0 && out[0] == 0);                         /* nothing recorded: nothing printed */
+    m[0].step = JHD_STEP_HOSTLIB;
+    m[0].free_b = 21000;
+    m[0].largest_b = 9000;
+    m[1].step = JHD_STEP_RADIO;
+    m[1].free_b = 11500;
+    m[1].largest_b = 5800;
+    m[2].step = JHD_STEP_BRIDGE;
+    m[2].free_b = 5900;
+    m[2].largest_b = 5800;
+    CHECK(jhd_format_trace(m, 3, out, sizeof out) == strlen(out));
+    CHECK(!strcmp(out, "hostdiag_trace=hostlib:21000/9000,radio:11500/5800,bridge:5900/5800\n"));
+    m[3].step = JHD_STEP_BEAT;
+    CHECK(jhd_format_trace(m, 4, out, sizeof out) > 0 && strstr(out, ",beat:0/0\n"));
+    m[3].step = 200;
+    CHECK(jhd_format_trace(m, 4, out, sizeof out) > 0 && strstr(out, ",?:0/0\n"));               /* a step this build does not know */
+    CHECK(jhd_format_trace(m, 4, out, 30) < 30 && out[strlen(out)] == 0);                        /* cut to fit, still a string */
+    CHECK(jhd_format_trace(m, 4, out, 0) == 0);
+    {
+        struct jhd_mark big[JHD_TRACE_MAX + 5];
+        char wide[600];
+        memset(big, 0, sizeof big);
+        for (unsigned i = 0; i < JHD_TRACE_MAX + 5u; i++)
+            big[i].step = JHD_STEP_HOSTLIB;
+        CHECK(jhd_format_trace(big, JHD_TRACE_MAX + 5u, wide, sizeof wide) < sizeof wide);        /* more marks than the trace holds: the first JHD_TRACE_MAX */
+        CHECK(strstr(wide, "hostlib:0/0") != NULL);
+    }
+}
+
 static void test_failure_text(void)
 {
     char out[128];
@@ -50,6 +85,8 @@ static void test_failure_text(void)
     CHECK(jhd_format_failure(JHD_STEP_MIDI_TASK, 1, out, sizeof out) > 0 && strstr(out, "failed:midi_task,"));
     CHECK(jhd_format_failure(JHD_STEP_ROLE, 1, out, sizeof out) > 0 && strstr(out, "failed:role,"));
     /* a host run that did not last (a panic, a watchdog, a brownout, seen at the next start): err is esp_reset_reason()'s code */
+    CHECK(jhd_format_failure(JHD_STEP_BRIDGE, 257, out, sizeof out) > 0 && !strcmp(out, "hostdiag_start=failed:bridge,err:257\n"));
+    CHECK(jhd_format_failure(JHD_STEP_BEAT, 257, out, sizeof out) > 0 && !strcmp(out, "hostdiag_start=failed:beat,err:257\n"));
     CHECK(jhd_format_failure(JHD_STEP_CRASH, 4, out, sizeof out) > 0 && !strcmp(out, "hostdiag_start=failed:crash,err:4\n"));
     CHECK(jhd_format_failure(JHD_STEP_CRASH, 9, out, sizeof out) > 0 && strstr(out, "failed:crash,err:9"));
     CHECK(jhd_format_failure(JHD_STEP_NONE + 99, 5, out, sizeof out) > 0 && strstr(out, "failed:?,err:5"));   /* a step this build does not know */
@@ -153,6 +190,7 @@ int main(void)
 {
     test_empty_record();
     test_memory_line();
+    test_trace_text();
     test_failure_text();
     test_full_record();
     test_roles_and_claim_error();

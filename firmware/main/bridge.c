@@ -604,11 +604,19 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     }
     if (s_on_network)                    /* read-only diagnostics over the network (core/jank_wsvc.h); not fatal: without it the rest runs */
         (void)wsvc_start();
-    if (xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) != pdPASS)
+    hostdiag_mark(JHD_STEP_BRIDGE);      /* the heap before the bridge task's 6 KB stack (host mode only) */
+    if (xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) != pdPASS) {
+        if (usb_is_host())               /* host start used the memory: a restart as a device, with the reason and the heap trace kept */
+            usbrole_host_failed(JHD_STEP_BRIDGE, ESP_ERR_NO_MEM);
         return ESP_ERR_NO_MEM;
+    }
+    hostdiag_mark(JHD_STEP_BEAT);
     e = beat_start();
-    if (e != ESP_OK)
+    if (e != ESP_OK) {
+        if (usb_is_host())
+            usbrole_host_failed(JHD_STEP_BEAT, e);
         return e;
+    }
     /* the LINE IN after the tracker (its ring is ready); not fatal: without it the rest runs on USB audio */
     if (linein_start() != ESP_OK)
         ESP_LOGE(TAG, "LINE IN task: no memory");
