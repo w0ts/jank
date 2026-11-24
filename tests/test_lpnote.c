@@ -153,7 +153,8 @@ static void test_colours(void)
 {
     struct jln_pad root = {60, 1, 1}, in = {62, 0, 1}, out = {61, 0, 0}, none = {-1, 0, 0};
     CHECK(jln_color(&root, 0) == JLN_COLOR_ROOT && jln_color(&in, 0) == JLN_COLOR_IN_SCALE);
-    CHECK(jln_color(&out, 0) == 0 && jln_color(&none, 0) == 0);
+    CHECK(jln_color(&out, 0) == JLN_COLOR_OUT_OF_SCALE && jln_color(&none, 0) == 0);          /* a note outside the scale is DARK_GREY, no note at all is dark */
+    CHECK(JLN_COLOR_ROOT == 45 && JLN_COLOR_IN_SCALE == 38 && JLN_COLOR_OUT_OF_SCALE == 1 && JLN_COLOR_PLAYING == 21);   /* BLUE, LIGHT_BLUE_HALF, DARK_GREY, GREEN: LP95's Note.Pads */
     CHECK(jln_color(&root, 1) == JLN_COLOR_PLAYING && jln_color(&out, 1) == JLN_COLOR_PLAYING);   /* playing wins over everything */
     CHECK(jln_color(&none, 1) == 0);
 }

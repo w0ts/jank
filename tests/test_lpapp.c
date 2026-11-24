@@ -218,9 +218,10 @@ static void test_buttons_lit(void)
     struct jlapp a = fresh();
     struct jlx_frame f;
     jlapp_frame(&a, &f);
-    for (uint32_t i = 0; i < 4; i++)
-        CHECK(f.led[JLX_TOP0 + i].color == JLAPP_COLOR_ARROW);
+    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + 1].color == JLAPP_COLOR_ARROW_ON);   /* octave 3 of 0..5: up and down both go */
+    CHECK(f.led[JLX_TOP0 + 2].color == JLAPP_COLOR_ARROW_OFF && f.led[JLX_TOP0 + 3].color == JLAPP_COLOR_ARROW_ON);   /* track 1 of 16: nothing to the left */
     CHECK(f.led[JLX_TOP0 + 5].color == JLAPP_COLOR_MODE);          /* the Note button */
+    CHECK(JLAPP_COLOR_ARROW_ON == 21 && JLAPP_COLOR_ARROW_OFF == 23 && JLAPP_COLOR_MODE == 37);   /* GREEN, GREEN_THIRD, LIGHT_BLUE: LP95's Note.Octave and Mode.Note */
     CHECK(f.led[JLX_TOP0 + 4].color == 0 && f.led[JLX_TOP0 + 6].color == 0 && f.led[JLX_TOP0 + 7].color == 0);
     for (uint32_t i = 0; i < 8; i++)
         CHECK(f.led[JLX_SIDE0 + i].color == 0);
@@ -430,33 +431,62 @@ static void test_page_relative_scale(void)
     CHECK(jls_index_of(a.scale) == 2 && a.n.key == 0);
 }
 
+/* the page's colours are Launchpad 95's (SkinMK2.py Scale.*): keys and Horizontal green, AbsoluteRoot / Mode / Octave red, Modus (the scales) blue, the relative
+ * scale and the circle of fifths plain blue; on is the bright one, off its "third" (palette 21/23, 5/7, 45/47) */
 static void test_page_lights(void)
 {
     struct jlapp a = fresh_list();
     uint8_t o[4];
-    CHECK(colour(&a, 0, 5) != JLAPP_PAGE_ON);                /* off the page the pads show notes */
+    CHECK(JLAPP_GREEN == 21 && JLAPP_GREEN_THIRD == 23 && JLAPP_RED == 5 && JLAPP_RED_THIRD == 7 && JLAPP_BLUE == 45 && JLAPP_BLUE_THIRD == 47);
+    CHECK(colour(&a, 0, 0) == JLN_COLOR_ROOT && colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);   /* off the page the pads show notes: C blue, D light blue */
     press(&a, top(NOTE_BTN, 127), o);
-    CHECK(colour(&a, 5, 7) == JLAPP_PAGE_ON);                /* diatonic */
-    CHECK(colour(&a, 4, 7) == JLAPP_PAGE_LAYOUT && colour(&a, 6, 7) == JLAPP_PAGE_LAYOUT);
-    CHECK(colour(&a, 1, 7) == JLAPP_PAGE_ON);                /* horizontal */
-    CHECK(colour(&a, 0, 7) == JLAPP_PAGE_LAYOUT);            /* relative root: absolute is off */
-    CHECK(colour(&a, 2, 7) == 0 && colour(&a, 3, 7) == 0 && colour(&a, 7, 7) == 0);
-    CHECK(colour(&a, 0, 5) == JLAPP_PAGE_ON);                /* C */
-    CHECK(colour(&a, 1, 5) == JLAPP_PAGE_WHITE_KEY);
-    CHECK(colour(&a, 0, 6) == JLAPP_PAGE_BLACK_KEY);
-    CHECK(colour(&a, 2, 6) == JLAPP_PAGE_SHIFT && colour(&a, 6, 6) == JLAPP_PAGE_SHIFT && colour(&a, 7, 5) == JLAPP_PAGE_SHIFT);
-    CHECK(colour(&a, 2, 6) != 0 && colour(&a, 7, 6) == 0);
-    CHECK(colour(&a, 3, 4) == JLAPP_PAGE_ON);                /* octave 3 */
-    CHECK(colour(&a, 0, 4) == JLAPP_PAGE_OCTAVE && colour(&a, 5, 4) == JLAPP_PAGE_OCTAVE);
+    CHECK(colour(&a, 5, 7) == JLAPP_RED);                    /* the diatonic layout: Mode on */
+    CHECK(colour(&a, 4, 7) == JLAPP_RED_THIRD && colour(&a, 6, 7) == JLAPP_RED_THIRD);
+    CHECK(colour(&a, 1, 7) == JLAPP_GREEN);                  /* Horizontal on */
+    CHECK(colour(&a, 0, 7) == JLAPP_RED_THIRD);              /* AbsoluteRoot off */
+    CHECK(colour(&a, 2, 7) == 0 && colour(&a, 3, 7) == 0 && colour(&a, 7, 7) == 0);   /* pads this port has no job for */
+    CHECK(colour(&a, 0, 5) == JLAPP_GREEN);                  /* the key C: Key on */
+    CHECK(colour(&a, 1, 5) == JLAPP_GREEN_THIRD);            /* D: Key off */
+    CHECK(colour(&a, 0, 6) == JLAPP_GREEN_THIRD);            /* C#: a black key, the same Key off */
+    CHECK(colour(&a, 2, 6) == JLAPP_BLUE && colour(&a, 6, 6) == JLAPP_BLUE && colour(&a, 7, 5) == JLAPP_BLUE);   /* RelativeScale, CircleOfFifths both ways */
+    CHECK(colour(&a, 7, 6) == 0);
+    CHECK(colour(&a, 3, 4) == JLAPP_RED);                    /* Octave 3 on */
+    CHECK(colour(&a, 0, 4) == JLAPP_RED_THIRD && colour(&a, 5, 4) == JLAPP_RED_THIRD);
     CHECK(colour(&a, 6, 4) == 0 && colour(&a, 7, 4) == 0);   /* diatonic stops at octave 5 */
-    CHECK(colour(&a, 0, 3) == JLAPP_PAGE_ON);                /* Major */
-    CHECK(colour(&a, 1, 3) == JLAPP_PAGE_SCALE && colour(&a, 7, 0) == JLAPP_PAGE_SCALE);
-    tap(&a, 6, 7);                                           /* chromatic: its extra octave lights, horizontal goes dark */
-    CHECK(colour(&a, 6, 4) == JLAPP_PAGE_OCTAVE && colour(&a, 1, 7) == 0);
-    tap(&a, 4, 5);                                           /* G is the key: C is no longer lit, G is */
-    CHECK(colour(&a, 4, 5) == JLAPP_PAGE_ON && colour(&a, 0, 5) == JLAPP_PAGE_WHITE_KEY);
-    tap(&a, 1, 6);                                           /* a black key lights */
-    CHECK(colour(&a, 1, 6) == JLAPP_PAGE_ON && colour(&a, 4, 5) == JLAPP_PAGE_WHITE_KEY);
+    CHECK(colour(&a, 0, 3) == JLAPP_BLUE);                   /* Modus: Major on */
+    CHECK(colour(&a, 1, 3) == JLAPP_BLUE_THIRD && colour(&a, 7, 0) == JLAPP_BLUE_THIRD);
+    tap(&a, 6, 7);                                           /* chromatic: its extra octave lights; Horizontal shows its state in every layout, as in LP95 */
+    CHECK(colour(&a, 6, 4) == JLAPP_RED_THIRD && colour(&a, 1, 7) == JLAPP_GREEN && colour(&a, 6, 7) == JLAPP_RED && colour(&a, 5, 7) == JLAPP_RED_THIRD);
+    tap(&a, 4, 7);                                           /* chords: Horizontal is off */
+    CHECK(colour(&a, 4, 7) == JLAPP_RED && colour(&a, 1, 7) == JLAPP_GREEN_THIRD);
+    tap(&a, 4, 5);                                           /* G is the key: C is no longer on, G is */
+    CHECK(colour(&a, 4, 5) == JLAPP_GREEN && colour(&a, 0, 5) == JLAPP_GREEN_THIRD);
+    tap(&a, 1, 6);                                           /* a black key lights, G does not */
+    CHECK(colour(&a, 1, 6) == JLAPP_GREEN && colour(&a, 4, 5) == JLAPP_GREEN_THIRD);
+    tap(&a, 0, 7);                                           /* AbsoluteRoot on */
+    CHECK(colour(&a, 0, 7) == JLAPP_RED);
+}
+
+static void test_arrows_dim_at_their_limits(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlx_frame f;
+    uint8_t o[4];
+    for (int i = 0; i < 6; i++)
+        press(&a, top(0, 127), o);                           /* up to the highest octave of the diatonic layout (5) */
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW_OFF && f.led[JLX_TOP0 + 1].color == JLAPP_COLOR_ARROW_ON);
+    for (int i = 0; i < 6; i++)
+        press(&a, top(1, 127), o);                           /* down to octave 0 */
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + 1].color == JLAPP_COLOR_ARROW_OFF);
+    press(&a, top(3, 127), o);                               /* one track to the right: both ways open */
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + 2].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + 3].color == JLAPP_COLOR_ARROW_ON);
+    for (int i = 0; i < 20; i++)
+        press(&a, top(3, 127), o);                           /* to the last track */
+    jlapp_frame(&a, &f);
+    CHECK(a.n.track == JLN_TRACKS - 1u && f.led[JLX_TOP0 + 2].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + 3].color == JLAPP_COLOR_ARROW_OFF);
 }
 
 static void test_page_lights_with_a_scale_that_is_not_in_the_list(void)
@@ -466,7 +496,7 @@ static void test_page_lights_with_a_scale_that_is_not_in_the_list(void)
     press(&a, top(NOTE_BTN, 127), o);
     for (uint8_t y = 0; y < 4; y++)
         for (uint8_t x = 0; x < 8; x++)
-            CHECK(colour(&a, x, y) != JLAPP_PAGE_ON);        /* none of the scales is marked as selected */
+            CHECK(colour(&a, x, y) != JLAPP_BLUE);           /* none of the scales is marked as selected */
     tap(&a, 0, 6);
     tap(&a, 2, 6);                                           /* a relative scale for a scale the page does not know: nothing */
     CHECK(a.scale == &MAJOR);
@@ -493,7 +523,7 @@ static void test_page_buttons_still_work_and_note_stays_lit(void)
     CHECK(a.n.octave == 4);
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE);
-    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW);
+    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW_ON);                /* octave 4 of 0..5: up still goes */
 }
 
 int main(void)
@@ -506,6 +536,7 @@ int main(void)
     test_page_circle_of_fifths();
     test_page_relative_scale();
     test_page_lights();
+    test_arrows_dim_at_their_limits();
     test_page_lights_with_a_scale_that_is_not_in_the_list();
     test_a_note_down_before_the_page_still_ends();
     test_page_buttons_still_work_and_note_stays_lit();

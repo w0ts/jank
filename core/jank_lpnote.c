@@ -133,5 +133,5 @@ uint8_t jln_color(const struct jln_pad *p, int playing)
         return JLN_COLOR_PLAYING;
     if (p->root)
         return JLN_COLOR_ROOT;
-    return p->in_scale ? JLN_COLOR_IN_SCALE : 0;
+    return p->in_scale ? JLN_COLOR_IN_SCALE : JLN_COLOR_OUT_OF_SCALE;
 }

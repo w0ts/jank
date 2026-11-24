@@ -39,9 +39,11 @@ struct jln_pad {
 };
 
 /* Launchpad palette indexes (manual p. 12): the colours of Live's Note mode */
-#define JLN_COLOR_ROOT 45u             /* blue */
-#define JLN_COLOR_IN_SCALE 3u          /* white */
-#define JLN_COLOR_PLAYING 21u          /* green: a note the DN2 is sounding */
+/* the colours of Launchpad 95's Note mode (SkinMK2.py Note.Pads and Note.Feedback; the indexes are its ColorsMK2.py's names) */
+#define JLN_COLOR_ROOT 45u             /* BLUE */
+#define JLN_COLOR_IN_SCALE 38u         /* LIGHT_BLUE_HALF */
+#define JLN_COLOR_OUT_OF_SCALE 1u      /* DARK_GREY: a pad whose note is outside the scale (the chromatic layout) */
+#define JLN_COLOR_PLAYING 21u          /* GREEN: a note the DN2 is sounding */
 
 void jln_init(struct jln *s);                                        /* diatonic, C, octave 3, relative, track 0 */
 void jln_set_layout(struct jln *s, enum jln_layout l);               /* sets the orientation, pulls the octave under the layout's top */
@@ -54,6 +56,6 @@ void jln_pad(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t
 /* the pads (bit y * 8 + x) that play `note`: one note lights every pad with that pitch; 0 for a note out of 0..127 */
 uint64_t jln_pads_with_note(const struct jln *s, const struct jln_scale *sc, int note);
 
-/* a pad's palette index; playing wins over everything, an unlit pad is 0 */
+/* a pad's palette index; playing wins over everything; a pad that plays nothing (outside MIDI's 0..127) is 0 */
 uint8_t jln_color(const struct jln_pad *p, int playing);
 #endif

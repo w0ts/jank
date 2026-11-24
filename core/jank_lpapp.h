@@ -20,21 +20,23 @@
 #include "jank_lpnote.h"
 #include "jank_lpx.h"
 
-/* the scale page's palette indexes (manual p. 12) */
-#define JLAPP_PAGE_ON 21u                /* green: what is selected */
-#define JLAPP_PAGE_LAYOUT 37u            /* cyan: a layout or toggle that is off */
-#define JLAPP_PAGE_WHITE_KEY 3u          /* white */
-#define JLAPP_PAGE_BLACK_KEY 1u          /* dim grey */
-#define JLAPP_PAGE_OCTAVE 13u            /* yellow */
-#define JLAPP_PAGE_SCALE 45u             /* blue */
-#define JLAPP_PAGE_SHIFT 9u              /* orange: the relative scale and the circle of fifths */
+/* The colours are Launchpad 95's (SkinMK2.py), as palette indexes (manual p. 12) under the names its ColorsMK2.py gives them; "on" is the bright one and "off"
+ * its THIRD: the scale page's Horizontal and Key are green, AbsoluteRoot, Mode (the layouts) and Octave are red, Modus (the scales) is blue, and the relative
+ * scale and the circle of fifths are plain BLUE; Note mode's arrows (Note.Octave) are green, dim at a limit, and the Note mode button (Mode.Note) LIGHT_BLUE. */
+#define JLAPP_GREEN 21u
+#define JLAPP_GREEN_THIRD 23u
+#define JLAPP_RED 5u
+#define JLAPP_RED_THIRD 7u
+#define JLAPP_BLUE 45u
+#define JLAPP_BLUE_THIRD 47u
 
 #define JLAPP_CHANNELS 16u
 #define JLAPP_PADS 64u
 
-/* the arrow buttons' and the mode button's palette indexes */
-#define JLAPP_COLOR_ARROW 1u             /* dim grey */
-#define JLAPP_COLOR_MODE 3u              /* white */
+/* the arrow buttons' and the mode button's palette indexes: Note.Octave On / Off, and Mode.Note On (LIGHT_BLUE) */
+#define JLAPP_COLOR_ARROW_ON JLAPP_GREEN             /* a direction that can still be taken */
+#define JLAPP_COLOR_ARROW_OFF JLAPP_GREEN_THIRD      /* at the limit: the lowest or highest octave, the first or last track */
+#define JLAPP_COLOR_MODE 37u
 
 /* the hosted devices that matter here, told apart by their USB product string */
 enum jlapp_role { JLAPP_OTHER, JLAPP_LPX, JLAPP_DN2 };

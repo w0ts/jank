@@ -160,38 +160,38 @@ static void page_pad(struct jlapp *a, uint8_t x, uint8_t y)
     }
 }
 
-static uint8_t on_off(int on, uint8_t off_colour) { return on ? JLAPP_PAGE_ON : off_colour; }
+static uint8_t on_off(int on, uint8_t on_colour, uint8_t off_colour) { return on ? on_colour : off_colour; }
 
-/* the colour of the scale page's pad (x, y), 0 for none */
+/* the colour of the scale page's pad (x, y), 0 for none: Launchpad 95's (SkinMK2.py Scale.*; see jank_lpapp.h) */
 static uint8_t page_colour(const struct jlapp *a, uint8_t x, uint8_t y)
 {
     const struct jln *n = &a->n;
     uint8_t r = (uint8_t)PAGE_ROW(y);
     if (r == 0) {
-        if (x == 0)
-            return on_off(n->absolute, JLAPP_PAGE_LAYOUT);
-        if (x == 1)
-            return n->layout == JLN_DIATONIC ? on_off(n->horizontal, JLAPP_PAGE_LAYOUT) : 0;
-        if (x == 4)
-            return on_off(n->layout == JLN_CHORDS, JLAPP_PAGE_LAYOUT);
+        if (x == 0)                    /* AbsoluteRoot */
+            return on_off(n->absolute, JLAPP_RED, JLAPP_RED_THIRD);
+        if (x == 1)                    /* Horizontal (LP95 shows it in every layout, though only the diatonic one takes it) */
+            return on_off(n->horizontal, JLAPP_GREEN, JLAPP_GREEN_THIRD);
+        if (x == 4)                    /* Mode: the layouts */
+            return on_off(n->layout == JLN_CHORDS, JLAPP_RED, JLAPP_RED_THIRD);
         if (x == 5)
-            return on_off(n->layout == JLN_DIATONIC, JLAPP_PAGE_LAYOUT);
+            return on_off(n->layout == JLN_DIATONIC, JLAPP_RED, JLAPP_RED_THIRD);
         if (x == 6)
-            return on_off(n->layout == JLN_CHROMATIC, JLAPP_PAGE_LAYOUT);
+            return on_off(n->layout == JLN_CHROMATIC, JLAPP_RED, JLAPP_RED_THIRD);
         return 0;
     }
     if (r == 1) {
-        if (is_black_key_pad(x))
-            return on_off(n->key == WHITE_KEY[x] + 1u, JLAPP_PAGE_BLACK_KEY);
-        return x == 2 || x == 6 ? JLAPP_PAGE_SHIFT : 0;
+        if (is_black_key_pad(x))       /* Key */
+            return on_off(n->key == WHITE_KEY[x] + 1u, JLAPP_GREEN, JLAPP_GREEN_THIRD);
+        return x == 2 || x == 6 ? JLAPP_BLUE : 0;      /* RelativeScale, CircleOfFifths */
     }
     if (r == 2)
-        return x < 7u ? on_off(n->key == WHITE_KEY[x], JLAPP_PAGE_WHITE_KEY) : JLAPP_PAGE_SHIFT;
-    if (r == 3)
-        return x < jln_octaves(n) ? on_off(n->octave == x, JLAPP_PAGE_OCTAVE) : 0;
+        return x < 7u ? on_off(n->key == WHITE_KEY[x], JLAPP_GREEN, JLAPP_GREEN_THIRD) : JLAPP_BLUE;
+    if (r == 3)                        /* Octave */
+        return x < jln_octaves(n) ? on_off(n->octave == x, JLAPP_RED, JLAPP_RED_THIRD) : 0;
     {
-        unsigned idx = (unsigned)(r - FIRST_SCALE_ROW) * 8u + x;
-        return idx < jls_count() ? on_off((int)idx == jls_index_of(a->scale), JLAPP_PAGE_SCALE) : 0;
+        unsigned idx = (unsigned)(r - FIRST_SCALE_ROW) * 8u + x;   /* Modus: the scales */
+        return idx < jls_count() ? on_off((int)idx == jls_index_of(a->scale), JLAPP_BLUE, JLAPP_BLUE_THIRD) : 0;
     }
 }
 
@@ -278,7 +278,10 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
             playing = p.note >= 0 && (bit(a->playing[chan], p.note) || bit(own, p.note));
             f->led[JLX_PAD0 + y * 8u + x].color = jln_color(&p, playing);
         }
-    for (uint32_t b = BUTTON_UP; b <= BUTTON_RIGHT; b++)
-        f->led[JLX_TOP0 + b].color = JLAPP_COLOR_ARROW;
+    /* the arrows are green, and dim at the end of what they do (Launchpad 95's Note.Octave): the octave's limits, the first and last track */
+    f->led[JLX_TOP0 + BUTTON_UP].color = a->n.octave + 1u < jln_octaves(&a->n) ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+    f->led[JLX_TOP0 + BUTTON_DOWN].color = a->n.octave > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+    f->led[JLX_TOP0 + BUTTON_LEFT].color = a->n.track > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+    f->led[JLX_TOP0 + BUTTON_RIGHT].color = a->n.track + 1u < JLN_TRACKS ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
     f->led[JLX_TOP0 + BUTTON_NOTE].color = JLAPP_COLOR_MODE;
 }

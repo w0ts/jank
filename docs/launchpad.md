@@ -11,15 +11,18 @@ flashing and pulsing follow it. First slice: **Note mode on stock MIDI**, nothin
   are in the core, no button picks them yet).
 - Buttons in Note mode (owner, 2026-11-23): up / down = octave, left / right = the previous / next track, one at a time, no
   wrap. On an 8-track page (Mixer, later) up / down will be the bank 1-8 / 9-16 and left / right do nothing.
-- Pad lights: the scale's root blue, the other scale notes white, a note the Digitone sounds (or a pad that is down) green;
-  one note lights every pad with that pitch (the layouts overlap). The arrows and the Note button are lit.
+- Pad lights, **the colours of Launchpad 95** (its `SkinMK2.py`, palette indexes from its `ColorsMK2.py`): the scale's root BLUE (45), the other
+  scale notes LIGHT_BLUE_HALF (38), a note outside the scale DARK_GREY (1, the chromatic layout), a note the Digitone sounds (or a pad that is
+  down) GREEN (21); one note lights every pad with that pitch (the layouts overlap). The arrows are GREEN (Note.Octave) and dim to GREEN_THIRD (23)
+  where they can go no further (the lowest or highest octave, the first or last track); the Note button is LIGHT_BLUE (37, Mode.Note).
 - A pad that is down when the track changes ends its note on the channel it started on; a Launchpad that goes away ends
   every note it had down.
 - **Scale page: hold Note.** While the Note button is held the pads are Launchpad 95's scale editor, rows from the top: (1) absolute
   root (pad 1), horizontal (pad 2, diatonic only), the layouts: chords (5), diatonic (6), chromatic (7); (2) the black keys, the
   relative scale (pad 3), the circle of fifths back (pad 7); (3) the white keys C to B, the circle of fifths forward (pad 8); (4) the
-  octaves; (5 to 8) the scales. Selected is green; the keys are white and dim grey, the layouts cyan, the octaves yellow, the scales
-  blue, the relative and fifths pads orange. Let go of Note and the pads play again; a note that was down when the page opened still
+  octaves; (5 to 8) the scales. Colours as Launchpad 95's `Scale.*`, each bright when on and its "third" when off: the keys and Horizontal
+  GREEN, AbsoluteRoot, the layouts and the octaves RED, the scales BLUE, the relative scale and the circle of fifths plain BLUE. Let go of
+  Note and the pads play again; a note that was down when the page opened still
   ends. The scales are a **starter list of 32** (`core/jank_lpscales.h`: standard names and intervals, neither Live's nor the
   Digitone's list). LP95's two guitar / not-staggered layouts, the drum rack and quick scale are not there. Host-tested; **not
   verified on the Launchpad itself** (how the page looks and feels).
