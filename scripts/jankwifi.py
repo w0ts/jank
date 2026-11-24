@@ -272,6 +272,47 @@ def read_uptime(ip: str, port: int = PORT) -> int | None:
     return uptime_of(answers.get(ip))
 
 
+APP_DESC_AT = 32  # an ESP-IDF app image: 24-byte header, an 8-byte segment header, then esp_app_desc_t
+APP_DESC_MAGIC = bytes.fromhex("3254cdab")  # 0xABCD5432, little-endian
+APP_ELF_SHA_AT = APP_DESC_AT + 4 + 4 + 8 + 32 + 32 + 16 + 16 + 32  # magic, secure_version, reserv1[2], version, project_name, time, date, idf_ver
+
+
+def image_id(image: bytes) -> str | None:
+    """Which image this file is: the first 4 bytes of the ELF's SHA-256 that the app descriptor holds, as 8 hex characters (what the unit's `diag`
+    reports as image=); None if the file is not an ESP-IDF app image."""
+    if len(image) < APP_ELF_SHA_AT + 4 or image[APP_DESC_AT : APP_DESC_AT + 4] != APP_DESC_MAGIC:
+        return None
+    return image[APP_ELF_SHA_AT : APP_ELF_SHA_AT + 4].hex()
+
+
+def running_image(ip: str, port: int = PORT) -> str | None:
+    """The image= line of the unit's `diag`: which image runs now."""
+    text = ask("diag", ip, port, 3.0).get(ip) or ""
+    for line in text.splitlines():
+        if line.startswith("image="):
+            return line.split("=", 1)[1].strip()
+    return None
+
+
+def verify_image(ip: str, expected: str | None, port: int = PORT, log=lambda s: None) -> None:
+    """After the update: the unit must run the image that was sent. A unit that went back to the old one (a restart while the new image was still on
+    probation rolls it back) says `confirmed` or `not on probation` all the same, so this is the real answer. UpdateError if it does not."""
+    if expected is None:
+        log("(the file is not an ESP-IDF app image: cannot check which one runs)")
+        return
+    now = None
+    for _ in range(5):
+        now = running_image(ip, port)
+        if now is not None:
+            break
+        time.sleep(1.0)
+    if now is None:
+        raise UpdateError("could not read which image the unit runs (its diag has no image= line: an older image)")
+    if now != expected:
+        raise UpdateError("the unit runs image %s, not the one sent (%s): the new image was rolled back" % (now, expected))
+    log("the unit runs the new image (%s)" % now)
+
+
 def wait_restart(ip: str, up_before: int, port: int = PORT, wait_s: float = 120.0, log=lambda s: None) -> int:
     """After END: waits for the unit to answer from a new run (its uptime below what it was) -> that uptime. UpdateError if it does not."""
     end = time.monotonic() + wait_s
@@ -305,7 +346,7 @@ def confirm(ip: str, key: bytes, up_now: int, port: int = PORT, log=lambda s: No
             log("the new image is confirmed")
             return
         if status == 0x81:
-            log("the new image needed no confirming (it was not on probation)")
+            log("the unit says its image is not on probation (confirmed already, or rolled back: the next check says which)")
             return
         if status != 0x82:
             raise UpdateError("the unit would not confirm: %s" % STATUS.get(status, status))
@@ -347,6 +388,7 @@ def ota_main(ip: str, image_path: str, key_path: str, port: int, do_confirm: boo
         log("the unit is back (uptime %d s)" % up)
         if do_confirm:
             confirm(ip, key, up, port, log)
+            verify_image(ip, image_id(image), port, log)
         else:
             log("not confirming (--no-confirm): the unit goes back to the old image by itself within 2 minutes")
     except UpdateError as e:

@@ -334,7 +334,52 @@ def test_restart_detection() -> None:
     check(jw.uptime_of("a=1\nuptime_s=57\nreset=SW\n") == 57 and jw.uptime_of("nothing") is None and jw.uptime_of(None) is None, "uptime_of")
 
 
+def app_image(elf_sha: bytes) -> bytes:
+    """A made-up ESP-IDF app image: header, segment header, esp_app_desc_t with the given ELF hash."""
+    desc = bytearray(256)
+    desc[0:4] = jw.APP_DESC_MAGIC
+    desc[144:176] = elf_sha
+    return bytes([0xE9, 1, 2, 0x10]) + bytes(28) + bytes(desc)
+
+
+def test_image_id() -> None:
+    sha = bytes(range(0x40, 0x60))
+    img = app_image(sha)
+    check(jw.image_id(img) == "40414243", "image id: the first 4 bytes of the ELF hash in the descriptor")
+    check(jw.image_id(img[:100]) is None and jw.image_id(bytes(300)) is None, "image id: not an app image")
+    check(jw.APP_ELF_SHA_AT == 176, "image id: the hash is at byte 176 of the file")
+
+
+def test_verify_image() -> None:
+    real_ask = jw.ask
+    logs: list[str] = []
+    real_sleep = jw.time.sleep
+    jw.time.sleep = lambda s: None  # type: ignore[assignment]
+    try:
+        jw.ask = lambda line, ip=None, port=jw.PORT, timeout=3.0, retry_s=None: {"u": "image=40414243\nboots=3\n"}  # type: ignore[assignment]
+        jw.verify_image("u", "40414243", log=logs.append)
+        check(any("new image" in s for s in logs), "verify: the new image runs")
+        try:
+            jw.verify_image("u", "deadbeef")
+            check(False, "verify: the old image running must raise")
+        except jw.UpdateError as e:
+            check("rolled back" in str(e) and "40414243" in str(e), "verify: says it was rolled back, with both ids")
+        jw.ask = lambda line, ip=None, port=jw.PORT, timeout=3.0, retry_s=None: {"u": "boots=3\n"}  # type: ignore[assignment]
+        try:
+            jw.verify_image("u", "40414243")
+            check(False, "verify: no image= line must raise")
+        except jw.UpdateError as e:
+            check("image=" in str(e), "verify: an older image has no image= line")
+        jw.verify_image("u", None, log=logs.append)  # a file that is not an app image: nothing to compare, no error
+        check(any("cannot check" in s for s in logs), "verify: says it cannot check")
+    finally:
+        jw.ask = real_ask  # type: ignore[assignment]
+        jw.time.sleep = real_sleep  # type: ignore[assignment]
+
+
 def main() -> int:
+    test_image_id()
+    test_verify_image()
     test_vectors_match_the_c_implementation()
     test_reply_checks()
     test_load_key()

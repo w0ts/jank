@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "app.h"
+#include "esp_app_desc.h"
 #include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -138,8 +139,9 @@ void app_diag(char *out, size_t cap)
     static const char *const why[] = {"unknown", "poweron", "ext", "sw", "panic", "int_wdt", "task_wdt", "wdt", "deepsleep",
                                       "brownout", "sdio", "usb", "jtag", "efuse", "pwr_glitch", "cpu_lockup"};
     unsigned r = (unsigned)s_reason;
-    snprintf(out, cap, "boots=%lu\nreset=%s\nsave_pending=%u\nnvs=%s\n", (unsigned long)s_boots_now, r < sizeof why / sizeof why[0] ? why[r] : "?",
-             (unsigned)s_save_pending, s_nvs_note);
+    const uint8_t *id = esp_app_get_description()->app_elf_sha256;     /* which image runs: its first 4 bytes (scripts/jankwifi.py compares them with the file it sent) */
+    snprintf(out, cap, "image=%02x%02x%02x%02x\nboots=%lu\nreset=%s\nsave_pending=%u\nnvs=%s\n", id[0], id[1], id[2], id[3], (unsigned long)s_boots_now,
+             r < sizeof why / sizeof why[0] ? why[r] : "?", (unsigned)s_save_pending, s_nvs_note);
 }
 
 void app_main(void)

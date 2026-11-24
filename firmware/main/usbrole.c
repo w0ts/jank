@@ -162,6 +162,18 @@ static void vbus_out(int on)
         s_port->vbus_on(on);
 }
 
+/* An update's restart (ota.c): a unit that runs as host comes back as host at once. A XIAO otherwise starts as a device and restarts into host after
+ * 3 s with no computer (jur_boot_stack), and a restart while the new image is on probation puts the old one back: measured 2026-11-24, the first
+ * Wi-Fi update of a unit in host mode was rolled back that way, before it could be confirmed (which takes 20 s). */
+void usbrole_hint_stay(void)
+{
+    if (s_stack != JUR_STACK_HOST)
+        return;
+    s_hint = 1u + JUR_STACK_HOST;
+    s_hint_magic = HINT_MAGIC;
+    s_host_inflight = 0;               /* a restart of ours, not a crash */
+}
+
 static void restart_into(uint8_t stack)
 {
     vbus_out(0);

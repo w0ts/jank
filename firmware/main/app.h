@@ -180,6 +180,7 @@ enum jo_err ota_net_end(void);                                       /* JO_OK: a
 void ota_net_restart(void);
 void ota_net_abort(void);
 uint32_t ota_net_offset(void);
+void usbrole_hint_stay(void);                                        /* usbrole.c: the restart that follows an update brings a unit that runs as host back as host at once */
 unsigned ota_net_confirm(void);                                      /* 0, or JWO_S_NOT_PENDING / JWO_S_TOO_EARLY (jank_wota.h) */
 
 /* drive.c: the JANK drive, made up (core/jank_vdrive.h): jank.html on it, a jank.bin copied onto it streams into the spare

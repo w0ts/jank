@@ -175,6 +175,7 @@ static void restart_after_update(const char *how)
         snprintf(note, sizeof note, "jank.bin installed %s, restarted", how);
         drive_note(s_slot->label, note);
     }
+    usbrole_hint_stay();                              /* a unit that runs as host comes back as host: no device phase, whose restart would roll the new image back */
     vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));      /* the answer goes out first */
     esp_restart();
 }
