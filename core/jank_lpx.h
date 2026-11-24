@@ -37,6 +37,14 @@ uint8_t jlx_number(uint32_t i);
 /* the SysEx "Programmer mode" (on) or "Live mode" (off), 3 packets = 12 bytes, on cable `cable` */
 size_t jlx_programmer(uint8_t cable, int on, uint8_t *out);
 
+/* What Launchpad 95 sends right after Programmer mode (Launchpad.py handle_sysex, for the Launchpad X), and without which the Launchpad takes Programmer
+ * mode and every light message and shows nothing (measured 2026-11-24: dark from the unit and from a Mac, lit from the Mac once these two were sent):
+ *   F0 00 20 29 02 0C 0A 00 01 F7   LED feedback: the pads' own light off (internal 0), the host's messages on (external 1)
+ *   F0 00 20 29 02 0C 09 01 F7      sleep mode off (awake)
+ * 7 packets = 28 bytes on cable `cable`; JLX_SETUP_PACKETS. */
+#define JLX_SETUP_PACKETS 7u
+size_t jlx_setup(uint8_t cable, uint8_t *out);
+
 /* The SysEx that asks which mode the Launchpad is in (`F0 00 20 29 02 0C 0E F7`): 3 packets = 12 bytes on cable `cable`. It answers with `0E mode F7`, the
  * packet jlx_programmer_ack reads (1: Programmer, 0: Live). A Launchpad that is in Live mode takes no lights on this port. */
 size_t jlx_mode_query(uint8_t cable, uint8_t *out);

@@ -48,6 +48,7 @@ static struct jlx_frame s_shown;
 static struct jlo s_out;               /* for the Digitone */
 static uint8_t s_ready, s_lpx_up, s_dn2_up, s_programmer_pending;   /* pending: the Launchpad has not answered the Programmer mode message yet */
 static uint8_t s_tries;                /* Programmer mode messages sent to this Launchpad */
+static uint8_t s_setup_pending;        /* it is in Programmer mode: the LED-feedback and sleep-off messages (jlx_setup) are still to go, before any light */
 static TickType_t s_settle_at;         /* no lights before this tick */
 static TickType_t s_try_at;            /* the next Programmer mode message is due at this tick */
 static TickType_t s_refresh_at;        /* every light is sent again at this tick (REFRESH_MS) */
@@ -91,6 +92,7 @@ void usb_lp_attach(enum jlapp_role r)
         s_lpx_up = 1;
         g_hostdiag.lpx_up = 1;
         s_programmer_pending = 1;      /* sent by usb_lp_pump, after a wait and when its queue has room */
+        s_setup_pending = 0;
         s_tries = 0;
         s_try_at = xTaskGetTickCount() + pdMS_TO_TICKS(ATTACH_WAIT_MS);
         ESP_LOGI(TAG, "Launchpad X");
@@ -110,6 +112,7 @@ void usb_lp_detach(enum jlapp_role r)
         s_lpx_up = 0;
         g_hostdiag.lpx_up = 0;
         s_programmer_pending = 0;
+        s_setup_pending = 0;
         /* its pads that were down end their notes: nothing stays sounding on the Digitone */
         dn2_send(off, 4u * jlapp_release_all(&s_app, off, JLAPP_PADS));
     } else if (r == JLAPP_DN2) {
@@ -128,12 +131,10 @@ static void rx_lpx(const uint8_t p[4])
     int mode;
     if (jlx_programmer_ack(p, &mode)) {   /* its answer to the Programmer mode message, or to the mode query: the mode it is in now */
         g_hostdiag.lp_mode = (uint8_t)(mode ? 2 : 1);
-        if (mode && s_programmer_pending) {   /* now the lights can follow */
+        if (mode && s_programmer_pending) {   /* the setup messages, then the lights (usb_lp_pump) */
             s_programmer_pending = 0;
+            s_setup_pending = 1;
             g_hostdiag.programmer_acked++;
-            jlx_forget(&s_shown);      /* a Launchpad that just entered the mode shows nothing we know of */
-            s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
-            s_refresh_at = s_settle_at + pdMS_TO_TICKS(REFRESH_MS);
         } else if (!mode && !s_programmer_pending) {   /* it is in Live mode (it took no lights there): enter Programmer mode again */
             if (g_hostdiag.lp_reentered < UINT8_MAX)
                 g_hostdiag.lp_reentered++;
@@ -181,12 +182,21 @@ void usb_lp_pump(void)
         g_hostdiag.programmer_sent++;
         s_tries++;
         s_try_at = xTaskGetTickCount() + pdMS_TO_TICKS(ACK_WAIT_MS);
-        if (s_tries >= ACK_TRIES) {    /* it never answered: the lights go anyway, as before */
+        if (s_tries >= ACK_TRIES) {    /* it never answered: the setup and the lights go anyway */
             s_programmer_pending = 0;
-            jlx_forget(&s_shown);
-            s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
-            s_refresh_at = s_settle_at + pdMS_TO_TICKS(REFRESH_MS);
+            s_setup_pending = 1;
         }
+        return;
+    }
+    if (s_setup_pending) {             /* Launchpad 95's two messages after Programmer mode: without them the Launchpad shows no light (jank_lpx.h) */
+        if (room < JLX_SETUP_PACKETS + RESERVE)
+            return;
+        usb_midi_host_send_to(JLAPP_LPX, out, jlx_setup(LPX_CABLE, out));
+        g_hostdiag.setup_sent++;
+        s_setup_pending = 0;
+        jlx_forget(&s_shown);          /* a Launchpad that just entered the mode shows nothing we know of */
+        s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
+        s_refresh_at = s_settle_at + pdMS_TO_TICKS(REFRESH_MS);
         return;
     }
     if ((int32_t)(xTaskGetTickCount() - s_settle_at) < 0 || room <= RESERVE)
@@ -219,6 +229,8 @@ uint32_t usb_lp_wait_ticks(void)
             return (uint32_t)left;
         return pdMS_TO_TICKS(RETRY_MS) ? pdMS_TO_TICKS(RETRY_MS) : 1u;
     }
+    if (s_setup_pending)               /* waiting for room for the setup messages */
+        return pdMS_TO_TICKS(RETRY_MS) ? pdMS_TO_TICKS(RETRY_MS) : 1u;
     left = (int32_t)(s_settle_at - xTaskGetTickCount());
     if (left > 0)
         return (uint32_t)left;

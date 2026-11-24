@@ -229,6 +229,16 @@ static void test_programmer_ack(void)
     CHECK(jlx_programmer(0, 1, sent) == 12 && jlx_programmer_ack(sent + 8, &mode) && mode == 1);   /* our own message ends the way its answer does */
 }
 
+/* what Launchpad 95 sends after Programmer mode: LED feedback external on, sleep mode off */
+static void test_setup(void)
+{
+    uint8_t out[28];
+    static const uint8_t want[28] = {0x04, 0xF0, 0x00, 0x20, 0x04, 0x29, 0x02, 0x0C, 0x04, 0x0A, 0x00, 0x01, 0x05, 0xF7, 0x00, 0x00,
+                                     0x04, 0xF0, 0x00, 0x20, 0x04, 0x29, 0x02, 0x0C, 0x07, 0x09, 0x01, 0xF7};
+    CHECK(jlx_setup(0, out) == 28 && !memcmp(out, want, 28) && JLX_SETUP_PACKETS * 4u == 28u);
+    CHECK(jlx_setup(1, out) == 28 && out[0] == 0x14 && out[12] == 0x15 && out[24] == 0x17);        /* the cable in each packet's high nibble */
+}
+
 static void test_mode_query(void)
 {
     uint8_t out[12];
@@ -239,6 +249,7 @@ static void test_mode_query(void)
 
 int main(void)
 {
+    test_setup();
     test_mode_query();
     test_programmer_ack();
     test_decode_pads();

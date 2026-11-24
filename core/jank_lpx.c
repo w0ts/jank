@@ -62,6 +62,22 @@ size_t jlx_programmer(uint8_t cable, int on, uint8_t *out)
     return sizeof p;
 }
 
+size_t jlx_setup(uint8_t cable, uint8_t *out)
+{
+    const uint8_t hi = (uint8_t)(cable << 4);
+    const uint8_t p[28] = {
+        (uint8_t)(hi | CIN_SYSEX_CONT), 0xF0, 0x00, 0x20,       /* F0 00 20 29 02 0C 0A 00 01 F7: LED feedback, internal off, external on */
+        (uint8_t)(hi | CIN_SYSEX_CONT), 0x29, 0x02, 0x0C,
+        (uint8_t)(hi | CIN_SYSEX_CONT), 0x0A, 0x00, 0x01,
+        (uint8_t)(hi | 0x5u), 0xF7, 0x00, 0x00,                 /* CIN 5: a SysEx that ends with one byte */
+        (uint8_t)(hi | CIN_SYSEX_CONT), 0xF0, 0x00, 0x20,       /* F0 00 20 29 02 0C 09 01 F7: sleep mode off */
+        (uint8_t)(hi | CIN_SYSEX_CONT), 0x29, 0x02, 0x0C,
+        (uint8_t)(hi | CIN_SYSEX_END3), 0x09, 0x01, 0xF7,
+    };
+    memcpy(out, p, sizeof p);
+    return sizeof p;
+}
+
 size_t jlx_mode_query(uint8_t cable, uint8_t *out)
 {
     const uint8_t hi = (uint8_t)(cable << 4);

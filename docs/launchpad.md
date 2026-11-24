@@ -40,6 +40,11 @@ separate.
   moment it was claimed (cause not proven; a firmware that is not up yet is the guess). So the unit waits 500 ms after a Launchpad
   appears, sends the message, waits for the answer before any light, and sends it again every 400 ms (at most 4 times, then the lights
   go anyway). `diag`: `hostdiag_lp=...,programmer:<sent>,acked:<answered>`.
+- **Two more messages are needed before any light shows** (measured 2026-11-24: with the Launchpad in Programmer mode, answering, and taking about 40
+  light messages a second, every LED stayed dark, from the unit and from a Mac alike; Launchpad 95's `Launchpad.py` sends them and the pads then
+  lit): `F0 00 20 29 02 0C 0A 00 01 F7` (LED feedback: the pads' own light off, the host's messages on) and `F0 00 20 29 02 0C 09 01 F7` (sleep
+  mode off). The unit sends both after the Launchpad's answer (`jlx_setup`, `diag` `setup:`), then waits 400 ms, then the lights, and every 2 s it
+  sends all lights again and asks which mode the Launchpad is in (`diag` `mode:`; a Live answer makes it enter Programmer mode again, `reentered:`).
 - A pad is `10 x row + column` (rows 1..8 from the bottom): 11..88. Top buttons CC 91..98 (up, down, left, right, session,
   note, custom, capture), side buttons CC 89 (top) down to 19, logo CC 99. A pad sends Note On, velocity 0 for the release.
 - A light is a Note On (a CC for the buttons) on channel 1 static, 2 flashing, 3 pulsing; the velocity is the palette index
