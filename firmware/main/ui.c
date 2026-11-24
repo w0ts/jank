@@ -315,6 +315,7 @@ static void ui_task(void *arg)
 {
     struct jb_button b;
     uint32_t last_auto, last_clock_check, last_beat_feed;
+    int lp_started = 0;                  /* the Launchpad's start / stop button has the transport started (usb_midi_clock_force) */
     (void)arg;
     jb_init(&b);
     js_auto_init(&s_auto, bridge_ms());
@@ -338,6 +339,10 @@ static void ui_task(void *arg)
         if ((uint32_t)(now - last_clock_check) >= CLOCK_PEERS_MS) {   /* host mode: the clock to the Digitone only while there are peers (usb.c) */
             last_clock_check = now;
             usb_midi_clock_peers(usb_is_host() ? bridge_peers_heard() > 0u : 1);
+            if (lp_started && !bridge_is_playing()) {   /* the transport was stopped by some other means: the Launchpad's override ends too */
+                usb_midi_clock_force(0);
+                lp_started = 0;
+            }
         }
         if (usb_is_host() && (uint32_t)(now - last_beat_feed) >= BEAT_FEED_MS) {   /* the step modes' playhead: the session's beat, sampled here (the lock), used by usb_lp.c */
             int64_t beat_ub = 0;
@@ -347,8 +352,15 @@ static void ui_task(void *arg)
             known = bridge_beat(&beat_ub, &mpb);
             usb_lp_beat_feed(known, beat_ub, mpb);
         }
-        if (usb_is_host() && usb_lp_transport_request())   /* the Launchpad's start / stop scene button (usb_lp.c asks; this task does the bridge's work) */
-            bridge_play(!bridge_is_playing());
+        if (usb_is_host() && usb_lp_transport_request()) {   /* the Launchpad's start / stop scene button (usb_lp.c asks; this task does the bridge's work) */
+            int start = !bridge_is_playing();
+            if (start)
+                usb_midi_clock_force(1);       /* an explicit start reaches the Digitone even with no peers (usb.c); before the Start byte is made */
+            bridge_play(start);
+            if (!start)
+                usb_midi_clock_force(0);       /* after the Stop byte */
+            lp_started = start;
+        }
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }
 }

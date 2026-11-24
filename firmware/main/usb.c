@@ -93,12 +93,14 @@ static void on_tx_done(void *token, void *ctx)
 
 /* USB MIDI CLOCK (the setting usbmidi): off, no clock byte reaches the USB-MIDI port (DIN / TRS MIDI unaffected). Turned
  * off: one MIDI Stop goes out after the last clock, so gear that was playing stops instead of waiting for clocks */
-static volatile uint8_t s_clock_on = 1, s_peers_ok = 1, s_stop_due;
+static volatile uint8_t s_clock_on = 1, s_peers_ok = 1, s_forced, s_stop_due;
 
-/* the clock goes out while the setting allows it AND there is somebody to be the clock for (usb_midi_clock_peers) */
+/* the clock goes out while the setting allows it AND there is somebody to be the clock for (usb_midi_clock_peers) or the Launchpad started the transport (usb_midi_clock_force) */
+#define CLOCK_OUT() (s_clock_on && (s_peers_ok || s_forced))
+
 static void clock_changed(uint8_t was_on)
 {
-    if (was_on && !(s_clock_on && s_peers_ok) && s_task) {   /* (at boot, before the port runs: nothing was sent, nothing to stop) */
+    if (was_on && !CLOCK_OUT() && s_task) {   /* (at boot, before the port runs: nothing was sent, nothing to stop) */
         s_stop_due = 1;
         xTaskNotifyGive(s_task);
     }
@@ -106,7 +108,7 @@ static void clock_changed(uint8_t was_on)
 
 void usb_midi_clock(int on)
 {
-    uint8_t was = (uint8_t)(s_clock_on && s_peers_ok);
+    uint8_t was = (uint8_t)CLOCK_OUT();
     if ((on != 0) == s_clock_on)
         return;
     s_clock_on = (uint8_t)(on != 0);
@@ -118,10 +120,22 @@ void usb_midi_clock(int on)
  * usb_lp.c; 1 in every other mode */
 void usb_midi_clock_peers(int has_peers)
 {
-    uint8_t was = (uint8_t)(s_clock_on && s_peers_ok);
+    uint8_t was = (uint8_t)CLOCK_OUT();
     if ((has_peers != 0) == s_peers_ok)
         return;
     s_peers_ok = (uint8_t)(has_peers != 0);
+    clock_changed(was);
+}
+
+/* Host mode (owner 2026-11-24, "start stop on note mode is not working"): the Launchpad's start / stop scene button is an explicit start, so the clock and the Start byte
+ * go to the Digitone even when Jank has no peers (measured: peers=0, every clock and Start byte was dropped by the peers rule above, the button did nothing). On while the
+ * Launchpad has the transport started, off when it stops it (one MIDI Stop goes out if that ends the clock). ui.c */
+void usb_midi_clock_force(int on)
+{
+    uint8_t was = (uint8_t)CLOCK_OUT();
+    if ((on != 0) == s_forced)
+        return;
+    s_forced = (uint8_t)(on != 0);
     clock_changed(was);
 }
 
@@ -130,7 +144,7 @@ bool IRAM_ATTR usb_midi_isr(const uint8_t *bytes, size_t n)
     BaseType_t woken = pdFALSE;
     uint32_t head = s_head;
     uint32_t tail = __atomic_load_n(&s_tail, __ATOMIC_ACQUIRE);
-    if (!n || !s_task || !s_clock_on || !s_peers_ok)
+    if (!n || !s_task || !CLOCK_OUT())
         return false;
     if (RING_SIZE - (head - tail) < n) {
         ++s_dropped;
@@ -171,7 +185,7 @@ static void send_clock(void)
     while (tail != head)
         b[n++] = s_ring[tail++ & (RING_SIZE - 1u)];
     __atomic_store_n(&s_tail, tail, __ATOMIC_RELEASE);
-    if (s_stop_due && !(s_clock_on && s_peers_ok)) {   /* USB MIDI CLOCK just turned off (or no peers left): a Stop after what was queued */
+    if (s_stop_due && !CLOCK_OUT()) {   /* USB MIDI CLOCK just turned off (or no peers left): a Stop after what was queued */
         s_stop_due = 0;
         b[n++] = 0xFCu;
     }

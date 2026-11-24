@@ -77,7 +77,8 @@ void restart_why_set(const char *why);
 void restart_why_default(const char *why);
 void restart_why_boot(void);
 const char *restart_why_last(void);
-void usb_midi_clock_peers(int has_peers);                          /* host mode: the clock only while there are peers on the Jank / Link network (usb_lp.c) */
+void usb_midi_clock_force(int on);                                 /* host mode: the Launchpad started the transport: the clock goes out even without peers (usb.c) */
+void usb_midi_clock_peers(int has_peers);                         /* host mode: the clock only while there are peers on the Jank / Link network (usb_lp.c) */
 void usb_midi_clock(int on);                                     /* USB MIDI CLOCK (setting usbmidi): off, none of it to USB */
 void usb_serial_write(const char *text, size_t n);                 /* the control line, as SysEx on the MIDI port */
 
