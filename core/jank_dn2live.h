@@ -48,6 +48,10 @@ struct jdl {
     uint8_t play_ok;                   /* PLAY has not been refused (status 2): 1 until it is */
     uint8_t asked;                     /* a live request has been sent, at sent_ms */
     uint32_t sent_ms;
+    uint16_t read_seq, select_seq;     /* the last active-track read and the last select sent */
+    uint8_t has_read, has_select;
+    uint8_t read_ok;                   /* the no-argument TRACK read has not been refused (status 2): 1 until it is */
+    uint8_t fresh, active;             /* an answer to the last read, not yet taken: the Digitone's active track */
 };
 
 enum jdl_in {
@@ -66,6 +70,11 @@ size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 /* a request, only while live (else 0): the active track, a PLAY. A request also keeps the lease */
 size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, size_t cap);
 size_t jdl_play(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_play_op op, uint8_t note, uint8_t vel, uint8_t *out, size_t cap);
+/* TRACK with no argument asks for the active track (PROPOSED to the Digitone session 2026-11-24, not confirmed; a refusal, status 2, ends the asking). Only the
+ * answer to the last read counts, and only when the read was sent after the last select: jdl_take_active gives that track (0..15) once, else -1 */
+int jdl_can_read_track(const struct jdl *d);
+size_t jdl_track_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
+int jdl_take_active(struct jdl *d);
 
 /* a SysEx from the Digitone (F0 .. F7, n bytes). A reply moves the state (0 ok on a live request: live; 7: REMOTE CONTROL off; 2: no live control, or no PLAY; 4: the
  * lease ran out, ask again); a push fills notes (room for JDL_NOTES_MAX) and *count */

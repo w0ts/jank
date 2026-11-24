@@ -14,6 +14,8 @@ struct uis_led {
 void uis_init(void);                    /* app_main: the stored screen settings */
 int uis_open_screen(void);              /* app_main, before the radio: the screen found and switched on -> 1 */
 int uis_has_screen(void);
+/* a short message for the screen (the one-second overlay box, as for a setting that was changed); any task, a screen only: the ui task shows it. Newest wins, at most 23 characters */
+void uis_message(const char *text);
 void uis_start(uint32_t now);           /* the ui task's start */
 void uis_button(enum jo_btn b, int down, uint32_t now);
 void uis_boot_screen(void);             /* BOOT / BOOTLOADER, before download mode */

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Host tests of Launchpad Note mode against a Digitone II (core/jank_lpapp.c). Exit status: the number of failed checks. */
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include "jank_lpapp.h"
@@ -17,10 +18,20 @@ static int fails, checks;
 
 static const struct jln_scale MAJOR = {"Major", 7, {0, 2, 4, 5, 7, 9, 11}};
 
+/* an app whose Digitone is live, with PLAY and the active-track read (the normal case) */
 static struct jlapp fresh(void)
 {
     struct jlapp a;
-    jlapp_init(&a, &MAJOR, 0);
+    jlapp_init(&a, &MAJOR);
+    jlapp_set_live(&a, JDL_LIVE, 1, 1);
+    return a;
+}
+
+static struct jlapp fresh_not_live(int state)
+{
+    struct jlapp a;
+    jlapp_init(&a, &MAJOR);
+    jlapp_set_live(&a, state, 1, 1);
     return a;
 }
 
@@ -36,15 +47,37 @@ static struct jlx_ev top(uint8_t idx, uint8_t v)
     return e;
 }
 
+/* the older tests' view of a press: 1 for a note on / off, out = {0x09 | 0x08, status | track, note, velocity}; buttons and the rest give 0 */
 static size_t press(struct jlapp *a, struct jlx_ev e, uint8_t out[4])
 {
-    return jlapp_on_lpx(a, &e, out, 1);
+    struct jlapp_act act;
+    if (jlapp_on_lpx_acts(a, &e, &act, 1) < 1 || (act.kind != JLAPP_ACT_NOTE_ON && act.kind != JLAPP_ACT_NOTE_OFF))
+        return 0;
+    out[0] = act.kind == JLAPP_ACT_NOTE_ON ? 0x09 : 0x08;
+    out[1] = (uint8_t)((act.kind == JLAPP_ACT_NOTE_ON ? 0x90 : 0x80) | act.track);
+    out[2] = act.note;
+    out[3] = act.vel;
+    return 1;
 }
 
-static void dn2(struct jlapp *a, uint8_t status, uint8_t d1, uint8_t d2)
+static size_t acts(struct jlapp *a, struct jlx_ev e, struct jlapp_act *o)
 {
-    const uint8_t p[4] = {(uint8_t)(status >> 4), status, d1, d2};
-    jlapp_on_dn2(a, p);
+    return jlapp_on_lpx_acts(a, &e, o, 1);
+}
+
+static void say_nothing_yet(struct jlapp *a)
+{
+    char m[JLAPP_MSG_MAX];
+    jlapp_take_message(a, m, sizeof m);
+}
+
+/* the message the last press(es) left, "" if none */
+static const char *msg(struct jlapp *a)
+{
+    static char m[JLAPP_MSG_MAX];
+    m[0] = 0;
+    jlapp_take_message(a, m, sizeof m);
+    return m;
 }
 
 static uint8_t colour(struct jlapp *a, uint8_t x, uint8_t y)
@@ -52,212 +85,6 @@ static uint8_t colour(struct jlapp *a, uint8_t x, uint8_t y)
     struct jlx_frame f;
     jlapp_frame(a, &f);
     return f.led[y * 8u + x].color;
-}
-
-static void test_pad_plays_note_on_track_channel(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    CHECK(press(&a, pad(0, 0, 100), o) == 1);                     /* diatonic C major, octave 3: 48 */
-    CHECK(o[0] == 0x09 && o[1] == 0x90 && o[2] == 48 && o[3] == 100);
-    CHECK(press(&a, pad(0, 0, 0), o) == 1);
-    CHECK(o[0] == 0x08 && o[1] == 0x80 && o[2] == 48 && o[3] == 0);
-    a.dn2_cable = 2;                                              /* the cable of the DN2's port */
-    jlapp_on_lpx(&a, &(struct jlx_ev){JLX_TOP, 0, 0, 3, 127}, o, 1);   /* right: track 2, channel 2 */
-    CHECK(press(&a, pad(1, 0, 64), o) == 1);
-    CHECK(o[0] == 0x29 && o[1] == 0x91 && o[2] == 50 && o[3] == 64);
-}
-
-static void test_release_goes_to_the_note_it_started(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    press(&a, pad(1, 0, 90), o);                                  /* 50 */
-    press(&a, top(0, 127), o);                                    /* octave up while the pad is held */
-    press(&a, top(0, 0), o);
-    CHECK(a.n.octave == 4);
-    CHECK(press(&a, pad(1, 0, 0), o) == 1 && o[2] == 50 && o[1] == 0x80);   /* not 62 */
-}
-
-static void test_release_goes_to_the_channel_it_started(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    press(&a, pad(0, 0, 90), o);                                  /* track 1, channel 1 */
-    press(&a, top(3, 127), o);                                    /* track 2 */
-    CHECK(a.n.track == 1);
-    CHECK(press(&a, pad(0, 0, 0), o) == 1 && o[1] == 0x80 && o[2] == 48);   /* still channel 1: no stuck note */
-}
-
-static void test_same_pitch_on_two_pads(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    jln_set_layout(&a.n, JLN_CHROMATIC);                          /* (5,0) and (0,1) are both 53 */
-    CHECK(press(&a, pad(5, 0, 80), o) == 1 && o[1] == 0x90);
-    CHECK(press(&a, pad(0, 1, 80), o) == 1 && o[1] == 0x90);
-    CHECK(press(&a, pad(5, 0, 0), o) == 0);                       /* the other pad still holds it */
-    CHECK(press(&a, pad(0, 1, 0), o) == 1 && o[1] == 0x80 && o[2] == 53);
-}
-
-static void test_pad_outside_midi_range_is_silent(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    jln_set_layout(&a.n, JLN_CHROMATIC);
-    a.n.octave = 7;                                               /* base 96: the top rows pass 127 (the buttons stop at 6) */
-    CHECK(press(&a, pad(0, 7, 90), o) == 0);
-    CHECK(press(&a, pad(0, 7, 0), o) == 0);
-}
-
-static void test_repeated_press_and_stray_release(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    CHECK(press(&a, pad(2, 2, 70), o) == 1);
-    CHECK(press(&a, pad(2, 2, 70), o) == 0);                      /* a pad already down: nothing new */
-    CHECK(press(&a, pad(2, 2, 0), o) == 1);
-    CHECK(press(&a, pad(2, 2, 0), o) == 0);                       /* a release with no press: nothing */
-    CHECK(press(&a, pad(3, 3, 0), o) == 0);
-}
-
-static void test_buttons(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    CHECK(press(&a, top(0, 127), o) == 0 && a.n.octave == 4);     /* up: octave up, no MIDI */
-    press(&a, top(1, 127), o);
-    press(&a, top(1, 127), o);
-    CHECK(a.n.octave == 2);
-    press(&a, top(0, 0), o);                                      /* a release does nothing */
-    press(&a, top(1, 0), o);
-    CHECK(a.n.octave == 2);
-    press(&a, top(2, 127), o);                                    /* left at the first track: stays */
-    CHECK(a.n.track == 0);
-    press(&a, top(3, 127), o);
-    press(&a, top(3, 127), o);
-    CHECK(a.n.track == 2);
-    press(&a, top(2, 127), o);
-    CHECK(a.n.track == 1);
-    press(&a, top(5, 127), o);                                    /* the other buttons do nothing yet */
-    press(&a, top(7, 127), o);
-    CHECK(a.n.track == 1 && a.n.octave == 2);
-    {
-        struct jlx_ev side = {JLX_SIDE, 0, 0, 4, 127};
-        CHECK(jlapp_on_lpx(&a, &side, o, 1) == 0);
-    }
-}
-
-static void test_dn2_notes_light_the_pads(void)
-{
-    struct jlapp a = fresh();
-    CHECK(colour(&a, 0, 0) == JLN_COLOR_ROOT);                    /* 48 is C: the root */
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);                /* D */
-    dn2(&a, 0x90, 50, 100);                                       /* the DN2 plays D (50) on channel 1 */
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_PLAYING);
-    CHECK(colour(&a, 0, 0) == JLN_COLOR_ROOT);
-    dn2(&a, 0x80, 50, 0);
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
-    dn2(&a, 0x90, 50, 100);
-    dn2(&a, 0x90, 50, 0);                                         /* a Note On with velocity 0 is an off */
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
-}
-
-static void test_dn2_notes_per_channel(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    dn2(&a, 0x91, 50, 100);                                       /* channel 2: not the current track */
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
-    jlapp_tick(&a, 5000);
-    press(&a, top(3, 127), o);                                    /* track 2: it is lit now (once the track overlay has gone) */
-    jlapp_tick(&a, 5000 + JLAPP_SELECT_MS);
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_PLAYING);
-    press(&a, top(2, 127), o);                                    /* back to track 1: dark again */
-    jlapp_tick(&a, 5000 + 2u * JLAPP_SELECT_MS);
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
-}
-
-static void test_dn2_same_pitch_lights_every_pad(void)
-{
-    struct jlapp a = fresh();
-    jln_set_layout(&a.n, JLN_CHROMATIC);
-    dn2(&a, 0x90, 53, 100);
-    CHECK(colour(&a, 5, 0) == JLN_COLOR_PLAYING && colour(&a, 0, 1) == JLN_COLOR_PLAYING);
-}
-
-static void test_dn2_all_notes_off_and_noise(void)
-{
-    struct jlapp a = fresh();
-    dn2(&a, 0x90, 50, 100);
-    dn2(&a, 0x90, 52, 100);
-    dn2(&a, 0xB0, 7, 100);                                        /* a volume CC: ignored */
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_PLAYING);
-    dn2(&a, 0xB0, 123, 0);                                        /* All Notes Off on channel 1 */
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE && colour(&a, 2, 0) == JLN_COLOR_IN_SCALE);
-    {
-        const uint8_t clock[4] = {0x0F, 0xF8, 0, 0};              /* a clock byte */
-        const uint8_t sysex[4] = {0x04, 0xF0, 0x7D, 0x01};
-        const uint8_t pressure[4] = {0x0D, 0xD0, 50, 0};
-        jlapp_on_dn2(&a, clock);
-        jlapp_on_dn2(&a, sysex);
-        jlapp_on_dn2(&a, pressure);
-    }
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
-}
-
-static void test_own_press_lights_the_pad(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4];
-    press(&a, pad(1, 0, 100), o);
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_PLAYING);
-    press(&a, pad(1, 0, 0), o);
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
-}
-
-static void test_buttons_lit(void)
-{
-    struct jlapp a = fresh();
-    struct jlx_frame f;
-    jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + 1].color == JLAPP_COLOR_ARROW_ON);   /* octave 3 of 0..5: up and down both go */
-    CHECK(f.led[JLX_TOP0 + 2].color == JLAPP_COLOR_ARROW_OFF && f.led[JLX_TOP0 + 3].color == JLAPP_COLOR_ARROW_ON);   /* track 1 of 16: nothing to the left */
-    CHECK(f.led[JLX_TOP0 + 5].color == JLAPP_COLOR_MODE);          /* the Note button */
-    CHECK(JLAPP_COLOR_ARROW_ON == 21 && JLAPP_COLOR_ARROW_OFF == 23 && JLAPP_COLOR_MODE == 37);   /* GREEN, GREEN_THIRD, LIGHT_BLUE: LP95's Note.Octave and Mode.Note */
-    CHECK(f.led[JLX_TOP0 + 4].color == 0 && f.led[JLX_TOP0 + 6].color == 0 && f.led[JLX_TOP0 + 7].color == 0);
-    for (uint32_t i = 0; i < 8; i++)
-        CHECK(f.led[JLX_SIDE0 + i].color == 0);
-    CHECK(f.led[JLX_LOGO].color == 0);
-    for (uint32_t i = 0; i < JLX_LEDS; i++)
-        CHECK(f.led[i].mode == JLX_STATIC);
-}
-
-static void test_release_all(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4 * 8];
-    uint8_t one[4];
-    press(&a, pad(0, 0, 100), one);
-    press(&a, pad(1, 0, 100), one);
-    press(&a, top(3, 127), one);
-    press(&a, pad(2, 0, 100), one);                               /* a third one, on channel 2 */
-    CHECK(jlapp_release_all(&a, o, 8) == 3);
-    CHECK(o[1] == 0x80 && o[2] == 48 && o[5] == 0x80 && o[6] == 50 && o[9] == 0x81 && o[10] == 52);
-    CHECK(jlapp_release_all(&a, o, 8) == 0);                        /* all up now */
-    CHECK(press(&a, pad(0, 0, 0), one) == 0);
-}
-
-static void test_release_all_respects_the_room(void)
-{
-    struct jlapp a = fresh();
-    uint8_t o[4 * 2], one[4];
-    press(&a, pad(0, 0, 100), one);
-    press(&a, pad(1, 0, 100), one);
-    press(&a, pad(2, 0, 100), one);
-    CHECK(jlapp_release_all(&a, o, 2) == 2);
-    CHECK(jlapp_release_all(&a, o, 2) == 1);                        /* the rest waits for the next call */
-    CHECK(jlapp_release_all(&a, o, 2) == 0);
 }
 
 static void test_roles_by_product_name(void)
@@ -286,7 +113,8 @@ static void test_midi_interface_choice(void)
 static struct jlapp fresh_list(void)
 {
     struct jlapp a;
-    jlapp_init(&a, jls_get(JLS_MAJOR), 0);
+    jlapp_init(&a, jls_get(JLS_MAJOR));
+    jlapp_set_live(&a, JDL_LIVE, 1, 1);
     return a;
 }
 
@@ -530,11 +358,6 @@ static void test_page_buttons_still_work_and_note_stays_lit(void)
     CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW_ON);                /* octave 4 of 0..5: up still goes */
 }
 
-static size_t acts(struct jlapp *a, struct jlx_ev e, struct jlapp_act *o)
-{
-    return jlapp_on_lpx_acts(a, &e, o, 1);
-}
-
 static void switch_track_pads(struct jlapp *a)
 {
     struct jlapp_act o;
@@ -542,14 +365,146 @@ static void switch_track_pads(struct jlapp *a)
     acts(a, pad(7, 7, 127), &o);
     acts(a, pad(7, 7, 0), &o);
     acts(a, top(NOTE_BTN, 0), &o);
+    say_nothing_yet(a);
 }
+
+/* does the message the app has now say prefix + name, upper case and cut to the 20 characters a message holds? */
+static int says(struct jlapp *a, const char *prefix, const char *name)
+{
+    char want[96];
+    size_t i;
+    snprintf(want, sizeof want, "%s%s", prefix, name);
+    for (i = 0; want[i]; i++)
+        want[i] = (char)toupper((unsigned char)want[i]);
+    if (strlen(want) > JLAPP_MSG_MAX - 1u)
+        want[JLAPP_MSG_MAX - 1u] = 0;
+    return strcmp(msg(a), want) == 0;
+}
+
+/* ---- Note mode through live control: acts, never MIDI ---- */
+
+static void test_a_pad_plays_a_note_on_the_current_track(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    CHECK(acts(&a, pad(0, 0, 100), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.track == 0 && o.note == 48 && o.vel == 100);   /* diatonic C major, octave 3 */
+    CHECK(acts(&a, pad(0, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF && o.track == 0 && o.note == 48);
+    acts(&a, top(3, 127), &o);                                    /* right: track 2 */
+    CHECK(acts(&a, pad(1, 0, 64), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.track == 1 && o.note == 50 && o.vel == 64);
+}
+
+static void test_release_goes_to_the_note_and_the_track_it_started(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    acts(&a, pad(1, 0, 90), &o);                                  /* 50, track 1 */
+    acts(&a, top(0, 127), &o);                                    /* octave up while the pad is held */
+    acts(&a, top(3, 127), &o);                                    /* and the next track */
+    CHECK(a.n.octave == 4 && a.n.track == 1);
+    CHECK(acts(&a, pad(1, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF && o.note == 50 && o.track == 0);   /* not 62, not track 2: no stuck note */
+}
+
+static void test_same_pitch_on_two_pads(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    jln_set_layout(&a.n, JLN_CHROMATIC);                          /* (5,0) and (0,1) are both 53 */
+    CHECK(acts(&a, pad(5, 0, 80), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON);
+    CHECK(acts(&a, pad(0, 1, 80), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON);
+    CHECK(acts(&a, pad(5, 0, 0), &o) == 0);                       /* the other pad still holds it */
+    CHECK(acts(&a, pad(0, 1, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF && o.note == 53);
+}
+
+static void test_pad_outside_midi_range_is_silent(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    jln_set_layout(&a.n, JLN_CHROMATIC);
+    a.n.octave = 7;                                               /* base 96: the top rows pass 127 (the buttons stop at 6) */
+    CHECK(acts(&a, pad(0, 7, 90), &o) == 0);
+    CHECK(acts(&a, pad(0, 7, 0), &o) == 0);
+    CHECK(msg(&a)[0] == 0);                                       /* silent, and not a "cannot play" either */
+}
+
+static void test_repeated_press_and_stray_release(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    CHECK(acts(&a, pad(2, 2, 70), &o) == 1);
+    CHECK(acts(&a, pad(2, 2, 70), &o) == 0);                      /* a pad already down: nothing new */
+    CHECK(acts(&a, pad(2, 2, 0), &o) == 1);
+    CHECK(acts(&a, pad(2, 2, 0), &o) == 0);                       /* a release with no press: nothing */
+    CHECK(acts(&a, pad(3, 3, 0), &o) == 0);
+    CHECK(jlapp_on_lpx_acts(&a, &(struct jlx_ev){JLX_PAD, 0, 0, 0, 100}, &o, 0) == 0 && a.held[0].note < 0);   /* no room: nothing changes */
+}
+
+static void test_octave_and_other_buttons(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    struct jlx_ev side = {JLX_SIDE, 0, 0, 4, 127};
+    CHECK(acts(&a, top(0, 127), &o) == 0 && a.n.octave == 4);     /* up: octave up, nothing for the Digitone */
+    CHECK(strcmp(msg(&a), "OCTAVE 4") == 0);
+    acts(&a, top(1, 127), &o);
+    acts(&a, top(1, 127), &o);
+    CHECK(a.n.octave == 2 && strcmp(msg(&a), "OCTAVE 2") == 0);
+    acts(&a, top(0, 0), &o);                                      /* a release does nothing */
+    acts(&a, top(1, 0), &o);
+    CHECK(a.n.octave == 2 && msg(&a)[0] == 0);
+    acts(&a, top(5, 127), &o);                                    /* the other buttons do nothing yet */
+    acts(&a, top(7, 127), &o);
+    CHECK(jlapp_on_lpx_acts(&a, &side, &o, 1) == 0 && a.n.octave == 2 && msg(&a)[0] == 0);
+}
+
+static void test_own_press_lights_the_pad(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    acts(&a, pad(1, 0, 100), &o);
+    CHECK(colour(&a, 1, 0) == JLN_COLOR_PLAYING);
+    acts(&a, pad(1, 0, 0), &o);
+    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
+}
+
+static void test_buttons_lit(void)
+{
+    struct jlapp a = fresh();
+    struct jlx_frame f;
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + 1].color == JLAPP_COLOR_ARROW_ON);   /* octave 3 of 0..5: up and down both go */
+    CHECK(f.led[JLX_TOP0 + 2].color == JLAPP_COLOR_ARROW_OFF && f.led[JLX_TOP0 + 3].color == JLAPP_COLOR_ARROW_ON);   /* track 1 of 16: nothing to the left */
+    CHECK(f.led[JLX_TOP0 + 5].color == JLAPP_COLOR_MODE);          /* the Note button */
+    CHECK(JLAPP_COLOR_ARROW_ON == 21 && JLAPP_COLOR_ARROW_OFF == 23 && JLAPP_COLOR_MODE == 37);   /* GREEN, GREEN_THIRD, LIGHT_BLUE: LP95's Note.Octave and Mode.Note */
+    CHECK(f.led[JLX_TOP0 + 4].color == 0 && f.led[JLX_TOP0 + 6].color == 0 && f.led[JLX_TOP0 + 7].color == 0);
+    for (uint32_t i = 0; i < 8; i++)
+        CHECK(f.led[JLX_SIDE0 + i].color == 0);
+    CHECK(f.led[JLX_LOGO].color == 0);
+    for (uint32_t i = 0; i < JLX_LEDS; i++)
+        CHECK(f.led[i].mode == JLX_STATIC);
+}
+
+static void test_release_acts(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o[JLAPP_PADS + JLN_TRACKS];
+    acts(&a, pad(0, 3, 100), &o[0]);                               /* a note pad */
+    switch_track_pads(&a);
+    acts(&a, pad(5, 0, 100), &o[0]);                               /* and a track pad */
+    CHECK(jlapp_release_acts(&a, o, 1) == 1 && o[0].kind == JLAPP_ACT_NOTE_OFF);   /* room for one: the notes first */
+    CHECK(jlapp_release_acts(&a, o, JLAPP_PADS + JLN_TRACKS) == 1 && o[0].kind == JLAPP_ACT_TRACK_OFF && o[0].track == 5);
+    CHECK(jlapp_release_acts(&a, o, JLAPP_PADS + JLN_TRACKS) == 0);
+    CHECK(a.track_held == 0);
+}
+
+/* ---- left / right: the track, and the bottom pads that show it ---- */
 
 static void test_left_right_select_the_track_and_show_it(void)
 {
     struct jlapp a = fresh();
     struct jlapp_act o;
     jlapp_tick(&a, 1000);
-    CHECK(acts(&a, top(3, 127), &o) == 1 && o.kind == JLAPP_ACT_SELECT && o.track == 1 && o.live == 1);   /* right: track 2, the Digitone's active one too */
+    CHECK(acts(&a, top(3, 127), &o) == 1 && o.kind == JLAPP_ACT_SELECT && o.track == 1);   /* right: track 2, the Digitone's active one too */
+    CHECK(strcmp(msg(&a), "TRACK 2") == 0);
     CHECK(colour(&a, 1, 0) == JLAPP_COLOR_TRACK_CHOSEN);          /* the 16 bottom pads show it: row 1 tracks 1..8 */
     CHECK(colour(&a, 0, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 7, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 3, 1) == JLAPP_COLOR_TRACK_IDLE);
     jlapp_tick(&a, 1000 + JLAPP_SELECT_MS - 1u);
@@ -557,8 +512,11 @@ static void test_left_right_select_the_track_and_show_it(void)
     jlapp_tick(&a, 1000 + JLAPP_SELECT_MS);                       /* the notes are back */
     CHECK(colour(&a, 0, 0) == JLN_COLOR_ROOT && colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
     jlapp_tick(&a, 3000);
-    for (int i = 0; i < 8; i++)
+    acts(&a, top(3, 0), &o);
+    for (int i = 0; i < 8; i++) {
         acts(&a, top(3, 127), &o);                                /* up to track 10: row 2 */
+        acts(&a, top(3, 0), &o);
+    }
     CHECK(a.n.track == 9 && colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CHOSEN && colour(&a, 1, 0) == JLAPP_COLOR_TRACK_IDLE);
     CHECK(acts(&a, top(2, 127), &o) == 1 && o.track == 8);
 }
@@ -569,9 +527,11 @@ static void test_a_limit_shows_the_track_but_selects_nothing(void)
     struct jlapp_act o;
     jlapp_tick(&a, 10);
     CHECK(acts(&a, top(2, 127), &o) == 0);                        /* left on track 1: nothing to select */
-    CHECK(colour(&a, 0, 0) == JLAPP_COLOR_TRACK_CHOSEN);
+    CHECK(colour(&a, 0, 0) == JLAPP_COLOR_TRACK_CHOSEN && strcmp(msg(&a), "TRACK 1") == 0);
     CHECK(acts(&a, top(2, 0), &o) == 0 && acts(&a, top(5, 127), &o) == 0);   /* a release, and the Note button, select nothing */
 }
+
+/* ---- the track pads ---- */
 
 static void test_the_track_pads_switch(void)
 {
@@ -580,19 +540,19 @@ static void test_the_track_pads_switch(void)
     acts(&a, top(NOTE_BTN, 127), &o);
     CHECK(colour(&a, 7, 7) == JLAPP_GREEN_THIRD && !a.track_pads);
     CHECK(acts(&a, pad(7, 7, 127), &o) == 0 && a.track_pads && colour(&a, 7, 7) == JLAPP_GREEN);
+    CHECK(strcmp(msg(&a), "TRACK PADS ON") == 0);
     acts(&a, pad(7, 7, 0), &o);
     CHECK(a.track_pads);                                           /* a release changes nothing */
     acts(&a, pad(7, 7, 127), &o);
-    CHECK(!a.track_pads && colour(&a, 7, 7) == JLAPP_GREEN_THIRD);
+    CHECK(!a.track_pads && colour(&a, 7, 7) == JLAPP_GREEN_THIRD && strcmp(msg(&a), "TRACK PADS OFF") == 0);
 }
 
 static void test_the_track_pads_play_each_tracks_own_note(void)
 {
     struct jlapp a = fresh();
     struct jlapp_act o;
-    jlapp_set_live(&a, 1, 1);
     switch_track_pads(&a);
-    CHECK(acts(&a, pad(2, 0, 100), &o) == 1 && o.kind == JLAPP_ACT_TRACK_ON && o.track == 2 && o.live == 1);
+    CHECK(acts(&a, pad(2, 0, 100), &o) == 1 && o.kind == JLAPP_ACT_TRACK_ON && o.track == 2);
     CHECK(acts(&a, pad(2, 0, 100), &o) == 0);                      /* a second press of the same pad: nothing */
     CHECK(acts(&a, pad(2, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_TRACK_OFF && o.track == 2);
     CHECK(acts(&a, pad(2, 0, 0), &o) == 0);                        /* a stray release */
@@ -605,68 +565,73 @@ static void test_the_track_pads_play_each_tracks_own_note(void)
 
 static void test_the_layout_moves_up_two_rows(void)
 {
-    struct jlapp a = fresh(), b = fresh();
+    struct jlapp a = fresh(), b = fresh(), c = fresh();
     struct jlapp_act o, p;
-    jlapp_set_live(&a, 1, 1);
+    struct jln_pad old_pad, new_pad;
     switch_track_pads(&a);
     CHECK(acts(&b, pad(1, 3, 100), &p) == 1);                      /* where the notes were: pad (1,3) */
     CHECK(acts(&a, pad(1, 5, 100), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.note == p.note);   /* now two rows up */
-    CHECK(colour(&a, 1, 5) == JLN_COLOR_PLAYING && colour(&a, 1, 6) != JLN_COLOR_PLAYING);   /* and it is the one lit, not another row of the same pitch (diatonic: none) */
-    {
-        struct jlapp c = fresh();
-        struct jln_pad top_of_old, new_pad;
-        jln_pad(&c.n, c.scale, 4, 0, &top_of_old);
-        jln_pad(&a.n, a.scale, 4, 0, &new_pad);
-        CHECK(top_of_old.note == new_pad.note);
-    }
+    CHECK(colour(&a, 1, 5) == JLN_COLOR_PLAYING);
+    jln_pad(&c.n, c.scale, 4, 0, &old_pad);
+    jln_pad(&a.n, a.scale, 4, 0, &new_pad);
+    CHECK(old_pad.note == new_pad.note);
     acts(&a, pad(1, 5, 0), &o);
     CHECK(colour(&a, 0, 2) == JLN_COLOR_ROOT);                     /* the layout's bottom row is pad row 3 now */
 }
 
-static void test_track_pads_do_nothing_without_play(void)
+/* ---- live control missing: the pads say so, and never fall back to MIDI ---- */
+
+static void test_without_live_control_the_pads_are_silent_and_say_why(void)
 {
-    struct jlapp a = fresh();
+    struct jlapp a = fresh_not_live(JDL_REMOTE_OFF);
     struct jlapp_act o;
-    switch_track_pads(&a);
+    jlapp_tick(&a, 100);
+    CHECK(acts(&a, pad(0, 0, 100), &o) == 0 && a.held[0].note < 0);
+    CHECK(strcmp(msg(&a), "REMOTE CONTROL OFF") == 0);
+    CHECK(acts(&a, pad(1, 0, 100), &o) == 0 && msg(&a)[0] == 0);   /* said once, not on every pad */
+    jlapp_tick(&a, 100 + 2000u);
+    acts(&a, pad(2, 0, 100), &o);
+    CHECK(strcmp(msg(&a), "REMOTE CONTROL OFF") == 0);             /* and again after two seconds */
+    CHECK(acts(&a, pad(0, 0, 0), &o) == 0);                        /* the release of a pad that never played */
+    jlapp_set_live(&a, JDL_NO_LIVE, 1, 1);
+    jlapp_tick(&a, 9000);
+    acts(&a, pad(0, 0, 100), &o);
+    CHECK(strcmp(msg(&a), "NO LIVE CONTROL") == 0);
+    jlapp_set_live(&a, JDL_ASKING, 1, 1);
+    jlapp_tick(&a, 12000);
+    acts(&a, pad(0, 0, 100), &o);
+    CHECK(strcmp(msg(&a), "DN2 NOT READY") == 0);
+    jlapp_set_live(&a, JDL_LIVE, 0, 1);                            /* live, but the Digitone refused PLAY */
+    jlapp_tick(&a, 15000);
+    CHECK(acts(&a, pad(0, 0, 100), &o) == 0 && strcmp(msg(&a), "DN2 HAS NO PLAY") == 0);
+}
+
+static void test_the_track_pads_say_why_too(void)
+{
+    struct jlapp a = fresh_not_live(JDL_NO_LIVE);
+    struct jlapp_act o;
+    a.track_pads = 1;
     CHECK(acts(&a, pad(2, 0, 100), &o) == 0 && a.track_held == 0);
+    CHECK(strcmp(msg(&a), "NO LIVE CONTROL") == 0);
     CHECK(acts(&a, pad(2, 0, 0), &o) == 0);
-    CHECK(acts(&a, pad(2, 2, 100), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.live == 0);   /* the note pads still play, by MIDI channel */
 }
 
-static void test_notes_are_live_acts_while_play_works(void)
+static void test_a_note_down_when_live_goes_still_ends(void)
 {
     struct jlapp a = fresh();
     struct jlapp_act o;
-    uint8_t pkt[4];
-    CHECK(acts(&a, pad(0, 0, 100), &o) == 1 && o.live == 0 && o.chan == 0);     /* no live control: MIDI on the track's channel */
-    CHECK(jlapp_act_midi(&a, &o, pkt) == 1 && pkt[1] == 0x90 && pkt[2] == o.note && pkt[3] == 100);
-    acts(&a, pad(0, 0, 0), &o);
-    CHECK(o.kind == JLAPP_ACT_NOTE_OFF && o.live == 0 && jlapp_act_midi(&a, &o, pkt) == 1 && pkt[1] == 0x80 && pkt[3] == 0);
-    jlapp_set_live(&a, 1, 1);
-    CHECK(acts(&a, pad(1, 0, 90), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.live == 1 && o.track == 0 && o.vel == 90);
-    jlapp_set_live(&a, 0, 0);                                      /* live control went away with the pad down: the end still goes the way the start did */
-    CHECK(acts(&a, pad(1, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF && o.live == 1 && o.track == 0);
-    CHECK(jlapp_act_midi(&a, &(struct jlapp_act){JLAPP_ACT_SELECT, 1, 0, 1, 0, 0}, pkt) == 0);
+    acts(&a, pad(1, 0, 100), &o);
+    jlapp_set_live(&a, JDL_ASKING, 1, 1);                          /* the lease ran out with the pad down */
+    CHECK(acts(&a, pad(1, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF && o.note == 50);   /* the firmware drops it if it cannot be sent; the Digitone ends its notes */
 }
 
-static void test_a_note_down_by_midi_and_a_note_down_by_play_each_end_their_own_way(void)
-{
-    struct jlapp a = fresh();
-    struct jlapp_act o;
-    acts(&a, pad(0, 0, 100), &o);                                  /* MIDI */
-    jlapp_set_live(&a, 1, 1);
-    acts(&a, pad(0, 1, 100), &o);                                  /* another pad, pressed once PLAY works */
-    CHECK(a.held[0].live == 0 && a.held[8].live == 1);
-    CHECK(acts(&a, pad(0, 0, 0), &o) == 1 && o.live == 0);         /* each ends its own */
-    CHECK(acts(&a, pad(0, 1, 0), &o) == 1 && o.live == 1);
-}
+/* ---- lights from the Digitone's push ---- */
 
-static void test_pushed_notes_light_pads_and_tracks(void)
+static void test_pushed_notes_light_pads(void)
 {
     struct jlapp a = fresh();
     const struct jdl_note n1[1] = {{0, 4, 50, 100, 8, 0}};
     const struct jdl_note n2[1] = {{1, 4, 50, 100, 8, 0}};
-    jlapp_set_live(&a, 1, 0);
     jlapp_tick(&a, 100);
     jlapp_on_push(&a, n1, 1);
     CHECK(colour(&a, 1, 0) == JLN_COLOR_PLAYING);                  /* D (50) on the current track 1 */
@@ -683,7 +648,6 @@ static void test_pushed_notes_light_the_track_pads(void)
 {
     struct jlapp a = fresh();
     const struct jdl_note n[2] = {{4, 0, 60, 100, 8, 0}, {12, 0, 36, 100, 8, 0}};
-    jlapp_set_live(&a, 1, 1);
     switch_track_pads(&a);
     jlapp_tick(&a, 500);
     jlapp_on_push(&a, n, 2);
@@ -693,21 +657,10 @@ static void test_pushed_notes_light_the_track_pads(void)
     CHECK(colour(&a, 4, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 4, 1) == JLAPP_COLOR_TRACK_IDLE);
 }
 
-static void test_live_lights_ignore_the_midi_channels(void)
-{
-    struct jlapp a = fresh();
-    jlapp_set_live(&a, 1, 1);
-    dn2(&a, 0x90, 50, 100);                                        /* the Digitone's MIDI on channel 1: not what the lights go by while live */
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
-    jlapp_set_live(&a, 0, 0);                                      /* without live control it is, as before */
-    CHECK(colour(&a, 1, 0) == JLN_COLOR_PLAYING);
-}
-
 static void test_the_overlay_over_the_track_pads_then_back(void)
 {
     struct jlapp a = fresh();
     struct jlapp_act o;
-    jlapp_set_live(&a, 1, 1);
     switch_track_pads(&a);
     jlapp_tick(&a, 2000);
     acts(&a, top(3, 127), &o);
@@ -721,7 +674,6 @@ static void test_a_push_with_junk_and_the_ring(void)
     struct jlapp a = fresh();
     const struct jdl_note junk[2] = {{16, 0, 50, 100, 8, 0}, {0, 0, 200, 100, 8, 0}};
     struct jdl_note one = {0, 0, 50, 100, 8, 0};
-    jlapp_set_live(&a, 1, 0);
     jlapp_tick(&a, 10);
     jlapp_on_push(&a, junk, 2);
     CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);                 /* a track past 15 and a note past 127 light nothing */
@@ -739,7 +691,6 @@ static void test_the_clock_wrapping(void)
     struct jlapp a = fresh();
     struct jlapp_act o;
     const struct jdl_note n[1] = {{0, 0, 50, 100, 8, 0}};
-    jlapp_set_live(&a, 1, 0);
     jlapp_tick(&a, 0xFFFFFF00u);
     jlapp_on_push(&a, n, 1);
     acts(&a, top(3, 127), &o);
@@ -749,37 +700,193 @@ static void test_the_clock_wrapping(void)
     CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
 }
 
-static void test_release_acts(void)
+/* ---- the messages (what Launchpad 95 writes in Live's status bar) ---- */
+
+static void test_the_scale_page_says_what_it_did(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    acts(&a, top(NOTE_BTN, 127), &o);
+    tap(&a, 0, 7);                                                 /* absolute root */
+    CHECK(strcmp(msg(&a), "ABSOLUTE ROOT ON") == 0);
+    tap(&a, 0, 7);
+    CHECK(strcmp(msg(&a), "ABSOLUTE ROOT OFF") == 0);
+    tap(&a, 1, 7);                                                 /* horizontal (it starts on) */
+    CHECK(strcmp(msg(&a), "HORIZONTAL OFF") == 0);
+    tap(&a, 4, 7);
+    CHECK(strcmp(msg(&a), "LAYOUT CHORDS") == 0);
+    tap(&a, 1, 7);
+    CHECK(strcmp(msg(&a), "DIATONIC ONLY") == 0);                  /* horizontal does nothing in this layout */
+    tap(&a, 6, 7);
+    CHECK(strcmp(msg(&a), "LAYOUT CHROMATIC") == 0);
+    tap(&a, 5, 7);
+    CHECK(strcmp(msg(&a), "LAYOUT DIATONIC") == 0);
+    tap(&a, 7, 7);
+    CHECK(strcmp(msg(&a), "TRACK PADS ON") == 0);
+    tap(&a, 0, 6);                                                 /* a black key */
+    CHECK(strcmp(msg(&a), "KEY C#") == 0);
+    tap(&a, 2, 5);                                                 /* a white key */
+    CHECK(strcmp(msg(&a), "KEY E") == 0);
+    tap(&a, 7, 5);                                                 /* the circle of fifths forward: B */
+    CHECK(strcmp(msg(&a), "KEY B") == 0);
+    tap(&a, 6, 6);                                                 /* and back: E */
+    CHECK(strcmp(msg(&a), "KEY E") == 0);
+    tap(&a, 3, 4);                                                 /* the octaves */
+    CHECK(strcmp(msg(&a), "OCTAVE 3") == 0);
+    tap(&a, 1, 4);
+    CHECK(strcmp(msg(&a), "OCTAVE 1") == 0);
+    tap(&a, 1, 3);                                                 /* the scales: the second of the first row */
+    CHECK(says(&a, "SCALE ", jls_get(1)->name));
+    tap(&a, 4, 0);                                                 /* the last row */
+    CHECK(a.scale == jls_get(24 + 4) && says(&a, "SCALE ", jls_get(28)->name));
+}
+
+static void test_the_relative_scale_says_key_and_scale(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    acts(&a, top(NOTE_BTN, 127), &o);
+    tap(&a, 2, 6);                                                 /* C major -> A minor */
+    CHECK(says(&a, "A ", jls_get(JLS_MINOR)->name));
+    tap(&a, 2, 6);                                                 /* and back: C major */
+    CHECK(says(&a, "C ", jls_get(JLS_MAJOR)->name));
+    a.scale = jls_get(2);                                          /* a scale with no relative one */
+    tap(&a, 2, 6);
+    CHECK(strcmp(msg(&a), "NO RELATIVE SCALE") == 0);
+}
+
+static void test_messages_are_short_upper_case_and_the_newest_wins(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    char m[JLAPP_MSG_MAX];
+    CHECK(jlapp_take_message(&a, m, sizeof m) == 0);               /* nothing said yet */
+    acts(&a, top(NOTE_BTN, 127), &o);
+    tap(&a, JLS_MINOR_PENTATONIC % 8, 3 - JLS_MINOR_PENTATONIC / 8);   /* a long scale name */
+    CHECK(jlapp_take_message(&a, m, sizeof m) == strlen(m) && strlen(m) <= JLAPP_MSG_MAX - 1u && strncmp(m, "SCALE ", 6) == 0);
+    for (size_t i = 0; m[i]; i++)
+        CHECK(m[i] >= ' ' && m[i] <= '~' && !(m[i] >= 'a' && m[i] <= 'z'));
+    CHECK(jlapp_take_message(&a, m, sizeof m) == 0);               /* taken: gone */
+    tap(&a, 0, 7);
+    tap(&a, 7, 7);                                                 /* two in a row: only the newest */
+    CHECK(jlapp_take_message(&a, m, sizeof m) > 0 && strcmp(m, "TRACK PADS ON") == 0);
+    tap(&a, 0, 7);
+    CHECK(jlapp_take_message(&a, m, 5) == 4 && strcmp(m, "ABSO") == 0);   /* a small buffer: cut, still terminated */
+    CHECK(jlapp_take_message(&a, m, 0) == 0);
+}
+
+/* ---- FOLLOW: left and right together ---- */
+
+static void to_track(struct jlapp *a, unsigned t)
+{
+    struct jlapp_act o;
+    while (a->n.track < t) {
+        acts(a, top(3, 127), &o);
+        acts(a, top(3, 0), &o);
+    }
+    say_nothing_yet(a);
+}
+
+static void test_left_and_right_together_switch_follow_and_make_no_step(void)
 {
     struct jlapp a = fresh();
-    struct jlapp_act o[JLAPP_PADS + JLN_TRACKS];
-    jlapp_set_live(&a, 1, 1);
-    acts(&a, pad(0, 3, 100), &o[0]);                               /* a note pad, by PLAY */
-    switch_track_pads(&a);
-    acts(&a, pad(5, 0, 100), &o[0]);                               /* and a track pad */
-    CHECK(jlapp_release_acts(&a, o, 1) == 1 && o[0].kind == JLAPP_ACT_NOTE_OFF);   /* room for one: the notes first */
-    CHECK(jlapp_release_acts(&a, o, JLAPP_PADS + JLN_TRACKS) == 1 && o[0].kind == JLAPP_ACT_TRACK_OFF && o[0].track == 5);
-    CHECK(jlapp_release_acts(&a, o, JLAPP_PADS + JLN_TRACKS) == 0);
-    CHECK(a.track_held == 0);
+    struct jlapp_act o;
+    to_track(&a, 3);
+    jlapp_tick(&a, 5000);
+    CHECK(acts(&a, top(2, 127), &o) == 1 && o.kind == JLAPP_ACT_SELECT && o.track == 2);   /* left: track 3 (index 2) */
+    CHECK(acts(&a, top(3, 127), &o) == 1 && o.kind == JLAPP_ACT_SELECT && o.track == 3);   /* right with left held: the track is put back, the Digitone told */
+    CHECK(a.n.track == 3 && a.follow && strcmp(msg(&a), "FOLLOW ON") == 0);
+    acts(&a, top(2, 0), &o);
+    acts(&a, top(3, 0), &o);
+    CHECK(a.n.track == 3 && a.follow);                             /* the releases do nothing */
+    CHECK(jlapp_following(&a));
+    CHECK(acts(&a, top(3, 127), &o) == 1 && o.track == 4);         /* right alone steps again */
+    CHECK(acts(&a, top(2, 127), &o) == 1 && o.kind == JLAPP_ACT_SELECT && o.track == 3 && a.n.track == 3 && !a.follow && strcmp(msg(&a), "FOLLOW OFF") == 0);   /* the other order: off, and right's step put back */
+    CHECK(!jlapp_following(&a));
+}
+
+static void test_a_pair_at_the_first_track_changes_no_track(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    jlapp_tick(&a, 1);
+    CHECK(acts(&a, top(2, 127), &o) == 0);                         /* left at the first track: nothing */
+    CHECK(acts(&a, top(3, 127), &o) == 0 && a.n.track == 0 && a.follow);   /* the pair: still track 1, nothing to select */
+}
+
+static void test_follow_shows_in_the_arrows(void)
+{
+    struct jlapp a = fresh();
+    struct jlx_frame f;
+    struct jlapp_act o;
+    acts(&a, top(2, 127), &o);
+    acts(&a, top(3, 127), &o);
+    acts(&a, top(2, 0), &o);
+    acts(&a, top(3, 0), &o);
+    CHECK(a.follow);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + 2].color == JLAPP_COLOR_FOLLOW_OFF && f.led[JLX_TOP0 + 3].color == JLAPP_COLOR_FOLLOW_ON);   /* amber; the first track has nothing to its left */
+    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + 1].color == JLAPP_COLOR_ARROW_ON);    /* up / down are as ever */
+    CHECK(JLAPP_COLOR_FOLLOW_ON == 9 && JLAPP_COLOR_FOLLOW_OFF == 11);
+}
+
+static void test_follow_needs_a_digitone_that_can_be_asked(void)
+{
+    struct jlapp a = fresh_not_live(JDL_REMOTE_OFF);
+    struct jlapp_act o;
+    acts(&a, top(2, 127), &o);
+    acts(&a, top(3, 127), &o);
+    CHECK(!a.follow && strcmp(msg(&a), "DN2 NOT READY") == 0);
+    acts(&a, top(2, 0), &o);
+    acts(&a, top(3, 0), &o);
+    jlapp_set_live(&a, JDL_LIVE, 1, 0);                            /* live, but a Digitone build that cannot say its track */
+    acts(&a, top(2, 127), &o);
+    acts(&a, top(3, 127), &o);
+    CHECK(!a.follow && strcmp(msg(&a), "DN2 CANNOT FOLLOW") == 0);
+    acts(&a, top(2, 0), &o);
+    acts(&a, top(3, 0), &o);
+    jlapp_set_live(&a, JDL_LIVE, 1, 1);
+    acts(&a, top(2, 127), &o);
+    acts(&a, top(3, 127), &o);
+    acts(&a, top(2, 0), &o);
+    acts(&a, top(3, 0), &o);
+    CHECK(a.follow);
+    jlapp_set_live(&a, JDL_ASKING, 1, 1);                          /* live control lapsed: FOLLOW stays on but does not run, and can be turned off */
+    CHECK(a.follow && !jlapp_following(&a));
+    acts(&a, top(2, 127), &o);
+    acts(&a, top(3, 127), &o);
+    CHECK(!a.follow && strcmp(msg(&a), "FOLLOW OFF") == 0);
+}
+
+static void test_follow_takes_the_digitones_track(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    jlapp_on_active_track(&a, 5);
+    CHECK(a.n.track == 0);                                         /* FOLLOW off: ignored */
+    jlapp_tick(&a, 1000);
+    acts(&a, top(2, 127), &o);
+    acts(&a, top(3, 127), &o);
+    acts(&a, top(2, 0), &o);
+    acts(&a, top(3, 0), &o);
+    say_nothing_yet(&a);
+    jlapp_tick(&a, 1000 + JLAPP_FOLLOW_HOLD_MS - 1u);
+    jlapp_on_active_track(&a, 5);
+    CHECK(a.n.track == 0);                                         /* just after the Launchpad's own choice: the Digitone may not have taken it yet */
+    jlapp_tick(&a, 1000 + JLAPP_FOLLOW_HOLD_MS);
+    jlapp_on_active_track(&a, 5);
+    CHECK(a.n.track == 5 && colour(&a, 5, 0) == JLAPP_COLOR_TRACK_CHOSEN);   /* followed, and shown on the bottom pads */
+    CHECK(msg(&a)[0] == 0);                                        /* no message: the pads say it */
+    jlapp_on_active_track(&a, 16);
+    CHECK(a.n.track == 5);                                         /* not a track */
+    jlapp_on_active_track(&a, 5);
+    CHECK(a.n.track == 5);
 }
 
 int main(void)
 {
-    test_left_right_select_the_track_and_show_it();
-    test_a_limit_shows_the_track_but_selects_nothing();
-    test_the_track_pads_switch();
-    test_the_track_pads_play_each_tracks_own_note();
-    test_the_layout_moves_up_two_rows();
-    test_track_pads_do_nothing_without_play();
-    test_notes_are_live_acts_while_play_works();
-    test_a_note_down_by_midi_and_a_note_down_by_play_each_end_their_own_way();
-    test_pushed_notes_light_pads_and_tracks();
-    test_pushed_notes_light_the_track_pads();
-    test_live_lights_ignore_the_midi_channels();
-    test_the_overlay_over_the_track_pads_then_back();
-    test_a_push_with_junk_and_the_ring();
-    test_the_clock_wrapping();
-    test_release_acts();
+    test_roles_by_product_name();
+    test_midi_interface_choice();
     test_the_note_button_opens_the_page_while_held();
     test_page_pads_edit_and_do_not_play();
     test_page_picks_the_scale();
@@ -792,23 +899,36 @@ int main(void)
     test_page_lights_with_a_scale_that_is_not_in_the_list();
     test_a_note_down_before_the_page_still_ends();
     test_page_buttons_still_work_and_note_stays_lit();
-    test_roles_by_product_name();
-    test_midi_interface_choice();
-    test_pad_plays_note_on_track_channel();
-    test_release_goes_to_the_note_it_started();
-    test_release_goes_to_the_channel_it_started();
+    test_a_pad_plays_a_note_on_the_current_track();
+    test_release_goes_to_the_note_and_the_track_it_started();
     test_same_pitch_on_two_pads();
     test_pad_outside_midi_range_is_silent();
     test_repeated_press_and_stray_release();
-    test_buttons();
-    test_dn2_notes_light_the_pads();
-    test_dn2_notes_per_channel();
-    test_dn2_same_pitch_lights_every_pad();
-    test_dn2_all_notes_off_and_noise();
+    test_octave_and_other_buttons();
     test_own_press_lights_the_pad();
     test_buttons_lit();
-    test_release_all();
-    test_release_all_respects_the_room();
+    test_release_acts();
+    test_left_right_select_the_track_and_show_it();
+    test_a_limit_shows_the_track_but_selects_nothing();
+    test_the_track_pads_switch();
+    test_the_track_pads_play_each_tracks_own_note();
+    test_the_layout_moves_up_two_rows();
+    test_without_live_control_the_pads_are_silent_and_say_why();
+    test_the_track_pads_say_why_too();
+    test_a_note_down_when_live_goes_still_ends();
+    test_pushed_notes_light_pads();
+    test_pushed_notes_light_the_track_pads();
+    test_the_overlay_over_the_track_pads_then_back();
+    test_a_push_with_junk_and_the_ring();
+    test_the_clock_wrapping();
+    test_the_scale_page_says_what_it_did();
+    test_the_relative_scale_says_key_and_scale();
+    test_messages_are_short_upper_case_and_the_newest_wins();
+    test_left_and_right_together_switch_follow_and_make_no_step();
+    test_a_pair_at_the_first_track_changes_no_track();
+    test_follow_shows_in_the_arrows();
+    test_follow_needs_a_digitone_that_can_be_asked();
+    test_follow_takes_the_digitones_track();
     printf("test_lpapp: %d checks, %d failed\n", checks, fails);
     return fails;
 }

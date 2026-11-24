@@ -17,6 +17,7 @@ void jdl_init(struct jdl *d)
     memset(d, 0, sizeof *d);
     d->state = JDL_DOWN;
     d->play_ok = 1;
+    d->read_ok = 1;
 }
 
 int jdl_is_live(const struct jdl *d) { return d->state == JDL_LIVE; }
@@ -58,9 +59,37 @@ size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
 
 size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, size_t cap)
 {
+    size_t n;
     if (d->state != JDL_LIVE || track > 15u)
         return 0;
-    return send(d, now_ms, JDL_CMD_TRACK, &track, 1, out, cap);
+    n = send(d, now_ms, JDL_CMD_TRACK, &track, 1, out, cap);
+    if (n) {
+        d->select_seq = d->seq;        /* a read sent before this one may answer with the track it had */
+        d->has_select = 1;
+    }
+    return n;
+}
+
+int jdl_can_read_track(const struct jdl *d) { return d->state == JDL_LIVE && d->read_ok; }
+
+size_t jdl_track_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
+{
+    size_t n;
+    if (!jdl_can_read_track(d))
+        return 0;
+    n = send(d, now_ms, JDL_CMD_TRACK, NULL, 0, out, cap);
+    if (n) {
+        d->read_seq = d->seq;
+        d->has_read = 1;
+    }
+    return n;
+}
+
+int jdl_take_active(struct jdl *d)
+{
+    int t = d->fresh ? d->active : -1;
+    d->fresh = 0;
+    return t;
 }
 
 size_t jdl_play(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_play_op op, uint8_t note, uint8_t vel, uint8_t *out, size_t cap)
@@ -107,6 +136,21 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
     }
     if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY)
         return JDL_IN_IGNORED;
+    if (r.cmd == JDL_CMD_TRACK) {
+        int mine = d->has_read && r.seq == d->read_seq;
+        if (r.status == ST_NOT_UNDERSTOOD) {   /* this command only: a build whose TRACK cannot be read (or a bad track); live control itself is fine */
+            if (mine)
+                d->read_ok = 0;
+            return JDL_IN_REPLY;
+        }
+        if (r.status == 0 && mine && r.n >= 1u && r.data[0] <= 15u) {
+            unsigned after = (uint16_t)(d->read_seq - d->select_seq);   /* the read must have been sent after the last select */
+            if (!d->has_select || (after >= 1u && after <= 0x7FFFu)) {
+                d->active = r.data[0];
+                d->fresh = 1;
+            }
+        }
+    }
     if (r.status == 0) {
         if (d->state != JDL_LIVE)
             d->state = JDL_LIVE;

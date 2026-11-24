@@ -133,6 +133,8 @@ static void test_full_record(void)
     d.live_pushes = 4;
     d.live_notes = 6;
     d.live_dropped = 1;
+    d.live_reads = 8;
+    d.live_msgs = 10;
     d.dev[1].used = 1;
     strcpy(d.dev[1].name, "Launchpad X");
     d.dev[1].vid = 0x1235;
@@ -164,7 +166,7 @@ static void test_full_record(void)
     CHECK(strstr(out, "hostdiag_filter=hub:1,skipped:2,last:25A4:9311,learned:14CD:1212+25A4:9311\n"));   /* what the enumeration rule left alone, and its list */
     CHECK(strstr(out, "hostdiag_events=new:3,gone:1,add:3\n"));
     CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:2,acked:1,setup:2,mode:live,reentered:1,lights:243,pads:7,dn2msgs:9\n"));
-    CHECK(strstr(out, "hostdiag_live=state:live,play:1,asked:12,replies:11,plays:5,selects:3,pushes:4,notes:6,dropped:1\n"));
+    CHECK(strstr(out, "hostdiag_live=state:live,play:1,asked:12,replies:11,plays:5,selects:3,pushes:4,notes:6,dropped:1,reads:8,msgs:10\n"));
     d.live_state = 9;                  /* a state number from a newer build prints as ?, not past the list */
     jhd_format(&d, out, sizeof out);
     CHECK(strstr(out, "hostdiag_live=state:?,"));

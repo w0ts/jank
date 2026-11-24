@@ -29,6 +29,7 @@
 #include "esp_partition.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
 #include "jank_oled_int.h"
 #include "jank_prefs.h"
 #include "jank_usbrole.h"
@@ -588,6 +589,41 @@ void uis_start(uint32_t now)
 
 int uis_has_screen(void) { return s_screen; }
 
+/* the mailbox from other tasks (the USB host task's Launchpad messages): one slot, the newest wins */
+#define MSG_MAX 24
+static char s_msg[MSG_MAX];
+static uint8_t s_msg_ready;
+static portMUX_TYPE s_msg_mux = portMUX_INITIALIZER_UNLOCKED;
+
+void uis_message(const char *text)
+{
+    if (!s_screen || !text)
+        return;
+    portENTER_CRITICAL(&s_msg_mux);
+    strncpy(s_msg, text, MSG_MAX - 1);
+    s_msg[MSG_MAX - 1] = 0;
+    s_msg_ready = 1;
+    portEXIT_CRITICAL(&s_msg_mux);
+}
+
+/* the ui task: a posted message becomes the overlay box */
+static void show_posted_message(uint32_t now)
+{
+    char m[MSG_MAX];
+    int ready;
+    portENTER_CRITICAL(&s_msg_mux);
+    ready = s_msg_ready;
+    if (ready) {
+        memcpy(m, s_msg, MSG_MAX);
+        s_msg_ready = 0;
+    }
+    portEXIT_CRITICAL(&s_msg_mux);
+    if (ready) {
+        jo_show_overlay(&s_ui, now, m, "");
+        s_want_frame = 1;
+    }
+}
+
 void uis_button(enum jo_btn b, int down, uint32_t now)
 {
     if (down)
@@ -636,6 +672,7 @@ static void step(uint32_t now, struct uis_led *led)
     const struct jo_ctx *c;
     jo_input_tick(&s_in, &s_ui, now, &HOST);
     prefs_step(now);
+    show_posted_message(now);
     if (s_reboot && (int32_t)(now - s_reboot_at) >= 0) {
         app_reboot();
         return;

@@ -245,8 +245,102 @@ static void test_the_clock_wrapping(void)
     CHECK(jdl_poll(&d, 0xFFFFFC00u + JDL_KEEPALIVE_MS, out, sizeof out) > 0);                /* and now they are, past the wrap */
 }
 
+/* a reply to request number `seq` of command `cmd` with data */
+static void reply_to(struct jdl *d, uint16_t seq, uint8_t cmd, uint8_t status, const uint8_t *data, size_t n)
+{
+    uint8_t f[64];
+    struct jdl_note nn[JDL_NOTES_MAX];
+    size_t count, k = frame(f, seq, (uint8_t)(cmd | 0x80), status, data, n);
+    CHECK(jdl_input(d, f, k, nn, &count) == JDL_IN_REPLY);
+}
+
+static void test_reading_the_active_track(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64], body[32];
+    const uint8_t five[1] = {5}, nine[1] = {9}, big[1] = {16};
+    size_t n = jdl_track_read(&d, 100, out, sizeof out);
+    CHECK(jdl_can_read_track(&d) && n > 0 && request_body(out, n, body) == 3 && body[2] == JDL_CMD_TRACK);   /* TRACK with no argument */
+    CHECK(jdl_take_active(&d) == -1);                                                        /* nothing answered yet */
+    reply_to(&d, (uint16_t)(d.seq + 1u), JDL_CMD_TRACK, 0, five, 1);                         /* an answer to another request: not ours */
+    CHECK(jdl_take_active(&d) == -1);
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 0, five, 1);
+    CHECK(jdl_take_active(&d) == 5 && jdl_take_active(&d) == -1);                            /* taken once */
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 0, big, 1);                                           /* not a track */
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 0, NULL, 0);                                          /* no data */
+    CHECK(jdl_take_active(&d) == -1 && jdl_is_live(&d));
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 0, nine, 1);
+    CHECK(jdl_take_active(&d) == 9);
+}
+
+static void test_a_read_sent_before_a_select_is_stale(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64];
+    const uint8_t old_track[1] = {2}, new_track[1] = {7};
+    uint16_t read_seq;
+    CHECK(jdl_track_read(&d, 100, out, sizeof out) > 0);
+    read_seq = d.seq;
+    CHECK(jdl_track(&d, 110, 7, out, sizeof out) > 0);                                       /* the Launchpad chose 7 after the read went out */
+    reply_to(&d, read_seq, JDL_CMD_TRACK, 0, old_track, 1);                                  /* the read comes back with the track it had */
+    CHECK(jdl_take_active(&d) == -1);
+    CHECK(jdl_track_read(&d, 200, out, sizeof out) > 0);                                     /* a read sent after the select counts */
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 0, new_track, 1);
+    CHECK(jdl_take_active(&d) == 7);
+}
+
+static void test_the_sequence_wrapping_in_the_stale_rule(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64];
+    const uint8_t t[1] = {4};
+    d.seq = 0xFFFC;
+    CHECK(jdl_track(&d, 10, 1, out, sizeof out) > 0);                                        /* select 0xFFFD */
+    CHECK(jdl_track_read(&d, 20, out, sizeof out) > 0);                                      /* read 0xFFFE: after the select */
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 0, t, 1);
+    CHECK(jdl_take_active(&d) == 4);
+    d.seq = 0xFFFF;                                                                          /* the next requests wrap: read 0x0000 is still after select 0xFFFD */
+    CHECK(jdl_track(&d, 30, 1, out, sizeof out) > 0);                                        /* select 0x0000 */
+    CHECK(jdl_track_read(&d, 40, out, sizeof out) > 0);                                      /* read 0x0001 */
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 0, t, 1);
+    CHECK(jdl_take_active(&d) == 4);
+}
+
+static void test_a_build_that_cannot_read_the_track(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64];
+    CHECK(jdl_track_read(&d, 10, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 2, NULL, 0);                                          /* status 2: not understood */
+    CHECK(jdl_is_live(&d) && !jdl_can_read_track(&d) && jdl_track_read(&d, 20, out, sizeof out) == 0);   /* live control itself is fine: only the read is off */
+    CHECK(jdl_can_play(&d) && jdl_track(&d, 30, 3, out, sizeof out) > 0);
+}
+
+static void test_a_refused_select_is_not_the_end_of_live_control(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64];
+    CHECK(jdl_track(&d, 10, 3, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_TRACK, 2, NULL, 0);                                          /* a select the Digitone did not like */
+    CHECK(jdl_is_live(&d) && jdl_can_read_track(&d));
+}
+
+static void test_no_read_unless_live(void)
+{
+    struct jdl d;
+    uint8_t out[64];
+    jdl_init(&d);
+    CHECK(!jdl_can_read_track(&d) && jdl_track_read(&d, 10, out, sizeof out) == 0);
+}
+
 int main(void)
 {
+    test_reading_the_active_track();
+    test_a_read_sent_before_a_select_is_stale();
+    test_the_sequence_wrapping_in_the_stale_rule();
+    test_a_build_that_cannot_read_the_track();
+    test_a_refused_select_is_not_the_end_of_live_control();
+    test_no_read_unless_live();
     test_asks_for_live_control_until_answered();
     test_keepalive_while_live();
     test_track_and_play_are_requests_and_keep_the_lease();

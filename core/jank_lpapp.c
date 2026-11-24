@@ -1,18 +1,17 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Launchpad X -> Digitone II, Note mode (jank_lpapp.h). */
 #include "jank_lpapp.h"
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include "jank_lpscales.h"
 
-#define CIN_NOTE_OFF 0x8u
-#define CIN_NOTE_ON 0x9u
-#define CIN_CC 0xBu
-#define CC_ALL_NOTES_OFF 123u
 #define BUTTON_UP 0u                   /* the top buttons, left to right */
 #define BUTTON_DOWN 1u
 #define BUTTON_LEFT 2u
 #define BUTTON_RIGHT 3u
 #define BUTTON_NOTE 5u
+#define WHY_EVERY_MS 2000u             /* "why the pads do not play" is said at most this often */
 
 enum jlapp_role jlapp_role_from_name(const char *product)
 {
@@ -27,58 +26,96 @@ enum jlapp_role jlapp_role_from_name(const char *product)
 
 unsigned jlapp_midi_interface_index(enum jlapp_role r) { return r == JLAPP_LPX ? 1u : 0u; }
 
-void jlapp_init(struct jlapp *a, const struct jln_scale *scale, uint8_t dn2_cable)
+void jlapp_init(struct jlapp *a, const struct jln_scale *scale)
 {
     memset(a, 0, sizeof *a);
     jln_init(&a->n);
     a->scale = scale;
     a->minor_idx = JLS_MINOR;
-    a->dn2_cable = dn2_cable;
-    for (uint32_t t = 0; t < JLN_TRACKS; t++)
-        a->chan[t] = (uint8_t)t;
+    a->play_ok = 1;
     for (uint32_t i = 0; i < JLAPP_PADS; i++)
         a->held[i].note = -1;
 }
 
 void jlapp_tick(struct jlapp *a, uint32_t now_ms) { a->now_ms = now_ms; }
 
-void jlapp_set_live(struct jlapp *a, int push, int can_play)
+void jlapp_set_live(struct jlapp *a, int state, int play_ok, int read_ok)
 {
-    a->push = push != 0;
-    a->can_play = can_play != 0;
+    a->live_state = (uint8_t)state;
+    a->play_ok = play_ok != 0;
+    a->push = state == (int)JDL_LIVE;
+    a->can_play = a->push && play_ok;
+    a->read_ok = read_ok != 0;
 }
 
-size_t jlapp_act_midi(const struct jlapp *a, const struct jlapp_act *act, uint8_t out[4])
+/* ---- the messages: upper case, 7-bit, at most JLAPP_MSG_MAX - 1 characters; the newest replaces one nobody has taken ---- */
+
+static void say(struct jlapp *a, const char *fmt, ...)
 {
-    uint8_t cin;
-    if (act->kind == JLAPP_ACT_NOTE_ON)
-        cin = CIN_NOTE_ON;
-    else if (act->kind == JLAPP_ACT_NOTE_OFF)
-        cin = CIN_NOTE_OFF;
-    else
+    char buf[64];
+    size_t i;
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    for (i = 0; buf[i] && i < JLAPP_MSG_MAX - 1u; i++) {
+        char c = buf[i];
+        if (c >= 'a' && c <= 'z')
+            c = (char)(c - 'a' + 'A');
+        a->msg[i] = c >= ' ' && c <= '~' ? c : '?';
+    }
+    a->msg[i] = 0;
+    a->msg_new = 1;
+}
+
+size_t jlapp_take_message(struct jlapp *a, char *out, size_t cap)
+{
+    size_t n;
+    if (!a->msg_new || !cap)
         return 0;
-    out[0] = (uint8_t)((a->dn2_cable << 4) | cin);
-    out[1] = (uint8_t)((cin << 4) | act->chan);
-    out[2] = act->note;
-    out[3] = act->kind == JLAPP_ACT_NOTE_ON ? act->vel : 0;
-    return 1;
+    n = strlen(a->msg);
+    if (n >= cap)
+        n = cap - 1u;
+    memcpy(out, a->msg, n);
+    out[n] = 0;
+    a->msg_new = 0;
+    return n;
 }
 
-static void set_act(struct jlapp_act *o, uint8_t kind, uint8_t track, uint8_t chan, uint8_t live, uint8_t note, uint8_t vel)
+static const char *const NOTE_NAME[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
+/* a press that cannot play says why (at most every WHY_EVERY_MS): the pads never fall back to MIDI */
+static void say_why_not(struct jlapp *a)
+{
+    if (a->why_on && (uint32_t)(a->now_ms - a->why_ms) < WHY_EVERY_MS)
+        return;
+    a->why_on = 1;
+    a->why_ms = a->now_ms;
+    if (a->live_state == JDL_REMOTE_OFF)
+        say(a, "REMOTE CONTROL OFF");
+    else if (a->live_state == JDL_NO_LIVE)
+        say(a, "NO LIVE CONTROL");
+    else if (a->live_state == JDL_LIVE && !a->play_ok)
+        say(a, "DN2 HAS NO PLAY");
+    else
+        say(a, "DN2 NOT READY");
+}
+
+/* ---- pads ---- */
+
+static void set_act(struct jlapp_act *o, uint8_t kind, uint8_t track, uint8_t note, uint8_t vel)
 {
     o->kind = kind;
     o->track = track;
-    o->chan = chan;
-    o->live = live;
     o->note = note;
     o->vel = vel;
 }
 
-/* another pad that is down holds the same note on the same channel (and went the same way) */
+/* another pad that is down holds the same note on the same track */
 static int held_elsewhere(const struct jlapp *a, uint32_t pad, const struct jlapp_held *h)
 {
     for (uint32_t i = 0; i < JLAPP_PADS; i++)
-        if (i != pad && a->held[i].note == h->note && a->held[i].chan == h->chan && a->held[i].live == h->live)
+        if (i != pad && a->held[i].note == h->note && a->held[i].track == h->track)
             return 1;
     return 0;
 }
@@ -97,11 +134,13 @@ static size_t pad_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_a
         jln_pad(&a->n, a->scale, ev->col, (uint8_t)(ev->row - note_shift(a)), &p);
         if (p.note < 0)
             return 0;
+        if (!a->can_play) {
+            say_why_not(a);
+            return 0;
+        }
         h->note = p.note;
         h->track = a->n.track;
-        h->chan = a->chan[a->n.track];
-        h->live = a->can_play;
-        set_act(out, JLAPP_ACT_NOTE_ON, h->track, h->chan, h->live, (uint8_t)p.note, ev->value);
+        set_act(out, JLAPP_ACT_NOTE_ON, h->track, (uint8_t)p.note, ev->value);
         return 1;
     }
     if (h->note < 0)
@@ -111,7 +150,7 @@ static size_t pad_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_a
         h->note = -1;
         if (held_elsewhere(a, i, &was) || max < 1)
             return 0;
-        set_act(out, JLAPP_ACT_NOTE_OFF, was.track, was.chan, was.live, (uint8_t)was.note, 0);
+        set_act(out, JLAPP_ACT_NOTE_OFF, was.track, (uint8_t)was.note, 0);
         return 1;
     }
 }
@@ -122,10 +161,14 @@ static size_t track_pad_event(struct jlapp *a, const struct jlx_ev *ev, struct j
     uint8_t t = (uint8_t)(ev->row * 8u + ev->col);
     uint16_t bitv = (uint16_t)(1u << t);
     if (ev->value) {
-        if ((a->track_held & bitv) || max < 1 || !a->can_play)   /* without PLAY there is no way to say "that track's note": nothing */
+        if ((a->track_held & bitv) || max < 1)
             return 0;
+        if (!a->can_play) {
+            say_why_not(a);
+            return 0;
+        }
         a->track_held |= bitv;
-        set_act(out, JLAPP_ACT_TRACK_ON, t, 0, 1, 0, 0);
+        set_act(out, JLAPP_ACT_TRACK_ON, t, 0, 0);
         return 1;
     }
     if (!(a->track_held & bitv))
@@ -133,11 +176,11 @@ static size_t track_pad_event(struct jlapp *a, const struct jlx_ev *ev, struct j
     a->track_held &= (uint16_t)~bitv;
     if (max < 1)
         return 0;
-    set_act(out, JLAPP_ACT_TRACK_OFF, t, 0, 1, 0, 0);
+    set_act(out, JLAPP_ACT_TRACK_OFF, t, 0, 0);
     return 1;
 }
 
-/* the scale page (jank_lpapp.h): rows are counted from the top, as Launchpad 95 does, row 0 being the top one (pad row 7) */
+/* ---- the scale page (jank_lpapp.h): rows are counted from the top, as Launchpad 95 does, row 0 being the top one (pad row 7) ---- */
 static const uint8_t WHITE_KEY[7] = {0, 2, 4, 5, 7, 9, 11};      /* C D E F G A B */
 #define PAGE_ROW(y) (7u - (y))
 #define FIRST_SCALE_ROW 4u
@@ -148,11 +191,15 @@ static const uint8_t WHITE_KEY[7] = {0, 2, 4, 5, 7, 9, 11};      /* C D E F G A 
 
 static int is_black_key_pad(uint8_t x) { return x == 0 || x == 1 || x == 3 || x == 4 || x == 5; }
 
+static void say_key(struct jlapp *a) { say(a, "KEY %s", NOTE_NAME[a->n.key % 12u]); }
+
 static void set_scale(struct jlapp *a, unsigned idx)
 {
     const struct jln_scale *s = jls_get(idx);
-    if (s)
+    if (s) {
         a->scale = s;
+        say(a, "SCALE %s", s->name);
+    }
 }
 
 /* major <-> the minor last used, minor pentatonic <-> major pentatonic; another scale has no relative one */
@@ -173,7 +220,17 @@ static void relative_scale(struct jlapp *a)
     } else if (idx == (int)JLS_MAJOR_PENTATONIC) {
         set_scale(a, JLS_MINOR_PENTATONIC);
         n->key = (uint8_t)((n->key + MAJOR_SIXTH_UP) % 12u);
+    } else {
+        say(a, "NO RELATIVE SCALE");
+        return;
     }
+    say(a, "%s %s", NOTE_NAME[n->key % 12u], a->scale->name);     /* the key and the scale it is now: "A Minor" */
+}
+
+static void layout_pad(struct jlapp *a, enum jln_layout l, const char *name)
+{
+    jln_set_layout(&a->n, l);
+    say(a, "LAYOUT %s", name);
 }
 
 static void page_pad(struct jlapp *a, uint8_t x, uint8_t y)
@@ -181,32 +238,43 @@ static void page_pad(struct jlapp *a, uint8_t x, uint8_t y)
     struct jln *n = &a->n;
     uint8_t r = (uint8_t)PAGE_ROW(y);
     if (r == 0) {
-        if (x == 0)
+        if (x == 0) {
             n->absolute ^= 1u;
-        else if (x == 1 && n->layout == JLN_DIATONIC)
+            say(a, "ABSOLUTE ROOT %s", n->absolute ? "ON" : "OFF");
+        } else if (x == 1 && n->layout == JLN_DIATONIC) {
             n->horizontal ^= 1u;
-        else if (x == 4)
-            jln_set_layout(n, JLN_CHORDS);
-        else if (x == 5)
-            jln_set_layout(n, JLN_DIATONIC);
-        else if (x == 6)
-            jln_set_layout(n, JLN_CHROMATIC);
-        else if (x == 7)
+            say(a, "HORIZONTAL %s", n->horizontal ? "ON" : "OFF");
+        } else if (x == 1) {
+            say(a, "DIATONIC ONLY");
+        } else if (x == 4) {
+            layout_pad(a, JLN_CHORDS, "CHORDS");
+        } else if (x == 5) {
+            layout_pad(a, JLN_DIATONIC, "DIATONIC");
+        } else if (x == 6) {
+            layout_pad(a, JLN_CHROMATIC, "CHROMATIC");
+        } else if (x == 7) {
             a->track_pads ^= 1u;
+            say(a, "TRACK PADS %s", a->track_pads ? "ON" : "OFF");
+        }
     } else if (r == 1) {
-        if (is_black_key_pad(x))
+        if (is_black_key_pad(x)) {
             n->key = (uint8_t)(WHITE_KEY[x] + 1u);
-        else if (x == 2)
+            say_key(a);
+        } else if (x == 2) {
             relative_scale(a);
-        else if (x == 6)
+        } else if (x == 6) {
             n->key = (uint8_t)((n->key + FIFTH_DOWN) % 12u);
+            say_key(a);
+        }
     } else if (r == 2) {
         if (x < 7u)
             n->key = WHITE_KEY[x];
         else
             n->key = (uint8_t)((n->key + FIFTH_UP) % 12u);
+        say_key(a);
     } else if (r == 3) {
         jln_set_octave(n, x);
+        say(a, "OCTAVE %u", (unsigned)n->octave);
     } else {
         set_scale(a, (unsigned)(r - FIRST_SCALE_ROW) * 8u + x);
     }
@@ -249,17 +317,62 @@ static uint8_t page_colour(const struct jlapp *a, uint8_t x, uint8_t y)
     }
 }
 
-/* left / right: the previous / next track, shown on the bottom pads for a moment; a track that changed is the Digitone's active one too */
-static size_t track_button(struct jlapp *a, int dir, struct jlapp_act *out, size_t max)
+/* ---- buttons ---- */
+
+static void show_track(struct jlapp *a)
 {
-    uint8_t before = a->n.track;
-    jln_track_step(&a->n, dir);
     a->select_on = 1;
     a->select_ms = a->now_ms;
+}
+
+/* a track the Launchpad chose: shown, said, and the Digitone's active track too (not trusted back from it for a moment: jlapp_on_active_track) */
+static size_t chose_track(struct jlapp *a, uint8_t before, int announce, struct jlapp_act *out, size_t max)
+{
+    show_track(a);
+    a->hold_on = 1;
+    a->hold_ms = a->now_ms;
+    if (announce)
+        say(a, "TRACK %u", (unsigned)a->n.track + 1u);
     if (a->n.track == before || max < 1)
         return 0;
-    set_act(out, JLAPP_ACT_SELECT, a->n.track, a->chan[a->n.track], 1, 0, 0);
+    set_act(out, JLAPP_ACT_SELECT, a->n.track, 0, 0);
     return 1;
+}
+
+/* both left and right: FOLLOW on / off (the first press already stepped the track: put it back) */
+static size_t follow_pair(struct jlapp *a, uint8_t other_idx, struct jlapp_act *out, size_t max)
+{
+    uint8_t stepped_to = a->n.track;
+    a->n.track = a->before[other_idx];
+    if (!a->follow && !(a->live_state == JDL_LIVE && a->read_ok)) {   /* it cannot run: say why, leave it off */
+        if (a->live_state == JDL_LIVE)
+            say(a, "DN2 CANNOT FOLLOW");
+        else
+            say(a, "DN2 NOT READY");
+    } else {
+        a->follow ^= 1u;
+        say(a, "FOLLOW %s", a->follow ? "ON" : "OFF");
+    }
+    return chose_track(a, stepped_to, 0, out, max);
+}
+
+/* left / right: the previous / next track; both together make no step but switch FOLLOW */
+static size_t track_button(struct jlapp *a, unsigned idx, int dir, int pressed, struct jlapp_act *out, size_t max)
+{
+    uint8_t bit = (uint8_t)(1u << idx), other = (uint8_t)(1u << (1u - idx)), before = a->n.track;
+    if (!pressed) {
+        a->buttons &= (uint8_t)~bit;
+        return 0;
+    }
+    a->before[idx] = before;
+    jln_track_step(&a->n, dir);
+    if (a->buttons & other) {
+        a->buttons |= bit;
+        a->n.track = before;           /* this press makes no step either: the first one's step is put back by follow_pair */
+        return follow_pair(a, 1u - idx, out, max);
+    }
+    a->buttons |= bit;
+    return chose_track(a, before, 1, out, max);
 }
 
 static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
@@ -268,16 +381,15 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
         a->page = ev->value != 0;
         return 0;
     }
+    if (ev->idx == BUTTON_LEFT || ev->idx == BUTTON_RIGHT)
+        return track_button(a, ev->idx - BUTTON_LEFT, ev->idx == BUTTON_LEFT ? -1 : 1, ev->value != 0, out, max);
     if (!ev->value)
         return 0;
-    switch (ev->idx) {
-    case BUTTON_UP: jln_octave_step(&a->n, 1); break;
-    case BUTTON_DOWN: jln_octave_step(&a->n, -1); break;
-    case BUTTON_LEFT: return track_button(a, -1, out, max);
-    case BUTTON_RIGHT: return track_button(a, 1, out, max);
-    default: break;                    /* the rest has no job in Note mode yet */
+    if (ev->idx == BUTTON_UP || ev->idx == BUTTON_DOWN) {
+        jln_octave_step(&a->n, ev->idx == BUTTON_UP ? 1 : -1);
+        say(a, "OCTAVE %u", (unsigned)a->n.octave);
     }
-    return 0;
+    return 0;                          /* the rest has no job in Note mode yet */
 }
 
 size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
@@ -297,25 +409,18 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
     return 0;
 }
 
-size_t jlapp_on_lpx(struct jlapp *a, const struct jlx_ev *ev, uint8_t *out, size_t max_packets)
-{
-    struct jlapp_act act;
-    if (jlapp_on_lpx_acts(a, ev, &act, max_packets ? 1u : 0u) < 1)
-        return 0;
-    return jlapp_act_midi(a, &act, out);
-}
+/* ---- from the Digitone ---- */
 
-void jlapp_on_dn2(struct jlapp *a, const uint8_t pkt[4])
+int jlapp_following(const struct jlapp *a) { return a->follow && a->live_state == JDL_LIVE && a->read_ok; }
+
+void jlapp_on_active_track(struct jlapp *a, unsigned track)
 {
-    uint8_t cin = pkt[0] & 0x0Fu, chan = pkt[1] & 0x0Fu, note = pkt[2] & 0x7Fu;
-    if ((pkt[1] >> 4) != cin)          /* not a channel message of that kind */
+    if (!a->follow || track >= JLN_TRACKS || track == a->n.track)
         return;
-    if (cin == CIN_NOTE_ON && pkt[3])
-        a->playing[chan][note >> 3] |= (uint8_t)(1u << (note & 7u));
-    else if (cin == CIN_NOTE_ON || cin == CIN_NOTE_OFF)
-        a->playing[chan][note >> 3] &= (uint8_t)~(1u << (note & 7u));
-    else if (cin == CIN_CC && note == CC_ALL_NOTES_OFF)
-        memset(a->playing[chan], 0, sizeof a->playing[chan]);
+    if (a->hold_on && (uint32_t)(a->now_ms - a->hold_ms) < JLAPP_FOLLOW_HOLD_MS)
+        return;
+    a->n.track = (uint8_t)track;
+    show_track(a);
 }
 
 void jlapp_on_push(struct jlapp *a, const struct jdl_note *notes, size_t n)
@@ -340,28 +445,19 @@ size_t jlapp_release_acts(struct jlapp *a, struct jlapp_act *out, size_t max)
         if (was.note < 0)
             continue;
         for (uint32_t j = i; j < JLAPP_PADS; j++)          /* one end for a note that several pads hold */
-            if (a->held[j].note == was.note && a->held[j].chan == was.chan && a->held[j].live == was.live)
+            if (a->held[j].note == was.note && a->held[j].track == was.track)
                 a->held[j].note = -1;
-        set_act(&out[n++], JLAPP_ACT_NOTE_OFF, was.track, was.chan, was.live, (uint8_t)was.note, 0);
+        set_act(&out[n++], JLAPP_ACT_NOTE_OFF, was.track, (uint8_t)was.note, 0);
     }
     for (uint8_t t = 0; t < JLN_TRACKS && n < max; t++)
         if (a->track_held & (1u << t)) {
             a->track_held &= (uint16_t)~(1u << t);
-            set_act(&out[n++], JLAPP_ACT_TRACK_OFF, t, 0, 1, 0, 0);
+            set_act(&out[n++], JLAPP_ACT_TRACK_OFF, t, 0, 0);
         }
     return n;
 }
 
-size_t jlapp_release_all(struct jlapp *a, uint8_t *out, size_t max_packets)
-{
-    struct jlapp_act acts[JLAPP_PADS + JLN_TRACKS];
-    size_t n = jlapp_release_acts(a, acts, max_packets < JLAPP_PADS + JLN_TRACKS ? max_packets : JLAPP_PADS + JLN_TRACKS), k = 0;
-    for (size_t i = 0; i < n; i++)
-        k += jlapp_act_midi(a, &acts[i], out + 4u * k);
-    return k;
-}
-
-static int bit(const uint8_t *set, int note) { return (set[note >> 3] >> (note & 7)) & 1; }
+/* ---- lights ---- */
 
 /* a pushed note sounded in the last JLAPP_PUSH_LIGHT_MS on this track (and with this pitch, unless note < 0) */
 static int pushed(const struct jlapp *a, uint8_t track, int note)
@@ -389,13 +485,13 @@ static uint8_t track_colour(const struct jlapp *a, uint8_t t, int chosen_shown)
 
 void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
 {
-    uint8_t chan = a->chan[a->n.track], own[16], shift = note_shift(a);
+    uint8_t own[16], shift = note_shift(a);
     int chosen_shown = select_shown(a);
     memset(f, 0, sizeof *f);
     memset(own, 0, sizeof own);
     for (uint32_t i = 0; i < JLAPP_PADS; i++) {
         const struct jlapp_held *h = &a->held[i];
-        if (h->note >= 0 && (h->live ? h->track == a->n.track : h->chan == chan))
+        if (h->note >= 0 && h->track == a->n.track)
             own[h->note >> 3] |= (uint8_t)(1u << (h->note & 7));
     }
     for (uint8_t y = 0; y < 8; y++)
@@ -411,13 +507,16 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
                 continue;
             }
             jln_pad(&a->n, a->scale, x, (uint8_t)(y - shift), &p);
-            playing = p.note >= 0 && (bit(own, p.note) || (a->push ? pushed(a, a->n.track, p.note) : bit(a->playing[chan], p.note)));
+            playing = p.note >= 0 && ((own[p.note >> 3] >> (p.note & 7)) & 1 || (a->push && pushed(a, a->n.track, p.note)));
             f->led[JLX_PAD0 + y * 8u + x].color = jln_color(&p, playing);
         }
-    /* the arrows are green, and dim at the end of what they do (Launchpad 95's Note.Octave): the octave's limits, the first and last track */
+    /* the arrows are green, and dim at the end of what they do (Launchpad 95's Note.Octave): the octave's limits, the first and last track; left and right are
+     * amber while FOLLOW is on */
     f->led[JLX_TOP0 + BUTTON_UP].color = a->n.octave + 1u < jln_octaves(&a->n) ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
     f->led[JLX_TOP0 + BUTTON_DOWN].color = a->n.octave > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
-    f->led[JLX_TOP0 + BUTTON_LEFT].color = a->n.track > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
-    f->led[JLX_TOP0 + BUTTON_RIGHT].color = a->n.track + 1u < JLN_TRACKS ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+    f->led[JLX_TOP0 + BUTTON_LEFT].color = a->n.track > 0u ? (a->follow ? JLAPP_COLOR_FOLLOW_ON : JLAPP_COLOR_ARROW_ON)
+                                                           : (a->follow ? JLAPP_COLOR_FOLLOW_OFF : JLAPP_COLOR_ARROW_OFF);
+    f->led[JLX_TOP0 + BUTTON_RIGHT].color = a->n.track + 1u < JLN_TRACKS ? (a->follow ? JLAPP_COLOR_FOLLOW_ON : JLAPP_COLOR_ARROW_ON)
+                                                                         : (a->follow ? JLAPP_COLOR_FOLLOW_OFF : JLAPP_COLOR_ARROW_OFF);
     f->led[JLX_TOP0 + BUTTON_NOTE].color = JLAPP_COLOR_MODE;
 }
