@@ -62,6 +62,15 @@ size_t jlx_programmer(uint8_t cable, int on, uint8_t *out)
     return sizeof p;
 }
 
+int jlx_programmer_ack(const uint8_t pkt[4], int *mode)
+{
+    if ((pkt[0] & 0x0Fu) != CIN_SYSEX_END3 || pkt[1] != 0x0E || pkt[2] > 1u || pkt[3] != 0xF7)
+        return 0;
+    if (mode)
+        *mode = pkt[2];
+    return 1;
+}
+
 void jlx_forget(struct jlx_frame *shown)
 {
     for (uint32_t i = 0; i < JLX_LEDS; i++) {

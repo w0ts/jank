@@ -24,8 +24,16 @@
 #define RESERVE 4u                     /* packets left free in a queue that also carries the clock: the clock must not wait */
 #define BATCH 16u                      /* lights per call: what fits one bulk packet */
 #define SYSEX_PACKETS 3u               /* the Programmer mode message */
-#define SETTLE_MS 150                  /* after the Programmer mode message, before the first lights: a guess, not measured */
+#define SETTLE_MS 150                  /* after the Launchpad's answer to the Programmer mode message, before the first lights: a guess, not measured */
 #define RETRY_MS 10                    /* the Programmer mode message waits for room this long between tries */
+/* A Launchpad that was replugged stayed dark (measured 2026-11-24 over Wi-Fi diag: attached, claimed, answering the clock, no lights; the
+ * message had gone out the moment it was claimed). The cause is not proven: a Launchpad whose firmware is not up yet may drop the message.
+ * So: a wait before the first message, then the message again every ACK_WAIT_MS until the Launchpad answers it (it sends the same message
+ * back: jlx_programmer_ack); lights wait for the answer. After ACK_TRIES messages with no answer the lights go anyway (a Launchpad that never
+ * answers would otherwise stay dark for good). diag shows messages sent and answers. */
+#define ATTACH_WAIT_MS 500
+#define ACK_WAIT_MS 400
+#define ACK_TRIES 4u
 #define CIN_NOTE_OFF 0x8u
 #define CIN_NOTE_ON 0x9u
 #define CIN_CC 0xBu
@@ -35,8 +43,10 @@ static const char *TAG = "usb lp";
 static struct jlapp s_app;
 static struct jlx_frame s_shown;
 static struct jlo s_out;               /* for the Digitone */
-static uint8_t s_ready, s_lpx_up, s_dn2_up, s_programmer_pending;
+static uint8_t s_ready, s_lpx_up, s_dn2_up, s_programmer_pending;   /* pending: the Launchpad has not answered the Programmer mode message yet */
+static uint8_t s_tries;                /* Programmer mode messages sent to this Launchpad */
 static TickType_t s_settle_at;         /* no lights before this tick */
+static TickType_t s_try_at;            /* the next Programmer mode message is due at this tick */
 
 static void ensure_init(void)
 {
@@ -76,7 +86,9 @@ void usb_lp_attach(enum jlapp_role r)
     if (r == JLAPP_LPX) {
         s_lpx_up = 1;
         g_hostdiag.lpx_up = 1;
-        s_programmer_pending = 1;      /* sent by usb_lp_pump, when its queue has room */
+        s_programmer_pending = 1;      /* sent by usb_lp_pump, after a wait and when its queue has room */
+        s_tries = 0;
+        s_try_at = xTaskGetTickCount() + pdMS_TO_TICKS(ATTACH_WAIT_MS);
         ESP_LOGI(TAG, "Launchpad X");
     } else if (r == JLAPP_DN2) {
         s_dn2_up = 1;
@@ -109,6 +121,16 @@ static void rx_lpx(const uint8_t p[4])
     uint8_t cin = p[0] & 0x0Fu, out[4];
     struct jlx_ev ev;
     const uint8_t msg[3] = {p[1], p[2], p[3]};
+    int mode;
+    if (jlx_programmer_ack(p, &mode)) {   /* its answer to the Programmer mode message: now the lights can follow */
+        if (mode && s_programmer_pending) {
+            s_programmer_pending = 0;
+            g_hostdiag.programmer_acked++;
+            jlx_forget(&s_shown);      /* a Launchpad that just entered the mode shows nothing we know of */
+            s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
+        }
+        return;
+    }
     if (cin != CIN_NOTE_ON && cin != CIN_NOTE_OFF && cin != CIN_CC)
         return;
     if (!jlx_decode(msg, &ev))
@@ -141,13 +163,17 @@ void usb_lp_pump(void)
         return;
     room = usb_midi_host_room(JLAPP_LPX);
     if (s_programmer_pending) {        /* the whole message or none of it: a cut SysEx would leave the Launchpad in Live mode */
-        if (room < SYSEX_PACKETS)
+        if ((int32_t)(xTaskGetTickCount() - s_try_at) < 0 || room < SYSEX_PACKETS)
             return;
         usb_midi_host_send_to(JLAPP_LPX, out, jlx_programmer(LPX_CABLE, 1, out));
         g_hostdiag.programmer_sent++;
-        s_programmer_pending = 0;
-        jlx_forget(&s_shown);
-        s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
+        s_tries++;
+        s_try_at = xTaskGetTickCount() + pdMS_TO_TICKS(ACK_WAIT_MS);
+        if (s_tries >= ACK_TRIES) {    /* it never answered: the lights go anyway, as before */
+            s_programmer_pending = 0;
+            jlx_forget(&s_shown);
+            s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
+        }
         return;
     }
     if ((int32_t)(xTaskGetTickCount() - s_settle_at) < 0 || room <= RESERVE)
@@ -164,8 +190,12 @@ uint32_t usb_lp_wait_ticks(void)
     int32_t left;
     if (!s_lpx_up)
         return portMAX_DELAY;
-    if (s_programmer_pending)
+    if (s_programmer_pending) {        /* until the next message is due, then every RETRY_MS while it waits for room */
+        left = (int32_t)(s_try_at - xTaskGetTickCount());
+        if (left > 0)
+            return (uint32_t)left;
         return pdMS_TO_TICKS(RETRY_MS) ? pdMS_TO_TICKS(RETRY_MS) : 1u;
+    }
     left = (int32_t)(s_settle_at - xTaskGetTickCount());
     return left > 0 ? (uint32_t)left : portMAX_DELAY;
 }

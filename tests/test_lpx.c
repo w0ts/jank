@@ -211,8 +211,27 @@ static void test_forget_sends_all(void)
     CHECK(jlx_diff(0, &shown, &want, out, JLX_LEDS) == 0);
 }
 
+/* the Launchpad's answer to the Programmer mode message: the same SysEx back, its last packet 07 0E 01 F7 (measured) */
+static void test_programmer_ack(void)
+{
+    const uint8_t on[4] = {0x07, 0x0E, 0x01, 0xF7}, off[4] = {0x07, 0x0E, 0x00, 0xF7}, cable2[4] = {0x27, 0x0E, 0x01, 0xF7};
+    const uint8_t first[4] = {0x04, 0xF0, 0x00, 0x20}, bad_mode[4] = {0x07, 0x0E, 0x02, 0xF7}, bad_end[4] = {0x07, 0x0E, 0x01, 0x00};
+    const uint8_t not_end[4] = {0x04, 0x0E, 0x01, 0xF7}, pad[4] = {0x09, 0x90, 0x18, 0x00}, other[4] = {0x07, 0x0F, 0x01, 0xF7};
+    uint8_t sent[12];
+    int mode = -1;
+    CHECK(jlx_programmer_ack(on, &mode) && mode == 1);
+    CHECK(jlx_programmer_ack(off, &mode) && mode == 0);
+    CHECK(jlx_programmer_ack(cable2, &mode) && mode == 1);       /* any cable */
+    CHECK(jlx_programmer_ack(on, NULL));                         /* the mode is optional */
+    CHECK(!jlx_programmer_ack(first, &mode));                    /* the first packet of the same SysEx is not its end */
+    CHECK(!jlx_programmer_ack(bad_mode, &mode) && !jlx_programmer_ack(bad_end, &mode) && !jlx_programmer_ack(not_end, &mode));
+    CHECK(!jlx_programmer_ack(pad, &mode) && !jlx_programmer_ack(other, &mode));
+    CHECK(jlx_programmer(0, 1, sent) == 12 && jlx_programmer_ack(sent + 8, &mode) && mode == 1);   /* our own message ends the way its answer does */
+}
+
 int main(void)
 {
+    test_programmer_ack();
     test_decode_pads();
     test_decode_not_pads();
     test_decode_buttons();

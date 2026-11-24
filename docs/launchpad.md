@@ -35,7 +35,11 @@ separate.
 
 - Two USB-MIDI interfaces: DAW (the first) and MIDI (the second). Programmer mode works on the MIDI one, so for a device
   named "Launchpad X" `usb_midi_host.c` takes the **second** MIDI streaming interface.
-- Programmer mode: `F0 00 20 29 02 0C 0E 01 F7` (0 = Live mode).
+- Programmer mode: `F0 00 20 29 02 0C 0E 01 F7` (0 = Live mode). **Measured** (2026-11-24, Wi-Fi `diag`): the Launchpad X sends the
+  same message back (three packets, the last `07 0E 01 F7`). A replugged Launchpad stayed dark after the unit sent the message the
+  moment it was claimed (cause not proven; a firmware that is not up yet is the guess). So the unit waits 500 ms after a Launchpad
+  appears, sends the message, waits for the answer before any light, and sends it again every 400 ms (at most 4 times, then the lights
+  go anyway). `diag`: `hostdiag_lp=...,programmer:<sent>,acked:<answered>`.
 - A pad is `10 x row + column` (rows 1..8 from the bottom): 11..88. Top buttons CC 91..98 (up, down, left, right, session,
   note, custom, capture), side buttons CC 89 (top) down to 19, logo CC 99. A pad sends Note On, velocity 0 for the release.
 - A light is a Note On (a CC for the buttons) on channel 1 static, 2 flashing, 3 pulsing; the velocity is the palette index

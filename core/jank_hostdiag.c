@@ -99,8 +99,8 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
         put(out, cap, &n, "%s%04X:%04X", i ? "+" : "", d->filter.deny.id[i].vid, d->filter.deny.id[i].pid);
     put(out, cap, &n, "%s\n", d->filter.deny.n ? "" : "-");
     put(out, cap, &n, "hostdiag_events=new:%lu,gone:%lu,add:%lu\n", (unsigned long)d->new_dev, (unsigned long)d->gone_dev, (unsigned long)d->add_calls);
-    put(out, cap, &n, "hostdiag_lp=lpx:%u,dn2:%u,programmer:%lu,pads:%lu,dn2msgs:%lu\n", d->lpx_up, d->dn2_up, (unsigned long)d->programmer_sent,
-        (unsigned long)d->pads, (unsigned long)d->dn2_msgs);
+    put(out, cap, &n, "hostdiag_lp=lpx:%u,dn2:%u,programmer:%lu,acked:%lu,pads:%lu,dn2msgs:%lu\n", d->lpx_up, d->dn2_up, (unsigned long)d->programmer_sent,
+        (unsigned long)d->programmer_acked, (unsigned long)d->pads, (unsigned long)d->dn2_msgs);
     put(out, cap, &n, "hostdiag_mem=heap:%u,heap_min:%u,largest:%lu,client_stack_free:%u\n", d->heap_kb, d->heap_min_kb, (unsigned long)d->heap_big_b,
         d->client_stack_free);
     for (unsigned i = 0; i < JHD_DEVS; i++) {
