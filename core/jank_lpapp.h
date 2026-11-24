@@ -17,7 +17,8 @@
  *
  * Scale page (hold Note): Launchpad 95's scale editor instead of notes, rows from the top: 1 the absolute-root and horizontal toggles (pads 1, 2), the layouts
  * (pads 5 chords, 6 diatonic, 7 chromatic) and the TRACK PADS switch (pad 8); 2 the black keys, the relative scale (pad 3) and the circle of fifths back (pad 7);
- * 3 the white keys C to B and the circle of fifths forward (pad 8); 4 the octaves; 5 to 8 the scales (jank_lpscales.h). Releasing Note goes back to playing.
+ * 3 the white keys C to B and the circle of fifths forward (pad 8); 4 the scale pages (three amber pads); 5 and 6 the scales (jank_lpscales.h); 7 and 8 the 16 tracks, a press
+ * SELECTS one (owner 2026-11-24: the octave row is gone, up / down do the octave): tracks 1-8 on row 7, 9-16 on row 8, WHITE, the selected one AMBER. Releasing Note goes back to playing.
  * With the track pads on, the two bottom rows play the 16 tracks on their own default note (PLAY's op 2) and the note layout moves up to the six rows left.
  *
  * Messages (what the Launchpad 95 shows in Live's status bar): each change of the scale page, each octave and track step, FOLLOW, and a press that cannot play
@@ -47,8 +48,8 @@
 #define JLAPP_AMBER_THIRD 11u
 
 #define JLAPP_PADS 64u
-#define JLAPP_SCALES_PER_PAGE 24u                    /* the scale page shows the Digitone's 36 scales three rows of eight at a time ... */
-#define JLAPP_SCALE_PAGES 2u                         /* ... on two pages, picked by two pads on the row above them */
+#define JLAPP_SCALES_PER_PAGE 16u                    /* the scale page shows the Digitone's 36 scales two rows of eight at a time ... */
+#define JLAPP_SCALE_PAGES 3u                         /* ... on three pages (16, 16, 4), picked by three pads on the row above them */
 #define JLAPP_TRACK_ROWS 2u                          /* the track pads: the two bottom rows */
 #define JLAPP_SELECT_MS 1000u                        /* the bottom 16 pads show the chosen track this long after left / right */
 #define JLAPP_PUSH_LIGHT_MS 150u                     /* a pushed note lights its pad this long (the note's length is not mapped yet: not measured) */

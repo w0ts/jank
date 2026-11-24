@@ -195,12 +195,15 @@ static size_t track_pad_event(struct jlapp *a, const struct jlx_ev *ev, struct j
 /* ---- the scale page (jank_lpapp.h): rows are counted from the top, as Launchpad 95 does, row 0 being the top one (pad row 7) ---- */
 static const uint8_t WHITE_KEY[7] = {0, 2, 4, 5, 7, 9, 11};      /* C D E F G A B */
 #define PAGE_ROW(y) (7u - (y))
-#define SCALE_PAGE_ROW 4u              /* the row above the scales: the page pads (owner 2026-11-24) */
-#define FIRST_SCALE_ROW 5u             /* the Digitone's 36 scales in banks of 3 rows of 8 (JLAPP_SCALES_PER_PAGE) */
+#define SCALE_PAGE_ROW 3u              /* the row above the scales: the page pads (owner 2026-11-24; the octave row that was here is gone) */
+#define FIRST_SCALE_ROW 4u             /* the Digitone's 36 scales in banks of 2 rows of 8 (JLAPP_SCALES_PER_PAGE) */
+#define FIRST_TRACK_ROW 6u             /* the two bottom rows: the 16 tracks, a press selects (owner 2026-11-24) */
 #define FIFTH_UP 7u                   /* the circle of fifths: a fifth up is 7 semitones, a fifth down 5 */
 #define FIFTH_DOWN 5u
 #define MINOR_THIRD_UP 3u
 #define MAJOR_SIXTH_UP 9u              /* the relative major of a minor key is a minor third up, its relative minor a minor third down (9 up) */
+
+static uint8_t track_colour(const struct jlapp *a, uint8_t t);
 
 static int is_black_key_pad(uint8_t x) { return x == 0 || x == 1 || x == 3 || x == 4 || x == 5; }
 
@@ -294,16 +297,13 @@ static void page_pad(struct jlapp *a, uint8_t x, uint8_t y)
         else
             n->key = (uint8_t)((n->key + FIFTH_UP) % 12u);
         say_key(a);
-    } else if (r == 3) {
-        jln_set_octave(n, x);
-        say(a, "OCTAVE %u", (unsigned)n->octave);
     } else if (r == SCALE_PAGE_ROW) {  /* the scales' page pads: only browsing, the scale in use is not changed */
         if (x < JLAPP_SCALE_PAGES) {
             unsigned first = x * JLAPP_SCALES_PER_PAGE, last = first + JLAPP_SCALES_PER_PAGE;
             a->scale_page = x;
             say(a, "SCALES %u-%u", first + 1u, last < jls_count() ? last : jls_count());
         }
-    } else {
+    } else if (r < FIRST_TRACK_ROW) {
         unsigned idx = a->scale_page * JLAPP_SCALES_PER_PAGE + (unsigned)(r - FIRST_SCALE_ROW) * 8u + x;
         if (idx < jls_count())
             set_scale(a, idx);
@@ -339,12 +339,12 @@ static uint8_t page_colour(const struct jlapp *a, uint8_t x, uint8_t y)
     }
     if (r == 2)
         return x < 7u ? on_off(n->key == WHITE_KEY[x], JLAPP_GREEN, JLAPP_GREEN_THIRD) : JLAPP_BLUE;
-    if (r == 3)                        /* Octave */
-        return x < jln_octaves(n) ? on_off(n->octave == x, JLAPP_RED, JLAPP_RED_THIRD) : 0;
+    if (r >= FIRST_TRACK_ROW)          /* the tracks: WHITE, the selected one AMBER (a track that sounds RED) */
+        return track_colour(a, track_of_pad(y, x));
     if (r == SCALE_PAGE_ROW)           /* the page pads: AMBER, not the scales' blue */
         return x < JLAPP_SCALE_PAGES ? on_off(x == a->scale_page, JLAPP_AMBER, JLAPP_AMBER_THIRD) : 0;
     {
-        unsigned idx = a->scale_page * JLAPP_SCALES_PER_PAGE + (unsigned)(r - FIRST_SCALE_ROW) * 8u + x;   /* Modus: the scales of the page shown */
+        unsigned idx = a->scale_page * JLAPP_SCALES_PER_PAGE + (unsigned)(r - FIRST_SCALE_ROW) * 8u + x;   /* Modus: the two rows of the page shown */
         return idx < jls_count() ? on_off((int)idx == jls_index_of(a->scale), JLAPP_BLUE, JLAPP_BLUE_THIRD) : 0;
     }
 }
@@ -562,8 +562,12 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
         int track_pad = a->track_pads && ev->row < JLAPP_TRACK_ROWS;
         if (a->page && ev->value) {    /* a press on the scale page edits it; a release still ends a note that was down before the page opened */
             int idx0 = jls_index_of(a->scale), idx1;
-            uint8_t key0 = a->n.key;
+            uint8_t key0 = a->n.key, before = a->n.track;
             a->note_used = 1;
+            if (ev->row < JLAPP_TRACK_ROWS) {   /* the two bottom rows of the page select a track (owner 2026-11-24) */
+                a->n.track = track_of_pad(ev->row, ev->col);
+                return chose_track(a, before, 1, out, max);
+            }
             page_pad(a, ev->col, ev->row);
             idx1 = jls_index_of(a->scale);
             if (max >= 1 && idx1 >= 0 && (idx1 != idx0 || a->n.key != key0)) {   /* the scale or the key changed: the Digitone is told */
