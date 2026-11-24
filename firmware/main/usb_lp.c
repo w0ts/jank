@@ -8,7 +8,7 @@
  * never lost to a full queue; the Launchpad's lights are only what changed (jlx_diff), a batch at a time.
  *
  * Not verified on hardware yet: the product names the roles are told apart by, that the Digitone's sequencer notes come out of
- * its USB port, its cable number (0 is assumed), the Launchpad taking lights SETTLE_MS after the Programmer mode message. */
+ * its USB port, its cable number (1: the Launchpad's "MIDI" port, measured), the Launchpad taking lights SETTLE_MS after the Programmer mode message. */
 #include <string.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -19,7 +19,11 @@
 #include "jank_lpx.h"
 #include "usb_host_mode.h"
 
-#define LPX_CABLE 0u                   /* the Launchpad's MIDI interface has one port */
+/* The Launchpad X has ONE USB-MIDI streaming interface (diag: ifs:1) with TWO cables, the high nibble of every USB-MIDI packet: 0 is the "DAW" port, 1 the
+ * "MIDI" port (a Mac lists them as "LPX DAW" and "LPX MIDI"). Programmer mode's lights, and its setup messages, take effect on cable 1. Measured
+ * 2026-11-24: the unit sent everything on cable 0 and the LEDs stayed dark although the Launchpad answered, took the messages without an error and
+ * reported Programmer mode; the same messages on the Mac's "LPX MIDI" port (cable 1) lit the pads. */
+#define LPX_CABLE 1u
 #define DN2_CABLE 0u
 #define RESERVE 4u                     /* packets left free in a queue that also carries the clock: the clock must not wait */
 #define BATCH 16u                      /* lights per call: what fits one bulk packet */

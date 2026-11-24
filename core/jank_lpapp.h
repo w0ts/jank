@@ -39,8 +39,8 @@
 /* the hosted devices that matter here, told apart by their USB product string */
 enum jlapp_role { JLAPP_OTHER, JLAPP_LPX, JLAPP_DN2 };
 enum jlapp_role jlapp_role_from_name(const char *product);
-/* which of a device's USB-MIDI streaming interfaces is the one to use (0 = the first): the Launchpad X's first is its DAW
- * interface, its MIDI one (Programmer mode, pads, lights) is the second */
+/* which of a device's USB-MIDI streaming interfaces is the one to use (0 = the first). The Launchpad X has only one (diag ifs:1: "DAW" and "MIDI" are its two
+ * CABLES, not two interfaces), so 1 is clamped to that one; the cable matters, not the interface: usb_lp.c sends on cable 1, the MIDI port */
 unsigned jlapp_midi_interface_index(enum jlapp_role r);
 
 struct jlapp_held {

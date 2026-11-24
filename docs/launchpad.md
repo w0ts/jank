@@ -33,8 +33,11 @@ separate.
 
 ## Verified against Novation's Launchpad X Programmer's reference manual
 
-- Two USB-MIDI interfaces: DAW (the first) and MIDI (the second). Programmer mode works on the MIDI one, so for a device
-  named "Launchpad X" `usb_midi_host.c` takes the **second** MIDI streaming interface.
+- **One USB-MIDI interface, two cables** (measured 2026-11-24: `diag` `ifs:1`; a Mac lists the two ports "LPX DAW" and "LPX MIDI"). "DAW" and "MIDI" are
+  the cable numbers in the high nibble of each USB-MIDI packet: 0 is DAW, 1 is MIDI. Programmer mode's lights and setup messages take effect on **cable 1**;
+  the unit sent everything on cable 0 at first and the LEDs stayed dark (the Launchpad answered the Programmer message, reported Programmer mode and took
+  every light message without an error). (An earlier version of this file said the Launchpad has two interfaces: wrong, only the code's clamp to the last
+  interface kept it working.)
 - Programmer mode: `F0 00 20 29 02 0C 0E 01 F7` (0 = Live mode). **Measured** (2026-11-24, Wi-Fi `diag`): the Launchpad X sends the
   same message back (three packets, the last `07 0E 01 F7`). A replugged Launchpad stayed dark after the unit sent the message the
   moment it was claimed (cause not proven; a firmware that is not up yet is the guess). So the unit waits 500 ms after a Launchpad
