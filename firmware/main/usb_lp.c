@@ -227,6 +227,11 @@ static void live_pump(void)
         g_hostdiag.live_selects += n != 0;
         dn2_send_sysex(sx, n);
     }
+    if (live) {                        /* once per connection: does this Digitone have PLAY? known before the first press (the reply comes within a few ms) */
+        n = jdl_probe_play(&s_jdl, t, sx, sizeof sx);
+        g_hostdiag.live_plays += n != 0;
+        dn2_send_sysex(sx, n);
+    }
     s_was_live = (uint8_t)live;
     if (jlapp_following(&s_app) && t - s_read_ms >= JLAPP_FOLLOW_MS) {
         n = jdl_track_read(&s_jdl, t, sx, sizeof sx);

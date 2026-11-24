@@ -352,8 +352,47 @@ static void test_the_digitones_own_counters(void)
     CHECK(d.st.made == 256);
 }
 
+static void test_play_is_asked_about_once_when_live(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64], body[32];
+    size_t n = jdl_probe_play(&d, 10, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 7 && body[2] == JDL_CMD_PLAY && body[3] == 255 && body[4] == 3);   /* all notes off, every track: harmless */
+    CHECK(jdl_probe_play(&d, 20, out, sizeof out) == 0);                                     /* once per connection */
+    reply_to(&d, d.seq, JDL_CMD_PLAY, 0, NULL, 0);                                           /* a Digitone with PLAY: it stays available */
+    CHECK(jdl_can_play(&d));
+}
+
+static void test_a_digitone_without_play_is_known_before_the_first_press(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64];
+    CHECK(jdl_can_play(&d));                                                                 /* until asked, PLAY is assumed */
+    CHECK(jdl_probe_play(&d, 10, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_PLAY, 2, NULL, 0);                                           /* not understood */
+    CHECK(jdl_is_live(&d) && !jdl_can_play(&d));
+    CHECK(jdl_play(&d, 20, 0, JDL_PLAY_ON, 48, 100, out, sizeof out) == 0);                  /* the first press never goes out */
+}
+
+static void test_play_is_asked_again_on_a_new_connection_and_not_before_live(void)
+{
+    struct jdl d;
+    uint8_t out[64];
+    jdl_init(&d);
+    CHECK(jdl_probe_play(&d, 0, out, sizeof out) == 0);                                      /* not live: nothing */
+    d = live(0);
+    CHECK(jdl_probe_play(&d, 10, out, sizeof out) > 0);
+    jdl_init(&d);                                                                            /* the Launchpad or Digitone came again */
+    jdl_poll(&d, 100, out, sizeof out);
+    reply_to(&d, d.seq, JDL_CMD_LIVE, 0, NULL, 0);
+    CHECK(jdl_probe_play(&d, 110, out, sizeof out) > 0);
+}
+
 int main(void)
 {
+    test_play_is_asked_about_once_when_live();
+    test_a_digitone_without_play_is_known_before_the_first_press();
+    test_play_is_asked_again_on_a_new_connection_and_not_before_live();
     test_the_digitones_own_counters();
     test_reading_the_active_track();
     test_a_read_sent_before_a_select_is_stale();

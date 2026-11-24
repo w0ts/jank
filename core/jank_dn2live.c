@@ -72,6 +72,17 @@ size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, si
     return n;
 }
 
+size_t jdl_probe_play(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
+{
+    size_t n;
+    if (d->state != JDL_LIVE || d->play_probed)
+        return 0;
+    n = jdl_play(d, now_ms, 255u, JDL_PLAY_ALL_OFF, 0, 0, out, cap);
+    if (n)
+        d->play_probed = 1;
+    return n;
+}
+
 int jdl_can_read_track(const struct jdl *d) { return d->state == JDL_LIVE && d->read_ok; }
 
 size_t jdl_track_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)

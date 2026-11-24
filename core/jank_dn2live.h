@@ -61,6 +61,7 @@ struct jdl {
     uint16_t read_seq, select_seq;     /* the last active-track read and the last select sent */
     uint8_t has_read, has_select;
     uint8_t read_ok;                   /* the no-argument TRACK read has not been refused (status 2): 1 until it is */
+    uint8_t play_probed;               /* PLAY has been asked about on this connection (jdl_probe_play) */
     uint8_t fresh, active;             /* an answer to the last read, not yet taken: the Digitone's active track */
 };
 
@@ -80,6 +81,10 @@ size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 /* a request, only while live (else 0): the active track, a PLAY. A request also keeps the lease */
 size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, size_t cap);
 size_t jdl_play(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_play_op op, uint8_t note, uint8_t vel, uint8_t *out, size_t cap);
+/* Right after live control comes up: one PLAY "all notes off, every track", which every Digitone with PLAY takes without a sound and one without it refuses (status 2),
+ * so the pads know PLAY's answer before the first press (else the first press went out, was refused, and only the later ones were blocked). Once per connection;
+ * 0 when not live or already asked */
+size_t jdl_probe_play(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 /* TRACK with no argument asks for the active track (PROPOSED to the Digitone session 2026-11-24, not confirmed; a refusal, status 2, ends the asking). Only the
  * answer to the last read counts, and only when the read was sent after the last select: jdl_take_active gives that track (0..15) once, else -1 */
 int jdl_can_read_track(const struct jdl *d);
