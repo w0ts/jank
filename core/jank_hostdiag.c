@@ -108,8 +108,9 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
         if (!v->used)
             continue;
         clean_name(v, name);
-        put(out, cap, &n, "hostdiag_dev%u=%s,%04X:%04X,role:%s,ifs:%u,use:%u,out:0x%02X,in:0x%02X,claim:%ld,", i, name, v->vid, v->pid,
-            ROLE[v->role < 3u ? v->role : 0], v->ifs, v->itf_index, v->out_ep, v->in_ep, (long)v->claim_err);
+        put(out, cap, &n, "hostdiag_dev%u=%s,%04X:%04X,role:%s,ifs:%u,use:%u,out:0x%02X,in:0x%02X,mps:%u/%u,eps:%u,claim:%ld,where:%u,", i, name, v->vid,
+            v->pid, ROLE[v->role < 3u ? v->role : 0], v->ifs, v->itf_index, v->out_ep, v->in_ep, v->out_mps, v->in_mps, v->neps, (long)v->claim_err,
+            v->claim_where);
         put(out, cap, &n, "in_pkts:%lu,in_err:%lu,in_status:%u,out_done:%lu,out_fail:%lu,last:%02X %02X %02X %02X\n", (unsigned long)v->in_packets,
             (unsigned long)v->in_errors, v->in_last_status, (unsigned long)v->out_done, (unsigned long)v->out_fail, v->in_last[0], v->in_last[1],
             v->in_last[2], v->in_last[3]);

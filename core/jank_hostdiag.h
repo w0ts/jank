@@ -47,6 +47,9 @@ struct jhd_dev {
     uint8_t itf_index;                 /* the one chosen (0 = the first) */
     uint8_t out_ep, in_ep;             /* endpoint addresses (in 0: none opened) */
     uint8_t in_last_status;            /* the last IN transfer status that was not "completed" */
+    uint8_t neps;                      /* endpoints in the chosen interface (the library books every one of them on a claim) */
+    uint8_t claim_where;               /* how far the claim got: 1 the interface, 2 the OUT transfer, 3 the IN transfer (the step that failed when claim_err is not 0) */
+    uint16_t out_mps, in_mps;          /* the bulk endpoints' max packet sizes as the descriptor gives them (the controller's FIFO limit is checked against them) */
     uint16_t vid, pid;
     int32_t claim_err;                 /* the claim's esp_err_t, 0 ok; non-zero: the device was left alone */
     uint32_t in_packets, in_errors, out_done, out_fail;

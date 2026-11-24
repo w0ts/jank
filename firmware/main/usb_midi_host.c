@@ -62,6 +62,7 @@ struct event {
 struct midi_eps {
     uint8_t index;                     /* which MIDI streaming interface (0 = the first) */
     uint8_t itf, out, in;              /* the interface and its first bulk OUT and IN endpoint addresses (in 0: none) */
+    uint8_t neps;                      /* its bNumEndpoints: a claim books all of them */
     uint16_t out_mps, in_mps;
 };
 
@@ -206,6 +207,7 @@ static int eps_of_interface(const usb_config_desc_t *c, unsigned index, struct m
                 inside = seen++ == index;
                 if (inside) {
                     m->itf = ((const usb_intf_desc_t *)cur)->bInterfaceNumber;
+                    m->neps = ((const usb_intf_desc_t *)cur)->bNumEndpoints;
                     m->index = (uint8_t)index;
                 }
             }
@@ -243,14 +245,19 @@ static int find_midi(const usb_config_desc_t *c, unsigned index, enum jlapp_role
     return 0;
 }
 
-static esp_err_t claim(struct dev *d, usb_device_handle_t h, const struct midi_eps *m, enum jlapp_role role)
+/* where: how far it got (the probe's claim_where): 1 the interface, 2 the OUT transfer, 3 the IN transfer */
+static esp_err_t claim(struct dev *d, usb_device_handle_t h, const struct midi_eps *m, enum jlapp_role role, uint8_t *where)
 {
     uint16_t mps = m->out_mps > PACKET_MAX ? PACKET_MAX : m->out_mps;
-    esp_err_t e = usb_host_interface_claim(s_client, h, m->itf, 0);
+    esp_err_t e;
+    *where = 1;
+    e = usb_host_interface_claim(s_client, h, m->itf, 0);
     if (e != ESP_OK)
         return e;
+    *where = 2;
     e = usb_host_transfer_alloc(mps, 0, &d->t);
     if (e == ESP_OK && role != JLAPP_OTHER && m->in && m->in_mps >= 4u) {
+        *where = 3;
         e = usb_host_transfer_alloc(m->in_mps, 0, &d->in);
         if (e != ESP_OK) {
             usb_host_transfer_free(d->t);
@@ -331,7 +338,10 @@ static void add_device(uint8_t address)
     if (e == ESP_OK && role == JLAPP_OTHER && !r->ifs && !has_audio_streaming(c) && (r->vid || r->pid))
         jhf_set_add(&s_useless, r->vid, r->pid);     /* of no use to jank, and it holds a pipe of the controller's 8 (core/jank_hostfilter.h) */
     if (e == ESP_OK && d && find_midi(c, jlapp_midi_interface_index(role), role, &m) && m.out_mps >= 4u) {
-        e = claim(d, h, &m, role);
+        r->out_mps = m.out_mps;        /* what the library is about to be asked to book (its FIFO limits are checked against these) */
+        r->in_mps = m.in_mps;
+        r->neps = m.neps;
+        e = claim(d, h, &m, role, &r->claim_where);
         r->itf_index = m.index;
         r->out_ep = m.out;
         r->in_ep = d->in ? m.in : 0;
