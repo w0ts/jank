@@ -13,8 +13,10 @@ flashing and pulsing follow it. First slice: **Note mode**, played through the D
   wrap. On an 8-track page (Mixer, later) up / down will be the bank 1-8 / 9-16 and left / right do nothing.
 - Pad lights, **the colours of Launchpad 95** (its `SkinMK2.py`, palette indexes from its `ColorsMK2.py`): the scale's root BLUE (45), its **3rd and 5th
   step LIGHT_BLUE (37, Note.Pads.Highlight: `scale[2]` and `scale[4]`, so for a pentatonic the 3rd and 5th step of that scale, not a fixed interval)**, the other
-  scale notes LIGHT_BLUE_HALF (38), a note outside the scale DARK_GREY (1, the chromatic layout), a note the Digitone sounds (or a pad that is
-  down) GREEN (21); one note lights every pad with that pitch (the layouts overlap). The arrows are GREEN (Note.Octave) and dim to GREEN_THIRD (23)
+  scale notes LIGHT_BLUE_HALF (38), a note outside the scale **WHITE (3, owner 2026-11-24; Launchpad 95 has DARK_GREY)**, a note the Digitone sounds (or a pad that is
+  down) GREEN (21). **The colours are relative to the current scale, except for the Digitone's Chromatic (all 12 notes, where nothing would stand out):
+  its reference is the MAJOR scale of the key** (root, 3rd and 5th as in major). Against major, a note that is in natural minor but not in major (the flat
+  3rd, 6th and 7th) is **AMBER (9)**, a note in neither WHITE; against any other scale there is no amber. One note lights every pad with that pitch (the layouts overlap). The arrows are GREEN (Note.Octave) and dim to GREEN_THIRD (23)
   where they can go no further (the lowest or highest octave, the first or last track); the Note button is LIGHT_BLUE (37, Mode.Note).
 - A pad that is down when the track changes ends its note on the track it started on; a Launchpad that goes away ends
   every note it had down.

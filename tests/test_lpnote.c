@@ -151,14 +151,16 @@ static void test_pads_with_note(void)
 
 static void test_colours(void)
 {
-    struct jln_pad root = {60, 1, 0, 1}, in = {62, 0, 0, 1}, high = {64, 0, 1, 1}, out = {61, 0, 0, 0}, none = {-1, 0, 0, 0};
+    struct jln_pad root = {60, 1, 0, 1, 0}, in = {62, 0, 0, 1, 0}, high = {64, 0, 1, 1, 0}, out = {61, 0, 0, 0, 0}, none = {-1, 0, 0, 0, 0};
     CHECK(jln_color(&root, 0) == JLN_COLOR_ROOT && jln_color(&in, 0) == JLN_COLOR_IN_SCALE);
     CHECK(jln_color(&high, 0) == JLN_COLOR_HIGHLIGHT && JLN_COLOR_HIGHLIGHT == 37);          /* the 3rd and 5th: LIGHT_BLUE, between the root and the rest */
     root.highlight = 1;                                          /* a root that is also a highlight (a scale whose 3rd step is the root an octave up): the root wins */
     CHECK(jln_color(&root, 0) == JLN_COLOR_ROOT);
     CHECK(jln_color(&high, 1) == JLN_COLOR_PLAYING);
-    CHECK(jln_color(&out, 0) == JLN_COLOR_OUT_OF_SCALE && jln_color(&none, 0) == 0);          /* a note outside the scale is DARK_GREY, no note at all is dark */
-    CHECK(JLN_COLOR_ROOT == 45 && JLN_COLOR_IN_SCALE == 38 && JLN_COLOR_OUT_OF_SCALE == 1 && JLN_COLOR_PLAYING == 21);   /* BLUE, LIGHT_BLUE_HALF, DARK_GREY, GREEN: LP95's Note.Pads */
+    CHECK(jln_color(&out, 0) == JLN_COLOR_OUT_OF_SCALE && jln_color(&none, 0) == 0);          /* a note outside the scale is WHITE (owner), no note at all is dark */
+    CHECK(JLN_COLOR_ROOT == 45 && JLN_COLOR_IN_SCALE == 38 && JLN_COLOR_OUT_OF_SCALE == 3 && JLN_COLOR_MINOR_ONLY == 9 && JLN_COLOR_PLAYING == 21);   /* BLUE, LIGHT_BLUE_HALF, WHITE, AMBER, GREEN */
+    out.minor_only = 1;
+    CHECK(jln_color(&out, 0) == JLN_COLOR_MINOR_ONLY);           /* minor but not major: AMBER */
     CHECK(jln_color(&root, 1) == JLN_COLOR_PLAYING && jln_color(&out, 1) == JLN_COLOR_PLAYING);   /* playing wins over everything */
     CHECK(jln_color(&none, 1) == 0);
 }
@@ -177,7 +179,7 @@ static void test_highlight_is_the_third_and_fifth_step_of_the_scale(void)
         jln_pad(&s, &MAJOR, x, 0, &p);                           /* C C# D D# E F F# G: a semitone a pad */
         CHECK(p.highlight == (x == 4 || x == 7));                /* E (52) and G (55): the 3rd and 5th step of C major */
     }
-    CHECK(jln_color(&(struct jln_pad){52, 0, 1, 1}, 0) == JLN_COLOR_HIGHLIGHT);
+    CHECK(jln_color(&(struct jln_pad){52, 0, 1, 1, 0}, 0) == JLN_COLOR_HIGHLIGHT);
     jln_pad(&s, &PENTA, 5, 0, &p);                               /* x = 5 is F (53), the pentatonic's 3rd step (5) */
     CHECK(p.note == 53 && p.highlight && p.in_scale);
     jln_pad(&s, &PENTA, 10 - 8, 0, &p);                          /* x = 2 is D (50): not in minor pentatonic at all */
@@ -192,6 +194,44 @@ static void test_highlight_is_the_third_and_fifth_step_of_the_scale(void)
         lit += p.highlight;
     }
     CHECK(lit == 0);
+}
+
+/* the colour of the 12 notes above C (octave 3, the chromatic row's first 12 pads) against a scale */
+static void colours_of_a_row(const struct jln_scale *sc, uint8_t out[12])
+{
+    struct jln s = state(JLN_CHROMATIC, 0, 3, 0);
+    struct jln_pad p;
+    for (uint8_t x = 0; x < 8; x++) {
+        jln_pad(&s, sc, x, 0, &p);
+        out[x] = jln_color(&p, 0);
+    }
+    for (uint8_t x = 0; x < 4; x++) {                            /* row 1 starts a fourth (5 semitones) higher: its pads x = 3..6 are semitones 8, 9, 10, 11 */
+        jln_pad(&s, sc, (uint8_t)(x + 3), 1, &p);
+        out[8 + x] = jln_color(&p, 0);
+    }
+}
+
+/* owner 2026-11-24: against major (the Digitone's Chromatic uses the major scale of the key as reference) the notes outside it are WHITE, and the minor-but-not-major ones AMBER */
+static void test_chromatic_scale_is_coloured_against_major(void)
+{
+    static const struct jln_scale CHROM = {"Chromatic", 12, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}};
+    static const struct jln_scale MINOR = {"Minor", 7, {0, 2, 3, 5, 7, 8, 10}};
+    uint8_t c[12];
+    colours_of_a_row(&CHROM, c);                                 /* C C# D D# E F F# G G# A A# B */
+    CHECK(c[0] == JLN_COLOR_ROOT);
+    CHECK(c[2] == JLN_COLOR_IN_SCALE && c[5] == JLN_COLOR_IN_SCALE && c[9] == JLN_COLOR_IN_SCALE && c[11] == JLN_COLOR_IN_SCALE);   /* D F A B: in major */
+    CHECK(c[4] == JLN_COLOR_HIGHLIGHT && c[7] == JLN_COLOR_HIGHLIGHT);                                                             /* E and G: major's 3rd and 5th */
+    CHECK(c[3] == JLN_COLOR_MINOR_ONLY && c[8] == JLN_COLOR_MINOR_ONLY && c[10] == JLN_COLOR_MINOR_ONLY);                          /* D# G# A#: minor, not major */
+    CHECK(c[1] == JLN_COLOR_OUT_OF_SCALE && c[6] == JLN_COLOR_OUT_OF_SCALE);                                                       /* C# F#: in neither */
+    colours_of_a_row(&MAJOR, c);                                 /* a real major scale gives the same picture */
+    CHECK(c[3] == JLN_COLOR_MINOR_ONLY && c[1] == JLN_COLOR_OUT_OF_SCALE && c[4] == JLN_COLOR_HIGHLIGHT);
+    colours_of_a_row(&MINOR, c);                                 /* any other scale: its own notes, everything else WHITE, no amber */
+    CHECK(c[3] == JLN_COLOR_HIGHLIGHT && c[4] == JLN_COLOR_OUT_OF_SCALE && c[1] == JLN_COLOR_OUT_OF_SCALE && c[8] == JLN_COLOR_IN_SCALE);
+    for (int i = 0; i < 12; i++)
+        CHECK(c[i] != JLN_COLOR_MINOR_ONLY);
+    colours_of_a_row(&PENT, c);
+    for (int i = 0; i < 12; i++)
+        CHECK(c[i] != JLN_COLOR_MINOR_ONLY);
 }
 
 /* the scale page sets an octave directly: inside the layout's octaves, a place past the last one changes nothing */
@@ -219,6 +259,7 @@ static void test_set_octave(void)
 int main(void)
 {
     test_highlight_is_the_third_and_fifth_step_of_the_scale();
+    test_chromatic_scale_is_coloured_against_major();
     test_set_octave();
     test_defaults();
     test_chromatic_relative();

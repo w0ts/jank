@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Launchpad Note mode's pad layouts (jank_lpnote.h): a port of Launchpad 95's MelodicPattern. */
 #include "jank_lpnote.h"
+#include <string.h>
 
 #define TOP_OCTAVE_DIATONIC 6u         /* LP95's TOP_OCTAVE: octaves 0 .. top - 1 */
 #define TOP_OCTAVE_OTHER 7u
@@ -100,6 +101,19 @@ static int pad_index(const struct jln *s, const struct jln_scale *sc, uint8_t x,
     return step_x * (ox + x) + step_y * (oy + y);
 }
 
+static const uint8_t MAJOR_IV[7] = {0, 2, 4, 5, 7, 9, 11};
+static const uint8_t MINOR_IV[7] = {0, 2, 3, 5, 7, 8, 10};      /* natural minor */
+#define MAJOR_N 7
+
+/* the note is key + one of the list's intervals */
+static int in_list(const uint8_t *iv, int n, int key, int note)
+{
+    for (int i = 0; i < n; i++)
+        if (note == key + iv[i])
+            return 1;
+    return 0;
+}
+
 /* the note `index` steps along the scale (chromatic: semitones) from the layout's origin */
 static void pad_from_index(const struct jln *s, const struct jln_scale *sc, int index, struct jln_pad *out)
 {
@@ -108,14 +122,19 @@ static void pad_from_index(const struct jln *s, const struct jln_scale *sc, int 
     int k = floor_mod(index, size);
     int note_in_octave = chromatic ? s->key + k : s->key + sc->iv[k];
     int midi = (s->octave + 1) * 12 + 12 * floor_div(index, size) + note_in_octave;
+    const uint8_t *ref = sc->iv;       /* the reference the colours are relative to: the current scale, but for Chromatic the major scale of the key */
+    int ref_n = sc->n, ref_major;
     out->note = (int16_t)(midi >= 0 && midi < 128 ? midi : -1);
     out->root = note_in_octave == s->key;
-    out->in_scale = 0;
-    for (int i = 0; i < sc->n; i++)
-        if (note_in_octave == s->key + sc->iv[i])
-            out->in_scale = 1;
+    if (sc->n == CHROMATIC_SIZE) {     /* the Digitone's Chromatic: every note is in it, so nothing would stand out: major is the reference */
+        ref = MAJOR_IV;
+        ref_n = MAJOR_N;
+    }
+    ref_major = ref_n == MAJOR_N && !memcmp(ref, MAJOR_IV, MAJOR_N);
+    out->in_scale = in_list(ref, ref_n, s->key, note_in_octave);
     /* Launchpad 95 (ScaleComponent.note): highlight = note == scale[2] or note == scale[4], the third and fifth STEP of the scale (a scale with fewer steps has no such note) */
-    out->highlight = (sc->n > 2 && note_in_octave == s->key + sc->iv[2]) || (sc->n > 4 && note_in_octave == s->key + sc->iv[4]);
+    out->highlight = (ref_n > 2 && note_in_octave == s->key + ref[2]) || (ref_n > 4 && note_in_octave == s->key + ref[4]);
+    out->minor_only = ref_major && !out->in_scale && in_list(MINOR_IV, MAJOR_N, s->key, note_in_octave);
 }
 
 void jln_pad(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t y, struct jln_pad *out)
@@ -156,5 +175,7 @@ uint8_t jln_color(const struct jln_pad *p, int playing)
         return JLN_COLOR_ROOT;
     if (p->highlight)
         return JLN_COLOR_HIGHLIGHT;
-    return p->in_scale ? JLN_COLOR_IN_SCALE : JLN_COLOR_OUT_OF_SCALE;
+    if (p->in_scale)
+        return JLN_COLOR_IN_SCALE;
+    return p->minor_only ? JLN_COLOR_MINOR_ONLY : JLN_COLOR_OUT_OF_SCALE;
 }
