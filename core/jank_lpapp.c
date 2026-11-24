@@ -506,7 +506,7 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
     return 0;                          /* the rest has no job yet */
 }
 
-static const char *const VIEW_NAME[JLMX_VIEWS] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND", "MUTE", "SOLO"};
+static const char *const VIEW_NAME[JLMX_VIEWS] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND", "MUTE AND SOLO", "MUTE AND SOLO"};
 
 /* a pad of the mixer screen: a press writes (the fader moves at once); a release is nothing. A value row of the overview opens its sub mode (no write). Without live control
  * it says why, and without the Digitone's mixer writes (a build without stage 6) it says MIXER READ ONLY, at most every WHY_EVERY_MS */

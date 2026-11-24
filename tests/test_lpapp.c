@@ -1333,7 +1333,7 @@ static void test_scene_buttons_pick_the_view_and_say_it(void)
 {
     struct jlapp a = fresh_list();
     struct jlapp_act o;
-    static const char *const NAME[7] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND", "MUTE", "SOLO"};
+    static const char *const NAME[7] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND", "MUTE AND SOLO", "MUTE AND SOLO"};   /* scene buttons 6 and 7: one screen */
     acts(&a, top(CAPTURE, 127), &o);
     say_nothing_yet(&a);
     for (uint8_t i = 0; i < 7; i++) {
@@ -1432,11 +1432,11 @@ static void test_the_faders_follow_the_digitone_and_a_press_writes(void)
     CHECK(acts(&a, pad(3, 5, 0), &o) == 0);                        /* a release: nothing */
     acts(&a, side(1, 127), &o);                                    /* pan */
     CHECK(acts(&a, pad(0, 7, 100), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.op == JDL_MIX_PAN && o.vel == 127 && o.track == 0);
-    acts(&a, side(5, 127), &o);                                    /* mute */
-    CHECK(acts(&a, pad(2, 4, 100), &o) == 1 && o.kind == JLAPP_ACT_MUTE && o.op == 0 && o.note == 0x05 && o.step == 0);   /* track 3 muted too: tracks 1 and 3 */
-    acts(&a, side(6, 127), &o);                                    /* solo, in the second bank */
-    acts(&a, top(1, 127), &o);
-    CHECK(acts(&a, pad(7, 0, 100), &o) == 1 && o.kind == JLAPP_ACT_MUTE && o.op == 1 && o.note == 0x00 && o.step == 0x80);   /* track 16 soloed: 0x8000 */
+    acts(&a, side(5, 127), &o);                                    /* the mute / solo screen */
+    CHECK(acts(&a, pad(2, 3, 100), &o) == 1 && o.kind == JLAPP_ACT_MUTE && o.op == 0 && o.note == 0x05 && o.step == 0);   /* mute 1-8: track 3 muted too: tracks 1 and 3 */
+    acts(&a, side(6, 127), &o);                                    /* the other scene button: the same screen */
+    CHECK(acts(&a, pad(7, 0, 100), &o) == 1 && o.kind == JLAPP_ACT_MUTE && o.op == 1 && o.note == 0x00 && o.step == 0x80);   /* solo 9-16: track 16 soloed: 0x8000 */
+    CHECK(acts(&a, pad(0, 4, 100), &o) == 0);                      /* the top four rows have no job */
 }
 
 static void test_a_mixer_without_writes_or_without_live_control_says_so(void)

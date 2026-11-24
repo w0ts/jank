@@ -7,7 +7,8 @@
  * Overview, a pad row per thing, from the top in the scene buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm): rows 1-5 volume, pan, delay,
  * reverb, chorus, MINT, a press opens that sub mode; row 6 mute (bright YELLOW, dim when muted) and row 7 solo (bright BLUE when soloed, dim when not), a press toggles that
  * track; row 8 dark. Sub modes: volume, delay, reverb and chorus are 8-pad faders with Launchpad 95's value steps (volume dB steps, its send steps; the bottom pad is 0 and
- * lights nothing), pan a bar from the centre pair out to the value; mute and solo show each track's column. Colours as Launchpad 95's (SkinMK2.py Mixer.*: MINT, YELLOW,
+ * lights nothing), pan a bar from the centre pair out to the value. Scene buttons 6 and 7 both show the MUTE / SOLO screen: on / off buttons for all 16 tracks in the lower four
+ * pad rows, from the top mute 1-8, mute 9-16, solo 1-8, solo 9-16 (the top four rows dark; the bank does not matter). Colours as Launchpad 95's (SkinMK2.py Mixer.*: MINT, YELLOW,
  * BLUE). The values come from MIXER (jank_dn2live.h), so the faders move when the Digitone's values do; a press writes (MIXER SET / MUTE SET, the Digitone's stage 6) and
  * the fader moves at once. Pure; host-tested (tests/test_lpmix.c). */
 #ifndef JANK_LPMIX_H
@@ -56,7 +57,7 @@ void jlmx_init(struct jlmx *s);
 /* the Digitone's answer (jdl_take_mixer); within JLMX_HOLD_MS of a press it is not taken (the fader would jump back and forth), the next one is */
 void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m, uint32_t now_ms);
 /* A pad (x 0..7, y 0..7 from the bottom) pressed: what to write, and the local copy is changed at once (the fader moves). Volume and the sends: the pad's step (the bottom
- * pad is 0); pan: the 8 positions (the two middle ones are the centre); mute / solo (the views, and the overview's rows 6 and 7): the column's track toggles. 1 and *w
+ * pad is 0); pan: the 8 positions (the two middle ones are the centre); mute / solo (the 4-row screen, and the overview's rows 6 and 7): the pad's track toggles. 1 and *w
  * filled, 0 when nothing is to be written (no answer from the Digitone yet; or an overview pad that opens a view: jlmx_open) */
 int jlmx_press(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlmx_write *w);
 /* The overview's pad row y (from the bottom) pressed: rows 1-5 from the top open that sub mode (the view is set), 1; anything else, or not on the overview: 0 */

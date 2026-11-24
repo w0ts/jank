@@ -184,18 +184,23 @@ static void test_pan_is_a_bar_from_the_centre(void)
     CHECK(lit_in_column(&s, 7) == 1 && colour(&s, 7, 4) == JLMX_COLOR_FADER && colour(&s, 7, 5) == 0);                                         /* 65: just right: only the centre pad 4 (the step 84 is above it) */
 }
 
-static void test_mute_and_solo_show_whole_columns(void)
+/* owner 2026-11-24: mute and solo are on / off buttons for all 16 tracks, 4 rows: the lower four pad rows, from the top mute 1-8, mute 9-16, solo 1-8, solo 9-16 */
+static void test_the_mute_and_solo_screen_shows_16_tracks_in_four_rows(void)
 {
-    struct jdl_mixer m = mixer();
-    struct jlmx s = on_view(&m, JLMX_MUTE);
-    CHECK(s.view == JLMX_MUTE);
-    CHECK(colour(&s, 0, 0) == JLMX_COLOR_MUTED && colour(&s, 0, 7) == JLMX_COLOR_MUTED);       /* track 1: muted: dim */
-    CHECK(colour(&s, 1, 3) == JLMX_COLOR_UNMUTED);                                             /* track 2: not muted: bright */
-    CHECK(colour(&s, 2, 5) == JLMX_COLOR_MUTED && colour(&s, 3, 5) == JLMX_COLOR_UNMUTED);
-    jlmx_scene(&s, 6);
-    CHECK(s.view == JLMX_SOLO && colour(&s, 0, 0) == JLMX_COLOR_NOSOLO && colour(&s, 7, 7) == JLMX_COLOR_NOSOLO);
-    jlmx_bank_step(&s, 1);
-    CHECK(colour(&s, 7, 2) == JLMX_COLOR_SOLO && colour(&s, 6, 2) == JLMX_COLOR_NOSOLO);       /* track 16 is the soloed one */
+    struct jdl_mixer m = mixer();                                  /* mute: tracks 1 and 3; solo: track 16 */
+    for (uint8_t view = JLMX_MUTE; view <= JLMX_SOLO; view++) {     /* scene buttons 6 and 7 are the same screen */
+        struct jlmx s = on_view(&m, view);
+        for (unsigned bank = 0; bank < 2; bank++) {                 /* ... whatever the bank */
+            s.bank = (uint8_t)bank;
+            for (uint8_t y = 4; y < 8; y++)
+                for (uint8_t x = 0; x < 8; x++)
+                    CHECK(colour(&s, x, y) == 0);                   /* the top four rows are dark */
+            CHECK(colour(&s, 0, 3) == JLMX_COLOR_MUTED && colour(&s, 1, 3) == JLMX_COLOR_UNMUTED && colour(&s, 2, 3) == JLMX_COLOR_MUTED && colour(&s, 3, 3) == JLMX_COLOR_UNMUTED);   /* mute 1-8 */
+            for (uint8_t x = 0; x < 8; x++)
+                CHECK(colour(&s, x, 2) == JLMX_COLOR_UNMUTED && colour(&s, x, 1) == JLMX_COLOR_NOSOLO);   /* mute 9-16: none; solo 1-8: none */
+            CHECK(colour(&s, 7, 0) == JLMX_COLOR_SOLO && colour(&s, 6, 0) == JLMX_COLOR_NOSOLO && colour(&s, 0, 0) == JLMX_COLOR_NOSOLO);   /* solo 9-16: track 16 */
+        }
+    }
 }
 
 static void test_the_banks(void)
@@ -222,10 +227,10 @@ static void test_scene_buttons(void)
     jlmx_scene(&s, 4);
     CHECK(jlmx_scene_colour(&s, 4) == JLMX_COLOR_FADER && jlmx_scene_colour(&s, 0) == JLMX_COLOR_FADER_THIRD);
     CHECK(jlmx_scene_colour(&s, 5) == JLMX_COLOR_MUTED && jlmx_scene_colour(&s, 6) == JLMX_COLOR_NOSOLO);
-    jlmx_scene(&s, 5);
-    CHECK(jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED);
+    jlmx_scene(&s, 5);                                             /* the mute / solo screen: scene buttons 6 and 7 are both on */
+    CHECK(jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED && jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO && jlmx_scene_colour(&s, 0) == JLMX_COLOR_FADER_THIRD);
     jlmx_scene(&s, 6);
-    CHECK(jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO);
+    CHECK(jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO && jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED);
     CHECK(jlmx_scene_colour(&s, 7) == 0);
     CHECK(JLMX_COLOR_FADER == 29 && JLMX_COLOR_FADER_THIRD == 31 && JLMX_COLOR_UNMUTED == 13 && JLMX_COLOR_MUTED == 15 && JLMX_COLOR_SOLO == 45 && JLMX_COLOR_NOSOLO == 47);   /* LP95's MINT, MINT_THIRD, YELLOW, YELLOW_THIRD, BLUE, BLUE_THIRD */
 }
@@ -278,18 +283,22 @@ static void test_a_pan_press_writes_the_step_and_lights_the_bar(void)
     }
 }
 
-static void test_mute_and_solo_views_press_toggle_a_whole_track(void)
+static void test_a_mute_or_solo_pad_toggles_its_track(void)
 {
     struct jdl_mixer m = mixer();                                  /* mute: tracks 1 and 3; solo: track 16 */
     struct jlmx s = on_view(&m, JLMX_MUTE);
     struct jlmx_write w;
-    CHECK(jlmx_press(&s, 1, 4, 0, &w) && w.kind == JLMX_WRITE_MASK && w.which == 0 && w.mask == 0x0007u);     /* track 2 muted too: 0b111 */
-    CHECK(colour(&s, 1, 0) == JLMX_COLOR_MUTED);
-    CHECK(jlmx_press(&s, 0, 0, 0, &w) && w.mask == 0x0006u && colour(&s, 0, 0) == JLMX_COLOR_UNMUTED);        /* track 1 unmuted */
-    jlmx_scene(&s, 6);
-    jlmx_bank_step(&s, 1);
-    CHECK(jlmx_press(&s, 7, 2, 0, &w) && w.which == 1 && w.mask == 0x0000u && colour(&s, 7, 0) == JLMX_COLOR_NOSOLO);   /* track 16 not soloed any more */
-    CHECK(jlmx_press(&s, 0, 2, 0, &w) && w.which == 1 && w.mask == 0x0100u);                                  /* track 9 soloed: the whole mask */
+    CHECK(jlmx_press(&s, 1, 3, 0, &w) && w.kind == JLMX_WRITE_MASK && w.which == 0 && w.mask == 0x0007u);     /* mute 1-8, column 2: track 2 muted too: 0b111 */
+    CHECK(colour(&s, 1, 3) == JLMX_COLOR_MUTED);
+    CHECK(jlmx_press(&s, 0, 3, 0, &w) && w.mask == 0x0006u && colour(&s, 0, 3) == JLMX_COLOR_UNMUTED);        /* track 1 unmuted */
+    CHECK(jlmx_press(&s, 1, 2, 0, &w) && w.which == 0 && w.mask == 0x0206u && colour(&s, 1, 2) == JLMX_COLOR_MUTED);   /* mute 9-16, column 2: track 10 */
+    CHECK(jlmx_press(&s, 7, 0, 0, &w) && w.which == 1 && w.mask == 0x0000u && colour(&s, 7, 0) == JLMX_COLOR_NOSOLO); /* solo 9-16, column 8: track 16 not soloed any more */
+    CHECK(jlmx_press(&s, 0, 1, 0, &w) && w.which == 1 && w.mask == 0x0001u && colour(&s, 0, 1) == JLMX_COLOR_SOLO);   /* solo 1-8, column 1: track 1 soloed */
+    jlmx_scene(&s, 6);                                             /* the other scene button: the same screen */
+    jlmx_bank_step(&s, 1);                                         /* and the bank does not matter */
+    CHECK(jlmx_press(&s, 0, 3, 0, &w) && w.which == 0 && w.mask == 0x0207u);                                  /* still track 1 (muted again) */
+    for (uint8_t y = 4; y < 8; y++)
+        CHECK(!jlmx_press(&s, 0, y, 0, &w));                       /* the top four rows have no job */
 }
 
 static void test_the_digitones_older_reading_does_not_put_a_fader_back(void)
@@ -322,13 +331,13 @@ int main(void)
     test_volume_faders_light_up_to_the_first_step_not_passed();
     test_the_sends_use_their_own_steps();
     test_pan_is_a_bar_from_the_centre();
-    test_mute_and_solo_show_whole_columns();
+    test_the_mute_and_solo_screen_shows_16_tracks_in_four_rows();
     test_the_banks();
     test_scene_buttons();
     test_a_fader_press_writes_its_step_and_the_fader_moves_at_once();
     test_every_fader_step_lights_exactly_the_pads_that_were_pressed();
     test_a_pan_press_writes_the_step_and_lights_the_bar();
-    test_mute_and_solo_views_press_toggle_a_whole_track();
+    test_a_mute_or_solo_pad_toggles_its_track();
     test_the_digitones_older_reading_does_not_put_a_fader_back();
     printf("test_lpmix: %d checks, %d failed\n", checks, fails);
     return fails;

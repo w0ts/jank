@@ -11,6 +11,7 @@
 #define OVERVIEW_LAST_VALUE_ROW 4u     /* the overview's rows from the top: 0 volume .. 4 chorus (the views), 5 mute, 6 solo, 7 nothing */
 #define OVERVIEW_MUTE_ROW 5u
 #define OVERVIEW_SOLO_ROW 6u
+#define MUTE_SOLO_ROWS 4u              /* the mute / solo screen: the lower four pad rows */
 
 /* Launchpad 95's value maps (SubSelectorComponent.py), its 0..1 values on the Digitone's 0..127. Volume: 0 and the dB steps -42 -24 -18 -12 -6 0 +6 through its level_to_value
  * (0.1424 0.3066 0.40 0.55 0.70 0.85 1.0); the sends: SEND_VALUE_MAP; pan: PAN_VALUE_MAP (-1 -0.63 -0.32 0 0 0.32 0.63 1) as 0..127, the two middle pads the centre (64). The
@@ -133,7 +134,13 @@ static uint8_t param_of(uint8_t view)
     }
 }
 
-/* mute or solo of a track toggled: the whole new mask (the view is MUTE or SOLO, or the overview's mute / solo row) */
+/* The mute / solo screen (owner 2026-11-24: "make them on/off buttons for 16 tracks, both solo and mute, 4 rows"): both scene buttons 6 and 7 show it. The lower four pad rows
+ * (y 3 .. 0), as the Digitone's trig keys lie, tracks 1-8 above 9-16: y 3 mute 1-8, y 2 mute 9-16, y 1 solo 1-8, y 0 solo 9-16. Whatever the bank. */
+static int is_mute_solo(uint8_t view) { return view == JLMX_MUTE || view == JLMX_SOLO; }
+
+static unsigned mute_solo_track(uint8_t y, uint8_t x) { return (y & 1u ? 0u : JLMX_COLUMNS) + x; }
+
+/* mute or solo of a track toggled: the whole new mask (the mute / solo screen, or the overview's mute / solo row) */
 static void toggle_mask(struct jlmx *s, unsigned track, int solo, struct jlmx_write *w)
 {
     uint32_t *mask = solo ? &s->m.solo : &s->m.mute;
@@ -154,8 +161,10 @@ int jlmx_press(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlm
         if (r != OVERVIEW_MUTE_ROW && r != OVERVIEW_SOLO_ROW)
             return 0;                  /* the value rows open a view (jlmx_open); the last row has no job */
         toggle_mask(s, track, r == OVERVIEW_SOLO_ROW, w);
-    } else if (s->view == JLMX_MUTE || s->view == JLMX_SOLO) {
-        toggle_mask(s, track, s->view == JLMX_SOLO, w);
+    } else if (is_mute_solo(s->view)) {
+        if (y >= MUTE_SOLO_ROWS)
+            return 0;                  /* the screen is the lower four pad rows; the rest is dark */
+        toggle_mask(s, mute_solo_track(y, x), y < MUTE_SOLO_ROWS / 2u, w);
     } else {
         uint8_t nv = map_of(s->view)[y];   /* the pad's step: pressing the lowest sets 0 and darkens the fader, as Launchpad 95 does */
         *value_ref(&s->m.t[track], s->view) = nv;
@@ -187,10 +196,15 @@ static uint8_t column_colour(const struct jlmx *s, unsigned track, unsigned row)
     uint8_t v;
     if (s->view == JLMX_OVERVIEW)
         return overview_colour(s, track, row);
-    if (s->view == JLMX_MUTE)
-        return (s->m.mute >> track) & 1u ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED;
-    if (s->view == JLMX_SOLO)
-        return (s->m.solo >> track) & 1u ? JLMX_COLOR_SOLO : JLMX_COLOR_NOSOLO;
+    if (is_mute_solo(s->view)) {
+        unsigned of;
+        if (row >= MUTE_SOLO_ROWS)
+            return 0;
+        of = mute_solo_track((uint8_t)row, (uint8_t)(track % JLMX_COLUMNS));
+        if (row < MUTE_SOLO_ROWS / 2u)
+            return (s->m.solo >> of) & 1u ? JLMX_COLOR_SOLO : JLMX_COLOR_NOSOLO;
+        return (s->m.mute >> of) & 1u ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED;
+    }
     v = value_of(t, s->view);
     if (s->view == JLMX_PAN)
         return pan_lit(v, row) ? JLMX_COLOR_FADER : 0;
@@ -209,6 +223,7 @@ uint8_t jlmx_scene_colour(const struct jlmx *s, uint8_t idx)
     int on = s->view == idx;
     if (idx <= JLMX_CHR)
         return on ? JLMX_COLOR_FADER : JLMX_COLOR_FADER_THIRD;
+    on = is_mute_solo(s->view);        /* scene buttons 6 and 7 are the same screen: both bright while it is shown */
     if (idx == JLMX_MUTE)
         return on ? JLMX_COLOR_UNMUTED : JLMX_COLOR_MUTED;
     if (idx == JLMX_SOLO)
