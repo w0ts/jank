@@ -37,7 +37,7 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
 - Jank asks for live control (LIVE ON, with the note push) as soon as both devices are up, keeps it (a request at least every 4 s; the lease is 10 s) and
   asks again every second until it answers; if the Digitone says REMOTE CONTROL is off, or has no live control, it asks again every 5 s. `diag` shows it:
   `hostdiag_live=state:live,play:1,asked:..,replies:..,plays:..,selects:..,pushes:..,notes:..,dropped:..,reads:..,msgs:..`.
-- **A pad plays by PLAY** (command 50, in the Digitone's stage 4 or 5; `track, op, note, velocity`). Without live control, or on a Digitone that has no PLAY,
+- **A pad plays by PLAY** (command 53, in the Digitone's stage 5, 19:00-20:00 on 2026-11-24 at the earliest; 50 is its SCALE; `track, op, note, velocity`). Without live control, or on a Digitone that has no PLAY,
   **the pads play nothing and say why** (a message, at most every 2 s): REMOTE CONTROL OFF, NO LIVE CONTROL, DN2 HAS NO PLAY, DN2 NOT READY. A note ends by the
   same route, on the track it started on, whatever changed meanwhile. Lost requests are counted (`dropped:`) and never half sent.
 - **Left / right choose the Digitone's active track** (TRACK, 49) and, for a second, the 16 bottom pads show which: row 1 tracks 1-8, row 2 tracks 9-16, the
@@ -54,7 +54,7 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
 - **Messages** (what Launchpad 95 writes in Live's status bar; at most 20 characters, upper case): every change on the scale page (ABSOLUTE ROOT ON, HORIZONTAL
   OFF, DIATONIC ONLY, LAYOUT CHORDS, TRACK PADS ON, KEY C#, A MINOR, SCALE DORIAN, OCTAVE 2, NO RELATIVE SCALE), up / down (OCTAVE 4), left / right (TRACK 3),
   FOLLOW ON / OFF, and why a press cannot play. **Jank's own screen shows them** as its one-second overlay box (`uis_message`, the ui task). **Without a screen
-  they go to the Digitone**: a MESSAGE command (51) was asked of dn2-wishes (a full-screen popup of about a second) and is **not confirmed (stage 5)**, so
+  they go to the Digitone**: a MESSAGE command (54) was asked of dn2-wishes (a full-screen popup of about a second) and is **not confirmed (stage 5)**, so
   nothing is sent yet and a unit without a screen shows no message. `diag` `msgs:` counts them.
 
 ### Colour language so far (to be decided with the owner)

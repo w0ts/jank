@@ -6,7 +6,7 @@
  *   44 LIVE   sub 0 STATUS, 1 ON (what = 1: push the notes), 2 OFF       any live request within 10 s keeps live control on (the lease): jank asks at
  *                                                                        least every JDL_KEEPALIVE_MS
  *   49 TRACK  u8 track (0..15)                                           the active track, as [TRK]+[TRIG n] does
- *   50 PLAY   u8 track (0..15, 255 = the active one), u8 op, u8 note, u8 vel     op 0 note off, 1 note on (vel 0: the track's own), 2 the track's own default
+ *   53 PLAY   u8 track (0..15, 255 = the active one), u8 op, u8 note, u8 vel     op 0 note off, 1 note on (vel 0: the track's own), 2 the track's own default
  *                                                                        note on, 3 all notes off (track 255: every track); op 0 with note 255 ends the
  *                                                                        track's own default note (what op 2 started); PROPOSED by jank, accepted by
  *                                                                        the Digitone session (stage 4, not built yet): a Digitone without it answers status 2
@@ -20,7 +20,7 @@
 
 #define JDL_CMD_LIVE 44u
 #define JDL_CMD_TRACK 49u
-#define JDL_CMD_PLAY 50u
+#define JDL_CMD_PLAY 53u              /* not 50: the Digitone's stage 4 uses 50 SCALE, 51 PATTERNS, 52 SONG (renumbered 2026-11-24 at its request); MESSAGE will be 54 */
 #define JDL_CMD_PUSH 47u               /* the push's command number (its cmd byte on the wire is 0xAF) */
 #define JDL_NOTES_MAX 16u              /* notes in one push */
 
