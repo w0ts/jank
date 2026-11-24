@@ -105,10 +105,10 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
         (unsigned long)d->dn2_msgs);
     {
         static const char *const live[] = {"down", "asking", "live", "remote_off", "no_live"};
-        put(out, cap, &n, "hostdiag_live=state:%s,play:%u,asked:%lu,replies:%lu,plays:%lu,selects:%lu,pushes:%lu,notes:%lu,dropped:%lu,reads:%lu,msgs:%lu\n",
+        put(out, cap, &n, "hostdiag_live=state:%s,play:%u,asked:%lu,replies:%lu,plays:%lu,selects:%lu,pushes:%lu,notes:%lu,dropped:%lu,reads:%lu,msgs:%lu,msgs_sent:%lu,msg_ok:%u\n",
             d->live_state < sizeof live / sizeof live[0] ? live[d->live_state] : "?", d->live_play, (unsigned long)d->live_asked, (unsigned long)d->live_replies,
             (unsigned long)d->live_plays, (unsigned long)d->live_selects, (unsigned long)d->live_pushes, (unsigned long)d->live_notes,
-            (unsigned long)d->live_dropped, (unsigned long)d->live_reads, (unsigned long)d->live_msgs);
+            (unsigned long)d->live_dropped, (unsigned long)d->live_reads, (unsigned long)d->live_msgs, (unsigned long)d->live_msgs_sent, d->live_msg_ok);
     }
     put(out, cap, &n, "hostdiag_head=rt_clocks:%lu,rt_starts:%lu,rt_stops:%lu,rt_run:%u,beat:%u,transport:%u\n", (unsigned long)d->head_rt_clocks,
         (unsigned long)d->head_rt_starts, (unsigned long)d->head_rt_stops, d->head_rt_run, d->head_beat, d->head_transport);

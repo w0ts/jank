@@ -20,6 +20,7 @@ void jdl_init(struct jdl *d)
     d->state = JDL_DOWN;
     d->play_ok = 1;
     d->read_ok = 1;
+    d->msg_ok = 1;
 }
 
 int jdl_is_live(const struct jdl *d) { return d->state == JDL_LIVE; }
@@ -132,6 +133,25 @@ static void take_steps(struct jdl *d, const struct jd2_reply *r)
     d->page_fresh = 1;
 }
 
+int jdl_can_message(const struct jdl *d) { return d->state == JDL_LIVE && d->msg_ok; }
+
+size_t jdl_message(struct jdl *d, uint32_t now_ms, const char *text, uint8_t tenths, uint8_t *out, size_t cap)
+{
+    uint8_t args[1u + JDL_MSG_MAX];
+    size_t n = 0;
+    if (!jdl_can_message(d) || !text)
+        return 0;
+    args[0] = tenths;
+    for (; text[n]; n++) {
+        if (n >= JDL_MSG_MAX || (unsigned char)text[n] < 0x20u || (unsigned char)text[n] > 0x7Eu)
+            return 0;                  /* the Digitone refuses it: say nothing instead */
+        args[1u + n] = (uint8_t)text[n];
+    }
+    if (!n)
+        return 0;
+    return send(d, now_ms, JDL_CMD_MESSAGE, args, 1u + n, out, cap);
+}
+
 size_t jdl_probe_play(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
 {
     size_t n;
@@ -207,7 +227,11 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         d->play_ok = 0;
         return JDL_IN_REPLY;
     }
-    if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP)
+    if (r.cmd == JDL_CMD_MESSAGE && r.status == ST_NOT_UNDERSTOOD) {   /* a build without MESSAGE (our texts are always valid): none is sent from now on */
+        d->msg_ok = 0;
+        return JDL_IN_REPLY;
+    }
+    if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE)
         return JDL_IN_IGNORED;
     if (r.cmd == JDL_CMD_STEPS || r.cmd == JDL_CMD_STEP) {   /* a refused read or write (2), a full queue (5): that request only, live control is fine */
         if (r.status == ST_NOT_UNDERSTOOD) {

@@ -12,8 +12,8 @@
 
 #define JHD_DEVS 4u                    /* as many as usb_midi_host.c has slots */
 #define JHD_NAME_MAX 23u               /* as JK_USB_NAME_MAX */
-#define JHD_VERSION 15u             /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
-                                          15: the playhead's source (head_); 14: the step counters; 13: live_ignored and the dn2_ status; 12: live_reads, live_msgs; 11: the live_ fields; 10: setup_sent; 9: lp_mode, lp_reentered; 8: lights_sent; 7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
+#define JHD_VERSION 16u             /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
+                                          16: live_msgs_sent, live_msg_ok; 15: the playhead's source (head_); 14: the step counters; 13: live_ignored and the dn2_ status; 12: live_reads, live_msgs; 11: the live_ fields; 10: setup_sent; 9: lp_mode, lp_reentered; 8: lights_sent; 7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
                                           so the size check does not catch it: bump this with every change to struct jhd or jhd_dev) */
 
 /* the steps of a host start, in order, for the one that failed (jhd_format_failure) */
@@ -92,6 +92,8 @@ struct jhd {
     uint8_t head_rt_run, head_beat, head_transport;           /* it is running (Start seen, no Stop); Jank's session beat is known; Jank's transport runs */
     uint32_t live_edits, live_pagereads;   /* the step modes: STEP edits sent, STEPS page reads sent */
     uint32_t live_step_busy, live_step_refused;   /* the Digitone answered STEP / STEPS with 5 (16 writes waiting) / 2 (refused) */
+    uint32_t live_msgs_sent;           /* of those messages, the ones sent to the Digitone's screen (MESSAGE, 54) */
+    uint8_t live_msg_ok;               /* the Digitone has not refused MESSAGE: 1 until it does */
     uint32_t live_ignored;             /* SysEx frames from the Digitone that the live-control reader did not take (not a reply, not a push, or damaged) */
     uint16_t live_ign_len;             /* the length of the last one */
     uint8_t dn2_proto, dn2_push, dn2_lease;   /* the Digitone's own LIVE STATUS: protocol (0: none read yet), push on, seconds of lease left */

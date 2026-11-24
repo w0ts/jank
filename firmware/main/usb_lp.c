@@ -191,21 +191,30 @@ static void sync_live(void)
     g_hostdiag.head_rt_run = s_app.step.rt_run;
     g_hostdiag.head_beat = s_app.beat_ok;
     g_hostdiag.head_transport = s_app.transport;
+    g_hostdiag.live_msg_ok = s_jdl.msg_ok;
     g_hostdiag.live_step_busy = s_jdl.step_busy;
     g_hostdiag.live_step_refused = s_jdl.step_refused;
     jlapp_set_live(&s_app, s_jdl.state, s_jdl.play_ok, jdl_can_read_track(&s_jdl));
 }
 
-/* the message the pad logic left (what Launchpad 95 writes in Live's status bar): on Jank's own screen when it has one. Without a screen it is not shown: the
- * Digitone's own MESSAGE command is not confirmed yet (dn2-wishes, stage 5), so nothing is sent for it */
+/* the message the pad logic left (what Launchpad 95 writes in Live's status bar): on Jank's own screen when it has one; without a screen on the Digitone's (live control
+ * MESSAGE, 54, a box of about a second over its page: stage 5; a build without it refuses once and nothing more is sent). A message made while live control is not up
+ * (the "why the pads do not play" ones) has no way to be shown and is dropped. */
 static void deliver_messages(void)
 {
     char m[JLAPP_MSG_MAX];
+    uint8_t sx[REQUEST_MAX];
+    size_t n;
     if (!jlapp_take_message(&s_app, m, sizeof m))
         return;
     g_hostdiag.live_msgs++;
-    if (uis_has_screen())
+    if (uis_has_screen()) {
         uis_message(m);
+        return;
+    }
+    n = jdl_message(&s_jdl, now_ms(), m, 0, sx, sizeof sx);   /* duration 0: the Digitone's own second */
+    g_hostdiag.live_msgs_sent += n != 0;
+    dn2_send_sysex(sx, n);
 }
 
 /* a whole SysEx from the Digitone: an answer to a live-control request (moves its state), or the push of the notes it is playing (lights) */

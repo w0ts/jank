@@ -22,7 +22,9 @@
 #define JDL_CMD_STEPS 46u              /* read a page of 16 steps of a track */
 #define JDL_CMD_STEP 48u               /* set / clear a trig, set its note */
 #define JDL_CMD_TRACK 49u
-#define JDL_CMD_PLAY 53u              /* not 50: the Digitone's stage 4 uses 50 SCALE, 51 PATTERNS, 52 SONG (renumbered 2026-11-24 at its request); MESSAGE will be 54 */
+#define JDL_CMD_MESSAGE 54u            /* u8 duration (100 ms units, 0 = 1 s), then 1..20 characters 0x20..0x7e: a box over the Digitone's page (stage 5) */
+#define JDL_MSG_MAX 20u
+#define JDL_CMD_PLAY 53u             /* not 50: the Digitone's stage 4 uses 50 SCALE, 51 PATTERNS, 52 SONG (renumbered 2026-11-24 at its request); MESSAGE will be 54 */
 #define JDL_CMD_PUSH 47u               /* the push's command number (its cmd byte on the wire is 0xAF) */
 #define JDL_NOTES_MAX 16u              /* notes in one push */
 
@@ -76,6 +78,7 @@ struct jdl {
     uint16_t seq;
     uint8_t state;                     /* enum jdl_state */
     uint8_t play_ok;                   /* PLAY has not been refused (status 2): 1 until it is */
+    uint8_t msg_ok;                    /* MESSAGE has not been refused (status 2: a Digitone build without it): 1 until it is */
     uint8_t asked;                     /* a live request has been sent, at sent_ms */
     uint32_t sent_ms;
     uint16_t read_seq, select_seq;     /* the last active-track read and the last select sent */
@@ -105,6 +108,12 @@ size_t jdl_play(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_play_op 
 size_t jdl_steps_read(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t page, uint8_t *out, size_t cap);
 size_t jdl_step_edit(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t step, enum jdl_step_op op, uint8_t note, uint8_t vel, uint8_t len, uint8_t *out, size_t cap);
 int jdl_take_page(struct jdl *d, struct jdl_page *out);
+
+/* A short message for the Digitone's screen (MESSAGE, 54; Jank has no screen of its own): `text` of 1..JDL_MSG_MAX printable ASCII characters, shown `tenths` x 100 ms (0: the
+ * Digitone's default, 1 s). Only while live and while MESSAGE has not been refused; else 0 (also for text the Digitone would refuse: empty, too long, a character outside
+ * 0x20..0x7e). It changes nothing on the Digitone and never covers one of stock's dialogs. A newer message replaces the one showing. */
+int jdl_can_message(const struct jdl *d);
+size_t jdl_message(struct jdl *d, uint32_t now_ms, const char *text, uint8_t tenths, uint8_t *out, size_t cap);
 
 /* Right after live control comes up: one PLAY "all notes off, every track", which every Digitone with PLAY takes without a sound and one without it refuses (status 2),
  * so the pads know PLAY's answer before the first press (else the first press went out, was refused, and only the later ones were blocked). Once per connection;

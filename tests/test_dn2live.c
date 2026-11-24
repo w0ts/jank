@@ -488,8 +488,44 @@ static void test_a_refused_or_full_step_request_changes_nothing_else(void)
     CHECK(!jdl_is_live(&d));
 }
 
+static void test_a_message_for_the_digitones_screen(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64], body[40];
+    size_t n = jdl_message(&d, 10, "KEY C#", 10, out, sizeof out);
+    CHECK(jdl_can_message(&d) && n > 0 && request_body(out, n, body) == 3 + 1 + 6 && body[2] == JDL_CMD_MESSAGE && body[3] == 10 && memcmp(body + 4, "KEY C#", 6) == 0);
+    n = jdl_message(&d, 11, "TWENTY CHARACTERS 20", 0, out, sizeof out);          /* the longest: 20 characters, duration 0 = the Digitone's default */
+    CHECK(n > 0 && request_body(out, n, body) == 3 + 1 + 20 && body[3] == 0 && memcmp(body + 4, "TWENTY CHARACTERS 20", 20) == 0);
+    CHECK(jdl_message(&d, 12, "TWENTY ONE CHARACTERS", 0, out, sizeof out) == 0);   /* 21: the Digitone would refuse it */
+    CHECK(jdl_message(&d, 12, "", 0, out, sizeof out) == 0 && jdl_message(&d, 12, NULL, 0, out, sizeof out) == 0);
+    CHECK(jdl_message(&d, 12, "TAB\tHERE", 0, out, sizeof out) == 0 && jdl_message(&d, 12, "\xC3\xA9", 0, out, sizeof out) == 0);   /* outside 0x20..0x7e */
+    CHECK(jdl_message(&d, 12, " ~", 0, out, sizeof out) > 0);                      /* the edges of the range are fine */
+    CHECK(jdl_message(&d, 13, "SHORT", 5, out, 8) == 0);                           /* no room: nothing */
+}
+
+static void test_a_message_needs_live_control_and_a_digitone_that_has_it(void)
+{
+    struct jdl d;
+    uint8_t out[64];
+    jdl_init(&d);
+    CHECK(!jdl_can_message(&d) && jdl_message(&d, 0, "HI", 0, out, sizeof out) == 0);   /* not live */
+    d = live(0);
+    CHECK(jdl_message(&d, 10, "HI", 0, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_MESSAGE, 0, NULL, 0);                                  /* shown: nothing changes */
+    CHECK(jdl_can_message(&d) && jdl_is_live(&d));
+    CHECK(jdl_message(&d, 20, "HI", 0, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_MESSAGE, 2, NULL, 0);                                  /* a Digitone build without MESSAGE (stage 4): never again */
+    CHECK(!jdl_can_message(&d) && jdl_is_live(&d) && jdl_can_play(&d) && jdl_message(&d, 30, "HI", 0, out, sizeof out) == 0);
+    d = live(0);
+    CHECK(jdl_message(&d, 10, "HI", 0, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_MESSAGE, 4, NULL, 0);                                  /* the lease ran out: live control asked for again, MESSAGE not given up */
+    CHECK(!jdl_is_live(&d) && d.msg_ok);
+}
+
 int main(void)
 {
+    test_a_message_for_the_digitones_screen();
+    test_a_message_needs_live_control_and_a_digitone_that_has_it();
     test_reading_a_page_of_steps();
     test_a_damaged_steps_answer_is_not_taken();
     test_editing_a_step();

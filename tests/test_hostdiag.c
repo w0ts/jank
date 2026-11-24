@@ -135,6 +135,8 @@ static void test_full_record(void)
     d.live_dropped = 1;
     d.live_reads = 8;
     d.live_msgs = 10;
+    d.live_msgs_sent = 7;
+    d.live_msg_ok = 1;
     d.head_rt_clocks = 9000;
     d.head_rt_starts = 3;
     d.head_rt_stops = 2;
@@ -186,7 +188,7 @@ static void test_full_record(void)
     CHECK(strstr(out, "hostdiag_filter=hub:1,skipped:2,last:25A4:9311,learned:14CD:1212+25A4:9311\n"));   /* what the enumeration rule left alone, and its list */
     CHECK(strstr(out, "hostdiag_events=new:3,gone:1,add:3\n"));
     CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:2,acked:1,setup:2,mode:live,reentered:1,lights:243,pads:7,dn2msgs:9\n"));
-    CHECK(strstr(out, "hostdiag_live=state:live,play:1,asked:12,replies:11,plays:5,selects:3,pushes:4,notes:6,dropped:1,reads:8,msgs:10\n"));
+    CHECK(strstr(out, "hostdiag_live=state:live,play:1,asked:12,replies:11,plays:5,selects:3,pushes:4,notes:6,dropped:1,reads:8,msgs:10,msgs_sent:7,msg_ok:1\n"));
     CHECK(strstr(out, "hostdiag_head=rt_clocks:9000,rt_starts:3,rt_stops:2,rt_run:1,beat:1,transport:0\n"));
     CHECK(strstr(out, "hostdiag_steps=edits:12,reads:340,busy:2,refused:1\n"));
     CHECK(strstr(out, "hostdiag_dn2live=proto:3,push:1,lease:9,made:100,sent:96,lost:4,dropped:2,pushmsgs:30,ignored:3,last_ignored_len:41\n"));

@@ -54,8 +54,10 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
 - **Messages** (what Launchpad 95 writes in Live's status bar; at most 20 characters, upper case): every change on the scale page (ABSOLUTE ROOT ON, HORIZONTAL
   OFF, DIATONIC ONLY, LAYOUT CHORDS, TRACK PADS ON, KEY C#, A MINOR, SCALE DORIAN, OCTAVE 2, NO RELATIVE SCALE), up / down (OCTAVE 4), left / right (TRACK 3),
   FOLLOW ON / OFF, and why a press cannot play. **Jank's own screen shows them** as its one-second overlay box (`uis_message`, the ui task). **Without a screen
-  they go to the Digitone**: a MESSAGE command (54) was asked of dn2-wishes (a full-screen popup of about a second) and is **not confirmed (stage 5)**, so
-  nothing is sent yet and a unit without a screen shows no message. `diag` `msgs:` counts them.
+  they go to the Digitone**: live control MESSAGE (54, stage 5 of dn2-wishes: `u8 duration` in 100 ms units, 0 = 1 s, then 1..20 characters 0x20..0x7e; a box over the
+  Digitone's page that changes nothing and never covers one of stock's dialogs; a newer one replaces it). Jank sends them with duration 0. A Digitone build without it
+  (stage 4) answers status 2 once and nothing more is sent. A message made while live control is not up (the "why the pads do not play" ones) cannot be shown and is dropped.
+  `diag`: `msgs:` made, `msgs_sent:` sent to the Digitone, `msg_ok:` not refused. Needs stage 5 installed on the Digitone; **not tried on hardware**.
 
 ### Modes: Note, melodic step, drum step (`core/jank_lpstep.[ch]`)
 
