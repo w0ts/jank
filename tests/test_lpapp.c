@@ -1162,8 +1162,109 @@ static void test_release_acts_in_a_step_mode(void)
     CHECK(jlapp_release_acts(&a, o, 4) == 1 && o[0].kind == JLAPP_ACT_NOTE_OFF);
 }
 
+/* ---- the scale, synced with the Digitone ---- */
+
+static void test_the_digitones_scale_is_taken_when_it_is_first_read_and_when_it_changes(void)
+{
+    struct jlapp a = fresh_list();
+    CHECK(jls_index_of(a.scale) == 1 && a.n.key == 0);             /* Ionian (Maj), C, until the Digitone says */
+    jlapp_on_dn2_scale(&a, 6, 1, 9);                               /* its first reading: Aeolian (Min), root A */
+    CHECK(jls_index_of(a.scale) == 6 && a.n.key == 9 && a.scale_page == 0);
+    jlapp_on_dn2_scale(&a, 30, 1, 2);                              /* it changes the scale and the root */
+    CHECK(jls_index_of(a.scale) == 30 && a.n.key == 2 && a.scale_page == 1);   /* scale 30 is on the second page */
+    jlapp_on_dn2_scale(&a, 3, 1, 2);                               /* only the scale changes */
+    CHECK(jls_index_of(a.scale) == 3 && a.n.key == 2 && a.scale_page == 0);
+    CHECK(strcmp(msg(&a), "") == 0);                               /* no message: the Digitone's screen says it */
+    jlapp_on_dn2_scale(&a, 99, 1, 0);                              /* not a scale: ignored */
+    CHECK(jls_index_of(a.scale) == 3);
+}
+
+static void test_an_unchanged_reading_leaves_the_launchpads_choice_alone(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    jlapp_on_dn2_scale(&a, 1, 1, 0);
+    acts(&a, top(NOTE_BTN, 127), &o);
+    CHECK(acts(&a, pad(2, 2, 100), &o) == 1 && o.kind == JLAPP_ACT_SCALE && o.note == 2);   /* Dorian, chosen here */
+    acts(&a, top(NOTE_BTN, 0), &o);
+    jlapp_on_dn2_scale(&a, 1, 1, 0);                               /* the Digitone still says Ionian (an older build that cannot be set, or the write not yet applied) */
+    jlapp_on_dn2_scale(&a, 1, 1, 0);
+    CHECK(jls_index_of(a.scale) == 2);                             /* the Launchpad is not put back */
+    jlapp_on_dn2_scale(&a, 2, 1, 0);                               /* the write was applied: the same as ours, nothing to do */
+    CHECK(jls_index_of(a.scale) == 2);
+    jlapp_on_dn2_scale(&a, 5, 1, 0);                               /* the Digitone changes it: that wins */
+    CHECK(jls_index_of(a.scale) == 5);
+}
+
+static void test_the_first_reading_after_live_control_comes_back_is_taken_again(void)
+{
+    struct jlapp a = fresh_list();
+    jlapp_on_dn2_scale(&a, 4, 1, 7);
+    CHECK(jls_index_of(a.scale) == 4 && a.n.key == 7);
+    a.scale = jls_get(9);                                          /* the Launchpad's own, meanwhile */
+    a.n.key = 1;
+    jlapp_on_dn2_scale(&a, 4, 1, 7);                               /* unchanged: stays */
+    CHECK(jls_index_of(a.scale) == 9 && a.n.key == 1);
+    jlapp_set_live(&a, JDL_ASKING, 1, 1);                          /* live control lapsed ... */
+    jlapp_set_live(&a, JDL_LIVE, 1, 1);                            /* ... and came back */
+    jlapp_on_dn2_scale(&a, 4, 1, 7);                               /* a first reading again: the Digitone's word */
+    CHECK(jls_index_of(a.scale) == 4 && a.n.key == 7);
+}
+
+static void test_a_digitone_without_the_root_leaves_the_key(void)
+{
+    struct jlapp a = fresh_list();
+    a.n.key = 5;
+    jlapp_on_dn2_scale(&a, 6, 0, 0);                               /* protocol 4: a scale and no root */
+    CHECK(jls_index_of(a.scale) == 6 && a.n.key == 5);
+    jlapp_on_dn2_scale(&a, 6, 1, 3);                               /* a root appears (an upgraded Digitone): taken */
+    CHECK(a.n.key == 3);
+    jlapp_on_dn2_scale(&a, 6, 1, 3);
+    a.n.key = 8;                                                   /* chosen here */
+    jlapp_on_dn2_scale(&a, 6, 1, 3);                               /* unchanged root: stays */
+    CHECK(a.n.key == 8);
+    jlapp_on_dn2_scale(&a, 6, 1, 10);                              /* the Digitone's root changes */
+    CHECK(a.n.key == 10);
+    jlapp_on_dn2_scale(&a, 6, 1, 12);                              /* a root that does not exist: ignored */
+    CHECK(a.n.key == 10);
+}
+
+static void test_scale_and_key_acts_carry_both(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    acts(&a, top(NOTE_BTN, 127), &o);
+    CHECK(acts(&a, pad(2, 5, 100), &o) == 1 && o.kind == JLAPP_ACT_SCALE && o.note == 1 && o.vel == 4);   /* white key E: scale 1, root 4 */
+    CHECK(acts(&a, pad(2, 5, 100), &o) == 0);                      /* the same key again: nothing changed, nothing sent */
+    CHECK(acts(&a, pad(7, 5, 100), &o) == 1 && o.vel == 11);       /* the circle of fifths forward: E + 7 = B */
+    CHECK(acts(&a, pad(6, 6, 100), &o) == 1 && o.vel == 4);        /* ... and back: E */
+    CHECK(acts(&a, pad(0, 6, 100), &o) == 1 && o.vel == 1);        /* a black key: C# */
+    CHECK(acts(&a, pad(2, 6, 100), &o) == 1 && o.note == 6 && o.vel == 10);   /* the relative scale: Ionian in C# -> Aeolian in A# (10) */
+    CHECK(acts(&a, pad(3, 1, 100), &o) == 1 && o.note == 11 && o.vel == 10);   /* Harmonic Min (11): the key stays A# */
+}
+
+static void test_page_presses_that_change_nothing_send_nothing(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    acts(&a, top(NOTE_BTN, 127), &o);
+    CHECK(acts(&a, pad(1, 2, 100), &o) == 0);                      /* the scale already in use (Ionian, on the first page) */
+    CHECK(acts(&a, pad(1, 3, 100), &o) == 0 && a.scale_page == 1); /* a page pad only browses ... */
+    CHECK(acts(&a, pad(0, 3, 100), &o) == 0 && a.scale_page == 0); /* ... and back */
+    CHECK(acts(&a, pad(4, 4, 100), &o) == 0);                      /* the octaves: not the Digitone's */
+    CHECK(acts(&a, pad(5, 7, 100), &o) == 0);                      /* the layouts */
+    CHECK(jlapp_on_lpx_acts(&a, &(struct jlx_ev){JLX_PAD, 2, 2, 0, 100}, &o, 0) == 0);   /* no room for the act: nothing is sent ... */
+    CHECK(jls_index_of(a.scale) == 2);                             /* ... but the scale still changes on the Launchpad */
+}
+
 int main(void)
 {
+    test_the_digitones_scale_is_taken_when_it_is_first_read_and_when_it_changes();
+    test_an_unchanged_reading_leaves_the_launchpads_choice_alone();
+    test_the_first_reading_after_live_control_comes_back_is_taken_again();
+    test_a_digitone_without_the_root_leaves_the_key();
+    test_scale_and_key_acts_carry_both();
+    test_page_presses_that_change_nothing_send_nothing();
     test_custom_enters_the_step_modes_and_cycles_them();
     test_a_tap_on_note_goes_back_to_note_mode_a_hold_does_not();
     test_up_and_down_are_the_octave_except_in_drum_step();

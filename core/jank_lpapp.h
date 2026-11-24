@@ -94,6 +94,8 @@ struct jlapp {
     const struct jln_scale *scale;
     uint8_t page;                      /* the Note button is held: the pads are the scale page */
     uint8_t scale_page;                /* which 24 scales the page shows (0: 1-24, 1: 25-36); the page of the scale in use when the page opens or the scale changes */
+    uint8_t dn2_seen;                  /* the Digitone's scale has been read since live control came up */
+    uint8_t dn2_idx, dn2_root, dn2_has_root;   /* ... and what it said last: only a CHANGE of it is taken, so a scale chosen here is not undone by an unchanged reading */
     uint8_t minor_idx;                 /* the minor scale the relative pad returns to (jank_lpscales.h index) */
     struct jlapp_held held[JLAPP_PADS];
     uint8_t track_pads;                /* the two bottom rows are the 16 tracks (page switch) */
@@ -134,6 +136,12 @@ void jlapp_tick(struct jlapp *a, uint32_t now_ms);
 /* what live control is: `state` an enum jdl_state, `play_ok` PLAY has not been refused, `read_ok` the active track can be read (jdl_can_read_track). Live
  * and PLAY there: a press plays; live: the lights come from the push, FOLLOW can run */
 void jlapp_set_live(struct jlapp *a, int state, int play_ok, int read_ok);
+
+/* The Digitone's scale (owner 2026-11-24: synced both ways; jdl_take_scale): the first reading after live control came up, and then every CHANGE of its reading, becomes the
+ * Launchpad's scale (and, when the Digitone says it, the root = the key); the scale page shows the page that holds it. A reading that has not changed leaves what the
+ * Launchpad chose alone (a Digitone that refuses SCALE SET keeps its own and the Launchpad its own, until the Digitone changes). The other way round: a scale, key,
+ * relative-scale or fifths press on the scale page comes out as JLAPP_ACT_SCALE. `idx` is 0..35; `has_root` 0 below protocol 5. */
+void jlapp_on_dn2_scale(struct jlapp *a, unsigned idx, int has_root, unsigned root);
 
 /* a Launchpad pad or button; what it asks of the Digitone comes out as acts, at most `max` (one per event); returns how many. A pad press that finds no
  * room (max 0) changes nothing */

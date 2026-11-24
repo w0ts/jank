@@ -20,6 +20,10 @@
 
 #define JDL_CMD_LIVE 44u
 #define JDL_CMD_MIXER 45u              /* read the mixer: every track's VOL, PAN, sends and LEVEL, the mute and solo masks */
+#define JDL_CMD_SCALE 50u              /* read the scale (and, from protocol 5, the root) a track plays */
+#define JDL_CMD_SCALE_SET 55u          /* set it (stage 6) */
+#define JDL_SCALES 36u
+#define JDL_ROOT_UNCHANGED 255u
 #define JDL_CMD_STEPS 46u              /* read a page of 16 steps of a track */
 #define JDL_CMD_STEP 48u               /* set / clear a trig, set its note */
 #define JDL_CMD_TRACK 49u
@@ -83,8 +87,21 @@ struct jdl_mixer {
     struct jdl_mix_track t[JDL_TRACKS];
 };
 
+/* The scale of the active track (SCALE, 50: `u8 track (255 active), u8 first name, u8 kind` -> `u8 track, u8 scale 0..35 (0 Chromatic), u8 per-track flag, u8 36, u8 first, u8 n`,
+ * then (protocol >= 5) `u8 root 0..11, u8 key mode`, then n names; Jank asks with first = 35, kind = 1 so that one short name follows and reads only the header). SCALE SET
+ * (55: `u8 track (255 active), u8 scale 0..35, u8 root 0..11 or 255 (unchanged)` -> `u8 track, u8 scale, u8 root`) writes it at the Digitone's next UI pass (stage 6; status 2
+ * on older builds). */
+struct jdl_scale {
+    uint8_t track, index, per_track;   /* the track asked, its scale, the Digitone keeps a scale per track */
+    uint8_t has_root, root, key_mode;  /* root and key mode: only from protocol 5 */
+};
+
 struct jdl {
     struct jdl_status st;              /* the Digitone's last LIVE STATUS */
+    struct jdl_scale sc;               /* the last SCALE answer (or SCALE SET's), until taken (scale_fresh) */
+    uint8_t scale_fresh;
+    uint8_t scale_ok;                  /* SCALE has not been refused (status 2): 1 until it is */
+    uint8_t scale_set_ok;              /* SCALE SET has not been refused (an older Digitone build): 1 until it is */
     struct jdl_mixer mx;               /* the last MIXER answer, until taken (mixer_fresh) */
     uint8_t mixer_fresh;
     struct jdl_page pg;                /* the last STEPS answer, until taken (page_fresh) */
@@ -119,6 +136,12 @@ size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 /* a request, only while live (else 0): the active track, a PLAY. A request also keeps the lease */
 size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, size_t cap);
 size_t jdl_play(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_play_op op, uint8_t note, uint8_t vel, uint8_t *out, size_t cap);
+/* The scale (only while live, else 0). jdl_scale_read: the cheap poll; jdl_scale_set: scale 0..35, root 0..11 or JDL_ROOT_UNCHANGED, and only while SCALE SET has not been
+ * refused. jdl_take_scale: the last answer (a read's or a set's), once (1 and *out filled), else 0 */
+size_t jdl_scale_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
+size_t jdl_scale_set(struct jdl *d, uint32_t now_ms, uint8_t scale, uint8_t root, uint8_t *out, size_t cap);
+int jdl_take_scale(struct jdl *d, struct jdl_scale *out);
+
 /* The mixer read (only while live, else 0). jdl_take_mixer: the last MIXER answer, once (1 and *out filled), else 0 */
 size_t jdl_mixer_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out);

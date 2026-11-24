@@ -45,6 +45,8 @@ void jlapp_tick(struct jlapp *a, uint32_t now_ms) { a->now_ms = now_ms; }
 void jlapp_set_live(struct jlapp *a, int state, int play_ok, int read_ok)
 {
     a->live_state = (uint8_t)state;
+    if (state != (int)JDL_LIVE)
+        a->dn2_seen = 0;               /* the next reading after live control is back is a first one again */
     a->play_ok = play_ok != 0;
     a->push = state == (int)JDL_LIVE;
     a->can_play = a->push && play_ok;
@@ -508,8 +510,15 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
     if (ev->kind == JLX_PAD && ev->row < 8u && ev->col < 8u) {
         int track_pad = a->track_pads && ev->row < JLAPP_TRACK_ROWS;
         if (a->page && ev->value) {    /* a press on the scale page edits it; a release still ends a note that was down before the page opened */
+            int idx0 = jls_index_of(a->scale), idx1;
+            uint8_t key0 = a->n.key;
             a->note_used = 1;
             page_pad(a, ev->col, ev->row);
+            idx1 = jls_index_of(a->scale);
+            if (max >= 1 && idx1 >= 0 && (idx1 != idx0 || a->n.key != key0)) {   /* the scale or the key changed: the Digitone is told */
+                set_act(out, JLAPP_ACT_SCALE, a->n.track, (uint8_t)idx1, a->n.key);
+                return 1;
+            }
             return 0;
         }
         if (a->mode == JLAPP_MODE_STEP || (!ev->value && step_holds(a) && ev->row < QUADRANT && ev->col < QUADRANT))   /* a release also ends a step mode pad's note after a mode change */
@@ -524,6 +533,23 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
 }
 
 /* ---- from the Digitone ---- */
+
+void jlapp_on_dn2_scale(struct jlapp *a, unsigned idx, int has_root, unsigned root)
+{
+    int first = !a->dn2_seen;
+    if (idx >= jls_count())
+        return;
+    if (first || idx != a->dn2_idx) {  /* the Digitone's scale is new to us: take it (no message: the Digitone's own screen says it) */
+        a->scale = jls_get(idx);
+        a->scale_page = (uint8_t)(idx / JLAPP_SCALES_PER_PAGE);
+    }
+    if (has_root && root < 12u && (first || !a->dn2_has_root || root != a->dn2_root))
+        a->n.key = (uint8_t)root;
+    a->dn2_seen = 1;
+    a->dn2_idx = (uint8_t)idx;
+    a->dn2_has_root = has_root != 0 && root < 12u;
+    a->dn2_root = (uint8_t)(a->dn2_has_root ? root : 0u);
+}
 
 int jlapp_following(const struct jlapp *a) { return a->follow && a->live_state == JDL_LIVE && a->read_ok; }
 

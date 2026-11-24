@@ -163,6 +163,10 @@ static void run_act(const struct jlapp_act *act)
         n = jdl_step_edit(&s_jdl, t, act->track, act->step, (enum jdl_step_op)act->op, act->note, act->vel, act->len, sx, sizeof sx);
         g_hostdiag.live_edits += n != 0;
         break;
+    case JLAPP_ACT_SCALE:              /* the Launchpad's scale or key: the Digitone follows (SCALE SET, stage 6; an older build refuses once and the scale stays the Launchpad's) */
+        n = jdl_scale_set(&s_jdl, t, act->note, act->vel, sx, sizeof sx);
+        g_hostdiag.live_scale_sets += n != 0;
+        break;
     case JLAPP_ACT_TRANSPORT:          /* the ui task starts / stops the transport (it may wait for the bridge; this task must not) */
         s_transport_req = 1;
         return;
@@ -185,13 +189,9 @@ static void sync_live(void)
     g_hostdiag.dn2_lost = s_jdl.st.lost;
     g_hostdiag.dn2_dropped = s_jdl.st.dropped;
     g_hostdiag.dn2_pushmsgs = s_jdl.st.msgs;
-    g_hostdiag.head_rt_clocks = s_app.step.rt_clocks;   /* the playhead's source: the Digitone's own MIDI transport, or Jank's */
-    g_hostdiag.head_rt_starts = s_app.step.rt_starts;
-    g_hostdiag.head_rt_stops = s_app.step.rt_stops;
-    g_hostdiag.head_rt_run = s_app.step.rt_run;
-    g_hostdiag.head_beat = s_app.beat_ok;
-    g_hostdiag.head_transport = s_app.transport;
     g_hostdiag.live_msg_ok = s_jdl.msg_ok;
+    g_hostdiag.scale_ok = s_jdl.scale_ok;
+    g_hostdiag.scale_set_ok = s_jdl.scale_set_ok;
     g_hostdiag.live_step_busy = s_jdl.step_busy;
     g_hostdiag.live_step_refused = s_jdl.step_refused;
     jlapp_set_live(&s_app, s_jdl.state, s_jdl.play_ok, jdl_can_read_track(&s_jdl));
@@ -226,6 +226,7 @@ static void dn2_sysex(void)
     enum jdl_in k = jdl_input(&s_jdl, s_sx.buf, s_sx.n, notes, &count);
     if (k == JDL_IN_REPLY) {
         static struct jdl_page page;
+        struct jdl_scale scale;
         g_hostdiag.live_replies++;
         track = jdl_take_active(&s_jdl);           /* FOLLOW: the answer to an active-track read */
         if (track >= 0) {
@@ -235,6 +236,13 @@ static void dn2_sysex(void)
         if (jdl_take_page(&s_jdl, &page)) {        /* a step mode: a page of the current track */
             jlapp_tick(&s_app, now_ms());
             jlapp_on_page(&s_app, &page);
+        }
+        if (jdl_take_scale(&s_jdl, &scale)) {      /* the Digitone's scale (and, from protocol 5, its root): the Launchpad follows when it changes */
+            jlapp_tick(&s_app, now_ms());
+            jlapp_on_dn2_scale(&s_app, scale.index, scale.has_root, scale.root);
+            g_hostdiag.dn2_scale = scale.index;
+            g_hostdiag.dn2_root = scale.root;
+            g_hostdiag.dn2_root_known = scale.has_root;
         }
     } else if (k == JDL_IN_IGNORED) {
         g_hostdiag.live_ignored++;
@@ -298,6 +306,8 @@ static int beat_sixteenths(uint32_t t, uint32_t *tick16)
 
 static uint32_t s_read_ms;             /* the last active-track read (FOLLOW) */
 static uint32_t s_page_ms;             /* the last read of the step pages */
+static uint32_t s_scale_ms;            /* the last read of the Digitone's scale */
+#define SCALE_POLL_MS 1000u            /* ... every second: the header and one short name, about 20 bytes of data */
 #define STEP_URGENT_MS 60u             /* ... right after a track or page switch, until its pages are in (at most STEP_URGENT_TRIES reads, then back to the slow rate) */
 #define STEP_URGENT_TRIES 6u
 static uint32_t s_seen_pages_ms;       /* the step modes' last page seen by the pump */
@@ -356,6 +366,12 @@ static void live_pump(void)
         n = jdl_track_read(&s_jdl, t, sx, sizeof sx);
         s_read_ms = t;
         g_hostdiag.live_reads += n != 0;
+        dn2_send_sysex(sx, n);
+    }
+    if (live && t - s_scale_ms >= SCALE_POLL_MS) {   /* the Digitone's scale (and root): a cheap header-only read, once a second */
+        n = jdl_scale_read(&s_jdl, t, sx, sizeof sx);
+        s_scale_ms = t;
+        g_hostdiag.live_scale_reads += n != 0;
         dn2_send_sysex(sx, n);
     }
 }

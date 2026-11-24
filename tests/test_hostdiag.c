@@ -17,7 +17,7 @@ static int fails, checks;
 static void test_empty_record(void)
 {
     struct jhd d;
-    char out[1024];
+    char out[2048];
     jhd_init(&d);
     CHECK(jhd_format(&d, out, sizeof out) == strlen(out));
     CHECK(strstr(out, "hostdiag_stack=unknown\n"));              /* nothing reported yet */
@@ -30,7 +30,7 @@ static void test_empty_record(void)
 static void test_memory_line(void)
 {
     struct jhd d;
-    char out[1024];
+    char out[2048];
     jhd_init(&d);
     d.heap_kb = 13;                                              /* internal free heap now, its minimum since boot, the client task's stack margin */
     d.heap_min_kb = 4;
@@ -100,7 +100,7 @@ static void test_failure_text(void)
 static void test_full_record(void)
 {
     struct jhd d;
-    char out[1024];
+    char out[2048];
     jhd_init(&d);
     d.stack = JHD_STACK_HOST;
     d.lib_up = 1;
@@ -137,12 +137,13 @@ static void test_full_record(void)
     d.live_msgs = 10;
     d.live_msgs_sent = 7;
     d.live_msg_ok = 1;
-    d.head_rt_clocks = 9000;
-    d.head_rt_starts = 3;
-    d.head_rt_stops = 2;
-    d.head_rt_run = 1;
-    d.head_beat = 1;
-    d.head_transport = 0;
+    d.live_scale_reads = 55;
+    d.live_scale_sets = 4;
+    d.dn2_scale = 6;
+    d.dn2_root = 9;
+    d.dn2_root_known = 1;
+    d.scale_ok = 1;
+    d.scale_set_ok = 0;
     d.live_edits = 12;
     d.live_pagereads = 340;
     d.live_step_busy = 2;
@@ -189,7 +190,11 @@ static void test_full_record(void)
     CHECK(strstr(out, "hostdiag_events=new:3,gone:1,add:3\n"));
     CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:2,acked:1,setup:2,mode:live,reentered:1,lights:243,pads:7,dn2msgs:9\n"));
     CHECK(strstr(out, "hostdiag_live=state:live,play:1,asked:12,replies:11,plays:5,selects:3,pushes:4,notes:6,dropped:1,reads:8,msgs:10,msgs_sent:7,msg_ok:1\n"));
-    CHECK(strstr(out, "hostdiag_head=rt_clocks:9000,rt_starts:3,rt_stops:2,rt_run:1,beat:1,transport:0\n"));
+    CHECK(strstr(out, "hostdiag_scale=dn2:6,root:9,reads:55,sets:4,read_ok:1,set_ok:0\n"));
+    d.dn2_root_known = 0;                                         /* no root known (protocol 4): -1 */
+    jhd_format(&d, out, sizeof out);
+    CHECK(strstr(out, "hostdiag_scale=dn2:6,root:-1,"));
+    d.dn2_root_known = 1;
     CHECK(strstr(out, "hostdiag_steps=edits:12,reads:340,busy:2,refused:1\n"));
     CHECK(strstr(out, "hostdiag_dn2live=proto:3,push:1,lease:9,made:100,sent:96,lost:4,dropped:2,pushmsgs:30,ignored:3,last_ignored_len:41\n"));
     d.live_state = 9;                  /* a state number from a newer build prints as ?, not past the list */
@@ -203,7 +208,7 @@ static void test_full_record(void)
 static void test_roles_and_claim_error(void)
 {
     struct jhd d;
-    char out[1024];
+    char out[2048];
     jhd_init(&d);
     d.dev[0].used = 1;
     strcpy(d.dev[0].name, "Digitone");

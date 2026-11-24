@@ -21,6 +21,8 @@ void jdl_init(struct jdl *d)
     d->play_ok = 1;
     d->read_ok = 1;
     d->msg_ok = 1;
+    d->scale_ok = 1;
+    d->scale_set_ok = 1;
 }
 
 int jdl_is_live(const struct jdl *d) { return d->state == JDL_LIVE; }
@@ -96,6 +98,69 @@ size_t jdl_step_edit(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t step
     args[4] = vel;
     args[5] = len;
     return send(d, now_ms, JDL_CMD_STEP, args, sizeof args, out, cap);
+}
+
+size_t jdl_scale_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
+{
+    static const uint8_t args[3] = {255u, (uint8_t)(JDL_SCALES - 1u), 1u};   /* the active track; the last name only (one short name follows the header); short names */
+    if (d->state != JDL_LIVE || !d->scale_ok)
+        return 0;
+    return send(d, now_ms, JDL_CMD_SCALE, args, sizeof args, out, cap);
+}
+
+size_t jdl_scale_set(struct jdl *d, uint32_t now_ms, uint8_t scale, uint8_t root, uint8_t *out, size_t cap)
+{
+    uint8_t args[3];
+    if (d->state != JDL_LIVE || !d->scale_set_ok || scale >= JDL_SCALES || (root >= 12u && root != JDL_ROOT_UNCHANGED))
+        return 0;
+    args[0] = 255u;
+    args[1] = scale;
+    args[2] = root;
+    return send(d, now_ms, JDL_CMD_SCALE_SET, args, sizeof args, out, cap);
+}
+
+int jdl_take_scale(struct jdl *d, struct jdl_scale *out)
+{
+    if (!d->scale_fresh)
+        return 0;
+    *out = d->sc;
+    d->scale_fresh = 0;
+    return 1;
+}
+
+#define SCALE_HEAD 6u                  /* track, scale, per track, names, first, n */
+#define SCALE_PROTO_ROOT 5u            /* from this LIVE STATUS protocol the header is followed by the root and the key mode */
+
+static void take_scale(struct jdl *d, const struct jd2_reply *r)
+{
+    struct jdl_scale *s = &d->sc;
+    if (r->n < SCALE_HEAD || r->data[1] >= JDL_SCALES)
+        return;
+    s->track = r->data[0];
+    s->index = r->data[1];
+    s->per_track = r->data[2];
+    s->has_root = 0;
+    s->root = 0;
+    s->key_mode = 0;
+    if (d->st.valid && d->st.proto >= SCALE_PROTO_ROOT && r->n >= SCALE_HEAD + 2u && r->data[SCALE_HEAD] < 12u) {
+        s->has_root = 1;
+        s->root = r->data[SCALE_HEAD];
+        s->key_mode = r->data[SCALE_HEAD + 1u];
+    }
+    d->scale_fresh = 1;
+}
+
+/* SCALE SET's answer: `u8 track, u8 scale, u8 root` */
+static void take_scale_set(struct jdl *d, const struct jd2_reply *r)
+{
+    struct jdl_scale *s = &d->sc;
+    if (r->n < 3u || r->data[1] >= JDL_SCALES)
+        return;
+    s->track = r->data[0];
+    s->index = r->data[1];
+    s->has_root = r->data[2] < 12u;    /* (per-track flag and key mode: as the last read said) */
+    s->root = r->data[2] < 12u ? r->data[2] : 0u;
+    d->scale_fresh = 1;
 }
 
 size_t jdl_mixer_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
@@ -273,8 +338,23 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         return JDL_IN_REPLY;
     }
     if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE &&
-        r.cmd != JDL_CMD_MIXER)
+        r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET)
         return JDL_IN_IGNORED;
+    if (r.cmd == JDL_CMD_SCALE || r.cmd == JDL_CMD_SCALE_SET) {   /* a refusal (2) ends that command only: live control is fine */
+        if (r.status == ST_NOT_UNDERSTOOD) {
+            if (r.cmd == JDL_CMD_SCALE)
+                d->scale_ok = 0;
+            else
+                d->scale_set_ok = 0;
+            return JDL_IN_REPLY;
+        }
+        if (r.status == 0) {
+            if (r.cmd == JDL_CMD_SCALE)
+                take_scale(d, &r);
+            else
+                take_scale_set(d, &r);
+        }
+    }
     if (r.cmd == JDL_CMD_MIXER) {      /* a refused read (2) changes nothing else: live control is fine */
         if (r.status == ST_NOT_UNDERSTOOD)
             return JDL_IN_REPLY;

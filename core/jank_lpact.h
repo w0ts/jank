@@ -13,7 +13,8 @@ enum jlapp_act_kind {
     JLAPP_ACT_TRACK_OFF,
     JLAPP_ACT_SELECT,                  /* the Digitone's active track becomes `track` */
     JLAPP_ACT_STEP,                    /* a step edit: track, step (0..127), op (enum jdl_step_op: 0 clear, 1 trig, 2 note), note, vel (255: the track's), len (255) */
-    JLAPP_ACT_TRANSPORT                /* start / stop the clock (Jank is the transport master) */
+    JLAPP_ACT_TRANSPORT,               /* start / stop the clock (Jank is the transport master) */
+    JLAPP_ACT_SCALE                    /* the Launchpad changed the scale or the key: note = the scale's index (0..35), vel = the root (0..11): the Digitone follows (SCALE SET) */
 };
 
 struct jlapp_act {

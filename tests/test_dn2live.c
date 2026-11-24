@@ -589,8 +589,102 @@ static void test_no_mixer_read_unless_live(void)
     CHECK(jdl_mixer_read(&d, 0, out, sizeof out) == 0);
 }
 
+/* a LIVE STATUS of protocol `proto` (so that SCALE knows whether the root bytes are there) */
+static void status_of_protocol(struct jdl *d, uint8_t proto)
+{
+    uint8_t st[31] = {0};
+    st[0] = proto;
+    st[1] = 1;
+    st[2] = 10;
+    st[3] = 64;
+    st[4] = 16;
+    jdl_poll(d, 1000000, (uint8_t[64]){0}, 64);
+    reply_to(d, d->seq, JDL_CMD_LIVE, 0, st, sizeof st);
+}
+
+static void test_reading_the_scale_with_the_cheap_poll(void)
+{
+    struct jdl d = live(0);
+    struct jdl_scale s;
+    uint8_t out[64], body[32], data[24];
+    size_t n = jdl_scale_read(&d, 10, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[2] == JDL_CMD_SCALE && body[3] == 255 && body[4] == 35 && body[5] == 1);   /* the active track, the last name, short */
+    CHECK(!jdl_take_scale(&d, &s));
+    status_of_protocol(&d, 4);                                                   /* stage 5: no root bytes */
+    data[0] = 0; data[1] = 6; data[2] = 1; data[3] = 36; data[4] = 35; data[5] = 1;
+    data[6] = 5; data[7] = 'L'; data[8] = 'o'; data[9] = 'c'; data[10] = 'r'; data[11] = '.';   /* names from data[6]: a length byte, not a root */
+    reply_to(&d, d.seq, JDL_CMD_SCALE, 0, data, 12);
+    CHECK(jdl_take_scale(&d, &s) && s.track == 0 && s.index == 6 && s.per_track == 1 && !s.has_root);
+    CHECK(!jdl_take_scale(&d, &s) && jdl_is_live(&d));                           /* taken once */
+}
+
+static void test_the_root_comes_with_protocol_five(void)
+{
+    struct jdl d = live(0);
+    struct jdl_scale s;
+    uint8_t data[24];
+    status_of_protocol(&d, 5);
+    data[0] = 3; data[1] = 20; data[2] = 0; data[3] = 36; data[4] = 35; data[5] = 1;
+    data[6] = 9; data[7] = 2;                                                    /* root A, key mode 2; the name follows from data[8] */
+    data[8] = 4; data[9] = 'T'; data[10] = 'e'; data[11] = 's'; data[12] = 't';
+    reply_to(&d, d.seq, JDL_CMD_SCALE, 0, data, 13);
+    CHECK(jdl_take_scale(&d, &s) && s.index == 20 && s.per_track == 0 && s.has_root && s.root == 9 && s.key_mode == 2);
+    data[6] = 12;                                                                /* a root that does not exist: not taken as one */
+    reply_to(&d, d.seq, JDL_CMD_SCALE, 0, data, 13);
+    CHECK(jdl_take_scale(&d, &s) && !s.has_root);
+    reply_to(&d, d.seq, JDL_CMD_SCALE, 0, data, 7);                              /* the header only, no root bytes at all: the scale still counts */
+    CHECK(jdl_take_scale(&d, &s) && s.index == 20 && !s.has_root);
+}
+
+static void test_a_damaged_or_refused_scale_answer(void)
+{
+    struct jdl d = live(0);
+    struct jdl_scale s;
+    uint8_t data[24] = {0, 36, 0, 36, 35, 1, 0, 0};
+    reply_to(&d, d.seq, JDL_CMD_SCALE, 0, data, 5);                              /* shorter than its header */
+    CHECK(!jdl_take_scale(&d, &s));
+    reply_to(&d, d.seq, JDL_CMD_SCALE, 0, data, 8);                              /* a scale index of 36: not one */
+    CHECK(!jdl_take_scale(&d, &s));
+    reply_to(&d, d.seq, JDL_CMD_SCALE, 2, NULL, 0);                              /* a build without SCALE: it is not asked again, live control is fine */
+    CHECK(!d.scale_ok && jdl_is_live(&d) && jdl_can_play(&d));
+    CHECK(jdl_scale_read(&d, 1, (uint8_t[64]){0}, 64) == 0);
+}
+
+static void test_setting_the_scale(void)
+{
+    struct jdl d = live(0);
+    struct jdl_scale s;
+    uint8_t out[64], body[32], data[8];
+    size_t n = jdl_scale_set(&d, 10, 11, 9, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[2] == JDL_CMD_SCALE_SET && body[3] == 255 && body[4] == 11 && body[5] == 9);   /* the active track, scale 11, root A */
+    n = jdl_scale_set(&d, 11, 0, JDL_ROOT_UNCHANGED, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[4] == 0 && body[5] == 255);   /* Chromatic, the root as it is */
+    CHECK(jdl_scale_set(&d, 12, 36, 0, out, sizeof out) == 0);                   /* what the Digitone would refuse is not sent */
+    CHECK(jdl_scale_set(&d, 12, 5, 12, out, sizeof out) == 0);
+    CHECK(jdl_scale_set(&d, 12, 5, 254, out, sizeof out) == 0);
+    data[0] = 0; data[1] = 11; data[2] = 9;
+    reply_to(&d, d.seq, JDL_CMD_SCALE_SET, 0, data, 3);                          /* its answer: scale 11, root 9 */
+    CHECK(jdl_take_scale(&d, &s) && s.index == 11 && s.has_root && s.root == 9);
+    reply_to(&d, d.seq, JDL_CMD_SCALE_SET, 2, NULL, 0);                          /* an older build: no more writes, nothing else changes */
+    CHECK(!d.scale_set_ok && d.scale_ok && jdl_is_live(&d));
+    CHECK(jdl_scale_set(&d, 20, 1, 0, out, sizeof out) == 0);
+}
+
+static void test_the_scale_needs_live_control(void)
+{
+    struct jdl d;
+    uint8_t out[64];
+    jdl_init(&d);
+    CHECK(jdl_scale_read(&d, 0, out, sizeof out) == 0 && jdl_scale_set(&d, 0, 1, 0, out, sizeof out) == 0);
+}
+
 int main(void)
 {
+    test_reading_the_scale_with_the_cheap_poll();
+    test_the_root_comes_with_protocol_five();
+    test_a_damaged_or_refused_scale_answer();
+    test_setting_the_scale();
+    test_the_scale_needs_live_control();
     test_reading_the_mixer();
     test_a_damaged_or_refused_mixer_answer_is_not_taken();
     test_no_mixer_read_unless_live();

@@ -50,6 +50,14 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
   Digitone's as well (TRACK with no argument reads its active track, every 250 ms, accepted by dn2-wishes for stage 5; a Digitone without it: "DN2 CANNOT
   FOLLOW"), and left / right show **AMBER** (9, dim 11 at the first / last track). The Launchpad's own choice is not overridden for 500 ms (the Digitone takes a
   select at its next UI pass). The pair again: off.
+- **The scale is synced with the Digitone, both ways** (owner 2026-11-24). *Reading:* Jank asks SCALE (50) every second with `first = 35, kind = 1` (the header plus one short
+  name, about 20 bytes) and takes the Digitone's scale, and its root from protocol 5 on (stage 6), **when its reading changes** (and at the first reading after live control
+  came up); a reading that has not changed leaves what the Launchpad chose alone, so a Digitone that cannot be written to (stage 5) does not undo the Launchpad's choice. The
+  Launchpad then shows the page of that scale. No message: the Digitone's own screen says it. *Writing:* a scale, key, relative-scale or circle-of-fifths press on the scale
+  page sends SCALE SET (55: `track 255 (the active one), scale 0..35, root 0..11`), applied at the Digitone's next UI pass; the Digitone writes it per track or per pattern
+  as its own setting says. A build without SCALE SET answers status 2 once and no more are sent. **Formats are the Digitone session's planned ones for stage 6** (the SCALE
+  reply has the root and key mode from `data[6]` when LIVE STATUS says protocol >= 5; confirmed by them); stage 6 is not installed yet, so only the reading of the scale index
+  can work today. `diag`: `hostdiag_scale=dn2:<index>,root:<0..11 or -1>,reads:,sets:,read_ok:,set_ok:`. Not tried on hardware.
 - **Track pads (hold Note, pad 8 of the top row, GREEN when on):** the two bottom rows play the 16 tracks on each track's own default note (PLAY op 2, ended
   with op 0 and note 255, confirmed by dn2-wishes); the note layout moves up to the six rows left. Colours as the track overlay above: the current track AMBER, a track that sounds or
   is held RED, the rest WHITE. (The drum step quadrant keeps Launchpad 95's drum rack colours, yellow / green / red, as asked: green there is the selected track.)
@@ -75,7 +83,7 @@ lower left, the sequence on top, the loop selector lower right):
   playing-step byte (wrong on firmware 1.12): the session's beat x 4 (sixteenth notes, sampled by the ui task, extrapolated between samples), modulo the pattern's
   length, and a pushed note (its step is exact) corrects the phase. **Measured 2026-11-24: that was not enough**: with the sequencer started by the Digitone's own play key,
   Jank's transport is stopped and no playhead showed. So the playhead **follows the Digitone's own MIDI transport** while its clock ticks (Start / Continue / Stop and 6
-  clock ticks a sixteenth, read-only, no channel involved: `jlst_on_rt`, `hostdiag_head=`), whoever started it; Jank's session beat is the fallback when the Digitone's
+  clock ticks a sixteenth, read-only, no channel involved: `jlst_on_rt`), whoever started it; Jank's session beat is the fallback when the Digitone's
   clock is silent (500 ms). Not measured on hardware: whether the steps line up (the pushed notes correct the phase). Without any clock only the step that just played
   shows, WHITE for 150 ms. The pages come from the Digitone
   (STEPS, 46, every 400 ms for the two shown); a press is shown at once and the next read does not undo it for 300 ms; a page the Digitone has not answered is dark and
