@@ -235,7 +235,7 @@ static uint8_t quadrant_colour(const struct jlst *s, const struct jlst_ctx *c, u
     if (s->kind == JLST_DRUM) {
         uint8_t t = (uint8_t)((QUAD - 1u - y) * QUAD + x);
         if (s->track_held & (1u << t))
-            return JLN_COLOR_PLAYING;
+            return JLST_COLOR_TRACK_PLAYING;
         return t == c->n->track ? JLST_COLOR_TRACK_CURRENT : JLST_COLOR_TRACK_IDLE;
     } else {
         struct jln_pad p;

@@ -31,8 +31,11 @@
 #define JLST_COLOR_ON 21u              /* GREEN: a step with a trig */
 #define JLST_COLOR_OFF 1u              /* DARK_GREY: a step without */
 #define JLST_COLOR_HEAD 3u             /* WHITE: the step that just played, the picked key */
-#define JLST_COLOR_TRACK_IDLE 39u      /* drum quadrant: LIGHT_BLUE_THIRD; the current track BLUE 45; a pad held GREEN */
-#define JLST_COLOR_TRACK_CURRENT 45u
+/* the drum quadrant, as Launchpad 95's drum rack in its step sequencer (SkinMK2.py DrumGroup.PadFilled = YELLOW, StepSequencer.NoteSelector Selected = GREEN, Playing =
+ * RED): every track yellow, the track the steps show GREEN, a track pad that is down (auditioning) RED */
+#define JLST_COLOR_TRACK_IDLE 13u      /* YELLOW */
+#define JLST_COLOR_TRACK_CURRENT 21u   /* GREEN */
+#define JLST_COLOR_TRACK_PLAYING 5u    /* RED */
 #define JLST_COLOR_PAGE_ON 21u         /* a page shown: GREEN; another page that exists GREEN_THIRD */
 #define JLST_COLOR_PAGE_OFF 23u
 

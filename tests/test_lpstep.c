@@ -181,9 +181,10 @@ static void test_the_drum_quadrant_lights(void)
     rig_init(&r, JLST_DRUM);
     CHECK(colour(&r, 0, 3) == JLST_COLOR_TRACK_CURRENT && colour(&r, 1, 3) == JLST_COLOR_TRACK_IDLE && colour(&r, 3, 0) == JLST_COLOR_TRACK_IDLE);
     press(&r, 3, 0, 100, o, 2);
-    CHECK(colour(&r, 3, 0) == JLN_COLOR_PLAYING);                 /* held: it sounds */
+    CHECK(colour(&r, 3, 0) == JLST_COLOR_TRACK_PLAYING);          /* held: it sounds, RED as Launchpad 95's playing note */
     press(&r, 3, 0, 0, o, 2);
     CHECK(colour(&r, 3, 0) == JLST_COLOR_TRACK_CURRENT && colour(&r, 0, 3) == JLST_COLOR_TRACK_IDLE);
+    CHECK(JLST_COLOR_TRACK_IDLE == 13 && JLST_COLOR_TRACK_CURRENT == 21 && JLST_COLOR_TRACK_PLAYING == 5);   /* YELLOW, GREEN, RED */
 }
 
 static void test_the_melodic_keyboard_lights(void)

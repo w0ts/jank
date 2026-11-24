@@ -68,7 +68,8 @@ lower left, the sequence on top, the loop selector lower right):
   (STEPS, 46, every 400 ms for the two shown); a press is shown at once and the next read does not undo it for 300 ms; a page the Digitone has not answered is dark and
   does nothing.
 - **Lower right 4x4:** the top row of it holds four page pads (the Digitone's 64 steps): the page the top rows start at.
-- **Lower left 4x4, drum:** the 16 tracks in reading order (track 1 top left of the quadrant): a press selects the track the steps show and edit. **Melodic:** a 4x4 keyboard
+- **Lower left 4x4, drum:** the 16 tracks in reading order (track 1 top left of the quadrant), coloured as Launchpad 95's drum rack (owner 2026-11-24): **YELLOW** (13) tracks,
+  the track the steps show GREEN (21, its step sequencer's selected note), a pad that is down RED (5, its playing note). A press selects the track the steps show and edit. **Melodic:** a 4x4 keyboard
   (the Note mode's layout, scale and octave; up / down are the octave in melodic, nothing in drum): a press picks the note a step press places. With a key picked a step
   press sets that note (STEP op 2; the same note again clears it); with none, the trig with the track's own note.
 - **The quadrant also plays while the transport is stopped** (the track's own note / the key), and only selects while it runs (owner's rule). **Scene button 5 starts / stops
