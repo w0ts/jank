@@ -1138,6 +1138,24 @@ static void test_the_mode_buttons_light(void)
     CHECK(a.mode == JLAPP_MODE_NOTE && f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_AMBER_THIRD);
 }
 
+/* the whole path in the app: Delete (scene 6) held in a step mode: a step pad press clears that step (a trig is cleared, an empty step stays empty) while the track wipe runs */
+static void test_a_step_press_with_delete_held_in_the_app(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    acts(&a, top(CUSTOM, 127), &o);                                /* melodic step */
+    read_pages(&a, 4, 1);                                          /* trigs on steps 0, 4, 8, 12 ... */
+    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 127), &o) == 1 && o.kind == JLAPP_ACT_ERASE && o.vel == 1);
+    CHECK(acts(&a, pad(0, 7, 100), &o) == 1 && o.kind == JLAPP_ACT_STEP && o.step == 0 && o.op == JDL_STEP_CLEAR);   /* step 1 had a trig: cleared */
+    CHECK(acts(&a, pad(1, 7, 100), &o) == 0);                      /* step 2 is empty: nothing, and no trig is set */
+    CHECK(colour(&a, 1, 7) == JLST_COLOR_OFF);
+    acts(&a, side(JLAPP_SIDE_DELETE, 0), &o);                      /* let go: presses set steps again */
+    CHECK(acts(&a, pad(1, 7, 100), &o) == 1 && o.kind == JLAPP_ACT_STEP && o.step == 1 && o.op != JDL_STEP_CLEAR);
+    acts(&a, top(CUSTOM, 127), &o);                                /* the drum step mode: the same */
+    acts(&a, side(JLAPP_SIDE_DELETE, 127), &o);
+    CHECK(acts(&a, pad(0, 6, 100), &o) == 1 && o.kind == JLAPP_ACT_STEP && o.step == 8 && o.op == JDL_STEP_CLEAR);   /* (the second row of steps: step 9 .. 16, x = 0 is step 9: has a trig at 8) */
+}
+
 static void test_a_step_press_in_the_app(void)
 {
     struct jlapp a = fresh();
@@ -1557,6 +1575,7 @@ int main(void)
     test_delete_ends_when_the_launchpad_goes_away();
     test_the_mode_buttons_light();
     test_a_step_press_in_the_app();
+    test_a_step_press_with_delete_held_in_the_app();
     test_a_drum_track_pad_changes_the_current_track();
     test_a_note_held_in_a_step_mode_still_ends_after_the_mode_changes();
     test_the_playhead_comes_from_the_push();

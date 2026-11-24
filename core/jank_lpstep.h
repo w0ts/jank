@@ -80,6 +80,7 @@ struct jlst_ctx {
     uint32_t now_ms;
     const struct jlapp_recent *recent; /* what the Digitone played lately (jlapp_on_push): the quadrant flashes it */
     unsigned recent_n;
+    uint8_t deleting;                  /* the Delete scene button is held (owner 2026-11-24): a step pad press clears that step, whatever it held, and never sets one */
 };
 
 void jlst_init(struct jlst *s, enum jlst_kind kind);

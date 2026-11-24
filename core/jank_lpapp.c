@@ -419,6 +419,7 @@ static struct jlst_ctx step_ctx(const struct jlapp *a, struct jln *n)
     c.now_ms = a->now_ms;
     c.recent = a->recent;
     c.recent_n = JLAPP_RECENT;
+    c.deleting = a->erase_on;
     return c;
 }
 

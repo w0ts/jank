@@ -40,7 +40,11 @@ static size_t step_press(struct jlst *s, const struct jlst_ctx *c, unsigned k, s
     if (max < 1 || !is_of(s, p, track) || abs_page >= s->pages_known)
         return 0;                      /* the Digitone has not told this page of this track yet (the pads may still show the last track's): nothing to toggle */
     st = &s->pg[p].step[idx];
-    if (s->kind == JLST_MELODIC && s->note >= 0) {
+    if (c->deleting) {
+        if (!st->trig)
+            return 0;                  /* nothing there to clear: and a Delete press never sets a trig */
+        op = JDL_STEP_CLEAR;
+    } else if (s->kind == JLST_MELODIC && s->note >= 0) {
         if (st->trig && st->note == s->note) {
             op = JDL_STEP_CLEAR;
         } else {

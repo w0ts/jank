@@ -34,6 +34,7 @@ static void rig_init(struct rig *r, enum jlst_kind kind)
     r->c.now_ms = 1000;
     r->c.recent = r->recent;
     r->c.recent_n = 8;
+    r->c.deleting = 0;
     memset(r->recent, 0, sizeof r->recent);
 }
 
@@ -92,6 +93,27 @@ static void test_a_step_does_nothing_until_its_page_is_read(void)
     CHECK(colour(&r, 0, 7) == 0);                                 /* and the pad is dark */
     feed(&r, 0, 4, 1);
     CHECK(press(&r, 0, 7, 100, o, 2) == 1);
+}
+
+/* owner 2026-11-24: with the Delete button held a step pad press clears that step (any trig, whatever its note), and never sets one; both step modes */
+static void test_a_step_press_with_delete_held_clears_the_step(void)
+{
+    struct rig r;
+    struct jlapp_act o[2];
+    for (int kind = JLST_MELODIC; kind <= JLST_DRUM; kind++) {
+        rig_init(&r, (enum jlst_kind)kind);
+        feed(&r, 0, 4, 1);                                        /* trigs on steps 0, 4, 8, 12, notes 40 + step */
+        r.c.deleting = 1;
+        if (kind == JLST_MELODIC)
+            r.s.note = 60;                                        /* a key was played: a plain press would place note 60 */
+        CHECK(press(&r, 1, 7, 100, o, 2) == 0 && colour(&r, 1, 7) == JLST_COLOR_OFF);   /* step 1 has no trig: nothing to clear, nothing set */
+        CHECK(press(&r, 0, 7, 100, o, 2) == 1 && o[0].kind == JLAPP_ACT_STEP && o[0].op == JDL_STEP_CLEAR && o[0].step == 0 && o[0].track == 0);   /* step 0: cleared */
+        CHECK(colour(&r, 0, 7) == JLST_COLOR_OFF);                /* shown at once */
+        CHECK(press(&r, 0, 7, 0, o, 2) == 0);                     /* a release is nothing */
+        CHECK(press(&r, 0, 7, 100, o, 2) == 0);                   /* cleared already: nothing more */
+        r.c.deleting = 0;
+        CHECK(press(&r, 1, 7, 100, o, 2) == 1 && o[0].op != JDL_STEP_CLEAR);   /* Delete let go: a press sets again */
+    }
 }
 
 static void test_a_step_press_toggles_the_trig(void)
@@ -619,6 +641,7 @@ int main(void)
     test_without_a_clock_only_the_note_that_played_shows();
     test_a_step_does_nothing_until_its_page_is_read();
     test_a_step_press_toggles_the_trig();
+    test_a_step_press_with_delete_held_clears_the_step();
     test_the_step_pads_are_the_digitones_layout();
     test_a_melodic_step_with_a_key_picked();
     test_the_keys_play_only_while_the_transport_is_stopped();
