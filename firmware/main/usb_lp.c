@@ -230,7 +230,10 @@ static void run_act(const struct jlapp_act *act)
         n = jdl_mute_set(&s_jdl, t, act->op, (uint16_t)(act->note | ((unsigned)act->step << 8)), sx, sizeof sx);
         g_hostdiag.live_mixer_sets += n != 0;
         break;
-    case JLAPP_ACT_ERASE:              /* the Delete button held / let go: the Digitone erases that track's steps on its own playhead (LIVE ERASE) */
+    case JLAPP_ACT_RECORD:             /* the Record button: the Digitone's own live record (RECORD, 58) */
+        n = jdl_record(&s_jdl, t, act->vel ? 1u : 0u, sx, sizeof sx);
+        break;
+    case JLAPP_ACT_ERASE:            /* the Delete button held / let go: the Digitone erases that track's steps on its own playhead (LIVE ERASE) */
         n = jdl_erase(&s_jdl, t, act->vel ? (uint16_t)(1u << act->track) : 0u, sx, sizeof sx);
         break;
     case JLAPP_ACT_TRANSPORT:          /* the ui task starts / stops the transport (it may wait for the bridge; this task must not) */
@@ -257,6 +260,7 @@ static void sync_live(void)
     g_hostdiag.dn2_pushmsgs = s_jdl.st.msgs;
     g_hostdiag.live_msg_ok = s_jdl.msg_ok;
     jlapp_set_mixer_writes(&s_app, s_jdl.mix_set_ok);
+    jlapp_set_record(&s_app, s_jdl.record_ok, s_jdl.st.rec_valid, s_jdl.st.rec_bits, s_jdl.record_busy);
     g_hostdiag.scale_ok = s_jdl.scale_ok;
     g_hostdiag.scale_set_ok = s_jdl.scale_set_ok;
     g_hostdiag.live_step_busy = s_jdl.step_busy;

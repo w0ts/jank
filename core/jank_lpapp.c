@@ -38,6 +38,7 @@ void jlapp_init(struct jlapp *a, const struct jln_scale *scale)
     jlst_init(&a->step, JLST_MELODIC);
     jlmx_init(&a->mix);
     a->mix_writes = 1;
+    a->record_ok = 1;
     for (uint32_t i = 0; i < JLAPP_PADS; i++)
         a->held[i].note = -1;
 }
@@ -475,6 +476,26 @@ static size_t step_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_ac
     return n;
 }
 
+/* Session: the colour chart (jank_lpapp.h): the first page, the second, then back to the mode it came from */
+static void session_button(struct jlapp *a)
+{
+    if (a->mode != JLAPP_MODE_PALETTE) {
+        a->palette_prev = a->mode;
+        a->palette_page = 0;
+        a->mode = JLAPP_MODE_PALETTE;
+    } else if (a->palette_page + 1u < JLAPP_PALETTE_PAGES) {
+        a->palette_page++;
+    } else {
+        a->mode = a->palette_prev;
+        say(a, "COLOURS OFF");
+        return;
+    }
+    say(a, "COLOURS %u-%u", (unsigned)a->palette_page * 64u, (unsigned)a->palette_page * 64u + 63u);
+}
+
+/* the palette index on a pad of the chart (y from the bottom, 0 the bottom row): reading order from the top left */
+static uint8_t palette_index(const struct jlapp *a, uint8_t x, uint8_t y) { return (uint8_t)(a->palette_page * 64u + (7u - y) * 8u + x); }
+
 static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
     if (ev->idx == BUTTON_NOTE) {
@@ -485,6 +506,10 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
         return track_button(a, ev->idx - BUTTON_LEFT, ev->idx == BUTTON_LEFT ? -1 : 1, ev->value != 0, out, max);
     if (!ev->value)
         return 0;
+    if (ev->idx == BUTTON_SESSION_IDX) {
+        session_button(a);
+        return 0;
+    }
     if (ev->idx == BUTTON_CUSTOM_IDX) {
         custom_button(a);
         return 0;
@@ -569,6 +594,46 @@ static size_t delete_button(struct jlapp *a, const struct jlx_ev *ev, struct jla
     return 1;
 }
 
+/* Record (scene 8): arm / disarm the Digitone's own live record. The light follows at once and then the Digitone's own state (jlapp_set_record) */
+static size_t record_button(struct jlapp *a, struct jlapp_act *out, size_t max)
+{
+    if (max < 1)
+        return 0;
+    if (!a->record_ok) {
+        say(a, "RECORD: DN2 TOO OLD");
+        return 0;
+    }
+    if (a->live_state != JDL_LIVE) {
+        say_why_not(a);
+        return 0;
+    }
+    a->record_on = a->record_on ? 0u : 1u;
+    a->record_hold = 1;
+    a->record_ms = a->now_ms;
+    say(a, "RECORD %s", a->record_on ? "ON" : "OFF");
+    set_act(out, JLAPP_ACT_RECORD, a->n.track, 0, a->record_on);
+    return 1;
+}
+
+void jlapp_set_record(struct jlapp *a, int ok, int bits_valid, uint8_t bits, uint32_t busy_count)
+{
+    if (a->record_ok && !ok) {         /* a Digitone without RECORD: the button goes dark and says so on the next press */
+        a->record_on = 0;
+        say(a, "RECORD: DN2 TOO OLD");
+    }
+    a->record_ok = ok != 0;
+    if (busy_count < a->record_busy_seen)      /* the Digitone's counters restarted (live control came back) */
+        a->record_busy_seen = busy_count;
+    if (busy_count != a->record_busy_seen) {   /* GRID or STEP RECORDING is on: the Digitone did not arm */
+        a->record_busy_seen = busy_count;
+        a->record_on = 0;
+        a->record_hold = 0;
+        say(a, "GRID/STEP REC IS ON");
+    }
+    if (bits_valid && !(a->record_hold && (uint32_t)(a->now_ms - a->record_ms) < JLAPP_RECORD_HOLD_MS))
+        a->record_on = (bits & (JDL_REC_ARMED | JDL_REC_RECORDING)) != 0;
+}
+
 static size_t side_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
     if (ev->idx == JLAPP_SIDE_DELETE && (a->mode != JLAPP_MODE_MIXER || (!ev->value && a->erase_on)))
@@ -578,6 +643,8 @@ static size_t side_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
             say(a, "%s", VIEW_NAME[a->mix.view]);
         return 0;
     }
+    if (ev->idx == JLAPP_SIDE_RECORD && ev->value)
+        return record_button(a, out, max);
     if (ev->idx != JLAPP_SIDE_START_STOP || !ev->value || max < 1)
         return 0;
     say(a, a->transport ? "STOP" : "START");
@@ -605,6 +672,10 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
                 set_act(out, JLAPP_ACT_SCALE, a->n.track, (uint8_t)idx1, a->n.key);
                 return 1;
             }
+            return 0;
+        }
+        if (a->mode == JLAPP_MODE_PALETTE && ev->value) {   /* the colour chart: a pad says its palette index */
+            say(a, "COLOUR %u", (unsigned)palette_index(a, ev->col, ev->row));
             return 0;
         }
         if (a->mode == JLAPP_MODE_MIXER && !(!ev->value && step_holds(a) && ev->row < QUADRANT && ev->col < QUADRANT))   /* (a note held when the mode changed still ends below) */
@@ -759,6 +830,10 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         jlst_frame(&a->step, &c, f);
     } else if (a->mode == JLAPP_MODE_MIXER && !a->page) {   /* so does the mixer */
         jlmx_frame(&a->mix, f);
+    } else if (a->mode == JLAPP_MODE_PALETTE && !a->page) {   /* and the colour chart: the palette index is the colour */
+        for (uint8_t y = 0; y < 8; y++)
+            for (uint8_t x = 0; x < 8; x++)
+                f->led[JLX_PAD0 + y * 8u + x].color = palette_index(a, x, y);
     }
     for (uint8_t y = 0; y < 8; y++)
         for (uint8_t x = 0; x < 8; x++) {
@@ -803,12 +878,14 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
     }
     /* the mixer's button (Launchpad 95's Mixer: MINT, dim when it is not on), always lit */
     f->led[JLX_TOP0 + BUTTON_CAPTURE_IDX].color = a->mode == JLAPP_MODE_MIXER ? JLMX_COLOR_FADER : JLMX_COLOR_FADER_THIRD;
+    f->led[JLX_TOP0 + BUTTON_SESSION_IDX].color = a->mode == JLAPP_MODE_PALETTE ? JLAPP_COLOR_PALETTE_ON : JLAPP_COLOR_PALETTE_OFF;   /* the colour chart: white in it, dim grey out of it */
     if (a->mode == JLAPP_MODE_MIXER) {   /* the scene buttons pick the view; start / stop is the other modes' */
         for (uint8_t i = 0; i < 8u; i++)
             f->led[JLX_SIDE0 + i].color = jlmx_scene_colour(&a->mix, i);
     } else {
         f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = a->transport ? JLAPP_GREEN : JLAPP_RED_THIRD;   /* start / stop: running green, stopped dim red */
         f->led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color = a->erase_on ? JLAPP_PINK : JLAPP_PINK_THIRD;        /* delete: bright while held */
+        f->led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color = a->record_ok ? (a->record_on ? JLAPP_RED : JLAPP_RED_THIRD) : 0;   /* record: red armed / recording, dim red off, dark when the Digitone has none */
     }
 }
 

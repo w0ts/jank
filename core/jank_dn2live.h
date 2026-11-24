@@ -22,6 +22,14 @@
 #define JDL_CMD_MIXER 45u              /* read the mixer: every track's VOL, PAN, sends and LEVEL, the mute and solo masks */
 #define JDL_CMD_MIXER_SET 56u          /* set one value of one track (stage 6) */
 #define JDL_CMD_MUTE_SET 57u           /* set the mute or the solo mask (stage 6) */
+#define JDL_CMD_RECORD 58u             /* u8 on: 0 off, 1 on, 255 read -> u8 on (stage 7, dn2-wishes 2026-11-24 measured format, NOT built there yet): the Digitone's own live record. On = what
+                                        * [RECORD]+[PLAY] does but it does not start the sequencer (it only arms while stopped); off = what [PLAY] does during live record. Status 6 while GRID or
+                                        * STEP RECORDING is on; 2 on a build without it. PLAY's notes are recorded as its keys' are (its quantise, PLAY's velocity, on the PLAYED track) */
+#define JDL_REC_ARMED 1u               /* LIVE STATUS protocol 6, 73 bytes, byte 72: bit 0 armed, bit 1 recording (the REC LED), bit 2 quantised, bit 3 GRID, bit 4 STEP */
+#define JDL_REC_RECORDING 2u
+#define JDL_REC_GRID 8u
+#define JDL_REC_STEP 16u
+#define JDL_REC_BYTE 72u               /* its index in the LIVE STATUS data: it needs protocol >= 6 and 73 bytes */
 enum jdl_mix_param { JDL_MIX_VOL = 0, JDL_MIX_PAN = 1, JDL_MIX_DEL = 2, JDL_MIX_REV = 3, JDL_MIX_CHR = 4, JDL_MIX_LEVEL = 5 };
 #define JDL_CMD_SCALE 50u              /* read the scale (and, from protocol 5, the root) a track plays */
 #define JDL_CMD_SCALE_SET 55u          /* set it (stage 6) */
@@ -76,6 +84,7 @@ struct jdl_page {
 struct jdl_status {
     uint8_t valid, proto, push, lease;
     uint32_t made, sent, lost, dropped, msgs, waited;
+    uint8_t rec_valid, rec_bits;       /* protocol >= 6: the record byte (JDL_REC_*) */
 };
 
 /* The mixer (MIXER, 45, no arguments -> 106 bytes: u32 mute mask (bit t = track t+1), u32 solo mask, u8 active track, u8 16, then 16 x {VOL, PAN, DEL send, REV send, CHR
@@ -108,6 +117,8 @@ struct jdl {
     uint32_t scale_set_refused;        /* SCALE SET answered 2 by a build that has it (protocol >= 5): that write refused, the next may go */
     uint8_t mix_set_ok;                /* MIXER SET / MUTE SET have not been refused by a build without them: 1 until they are */
     uint32_t mix_set_refused;          /* ... answered 2 or 5 by a build that has them: that write refused */
+    uint8_t record_ok;                 /* RECORD has not been refused by a build without it (status 2): 1 until it is */
+    uint32_t record_busy;              /* RECORD answered 6: GRID or STEP RECORDING is on, the Digitone did not arm */
     struct jdl_mixer mx;               /* the last MIXER answer, until taken (mixer_fresh) */
     uint8_t mixer_fresh;
     struct jdl_page pg;                /* the last STEPS answer, until taken (page_fresh) */
@@ -155,6 +166,8 @@ int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out);
  * MIXER SET {track 0..15 (255 = the active one), param (enum jdl_mix_param), value 0..127}; MUTE SET {which 0 mute / 1 solo, u16 mask (bit t = track t + 1)}: the whole mask */
 size_t jdl_mixer_set(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_mix_param param, uint8_t value, uint8_t *out, size_t cap);
 size_t jdl_mute_set(struct jdl *d, uint32_t now_ms, uint8_t which, uint16_t mask, uint8_t *out, size_t cap);
+/* RECORD (58): on 0 / 1 (255 reads). 0 unless live control is on and the Digitone has not said it lacks RECORD */
+size_t jdl_record(struct jdl *d, uint32_t now_ms, uint8_t on, uint8_t *out, size_t cap);
 /* LIVE ERASE: bit t of `tracks` = erase on for track t, 0 = all off (the Delete button held / let go). The answer is LIVE STATUS. 0 unless live control is on */
 size_t jdl_erase(struct jdl *d, uint32_t now_ms, uint16_t tracks, uint8_t *out, size_t cap);
 

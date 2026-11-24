@@ -86,13 +86,23 @@ struct jlapp_held {
 /* Modes (owner 2026-11-24): the Note button (a tap, shorter than JLAPP_TAP_MS) is Note mode; Custom goes to the step modes and cycles melodic <-> drum
  * (jank_lpstep.h); held, the Note button is the scale page in every mode. Scene button 5 (side index 4) starts / stops the transport, as Launchpad 95's Note mode.
  * Up / down are the octave in Note mode and in melodic step, nothing in drum step. */
-enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP, JLAPP_MODE_MIXER };
+enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP, JLAPP_MODE_MIXER, JLAPP_MODE_PALETTE };
+/* The Session button (owner 2026-11-24: "while we dont have anything on session button, put all the colors in there, it will help us to pick colors"): a colour chart, the
+ * Launchpad X's 128 palette indexes on the 64 pads, two pages. Session shows indexes 0-63 (reading order, 0 top left), again 64-127, again goes back to the mode it came from;
+ * a pad pressed says its index (COLOUR 51). Note, Custom and Capture leave it as always. Session is lit: WHITE in the chart, DARK_GREY (dim) out of it. */
+#define BUTTON_SESSION_IDX 4u
+#define JLAPP_PALETTE_PAGES 2u
+#define JLAPP_COLOR_PALETTE_ON 3u
+#define JLAPP_COLOR_PALETTE_OFF 1u
 #define BUTTON_CAPTURE_IDX 7u               /* the top button that enters the mixer (Launchpad 95's mixer button is the last one too) */
 #define JLAPP_TAP_MS 400u
 #define JLAPP_SIDE_START_STOP 4u            /* the side buttons, top (scene 1) = 0: scene 5 */
 #define JLAPP_SIDE_DELETE 5u                /* scene 6 (owner 2026-11-24): held, the Digitone erases the track's steps as its playhead passes; Note and step modes (the mixer's scene 6 is a view).
                                              * Scene 8 will be Record, lit once the Digitone has a record command (dn2-wishes stage 7) */
-#define JLAPP_PINK 53u                      /* the Delete button: PINK held, PINK_THIRD otherwise (my pick, the owner asked for one) */
+#define JLAPP_SIDE_RECORD 7u                /* scene 8 (owner 2026-11-24, red): the Digitone's own live record, RECORD 58 (dn2-wishes stage 7); Note and step modes. RED when armed or recording, RED_THIRD
+                                             * when not, dark on a Digitone that has no RECORD. It does not start the sequencer: it arms, and recording runs while the sequencer plays */
+#define JLAPP_RECORD_HOLD_MS 1000u          /* after a press the Digitone's older LIVE STATUS is not allowed to put the light back */
+#define JLAPP_PINK 53u                     /* the Delete button: PINK held, PINK_THIRD otherwise (my pick, the owner asked for one) */
 #define JLAPP_PINK_THIRD 55u
 #define BUTTON_CUSTOM_IDX 6u
 
@@ -107,6 +117,12 @@ struct jlapp {
     struct jlapp_held held[JLAPP_PADS];
     uint8_t track_pads;                /* the two bottom rows are the 16 tracks (page switch) */
     uint8_t erase_on, erase_track;     /* the Delete button is held, and the track it erases (the current track when it went down) */
+    uint8_t palette_page, palette_prev;   /* the colour chart's page (0: indexes 0-63, 1: 64-127) and the mode Session came from */
+    uint8_t record_ok;                 /* the Digitone has RECORD (not refused by a build without it) */
+    uint8_t record_on;                 /* the Record button is lit: armed or recording (the Digitone's LIVE STATUS, or the press until it answers) */
+    uint8_t record_hold;               /* a press at record_ms: LIVE STATUS is not taken for JLAPP_RECORD_HOLD_MS */
+    uint32_t record_ms;
+    uint32_t record_busy_seen;         /* the Digitone's count of "GRID / STEP RECORDING is on" refusals already said */
     uint8_t live_state;                /* enum jdl_state, as the firmware last told (jlapp_set_live) */
     uint8_t play_ok;                   /* PLAY has not been refused */
     uint8_t can_play;                  /* live control is on and PLAY is there: a press can play */
@@ -177,6 +193,10 @@ void jlapp_on_dn2_rt(struct jlapp *a, uint8_t byte);
 int jlapp_mixer_wanted(const struct jlapp *a);
 void jlapp_on_mixer(struct jlapp *a, const struct jdl_mixer *m);
 void jlapp_set_mixer_writes(struct jlapp *a, int ok);
+/* The Digitone's record state, as the firmware last knows it (jdl: record_ok, st.rec_valid / rec_bits, record_busy): the Record button's light follows the armed / recording bits
+ * (when the Digitone sends them: protocol 6), a refusal count that grew says GRID / STEP REC IS ON and puts the light back, and a Digitone that has no RECORD darkens the button
+ * (it says RECORD: DN2 TOO OLD once) */
+void jlapp_set_record(struct jlapp *a, int ok, int bits_valid, uint8_t bits, uint32_t busy_count);
 /* the step modes: the pages of the current track to read now (pages[0..n), 0 outside the step modes), and a page the Digitone answered (jdl_take_page) */
 size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2]);
 void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg);

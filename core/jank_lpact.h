@@ -16,7 +16,8 @@ enum jlapp_act_kind {
     JLAPP_ACT_TRANSPORT,               /* start / stop the clock (Jank is the transport master) */
     JLAPP_ACT_MIX,                     /* a mixer fader: track (0..15), op = the parameter (enum jdl_mix_param), vel = the value 0..127 (MIXER SET) */
     JLAPP_ACT_MUTE,                    /* a mute / solo column: op = which (0 mute, 1 solo), the whole new mask = note (low byte) | step << 8 (MUTE SET) */
-    JLAPP_ACT_ERASE,                   /* the Delete button: track, vel = 1 on / 0 off: the Digitone erases that track's steps as its playhead passes (LIVE ERASE, 44 sub 3) */
+    JLAPP_ACT_RECORD,                  /* the Record button: vel = 1 arm / 0 off (RECORD, 58: the Digitone's own live record) */
+    JLAPP_ACT_ERASE,                 /* the Delete button: track, vel = 1 on / 0 off: the Digitone erases that track's steps as its playhead passes (LIVE ERASE, 44 sub 3) */
     JLAPP_ACT_SCALE                    /* the Launchpad changed the scale or the key: note = the scale's index (0..35), vel = the root (0..11): the Digitone follows (SCALE SET) */
 };
 

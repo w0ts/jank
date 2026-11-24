@@ -10,6 +10,8 @@
 #define WHAT_PUSH_NOTES 1u
 #define ST_NOT_UNDERSTOOD 2u
 #define ST_NOT_LIVE 4u
+#define ST_RECORD_BUSY 6u              /* RECORD: GRID or STEP RECORDING is on */
+#define RECORD_PROTO 6u                /* the LIVE STATUS protocol that has the record byte */
 #define NOTE_BYTES 6u                  /* track, step, note, velocity, length, flags */
 #define PUSH_HEAD 3u                   /* n, u16 lost */
 
@@ -25,6 +27,7 @@ void jdl_init(struct jdl *d)
     d->scale_ok = 1;
     d->scale_set_ok = 1;
     d->mix_set_ok = 1;
+    d->record_ok = 1;
 }
 
 int jdl_is_live(const struct jdl *d) { return d->state == JDL_LIVE; }
@@ -205,6 +208,13 @@ size_t jdl_erase(struct jdl *d, uint32_t now_ms, uint16_t tracks, uint8_t *out, 
     return send(d, now_ms, JDL_CMD_LIVE, args, sizeof args, out, cap);
 }
 
+size_t jdl_record(struct jdl *d, uint32_t now_ms, uint8_t on, uint8_t *out, size_t cap)
+{
+    if (d->state != JDL_LIVE || !d->record_ok || (on > 1u && on != 255u))
+        return 0;
+    return send(d, now_ms, JDL_CMD_RECORD, &on, 1, out, cap);
+}
+
 int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out)
 {
     if (!d->mixer_fresh)
@@ -373,8 +383,18 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         return JDL_IN_REPLY;
     }
     if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE &&
-        r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET && r.cmd != JDL_CMD_MIXER_SET && r.cmd != JDL_CMD_MUTE_SET)
+        r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET && r.cmd != JDL_CMD_MIXER_SET && r.cmd != JDL_CMD_MUTE_SET && r.cmd != JDL_CMD_RECORD)
         return JDL_IN_IGNORED;
+    if (r.cmd == JDL_CMD_RECORD) {     /* 2: a build without RECORD (live control itself is fine); 6: GRID or STEP RECORDING is on, that request only */
+        if (r.status == ST_NOT_UNDERSTOOD) {
+            d->record_ok = 0;
+            return JDL_IN_REPLY;
+        }
+        if (r.status == ST_RECORD_BUSY) {
+            d->record_busy++;
+            return JDL_IN_REPLY;
+        }
+    }
     if (r.cmd == JDL_CMD_MIXER_SET || r.cmd == JDL_CMD_MUTE_SET) {   /* 2: not understood (an older build) or refused; 5: 16 writes already waiting: that write only */
         if (r.status == ST_NOT_UNDERSTOOD || r.status == ST_BUSY) {
             if (r.status == ST_NOT_UNDERSTOOD && !(d->st.valid && d->st.proto >= SCALE_PROTO_ROOT))
@@ -446,6 +466,8 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         d->st.dropped = u32be(s + 17);
         d->st.msgs = u32be(s + 21);
         d->st.waited = u32be(s + 25);
+        d->st.rec_valid = s[0] >= RECORD_PROTO && r.n > JDL_REC_BYTE;   /* protocol 6: the record byte at the end */
+        d->st.rec_bits = d->st.rec_valid ? s[JDL_REC_BYTE] : 0u;
     }
     if (r.status == 0) {
         if (d->state != JDL_LIVE)

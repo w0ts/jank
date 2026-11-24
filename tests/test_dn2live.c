@@ -742,6 +742,50 @@ static void test_the_mixer_writes_stop_on_a_build_without_them_but_not_on_one_th
     CHECK(d.mix_set_ok && d.mix_set_refused == 2);
 }
 
+/* RECORD (58, dn2-wishes stage 7): the request, the refusals that do not end live control, and the record byte of LIVE STATUS protocol 6 (73 bytes, byte 72) */
+static void test_record(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64], body[16], st[73] = {0};
+    size_t n;
+    n = jdl_record(&d, 10, 1, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[2] == JDL_CMD_RECORD && body[3] == 1);              /* arm */
+    n = jdl_record(&d, 11, 0, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[3] == 0);                                           /* off */
+    n = jdl_record(&d, 12, 255, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[3] == 255);                                         /* read */
+    CHECK(jdl_record(&d, 13, 2, out, sizeof out) == 0);                                                        /* a value the Digitone would refuse */
+    CHECK(jdl_record(&d, 14, 1, out, 4) == 0);                                                                 /* no room: nothing */
+    reply_to(&d, d.seq, JDL_CMD_RECORD, 6, NULL, 0);                                                           /* GRID or STEP RECORDING is on */
+    CHECK(d.record_ok && d.record_busy == 1 && jdl_is_live(&d));
+    reply_to(&d, d.seq, JDL_CMD_RECORD, 0, (uint8_t[]){1}, 1);                                                 /* the value asked */
+    CHECK(d.record_ok && d.record_busy == 1 && jdl_is_live(&d));
+    reply_to(&d, d.seq, JDL_CMD_RECORD, 2, NULL, 0);                                                           /* a build without RECORD */
+    CHECK(!d.record_ok && jdl_is_live(&d));                                                                    /* live control is fine */
+    CHECK(jdl_record(&d, 20, 1, out, sizeof out) == 0);                                                        /* none is sent any more */
+    d = live(0);
+    status_of_protocol(&d, 5);
+    CHECK(!d.st.rec_valid && d.st.rec_bits == 0);                                                              /* protocol 5: no record byte */
+    st[0] = 6;
+    st[1] = 1;
+    st[2] = 10;
+    st[72] = JDL_REC_ARMED | JDL_REC_GRID;
+    jdl_poll(&d, 2000000, (uint8_t[64]){0}, 64);
+    reply_to(&d, d.seq, JDL_CMD_LIVE, 0, st, sizeof st);
+    CHECK(d.st.proto == 6 && d.st.rec_valid && d.st.rec_bits == (JDL_REC_ARMED | JDL_REC_GRID));
+    st[72] = JDL_REC_RECORDING;
+    jdl_poll(&d, 3000000, (uint8_t[64]){0}, 64);
+    reply_to(&d, d.seq, JDL_CMD_LIVE, 0, st, sizeof st);
+    CHECK(d.st.rec_valid && d.st.rec_bits == JDL_REC_RECORDING);
+    st[0] = 6;
+    jdl_poll(&d, 4000000, (uint8_t[64]){0}, 64);
+    reply_to(&d, d.seq, JDL_CMD_LIVE, 0, st, 72);                                                              /* a protocol 6 answer too short for the byte */
+    CHECK(!d.st.rec_valid);
+    d = live(0);
+    jdl_init(&d);
+    CHECK(jdl_record(&d, 1, 1, out, sizeof out) == 0);                                                         /* not live: nothing */
+}
+
 static void test_the_scale_needs_live_control(void)
 {
     struct jdl d;
@@ -753,6 +797,7 @@ static void test_the_scale_needs_live_control(void)
 int main(void)
 {
     test_erase_needs_live_control();
+    test_record();
     test_reading_the_scale_with_the_cheap_poll();
     test_the_root_comes_with_protocol_five();
     test_a_damaged_or_refused_scale_answer();

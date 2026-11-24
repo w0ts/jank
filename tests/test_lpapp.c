@@ -495,8 +495,7 @@ static void test_octave_and_other_buttons(void)
     acts(&a, top(0, 0), &o);                                      /* a release does nothing */
     acts(&a, top(1, 0), &o);
     CHECK(a.n.octave == 2 && msg(&a)[0] == 0);
-    acts(&a, top(5, 127), &o);                                    /* the other buttons do nothing yet (Session; Capture is the mixer's) */
-    acts(&a, top(4, 127), &o);
+    acts(&a, top(5, 127), &o);                                    /* a scene button with no job does nothing (Session is the colour chart, Capture the mixer) */
     CHECK(jlapp_on_lpx_acts(&a, &side, &o, 1) == 0 && a.n.octave == 2 && msg(&a)[0] == 0);
 }
 
@@ -519,11 +518,11 @@ static void test_buttons_lit(void)
     CHECK(f.led[JLX_TOP0 + 2].color == JLAPP_COLOR_ARROW_OFF && f.led[JLX_TOP0 + 3].color == JLAPP_COLOR_ARROW_ON);   /* track 1 of 16: nothing to the left */
     CHECK(f.led[JLX_TOP0 + 5].color == JLAPP_COLOR_MODE);          /* the Note button */
     CHECK(JLAPP_COLOR_ARROW_ON == 21 && JLAPP_COLOR_ARROW_OFF == 23 && JLAPP_COLOR_MODE == 37);   /* GREEN, GREEN_THIRD, LIGHT_BLUE: LP95's Note.Octave and Mode.Note */
-    CHECK(f.led[JLX_TOP0 + 4].color == 0);                        /* Session: no job yet, dark */
+    CHECK(f.led[JLX_TOP0 + 4].color == JLAPP_COLOR_PALETTE_OFF);  /* Session is the colour chart: lit, dim grey out of it */
     CHECK(f.led[JLX_TOP0 + 6].color == JLAPP_GREEN_THIRD);        /* Custom does something: lit, dim (melodic step is the one it leads to) */
     CHECK(f.led[JLX_TOP0 + 7].color == JLMX_COLOR_FADER_THIRD);   /* Capture is the mixer's: lit, dim (MINT_THIRD) */
     for (uint32_t i = 0; i < 8; i++)
-        CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_RED_THIRD : i == 5 ? JLAPP_PINK_THIRD : 0));   /* start / stop (dim red while stopped) and Delete (dim pink) are lit */
+        CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_RED_THIRD : i == 5 ? JLAPP_PINK_THIRD : i == 7 ? JLAPP_RED_THIRD : 0));   /* start / stop (dim red while stopped), Delete (dim pink) and Record (dim red) are lit */
     CHECK(f.led[JLX_LOGO].color == 0);
     for (uint32_t i = 0; i < JLX_LEDS; i++)
         CHECK(f.led[i].mode == JLX_STATIC);
@@ -1074,7 +1073,7 @@ static void test_the_delete_scene_button_is_held(void)
     struct jlx_frame f;
     CHECK(JLAPP_SIDE_DELETE == 5);
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == JLAPP_PINK_THIRD && f.led[JLX_SIDE0 + 7].color == 0);   /* dim; scene 8 (record) is dark until the Digitone has it */
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == JLAPP_PINK_THIRD && f.led[JLX_SIDE0 + 7].color == JLAPP_RED_THIRD);   /* dim; scene 8 is Record, dim red */
     acts(&a, top(3, 127), &o);                                     /* the track: the next one (index 1) */
     CHECK(a.n.track == 1);
     say_nothing_yet(&a);
@@ -1117,6 +1116,109 @@ static void test_delete_ends_when_the_launchpad_goes_away(void)
     CHECK(jlapp_on_lpx_acts(&a, &ev, o, 1) == 1 && a.erase_on);
     CHECK(jlapp_release_acts(&a, o, JLAPP_PADS + JLN_TRACKS + 1u) == 1 && o[0].kind == JLAPP_ACT_ERASE && o[0].vel == 0 && !a.erase_on);
     CHECK(jlapp_release_acts(&a, o, JLAPP_PADS + JLN_TRACKS + 1u) == 0);
+}
+
+/* owner 2026-11-24: Record on scene 8 (red): the Digitone's own live record (RECORD, 58); it arms, the Digitone records while its sequencer plays */
+static void test_the_record_button(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    struct jlx_frame f;
+    jlapp_tick(&a, 1000);
+    CHECK(JLAPP_SIDE_RECORD == 7);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color == JLAPP_RED_THIRD);   /* dim red: off */
+    say_nothing_yet(&a);
+    CHECK(acts(&a, side(JLAPP_SIDE_RECORD, 127), &o) == 1 && o.kind == JLAPP_ACT_RECORD && o.vel == 1 && strcmp(msg(&a), "RECORD ON") == 0);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color == JLAPP_RED);          /* bright at once */
+    CHECK(acts(&a, side(JLAPP_SIDE_RECORD, 0), &o) == 0);                    /* a release is nothing */
+    jlapp_set_record(&a, 1, 1, 0, 0);                                        /* an older LIVE STATUS right after the press: not taken */
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color == JLAPP_RED);
+    jlapp_tick(&a, 1000u + JLAPP_RECORD_HOLD_MS);
+    jlapp_set_record(&a, 1, 1, JDL_REC_ARMED, 0);                            /* the Digitone says armed: it stays on */
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color == JLAPP_RED);
+    jlapp_set_record(&a, 1, 1, JDL_REC_RECORDING | JDL_REC_ARMED, 0);        /* and recording */
+    CHECK(a.record_on);
+    jlapp_set_record(&a, 1, 1, 0, 0);                                        /* the Digitone's own REC key turned it off: the light follows */
+    CHECK(!a.record_on);
+    jlapp_set_record(&a, 1, 1, JDL_REC_ARMED, 0);                            /* ... or on */
+    CHECK(a.record_on);
+    CHECK(acts(&a, side(JLAPP_SIDE_RECORD, 127), &o) == 1 && o.vel == 0 && strcmp(msg(&a), "RECORD OFF") == 0);   /* a press while on: off */
+    jlapp_tick(&a, 5000);
+    jlapp_set_record(&a, 1, 0, 0, 0);                                        /* protocol 5: no record byte: the press stays */
+    CHECK(!a.record_on);
+    acts(&a, side(JLAPP_SIDE_RECORD, 127), &o);                              /* armed again by the press */
+    jlapp_tick(&a, 9000);
+    jlapp_set_record(&a, 1, 0, 0, 0);
+    CHECK(a.record_on);
+    say_nothing_yet(&a);
+    jlapp_set_record(&a, 1, 0, 0, 1);                                        /* GRID or STEP RECORDING is on: refused */
+    CHECK(!a.record_on && strcmp(msg(&a), "GRID/STEP REC IS ON") == 0);
+    jlapp_set_record(&a, 1, 0, 0, 1);
+    CHECK(msg(&a)[0] == 0);                                                  /* said once per refusal */
+    jlapp_set_record(&a, 1, 0, 0, 0);                                        /* the counter restarted (live control came back): no message */
+    CHECK(msg(&a)[0] == 0);
+    jlapp_set_record(&a, 0, 0, 0, 0);                                        /* a Digitone without RECORD */
+    CHECK(strcmp(msg(&a), "RECORD: DN2 TOO OLD") == 0);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color == 0);                  /* dark */
+    CHECK(acts(&a, side(JLAPP_SIDE_RECORD, 127), &o) == 0 && strcmp(msg(&a), "RECORD: DN2 TOO OLD") == 0);
+    {
+        struct jlapp b = fresh_not_live(JDL_REMOTE_OFF);                     /* no live control: it says why, arms nothing */
+        say_nothing_yet(&b);
+        CHECK(acts(&b, side(JLAPP_SIDE_RECORD, 127), &o) == 0 && !b.record_on && msg(&b)[0] != 0);
+    }
+    {
+        struct jlapp c = fresh();                                            /* the step modes: the same button */
+        acts(&c, top(6, 127), &o);
+        CHECK(acts(&c, side(JLAPP_SIDE_RECORD, 127), &o) == 1 && o.kind == JLAPP_ACT_RECORD && o.vel == 1);
+        acts(&c, top(7, 127), &o);                                           /* the mixer: scene 8 has no job there */
+        CHECK(acts(&c, side(JLAPP_SIDE_RECORD, 127), &o) == 0);
+    }
+}
+
+/* owner 2026-11-24: the Session button is a colour chart: the 128 palette indexes on the pads, two pages */
+static void test_the_session_button_is_a_colour_chart(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    struct jlx_frame f;
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + BUTTON_SESSION_IDX].color == JLAPP_COLOR_PALETTE_OFF);
+    say_nothing_yet(&a);
+    CHECK(acts(&a, top(BUTTON_SESSION_IDX, 127), &o) == 0 && a.mode == JLAPP_MODE_PALETTE && strcmp(msg(&a), "COLOURS 0-63") == 0);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + BUTTON_SESSION_IDX].color == JLAPP_COLOR_PALETTE_ON);
+    CHECK(f.led[JLX_PAD0 + 7 * 8 + 0].color == 0 && f.led[JLX_PAD0 + 7 * 8 + 1].color == 1 && f.led[JLX_PAD0 + 7 * 8 + 7].color == 7);   /* the top row: 0 .. 7, index 0 top left */
+    CHECK(f.led[JLX_PAD0 + 6 * 8 + 3].color == 11 && f.led[JLX_PAD0 + 0].color == 56 && f.led[JLX_PAD0 + 7].color == 63);   /* the bottom row: 56 .. 63 */
+    for (uint32_t i = 0; i < 64; i++)
+        CHECK(f.led[JLX_PAD0 + i].color < 64);
+    CHECK(acts(&a, pad(3, 6, 100), &o) == 0 && strcmp(msg(&a), "COLOUR 11") == 0);   /* a pad says its index, plays nothing */
+    CHECK(acts(&a, pad(3, 6, 0), &o) == 0);
+    acts(&a, top(BUTTON_SESSION_IDX, 0), &o);                                /* a release of Session: nothing */
+    CHECK(a.mode == JLAPP_MODE_PALETTE && a.palette_page == 0);
+    acts(&a, top(BUTTON_SESSION_IDX, 127), &o);                              /* the second page */
+    CHECK(a.palette_page == 1 && strcmp(msg(&a), "COLOURS 64-127") == 0);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_PAD0 + 7 * 8 + 0].color == 64 && f.led[JLX_PAD0 + 0].color == 120 && f.led[JLX_PAD0 + 7].color == 127);
+    CHECK(acts(&a, pad(0, 0, 100), &o) == 0 && strcmp(msg(&a), "COLOUR 120") == 0);
+    acts(&a, top(BUTTON_SESSION_IDX, 127), &o);                              /* a third press: back to where it came from */
+    CHECK(a.mode == JLAPP_MODE_NOTE && strcmp(msg(&a), "COLOURS OFF") == 0);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_PAD0].color == JLN_COLOR_ROOT && f.led[JLX_TOP0 + BUTTON_SESSION_IDX].color == JLAPP_COLOR_PALETTE_OFF);   /* the note pads again */
+    acts(&a, top(6, 127), &o);                                               /* from a step mode ... */
+    acts(&a, top(BUTTON_SESSION_IDX, 127), &o);
+    acts(&a, top(BUTTON_SESSION_IDX, 127), &o);
+    acts(&a, top(BUTTON_SESSION_IDX, 127), &o);
+    CHECK(a.mode == JLAPP_MODE_STEP);                                        /* ... back to it */
+    acts(&a, top(BUTTON_SESSION_IDX, 127), &o);
+    acts(&a, top(NOTE_BTN, 127), &o);                                        /* a tap on Note leaves the chart for Note mode */
+    jlapp_tick(&a, 100);
+    acts(&a, top(NOTE_BTN, 0), &o);
+    CHECK(a.mode == JLAPP_MODE_NOTE);
 }
 
 static void test_the_mode_buttons_light(void)
@@ -1570,6 +1672,8 @@ int main(void)
     test_up_and_down_are_the_octave_except_in_drum_step();
     test_a_drum_pad_on_another_track_selects_and_plays_while_stopped();
     test_the_start_stop_scene_button();
+    test_the_record_button();
+    test_the_session_button_is_a_colour_chart();
     test_the_delete_scene_button_is_held();
     test_delete_in_a_step_mode_and_in_the_mixer_and_without_live_control();
     test_delete_ends_when_the_launchpad_goes_away();
