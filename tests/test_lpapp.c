@@ -1316,7 +1316,7 @@ static void test_capture_enters_the_mixer_and_the_buttons_follow(void)
     CHECK(a.mode == JLAPP_MODE_MIXER && strcmp(msg(&a), "MIXER") == 0);
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_TOP0 + CAPTURE].color == JLMX_COLOR_FADER && f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE_DIM);
-    CHECK(f.led[JLX_SIDE0 + 0].color == JLMX_COLOR_FADER && f.led[JLX_SIDE0 + 1].color == JLMX_COLOR_FADER_THIRD);   /* the volume view is the one shown */
+    CHECK(f.led[JLX_SIDE0 + 0].color == JLMX_COLOR_FADER_THIRD && f.led[JLX_SIDE0 + 1].color == JLMX_COLOR_FADER_THIRD);   /* the overview is on: no sub mode is the one shown */
     CHECK(f.led[JLX_SIDE0 + 5].color == JLMX_COLOR_MUTED && f.led[JLX_SIDE0 + 6].color == JLMX_COLOR_NOSOLO && f.led[JLX_SIDE0 + 7].color == 0);
     acts(&a, top(NOTE_BTN, 127), &o);                              /* a tap on Note: Note mode */
     jlapp_tick(&a, 100);
@@ -1342,6 +1342,58 @@ static void test_scene_buttons_pick_the_view_and_say_it(void)
     }
     CHECK(acts(&a, side(7, 127), &o) == 0 && a.mix.view == JLMX_SOLO && msg(&a)[0] == 0);   /* the eighth has no job */
     CHECK(acts(&a, side(SCENE5, 127), &o) == 0 && a.mix.view == JLMX_CHR);   /* scene 5 is chorus here, not start / stop */
+}
+
+/* owner 2026-11-24: the mixer opens on an overview (Launchpad 95's); the scene buttons switch to the sub modes; a press on a value row opens that sub mode; Capture again is the overview */
+static void test_the_mixer_opens_on_the_overview(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    struct jdl_mixer m = app_mixer();
+    struct jlx_frame f;
+    static const char *const NAME[5] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND"};
+    jlapp_tick(&a, 1000);
+    acts(&a, top(CAPTURE, 127), &o);
+    jlapp_on_mixer(&a, &m);
+    CHECK(a.mix.view == JLMX_OVERVIEW);
+    jlapp_frame(&a, &f);
+    for (uint8_t x = 0; x < 8; x++) {
+        for (uint8_t y = 3; y < 8; y++)                            /* rows 1-5 from the top: volume .. chorus, MINT */
+            CHECK(f.led[JLX_PAD0 + y * 8 + x].color == JLMX_COLOR_FADER);
+        CHECK(f.led[JLX_PAD0 + 2 * 8 + x].color == (x == 0 ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED));   /* row 6: mute */
+        CHECK(f.led[JLX_PAD0 + 1 * 8 + x].color == JLMX_COLOR_NOSOLO);                                  /* row 7: solo */
+        CHECK(f.led[JLX_PAD0 + 0 * 8 + x].color == 0);                                                  /* row 8: nothing */
+    }
+    for (uint8_t i = 0; i < 5; i++) {                              /* a press on a value row opens its sub mode: no write */
+        acts(&a, top(CAPTURE, 127), &o);
+        CHECK(a.mix.view == JLMX_OVERVIEW);
+        say_nothing_yet(&a);
+        CHECK(acts(&a, pad(2, (uint8_t)(7 - i), 100), &o) == 0 && a.mix.view == i && strcmp(msg(&a), NAME[i]) == 0);
+        CHECK(acts(&a, pad(2, (uint8_t)(7 - i), 0), &o) == 0);
+    }
+    CHECK(acts(&a, pad(2, 7, 100), &o) == 1 && o.kind == JLAPP_ACT_MIX && a.mix.view == JLMX_CHR);   /* in a sub mode a press is a fader press, not another opening (it writes) */
+    acts(&a, top(CAPTURE, 127), &o);                               /* Capture again: back on the overview */
+    CHECK(a.mix.view == JLMX_OVERVIEW && a.mode == JLAPP_MODE_MIXER);
+    acts(&a, side(1, 127), &o);                                    /* a scene button switches from the overview */
+    CHECK(a.mix.view == JLMX_PAN);
+}
+
+static void test_the_overviews_mute_and_solo_rows_toggle_tracks_and_row_8_does_nothing(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    struct jdl_mixer m = app_mixer();
+    jlapp_tick(&a, 1000);
+    acts(&a, top(CAPTURE, 127), &o);
+    jlapp_on_mixer(&a, &m);
+    CHECK(acts(&a, pad(2, 2, 100), &o) == 1 && o.kind == JLAPP_ACT_MUTE && o.op == 0 && o.note == 0x05 && a.mix.view == JLMX_OVERVIEW);   /* row 6: track 3 muted too */
+    CHECK(acts(&a, pad(0, 2, 100), &o) == 1 && o.kind == JLAPP_ACT_MUTE && o.op == 0 && o.note == 0x04);                                  /* and track 1 unmuted */
+    CHECK(acts(&a, pad(1, 1, 100), &o) == 1 && o.kind == JLAPP_ACT_MUTE && o.op == 1 && o.note == 0x02);                                  /* row 7: track 2 soloed */
+    CHECK(acts(&a, pad(1, 0, 100), &o) == 0 && a.mix.view == JLMX_OVERVIEW);                                                              /* row 8: nothing */
+    jlapp_set_mixer_writes(&a, 0);
+    say_nothing_yet(&a);
+    CHECK(acts(&a, pad(4, 7, 100), &o) == 0 && a.mix.view == JLMX_VOL);   /* opening a sub mode needs no write: it works on a read-only build */
+    CHECK(strcmp(msg(&a), "VOLUME") == 0);
 }
 
 static void test_up_and_down_are_the_mixers_banks(void)
@@ -1370,10 +1422,11 @@ static void test_the_faders_follow_the_digitone_and_a_press_writes(void)
     jlapp_tick(&a, 1000);
     acts(&a, top(CAPTURE, 127), &o);
     jlapp_on_mixer(&a, &m);
+    CHECK(a.mix.view == JLMX_OVERVIEW && jlapp_mixer_wanted(&a));
+    acts(&a, side(0, 127), &o);                                    /* the volume sub mode */
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_PAD0 + 0 * 8 + 3].color == JLMX_COLOR_FADER && f.led[JLX_PAD0 + 3 * 8 + 3].color == 0);   /* track 4: volume 24: (8 * 24 + 126) / 127 = 2 pads */
-    CHECK(jlapp_mixer_wanted(&a));
-    CHECK(acts(&a, pad(3, 5, 100), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 3 && o.op == JDL_MIX_VOL && o.vel == 95);   /* a press: pad 6 of 8 */
+    CHECK(f.led[JLX_PAD0 + 0 * 8 + 3].color == JLMX_COLOR_FADER && f.led[JLX_PAD0 + 2 * 8 + 3].color == JLMX_COLOR_FADER && f.led[JLX_PAD0 + 3 * 8 + 3].color == 0);   /* track 4: volume 24: up to Launchpad 95's step 39: 3 pads */
+    CHECK(acts(&a, pad(3, 5, 100), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 3 && o.op == JDL_MIX_VOL && o.vel == 89);   /* a press: pad 6 of 8, its step (-6 dB: 0.70 of the range) */
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_PAD0 + 5 * 8 + 3].color == JLMX_COLOR_FADER && f.led[JLX_PAD0 + 6 * 8 + 3].color == 0);   /* the fader moved at once */
     CHECK(acts(&a, pad(3, 5, 0), &o) == 0);                        /* a release: nothing */
@@ -1394,8 +1447,9 @@ static void test_a_mixer_without_writes_or_without_live_control_says_so(void)
     jlapp_tick(&a, 1000);
     acts(&a, top(CAPTURE, 127), &o);
     jlapp_on_mixer(&a, &m);
+    acts(&a, side(0, 127), &o);                                    /* a fader screen: its pads write */
     say_nothing_yet(&a);
-    jlapp_set_mixer_writes(&a, 0);                                 /* a Digitone without the mixer writes (stage 5) */
+    jlapp_set_mixer_writes(&a, 0);                               /* a Digitone without the mixer writes (stage 5) */
     CHECK(acts(&a, pad(3, 5, 100), &o) == 0 && strcmp(msg(&a), "MIXER READ ONLY") == 0);
     CHECK(acts(&a, pad(3, 6, 100), &o) == 0 && msg(&a)[0] == 0);   /* said once, not on every press */
     jlapp_tick(&a, 1000 + 2000u);
@@ -1427,6 +1481,8 @@ int main(void)
 {
     test_capture_enters_the_mixer_and_the_buttons_follow();
     test_scene_buttons_pick_the_view_and_say_it();
+    test_the_mixer_opens_on_the_overview();
+    test_the_overviews_mute_and_solo_rows_toggle_tracks_and_row_8_does_nothing();
     test_up_and_down_are_the_mixers_banks();
     test_the_faders_follow_the_digitone_and_a_press_writes();
     test_a_mixer_without_writes_or_without_live_control_says_so();

@@ -12,7 +12,7 @@ void jlprefs_defaults(struct jlprefs *p)
     p->horizontal = 1;
     p->octave = 3;
     p->step_kind = JLST_MELODIC;
-    p->mix_view = JLMX_VOL;
+    p->mix_view = JLMX_OVERVIEW;
 }
 
 static uint8_t checksum(const uint8_t *b, size_t n)
@@ -53,7 +53,7 @@ int jlprefs_unpack(struct jlprefs *p, const uint8_t *in, size_t n)
     t.step_kind = in[6];
     t.mix_view = in[7];
     t.follow = in[8];
-    if (t.layout > JLN_CHORDS || t.horizontal > 1u || t.absolute > 1u || t.octave > 6u || t.track_pads > 1u || t.step_kind > JLST_DRUM || t.mix_view >= JLMX_VIEWS ||
+    if (t.layout > JLN_CHORDS || t.horizontal > 1u || t.absolute > 1u || t.octave > 6u || t.track_pads > 1u || t.step_kind > JLST_DRUM || t.mix_view > JLMX_OVERVIEW ||
         t.follow > 1u)
         return 0;
     *p = t;

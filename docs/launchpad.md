@@ -16,7 +16,7 @@ flashing and pulsing follow it. First slice: **Note mode**, played through the D
   scale notes LIGHT_BLUE_HALF (38), a note outside the scale **WHITE (3, owner 2026-11-24; Launchpad 95 has DARK_GREY)**, a note the Digitone sounds (or a pad that is
   down) GREEN (21). **The colours are relative to the current scale, except for the Digitone's Chromatic (all 12 notes, where nothing would stand out):
   its reference is the MAJOR scale of the key** (root, 3rd and 5th as in major). Against major, a note that is in natural minor but not in major (the flat
-  3rd, 6th and 7th) is a dim **PURPLE_HALF (49**; the owner found amber too loud; 50 is the dimmer PURPLE_THIRD), a note in neither WHITE; against any other scale there is no purple. One note lights every pad with that pitch (the layouts overlap). The arrows are GREEN (Note.Octave) and dim to GREEN_THIRD (23)
+  3rd, 6th and 7th) is a dark **PURPLE_THIRD (50**; the owner found amber too loud, and PURPLE_HALF 49 still stood out too much), a note in neither WHITE; against any other scale there is no purple. One note lights every pad with that pitch (the layouts overlap). The arrows are GREEN (Note.Octave) and dim to GREEN_THIRD (23)
   where they can go no further (the lowest or highest octave, the first or last track); the Note button is LIGHT_BLUE (37, Mode.Note).
 - A pad that is down when the track changes ends its note on the track it started on; a Launchpad that goes away ends
   every note it had down.
@@ -114,7 +114,7 @@ USB MIDI CLOCK setting is turned off); with one it starts again. Device mode (a 
 ### Remembered settings (`core/jank_lpprefs.[ch]`)
 
 Owner, 2026-11-24: "jank should remember the settings, like enabling the 16 bottom pads". Kept across a restart (an update restarts the unit): the note **layout** and its
-**horizontal / absolute** switches, the **octave**, the **track pads** (the 16 bottom pads), the **step mode Custom opens** (melodic / drum), the **mixer's view** and
+**horizontal / absolute** switches, the **octave**, the **track pads** (the 16 bottom pads), the **step mode Custom opens** (melodic / drum), the **mixer's view** (stored, but Capture always opens the mixer on its overview, so it is not restored) and
 **FOLLOW**. **Not** kept: the scale and the key (while the Digitone is live they come from it, so a stored pair would only be stale), the mode (it starts in Note mode), the
 mixer's bank, the step page and the track. One 10-byte blob (`jlp` / `p` in NVS: version, 8 settings, a checksum); a blob that is short, of another version, damaged or with a
 value out of range is ignored and the defaults stay. It is written **400 ms after the last change and never while the transport plays** (the rule of `core/jank_prefs.h`: no
@@ -122,18 +122,32 @@ flash writes then, so it waits until it stops); a change that returns to what is
 
 ### Mixer (`core/jank_lpmix.[ch]`)
 
-Owner, 2026-11-24, after Launchpad 95's mixer (read from its source on the owner's Mac). **Capture** (top button 8, MINT: dim when it is not on, full when it is) enters
-it; a tap on Note or Custom leaves it. Each of the 8 pad columns is **one track as a vertical fader 8 pads high**; **up / down are the banks**: up the upper row, tracks 1-8,
-down tracks 9-16, as the Digitone's trig keys lie (it says TRACKS 1-8 / 9-16). The **scene buttons** pick the view (the one shown is bright, the others dim):
+Owner, 2026-11-24, after Launchpad 95's mixer (read from its source on the owner's Mac, `SubSelectorComponent.py`, `PreciseButtonSliderElement.py`). **Capture** (top button 8,
+MINT: dim when it is not on, full when it is) opens the mixer **on its overview**, and Capture again (from a sub mode) comes back to it; a tap on Note or Custom leaves it. Each of
+the 8 pad columns is **one track**; **up / down are the banks**: up the upper row, tracks 1-8, down tracks 9-16, as the Digitone's trig keys lie (it says TRACKS 1-8 / 9-16).
 
-| scene | view | shows | a press |
+**The overview** (owner: "the mixer page is a mixer overview, and then the scene buttons on the right switch to the sub modes"): a pad row per thing, from the top, in the scene
+buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm):
+
+| row (from the top) | shows | a press |
+|---|---|---|
+| 1 - 5 | volume, pan, delay, reverb, chorus: MINT | **opens that sub mode** (the same as its scene button; the owner chose this over Launchpad 95's reset-to-default, which needs the Digitone's defaults) |
+| 6 | mute: bright YELLOW, dim when the track is muted | toggles that track's mute (the whole new mask is written) |
+| 7 | solo: BLUE when soloed, BLUE_THIRD when not | toggles that track's solo |
+| 8 | dark | nothing |
+
+**The scene buttons** (right side) switch to the sub modes, from the overview or from each other (the one shown is bright, the others dim; on the overview all are dim):
+
+| scene | sub mode | shows | a press |
 |---|---|---|---|
-| 1 | volume | the fader, filled from the bottom (MINT) | writes that height: 8 steps (15, 31 ... 127); the lowest pad again at that step sets 0 |
-| 2 | pan | one pad, the two middle pads marked | writes the position (0, 23, 44, 64, 64, 84, 105, 127 = Launchpad 95's pan map) |
-| 3, 4, 5 | delay, reverb, chorus send | as volume | as volume |
-| 6 | mute | the column bright YELLOW, dim when muted | toggles that track's mute (the whole new mask is written) |
+| 1 | volume | an 8-pad fader (MINT, the empty part dark): nothing lit for 0, else the pads up to the first step the value does not pass | writes that pad's step: **Launchpad 95's volume steps** 0, .14, .31, .40, .55, .70, .85, 1.0 of the range (its -42 -24 -18 -12 -6 0 +6 dB) = 0, 18, 39, 51, 70, 89, 108, 127; the lowest pad sets 0 and lights nothing, as there |
+| 2 | pan | a bar from the two middle pads out to the value (the middle pair alone for 63 / 64) | writes the pad's step: 0, 23, 43, 64, 64, 84, 104, 127 (Launchpad 95's pan map) |
+| 3, 4, 5 | delay, reverb, chorus send | as volume | **Launchpad 95's send steps** 0, .10, .16, .24, .34, .55, .77, 1.0 = 0, 13, 21, 30, 44, 70, 98, 127 |
+| 6 | mute | the column bright YELLOW, dim when muted | toggles that track's mute |
 | 7 | solo | the column BLUE when soloed, dim when not | toggles that track's solo |
 | 8 | (none yet; LEVEL could go here) | | |
+
+(The steps are Launchpad 95's fractions of its range laid on the Digitone's 0..127; the Digitone's own volume and send curves are **not measured**.)
 
 The faders **move when the Digitone's values do** (MIXER, 45, read every 300 ms while the screen is on: automation, an encoder), and a press moves its fader at once; the
 Digitone's reading is not allowed to put it back for 400 ms (its write applies at its next UI pass, up to 33 ms). **Writes are the Digitone's stage 6** (MIXER SET 56 and MUTE SET

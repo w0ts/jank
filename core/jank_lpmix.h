@@ -1,12 +1,15 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The Launchpad's mixer screen on the Digitone (owner 2026-11-24), after Launchpad 95's mixer: each of the 8 pad columns is one track as a vertical fader 8 pads high
- * (column x, bottom pad = the lowest value); up / down switch the bank, tracks 1-8 / 9-16. The scene buttons (right side, top to bottom) pick the view:
+/* The Launchpad's mixer screen on the Digitone (owner 2026-11-24), after Launchpad 95's mixer: each of the 8 pad columns is one track; up / down switch the bank, tracks
+ * 1-8 / 9-16. The mixer opens on the OVERVIEW (Capture again comes back to it), and the scene buttons (right side, top to bottom) switch to the sub modes:
  *
  *   1 volume   2 pan   3 delay send   4 reverb send   5 chorus send   6 mute   7 solo   (8: nothing yet)
  *
- * Volume and the sends fill from the bottom; pan is one pad (the centre pads marked); mute shows each track's column bright yellow, dim when it is muted; solo bright
- * blue when it is soloed, dim when not. Colours as Launchpad 95's (SkinMK2.py Mixer.*: MINT, YELLOW, BLUE). The values come from MIXER (jank_dn2live.h), so the faders
- * move when the Digitone's values do; a press writes (MIXER SET / MUTE SET, the Digitone's stage 6) and the fader moves at once. Pure; host-tested (tests/test_lpmix.c). */
+ * Overview, a pad row per thing, from the top in the scene buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm): rows 1-5 volume, pan, delay,
+ * reverb, chorus, MINT, a press opens that sub mode; row 6 mute (bright YELLOW, dim when muted) and row 7 solo (bright BLUE when soloed, dim when not), a press toggles that
+ * track; row 8 dark. Sub modes: volume, delay, reverb and chorus are 8-pad faders with Launchpad 95's value steps (volume dB steps, its send steps; the bottom pad is 0 and
+ * lights nothing), pan a bar from the centre pair out to the value; mute and solo show each track's column. Colours as Launchpad 95's (SkinMK2.py Mixer.*: MINT, YELLOW,
+ * BLUE). The values come from MIXER (jank_dn2live.h), so the faders move when the Digitone's values do; a press writes (MIXER SET / MUTE SET, the Digitone's stage 6) and
+ * the fader moves at once. Pure; host-tested (tests/test_lpmix.c). */
 #ifndef JANK_LPMIX_H
 #define JANK_LPMIX_H
 #include <stdint.h>
@@ -25,6 +28,7 @@
 #define JLMX_COLOR_NOSOLO 47u          /* BLUE_THIRD */
 
 enum jlmx_view { JLMX_VOL, JLMX_PAN, JLMX_DEL, JLMX_REV, JLMX_CHR, JLMX_MUTE, JLMX_SOLO, JLMX_VIEWS };
+#define JLMX_OVERVIEW JLMX_VIEWS       /* the page the mixer opens on: not a scene button's view */
 
 #define JLMX_HOLD_MS 400u              /* after a press the Digitone's older reading is not allowed to put the fader back (its write applies at its next UI pass) */
 
@@ -51,10 +55,14 @@ struct jlmx_write {
 void jlmx_init(struct jlmx *s);
 /* the Digitone's answer (jdl_take_mixer); within JLMX_HOLD_MS of a press it is not taken (the fader would jump back and forth), the next one is */
 void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m, uint32_t now_ms);
-/* A pad (x 0..7, y 0..7 from the bottom) pressed: what to write, and the local copy is changed at once (the fader moves). Volume and the sends: the pad's height,
- * 8 steps, and the lowest pad again when the fader is already at that step sets 0; pan: the 8 positions (the two middle ones are the centre); mute / solo: the column's track
- * toggles. 1 and *w filled, 0 when nothing is to be written (no answer from the Digitone yet) */
+/* A pad (x 0..7, y 0..7 from the bottom) pressed: what to write, and the local copy is changed at once (the fader moves). Volume and the sends: the pad's step (the bottom
+ * pad is 0); pan: the 8 positions (the two middle ones are the centre); mute / solo (the views, and the overview's rows 6 and 7): the column's track toggles. 1 and *w
+ * filled, 0 when nothing is to be written (no answer from the Digitone yet; or an overview pad that opens a view: jlmx_open) */
 int jlmx_press(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlmx_write *w);
+/* The overview's pad row y (from the bottom) pressed: rows 1-5 from the top open that sub mode (the view is set), 1; anything else, or not on the overview: 0 */
+int jlmx_open(struct jlmx *s, uint8_t y);
+/* back to the overview (Capture) */
+void jlmx_overview(struct jlmx *s);
 /* a scene button (index 0 = the top one): 1 and the view is picked if it is one of the views, else 0 */
 int jlmx_scene(struct jlmx *s, uint8_t idx);
 /* up (+1) / down (-1): the bank; 1 when it changed, 0 at the limit */

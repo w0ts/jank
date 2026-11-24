@@ -29,7 +29,7 @@ static void test_the_defaults_are_the_apps_starting_state(void)
     jlprefs_defaults(&d);
     jlprefs_from_app(&a, &now);
     CHECK(jlprefs_equal(&d, &now));                                /* a fresh app is the defaults: nothing to restore, nothing to write */
-    CHECK(d.layout == JLN_DIATONIC && d.horizontal == 1 && d.absolute == 0 && d.octave == 3 && d.track_pads == 0 && d.step_kind == JLST_MELODIC && d.mix_view == JLMX_VOL &&
+    CHECK(d.layout == JLN_DIATONIC && d.horizontal == 1 && d.absolute == 0 && d.octave == 3 && d.track_pads == 0 && d.step_kind == JLST_MELODIC && d.mix_view == JLMX_OVERVIEW &&
           d.follow == 0);
 }
 
@@ -75,7 +75,7 @@ static void test_a_blob_that_is_not_ours_is_not_used(void)
 
 static void test_a_blob_with_a_value_out_of_range_is_not_used(void)
 {
-    static const uint8_t LIMIT[8] = {JLN_CHORDS, 1, 1, 6, 1, JLST_DRUM, JLMX_VIEWS - 1u, 1};
+    static const uint8_t LIMIT[8] = {JLN_CHORDS, 1, 1, 6, 1, JLST_DRUM, JLMX_OVERVIEW, 1};
     struct jlprefs p, q;
     uint8_t b[JLPREFS_SIZE];
     for (unsigned field = 0; field < 8u; field++) {

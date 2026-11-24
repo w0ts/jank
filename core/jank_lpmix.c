@@ -6,12 +6,23 @@
 #define PAD_ROWS 8u
 #define PAN_CENTRE_LOW 3u              /* the centre pair of the pan's 8 positions */
 #define PAN_CENTRE_HIGH 4u
-#define VALUE_MAX 127u
+#define PAN_CENTRE_A 63u               /* Launchpad 95's _send_value_pan: 63 and 64 are the centre */
+#define PAN_CENTRE_B 64u
+#define OVERVIEW_LAST_VALUE_ROW 4u     /* the overview's rows from the top: 0 volume .. 4 chorus (the views), 5 mute, 6 solo, 7 nothing */
+#define OVERVIEW_MUTE_ROW 5u
+#define OVERVIEW_SOLO_ROW 6u
+
+/* Launchpad 95's value maps (SubSelectorComponent.py), its 0..1 values on the Digitone's 0..127. Volume: 0 and the dB steps -42 -24 -18 -12 -6 0 +6 through its level_to_value
+ * (0.1424 0.3066 0.40 0.55 0.70 0.85 1.0); the sends: SEND_VALUE_MAP; pan: PAN_VALUE_MAP (-1 -0.63 -0.32 0 0 0.32 0.63 1) as 0..127, the two middle pads the centre (64). The
+ * Digitone's own curves are not measured: these are Launchpad 95's steps taken as fractions of its range. */
+static const uint8_t VOL_MAP[PAD_ROWS] = {0, 18, 39, 51, 70, 89, 108, 127};
+static const uint8_t SEND_MAP[PAD_ROWS] = {0, 13, 21, 30, 44, 70, 98, 127};
+static const uint8_t PAN_MAP[PAD_ROWS] = {0, 23, 43, 64, 64, 84, 104, 127};
 
 void jlmx_init(struct jlmx *s)
 {
     memset(s, 0, sizeof *s);
-    s->view = JLMX_VOL;
+    s->view = JLMX_OVERVIEW;
 }
 
 void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m, uint32_t now_ms)
@@ -31,6 +42,8 @@ int jlmx_scene(struct jlmx *s, uint8_t idx)
     return 1;
 }
 
+void jlmx_overview(struct jlmx *s) { s->view = JLMX_OVERVIEW; }
+
 int jlmx_bank_step(struct jlmx *s, int dir)
 {
     if (dir > 0 && s->bank + 1u < JLMX_BANKS) {
@@ -42,6 +55,18 @@ int jlmx_bank_step(struct jlmx *s, int dir)
         return 1;
     }
     return 0;
+}
+
+/* a pad row counted from the top (0 the top one), as Launchpad 95 counts them */
+static unsigned row_from_top(uint8_t y) { return PAD_ROWS - 1u - y; }
+
+int jlmx_open(struct jlmx *s, uint8_t y)
+{
+    unsigned r = row_from_top(y);
+    if (s->view != JLMX_OVERVIEW || y >= PAD_ROWS || r > OVERVIEW_LAST_VALUE_ROW)
+        return 0;
+    s->view = (uint8_t)r;              /* the rows are in the scene buttons' order: volume, pan, delay, reverb, chorus */
+    return 1;
 }
 
 /* the value a view shows for a track */
@@ -56,34 +81,35 @@ static uint8_t value_of(const struct jdl_mix_track *t, uint8_t view)
     }
 }
 
-/* pads lit from the bottom for a value 0..127: 0 none, 1 for the smallest, 8 for the largest (every value above 0 shows at least the bottom pad) */
-static unsigned fader_height(uint8_t v)
+static const uint8_t *map_of(uint8_t view)
 {
-    if (v > VALUE_MAX)
-        v = VALUE_MAX;
-    return v ? ((unsigned)v * PAD_ROWS + VALUE_MAX - 1u) / VALUE_MAX : 0u;
-}
-
-/* the 8 pan positions as the Digitone's 0..127 (64 the centre): Launchpad 95's PAN_VALUE_MAP (-1, -0.63, -0.32, 0, 0, 0.32, 0.63, 1) mapped onto 0..127; the two middle pads
- * are both the centre */
-static const uint8_t PAN_MAP[PAD_ROWS] = {0, 23, 44, 64, 64, 84, 105, 127};
-
-/* the pan's one lit position, 0 (left) .. 7 (right): the position whose value is nearest (the lower of the two centre pads for the centre) */
-static unsigned pan_position(uint8_t v)
-{
-    unsigned best = 0, best_d = 255u;
-    for (unsigned p = 0; p < PAD_ROWS; p++) {
-        unsigned dist = v > PAN_MAP[p] ? (unsigned)(v - PAN_MAP[p]) : (unsigned)(PAN_MAP[p] - v);
-        if (dist < best_d) {
-            best = p;
-            best_d = dist;
-        }
+    switch (view) {
+    case JLMX_VOL: return VOL_MAP;
+    case JLMX_PAN: return PAN_MAP;
+    default: return SEND_MAP;
     }
-    return best;
 }
 
-/* the value of fader pad y (0 = the lowest): the pad's height of the 8, the value whose display fills exactly that many pads */
-static uint8_t fader_value(unsigned y) { return (uint8_t)(((y + 1u) * VALUE_MAX) / PAD_ROWS); }
+/* Launchpad 95's PreciseButtonSliderElement._send_value_volume: nothing is lit for 0, else the pads up to the first step the value does not pass */
+static int volume_lit(const uint8_t *map, uint8_t v, unsigned row)
+{
+    if (v == 0)
+        return 0;
+    for (unsigned i = 0; i < PAD_ROWS; i++)
+        if (v <= map[i])
+            return row <= i;
+    return 1;                          /* above the top step (a value past 127): the whole fader */
+}
+
+/* ... and _send_value_pan: the centre pair for 63 / 64, else a bar from the centre pair out to the value */
+static int pan_lit(uint8_t v, unsigned row)
+{
+    if (v == PAN_CENTRE_A || v == PAN_CENTRE_B)
+        return row == PAN_CENTRE_LOW || row == PAN_CENTRE_HIGH;
+    if (v < PAN_CENTRE_A)
+        return row <= PAN_CENTRE_LOW && PAN_MAP[row] >= v;
+    return row >= PAN_CENTRE_HIGH && PAN_MAP[row] <= v;
+}
 
 static uint8_t *value_ref(struct jdl_mix_track *t, uint8_t view)
 {
@@ -107,28 +133,32 @@ static uint8_t param_of(uint8_t view)
     }
 }
 
+/* mute or solo of a track toggled: the whole new mask (the view is MUTE or SOLO, or the overview's mute / solo row) */
+static void toggle_mask(struct jlmx *s, unsigned track, int solo, struct jlmx_write *w)
+{
+    uint32_t *mask = solo ? &s->m.solo : &s->m.mute;
+    *mask ^= 1u << track;
+    w->kind = JLMX_WRITE_MASK;
+    w->which = solo ? 1u : 0u;
+    w->mask = (uint16_t)*mask;
+}
+
 int jlmx_press(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlmx_write *w)
 {
     unsigned track = s->bank * JLMX_COLUMNS + x;
-    uint32_t *mask;
     if (!s->have || x >= JLMX_COLUMNS || y >= PAD_ROWS)
         return 0;
     memset(w, 0, sizeof *w);
-    if (s->view == JLMX_MUTE || s->view == JLMX_SOLO) {
-        mask = s->view == JLMX_MUTE ? &s->m.mute : &s->m.solo;
-        *mask ^= 1u << track;
-        w->kind = JLMX_WRITE_MASK;
-        w->which = s->view == JLMX_MUTE ? 0u : 1u;
-        w->mask = (uint16_t)*mask;
+    if (s->view == JLMX_OVERVIEW) {
+        unsigned r = row_from_top(y);
+        if (r != OVERVIEW_MUTE_ROW && r != OVERVIEW_SOLO_ROW)
+            return 0;                  /* the value rows open a view (jlmx_open); the last row has no job */
+        toggle_mask(s, track, r == OVERVIEW_SOLO_ROW, w);
+    } else if (s->view == JLMX_MUTE || s->view == JLMX_SOLO) {
+        toggle_mask(s, track, s->view == JLMX_SOLO, w);
     } else {
-        uint8_t *v = value_ref(&s->m.t[track], s->view), nv;
-        if (s->view == JLMX_PAN)
-            nv = PAN_MAP[y];
-        else if (y == 0 && fader_height(*v) == 1u)
-            nv = 0;                    /* the lowest pad again: the fader goes to nothing */
-        else
-            nv = fader_value(y);
-        *v = nv;
+        uint8_t nv = map_of(s->view)[y];   /* the pad's step: pressing the lowest sets 0 and darkens the fader, as Launchpad 95 does */
+        *value_ref(&s->m.t[track], s->view) = nv;
         w->kind = JLMX_WRITE_VALUE;
         w->track = (uint8_t)track;
         w->param = param_of(s->view);
@@ -139,20 +169,32 @@ int jlmx_press(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlm
     return 1;
 }
 
+static uint8_t overview_colour(const struct jlmx *s, unsigned track, unsigned row)
+{
+    unsigned r = row_from_top((uint8_t)row);
+    if (r <= OVERVIEW_LAST_VALUE_ROW)  /* Launchpad 95's Mixer.Volume / Pan / Sends: MINT, a pad that opens its fader screen */
+        return JLMX_COLOR_FADER;
+    if (r == OVERVIEW_MUTE_ROW)
+        return (s->m.mute >> track) & 1u ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED;
+    if (r == OVERVIEW_SOLO_ROW)
+        return (s->m.solo >> track) & 1u ? JLMX_COLOR_SOLO : JLMX_COLOR_NOSOLO;
+    return 0;
+}
+
 static uint8_t column_colour(const struct jlmx *s, unsigned track, unsigned row)
 {
     const struct jdl_mix_track *t = &s->m.t[track];
+    uint8_t v;
+    if (s->view == JLMX_OVERVIEW)
+        return overview_colour(s, track, row);
     if (s->view == JLMX_MUTE)
         return (s->m.mute >> track) & 1u ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED;
     if (s->view == JLMX_SOLO)
         return (s->m.solo >> track) & 1u ? JLMX_COLOR_SOLO : JLMX_COLOR_NOSOLO;
-    if (s->view == JLMX_PAN) {
-        unsigned p = pan_position(t->pan);
-        if (row == p)
-            return JLMX_COLOR_FADER;
-        return row == PAN_CENTRE_LOW || row == PAN_CENTRE_HIGH ? JLMX_COLOR_FADER_THIRD : 0;
-    }
-    return row < fader_height(value_of(t, s->view)) ? JLMX_COLOR_FADER : 0;
+    v = value_of(t, s->view);
+    if (s->view == JLMX_PAN)
+        return pan_lit(v, row) ? JLMX_COLOR_FADER : 0;
+    return volume_lit(map_of(s->view), v, row) ? JLMX_COLOR_FADER : 0;
 }
 
 void jlmx_frame(const struct jlmx *s, struct jlx_frame *f)

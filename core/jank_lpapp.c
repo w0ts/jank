@@ -488,8 +488,9 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
         custom_button(a);
         return 0;
     }
-    if (ev->idx == BUTTON_CAPTURE_IDX) {   /* the mixer (a tap on Note goes back to Note mode, Custom to the step modes) */
+    if (ev->idx == BUTTON_CAPTURE_IDX) {   /* the mixer, on its overview (Capture again from a sub mode comes back to it, as Launchpad 95's); a tap on Note goes back to Note mode, Custom to the step modes */
         a->mode = JLAPP_MODE_MIXER;
+        jlmx_overview(&a->mix);
         say(a, "MIXER");
         return 0;
     }
@@ -505,13 +506,19 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
     return 0;                          /* the rest has no job yet */
 }
 
-/* a pad of the mixer screen: a press writes (the fader moves at once); a release is nothing. Without live control it says why, and without the Digitone's mixer writes
- * (a build without stage 6) it says MIXER READ ONLY, at most every WHY_EVERY_MS */
+static const char *const VIEW_NAME[JLMX_VIEWS] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND", "MUTE", "SOLO"};
+
+/* a pad of the mixer screen: a press writes (the fader moves at once); a release is nothing. A value row of the overview opens its sub mode (no write). Without live control
+ * it says why, and without the Digitone's mixer writes (a build without stage 6) it says MIXER READ ONLY, at most every WHY_EVERY_MS */
 static size_t mixer_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
     struct jlmx_write w;
     if (!ev->value)
         return 0;
+    if (jlmx_open(&a->mix, ev->row)) {
+        say(a, "%s", VIEW_NAME[a->mix.view]);
+        return 0;
+    }
     if (a->live_state != JDL_LIVE) {
         say_why_not(a);
         return 0;
@@ -536,8 +543,6 @@ static size_t mixer_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_a
     }
     return 1;
 }
-
-static const char *const VIEW_NAME[JLMX_VIEWS] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND", "MUTE", "SOLO"};
 
 /* the scene buttons (Launchpad 95's Note mode): 5 starts / stops the transport; the others have no job yet. In the mixer they pick the view (jank_lpmix.h) */
 static size_t side_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)

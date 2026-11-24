@@ -49,7 +49,7 @@ struct jln_pad {
  * (the flat 3rd, 6th and 7th) a dim PURPLE. The reference is the current scale, except the Digitone's "Chromatic" (all 12 notes: nothing would stand out), where it is the MAJOR scale
  * of the key. */
 #define JLN_COLOR_OUT_OF_SCALE 3u      /* WHITE */
-#define JLN_COLOR_MINOR_ONLY 49u       /* PURPLE_HALF (owner 2026-11-24: amber was too loud, "something along the blues/purples"; 50 is the dimmer PURPLE_THIRD) */
+#define JLN_COLOR_MINOR_ONLY 50u       /* PURPLE_THIRD, a dark purple (owner 2026-11-24: amber was too loud, "something along the blues/purples"; PURPLE_HALF 49 still "stands out too much") */
 #define JLN_COLOR_PLAYING 21u          /* GREEN: a note the DN2 is sounding */
 
 void jln_init(struct jln *s);                                        /* diatonic, C, octave 3, relative, track 0 */
