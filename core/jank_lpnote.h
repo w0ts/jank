@@ -45,11 +45,11 @@ struct jln_pad {
 #define JLN_COLOR_ROOT 45u             /* BLUE */
 #define JLN_COLOR_HIGHLIGHT 37u        /* LIGHT_BLUE: the scale's 3rd and 5th step (Note.Pads.Highlight) */
 #define JLN_COLOR_IN_SCALE 38u         /* LIGHT_BLUE_HALF */
-/* Notes outside the scale (owner 2026-11-24): WHITE (Launchpad 95 has DARK_GREY); and, when the reference is the major scale, the notes that are in natural minor but not in major
- * (the flat 3rd, 6th and 7th) a dim PURPLE. The reference is the current scale, except the Digitone's "Chromatic" (all 12 notes: nothing would stand out), where it is the MAJOR scale
- * of the key. */
-#define JLN_COLOR_OUT_OF_SCALE 3u      /* WHITE */
-#define JLN_COLOR_MINOR_ONLY 50u       /* PURPLE_THIRD, a dark purple (owner 2026-11-24: amber was too loud, "something along the blues/purples"; PURPLE_HALF 49 still "stands out too much") */
+/* Notes outside the scale: DARK_GREY, Launchpad 95's own (owner 2026-11-24: "white we cannot use it for off scale notes"; white is the track pads' colour); and, when the
+ * reference is the major scale, the notes that are in natural minor but not in major (the flat 3rd, 6th and 7th) a very dark purple. The reference is the current scale, except
+ * the Digitone's "Chromatic" (all 12 notes: nothing would stand out), where it is the MAJOR scale of the key. */
+#define JLN_COLOR_OUT_OF_SCALE 1u      /* DARK_GREY (#3c3c3c on the Launchpad X, per a firmware reference) */
+#define JLN_COLOR_MINOR_ONLY 51u       /* the palette's darkest purple, one step below PURPLE_THIRD 50 (owner: amber too loud, PURPLE_HALF 49 and PURPLE_THIRD 50 "still too bright"); 55 is darker still. The RGB of 50 / 51 is not measured here */
 #define JLN_COLOR_PLAYING 21u          /* GREEN: a note the DN2 is sounding */
 
 void jln_init(struct jln *s);                                        /* diatonic, C, octave 3, relative, track 0 */

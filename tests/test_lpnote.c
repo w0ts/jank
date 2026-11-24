@@ -157,8 +157,9 @@ static void test_colours(void)
     root.highlight = 1;                                          /* a root that is also a highlight (a scale whose 3rd step is the root an octave up): the root wins */
     CHECK(jln_color(&root, 0) == JLN_COLOR_ROOT);
     CHECK(jln_color(&high, 1) == JLN_COLOR_PLAYING);
-    CHECK(jln_color(&out, 0) == JLN_COLOR_OUT_OF_SCALE && jln_color(&none, 0) == 0);          /* a note outside the scale is WHITE (owner), no note at all is dark */
-    CHECK(JLN_COLOR_ROOT == 45 && JLN_COLOR_IN_SCALE == 38 && JLN_COLOR_OUT_OF_SCALE == 3 && JLN_COLOR_MINOR_ONLY == 50 && JLN_COLOR_PLAYING == 21);   /* BLUE, LIGHT_BLUE_HALF, WHITE, PURPLE_THIRD, GREEN */
+    CHECK(jln_color(&out, 0) == JLN_COLOR_OUT_OF_SCALE && jln_color(&none, 0) == 0);          /* a note outside the scale is DARK_GREY (not white: owner), no note at all is dark */
+    CHECK(JLN_COLOR_ROOT == 45 && JLN_COLOR_IN_SCALE == 38 && JLN_COLOR_OUT_OF_SCALE == 1 && JLN_COLOR_MINOR_ONLY == 51 && JLN_COLOR_PLAYING == 21);   /* BLUE, LIGHT_BLUE_HALF, DARK_GREY, the darkest purple, GREEN */
+    CHECK(JLN_COLOR_OUT_OF_SCALE != 3 && JLN_COLOR_MINOR_ONLY != JLN_COLOR_OUT_OF_SCALE);   /* never white; the two are told apart */
     out.minor_only = 1;
     CHECK(jln_color(&out, 0) == JLN_COLOR_MINOR_ONLY);           /* minor but not major: dim PURPLE */
     CHECK(jln_color(&root, 1) == JLN_COLOR_PLAYING && jln_color(&out, 1) == JLN_COLOR_PLAYING);   /* playing wins over everything */
@@ -211,7 +212,7 @@ static void colours_of_a_row(const struct jln_scale *sc, uint8_t out[12])
     }
 }
 
-/* owner 2026-11-24: against major (the Digitone's Chromatic uses the major scale of the key as reference) the notes outside it are WHITE, and the minor-but-not-major ones a dim PURPLE */
+/* owner 2026-11-24: against major (the Digitone's Chromatic uses the major scale of the key as reference) the notes outside it are DARK_GREY, and the minor-but-not-major ones a very dark purple */
 static void test_chromatic_scale_is_coloured_against_major(void)
 {
     static const struct jln_scale CHROM = {"Chromatic", 12, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}};
@@ -225,7 +226,7 @@ static void test_chromatic_scale_is_coloured_against_major(void)
     CHECK(c[1] == JLN_COLOR_OUT_OF_SCALE && c[6] == JLN_COLOR_OUT_OF_SCALE);                                                       /* C# F#: in neither */
     colours_of_a_row(&MAJOR, c);                                 /* a real major scale gives the same picture */
     CHECK(c[3] == JLN_COLOR_MINOR_ONLY && c[1] == JLN_COLOR_OUT_OF_SCALE && c[4] == JLN_COLOR_HIGHLIGHT);
-    colours_of_a_row(&MINOR, c);                                 /* any other scale: its own notes, everything else WHITE, no purple */
+    colours_of_a_row(&MINOR, c);                                 /* any other scale: its own notes, everything else DARK_GREY, no purple */
     CHECK(c[3] == JLN_COLOR_HIGHLIGHT && c[4] == JLN_COLOR_OUT_OF_SCALE && c[1] == JLN_COLOR_OUT_OF_SCALE && c[8] == JLN_COLOR_IN_SCALE);
     for (int i = 0; i < 12; i++)
         CHECK(c[i] != JLN_COLOR_MINOR_ONLY);

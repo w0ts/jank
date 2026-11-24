@@ -13,10 +13,10 @@ flashing and pulsing follow it. First slice: **Note mode**, played through the D
   wrap. On an 8-track page (Mixer, later) up / down will be the bank 1-8 / 9-16 and left / right do nothing.
 - Pad lights, **the colours of Launchpad 95** (its `SkinMK2.py`, palette indexes from its `ColorsMK2.py`): the scale's root BLUE (45), its **3rd and 5th
   step LIGHT_BLUE (37, Note.Pads.Highlight: `scale[2]` and `scale[4]`, so for a pentatonic the 3rd and 5th step of that scale, not a fixed interval)**, the other
-  scale notes LIGHT_BLUE_HALF (38), a note outside the scale **WHITE (3, owner 2026-11-24; Launchpad 95 has DARK_GREY)**, a note the Digitone sounds (or a pad that is
+  scale notes LIGHT_BLUE_HALF (38), a note outside the scale **DARK_GREY (1, Launchpad 95's own; the owner: "white we cannot use it for off scale notes", white is the track pads' colour)**, a note the Digitone sounds (or a pad that is
   down) GREEN (21). **The colours are relative to the current scale, except for the Digitone's Chromatic (all 12 notes, where nothing would stand out):
   its reference is the MAJOR scale of the key** (root, 3rd and 5th as in major). Against major, a note that is in natural minor but not in major (the flat
-  3rd, 6th and 7th) is a dark **PURPLE_THIRD (50**; the owner found amber too loud, and PURPLE_HALF 49 still stood out too much), a note in neither WHITE; against any other scale there is no purple. One note lights every pad with that pitch (the layouts overlap). The arrows are GREEN (Note.Octave) and dim to GREEN_THIRD (23)
+  3rd, 6th and 7th) is the palette's darkest purple, **51** (one step below PURPLE_THIRD 50; the owner found amber too loud, and PURPLE_HALF 49 and PURPLE_THIRD 50 still too bright; 55 is darker still; the RGB of 50 / 51 is not measured, only a firmware reference for 1 = #3c3c3c and 53 = #fc00fc), a note in neither DARK_GREY; against any other scale there is no purple. One note lights every pad with that pitch (the layouts overlap). The arrows are GREEN (Note.Octave) and dim to GREEN_THIRD (23)
   where they can go no further (the lowest or highest octave, the first or last track); the Note button is LIGHT_BLUE (37, Mode.Note).
 - A pad that is down when the track changes ends its note on the track it started on; a Launchpad that goes away ends
   every note it had down.
