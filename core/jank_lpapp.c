@@ -593,15 +593,12 @@ static int pushed(const struct jlapp *a, uint8_t track, int note)
 
 static int select_shown(const struct jlapp *a) { return a->select_on && (uint32_t)(a->now_ms - a->select_ms) < JLAPP_SELECT_MS; }
 
-/* a track pad's colour: the chosen track white for a moment, a track that sounds (or whose pad is down) green, the current one blue, the rest dim */
-static uint8_t track_colour(const struct jlapp *a, uint8_t t, int chosen_shown)
+/* a track pad's colour (jank_lpapp.h): a track that sounds (or whose pad is down) RED, the selected one AMBER, the rest WHITE */
+static uint8_t track_colour(const struct jlapp *a, uint8_t t)
 {
-    int is_current = t == a->n.track;
-    if (is_current && chosen_shown)
-        return JLAPP_COLOR_TRACK_CHOSEN;
     if ((a->track_held & (1u << t)) || (a->push && pushed(a, t, -1)))
-        return JLN_COLOR_PLAYING;
-    return is_current ? JLAPP_COLOR_TRACK_CURRENT : JLAPP_COLOR_TRACK_IDLE;
+        return JLAPP_COLOR_TRACK_PLAYING;
+    return t == a->n.track ? JLAPP_COLOR_TRACK_CURRENT : JLAPP_COLOR_TRACK_IDLE;
 }
 
 void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
@@ -631,7 +628,7 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
                 continue;
             }
             if (y < JLAPP_TRACK_ROWS && (shift || chosen_shown)) {
-                f->led[JLX_PAD0 + y * 8u + x].color = track_colour(a, track_of_pad(y, x), chosen_shown);
+                f->led[JLX_PAD0 + y * 8u + x].color = track_colour(a, track_of_pad(y, x));
                 continue;
             }
             jln_pad(&a->n, a->scale, x, (uint8_t)(y - shift), &p);

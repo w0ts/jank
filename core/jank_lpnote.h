@@ -35,12 +35,14 @@ struct jln {
 struct jln_pad {
     int16_t note;                      /* MIDI note, -1: the pad plays nothing */
     uint8_t root;                      /* the note is the scale's root (any octave) */
+    uint8_t highlight;                 /* the scale's 3rd or 5th step (Launchpad 95: scale[2] and scale[4]): lit brighter than the other scale notes */
     uint8_t in_scale;
 };
 
 /* Launchpad palette indexes (manual p. 12): the colours of Live's Note mode */
 /* the colours of Launchpad 95's Note mode (SkinMK2.py Note.Pads and Note.Feedback; the indexes are its ColorsMK2.py's names) */
 #define JLN_COLOR_ROOT 45u             /* BLUE */
+#define JLN_COLOR_HIGHLIGHT 37u        /* LIGHT_BLUE: the scale's 3rd and 5th step (Note.Pads.Highlight) */
 #define JLN_COLOR_IN_SCALE 38u         /* LIGHT_BLUE_HALF */
 #define JLN_COLOR_OUT_OF_SCALE 1u      /* DARK_GREY: a pad whose note is outside the scale (the chromatic layout) */
 #define JLN_COLOR_PLAYING 21u          /* GREEN: a note the DN2 is sounding */

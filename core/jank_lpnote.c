@@ -114,6 +114,8 @@ static void pad_from_index(const struct jln *s, const struct jln_scale *sc, int 
     for (int i = 0; i < sc->n; i++)
         if (note_in_octave == s->key + sc->iv[i])
             out->in_scale = 1;
+    /* Launchpad 95 (ScaleComponent.note): highlight = note == scale[2] or note == scale[4], the third and fifth STEP of the scale (a scale with fewer steps has no such note) */
+    out->highlight = (sc->n > 2 && note_in_octave == s->key + sc->iv[2]) || (sc->n > 4 && note_in_octave == s->key + sc->iv[4]);
 }
 
 void jln_pad(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t y, struct jln_pad *out)
@@ -152,5 +154,7 @@ uint8_t jln_color(const struct jln_pad *p, int playing)
         return JLN_COLOR_PLAYING;
     if (p->root)
         return JLN_COLOR_ROOT;
+    if (p->highlight)
+        return JLN_COLOR_HIGHLIGHT;
     return p->in_scale ? JLN_COLOR_IN_SCALE : JLN_COLOR_OUT_OF_SCALE;
 }

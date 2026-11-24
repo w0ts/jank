@@ -19,6 +19,7 @@
 #include <stdint.h>
 
 #define JDL_CMD_LIVE 44u
+#define JDL_CMD_MIXER 45u              /* read the mixer: every track's VOL, PAN, sends and LEVEL, the mute and solo masks */
 #define JDL_CMD_STEPS 46u              /* read a page of 16 steps of a track */
 #define JDL_CMD_STEP 48u               /* set / clear a trig, set its note */
 #define JDL_CMD_TRACK 49u
@@ -70,8 +71,22 @@ struct jdl_status {
     uint32_t made, sent, lost, dropped, msgs, waited;
 };
 
+/* The mixer (MIXER, 45, no arguments -> 106 bytes: u32 mute mask (bit t = track t+1), u32 solo mask, u8 active track, u8 16, then 16 x {VOL, PAN, DEL send, REV send, CHR
+ * send, LEVEL}, each 0..127; PAN 64 is the centre; LEVEL is real from the Digitone's stage 4). A read only: writing needs the Digitone's stage 6. */
+#define JDL_TRACKS 16u
+struct jdl_mix_track {
+    uint8_t vol, pan, del, rev, chr, level;
+};
+struct jdl_mixer {
+    uint32_t mute, solo;               /* bit t: track t + 1 */
+    uint8_t active;                    /* the Digitone's active track, 0..15 */
+    struct jdl_mix_track t[JDL_TRACKS];
+};
+
 struct jdl {
     struct jdl_status st;              /* the Digitone's last LIVE STATUS */
+    struct jdl_mixer mx;               /* the last MIXER answer, until taken (mixer_fresh) */
+    uint8_t mixer_fresh;
     struct jdl_page pg;                /* the last STEPS answer, until taken (page_fresh) */
     uint8_t page_fresh;
     uint32_t step_busy, step_refused;  /* STEP / STEPS answered 5 (queue full) / 2 (refused) */
@@ -104,6 +119,10 @@ size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 /* a request, only while live (else 0): the active track, a PLAY. A request also keeps the lease */
 size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, size_t cap);
 size_t jdl_play(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_play_op op, uint8_t note, uint8_t vel, uint8_t *out, size_t cap);
+/* The mixer read (only while live, else 0). jdl_take_mixer: the last MIXER answer, once (1 and *out filled), else 0 */
+size_t jdl_mixer_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
+int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out);
+
 /* Step pages and edits (only while live; 0 for invalid arguments, which the Digitone would refuse). jdl_take_page: the last STEPS answer, once (1 and *out filled), else 0 */
 size_t jdl_steps_read(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t page, uint8_t *out, size_t cap);
 size_t jdl_step_edit(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t step, enum jdl_step_op op, uint8_t note, uint8_t vel, uint8_t len, uint8_t *out, size_t cap);

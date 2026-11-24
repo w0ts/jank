@@ -522,8 +522,78 @@ static void test_a_message_needs_live_control_and_a_digitone_that_has_it(void)
     CHECK(!jdl_is_live(&d) && d.msg_ok);
 }
 
+/* a MIXER answer: mute tracks 1 and 3, solo track 16, active track 5; track i: VOL 10 + i, PAN 64 + i, DEL 20 + i, REV 30 + i, CHR 40 + i, LEVEL 50 + i */
+static size_t mixer_data(uint8_t *data)
+{
+    size_t k = 0;
+    const uint32_t mute = 0x5u, solo = 0x8000u;
+    for (int s = 24; s >= 0; s -= 8)
+        data[k++] = (uint8_t)(mute >> s);
+    for (int s = 24; s >= 0; s -= 8)
+        data[k++] = (uint8_t)(solo >> s);
+    data[k++] = 5;
+    data[k++] = 16;
+    for (uint8_t i = 0; i < 16; i++) {
+        data[k++] = (uint8_t)(10 + i);
+        data[k++] = (uint8_t)(64 + i);
+        data[k++] = (uint8_t)(20 + i);
+        data[k++] = (uint8_t)(30 + i);
+        data[k++] = (uint8_t)(40 + i);
+        data[k++] = (uint8_t)(50 + i);
+    }
+    return k;
+}
+
+static void test_reading_the_mixer(void)
+{
+    struct jdl d = live(0);
+    struct jdl_mixer m;
+    uint8_t out[64], body[32], data[110];
+    size_t n = jdl_mixer_read(&d, 10, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 3 && body[2] == JDL_CMD_MIXER);               /* no arguments */
+    CHECK(!jdl_take_mixer(&d, &m));
+    CHECK(mixer_data(data) == 106);
+    reply_to(&d, d.seq, JDL_CMD_MIXER, 0, data, 106);
+    CHECK(jdl_take_mixer(&d, &m) && m.mute == 5u && m.solo == 0x8000u && m.active == 5);
+    CHECK(m.t[0].vol == 10 && m.t[0].pan == 64 && m.t[0].del == 20 && m.t[0].rev == 30 && m.t[0].chr == 40 && m.t[0].level == 50);
+    CHECK(m.t[15].vol == 25 && m.t[15].pan == 79 && m.t[15].level == 65);
+    CHECK(!jdl_take_mixer(&d, &m) && jdl_is_live(&d));                                         /* taken once */
+}
+
+static void test_a_damaged_or_refused_mixer_answer_is_not_taken(void)
+{
+    struct jdl d = live(0);
+    struct jdl_mixer m;
+    uint8_t data[110];
+    mixer_data(data);
+    reply_to(&d, d.seq, JDL_CMD_MIXER, 0, data, 105);                                          /* one byte short */
+    CHECK(!jdl_take_mixer(&d, &m));
+    data[8] = 16;                                                                              /* an active track that does not exist */
+    reply_to(&d, d.seq, JDL_CMD_MIXER, 0, data, 106);
+    CHECK(!jdl_take_mixer(&d, &m));
+    data[8] = 5;
+    data[9] = 8;                                                                               /* a different number of tracks: not what this reads */
+    reply_to(&d, d.seq, JDL_CMD_MIXER, 0, data, 106);
+    CHECK(!jdl_take_mixer(&d, &m));
+    reply_to(&d, d.seq, JDL_CMD_MIXER, 2, NULL, 0);                                            /* refused: live control itself is fine */
+    CHECK(!jdl_take_mixer(&d, &m) && jdl_is_live(&d) && jdl_can_play(&d));
+    reply_to(&d, d.seq, JDL_CMD_MIXER, 7, NULL, 0);                                            /* REMOTE CONTROL turned off: that is the state's business */
+    CHECK(!jdl_is_live(&d));
+}
+
+static void test_no_mixer_read_unless_live(void)
+{
+    struct jdl d;
+    uint8_t out[64];
+    jdl_init(&d);
+    CHECK(jdl_mixer_read(&d, 0, out, sizeof out) == 0);
+}
+
 int main(void)
 {
+    test_reading_the_mixer();
+    test_a_damaged_or_refused_mixer_answer_is_not_taken();
+    test_no_mixer_read_unless_live();
     test_a_message_for_the_digitones_screen();
     test_a_message_needs_live_control_and_a_digitone_that_has_it();
     test_reading_a_page_of_steps();

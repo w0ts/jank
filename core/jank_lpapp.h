@@ -53,9 +53,11 @@
 #define JLAPP_FOLLOW_MS 250u                         /* FOLLOW asks the Digitone for its active track this often */
 #define JLAPP_FOLLOW_HOLD_MS 500u                    /* ... and does not trust an answer this long after the Launchpad chose a track (the Digitone takes a select at its next UI pass) */
 #define JLAPP_MSG_MAX 21u                            /* a message, with its NUL: 20 characters (the Digitone's MESSAGE command takes that many) */
-#define JLAPP_COLOR_TRACK_IDLE 39u                   /* a track pad: LIGHT_BLUE_THIRD; the current track 45 (the scale root's blue), playing 21, just chosen 3 (WHITE) */
-#define JLAPP_COLOR_TRACK_CURRENT JLN_COLOR_ROOT
-#define JLAPP_COLOR_TRACK_CHOSEN 3u
+/* The track pads (the 16 bottom pads while the track is shown, and the track pads mode), owner 2026-11-24: not blue (it reads as the scale's root) and not green or purple (the
+ * Digitone's own mute modes): every track WHITE, the selected one AMBER, a track that is playing (or held) RED. */
+#define JLAPP_COLOR_TRACK_IDLE 3u                    /* WHITE */
+#define JLAPP_COLOR_TRACK_CURRENT 9u                 /* AMBER */
+#define JLAPP_COLOR_TRACK_PLAYING 5u                 /* RED */
 
 /* the arrow buttons' and the mode button's palette indexes: Note.Octave On / Off, and Mode.Note On (LIGHT_BLUE) */
 #define JLAPP_COLOR_ARROW_ON JLAPP_GREEN             /* a direction that can still be taken */

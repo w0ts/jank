@@ -98,6 +98,47 @@ size_t jdl_step_edit(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t step
     return send(d, now_ms, JDL_CMD_STEP, args, sizeof args, out, cap);
 }
 
+size_t jdl_mixer_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
+{
+    if (d->state != JDL_LIVE)
+        return 0;
+    return send(d, now_ms, JDL_CMD_MIXER, NULL, 0, out, cap);
+}
+
+int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out)
+{
+    if (!d->mixer_fresh)
+        return 0;
+    *out = d->mx;
+    d->mixer_fresh = 0;
+    return 1;
+}
+
+/* the MIXER data: 10 bytes, then 16 tracks of 6 */
+#define MIXER_HEAD 10u
+#define MIXER_TRACK_BYTES 6u
+#define MIXER_BYTES (MIXER_HEAD + JDL_TRACKS * MIXER_TRACK_BYTES)
+
+static void take_mixer(struct jdl *d, const struct jd2_reply *r)
+{
+    struct jdl_mixer *m = &d->mx;
+    if (r->n < MIXER_BYTES || r->data[8] > 15u || r->data[9] != JDL_TRACKS)
+        return;
+    m->mute = u32be(r->data);
+    m->solo = u32be(r->data + 4);
+    m->active = r->data[8];
+    for (unsigned i = 0; i < JDL_TRACKS; i++) {
+        const uint8_t *s = r->data + MIXER_HEAD + i * MIXER_TRACK_BYTES;
+        m->t[i].vol = s[0];
+        m->t[i].pan = s[1];
+        m->t[i].del = s[2];
+        m->t[i].rev = s[3];
+        m->t[i].chr = s[4];
+        m->t[i].level = s[5];
+    }
+    d->mixer_fresh = 1;
+}
+
 int jdl_take_page(struct jdl *d, struct jdl_page *out)
 {
     if (!d->page_fresh)
@@ -231,8 +272,15 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         d->msg_ok = 0;
         return JDL_IN_REPLY;
     }
-    if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE)
+    if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE &&
+        r.cmd != JDL_CMD_MIXER)
         return JDL_IN_IGNORED;
+    if (r.cmd == JDL_CMD_MIXER) {      /* a refused read (2) changes nothing else: live control is fine */
+        if (r.status == ST_NOT_UNDERSTOOD)
+            return JDL_IN_REPLY;
+        if (r.status == 0)
+            take_mixer(d, &r);
+    }
     if (r.cmd == JDL_CMD_STEPS || r.cmd == JDL_CMD_STEP) {   /* a refused read or write (2), a full queue (5): that request only, live control is fine */
         if (r.status == ST_NOT_UNDERSTOOD) {
             d->step_refused++;

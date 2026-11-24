@@ -11,7 +11,8 @@ flashing and pulsing follow it. First slice: **Note mode**, played through the D
   are in the core, no button picks them yet).
 - Buttons in Note mode (owner, 2026-11-23): up / down = octave, left / right = the previous / next track, one at a time, no
   wrap. On an 8-track page (Mixer, later) up / down will be the bank 1-8 / 9-16 and left / right do nothing.
-- Pad lights, **the colours of Launchpad 95** (its `SkinMK2.py`, palette indexes from its `ColorsMK2.py`): the scale's root BLUE (45), the other
+- Pad lights, **the colours of Launchpad 95** (its `SkinMK2.py`, palette indexes from its `ColorsMK2.py`): the scale's root BLUE (45), its **3rd and 5th
+  step LIGHT_BLUE (37, Note.Pads.Highlight: `scale[2]` and `scale[4]`, so for a pentatonic the 3rd and 5th step of that scale, not a fixed interval)**, the other
   scale notes LIGHT_BLUE_HALF (38), a note outside the scale DARK_GREY (1, the chromatic layout), a note the Digitone sounds (or a pad that is
   down) GREEN (21); one note lights every pad with that pitch (the layouts overlap). The arrows are GREEN (Note.Octave) and dim to GREEN_THIRD (23)
   where they can go no further (the lowest or highest octave, the first or last track); the Note button is LIGHT_BLUE (37, Mode.Note).
@@ -41,14 +42,15 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
   **the pads play nothing and say why** (a message, at most every 2 s): REMOTE CONTROL OFF, NO LIVE CONTROL, DN2 HAS NO PLAY, DN2 NOT READY. A note ends by the
   same route, on the track it started on, whatever changed meanwhile. Right after live control comes up Jank asks once whether PLAY exists (an "all notes off", which a Digitone with PLAY takes silently and one without refuses), so the answer is known before the first press: measured 2026-11-24 the first press used to go out and light, was refused, and only the later ones were blocked. Lost requests are counted (`dropped:`) and never half sent.
 - **Left / right choose the Digitone's active track** (TRACK, 49) and, for a second, the 16 bottom pads show which, as the Digitone's trig keys are laid out: tracks 1-8 in the upper of the two rows, 9-16 in the lower, the
-  chosen one WHITE (3), the others LIGHT_BLUE_THIRD (39). When live control comes up the pads' current track is sent to the Digitone.
+  selected one **AMBER (9)**, the others **WHITE (3)**, a track that plays RED (5). Not blue (it reads as the scale root), not green or purple (the Digitone's own mute
+  modes): owner 2026-11-24. When live control comes up the pads' current track is sent to the Digitone.
 - **FOLLOW: left and right together** (a press of both makes no track step; the first press's step is put back). The Launchpad's track then follows the
   Digitone's as well (TRACK with no argument reads its active track, every 250 ms, accepted by dn2-wishes for stage 5; a Digitone without it: "DN2 CANNOT
   FOLLOW"), and left / right show **AMBER** (9, dim 11 at the first / last track). The Launchpad's own choice is not overridden for 500 ms (the Digitone takes a
   select at its next UI pass). The pair again: off.
 - **Track pads (hold Note, pad 8 of the top row, GREEN when on):** the two bottom rows play the 16 tracks on each track's own default note (PLAY op 2, ended
-  with op 0 and note 255, confirmed by dn2-wishes); the note layout moves up to the six rows left. The current track is BLUE (45), a track that sounds or is held
-  GREEN (21), the rest LIGHT_BLUE_THIRD.
+  with op 0 and note 255, confirmed by dn2-wishes); the note layout moves up to the six rows left. Colours as the track overlay above: the current track AMBER, a track that sounds or
+  is held RED, the rest WHITE. (The drum step quadrant keeps Launchpad 95's drum rack colours, yellow / green / red, as asked: green there is the selected track.)
 - **Lights come from the Digitone's own note push**: a note pad lights for the pitch the current track played, a track pad for its track, each for 150 ms (the
   pushed note's length is not mapped yet, so it is a fixed time, not measured).
 - **Messages** (what Launchpad 95 writes in Live's status bar; at most 20 characters, upper case): every change on the scale page (ABSOLUTE ROOT ON, HORIZONTAL

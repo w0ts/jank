@@ -505,10 +505,10 @@ static void test_left_right_select_the_track_and_show_it(void)
     jlapp_tick(&a, 1000);
     CHECK(acts(&a, top(3, 127), &o) == 1 && o.kind == JLAPP_ACT_SELECT && o.track == 1);   /* right: track 2, the Digitone's active one too */
     CHECK(strcmp(msg(&a), "TRACK 2") == 0);
-    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CHOSEN);          /* the 16 bottom pads show it: tracks 1..8 in the upper row, 9..16 in the lower */
+    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CURRENT);          /* the 16 bottom pads show it: tracks 1..8 in the upper row, 9..16 in the lower */
     CHECK(colour(&a, 0, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 7, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 3, 1) == JLAPP_COLOR_TRACK_IDLE);
     jlapp_tick(&a, 1000 + JLAPP_SELECT_MS - 1u);
-    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CHOSEN);
+    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CURRENT);
     jlapp_tick(&a, 1000 + JLAPP_SELECT_MS);                       /* the notes are back */
     CHECK(colour(&a, 0, 0) == JLN_COLOR_ROOT && colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
     jlapp_tick(&a, 3000);
@@ -517,7 +517,7 @@ static void test_left_right_select_the_track_and_show_it(void)
         acts(&a, top(3, 127), &o);                                /* up to track 10: row 2 */
         acts(&a, top(3, 0), &o);
     }
-    CHECK(a.n.track == 9 && colour(&a, 1, 0) == JLAPP_COLOR_TRACK_CHOSEN && colour(&a, 1, 1) == JLAPP_COLOR_TRACK_IDLE);
+    CHECK(a.n.track == 9 && colour(&a, 1, 0) == JLAPP_COLOR_TRACK_CURRENT && colour(&a, 1, 1) == JLAPP_COLOR_TRACK_IDLE);
     CHECK(acts(&a, top(2, 127), &o) == 1 && o.track == 8);
 }
 
@@ -527,7 +527,7 @@ static void test_a_limit_shows_the_track_but_selects_nothing(void)
     struct jlapp_act o;
     jlapp_tick(&a, 10);
     CHECK(acts(&a, top(2, 127), &o) == 0);                        /* left on track 1: nothing to select */
-    CHECK(colour(&a, 0, 1) == JLAPP_COLOR_TRACK_CHOSEN && strcmp(msg(&a), "TRACK 1") == 0);
+    CHECK(colour(&a, 0, 1) == JLAPP_COLOR_TRACK_CURRENT && strcmp(msg(&a), "TRACK 1") == 0);
     CHECK(acts(&a, top(2, 0), &o) == 0 && acts(&a, top(5, 127), &o) == 0);   /* a release, and the Note button, select nothing */
 }
 
@@ -557,7 +557,7 @@ static void test_the_track_pads_play_each_tracks_own_note(void)
     CHECK(acts(&a, pad(2, 1, 0), &o) == 1 && o.kind == JLAPP_ACT_TRACK_OFF && o.track == 2);
     CHECK(acts(&a, pad(2, 1, 0), &o) == 0);                        /* a stray release */
     CHECK(acts(&a, pad(3, 0, 90), &o) == 1 && o.kind == JLAPP_ACT_TRACK_ON && o.track == 11);   /* the lower row: tracks 9..16 */
-    CHECK(colour(&a, 3, 0) == JLN_COLOR_PLAYING);                  /* held: lit */
+    CHECK(colour(&a, 3, 0) == JLAPP_COLOR_TRACK_PLAYING);          /* held: RED */
     CHECK(acts(&a, pad(3, 0, 0), &o) == 1 && o.track == 11);
     CHECK(colour(&a, 3, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 0, 1) == JLAPP_COLOR_TRACK_CURRENT);   /* the current track is blue */
     CHECK(colour(&a, 5, 1) == JLAPP_COLOR_TRACK_IDLE);
@@ -651,7 +651,7 @@ static void test_pushed_notes_light_the_track_pads(void)
     switch_track_pads(&a);
     jlapp_tick(&a, 500);
     jlapp_on_push(&a, n, 2);
-    CHECK(colour(&a, 4, 0) == JLN_COLOR_PLAYING && colour(&a, 4, 1) == JLN_COLOR_PLAYING);   /* track 5 is pad (4,0), track 13 is (4,1) */
+    CHECK(colour(&a, 4, 0) == JLAPP_COLOR_TRACK_PLAYING && colour(&a, 4, 1) == JLAPP_COLOR_TRACK_PLAYING);   /* RED: tracks 5 and 13 */
     CHECK(colour(&a, 5, 0) == JLAPP_COLOR_TRACK_IDLE);
     jlapp_tick(&a, 500 + JLAPP_PUSH_LIGHT_MS);
     CHECK(colour(&a, 4, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 4, 1) == JLAPP_COLOR_TRACK_IDLE);
@@ -664,7 +664,7 @@ static void test_the_overlay_over_the_track_pads_then_back(void)
     switch_track_pads(&a);
     jlapp_tick(&a, 2000);
     acts(&a, top(3, 127), &o);
-    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CHOSEN && colour(&a, 0, 1) == JLAPP_COLOR_TRACK_IDLE);
+    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CURRENT && colour(&a, 0, 1) == JLAPP_COLOR_TRACK_IDLE);
     jlapp_tick(&a, 2000 + JLAPP_SELECT_MS);
     CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CURRENT);
 }
@@ -695,7 +695,7 @@ static void test_the_clock_wrapping(void)
     jlapp_on_push(&a, n, 1);
     acts(&a, top(3, 127), &o);
     jlapp_tick(&a, 0xFFFFFF00u + 50u);                             /* 50 ms later, past a wrap of the counter below it */
-    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CHOSEN);           /* the overlay is still up */
+    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CURRENT);           /* the overlay is still up */
     jlapp_tick(&a, 0xFFFFFF00u + JLAPP_SELECT_MS);                 /* 1 s later: past the wrap */
     CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
 }
@@ -875,7 +875,7 @@ static void test_follow_takes_the_digitones_track(void)
     CHECK(a.n.track == 0);                                         /* just after the Launchpad's own choice: the Digitone may not have taken it yet */
     jlapp_tick(&a, 1000 + JLAPP_FOLLOW_HOLD_MS);
     jlapp_on_active_track(&a, 5);
-    CHECK(a.n.track == 5 && colour(&a, 5, 1) == JLAPP_COLOR_TRACK_CHOSEN);   /* followed, and shown on the bottom pads */
+    CHECK(a.n.track == 5 && colour(&a, 5, 1) == JLAPP_COLOR_TRACK_CURRENT);   /* followed, and shown on the bottom pads */
     CHECK(msg(&a)[0] == 0);                                        /* no message: the pads say it */
     jlapp_on_active_track(&a, 16);
     CHECK(a.n.track == 5);                                         /* not a track */

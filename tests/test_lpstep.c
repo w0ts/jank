@@ -209,7 +209,7 @@ static void test_the_melodic_keyboard_lights(void)
     r.c.can_play = 0;
     press(&r, 1, 0, 100, o, 2);
     CHECK(colour(&r, 1, 0) == JLST_COLOR_HEAD);                   /* the picked key: white */
-    CHECK(colour(&r, 2, 0) == JLN_COLOR_IN_SCALE);
+    CHECK(colour(&r, 2, 0) == JLN_COLOR_HIGHLIGHT);               /* E, the 3rd step: LIGHT_BLUE, as Launchpad 95 */
 }
 
 static void test_the_page_pads(void)
@@ -409,7 +409,7 @@ static void test_the_melodic_keyboard_flashes_the_pitches_that_play(void)
     played(&r, 0, 0, 50, 3000);                                   /* the current track plays D (50): the key (1,0) */
     played(&r, 1, 4, 52, 3000);                                   /* another track plays E: not this keyboard */
     CHECK(colour(&r, 1, 0) == JLST_COLOR_TRACK_PLAYING);
-    CHECK(colour(&r, 2, 0) == JLN_COLOR_IN_SCALE);                /* E on the current track's keyboard stays as it was */
+    CHECK(colour(&r, 2, 0) == JLN_COLOR_HIGHLIGHT);               /* E on the current track's keyboard stays as it was: the scale's 3rd step, LIGHT_BLUE */
     CHECK(colour(&r, 0, 0) == JLN_COLOR_ROOT);
     r.c.now_ms = 3000 + JLST_HEAD_MS;
     CHECK(colour(&r, 1, 0) == JLN_COLOR_IN_SCALE);

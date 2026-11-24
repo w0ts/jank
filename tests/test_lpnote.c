@@ -151,12 +151,47 @@ static void test_pads_with_note(void)
 
 static void test_colours(void)
 {
-    struct jln_pad root = {60, 1, 1}, in = {62, 0, 1}, out = {61, 0, 0}, none = {-1, 0, 0};
+    struct jln_pad root = {60, 1, 0, 1}, in = {62, 0, 0, 1}, high = {64, 0, 1, 1}, out = {61, 0, 0, 0}, none = {-1, 0, 0, 0};
     CHECK(jln_color(&root, 0) == JLN_COLOR_ROOT && jln_color(&in, 0) == JLN_COLOR_IN_SCALE);
+    CHECK(jln_color(&high, 0) == JLN_COLOR_HIGHLIGHT && JLN_COLOR_HIGHLIGHT == 37);          /* the 3rd and 5th: LIGHT_BLUE, between the root and the rest */
+    root.highlight = 1;                                          /* a root that is also a highlight (a scale whose 3rd step is the root an octave up): the root wins */
+    CHECK(jln_color(&root, 0) == JLN_COLOR_ROOT);
+    CHECK(jln_color(&high, 1) == JLN_COLOR_PLAYING);
     CHECK(jln_color(&out, 0) == JLN_COLOR_OUT_OF_SCALE && jln_color(&none, 0) == 0);          /* a note outside the scale is DARK_GREY, no note at all is dark */
     CHECK(JLN_COLOR_ROOT == 45 && JLN_COLOR_IN_SCALE == 38 && JLN_COLOR_OUT_OF_SCALE == 1 && JLN_COLOR_PLAYING == 21);   /* BLUE, LIGHT_BLUE_HALF, DARK_GREY, GREEN: LP95's Note.Pads */
     CHECK(jln_color(&root, 1) == JLN_COLOR_PLAYING && jln_color(&out, 1) == JLN_COLOR_PLAYING);   /* playing wins over everything */
     CHECK(jln_color(&none, 1) == 0);
+}
+
+/* Launchpad 95 (ScaleComponent.note): highlight = note == scale[2] or note == scale[4]: the scale's third and fifth STEP, not a fixed interval */
+static void test_highlight_is_the_third_and_fifth_step_of_the_scale(void)
+{
+    static const struct jln_scale PENTA = {"Minor pentatonic", 5, {0, 3, 5, 7, 10}};   /* its 3rd step is the fourth (5), its 5th step the seventh (10) */
+    static const struct jln_scale TWO = {"Two notes", 2, {0, 7}};
+    struct jln s;
+    struct jln_pad p;
+    unsigned lit = 0;
+    jln_init(&s);                                                /* C, octave 3, diatonic */
+    s.layout = JLN_CHROMATIC;                                    /* all 12 notes from C: 48 .. 59 along the row */
+    for (uint8_t x = 0; x < 8; x++) {
+        jln_pad(&s, &MAJOR, x, 0, &p);                           /* C C# D D# E F F# G: a semitone a pad */
+        CHECK(p.highlight == (x == 4 || x == 7));                /* E (52) and G (55): the 3rd and 5th step of C major */
+    }
+    CHECK(jln_color(&(struct jln_pad){52, 0, 1, 1}, 0) == JLN_COLOR_HIGHLIGHT);
+    jln_pad(&s, &PENTA, 5, 0, &p);                               /* x = 5 is F (53), the pentatonic's 3rd step (5) */
+    CHECK(p.note == 53 && p.highlight && p.in_scale);
+    jln_pad(&s, &PENTA, 10 - 8, 0, &p);                          /* x = 2 is D (50): not in minor pentatonic at all */
+    CHECK(p.note == 50 && !p.highlight && !p.in_scale);
+    jln_set_layout(&s, JLN_DIATONIC);
+    for (uint8_t x = 0; x < 5; x++) {                            /* the diatonic row of 5 steps: the 3rd and 5th step are x = 2 and 4 */
+        jln_pad(&s, &PENTA, x, 0, &p);
+        CHECK(p.highlight == (x == 2 || x == 4));
+    }
+    for (uint8_t i = 0; i < 8; i++) {                            /* a two-note scale has no 3rd step: nothing is highlighted */
+        jln_pad(&s, &TWO, i, 0, &p);
+        lit += p.highlight;
+    }
+    CHECK(lit == 0);
 }
 
 /* the scale page sets an octave directly: inside the layout's octaves, a place past the last one changes nothing */
@@ -183,6 +218,7 @@ static void test_set_octave(void)
 
 int main(void)
 {
+    test_highlight_is_the_third_and_fifth_step_of_the_scale();
     test_set_octave();
     test_defaults();
     test_chromatic_relative();
