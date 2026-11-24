@@ -13,6 +13,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "app.h"
 #include "jank_dn2live.h"
 #include "jank_dn2rpc.h"
 #include "jank_lpapp.h"
@@ -121,6 +122,16 @@ static void dn2_send_sysex(const uint8_t *sx, size_t n)
     dn2_send(pk, bytes);
 }
 
+static volatile uint8_t s_transport_req;   /* the Launchpad's start / stop scene button was pressed: the ui task acts on it */
+
+int usb_lp_transport_request(void)
+{
+    if (!s_transport_req)
+        return 0;
+    s_transport_req = 0;
+    return 1;
+}
+
 /* what a pad press or a button asks of the Digitone: always live control (SysEx), never a MIDI channel (jank_lpapp.h). A request that cannot be made (live
  * control is not on any more) is dropped: the Digitone ends the notes of a lapsed lease itself */
 static void run_act(const struct jlapp_act *act)
@@ -147,6 +158,13 @@ static void run_act(const struct jlapp_act *act)
         n = jdl_track(&s_jdl, t, act->track, sx, sizeof sx);
         g_hostdiag.live_selects += n != 0;
         break;
+    case JLAPP_ACT_STEP:               /* a trig set or cleared, a note set (the Digitone's STEP) */
+        n = jdl_step_edit(&s_jdl, t, act->track, act->step, (enum jdl_step_op)act->op, act->note, act->vel, act->len, sx, sizeof sx);
+        g_hostdiag.live_edits += n != 0;
+        break;
+    case JLAPP_ACT_TRANSPORT:          /* the ui task starts / stops the transport (it may wait for the bridge; this task must not) */
+        s_transport_req = 1;
+        return;
     default:
         return;
     }
@@ -166,6 +184,8 @@ static void sync_live(void)
     g_hostdiag.dn2_lost = s_jdl.st.lost;
     g_hostdiag.dn2_dropped = s_jdl.st.dropped;
     g_hostdiag.dn2_pushmsgs = s_jdl.st.msgs;
+    g_hostdiag.live_step_busy = s_jdl.step_busy;
+    g_hostdiag.live_step_refused = s_jdl.step_refused;
     jlapp_set_live(&s_app, s_jdl.state, s_jdl.play_ok, jdl_can_read_track(&s_jdl));
 }
 
@@ -189,11 +209,16 @@ static void dn2_sysex(void)
     int track;
     enum jdl_in k = jdl_input(&s_jdl, s_sx.buf, s_sx.n, notes, &count);
     if (k == JDL_IN_REPLY) {
+        static struct jdl_page page;
         g_hostdiag.live_replies++;
         track = jdl_take_active(&s_jdl);           /* FOLLOW: the answer to an active-track read */
         if (track >= 0) {
             jlapp_tick(&s_app, now_ms());
             jlapp_on_active_track(&s_app, (unsigned)track);
+        }
+        if (jdl_take_page(&s_jdl, &page)) {        /* a step mode: a page of the current track */
+            jlapp_tick(&s_app, now_ms());
+            jlapp_on_page(&s_app, &page);
         }
     } else if (k == JDL_IN_IGNORED) {
         g_hostdiag.live_ignored++;
@@ -208,6 +233,8 @@ static void dn2_sysex(void)
 }
 
 static uint32_t s_read_ms;             /* the last active-track read (FOLLOW) */
+static uint32_t s_page_ms;             /* the last read of the step pages */
+#define STEP_READ_MS 400u              /* a step mode reads its two pages this often (each answer is 104 data bytes); a press shows at once, the next read confirms it */
 
 /* live control is asked for, and kept up, while there is a Digitone and a Launchpad; once it answers, the Digitone's active track is made the one the pads are on;
  * while FOLLOW is on the Digitone's active track is read every JLAPP_FOLLOW_MS */
@@ -233,6 +260,17 @@ static void live_pump(void)
         dn2_send_sysex(sx, n);
     }
     s_was_live = (uint8_t)live;
+    jlapp_set_transport(&s_app, bridge_is_playing());   /* (lock-free) the start / stop scene button's light, and the lower quadrant's rule */
+    if (live && t - s_page_ms >= STEP_READ_MS) {   /* a step mode: the pages on the top rows, of the current track */
+        uint8_t pages[2];
+        size_t k = jlapp_step_wanted(&s_app, pages);
+        for (size_t i = 0; i < k; i++) {
+            n = jdl_steps_read(&s_jdl, t, s_app.n.track, pages[i], sx, sizeof sx);
+            g_hostdiag.live_pagereads += n != 0;
+            dn2_send_sysex(sx, n);
+        }
+        s_page_ms = t;
+    }
     if (jlapp_following(&s_app) && t - s_read_ms >= JLAPP_FOLLOW_MS) {
         n = jdl_track_read(&s_jdl, t, sx, sizeof sx);
         s_read_ms = t;

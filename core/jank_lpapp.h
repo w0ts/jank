@@ -28,7 +28,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "jank_dn2live.h"
+#include "jank_lpact.h"
 #include "jank_lpnote.h"
+#include "jank_lpstep.h"
 #include "jank_lpx.h"
 
 /* The colours are Launchpad 95's (SkinMK2.py), as palette indexes (manual p. 12) under the names its ColorsMK2.py gives them; "on" is the bright one and "off"
@@ -61,6 +63,7 @@
 #define JLAPP_COLOR_FOLLOW_ON JLAPP_AMBER            /* left / right while FOLLOW is on; dim at the first or last track */
 #define JLAPP_COLOR_FOLLOW_OFF JLAPP_AMBER_THIRD
 #define JLAPP_COLOR_MODE 37u
+#define JLAPP_COLOR_MODE_DIM 39u            /* the Note button while a step mode is on: LIGHT_BLUE_THIRD */
 
 /* the hosted devices that matter here, told apart by their USB product string */
 enum jlapp_role { JLAPP_OTHER, JLAPP_LPX, JLAPP_DN2 };
@@ -74,18 +77,13 @@ struct jlapp_held {
     uint8_t track;                     /* the track it was played on: its end goes there, whatever the track is by then */
 };
 
-enum jlapp_act_kind {
-    JLAPP_ACT_NONE,
-    JLAPP_ACT_NOTE_ON,                 /* track, note, vel */
-    JLAPP_ACT_NOTE_OFF,                /* track, note */
-    JLAPP_ACT_TRACK_ON,                /* a track pad: the track's own default note */
-    JLAPP_ACT_TRACK_OFF,
-    JLAPP_ACT_SELECT                   /* the Digitone's active track becomes `track` */
-};
-
-struct jlapp_act {
-    uint8_t kind, track, note, vel;
-};
+/* Modes (owner 2026-11-24): the Note button (a tap, shorter than JLAPP_TAP_MS) is Note mode; Custom goes to the step modes and cycles melodic <-> drum
+ * (jank_lpstep.h); held, the Note button is the scale page in every mode. Scene button 5 (side index 4) starts / stops the transport, as Launchpad 95's Note mode.
+ * Up / down are the octave in Note mode and in melodic step, nothing in drum step. */
+enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP };
+#define JLAPP_TAP_MS 400u
+#define JLAPP_SIDE_START_STOP 4u            /* the side buttons, top (scene 1) = 0: scene 5 */
+#define BUTTON_CUSTOM_IDX 6u
 
 struct jlapp_recent {
     uint32_t at_ms;
@@ -117,6 +115,12 @@ struct jlapp {
     uint8_t recent_head;
     char msg[JLAPP_MSG_MAX];
     uint8_t msg_new;
+    uint8_t mode;                      /* enum jlapp_mode */
+    uint8_t step_kind;                 /* enum jlst_kind: the step mode Custom goes to (and the one last used) */
+    uint8_t transport;                 /* the clock runs (set by the firmware) */
+    uint8_t note_used;                 /* a page pad was pressed while the Note button was held: its release is not a tap */
+    uint32_t note_down_ms;
+    struct jlst step;
 };
 
 /* `scale` is one of jank_lpscales.h's (the page marks it) or any other */
@@ -141,6 +145,12 @@ void jlapp_on_push(struct jlapp *a, const struct jdl_note *notes, size_t n);
 void jlapp_on_active_track(struct jlapp *a, unsigned track);
 /* 1 while FOLLOW is on and can run: the firmware then asks the Digitone for its active track every JLAPP_FOLLOW_MS (jdl_track_read) */
 int jlapp_following(const struct jlapp *a);
+
+/* the clock runs (the step modes' lower quadrant then only selects instead of playing; the start / stop scene button lights) */
+void jlapp_set_transport(struct jlapp *a, int playing);
+/* the step modes: the pages of the current track to read now (pages[0..n), 0 outside the step modes), and a page the Digitone answered (jdl_take_page) */
+size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2]);
+void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg);
 
 /* an end for every pad that is down (the Launchpad went away): acts, at most max; returns how many */
 size_t jlapp_release_acts(struct jlapp *a, struct jlapp_act *out, size_t max);

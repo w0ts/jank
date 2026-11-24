@@ -12,6 +12,7 @@
 #define BUTTON_RIGHT 3u
 #define BUTTON_NOTE 5u
 #define WHY_EVERY_MS 2000u             /* "why the pads do not play" is said at most this often */
+#define QUADRANT 4u                    /* the step modes' lower quadrants are 4 x 4 */
 
 enum jlapp_role jlapp_role_from_name(const char *product)
 {
@@ -33,6 +34,8 @@ void jlapp_init(struct jlapp *a, const struct jln_scale *scale)
     a->scale = scale;
     a->minor_idx = JLS_MINOR;
     a->play_ok = 1;
+    a->step_kind = JLST_MELODIC;
+    jlst_init(&a->step, JLST_MELODIC);
     for (uint32_t i = 0; i < JLAPP_PADS; i++)
         a->held[i].note = -1;
 }
@@ -105,6 +108,7 @@ static void say_why_not(struct jlapp *a)
 
 static void set_act(struct jlapp_act *o, uint8_t kind, uint8_t track, uint8_t note, uint8_t vel)
 {
+    memset(o, 0, sizeof *o);
     o->kind = kind;
     o->track = track;
     o->note = note;
@@ -379,31 +383,114 @@ static size_t track_button(struct jlapp *a, unsigned idx, int dir, int pressed, 
     return chose_track(a, before, 1, out, max);
 }
 
+/* ---- the modes ---- */
+
+static struct jlst_ctx step_ctx(const struct jlapp *a, struct jln *n)
+{
+    struct jlst_ctx c;
+    c.n = n;
+    c.scale = a->scale;
+    c.can_play = a->can_play;
+    c.transport_playing = a->transport;
+    c.now_ms = a->now_ms;
+    return c;
+}
+
+static int step_holds(const struct jlapp *a)
+{
+    if (a->step.track_held)
+        return 1;
+    for (unsigned i = 0; i < JLST_KEYS; i++)
+        if (a->step.key_note[i] >= 0)
+            return 1;
+    return 0;
+}
+
+/* Custom: from Note mode into the step mode last used (melodic at first), in a step mode to the other one */
+static void custom_button(struct jlapp *a)
+{
+    if (a->mode == JLAPP_MODE_STEP)
+        a->step_kind = a->step_kind == JLST_MELODIC ? JLST_DRUM : JLST_MELODIC;
+    a->mode = JLAPP_MODE_STEP;
+    a->step.kind = a->step_kind;
+    say(a, a->step_kind == JLST_MELODIC ? "MELODIC STEP" : "DRUM STEP");
+}
+
+/* the Note button: held, the scale page; a tap (short, nothing pressed on the page) from a step mode is Note mode */
+static void note_button(struct jlapp *a, int down)
+{
+    if (down) {
+        a->page = 1;
+        a->note_used = 0;
+        a->note_down_ms = a->now_ms;
+        return;
+    }
+    a->page = 0;
+    if (a->mode != JLAPP_MODE_NOTE && !a->note_used && (uint32_t)(a->now_ms - a->note_down_ms) < JLAPP_TAP_MS) {
+        a->mode = JLAPP_MODE_NOTE;
+        say(a, "NOTE MODE");
+    }
+}
+
+static size_t step_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
+{
+    struct jlst_ctx c = step_ctx(a, &a->n);
+    uint8_t before = a->n.track;
+    size_t n = jlst_pad(&a->step, &c, ev->col, ev->row, ev->value, out, max);
+    if (a->n.track != before) {        /* a drum track pad chose the track */
+        a->hold_on = 1;
+        a->hold_ms = a->now_ms;
+        say(a, "TRACK %u", (unsigned)a->n.track + 1u);
+    } else if (ev->value && !n && !a->push && ev->row >= 4u) {   /* a step with no live control to read or write it */
+        say_why_not(a);
+    }
+    return n;
+}
+
 static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
-    if (ev->idx == BUTTON_NOTE) {      /* held: the scale page; let go: the notes again */
-        a->page = ev->value != 0;
+    if (ev->idx == BUTTON_NOTE) {
+        note_button(a, ev->value != 0);
         return 0;
     }
     if (ev->idx == BUTTON_LEFT || ev->idx == BUTTON_RIGHT)
         return track_button(a, ev->idx - BUTTON_LEFT, ev->idx == BUTTON_LEFT ? -1 : 1, ev->value != 0, out, max);
     if (!ev->value)
         return 0;
-    if (ev->idx == BUTTON_UP || ev->idx == BUTTON_DOWN) {
+    if (ev->idx == BUTTON_CUSTOM_IDX) {
+        custom_button(a);
+        return 0;
+    }
+    if ((ev->idx == BUTTON_UP || ev->idx == BUTTON_DOWN) && !(a->mode == JLAPP_MODE_STEP && a->step_kind == JLST_DRUM)) {   /* the octave; drum step has none */
         jln_octave_step(&a->n, ev->idx == BUTTON_UP ? 1 : -1);
         say(a, "OCTAVE %u", (unsigned)a->n.octave);
     }
-    return 0;                          /* the rest has no job in Note mode yet */
+    return 0;                          /* the rest has no job yet */
+}
+
+/* the scene buttons (Launchpad 95's Note mode): 5 starts / stops the transport; the others have no job yet */
+static size_t side_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
+{
+    if (ev->idx != JLAPP_SIDE_START_STOP || !ev->value || max < 1)
+        return 0;
+    say(a, a->transport ? "STOP" : "START");
+    set_act(out, JLAPP_ACT_TRANSPORT, a->n.track, 0, 0);
+    return 1;
 }
 
 size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
+    if (ev->kind == JLX_SIDE)
+        return side_event(a, ev, out, max);
     if (ev->kind == JLX_PAD && ev->row < 8u && ev->col < 8u) {
         int track_pad = a->track_pads && ev->row < JLAPP_TRACK_ROWS;
         if (a->page && ev->value) {    /* a press on the scale page edits it; a release still ends a note that was down before the page opened */
+            a->note_used = 1;
             page_pad(a, ev->col, ev->row);
             return 0;
         }
+        if (a->mode == JLAPP_MODE_STEP || (!ev->value && step_holds(a) && ev->row < QUADRANT && ev->col < QUADRANT))   /* a release also ends a step mode pad's note after a mode change */
+            return step_pad(a, ev, out, max);
         if (track_pad && (ev->value || (a->track_held & (1u << track_of_pad(ev->row, ev->col)))))
             return track_pad_event(a, ev, out, max);
         return pad_event(a, ev, out, max);
@@ -438,8 +525,21 @@ void jlapp_on_push(struct jlapp *a, const struct jdl_note *notes, size_t n)
         r->note = notes[i].note;
         r->used = 1;
         a->recent_head = (uint8_t)((a->recent_head + 1u) % JLAPP_RECENT);
+        if (notes[i].track == a->n.track)      /* the step that played, for the step modes' playhead */
+            jlst_on_push(&a->step, notes[i].track, notes[i].step, a->now_ms);
     }
 }
+
+void jlapp_set_transport(struct jlapp *a, int playing) { a->transport = playing != 0; }
+
+size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2])
+{
+    if (a->mode != JLAPP_MODE_STEP || a->live_state != JDL_LIVE)
+        return 0;
+    return jlst_wanted(&a->step, pages);
+}
+
+void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg) { jlst_on_page(&a->step, a->n.track, pg, a->now_ms); }
 
 size_t jlapp_release_acts(struct jlapp *a, struct jlapp_act *out, size_t max)
 {
@@ -458,7 +558,7 @@ size_t jlapp_release_acts(struct jlapp *a, struct jlapp_act *out, size_t max)
             a->track_held &= (uint16_t)~(1u << t);
             set_act(&out[n++], JLAPP_ACT_TRACK_OFF, t, 0, 0);
         }
-    return n;
+    return n + jlst_release(&a->step, out + n, max - n);
 }
 
 /* ---- lights ---- */
@@ -498,10 +598,17 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         if (h->note >= 0 && h->track == a->n.track)
             own[h->note >> 3] |= (uint8_t)(1u << (h->note & 7));
     }
+    if (a->mode == JLAPP_MODE_STEP && !a->page) {   /* the step modes draw all 64 pads */
+        struct jln n = a->n;
+        struct jlst_ctx c = step_ctx(a, &n);
+        jlst_frame(&a->step, &c, f);
+    }
     for (uint8_t y = 0; y < 8; y++)
         for (uint8_t x = 0; x < 8; x++) {
             struct jln_pad p;
             int playing;
+            if (a->mode == JLAPP_MODE_STEP && !a->page)
+                break;
             if (a->page) {
                 f->led[JLX_PAD0 + y * 8u + x].color = page_colour(a, x, y);
                 continue;
@@ -516,11 +623,16 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         }
     /* the arrows are green, and dim at the end of what they do (Launchpad 95's Note.Octave): the octave's limits, the first and last track; left and right are
      * amber while FOLLOW is on */
-    f->led[JLX_TOP0 + BUTTON_UP].color = a->n.octave + 1u < jln_octaves(&a->n) ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
-    f->led[JLX_TOP0 + BUTTON_DOWN].color = a->n.octave > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+    if (!(a->mode == JLAPP_MODE_STEP && a->step_kind == JLST_DRUM)) {   /* drum step has no octave */
+        f->led[JLX_TOP0 + BUTTON_UP].color = a->n.octave + 1u < jln_octaves(&a->n) ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+        f->led[JLX_TOP0 + BUTTON_DOWN].color = a->n.octave > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+    }
     f->led[JLX_TOP0 + BUTTON_LEFT].color = a->n.track > 0u ? (a->follow ? JLAPP_COLOR_FOLLOW_ON : JLAPP_COLOR_ARROW_ON)
                                                            : (a->follow ? JLAPP_COLOR_FOLLOW_OFF : JLAPP_COLOR_ARROW_OFF);
     f->led[JLX_TOP0 + BUTTON_RIGHT].color = a->n.track + 1u < JLN_TRACKS ? (a->follow ? JLAPP_COLOR_FOLLOW_ON : JLAPP_COLOR_ARROW_ON)
                                                                          : (a->follow ? JLAPP_COLOR_FOLLOW_OFF : JLAPP_COLOR_ARROW_OFF);
-    f->led[JLX_TOP0 + BUTTON_NOTE].color = JLAPP_COLOR_MODE;
+    f->led[JLX_TOP0 + BUTTON_NOTE].color = a->mode == JLAPP_MODE_NOTE ? JLAPP_COLOR_MODE : JLAPP_COLOR_MODE_DIM;
+    if (a->mode == JLAPP_MODE_STEP)    /* which step mode: melodic green, drum amber */
+        f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = a->step_kind == JLST_MELODIC ? JLAPP_GREEN : JLAPP_AMBER;
+    f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = a->transport ? JLAPP_GREEN : JLAPP_RED_THIRD;   /* start / stop: running green, stopped dim red */
 }

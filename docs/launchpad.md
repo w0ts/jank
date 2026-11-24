@@ -57,6 +57,30 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
   they go to the Digitone**: a MESSAGE command (54) was asked of dn2-wishes (a full-screen popup of about a second) and is **not confirmed (stage 5)**, so
   nothing is sent yet and a unit without a screen shows no message. `diag` `msgs:` counts them.
 
+### Modes: Note, melodic step, drum step (`core/jank_lpstep.[ch]`)
+
+Owner, 2026-11-24. **Custom** (top button 7) enters the step modes and cycles **melodic <-> drum** (green / amber); **a tap on Note** goes back to Note mode (held it is the
+scale page in every mode, as before; a quick press that touched a page pad is not a tap). One layout for both, after Launchpad 95's drum step sequencer (its drum rack
+lower left, the sequence on top, the loop selector lower right):
+
+- **Top 4x8 = 32 steps** as the Digitone shows them: steps 1-8 on the top row, 9-16 below (one page of 16), then the next page on the two rows under it. A press toggles
+  the trig (GREEN on, DARK_GREY off, dark past the pattern's length); the step that just played (from the note push) is WHITE for 150 ms. The pages come from the Digitone
+  (STEPS, 46, every 400 ms for the two shown); a press is shown at once and the next read does not undo it for 300 ms; a page the Digitone has not answered is dark and
+  does nothing.
+- **Lower right 4x4:** the top row of it holds four page pads (the Digitone's 64 steps): the page the top rows start at.
+- **Lower left 4x4, drum:** the 16 tracks in reading order (track 1 top left of the quadrant): a press selects the track the steps show and edit. **Melodic:** a 4x4 keyboard
+  (the Note mode's layout, scale and octave; up / down are the octave in melodic, nothing in drum): a press picks the note a step press places. With a key picked a step
+  press sets that note (STEP op 2; the same note again clears it); with none, the trig with the track's own note.
+- **The quadrant also plays while the transport is stopped** (the track's own note / the key), and only selects while it runs (owner's rule). **Scene button 5 starts / stops
+  the transport** (Launchpad 95's Note mode: its start / stop; green running, dim red stopped): Jank is the transport master, the ui task calls `bridge_play`.
+- Reads and edits need live control; without it a step press says why (as a pad does). STEP's refusals (2) and full queue (5) are counted in `diag` (`hostdiag_steps`).
+- Velocity, length, quantise, random etc. (Launchpad 95's other scene buttons: drum 3 quant, 5/6 up/down, 7 velocity, 8 mute; melodic 4 random, 5 length, 6 octave, 7
+  velocity, 8 notes; Note mode 2 undo, 8 record; mixer 1-4 volume / pan / send A / send B) are **not built yet**.
+
+**The clock to the Digitone (owner 2026-11-24):** in host mode Jank sends MIDI clock to the Digitone **only while it has peers on the Jank / Link network**
+(`bridge_peers_heard`, checked each second by the ui task; `usb_midi_clock_peers` in usb.c). With none the clock stops, with one MIDI Stop after what was queued (as when the
+USB MIDI CLOCK setting is turned off); with one it starts again. Device mode (a computer on the port) is not affected.
+
 ### Colour language so far (to be decided with the owner)
 
 Launchpad 95's own colours stay as they are (scale page, Note mode). What this port adds: **green** a direction or switch that is available / on, dim green

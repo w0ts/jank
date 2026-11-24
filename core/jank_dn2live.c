@@ -72,6 +72,66 @@ size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, si
     return n;
 }
 
+size_t jdl_steps_read(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t page, uint8_t *out, size_t cap)
+{
+    uint8_t args[2];
+    if (d->state != JDL_LIVE || track > 15u || page > 3u)
+        return 0;
+    args[0] = track;
+    args[1] = page;
+    return send(d, now_ms, JDL_CMD_STEPS, args, sizeof args, out, cap);
+}
+
+size_t jdl_step_edit(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t step, enum jdl_step_op op, uint8_t note, uint8_t vel, uint8_t len, uint8_t *out, size_t cap)
+{
+    uint8_t args[6];
+    if (d->state != JDL_LIVE || track > 15u || step > 127u || (unsigned)op > (unsigned)JDL_STEP_NOTE || note > 127u || (vel != 255u && (vel < 1u || vel > 127u)) ||
+        (len != 255u && len > 127u))
+        return 0;
+    args[0] = track;
+    args[1] = step;
+    args[2] = (uint8_t)op;
+    args[3] = note;
+    args[4] = vel;
+    args[5] = len;
+    return send(d, now_ms, JDL_CMD_STEP, args, sizeof args, out, cap);
+}
+
+int jdl_take_page(struct jdl *d, struct jdl_page *out)
+{
+    if (!d->page_fresh)
+        return 0;
+    *out = d->pg;
+    d->page_fresh = 0;
+    return 1;
+}
+
+/* the STEPS data: 8 bytes, then 16 steps of 6 */
+#define STEPS_HEAD 8u
+#define STEPS_STEP_BYTES 6u
+#define STEPS_BYTES (STEPS_HEAD + JDL_PAGE_STEPS * STEPS_STEP_BYTES)
+#define ST_BUSY 5u
+
+static void take_steps(struct jdl *d, const struct jd2_reply *r)
+{
+    struct jdl_page *p = &d->pg;
+    if (r->n < STEPS_BYTES || r->data[0] > 15u || r->data[1] > 3u)
+        return;
+    p->track = r->data[0];
+    p->page = r->data[1];
+    p->pages = r->data[2];
+    p->length = r->data[3];
+    for (unsigned i = 0; i < JDL_PAGE_STEPS; i++) {
+        const uint8_t *s = r->data + STEPS_HEAD + i * STEPS_STEP_BYTES;
+        p->step[i].trig = s[1] & 1u;              /* the u16 flags, big-endian: bit 0 is in the second byte */
+        p->step[i].note = s[2];
+        p->step[i].vel = s[3];
+        p->step[i].len = s[4];
+        p->step[i].notes = s[5];
+    }
+    d->page_fresh = 1;
+}
+
 size_t jdl_probe_play(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
 {
     size_t n;
@@ -147,8 +207,20 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         d->play_ok = 0;
         return JDL_IN_REPLY;
     }
-    if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY)
+    if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP)
         return JDL_IN_IGNORED;
+    if (r.cmd == JDL_CMD_STEPS || r.cmd == JDL_CMD_STEP) {   /* a refused read or write (2), a full queue (5): that request only, live control is fine */
+        if (r.status == ST_NOT_UNDERSTOOD) {
+            d->step_refused++;
+            return JDL_IN_REPLY;
+        }
+        if (r.status == ST_BUSY) {
+            d->step_busy++;
+            return JDL_IN_REPLY;
+        }
+        if (r.status == 0 && r.cmd == JDL_CMD_STEPS)
+            take_steps(d, &r);
+    }
     if (r.cmd == JDL_CMD_TRACK) {
         int mine = d->has_read && r.seq == d->read_seq;
         if (r.status == ST_NOT_UNDERSTOOD) {   /* this command only: a build whose TRACK cannot be read (or a bad track); live control itself is fine */

@@ -248,7 +248,7 @@ static void test_the_clock_wrapping(void)
 /* a reply to request number `seq` of command `cmd` with data */
 static void reply_to(struct jdl *d, uint16_t seq, uint8_t cmd, uint8_t status, const uint8_t *data, size_t n)
 {
-    uint8_t f[64];
+    uint8_t f[256];
     struct jdl_note nn[JDL_NOTES_MAX];
     size_t count, k = frame(f, seq, (uint8_t)(cmd | 0x80), status, data, n);
     CHECK(jdl_input(d, f, k, nn, &count) == JDL_IN_REPLY);
@@ -388,8 +388,113 @@ static void test_play_is_asked_again_on_a_new_connection_and_not_before_live(voi
     CHECK(jdl_probe_play(&d, 110, out, sizeof out) > 0);
 }
 
+/* a STEPS answer for (track, page, pages, length): 16 steps, step i with flags 0x0381 (a note trig) when trigs[i], else 0x0300, note 40 + i, vel 100, len 14 */
+static size_t steps_data(uint8_t *data, uint8_t track, uint8_t page, uint8_t pages, uint8_t length, const uint8_t *trigs)
+{
+    size_t k = 0;
+    data[k++] = track;
+    data[k++] = page;
+    data[k++] = pages;
+    data[k++] = length;
+    data[k++] = 255;                                                                         /* playing step: not trusted */
+    data[k++] = 0;
+    data[k++] = track;
+    data[k++] = 8;
+    for (unsigned i = 0; i < 16; i++) {
+        data[k++] = 0x03;
+        data[k++] = trigs[i] ? 0x81 : 0x00;
+        data[k++] = (uint8_t)(40 + i);
+        data[k++] = 100;
+        data[k++] = 14;
+        data[k++] = trigs[i] ? 1 : 0;
+    }
+    return k;
+}
+
+static void test_reading_a_page_of_steps(void)
+{
+    struct jdl d = live(0);
+    struct jdl_page pg;
+    uint8_t out[64], body[32], data[104], trigs[16] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1};
+    size_t n = jdl_steps_read(&d, 10, 3, 1, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 5 && body[2] == JDL_CMD_STEPS && body[3] == 3 && body[4] == 1);
+    CHECK(jdl_steps_read(&d, 10, 16, 0, out, sizeof out) == 0 && jdl_steps_read(&d, 10, 0, 4, out, sizeof out) == 0);   /* only tracks 0..15, pages 0..3 */
+    CHECK(!jdl_take_page(&d, &pg));
+    reply_to(&d, d.seq, JDL_CMD_STEPS, 0, data, steps_data(data, 3, 1, 4, 64, trigs));
+    CHECK(jdl_take_page(&d, &pg) && pg.track == 3 && pg.page == 1 && pg.pages == 4 && pg.length == 64);
+    CHECK(pg.step[0].trig == 1 && pg.step[1].trig == 0 && pg.step[4].trig == 1 && pg.step[15].trig == 1);   /* trig = bit 0 of the u16 flags */
+    CHECK(pg.step[0].note == 40 && pg.step[15].note == 55 && pg.step[2].vel == 100 && pg.step[2].len == 14 && pg.step[0].notes == 1 && pg.step[1].notes == 0);
+    CHECK(!jdl_take_page(&d, &pg));                                                          /* taken once */
+    CHECK(jdl_is_live(&d));
+}
+
+static void test_a_damaged_steps_answer_is_not_taken(void)
+{
+    struct jdl d = live(0);
+    struct jdl_page pg;
+    uint8_t data[104], trigs[16] = {0};
+    size_t n = steps_data(data, 3, 1, 4, 64, trigs);
+    reply_to(&d, d.seq, JDL_CMD_STEPS, 0, data, n - 1u);                                     /* one byte short */
+    CHECK(!jdl_take_page(&d, &pg));
+    data[0] = 16;                                                                            /* a track that does not exist */
+    reply_to(&d, d.seq, JDL_CMD_STEPS, 0, data, n);
+    CHECK(!jdl_take_page(&d, &pg));
+    data[0] = 3;
+    data[1] = 4;                                                                             /* a page past the last */
+    reply_to(&d, d.seq, JDL_CMD_STEPS, 0, data, n);
+    CHECK(!jdl_take_page(&d, &pg));
+}
+
+static void test_editing_a_step(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64], body[32];
+    size_t n = jdl_step_edit(&d, 10, 2, 17, JDL_STEP_NOTE, 60, 255, 255, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 9 && body[2] == JDL_CMD_STEP && body[3] == 2 && body[4] == 17 && body[5] == 2 && body[6] == 60 && body[7] == 255 && body[8] == 255);
+    n = jdl_step_edit(&d, 11, 0, 0, JDL_STEP_TRIG, 0, 255, 255, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 9 && body[5] == 1);
+    n = jdl_step_edit(&d, 12, 15, 127, JDL_STEP_CLEAR, 0, 255, 255, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 9 && body[3] == 15 && body[4] == 127 && body[5] == 0);
+    CHECK(jdl_step_edit(&d, 13, 16, 0, JDL_STEP_TRIG, 0, 255, 255, out, sizeof out) == 0);       /* what the Digitone would refuse is not sent */
+    CHECK(jdl_step_edit(&d, 13, 0, 128, JDL_STEP_TRIG, 0, 255, 255, out, sizeof out) == 0);
+    CHECK(jdl_step_edit(&d, 13, 0, 0, (enum jdl_step_op)3, 0, 255, 255, out, sizeof out) == 0);
+    CHECK(jdl_step_edit(&d, 13, 0, 0, JDL_STEP_NOTE, 128, 255, 255, out, sizeof out) == 0);
+    CHECK(jdl_step_edit(&d, 13, 0, 0, JDL_STEP_NOTE, 60, 0, 255, out, sizeof out) == 0);         /* velocity 0 is refused by design */
+    CHECK(jdl_step_edit(&d, 13, 0, 0, JDL_STEP_NOTE, 60, 128, 255, out, sizeof out) == 0);
+    CHECK(jdl_step_edit(&d, 13, 0, 0, JDL_STEP_NOTE, 60, 100, 128, out, sizeof out) == 0);
+    CHECK(jdl_step_edit(&d, 13, 0, 0, JDL_STEP_NOTE, 60, 100, 127, out, sizeof out) > 0);
+}
+
+static void test_steps_need_live_control(void)
+{
+    struct jdl d;
+    uint8_t out[64];
+    jdl_init(&d);
+    CHECK(jdl_steps_read(&d, 0, 0, 0, out, sizeof out) == 0 && jdl_step_edit(&d, 0, 0, 0, JDL_STEP_TRIG, 0, 255, 255, out, sizeof out) == 0);
+}
+
+static void test_a_refused_or_full_step_request_changes_nothing_else(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64];
+    CHECK(jdl_step_edit(&d, 10, 0, 0, JDL_STEP_TRIG, 0, 255, 255, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_STEP, 5, NULL, 0);                                           /* 16 writes already waiting */
+    CHECK(d.step_busy == 1 && jdl_is_live(&d));
+    reply_to(&d, d.seq, JDL_CMD_STEP, 2, NULL, 0);                                           /* refused */
+    CHECK(d.step_refused == 1 && jdl_is_live(&d) && jdl_can_play(&d));
+    reply_to(&d, d.seq, JDL_CMD_STEPS, 2, NULL, 0);                                          /* a page that does not exist */
+    CHECK(d.step_refused == 2 && jdl_is_live(&d));
+    reply_to(&d, d.seq, JDL_CMD_STEP, 4, NULL, 0);                                           /* live control itself ended: that is the state's business */
+    CHECK(!jdl_is_live(&d));
+}
+
 int main(void)
 {
+    test_reading_a_page_of_steps();
+    test_a_damaged_steps_answer_is_not_taken();
+    test_editing_a_step();
+    test_steps_need_live_control();
+    test_a_refused_or_full_step_request_changes_nothing_else();
     test_play_is_asked_about_once_when_live();
     test_a_digitone_without_play_is_known_before_the_first_press();
     test_play_is_asked_again_on_a_new_connection_and_not_before_live();

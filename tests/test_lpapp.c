@@ -442,7 +442,7 @@ static void test_octave_and_other_buttons(void)
 {
     struct jlapp a = fresh();
     struct jlapp_act o;
-    struct jlx_ev side = {JLX_SIDE, 0, 0, 4, 127};
+    struct jlx_ev side = {JLX_SIDE, 0, 0, 2, 127};   /* scene button 3: no job yet (scene 5 is start / stop) */
     CHECK(acts(&a, top(0, 127), &o) == 0 && a.n.octave == 4);     /* up: octave up, nothing for the Digitone */
     CHECK(strcmp(msg(&a), "OCTAVE 4") == 0);
     acts(&a, top(1, 127), &o);
@@ -477,7 +477,7 @@ static void test_buttons_lit(void)
     CHECK(JLAPP_COLOR_ARROW_ON == 21 && JLAPP_COLOR_ARROW_OFF == 23 && JLAPP_COLOR_MODE == 37);   /* GREEN, GREEN_THIRD, LIGHT_BLUE: LP95's Note.Octave and Mode.Note */
     CHECK(f.led[JLX_TOP0 + 4].color == 0 && f.led[JLX_TOP0 + 6].color == 0 && f.led[JLX_TOP0 + 7].color == 0);
     for (uint32_t i = 0; i < 8; i++)
-        CHECK(f.led[JLX_SIDE0 + i].color == 0);
+        CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_RED_THIRD : 0));   /* only start / stop is lit: dim red while stopped */
     CHECK(f.led[JLX_LOGO].color == 0);
     for (uint32_t i = 0; i < JLX_LEDS; i++)
         CHECK(f.led[i].mode == JLX_STATIC);
@@ -883,8 +883,225 @@ static void test_follow_takes_the_digitones_track(void)
     CHECK(a.n.track == 5);
 }
 
+/* ---- the modes: Note, melodic step, drum step ---- */
+
+#define CUSTOM 6u
+#define SCENE5 4u
+
+static struct jlx_ev side(uint8_t idx, uint8_t v)
+{
+    struct jlx_ev e = {JLX_SIDE, 0, 0, idx, v};
+    return e;
+}
+
+static void read_pages(struct jlapp *a, uint8_t pages, int every4)
+{
+    struct jdl_page pg;
+    memset(&pg, 0, sizeof pg);
+    pg.track = a->n.track;
+    pg.pages = pages;
+    pg.length = (uint8_t)(pages * 16u);
+    for (unsigned p = 0; p < 2; p++) {
+        pg.page = (uint8_t)(a->step.first_page + p);
+        for (unsigned i = 0; i < 16; i++) {
+            pg.step[i].trig = every4 && i % 4 == 0;
+            pg.step[i].note = (uint8_t)(40 + i);
+        }
+        jlapp_on_page(a, &pg);
+    }
+}
+
+static void test_custom_enters_the_step_modes_and_cycles_them(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    CHECK(a.mode == JLAPP_MODE_NOTE);
+    acts(&a, top(CUSTOM, 127), &o);
+    CHECK(a.mode == JLAPP_MODE_STEP && a.step_kind == JLST_MELODIC && a.step.kind == JLST_MELODIC && strcmp(msg(&a), "MELODIC STEP") == 0);
+    acts(&a, top(CUSTOM, 0), &o);
+    CHECK(a.mode == JLAPP_MODE_STEP);                              /* a release does nothing */
+    acts(&a, top(CUSTOM, 127), &o);
+    CHECK(a.step_kind == JLST_DRUM && a.step.kind == JLST_DRUM && strcmp(msg(&a), "DRUM STEP") == 0);
+    acts(&a, top(CUSTOM, 127), &o);
+    CHECK(a.step_kind == JLST_MELODIC);                           /* the two cycle */
+}
+
+static void test_a_tap_on_note_goes_back_to_note_mode_a_hold_does_not(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    acts(&a, top(CUSTOM, 127), &o);
+    jlapp_tick(&a, 1000);
+    acts(&a, top(NOTE_BTN, 127), &o);
+    CHECK(a.page && a.mode == JLAPP_MODE_STEP);                    /* held: the scale page, in the step mode too */
+    jlapp_tick(&a, 1000 + JLAPP_TAP_MS - 1u);
+    acts(&a, top(NOTE_BTN, 0), &o);
+    CHECK(!a.page && a.mode == JLAPP_MODE_NOTE && strcmp(msg(&a), "NOTE MODE") == 0);   /* a tap */
+    acts(&a, top(CUSTOM, 127), &o);
+    say_nothing_yet(&a);
+    jlapp_tick(&a, 5000);
+    acts(&a, top(NOTE_BTN, 127), &o);
+    jlapp_tick(&a, 5000 + JLAPP_TAP_MS);
+    acts(&a, top(NOTE_BTN, 0), &o);
+    CHECK(a.mode == JLAPP_MODE_STEP);                              /* held long: it was the scale page */
+    jlapp_tick(&a, 6000);
+    acts(&a, top(NOTE_BTN, 127), &o);
+    acts(&a, pad(0, 6, 100), &o);                                  /* a black key on the page */
+    acts(&a, pad(0, 6, 0), &o);
+    jlapp_tick(&a, 6100);
+    acts(&a, top(NOTE_BTN, 0), &o);
+    CHECK(a.mode == JLAPP_MODE_STEP && a.n.key == 1);              /* a page pad was used: not a tap, even if quick */
+    jlapp_tick(&a, 7000);                                          /* a plain tap from a step mode: Note mode */
+    acts(&a, top(NOTE_BTN, 127), &o);
+    acts(&a, top(NOTE_BTN, 0), &o);
+    CHECK(a.mode == JLAPP_MODE_NOTE);
+    acts(&a, top(NOTE_BTN, 127), &o);                              /* and in Note mode a tap changes nothing */
+    acts(&a, top(NOTE_BTN, 0), &o);
+    CHECK(a.mode == JLAPP_MODE_NOTE);
+}
+
+static void test_up_and_down_are_the_octave_except_in_drum_step(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    acts(&a, top(CUSTOM, 127), &o);                                /* melodic step */
+    acts(&a, top(0, 127), &o);
+    CHECK(a.n.octave == 4);
+    acts(&a, top(CUSTOM, 127), &o);                                /* drum step */
+    acts(&a, top(0, 127), &o);
+    acts(&a, top(1, 127), &o);
+    CHECK(a.n.octave == 4);                                        /* nothing */
+    {
+        struct jlx_frame f;
+        jlapp_frame(&a, &f);
+        CHECK(f.led[JLX_TOP0 + 0].color == 0 && f.led[JLX_TOP0 + 1].color == 0);   /* and dark */
+    }
+}
+
+static void test_the_start_stop_scene_button(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    struct jlx_frame f;
+    CHECK(acts(&a, side(SCENE5, 127), &o) == 1 && o.kind == JLAPP_ACT_TRANSPORT && strcmp(msg(&a), "START") == 0);
+    CHECK(acts(&a, side(SCENE5, 0), &o) == 0);                     /* a release */
+    CHECK(acts(&a, side(1, 127), &o) == 0);                        /* the other scene buttons have no job yet */
+    jlapp_set_transport(&a, 1);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + SCENE5].color == JLAPP_GREEN);         /* running: green */
+    CHECK(acts(&a, side(SCENE5, 127), &o) == 1 && strcmp(msg(&a), "STOP") == 0);
+    jlapp_set_transport(&a, 0);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + SCENE5].color == JLAPP_RED_THIRD);
+}
+
+static void test_the_mode_buttons_light(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    struct jlx_frame f;
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == 0);
+    acts(&a, top(CUSTOM, 127), &o);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE_DIM && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_GREEN);   /* melodic: green */
+    acts(&a, top(CUSTOM, 127), &o);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + CUSTOM].color == JLAPP_AMBER);          /* drum: amber */
+}
+
+static void test_a_step_press_in_the_app(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    uint8_t pages[2];
+    acts(&a, top(CUSTOM, 127), &o);
+    CHECK(jlapp_step_wanted(&a, pages) == 1 && pages[0] == 0);     /* page 0 first: it says the length */
+    CHECK(acts(&a, pad(1, 7, 100), &o) == 0);                      /* nothing read: nothing to toggle */
+    read_pages(&a, 4, 1);
+    CHECK(jlapp_step_wanted(&a, pages) == 2 && pages[0] == 0 && pages[1] == 1);
+    CHECK(acts(&a, pad(1, 7, 100), &o) == 1 && o.kind == JLAPP_ACT_STEP && o.step == 1 && o.op == JDL_STEP_TRIG && o.track == 0);
+    CHECK(colour(&a, 1, 7) == JLST_COLOR_ON && colour(&a, 0, 7) == JLST_COLOR_ON && colour(&a, 2, 7) == JLST_COLOR_OFF);
+    acts(&a, top(CUSTOM, 127), &o);                                /* Custom again: the drum step mode */
+    CHECK(colour(&a, 0, 3) == JLST_COLOR_TRACK_CURRENT);           /* the quadrant is the tracks: track 1 top left of it */
+    acts(&a, top(NOTE_BTN, 127), &o);
+    CHECK(colour(&a, 7, 7) == JLAPP_GREEN_THIRD);                  /* held: the scale page covers the steps */
+    jlapp_tick(&a, JLAPP_TAP_MS);
+    acts(&a, top(NOTE_BTN, 0), &o);                                /* held long: still the step mode */
+    CHECK(a.mode == JLAPP_MODE_STEP && jlapp_step_wanted(&a, pages) == 2);
+    {
+        struct jlapp b = fresh_not_live(JDL_ASKING);
+        acts(&b, top(CUSTOM, 127), &o);
+        CHECK(jlapp_step_wanted(&b, pages) == 0);                  /* no live control: nothing to read */
+        CHECK(acts(&b, pad(1, 7, 100), &o) == 0 && strcmp(msg(&b), "DN2 NOT READY") == 0);   /* and why the step does nothing */
+    }
+    {
+        struct jlapp c = fresh();
+        acts(&c, top(5, 127), &o);
+        CHECK(jlapp_step_wanted(&c, pages) == 0);                  /* Note mode: no reads */
+    }
+}
+
+static void test_a_drum_track_pad_changes_the_current_track(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o[2];
+    acts(&a, top(CUSTOM, 127), &o[0]);
+    acts(&a, top(CUSTOM, 127), &o[0]);                             /* drum */
+    say_nothing_yet(&a);
+    CHECK(jlapp_on_lpx_acts(&a, &(struct jlx_ev){JLX_PAD, 0, 3, 0, 100}, o, 2) == 2);   /* pad row 0, column 3: track 16 */
+    CHECK(a.n.track == 15 && o[0].kind == JLAPP_ACT_SELECT && o[1].kind == JLAPP_ACT_TRACK_ON && strcmp(msg(&a), "TRACK 16") == 0);
+    CHECK(a.hold_on);                                              /* FOLLOW does not take it back at once */
+}
+
+static void test_a_note_held_in_a_step_mode_still_ends_after_the_mode_changes(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    acts(&a, top(CUSTOM, 127), &o);                                /* melodic: the keyboard plays while stopped */
+    CHECK(acts(&a, pad(1, 0, 100), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON);
+    jlapp_tick(&a, 100);
+    acts(&a, top(NOTE_BTN, 127), &o);
+    jlapp_tick(&a, 150);
+    acts(&a, top(NOTE_BTN, 0), &o);                                /* a tap: Note mode */
+    CHECK(a.mode == JLAPP_MODE_NOTE);
+    CHECK(acts(&a, pad(1, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF);   /* the release still reaches the step mode's note */
+}
+
+static void test_the_playhead_comes_from_the_push(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    const struct jdl_note n[2] = {{0, 4, 60, 100, 8, 0}, {3, 5, 60, 100, 8, 0}};
+    acts(&a, top(CUSTOM, 127), &o);
+    read_pages(&a, 4, 1);
+    jlapp_tick(&a, 100);
+    jlapp_on_push(&a, n, 2);
+    CHECK(colour(&a, 4, 7) == JLST_COLOR_HEAD);                    /* step 4 of the current track */
+    CHECK(colour(&a, 5, 7) == JLST_COLOR_OFF);                     /* another track's step 5 is not shown */
+}
+
+static void test_release_acts_in_a_step_mode(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o[4];
+    acts(&a, top(CUSTOM, 127), &o[0]);
+    acts(&a, pad(1, 0, 100), &o[0]);
+    CHECK(jlapp_release_acts(&a, o, 4) == 1 && o[0].kind == JLAPP_ACT_NOTE_OFF);
+}
+
 int main(void)
 {
+    test_custom_enters_the_step_modes_and_cycles_them();
+    test_a_tap_on_note_goes_back_to_note_mode_a_hold_does_not();
+    test_up_and_down_are_the_octave_except_in_drum_step();
+    test_the_start_stop_scene_button();
+    test_the_mode_buttons_light();
+    test_a_step_press_in_the_app();
+    test_a_drum_track_pad_changes_the_current_track();
+    test_a_note_held_in_a_step_mode_still_ends_after_the_mode_changes();
+    test_the_playhead_comes_from_the_push();
+    test_release_acts_in_a_step_mode();
     test_roles_by_product_name();
     test_midi_interface_choice();
     test_the_note_button_opens_the_page_while_held();

@@ -61,6 +61,7 @@ void wota_start(void);                                                          
 bool wota_key_line(const char *line);                                                                  /* "ota key ...": handled and answered -> true */
 void wota_serve(void);                                                                                 /* control task, once a pass */
 int usb_is_host(void);                                               /* the USB host stack is the one that started (the LED's double flash) */
+int usb_lp_transport_request(void);                                 /* host mode: 1 once when the Launchpad asked to start / stop (usb_lp.c, any task); the ui task acts on it */
 size_t hostdiag_text(char *out, size_t cap);                         /* hostdiag.c: what the last host session saw, for `diag` */
 int usb_host_spoke(void);                                            /* a control line came from the computer since the start */
 void usb_beat_line(const char *text, size_t n);                      /* a beat report: SysEx F0 7D 'J' 'B' 0x10 <text> F7, dropped when full */
@@ -69,7 +70,8 @@ esp_err_t usb_send(const uint8_t *eth, size_t len, void *token);   /* tx_done(to
 esp_err_t usb_midi_host_start(void);
 void usb_midi_host_send(const uint8_t *packets, size_t n);
 bool usb_midi_isr(const uint8_t *bytes, size_t n);                  /* from the timer interrupt -> a task was woken */
-void usb_midi_clock(int on);                                        /* USB MIDI CLOCK (setting usbmidi): off, none of it to USB */
+void usb_midi_clock_peers(int has_peers);                           /* host mode: the clock only while there are peers on the Jank / Link network (usb_lp.c) */
+void usb_midi_clock(int on);                                     /* USB MIDI CLOCK (setting usbmidi): off, none of it to USB */
 void usb_serial_write(const char *text, size_t n);                 /* the control line, as SysEx on the MIDI port */
 
 /* usb_audio.c, beat.c: the beat-follow bench build (README): the computer's audio into the beat tracker, into the Link session */

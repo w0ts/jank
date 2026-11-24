@@ -193,6 +193,7 @@ static void scan_groups(void)
  * js_auto_step). Quiet on the LED but for the sweep's magenta: no red "none found" every five seconds. Skipped while the
  * button's or the page's sweep holds the radio. */
 #define AUTO_CHECK_MS 250u
+#define CLOCK_PEERS_MS 1000u           /* host mode: how often the clock to the Digitone is allowed or stopped by the peers count (usb.c) */
 static struct js_auto s_auto;
 
 static void auto_scan(uint32_t now)
@@ -312,11 +313,12 @@ static void pads_step(uint32_t now, int no)
 static void ui_task(void *arg)
 {
     struct jb_button b;
-    uint32_t last_auto;
+    uint32_t last_auto, last_clock_check;
     (void)arg;
     jb_init(&b);
     js_auto_init(&s_auto, bridge_ms());
     last_auto = bridge_ms();
+    last_clock_check = bridge_ms();
     uis_start(bridge_ms());
     for (;;) {
         uint32_t now = bridge_ms();
@@ -331,6 +333,12 @@ static void ui_task(void *arg)
             last_auto = now;
             auto_scan(now);
         }
+        if ((uint32_t)(now - last_clock_check) >= CLOCK_PEERS_MS) {   /* host mode: the clock to the Digitone only while there are peers (usb.c) */
+            last_clock_check = now;
+            usb_midi_clock_peers(usb_is_host() ? bridge_peers_heard() > 0u : 1);
+        }
+        if (usb_is_host() && usb_lp_transport_request())   /* the Launchpad's start / stop scene button (usb_lp.c asks; this task does the bridge's work) */
+            bridge_play(!bridge_is_playing());
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }
 }

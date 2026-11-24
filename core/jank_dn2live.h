@@ -19,6 +19,8 @@
 #include <stdint.h>
 
 #define JDL_CMD_LIVE 44u
+#define JDL_CMD_STEPS 46u              /* read a page of 16 steps of a track */
+#define JDL_CMD_STEP 48u               /* set / clear a trig, set its note */
 #define JDL_CMD_TRACK 49u
 #define JDL_CMD_PLAY 53u              /* not 50: the Digitone's stage 4 uses 50 SCALE, 51 PATTERNS, 52 SONG (renumbered 2026-11-24 at its request); MESSAGE will be 54 */
 #define JDL_CMD_PUSH 47u               /* the push's command number (its cmd byte on the wire is 0xAF) */
@@ -42,6 +44,21 @@ struct jdl_note {
     uint8_t track, step, note, vel, length, flags;
 };
 
+/* One page of a track's steps (STEPS, 46: `u8 track (0..15, 255 active), u8 page` -> `u8 track, u8 page, u8 pages, u8 length, u8 playing step (not trusted: wrong on
+ * 1.12), u8 playing, u8 active track, u8 pattern index`, then 16 x `{u16 trig flags, u8 note, u8 vel, u8 len, u8 notes}`): trig = flags bit 0; note / vel / len the
+ * step's first note entry or the track's own (len is stock's length code, 14 = 1 step ... 127 INF, not converted here). STEP (48: `u8 track, u8 step, u8 op, u8 note,
+ * u8 vel, u8 len`): op 0 clear, 1 set a trig (the track's default entry), 2 set a note (places the trig if none); vel 1..127 or 255 (the track's), len 0..127 or 255.
+ * Status 2 (bad arguments, or not understood) and 5 (16 writes already waiting) refuse that one request and change nothing else. */
+#define JDL_PAGE_STEPS 16u
+enum jdl_step_op { JDL_STEP_CLEAR = 0, JDL_STEP_TRIG = 1, JDL_STEP_NOTE = 2 };
+struct jdl_step {
+    uint8_t trig, note, vel, len, notes;
+};
+struct jdl_page {
+    uint8_t track, page, pages, length;
+    struct jdl_step step[JDL_PAGE_STEPS];
+};
+
 /* LIVE STATUS data (the reply to every LIVE request, 31 bytes, docs/live-control.md in dn2-wishes): u8 protocol, u8 push on (the `what` bits), u8 seconds of lease
  * left, u8 ring size, u8 most notes a push, then u32 notes made (queued by the sequencer hook), u32 sent, u32 lost, u32 dropped, u32 push messages sent, u32 passes a
  * push waited for room in USB's ring, u16 the next push's sequence number; all numbers big-endian (the doc's rule for the channel) */
@@ -53,6 +70,9 @@ struct jdl_status {
 
 struct jdl {
     struct jdl_status st;              /* the Digitone's last LIVE STATUS */
+    struct jdl_page pg;                /* the last STEPS answer, until taken (page_fresh) */
+    uint8_t page_fresh;
+    uint32_t step_busy, step_refused;  /* STEP / STEPS answered 5 (queue full) / 2 (refused) */
     uint16_t seq;
     uint8_t state;                     /* enum jdl_state */
     uint8_t play_ok;                   /* PLAY has not been refused (status 2): 1 until it is */
@@ -81,6 +101,11 @@ size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 /* a request, only while live (else 0): the active track, a PLAY. A request also keeps the lease */
 size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, size_t cap);
 size_t jdl_play(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_play_op op, uint8_t note, uint8_t vel, uint8_t *out, size_t cap);
+/* Step pages and edits (only while live; 0 for invalid arguments, which the Digitone would refuse). jdl_take_page: the last STEPS answer, once (1 and *out filled), else 0 */
+size_t jdl_steps_read(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t page, uint8_t *out, size_t cap);
+size_t jdl_step_edit(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t step, enum jdl_step_op op, uint8_t note, uint8_t vel, uint8_t len, uint8_t *out, size_t cap);
+int jdl_take_page(struct jdl *d, struct jdl_page *out);
+
 /* Right after live control comes up: one PLAY "all notes off, every track", which every Digitone with PLAY takes without a sound and one without it refuses (status 2),
  * so the pads know PLAY's answer before the first press (else the first press went out, was refused, and only the later ones were blocked). Once per connection;
  * 0 when not live or already asked */
