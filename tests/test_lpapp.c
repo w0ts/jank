@@ -1028,6 +1028,27 @@ static void test_up_and_down_are_the_octave_except_in_drum_step(void)
     }
 }
 
+/* owner 2026-11-24: "in drum step, i cannot change track when transport is stopped. it should select the track and play it". The press makes TWO acts (select, play): the
+ * firmware's caller has to give room for JLAPP_ACTS_MAX; with room for one the library drops the whole press (it was called with 1 and nothing happened) */
+static void test_a_drum_pad_on_another_track_selects_and_plays_while_stopped(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o[JLAPP_ACTS_MAX];
+    struct jlx_ev down = pad(3, 0, 127), up = pad(3, 0, 0);          /* the quadrant's corner: track 16 */
+    acts(&a, top(CUSTOM, 127), o);                                   /* melodic step */
+    acts(&a, top(CUSTOM, 127), o);                                   /* drum step */
+    CHECK(JLAPP_ACTS_MAX == 2 && a.mode == JLAPP_MODE_STEP && a.step_kind == JLST_DRUM && !a.transport && a.n.track == 0);
+    CHECK(jlapp_on_lpx_acts(&a, &down, o, 1) == 0 && a.n.track == 0);   /* room for one act: nothing happens, as the owner saw */
+    CHECK(jlapp_on_lpx_acts(&a, &down, o, JLAPP_ACTS_MAX) == 2);
+    CHECK(o[0].kind == JLAPP_ACT_SELECT && o[0].track == 15 && o[1].kind == JLAPP_ACT_TRACK_ON && o[1].track == 15 && a.n.track == 15);
+    CHECK(jlapp_on_lpx_acts(&a, &up, o, JLAPP_ACTS_MAX) == 1 && o[0].kind == JLAPP_ACT_TRACK_OFF && o[0].track == 15);
+    CHECK(jlapp_on_lpx_acts(&a, &down, o, JLAPP_ACTS_MAX) == 1 && o[0].kind == JLAPP_ACT_TRACK_ON && o[0].track == 15);   /* the track it is on: only the sound */
+    jlapp_on_lpx_acts(&a, &up, o, JLAPP_ACTS_MAX);
+    jlapp_set_transport(&a, 1);                                      /* running: it only selects */
+    down = pad(0, 3, 127);
+    CHECK(jlapp_on_lpx_acts(&a, &down, o, JLAPP_ACTS_MAX) == 1 && o[0].kind == JLAPP_ACT_SELECT && o[0].track == 0 && a.n.track == 0);
+}
+
 static void test_the_start_stop_scene_button(void)
 {
     struct jlapp a = fresh();
@@ -1420,6 +1441,7 @@ int main(void)
     test_custom_enters_the_step_modes_and_cycles_them();
     test_a_tap_on_note_goes_back_to_note_mode_a_hold_does_not();
     test_up_and_down_are_the_octave_except_in_drum_step();
+    test_a_drum_pad_on_another_track_selects_and_plays_while_stopped();
     test_the_start_stop_scene_button();
     test_the_mode_buttons_light();
     test_a_step_press_in_the_app();

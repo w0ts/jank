@@ -24,6 +24,10 @@ struct jlapp_act {
     uint8_t step, op, len;
 };
 
+/* the most acts one pad event makes: a drum track pad on another track while the transport is stopped selects the track AND plays it. A caller that gives room for
+ * fewer drops such a press whole (nothing happens: owner 2026-11-24, "in drum step, i cannot change track when transport is stopped") */
+#define JLAPP_ACTS_MAX 2u
+
 /* a note the Digitone's sequencer played (its push), kept for the lights: both Note mode and the step modes flash what plays */
 struct jlapp_recent {
     uint32_t at_ms;

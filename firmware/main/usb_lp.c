@@ -502,10 +502,11 @@ void usb_lp_detach(enum jlapp_role r)
 static void rx_lpx(const uint8_t p[4])
 {
     uint8_t cin = p[0] & 0x0Fu;
-    struct jlapp_act act;
+    struct jlapp_act acts[JLAPP_ACTS_MAX];
     struct jlx_ev ev;
     const uint8_t msg[3] = {p[1], p[2], p[3]};
     int mode;
+    size_t made;
     if (jlx_programmer_ack(p, &mode)) {   /* its answer to the Programmer mode message, or to the mode query: the mode it is in now */
         g_hostdiag.lp_mode = (uint8_t)(mode ? 2 : 1);
         if (mode && s_programmer_pending) {   /* the setup messages, then the lights (usb_lp_pump) */
@@ -527,8 +528,9 @@ static void rx_lpx(const uint8_t p[4])
         return;
     g_hostdiag.pads++;
     jlapp_tick(&s_app, now_ms());
-    if (jlapp_on_lpx_acts(&s_app, &ev, &act, 1))
-        run_act(&act);
+    made = jlapp_on_lpx_acts(&s_app, &ev, acts, JLAPP_ACTS_MAX);
+    for (size_t i = 0; i < made; i++)
+        run_act(&acts[i]);
     deliver_messages();
 }
 
