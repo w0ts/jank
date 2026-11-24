@@ -27,6 +27,28 @@ flashing and pulsing follow it. First slice: **Note mode on stock MIDI**, nothin
   Digitone's list). LP95's two guitar / not-staggered layouts, the drum rack and quick scale are not there. Host-tested; **not
   verified on the Launchpad itself** (how the page looks and feels).
 
+## Independent of the Digitone's MIDI channels (live control)
+
+Owner, 2026-11-24: playing must not depend on how the Digitone's MIDI channels are set, and must not mix with the MIDI it receives otherwise. So the
+pads do not use a MIDI channel when the Digitone's **live control** answers (the SysEx channel of dn2-wishes, `docs/live-control.md` there, branches
+`claude/live-ctl2` and `claude/live-ctl4`; `core/jank_dn2live.[ch]` here; needs SETTINGS > SYSTEM > USB CONFIG > REMOTE CONTROL ON):
+
+- Jank asks for live control (LIVE ON, with the note push) as soon as both devices are up, keeps it (a request at least every 4 s; the lease is 10 s) and
+  asks again every second until it answers; if the Digitone says REMOTE CONTROL is off, or has no live control, it asks again every 5 s and the pads play by the
+  MIDI channel as before. `diag` shows it: `hostdiag_live=state:live,play:1,asked:..,replies:..,plays:..,selects:..,pushes:..,notes:..,dropped:..`.
+- **A pad plays by PLAY** (command 50, stage 4 of dn2-wishes, proposed here and accepted there; a Digitone without it answers status 2 and the pads
+  fall back to MIDI): `track, op, note, velocity`. A note on a pad that went down by PLAY ends by PLAY, one that went down by MIDI ends by MIDI, whatever
+  changed meanwhile. Lost requests are counted (`dropped:`) and never half sent.
+- **Left / right also choose the Digitone's active track** (TRACK, 49) and, for a second, the 16 bottom pads show which: row 1 tracks 1-8, row 2 tracks
+  9-16, the chosen one WHITE (3), the others LIGHT_BLUE_THIRD (39). When live control comes up the pads' current track is sent to the Digitone.
+- **Track pads (hold Note, pad 8 of the top row, GREEN when on):** the two bottom rows play the 16 tracks on each track's own default note (PLAY op 2, ended
+  with op 0 and note 255); the note layout moves up to the six rows left. The current track is BLUE (45), a track that sounds or is held GREEN (21), the rest
+  LIGHT_BLUE_THIRD. Without PLAY these pads do nothing (there is no way to say "that track's note" by MIDI).
+- **Lights come from the Digitone's own note push** while live: a note pad lights for the pitch the current track played, a track pad for its track, each
+  for 150 ms (the pushed note's length is not mapped yet, so it is a fixed time, not measured) and the MIDI the Digitone sends is not read for lights then.
+
+Not verified on hardware: all of it. TRACK and the push work with the installed stage-2 Digitone build; PLAY needs stage 4.
+
 ## What is not there yet
 
 The Digitone's own scale list (the scale page uses a starter list), Step, Mixer, Session, the song
@@ -83,6 +105,6 @@ separate.
 
 ## Files
 
-`core/jank_lpx.[ch]` (the Launchpad's protocol), `core/jank_lpnote.[ch]` (layouts), `core/jank_lpapp.[ch]` (what a press sends,
-what the pads show), `firmware/main/usb_lp.c` (the one state and the two devices), `firmware/main/usb_midi_host.c` (IN endpoints,
-interface choice). Host tests: `tests/test_lpx.c`, `test_lpnote.c`, `test_lpapp.c` (in `tests/run.sh`).
+`core/jank_lpx.[ch]` (the Launchpad's protocol), `core/jank_lpnote.[ch]` (layouts), `core/jank_lpapp.[ch]` (what a press asks for, as acts,
+what the pads show), `core/jank_dn2live.[ch]` and `core/jank_dn2rpc.[ch]` (the Digitone's live control: the requests, the answers, the note push), `firmware/main/usb_lp.c` (the one state and the two devices), `firmware/main/usb_midi_host.c` (IN endpoints,
+interface choice). Host tests: `tests/test_lpx.c`, `test_lpnote.c`, `test_lpapp.c`, `test_dn2live.c`, `test_dn2rpc.c` (in `tests/run.sh`).

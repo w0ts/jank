@@ -40,6 +40,27 @@ size_t jd2_unpack7(const uint8_t *in, size_t n, uint8_t *out)
     return o;
 }
 
+size_t jd2_request(uint16_t seq, uint8_t cmd, const uint8_t *args, size_t nargs, uint8_t *out, size_t cap)
+{
+    uint8_t body[3u + JD2_ARGS_MAX];
+    size_t n, blen = 3u + nargs;
+    if (nargs > JD2_ARGS_MAX || (nargs && !args))
+        return 0;
+    body[0] = (uint8_t)(seq >> 8);
+    body[1] = (uint8_t)seq;
+    body[2] = cmd;
+    if (nargs)
+        memcpy(body + 3, args, nargs);
+    n = sizeof HEADER + blen + (blen + 6u) / 7u + 1u;
+    if (cap < n)
+        return 0;
+    memcpy(out, HEADER, sizeof HEADER);
+    n = sizeof HEADER;
+    n += jd2_pack7(body, blen, out + n);
+    out[n++] = SX_END;
+    return n;
+}
+
 size_t jd2_peek_request(uint16_t seq, uint32_t address, uint8_t len, uint8_t *out, size_t cap)
 {
     const uint8_t body[8] = {

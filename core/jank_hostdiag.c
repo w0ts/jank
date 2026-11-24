@@ -103,6 +103,13 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
         d->dn2_up, (unsigned long)d->programmer_sent, (unsigned long)d->programmer_acked, (unsigned long)d->setup_sent,
         d->lp_mode == 2u ? "programmer" : d->lp_mode == 1u ? "live" : "unknown", d->lp_reentered, (unsigned long)d->lights_sent, (unsigned long)d->pads,
         (unsigned long)d->dn2_msgs);
+    {
+        static const char *const live[] = {"down", "asking", "live", "remote_off", "no_live"};
+        put(out, cap, &n, "hostdiag_live=state:%s,play:%u,asked:%lu,replies:%lu,plays:%lu,selects:%lu,pushes:%lu,notes:%lu,dropped:%lu\n",
+            d->live_state < sizeof live / sizeof live[0] ? live[d->live_state] : "?", d->live_play, (unsigned long)d->live_asked, (unsigned long)d->live_replies,
+            (unsigned long)d->live_plays, (unsigned long)d->live_selects, (unsigned long)d->live_pushes, (unsigned long)d->live_notes,
+            (unsigned long)d->live_dropped);
+    }
     put(out, cap, &n, "hostdiag_mem=heap:%u,heap_min:%u,largest:%lu,client_stack_free:%u\n", d->heap_kb, d->heap_min_kb, (unsigned long)d->heap_big_b,
         d->client_stack_free);
     for (unsigned i = 0; i < JHD_DEVS; i++) {

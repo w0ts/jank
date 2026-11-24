@@ -124,6 +124,15 @@ static void test_full_record(void)
     d.lp_reentered = 1;
     d.pads = 7;
     d.dn2_msgs = 9;
+    d.live_state = 2;
+    d.live_play = 1;
+    d.live_asked = 12;
+    d.live_replies = 11;
+    d.live_plays = 5;
+    d.live_selects = 3;
+    d.live_pushes = 4;
+    d.live_notes = 6;
+    d.live_dropped = 1;
     d.dev[1].used = 1;
     strcpy(d.dev[1].name, "Launchpad X");
     d.dev[1].vid = 0x1235;
@@ -155,6 +164,11 @@ static void test_full_record(void)
     CHECK(strstr(out, "hostdiag_filter=hub:1,skipped:2,last:25A4:9311,learned:14CD:1212+25A4:9311\n"));   /* what the enumeration rule left alone, and its list */
     CHECK(strstr(out, "hostdiag_events=new:3,gone:1,add:3\n"));
     CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:2,acked:1,setup:2,mode:live,reentered:1,lights:243,pads:7,dn2msgs:9\n"));
+    CHECK(strstr(out, "hostdiag_live=state:live,play:1,asked:12,replies:11,plays:5,selects:3,pushes:4,notes:6,dropped:1\n"));
+    d.live_state = 9;                  /* a state number from a newer build prints as ?, not past the list */
+    jhd_format(&d, out, sizeof out);
+    CHECK(strstr(out, "hostdiag_live=state:?,"));
+    d.live_state = 2;
     CHECK(strstr(out, "hostdiag_dev1=Launchpad X,1235:0103,role:lpx,ifs:2,use:1,out:0x02,in:0x82,mps:64/512,eps:2,clamp:2,claim:0,where:3,in_pkts:42,in_err:2,in_status:4,out_done:100,out_fail:1,last:09 90 0B 7F\n"));
     CHECK(!strstr(out, "hostdiag_dev0"));
 }

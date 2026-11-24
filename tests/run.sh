@@ -88,6 +88,8 @@ fi
 "$OUT/test_lpout"
 "$CC" $FLAGS "$HERE/tests/test_dn2rpc.c" "$HERE/core/jank_dn2rpc.c" -o "$OUT/test_dn2rpc"
 "$OUT/test_dn2rpc"
+"$CC" $FLAGS "$HERE/tests/test_dn2live.c" "$HERE/core/jank_dn2live.c" "$HERE/core/jank_dn2rpc.c" -o "$OUT/test_dn2live"
+"$OUT/test_dn2live"
 "$CC" $FLAGS "$HERE/tests/test_fsclamp.c" "$HERE/core/jank_fsclamp.c" -o "$OUT/test_fsclamp"
 "$OUT/test_fsclamp"
 "$CC" $FLAGS "$HERE/tests/test_hostfilter.c" "$HERE/core/jank_hostfilter.c" -o "$OUT/test_hostfilter"

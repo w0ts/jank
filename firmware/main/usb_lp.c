@@ -13,6 +13,8 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "jank_dn2live.h"
+#include "jank_dn2rpc.h"
 #include "jank_lpapp.h"
 #include "jank_lpout.h"
 #include "jank_lpscales.h"
@@ -47,9 +49,17 @@
 
 static const char *TAG = "usb lp";
 
+#define LIVE_WAKE_MS 100               /* the client task wakes at least this often once the Launchpad is going: pushed notes' lights end after 150 ms, and the
+                                          overlay after a second, and nothing else would wake the task to draw it (a clock transfer might, not always) */
+#define REQUEST_MAX 48u               /* a live-control request is at most 6 + 7 + 1 + 1 bytes before its SysEx end: far under this */
+#define REQUEST_PACKETS 16u            /* ... as USB-MIDI packets */
+
 static struct jlapp s_app;
 static struct jlx_frame s_shown;
 static struct jlo s_out;               /* for the Digitone */
+static struct jdl s_jdl;               /* the Digitone's live control: pads play and select the track by SysEx, not by MIDI channel (core/jank_dn2live.h) */
+static struct jd2_sx s_sx;             /* the Digitone's SysEx, put together from its packets */
+static uint8_t s_was_live;             /* live control was on at the last pump: a change to on sends the current track */
 static uint8_t s_ready, s_lpx_up, s_dn2_up, s_programmer_pending;   /* pending: the Launchpad has not answered the Programmer mode message yet */
 static uint8_t s_tries;                /* Programmer mode messages sent to this Launchpad */
 static uint8_t s_setup_pending;        /* it is in Programmer mode: the LED-feedback and sleep-off messages (jlx_setup) are still to go, before any light */
@@ -63,8 +73,12 @@ static void ensure_init(void)
         return;
     jlapp_init(&s_app, jls_get(JLS_MAJOR), DN2_CABLE);   /* the starter list's major scale; the scale page (hold Note) changes it */
     jlo_init(&s_out);
+    jdl_init(&s_jdl);
+    jd2_sx_init(&s_sx);
     s_ready = 1;
 }
+
+static uint32_t now_ms(void) { return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS); }
 
 /* the waiting packets go out as far as the Digitone's queue has room (beyond the clock's reserve) */
 static void dn2_drain(void)
@@ -89,6 +103,99 @@ static void dn2_send(const uint8_t *packets, size_t bytes)
     dn2_drain();
 }
 
+/* a live-control request (a whole SysEx) for the Digitone, all of it or none: a cut SysEx would leave its parser waiting for an end. g_hostdiag.live_dropped counts
+ * the ones that found no room */
+static void dn2_send_sysex(const uint8_t *sx, size_t n)
+{
+    uint8_t pk[4 * REQUEST_PACKETS];
+    size_t bytes;
+    if (!s_dn2_up || !n)
+        return;
+    bytes = jd2_sysex_to_packets(DN2_CABLE, sx, n, pk, sizeof pk);
+    if (!bytes || bytes / 4u > JLO_PACKETS - jlo_count(&s_out)) {
+        g_hostdiag.live_dropped++;
+        return;
+    }
+    g_hostdiag.live_asked++;
+    dn2_send(pk, bytes);
+}
+
+/* what a pad press or a button asks of the Digitone: by live control when the pad went that way (jlapp_act), else as a MIDI packet on the track's channel */
+static void run_act(const struct jlapp_act *act)
+{
+    uint8_t sx[REQUEST_MAX], pkt[4];
+    size_t n = 0;
+    uint32_t t = now_ms();
+    switch (act->kind) {
+    case JLAPP_ACT_NOTE_ON:
+    case JLAPP_ACT_NOTE_OFF:
+        if (!act->live) {
+            if (jlapp_act_midi(&s_app, act, pkt))
+                dn2_send(pkt, 4);
+            return;
+        }
+        n = act->kind == JLAPP_ACT_NOTE_ON ? jdl_play(&s_jdl, t, act->track, JDL_PLAY_ON, act->note, act->vel, sx, sizeof sx)
+                                           : jdl_play(&s_jdl, t, act->track, JDL_PLAY_OFF, act->note, 0, sx, sizeof sx);
+        g_hostdiag.live_plays += n != 0;
+        break;
+    case JLAPP_ACT_TRACK_ON:           /* the track's own default note */
+        n = jdl_play(&s_jdl, t, act->track, JDL_PLAY_DEFAULT, 0, 0, sx, sizeof sx);
+        g_hostdiag.live_plays += n != 0;
+        break;
+    case JLAPP_ACT_TRACK_OFF:          /* note 255: the track's own default note again */
+        n = jdl_play(&s_jdl, t, act->track, JDL_PLAY_OFF, 255, 0, sx, sizeof sx);
+        g_hostdiag.live_plays += n != 0;
+        break;
+    case JLAPP_ACT_SELECT:
+        n = jdl_track(&s_jdl, t, act->track, sx, sizeof sx);
+        g_hostdiag.live_selects += n != 0;
+        break;
+    default:
+        return;
+    }
+    dn2_send_sysex(sx, n);
+}
+
+/* a whole SysEx from the Digitone: an answer to a live-control request (moves its state), or the push of the notes it is playing (lights) */
+static void dn2_sysex(void)
+{
+    static struct jdl_note notes[JDL_NOTES_MAX];
+    size_t count;
+    enum jdl_in k = jdl_input(&s_jdl, s_sx.buf, s_sx.n, notes, &count);
+    if (k == JDL_IN_REPLY) {
+        g_hostdiag.live_replies++;
+    } else if (k == JDL_IN_PUSH) {
+        g_hostdiag.live_pushes++;
+        g_hostdiag.live_notes += (uint32_t)count;
+        jlapp_tick(&s_app, now_ms());
+        jlapp_on_push(&s_app, notes, count);
+    }
+    g_hostdiag.live_state = s_jdl.state;
+    g_hostdiag.live_play = s_jdl.play_ok;
+    jlapp_set_live(&s_app, jdl_is_live(&s_jdl), jdl_can_play(&s_jdl));
+}
+
+/* live control is asked for, and kept up, while there is a Digitone and a Launchpad; once it answers, the Digitone's active track is made the one the pads are on */
+static void live_pump(void)
+{
+    uint8_t sx[REQUEST_MAX];
+    size_t n;
+    int live;
+    if (!s_dn2_up || !s_lpx_up)
+        return;
+    dn2_send_sysex(sx, jdl_poll(&s_jdl, now_ms(), sx, sizeof sx));
+    live = jdl_is_live(&s_jdl);
+    g_hostdiag.live_state = s_jdl.state;
+    g_hostdiag.live_play = s_jdl.play_ok;
+    jlapp_set_live(&s_app, live, jdl_can_play(&s_jdl));
+    if (live && !s_was_live) {
+        n = jdl_track(&s_jdl, now_ms(), s_app.n.track, sx, sizeof sx);
+        g_hostdiag.live_selects += n != 0;
+        dn2_send_sysex(sx, n);
+    }
+    s_was_live = (uint8_t)live;
+}
+
 void usb_lp_attach(enum jlapp_role r)
 {
     ensure_init();
@@ -97,6 +204,8 @@ void usb_lp_attach(enum jlapp_role r)
         g_hostdiag.lpx_up = 1;
         s_programmer_pending = 1;      /* sent by usb_lp_pump, after a wait and when its queue has room */
         s_setup_pending = 0;
+        jdl_init(&s_jdl);              /* live control is only kept up while there is a Launchpad: ask afresh */
+        s_was_live = 0;
         s_tries = 0;
         s_try_at = xTaskGetTickCount() + pdMS_TO_TICKS(ATTACH_WAIT_MS);
         ESP_LOGI(TAG, "Launchpad X");
@@ -104,6 +213,8 @@ void usb_lp_attach(enum jlapp_role r)
         s_dn2_up = 1;
         g_hostdiag.dn2_up = 1;
         jlo_clear(&s_out);
+        jdl_init(&s_jdl);              /* live control is asked for afresh (usb_lp_pump) */
+        jd2_sx_init(&s_sx);
         ESP_LOGI(TAG, "Digitone");
     }
 }
@@ -112,24 +223,32 @@ void usb_lp_detach(enum jlapp_role r)
 {
     ensure_init();
     if (r == JLAPP_LPX) {
-        uint8_t off[4 * JLAPP_PADS];
+        struct jlapp_act off[JLAPP_PADS + JLN_TRACKS];
         s_lpx_up = 0;
         g_hostdiag.lpx_up = 0;
         s_programmer_pending = 0;
         s_setup_pending = 0;
         /* its pads that were down end their notes: nothing stays sounding on the Digitone */
-        dn2_send(off, 4u * jlapp_release_all(&s_app, off, JLAPP_PADS));
+        for (size_t i = 0, n = jlapp_release_acts(&s_app, off, JLAPP_PADS + JLN_TRACKS); i < n; i++)
+            run_act(&off[i]);
     } else if (r == JLAPP_DN2) {
         s_dn2_up = 0;
         g_hostdiag.dn2_up = 0;
         jlo_clear(&s_out);
+        jdl_init(&s_jdl);
+        jlapp_set_live(&s_app, 0, 0);
+        g_hostdiag.live_state = JDL_DOWN;
+        s_was_live = 0;
         memset(s_app.playing, 0, sizeof s_app.playing);
+        memset(s_app.recent, 0, sizeof s_app.recent);
+        s_app.track_held = 0;
     }
 }
 
 static void rx_lpx(const uint8_t p[4])
 {
-    uint8_t cin = p[0] & 0x0Fu, out[4];
+    uint8_t cin = p[0] & 0x0Fu;
+    struct jlapp_act act;
     struct jlx_ev ev;
     const uint8_t msg[3] = {p[1], p[2], p[3]};
     int mode;
@@ -153,8 +272,9 @@ static void rx_lpx(const uint8_t p[4])
     if (!jlx_decode(msg, &ev))
         return;
     g_hostdiag.pads++;
-    if (jlapp_on_lpx(&s_app, &ev, out, 1))
-        dn2_send(out, 4);
+    jlapp_tick(&s_app, now_ms());
+    if (jlapp_on_lpx_acts(&s_app, &ev, &act, 1))
+        run_act(&act);
 }
 
 void usb_lp_rx(enum jlapp_role r, const uint8_t *packets, size_t n)
@@ -165,6 +285,8 @@ void usb_lp_rx(enum jlapp_role r, const uint8_t *packets, size_t n)
             rx_lpx(packets + i);
         else if (r == JLAPP_DN2) {
             g_hostdiag.dn2_msgs++;
+            if (jd2_sx_feed(&s_sx, packets + i))
+                dn2_sysex();
             jlapp_on_dn2(&s_app, packets + i);
         }
     }
@@ -175,9 +297,11 @@ void usb_lp_pump(void)
     struct jlx_frame want;
     uint8_t out[4 * BATCH];
     size_t room, n;
+    live_pump();
     dn2_drain();
     if (!s_lpx_up)
         return;
+    jlapp_tick(&s_app, now_ms());      /* the track overlay and the pushed notes' lights run out with it */
     room = usb_midi_host_room(JLAPP_LPX);
     if (s_programmer_pending) {        /* the whole message or none of it: a cut SysEx would leave the Launchpad in Live mode */
         if ((int32_t)(xTaskGetTickCount() - s_try_at) < 0 || room < SYSEX_PACKETS)
@@ -239,5 +363,7 @@ uint32_t usb_lp_wait_ticks(void)
     if (left > 0)
         return (uint32_t)left;
     left = (int32_t)(s_refresh_at - xTaskGetTickCount());   /* settled: until the next refresh (the clock's transfers wake the task far oftener) */
+    if (left > (int32_t)pdMS_TO_TICKS(LIVE_WAKE_MS))        /* ... but live control is asked every second, and the lights fade by the clock */
+        left = (int32_t)pdMS_TO_TICKS(LIVE_WAKE_MS);
     return left > 0 ? (uint32_t)left : 1u;
 }

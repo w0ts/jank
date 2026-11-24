@@ -12,8 +12,8 @@
 
 #define JHD_DEVS 4u                    /* as many as usb_midi_host.c has slots */
 #define JHD_NAME_MAX 23u               /* as JK_USB_NAME_MAX */
-#define JHD_VERSION 10u             /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
-                                          10: setup_sent; 9: lp_mode, lp_reentered; 8: lights_sent; 7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
+#define JHD_VERSION 11u             /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
+                                          11: the live_ fields; 10: setup_sent; 9: lp_mode, lp_reentered; 8: lights_sent; 7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
                                           so the size check does not catch it: bump this with every change to struct jhd or jhd_dev) */
 
 /* the steps of a host start, in order, for the one that failed (jhd_format_failure) */
@@ -77,6 +77,15 @@ struct jhd {
     uint8_t lp_reentered;              /* times it was found in Live mode after it had been put in Programmer mode (capped at 255) */
     uint32_t pads;                     /* Launchpad pad / button events decoded */
     uint32_t dn2_msgs;                 /* packets from the Digitone */
+    uint8_t live_state;                /* the Digitone's live control (jank_dn2live.h enum jdl_state): 0 down, 1 asking, 2 live, 3 REMOTE CONTROL off, 4 no live control */
+    uint8_t live_play;                 /* PLAY has not been refused: 1 until the Digitone answers 2 to one */
+    uint32_t live_asked;               /* live-control requests sent (LIVE ON / STATUS, track select, PLAY) */
+    uint32_t live_replies;             /* replies to them */
+    uint32_t live_plays;               /* PLAY requests sent */
+    uint32_t live_selects;             /* track selects sent */
+    uint32_t live_pushes;              /* note pushes received */
+    uint32_t live_notes;               /* notes in them */
+    uint32_t live_dropped;             /* requests that found no room in the Digitone's packet FIFO, and were not sent */
     uint32_t heap_big_b;               /* the largest free block of byte-addressable internal RAM, bytes: what a task stack or a DMA buffer needs in one piece */
     uint16_t heap_kb;                  /* internal heap free now (task stacks and USB buffers come from it), KB */
     uint16_t heap_min_kb;              /* its lowest since the start */

@@ -171,8 +171,27 @@ static void test_reassemble_overflow(void)
     CHECK(jd2_sx_feed(&s, fin) && s.n == 4);
 }
 
+/* a request of any command: the same frame a PEEK is (jd2_request with the PEEK's arguments gives the PEEK's bytes), the body unpacks back to seq, cmd, args */
+static void test_generic_request(void)
+{
+    uint8_t out[64], peek[64], body[32];
+    const uint8_t args[5] = {0x42, 0x43, 0x2a, 0x61, 4};
+    size_t n = jd2_request(0x0102, JD2_CMD_PEEK, args, sizeof args, out, sizeof out), m = jd2_peek_request(0x0102, 0x42432a61u, 4, peek, sizeof peek);
+    CHECK(n == m && !memcmp(out, peek, n));
+    n = jd2_request(0x0A0B, 49, (const uint8_t[]){7}, 1, out, sizeof out);
+    CHECK(n > 8 && out[0] == 0xF0 && out[n - 1] == 0xF7 && !memcmp(out, "\xF0\x00\x20\x3C\x7D\x01", 6));
+    m = jd2_unpack7(out + 6, n - 7, body);
+    CHECK(m == 4 && body[0] == 0x0A && body[1] == 0x0B && body[2] == 49 && body[3] == 7);        /* u16 seq, u8 cmd, the argument */
+    n = jd2_request(1, 44, NULL, 0, out, sizeof out);                                                /* no arguments */
+    CHECK(n > 0 && jd2_unpack7(out + 6, n - 7, body) == 3 && body[2] == 44);
+    CHECK(jd2_request(1, 44, NULL, 3, out, sizeof out) == 0);                                        /* arguments promised, none given */
+    CHECK(jd2_request(1, 44, args, JD2_ARGS_MAX + 1u, out, sizeof out) == 0);                        /* too many */
+    CHECK(jd2_request(1, 44, args, 5, out, 8) == 0);                                                 /* does not fit */
+}
+
 int main(void)
 {
+    test_generic_request();
     test_pack7_golden_and_round_trip();
     test_peek_request_golden();
     test_parse_reply_golden();

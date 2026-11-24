@@ -25,6 +25,10 @@ size_t jd2_pack7(const uint8_t *in, size_t n, uint8_t *out);
 /* the reverse (a partial last group is allowed); out holds at most n bytes; returns the count */
 size_t jd2_unpack7(const uint8_t *in, size_t n, uint8_t *out);
 
+/* any request, F0 .. F7: `cmd` with nargs bytes of arguments (at most JD2_ARGS_MAX), into out (cap bytes); returns its length, 0 if it does not fit */
+#define JD2_ARGS_MAX 16u
+size_t jd2_request(uint16_t seq, uint8_t cmd, const uint8_t *args, size_t nargs, uint8_t *out, size_t cap);
+
 /* a PEEK request, F0 .. F7, into out (cap bytes); returns its length, 0 if len is not 1..JD2_PEEK_MAX or it does not fit */
 size_t jd2_peek_request(uint16_t seq, uint32_t address, uint8_t len, uint8_t *out, size_t cap);
 
