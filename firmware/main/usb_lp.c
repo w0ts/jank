@@ -126,13 +126,20 @@ static void rx_lpx(const uint8_t p[4])
     struct jlx_ev ev;
     const uint8_t msg[3] = {p[1], p[2], p[3]};
     int mode;
-    if (jlx_programmer_ack(p, &mode)) {   /* its answer to the Programmer mode message: now the lights can follow */
-        if (mode && s_programmer_pending) {
+    if (jlx_programmer_ack(p, &mode)) {   /* its answer to the Programmer mode message, or to the mode query: the mode it is in now */
+        g_hostdiag.lp_mode = (uint8_t)(mode ? 2 : 1);
+        if (mode && s_programmer_pending) {   /* now the lights can follow */
             s_programmer_pending = 0;
             g_hostdiag.programmer_acked++;
             jlx_forget(&s_shown);      /* a Launchpad that just entered the mode shows nothing we know of */
             s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
             s_refresh_at = s_settle_at + pdMS_TO_TICKS(REFRESH_MS);
+        } else if (!mode && !s_programmer_pending) {   /* it is in Live mode (it took no lights there): enter Programmer mode again */
+            if (g_hostdiag.lp_reentered < UINT8_MAX)
+                g_hostdiag.lp_reentered++;
+            s_programmer_pending = 1;
+            s_tries = 0;
+            s_try_at = xTaskGetTickCount();
         }
         return;
     }
@@ -184,9 +191,13 @@ void usb_lp_pump(void)
     }
     if ((int32_t)(xTaskGetTickCount() - s_settle_at) < 0 || room <= RESERVE)
         return;
-    if ((int32_t)(xTaskGetTickCount() - s_refresh_at) >= 0) {   /* all the lights again, in case one was lost */
+    if ((int32_t)(xTaskGetTickCount() - s_refresh_at) >= 0) {   /* all the lights again, in case one was lost; and which mode is it in? (a Launchpad in Live mode takes no lights) */
         jlx_forget(&s_shown);
         s_refresh_at = xTaskGetTickCount() + pdMS_TO_TICKS(REFRESH_MS);
+        if (room >= SYSEX_PACKETS + RESERVE) {      /* the whole query, and the clock's reserve left: else it waits for the next refresh */
+            usb_midi_host_send_to(JLAPP_LPX, out, jlx_mode_query(LPX_CABLE, out));
+            return;                    /* the lights follow on the next pass: the queue has 3 packets fewer room now */
+        }
     }
     jlapp_frame(&s_app, &want);
     n = jlx_diff(LPX_CABLE, &s_shown, &want, out, room - RESERVE < BATCH ? room - RESERVE : BATCH);

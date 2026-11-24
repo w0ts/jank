@@ -119,6 +119,8 @@ static void test_full_record(void)
     d.programmer_sent = 2;
     d.programmer_acked = 1;
     d.lights_sent = 243;
+    d.lp_mode = 1;                     /* found in Live mode once, put back in Programmer mode */
+    d.lp_reentered = 1;
     d.pads = 7;
     d.dn2_msgs = 9;
     d.dev[1].used = 1;
@@ -151,7 +153,7 @@ static void test_full_record(void)
     CHECK(strstr(out, "hostdiag_port=hprt:0x00021401,conn:1,ena:0,lnsts:1,pwr:1,spd:1\n"));   /* the root port's register, decoded */
     CHECK(strstr(out, "hostdiag_filter=hub:1,skipped:2,last:25A4:9311,learned:14CD:1212+25A4:9311\n"));   /* what the enumeration rule left alone, and its list */
     CHECK(strstr(out, "hostdiag_events=new:3,gone:1,add:3\n"));
-    CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:2,acked:1,lights:243,pads:7,dn2msgs:9\n"));
+    CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:2,acked:1,mode:live,reentered:1,lights:243,pads:7,dn2msgs:9\n"));
     CHECK(strstr(out, "hostdiag_dev1=Launchpad X,1235:0103,role:lpx,ifs:2,use:1,out:0x02,in:0x82,mps:64/512,eps:2,clamp:2,claim:0,where:3,in_pkts:42,in_err:2,in_status:4,out_done:100,out_fail:1,last:09 90 0B 7F\n"));
     CHECK(!strstr(out, "hostdiag_dev0"));
 }

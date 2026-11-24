@@ -62,6 +62,18 @@ size_t jlx_programmer(uint8_t cable, int on, uint8_t *out)
     return sizeof p;
 }
 
+size_t jlx_mode_query(uint8_t cable, uint8_t *out)
+{
+    const uint8_t hi = (uint8_t)(cable << 4);
+    const uint8_t p[12] = {
+        (uint8_t)(hi | CIN_SYSEX_CONT), 0xF0, 0x00, 0x20,
+        (uint8_t)(hi | CIN_SYSEX_CONT), 0x29, 0x02, 0x0C,
+        (uint8_t)(hi | 0x6u), 0x0E, 0xF7, 0x00,                /* CIN 6: a SysEx that ends with two bytes */
+    };
+    memcpy(out, p, sizeof p);
+    return sizeof p;
+}
+
 int jlx_programmer_ack(const uint8_t pkt[4], int *mode)
 {
     if ((pkt[0] & 0x0Fu) != CIN_SYSEX_END3 || pkt[1] != 0x0E || pkt[2] > 1u || pkt[3] != 0xF7)

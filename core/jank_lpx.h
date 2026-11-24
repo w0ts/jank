@@ -37,6 +37,10 @@ uint8_t jlx_number(uint32_t i);
 /* the SysEx "Programmer mode" (on) or "Live mode" (off), 3 packets = 12 bytes, on cable `cable` */
 size_t jlx_programmer(uint8_t cable, int on, uint8_t *out);
 
+/* The SysEx that asks which mode the Launchpad is in (`F0 00 20 29 02 0C 0E F7`): 3 packets = 12 bytes on cable `cable`. It answers with `0E mode F7`, the
+ * packet jlx_programmer_ack reads (1: Programmer, 0: Live). A Launchpad that is in Live mode takes no lights on this port. */
+size_t jlx_mode_query(uint8_t cable, uint8_t *out);
+
 /* The Launchpad X answers a Programmer / Live mode message with the same message (measured 2026-11-24 over Wi-Fi diag: three packets in
  * after the unit's SysEx, the last one 07 0E 01 F7). 1: pkt is that last packet, `0E mode F7` ending a SysEx (cable ignored); *mode is 1 for
  * Programmer, 0 for Live. The unit waits for it before it sends lights, and sends the message again when it does not come. */

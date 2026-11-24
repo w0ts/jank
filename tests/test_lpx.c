@@ -229,8 +229,17 @@ static void test_programmer_ack(void)
     CHECK(jlx_programmer(0, 1, sent) == 12 && jlx_programmer_ack(sent + 8, &mode) && mode == 1);   /* our own message ends the way its answer does */
 }
 
+static void test_mode_query(void)
+{
+    uint8_t out[12];
+    static const uint8_t want[12] = {0x04, 0xF0, 0x00, 0x20, 0x04, 0x29, 0x02, 0x0C, 0x06, 0x0E, 0xF7, 0x00};   /* F0 00 20 29 02 0C 0E F7 */
+    CHECK(jlx_mode_query(0, out) == 12 && !memcmp(out, want, 12));
+    CHECK(jlx_mode_query(2, out) == 12 && out[0] == 0x24 && out[4] == 0x24 && out[8] == 0x26);   /* the cable in the high nibble */
+}
+
 int main(void)
 {
+    test_mode_query();
     test_programmer_ack();
     test_decode_pads();
     test_decode_not_pads();
