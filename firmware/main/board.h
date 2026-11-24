@@ -37,6 +37,8 @@ struct board {
     int8_t host_en_gpio, vbus_sense_gpio, line_detect_gpio, pump_gpio;
     int8_t usbport_tusb320, usbport_mini3;   /* the USB port HAL: usbport_tusb320.c / usbport_mini3.c, or none */
     int8_t bridge_slots_psram;            /* bridge.c's frame slots in PSRAM (internal DRAM is short) */
+    int8_t host_audio;                    /* USB host mode runs the audio client (usb_uac_host.c: two tasks, 7 KB of stack) and the beat tracker; 0: neither
+                                             (the XIAO: its internal RAM is needed for the host library's pipes, measured 2026-11-24: claim 257) */
     int8_t has_linein, linein_gpio, linesense_gpio;
     int8_t cell_gpio, cell_div;           /* the cell's divider: its volts / the pin's */
     int16_t cell_empty_mv;
@@ -87,6 +89,7 @@ const char *board_how(void);
 #define BOARD_USBPORT_TUSB320 (g_board->usbport_tusb320)
 #define BOARD_USBPORT_MINI3 (g_board->usbport_mini3)
 #define BOARD_BRIDGE_SLOTS_PSRAM (g_board->bridge_slots_psram)
+#define BOARD_HOST_AUDIO (g_board->host_audio)
 #define BOARD_HAS_LINEIN (g_board->has_linein)
 #define BOARD_LINEIN_GPIO (g_board->linein_gpio)
 #define BOARD_LINESENSE_GPIO (g_board->linesense_gpio)

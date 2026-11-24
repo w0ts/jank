@@ -12,7 +12,9 @@
 
 #define JHD_DEVS 4u                    /* as many as usb_midi_host.c has slots */
 #define JHD_NAME_MAX 23u               /* as JK_USB_NAME_MAX */
-#define JHD_VERSION 5u                 /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter) */
+#define JHD_VERSION 6u                 /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
+                                          6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
+                                          so the size check does not catch it: bump this with every change to struct jhd or jhd_dev) */
 
 /* the steps of a host start, in order, for the one that failed (jhd_format_failure) */
 enum jhd_step {
@@ -70,6 +72,7 @@ struct jhd {
     uint32_t programmer_sent;          /* Programmer mode messages put in the Launchpad's queue */
     uint32_t pads;                     /* Launchpad pad / button events decoded */
     uint32_t dn2_msgs;                 /* packets from the Digitone */
+    uint32_t heap_big_b;               /* the largest free block of byte-addressable internal RAM, bytes: what a task stack or a DMA buffer needs in one piece */
     uint16_t heap_kb;                  /* internal heap free now (task stacks and USB buffers come from it), KB */
     uint16_t heap_min_kb;              /* its lowest since the start */
     uint16_t client_stack_free;        /* the MIDI client task's stack never used (high-water mark), bytes */

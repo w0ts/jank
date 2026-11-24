@@ -39,6 +39,7 @@ static void sample_mem(struct jhd *d)
 {
     d->heap_kb = (uint16_t)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024u);
     d->heap_min_kb = (uint16_t)(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024u);
+    d->heap_big_b = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     d->client_stack_free = usb_midi_host_stack_free();
     if (usb_hostlib_up()) {            /* the library's own count: a hub that enumerated counts, whether or not a client opened anything */
         usb_host_lib_info_t li;
@@ -68,14 +69,18 @@ static void save_task(void *arg)
     (void)arg;
     for (;;) {
         uint16_t heap_now;
+        uint32_t big_now;
         vTaskDelay(pdMS_TO_TICKS(EVERY_MS));
         sample_mem(&g_hostdiag);
         memcpy(&snap, &g_hostdiag, sizeof snap);
         heap_now = snap.heap_kb;
+        big_now = snap.heap_big_b;
         snap.heap_kb = saved.heap_kb;  /* the free heap moves all the time: it alone is not a change worth a flash write */
+        snap.heap_big_b = saved.heap_big_b;
         if (have_saved && !memcmp(&snap, &saved, sizeof snap))
             continue;
         snap.heap_kb = heap_now;
+        snap.heap_big_b = big_now;
         if (bridge_is_playing())
             continue;
         if (have_saved && xTaskGetTickCount() - last < pdMS_TO_TICKS(MIN_GAP_MS))

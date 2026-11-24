@@ -36,6 +36,8 @@ static DRAM_ATTR const struct board XIAO = {
     .usbport_tusb320 = 0, .usbport_mini3 = 0,
     .bridge_slots_psram = 1,              /* (2026-11-22: with both boards' drivers in one image the 30 KB no longer fit in
                                              internal RAM: ui_start failed with ESP_ERR_NO_MEM, measured with `diag`) */
+    .host_audio = 0,                      /* host mode: no audio client, no beat tracker: the Digitone and the Launchpad together need the RAM
+                                             (the second one's claim failed with ESP_ERR_NO_MEM, 2026-11-24); the tracker did not run there anyway */
 #if CONFIG_JANK_LINEIN_BENCH
     .has_linein = 1, .linein_gpio = 4,
 #else
@@ -65,7 +67,7 @@ static DRAM_ATTR const struct board LCD2 = {
     .lcd = 1, .lcd_mosi_gpio = 38, .lcd_sclk_gpio = 39, .lcd_cs_gpio = 45, .lcd_dc_gpio = 42, .lcd_rst_gpio = -1, .lcd_bl_gpio = 1,
     .cc_scl_gpio = -1, .cc_sda_gpio = -1, .cc_int_gpio = -1,
     .host_en_gpio = 17, .vbus_sense_gpio = 10, .line_detect_gpio = 18, .pump_gpio = -1,
-    .usbport_tusb320 = 0, .usbport_mini3 = 1, .bridge_slots_psram = 1,
+    .usbport_tusb320 = 0, .usbport_mini3 = 1, .bridge_slots_psram = 1, .host_audio = 1,
     .has_linein = 1, .linein_gpio = 7, .linesense_gpio = 8,
     .cell_gpio = 5, .cell_div = 3, .cell_empty_mv = 3300,
 };
@@ -89,7 +91,7 @@ static DRAM_ATTR const struct board MINI22 = {
     .lcd = 0, .lcd_mosi_gpio = -1, .lcd_sclk_gpio = -1, .lcd_cs_gpio = -1, .lcd_dc_gpio = -1, .lcd_rst_gpio = -1, .lcd_bl_gpio = -1,
     .cc_scl_gpio = 11, .cc_sda_gpio = 12, .cc_int_gpio = 39,
     .host_en_gpio = 42, .vbus_sense_gpio = 38, .line_detect_gpio = 16, .pump_gpio = -1,
-    .usbport_tusb320 = 1, .usbport_mini3 = 0, .bridge_slots_psram = 0,
+    .usbport_tusb320 = 1, .usbport_mini3 = 0, .bridge_slots_psram = 0, .host_audio = 1,
     .has_linein = 1, .linein_gpio = 9, .linesense_gpio = -1,
     .cell_gpio = 4, .cell_div = 2, .cell_empty_mv = 3300,
 };

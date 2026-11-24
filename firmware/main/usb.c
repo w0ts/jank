@@ -294,7 +294,7 @@ esp_err_t usb_start(const uint8_t mac[6], usb_frame_fn rx, usb_free_fn tx_done, 
             step = JHD_STEP_MIDI_TASK;
         }
         if (e == ESP_OK) {
-            esp_err_t a = usb_uac_host_start();
+            esp_err_t a = BOARD_HOST_AUDIO ? usb_uac_host_start() : ESP_OK;   /* (not on the XIAO: the RAM is the host library's, board.c) */
             if (a != ESP_OK)            /* the clock goes on without the audio */
                 ESP_LOGE(TAG, "host audio: %s", esp_err_to_name(a));
             s_stage = JHD_STEP_ROLE;

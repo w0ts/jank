@@ -35,6 +35,7 @@
 #include <string.h>
 #include "app.h"
 #include "beat_weights.h"
+#include "board.h"
 #include "esp_cpu.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -1201,7 +1202,7 @@ esp_err_t beat_start(void)
      * The block must also leave room for what starts after the bridge: the UI task's 6 KB stack (ui_start, main.c). Measured on the XIAO
      * (2026-11-23, image 19e45af8): a 20480-byte block passed a "16 KB + 1 KB" test, the tracker took 16 KB of it, and ui_start then failed
      * with ESP_ERR_NO_MEM (main:166). Hence BEAT_HOST_HEADROOM, not 1 KB. */
-    if (usb_is_host() && heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) < BEAT_STACK + BEAT_HOST_HEADROOM) {
+    if (usb_is_host() && (!BOARD_HOST_AUDIO || heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) < BEAT_STACK + BEAT_HOST_HEADROOM)) {
         ESP_LOGW(TAG, "USB host mode and no room for the tracker's %u-byte stack and the UI's after it: no beat follow", (unsigned)BEAT_STACK);
         return ESP_OK;
     }
