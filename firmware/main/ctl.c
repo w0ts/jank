@@ -304,6 +304,7 @@ static void ctl_task(void *arg)
         ++s_beats;
         app_cfg_flush(0);                      /* a change made while playing: saved once stopped */
         net_serve();                           /* a Wi-Fi request (read-only lines), within a tick */
+        wota_serve();                          /* a signed Wi-Fi update frame (core/jank_wota.h), if a key is set */
         n = xMessageBufferReceive(s_in, chunk, sizeof chunk, pdMS_TO_TICKS(CTL_TICK_MS));
         if (!n) {
             ota_idle();

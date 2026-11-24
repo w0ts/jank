@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "jank_ota.h"
+#include "jank_wota.h"
 
 #define VALID_POLL_MS 200
 #define VALID_MIN_UP_US 20000000LL     /* and 20 s alive: a crash once the clock or the radio gets going is rolled back too */
@@ -50,108 +51,99 @@ static void drop_flash(void)
     slot_give(SLOT_MIDI);
 }
 
-/* ota begin <size> <crc> beatw: the beat network's weights (core/beat/beat_weights.h) into the beatw partition. Erased
- * first (128 KB, about a second), then written chunk by chunk; no app slot, no boot change. A device whose partition table
- * has no beatw (an image from before 2026-11-22) answers err state: it needs one full flash. */
-static void do_begin_beatw(const struct jo_cmd *c)
+/* ---- the transfer's engine, shared by the control line (do_* below) and the Wi-Fi update (ota_net_*, wota.c): each core returns the
+ * answer and leaves in s_off the offset that answer carries (where the sender goes on from; 0 after a failure that ended the transfer) ---- */
+static uint32_t s_off;
+static uint8_t s_net_weights;          /* the transfer that just ended was the beat weights (the restart note says so) */
+
+static enum jo_err fail(enum jo_err e, uint32_t off)
+{
+    s_off = off;
+    return e;
+}
+
+/* the beat network's weights (core/beat/beat_weights.h) into the beatw partition. Erased first (128 KB, about a second), then written chunk by
+ * chunk; no app slot, no boot change. A device whose partition table has no beatw (an image from before 2026-11-22) answers err state: it
+ * needs one full flash. */
+static enum jo_err begin_beatw_core(uint32_t size, uint32_t crc)
 {
     const esp_partition_t *p = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, (esp_partition_subtype_t)0x40, "beatw");
     enum jo_err e;
-    int n;
-    if (!p) {
-        say(JO_E_STATE, 0);
-        return;
-    }
-    e = jo_begin(&s_jo, c->size, c->crc, p->size, now_ms());
-    if (e != JO_OK) {
-        say(e, s_jo.offset);
-        return;
-    }
+    if (!p)
+        return fail(JO_E_STATE, 0);
+    e = jo_begin(&s_jo, size, crc, p->size, now_ms());
+    if (e != JO_OK)
+        return fail(e, s_jo.offset);
     s_jo.target = JO_TARGET_BEATW;
     if (esp_partition_erase_range(p, 0, p->size) != ESP_OK) {
         ESP_LOGE(TAG, "beatw: erase failed");
         jo_abort(&s_jo);
-        say(JO_E_STATE, 0);
-        return;
+        return fail(JO_E_STATE, 0);
     }
     s_wpart = p;
-    n = snprintf(s_reply, sizeof s_reply, "ok 0 %u\n", (unsigned)JO_CHUNK_MAX);
-    usb_serial_write(s_reply, (size_t)n);
-    ESP_LOGI(TAG, "beat weights: %lu bytes into %s", (unsigned long)c->size, p->label);
+    ESP_LOGI(TAG, "beat weights: %lu bytes into %s", (unsigned long)size, p->label);
+    return fail(JO_OK, 0);
 }
 
-static void do_begin(const struct jo_cmd *c)
+static enum jo_err begin_core(uint32_t size, uint32_t crc, uint8_t target)
 {
     enum jo_err e;
     esp_err_t r;
-    int n;
-    if (c->target == JO_TARGET_BEATW) {
-        do_begin_beatw(c);
-        return;
-    }
-    const esp_partition_t *slot = esp_ota_get_next_update_partition(NULL);
-    if (!slot) {
-        say(JO_E_STATE, 0);
-        return;
-    }
+    const esp_partition_t *slot;
+    if (target == JO_TARGET_BEATW)
+        return begin_beatw_core(size, crc);
+    slot = esp_ota_get_next_update_partition(NULL);
+    if (!slot)
+        return fail(JO_E_STATE, 0);
     /* no "stop first" (the user, 2026-11-15: "drop the guard. just let me flash"): an update while playing is allowed;
      * its flash erases stall USB, Wi-Fi and the tracker for a moment, so the clock may hiccup during the transfer */
-    if (!slot_take(SLOT_MIDI)) {           /* a jank.bin from the drive has the slot (streaming, or installed) */
-        say(JO_E_BUSY, 0);
-        return;
-    }
-    e = jo_begin(&s_jo, c->size, c->crc, slot->size, now_ms());
+    if (!slot_take(SLOT_MIDI))             /* a jank.bin from the drive has the slot (streaming, or installed) */
+        return fail(JO_E_BUSY, 0);
+    e = jo_begin(&s_jo, size, crc, slot->size, now_ms());
     if (e != JO_OK) {
         if (!s_jo.active)                  /* (JO_E_BUSY: the transfer running keeps the slot) */
             slot_give(SLOT_MIDI);
-        say(e, s_jo.offset);
-        return;
+        return fail(e, s_jo.offset);
     }
     r = esp_ota_begin(slot, OTA_WITH_SEQUENTIAL_WRITES, &s_handle);    /* sectors are erased as the writes reach them */
     if (r != ESP_OK) {
         ESP_LOGE(TAG, "begin: %s", esp_err_to_name(r));
         drop_flash();
-        say(JO_E_STATE, 0);
-        return;
+        return fail(JO_E_STATE, 0);
     }
     s_slot = slot;
-    n = snprintf(s_reply, sizeof s_reply, "ok 0 %u\n", (unsigned)JO_CHUNK_MAX);
-    usb_serial_write(s_reply, (size_t)n);
-    ESP_LOGI(TAG, "update of %lu bytes into %s", (unsigned long)c->size, slot->label);
+    ESP_LOGI(TAG, "update of %lu bytes into %s", (unsigned long)size, slot->label);
+    return fail(JO_OK, 0);
 }
 
-static void do_data(const struct jo_cmd *c)
+static enum jo_err data_core(uint32_t offset, uint32_t crc, const uint8_t *data, size_t n, size_t max_n)
 {
     const uint32_t at = s_jo.offset;
-    enum jo_err e = jo_data(&s_jo, c, now_ms());
+    enum jo_err e = jo_data_raw(&s_jo, offset, crc, data, n, max_n, now_ms());
     if (e == JO_OK) {
-        esp_err_t r = s_wpart ? esp_partition_write(s_wpart, at, c->data, c->n) : esp_ota_write(s_handle, c->data, c->n);
+        esp_err_t r = s_wpart ? esp_partition_write(s_wpart, at, data, n) : esp_ota_write(s_handle, data, n);
         if (r != ESP_OK) {
-            ESP_LOGE(TAG, "write at %lu: %s", (unsigned long)c->offset, esp_err_to_name(r));
+            ESP_LOGE(TAG, "write at %lu: %s", (unsigned long)offset, esp_err_to_name(r));
             drop_flash();
-            say(JO_E_STATE, 0);
-            return;
+            return fail(JO_E_STATE, 0);
         }
     }
-    say(e, s_jo.offset);
+    return fail(e, s_jo.offset);
 }
 
-/* size and CRC as the sender said, then the image as the loader sees it (header, segments, SHA-256), then the boot choice */
-static void do_end(void)
+/* size and CRC as the sender said, then the image as the loader sees it (header, segments, SHA-256), then the boot choice. JO_OK: the caller
+ * answers, then restarts (restart_after_update) */
+static enum jo_err end_core(void)
 {
     enum jo_err e = jo_end(&s_jo);
     esp_err_t r = ESP_OK;
-    if (e == JO_E_SHORT) {
-        say(e, s_jo.offset);
-        return;
-    }
+    s_net_weights = 0;
+    if (e == JO_E_SHORT)
+        return fail(e, s_jo.offset);
     if (e == JO_OK && s_wpart) {      /* the weights: written in place; the restart binds them (beat.c weights_bind) */
         s_wpart = NULL;
-        say(JO_OK, s_jo.offset);
-        ESP_LOGI(TAG, "beat weights written, restarting");
-        drive_note(esp_ota_get_running_partition()->label, "beat weights written over MIDI, restarted");   /* (the app slot stays) */
-        vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));
-        esp_restart();
+        s_net_weights = 1;
+        return fail(JO_OK, s_jo.offset);
     }
     if (e == JO_OK) {
         r = esp_ota_end(s_handle);
@@ -165,20 +157,80 @@ static void do_end(void)
     }
     if (e != JO_OK) {
         drop_flash();
-        say(e, 0);
-        return;
+        return fail(e, 0);
     }
-    say(JO_OK, s_jo.offset);
-    ESP_LOGI(TAG, "update accepted, restarting");
-    drive_note(s_slot->label, "jank.bin installed over MIDI, restarted");
+    return fail(JO_OK, s_jo.offset);
+}
+
+/* after the answer: the note for UPDATE.TXT, a moment for the answer to leave, the restart */
+static void restart_after_update(const char *how)
+{
+    char note[64];
+    if (s_net_weights) {
+        ESP_LOGI(TAG, "beat weights written, restarting");
+        snprintf(note, sizeof note, "beat weights written %s, restarted", how);
+        drive_note(esp_ota_get_running_partition()->label, note);   /* (the app slot stays) */
+    } else {
+        ESP_LOGI(TAG, "update accepted, restarting");
+        snprintf(note, sizeof note, "jank.bin installed %s, restarted", how);
+        drive_note(s_slot->label, note);
+    }
     vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));      /* the answer goes out first */
     esp_restart();
 }
+
+/* ---- the control line's `ota` lines ---- */
+static void do_begin(const struct jo_cmd *c)
+{
+    enum jo_err e = begin_core(c->size, c->crc, c->target);
+    int n;
+    if (e != JO_OK) {
+        say(e, s_off);
+        return;
+    }
+    n = snprintf(s_reply, sizeof s_reply, "ok 0 %u\n", (unsigned)JO_CHUNK_MAX);
+    usb_serial_write(s_reply, (size_t)n);
+}
+
+static void do_data(const struct jo_cmd *c)
+{
+    enum jo_err e = data_core(c->offset, c->crc, c->data, c->n, JO_CHUNK_MAX);
+    say(e, s_off);
+}
+
+static void do_end(void)
+{
+    enum jo_err e = end_core();
+    say(e, s_off);
+    if (e == JO_OK)
+        restart_after_update("over MIDI");
+}
+
+/* ---- the Wi-Fi update (wota.c): the same engine, called from the control task with a signed request's fields; ota_net_offset() is the
+ * offset the answer carries ---- */
+enum jo_err ota_net_begin(uint32_t size, uint32_t crc, uint8_t target) { return begin_core(size, crc, target); }
+
+enum jo_err ota_net_data(uint32_t offset, uint32_t crc, const uint8_t *data, size_t n) { return data_core(offset, crc, data, n, JWO_DATA_MAX); }
+
+enum jo_err ota_net_end(void) { return end_core(); }
+
+void ota_net_restart(void) { restart_after_update("over Wi-Fi"); }
+
+void ota_net_abort(void)
+{
+    drop_flash();
+    s_off = 0;
+}
+
+uint32_t ota_net_offset(void) { return s_off; }
 
 bool ota_busy(void) { return s_jo.active != 0; }
 
 bool ota_line(const char *line)
 {
+    if (!strncmp(line, "otakey", 6) && (line[6] == 0 || line[6] == ' ' || line[6] == '?'))
+        return wota_key_line(line);    /* the Wi-Fi update's key (wota.c): only this control line sets it, never the network. One word, not "ota key":
+                                          scripts/ctl.py leaves lines that begin with the word ota to scripts/ota.py */
     switch (jo_parse(line, &s_cmd)) {
     case JO_NOT_OTA:
         return false;
@@ -210,6 +262,8 @@ void ota_idle(void)
     }
 }
 
+static volatile uint8_t s_confirmed;   /* this image has been confirmed (by the computer over USB, or by a signed request over Wi-Fi): valid_task has nothing left to do */
+
 void ota_mark_valid(void)
 {
     esp_err_t r = esp_ota_mark_app_valid_cancel_rollback();
@@ -217,7 +271,23 @@ void ota_mark_valid(void)
         ESP_LOGE(TAG, "mark valid: %s", esp_err_to_name(r));
     else
         ESP_LOGI(TAG, "this image is confirmed");
+    s_confirmed = 1;
     drive_note_forget();
+}
+
+/* The Wi-Fi update's confirm (a signed request from the sender, after the unit came back from its restart): the image on probation is
+ * confirmed once it has run VALID_MIN_UP_US. 0 confirmed, else JWO_S_NOT_PENDING / JWO_S_TOO_EARLY. In host mode there is no computer to speak
+ * on the control line, so this is the only way a new image there stays; a signed request proves a sender who holds the key can reach it. */
+unsigned ota_net_confirm(void)
+{
+    esp_ota_img_states_t st;
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    if (!run || esp_ota_get_state_partition(run, &st) != ESP_OK || st != ESP_OTA_IMG_PENDING_VERIFY)
+        return JWO_S_NOT_PENDING;
+    if (esp_timer_get_time() < VALID_MIN_UP_US)
+        return JWO_S_TOO_EARLY;
+    ota_mark_valid();
+    return 0;
 }
 
 /* A new image starts "pending verify": the next reset of any kind, a crash included, puts the old image back. It is
@@ -234,6 +304,8 @@ static void valid_task(void *arg)
     (void)arg;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(VALID_POLL_MS));
+        if (s_confirmed)               /* confirmed over Wi-Fi meanwhile */
+            vTaskDelete(NULL);
         if (ready) {                   /* the confirm (an otadata write) is made at once, playing or not */
             ota_mark_valid();
             vTaskDelete(NULL);

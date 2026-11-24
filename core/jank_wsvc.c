@@ -3,6 +3,7 @@
 #include "jank_wsvc.h"
 #include <string.h>
 #include "jank_net.h"
+#include "jank_wota.h"
 
 #define ETH_HDR 14u
 #define IP_HDR 20u
@@ -93,6 +94,18 @@ static int udp_input(uint32_t our_ip, uint32_t our_mask, const uint8_t *eth, siz
         return JW_IGNORE;
     pl = udp + UDP_HDR;
     n = ulen - UDP_HDR;
+    if (n >= 2u && pl[0] == JWO_MAGIC) {                       /* a signed update frame: binary, so no line-end trimming and no printable check */
+        if (dst != our_ip || n > JWO_FRAME_MAX || !sender_ok(our_ip, our_mask, eth + 6, rd32(ip + 12), rd16(udp)))
+            return JW_IGNORE;
+        memcpy(req->src_mac, eth + 6, 6);
+        req->src_ip = rd32(ip + 12);
+        req->src_port = (uint16_t)rd16(udp);
+        req->broadcast = 0;
+        req->line[0] = 0;
+        req->bin = pl;
+        req->bin_len = n;
+        return JW_BINARY;
+    }
     while (n && (pl[n - 1u] == '\n' || pl[n - 1u] == '\r'))
         n--;
     if (!n || n > JW_LINE_MAX || !printable(pl, n))
@@ -103,6 +116,8 @@ static int udp_input(uint32_t our_ip, uint32_t our_mask, const uint8_t *eth, siz
     req->src_ip = rd32(ip + 12);
     req->src_port = (uint16_t)rd16(udp);
     req->broadcast = (uint8_t)(dst == IP_BROADCAST);
+    req->bin = NULL;
+    req->bin_len = 0;
     memcpy(req->line, pl, n);
     req->line[n] = 0;
     return JW_REQUEST;
@@ -123,19 +138,20 @@ int jw_input(const uint8_t our_mac[6], uint32_t our_ip, uint32_t our_mask, const
 
 unsigned jw_chunks(size_t len) { return len ? (unsigned)((len + JW_CHUNK - 1u) / JW_CHUNK) : 1u; }
 
-size_t jw_reply_frame(const uint8_t our_mac[6], uint32_t our_ip, const struct jw_req *to, unsigned index, int last, const char *text, size_t n,
-                      uint8_t *out, size_t cap)
+/* a datagram to the sender of `to`: lead_n (0 or 1) bytes `lead`, then n bytes of payload */
+static size_t datagram_to(const uint8_t our_mac[6], uint32_t our_ip, const struct jw_req *to, int has_lead, uint8_t lead, const void *payload, size_t n,
+                          uint8_t *out, size_t cap)
 {
     uint8_t *ip = out + ETH_HDR, *udp = ip + IP_HDR;
-    size_t total = ETH_HDR + IP_HDR + UDP_HDR + 1u + n;
-    if (n > JW_CHUNK || index > JW_CHUNKS_MAX || cap < total)
+    size_t body = (has_lead ? 1u : 0u) + n, total = ETH_HDR + IP_HDR + UDP_HDR + body;
+    if (n > JW_CHUNK || cap < total)
         return 0;
     memcpy(out, to->src_mac, 6);
     memcpy(out + 6, our_mac, 6);
     wr16(out + 12, TYPE_IP);
     memset(ip, 0, IP_HDR);
     ip[0] = 0x45u;
-    wr16(ip + 2, IP_HDR + UDP_HDR + 1u + n);
+    wr16(ip + 2, IP_HDR + UDP_HDR + body);
     wr16(ip + 6, IP_DONT_FRAGMENT);
     ip[8] = IP_TTL;
     ip[9] = PROTO_UDP;
@@ -144,12 +160,26 @@ size_t jw_reply_frame(const uint8_t our_mac[6], uint32_t our_ip, const struct jw
     wr16(ip + 10, jn_sum(ip, IP_HDR));
     wr16(udp, JW_PORT);
     wr16(udp + 2, to->src_port);
-    wr16(udp + 4, UDP_HDR + 1u + n);
+    wr16(udp + 4, UDP_HDR + body);
     wr16(udp + 6, 0);                                          /* no UDP checksum: allowed over IPv4, as jank_net's own frames */
-    udp[UDP_HDR] = (uint8_t)(index | (last ? 0x80u : 0u));
+    if (has_lead)
+        udp[UDP_HDR] = lead;
     if (n)
-        memcpy(udp + UDP_HDR + 1u, text, n);
+        memcpy(udp + UDP_HDR + (has_lead ? 1u : 0u), payload, n);
     return total;
+}
+
+size_t jw_reply_frame(const uint8_t our_mac[6], uint32_t our_ip, const struct jw_req *to, unsigned index, int last, const char *text, size_t n,
+                      uint8_t *out, size_t cap)
+{
+    if (index > JW_CHUNKS_MAX)
+        return 0;
+    return datagram_to(our_mac, our_ip, to, 1, (uint8_t)(index | (last ? 0x80u : 0u)), text, n, out, cap);
+}
+
+size_t jw_raw_frame(const uint8_t our_mac[6], uint32_t our_ip, const struct jw_req *to, const uint8_t *payload, size_t n, uint8_t *out, size_t cap)
+{
+    return datagram_to(our_mac, our_ip, to, 0, 0, payload, n, out, cap);
 }
 
 int jw_allowed_broadcast(const char *line) { return line && !strcmp(line, "get"); }

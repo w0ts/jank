@@ -9,6 +9,7 @@
 #include "sdkconfig.h"
 #include "jank_clock.h"
 #include "jank_core.h"
+#include "jank_ota.h"
 #include "jank_ui.h"
 #include "jank_wsvc.h"
 
@@ -49,6 +50,16 @@ void ctl_wake(void);                   /* ctl.c: the control task looks at the W
 size_t wsvc_next_frame(const uint8_t mac[6], uint32_t ip, uint8_t *out, size_t cap);                  /* the next answer datagram's frame, 0: none */
 int wsvc_take_request(struct jw_req *rq);                                                              /* control task */
 int wsvc_put_reply(const struct jw_req *to, unsigned index, int last, const char *text, size_t n);   /* control task: 1 queued */
+/* the signed update's datagrams (core/jank_wota.h): the bridge task copies one into the single slot (wsvc_input), the control task takes it, and
+ * answers with raw datagrams. Accepted only while a key is set (wsvc_binary_enable). */
+void wsvc_binary_enable(int on);
+int wsvc_take_binary(struct jw_req *rq, const uint8_t **frame, size_t *n);                             /* control task: 1, the frame in the slot */
+void wsvc_release_binary(void);                                                                        /* control task: the slot is free again */
+int wsvc_put_raw(const struct jw_req *to, const uint8_t *data, size_t n);                              /* control task: a datagram as it is, 1 queued */
+/* wota.c: the signed Wi-Fi update (key in flash, the control task's handling of the frames) */
+void wota_start(void);                                                                                 /* wsvc_start: loads the key, enables the frames if there is one */
+bool wota_key_line(const char *line);                                                                  /* "ota key ...": handled and answered -> true */
+void wota_serve(void);                                                                                 /* control task, once a pass */
 int usb_is_host(void);                                               /* the USB host stack is the one that started (the LED's double flash) */
 size_t hostdiag_text(char *out, size_t cap);                         /* hostdiag.c: what the last host session saw, for `diag` */
 int usb_host_spoke(void);                                            /* a control line came from the computer since the start */
@@ -162,6 +173,14 @@ bool ota_line(const char *line);                             /* an "ota ..." lin
 void ota_idle(void);                                         /* called about once a second: drops a silent transfer */
 void ota_validate_start(void);                               /* a new image confirms itself once USB and the control task work */
 void ota_mark_valid(void);
+/* the Wi-Fi update's use of the same engine (wota.c; answers as an enum jo_err, ota_net_offset() is the offset the answer carries) */
+enum jo_err ota_net_begin(uint32_t size, uint32_t crc, uint8_t target);
+enum jo_err ota_net_data(uint32_t offset, uint32_t crc, const uint8_t *data, size_t n);
+enum jo_err ota_net_end(void);                                       /* JO_OK: answer, then ota_net_restart() */
+void ota_net_restart(void);
+void ota_net_abort(void);
+uint32_t ota_net_offset(void);
+unsigned ota_net_confirm(void);                                      /* 0, or JWO_S_NOT_PENDING / JWO_S_TOO_EARLY (jank_wota.h) */
 
 /* drive.c: the JANK drive, made up (core/jank_vdrive.h): jank.html on it, a jank.bin copied onto it streams into the spare
  * app slot and is installed */

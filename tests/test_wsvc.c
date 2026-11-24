@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "jank_net.h"
+#include "jank_wota.h"
 #include "jank_wsvc.h"
 
 static int fails, checks;
@@ -254,6 +255,67 @@ static void test_reply_frame(void)
     }
 }
 
+/* the signed update's datagrams (jank_wota.h) ride the same port: a first byte of 0x01 is never a text line, so they are handed up whole */
+static void test_binary_update_frames(void)
+{
+    static uint8_t f[1400], payload[JWO_FRAME_MAX + 8u];
+    uint8_t out[128];
+    struct jw_req rq;
+    size_t n, olen;
+    memset(payload, 0xAB, sizeof payload);
+    payload[0] = JWO_MAGIC;
+    payload[1] = JWO_T_CMD;
+    n = udp_frame(f, OUR_IP, JW_PORT, (const char *)payload, 40, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_BINARY);
+    CHECK(rq.bin_len == 40 && !memcmp(rq.bin, payload, 40));
+    CHECK(rq.bin >= f && rq.bin + rq.bin_len <= f + n);                    /* a pointer into the frame: nothing copied */
+    CHECK(rq.src_ip == PC_IP && rq.src_port == 51000 && !rq.broadcast && !memcmp(rq.src_mac, PC_MAC, 6));
+    payload[38] = '\r';                                                    /* line ends at the end are data in a binary frame, not trimmed */
+    payload[39] = '\n';
+    n = udp_frame(f, OUR_IP, JW_PORT, (const char *)payload, 40, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_BINARY && rq.bin_len == 40 && rq.bin[39] == '\n');
+    n = udp_frame(f, OUR_IP, JW_PORT, (const char *)payload, JWO_FRAME_MAX, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_BINARY && rq.bin_len == JWO_FRAME_MAX);                 /* the biggest request */
+    n = udp_frame(f, OUR_IP, JW_PORT, (const char *)payload, JWO_FRAME_MAX + 1u, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* over it */
+    n = udp_frame(f, OUR_IP, JW_PORT, (const char *)payload, 2, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_BINARY && rq.bin_len == 2);   /* a HELLO is two bytes */
+    n = udp_frame(f, 0xFFFFFFFFu, JW_PORT, (const char *)payload, 2, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* never to everyone: nothing answers a broadcast with a signed anything */
+    n = udp_frame(f, OUR_IP + 1u, JW_PORT, (const char *)payload, 2, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* not our address */
+    n = udp_frame(f, OUR_IP, JW_PORT + 1u, (const char *)payload, 2, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* not our port */
+    n = udp_frame(f, OUR_IP, JW_PORT, (const char *)payload, 40, 5);
+    set_src_ip(f, 0x0A000001u);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* from another network: no answer goes there */
+    n = udp_frame(f, OUR_IP, JW_PORT, (const char *)payload, 1, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_IGNORE);                      /* one byte of 0x01: neither a frame nor a printable line */
+    n = udp_frame(f, OUR_IP, JW_PORT, "status", 6, 5);
+    CHECK(input(f, n, &rq, out, &olen) == JW_REQUEST && !strcmp(rq.line, "status") && rq.bin == NULL && rq.bin_len == 0);   /* the text service is as it was */
+}
+
+static void test_raw_frame(void)
+{
+    struct jw_req to;
+    uint8_t out[300], payload[JWO_REPLY_LEN];
+    size_t n;
+    memcpy(to.src_mac, PC_MAC, 6);
+    to.src_ip = PC_IP;
+    to.src_port = 51000;
+    to.line[0] = 0;
+    for (size_t i = 0; i < sizeof payload; i++)
+        payload[i] = (uint8_t)(0x90 + i);
+    n = jw_raw_frame(OUR_MAC, OUR_IP, &to, payload, sizeof payload, out, sizeof out);
+    CHECK(n == 14u + 20u + 8u + JWO_REPLY_LEN);
+    CHECK(!memcmp(out, PC_MAC, 6) && !memcmp(out + 6, OUR_MAC, 6) && rd16(out + 12) == 0x0800u);
+    CHECK(rd16(out + 16) == 20u + 8u + JWO_REPLY_LEN && rd32(out + 26) == OUR_IP && rd32(out + 30) == PC_IP && jn_sum(out + 14, 20) == 0);
+    CHECK(rd16(out + 34) == JW_PORT && rd16(out + 36) == 51000 && rd16(out + 38) == 8u + JWO_REPLY_LEN);
+    CHECK(!memcmp(out + 42, payload, sizeof payload));                     /* the payload as it is: no index byte in front */
+    CHECK(jw_raw_frame(OUR_MAC, OUR_IP, &to, payload, JW_CHUNK + 1u, out, sizeof out) == 0);
+    CHECK(jw_raw_frame(OUR_MAC, OUR_IP, &to, payload, sizeof payload, out, 20) == 0);
+}
+
 static void test_chunks(void)
 {
     CHECK(jw_chunks(0) == 1 && jw_chunks(1) == 1 && jw_chunks(JW_CHUNK) == 1 && jw_chunks(JW_CHUNK + 1u) == 2);
@@ -280,6 +342,8 @@ int main(void)
     test_source_must_be_a_neighbour();
     test_broadcast_flag();
     test_reply_frame();
+    test_binary_update_frames();
+    test_raw_frame();
     test_chunks();
     test_allowed();
     printf("test_wsvc: %d checks, %d failed\n", checks, fails);

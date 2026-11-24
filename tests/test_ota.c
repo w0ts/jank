@@ -212,8 +212,35 @@ static void test_beatw(void)
     assert(jo_data(&j, &c, 1) == JO_E_HEADER);
 }
 
+/* the Wi-Fi update's chunks: up to 1024 bytes, straight from a frame (jo_data_raw); the line protocol's limit does not apply to a sender that may */
+static void test_transfer_raw_big_chunks(void)
+{
+    enum { SIZE = 5000, BIG = 1024 };
+    static uint8_t img[SIZE];
+    struct jo j;
+    image(img, SIZE);
+    jo_init(&j);
+    assert(jo_begin(&j, SIZE, jo_crc32(0, img, SIZE), 8192, 0) == JO_OK);
+    assert(jo_data_raw(&j, 0, jo_crc32(0, img, BIG), img, BIG, JO_CHUNK_MAX, 1) == JO_E_CRC && j.offset == 0);   /* over this sender's limit */
+    assert(jo_data_raw(&j, BIG, jo_crc32(0, img + BIG, BIG), img + BIG, BIG, BIG, 2) == JO_E_GAP && j.offset == 0);   /* a lost chunk */
+    assert(jo_data_raw(&j, 0, jo_crc32(0, img, BIG) ^ 1u, img, BIG, BIG, 3) == JO_E_CRC && j.offset == 0);        /* damaged in transit */
+    assert(jo_data_raw(&j, 0, jo_crc32(0, img, BIG), img, BIG, BIG, 4) == JO_OK && j.offset == BIG);
+    assert(jo_data_raw(&j, 0, jo_crc32(0, img, BIG), img, BIG, BIG, 5) == JO_OK_DUP && j.offset == BIG);          /* the answer was lost: sent again */
+    assert(jo_end(&j) == JO_E_SHORT && j.active);
+    for (uint32_t off = BIG; off < SIZE; off += BIG) {
+        size_t n = SIZE - off < BIG ? SIZE - off : BIG;
+        assert(jo_data_raw(&j, off, jo_crc32(0, img + off, n), img + off, n, BIG, 6 + off) == JO_OK);
+    }
+    assert(j.offset == SIZE);
+    assert(jo_end(&j) == JO_OK && !j.active);
+    jo_init(&j);                                                                                                  /* a chunk past the end of the image */
+    assert(jo_begin(&j, 100, jo_crc32(0, img, 100), 8192, 0) == JO_OK);
+    assert(jo_data_raw(&j, 0, jo_crc32(0, img, BIG), img, BIG, BIG, 1) == JO_E_SIZE && !j.active);
+}
+
 int main(void)
 {
+    test_transfer_raw_big_chunks();
     test_crc();
     test_base64();
     test_parse();

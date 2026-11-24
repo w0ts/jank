@@ -204,26 +204,31 @@ enum jo_err jo_begin(struct jo *j, uint32_t size, uint32_t crc, uint32_t slot_si
     return JO_OK;
 }
 
-enum jo_err jo_data(struct jo *j, const struct jo_cmd *c, uint32_t now_ms)
+enum jo_err jo_data_raw(struct jo *j, uint32_t offset, uint32_t crc, const uint8_t *data, size_t n, size_t max_n, uint32_t now_ms)
 {
     if (!j->active)
         return JO_E_STATE;
     j->last_ms = now_ms;
-    if (c->offset < j->offset)
+    if (offset < j->offset)
         return JO_OK_DUP;
-    if (c->offset > j->offset)
+    if (offset > j->offset)
         return JO_E_GAP;
-    if (c->n > JO_CHUNK_MAX || jo_crc32(0, c->data, c->n) != c->crc)
+    if (n > max_n || jo_crc32(0, data, n) != crc)
         return JO_E_CRC;
-    if (c->n > j->size - j->offset) {
+    if (n > j->size - j->offset) {
         jo_abort(j);
         return JO_E_SIZE;
     }
-    if (!j->offset && !(j->target == JO_TARGET_BEATW ? c->n >= 4u && !memcmp(c->data, "JBW1", 4) : jo_header_ok(c->data, c->n)))
+    if (!j->offset && !(j->target == JO_TARGET_BEATW ? n >= 4u && !memcmp(data, "JBW1", 4) : jo_header_ok(data, n)))
         return JO_E_HEADER;
-    j->crc_run = jo_crc32(j->crc_run, c->data, c->n);
-    j->offset += (uint32_t)c->n;
+    j->crc_run = jo_crc32(j->crc_run, data, n);
+    j->offset += (uint32_t)n;
     return JO_OK;
+}
+
+enum jo_err jo_data(struct jo *j, const struct jo_cmd *c, uint32_t now_ms)
+{
+    return jo_data_raw(j, c->offset, c->crc, c->data, c->n, JO_CHUNK_MAX, now_ms);
 }
 
 enum jo_err jo_end(struct jo *j)

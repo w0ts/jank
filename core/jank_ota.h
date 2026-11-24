@@ -68,6 +68,9 @@ int jo_header_ok(const uint8_t *first, size_t n);
 void jo_init(struct jo *j);
 enum jo_err jo_begin(struct jo *j, uint32_t size, uint32_t crc, uint32_t slot_size, uint32_t now_ms);
 enum jo_err jo_data(struct jo *j, const struct jo_cmd *c, uint32_t now_ms);   /* JO_OK: write c->data; the offset moves on */
+/* the same for a chunk that is not in a struct jo_cmd (the Wi-Fi update's, up to 1024 bytes straight from the frame): max_n is the biggest chunk
+ * this sender may send; JO_OK: write the n bytes at data */
+enum jo_err jo_data_raw(struct jo *j, uint32_t offset, uint32_t crc, const uint8_t *data, size_t n, size_t max_n, uint32_t now_ms);
 enum jo_err jo_end(struct jo *j);                                              /* JO_OK: all of it, CRC right; the transfer is over */
 void jo_abort(struct jo *j);
 enum jo_err jo_idle(struct jo *j, uint32_t now_ms);                            /* JO_E_IDLE once, when it drops the transfer */
