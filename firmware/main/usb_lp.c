@@ -15,6 +15,7 @@
 #include "freertos/task.h"
 #include "jank_lpapp.h"
 #include "jank_lpout.h"
+#include "jank_lpscales.h"
 #include "jank_lpx.h"
 #include "usb_host_mode.h"
 
@@ -31,9 +32,6 @@
 
 static const char *TAG = "usb lp";
 
-/* PLACEHOLDER: the Digitone's own scale list is not read from the unit yet; a major scale until the scale page and that list exist */
-static const struct jln_scale SCALE = {"Major", 7, {0, 2, 4, 5, 7, 9, 11}};
-
 static struct jlapp s_app;
 static struct jlx_frame s_shown;
 static struct jlo s_out;               /* for the Digitone */
@@ -44,7 +42,7 @@ static void ensure_init(void)
 {
     if (s_ready)
         return;
-    jlapp_init(&s_app, &SCALE, DN2_CABLE);
+    jlapp_init(&s_app, jls_get(JLS_MAJOR), DN2_CABLE);   /* the starter list's major scale; the scale page (hold Note) changes it */
     jlo_init(&s_out);
     s_ready = 1;
 }

@@ -46,6 +46,8 @@ struct jln_pad {
 void jln_init(struct jln *s);                                        /* diatonic, C, octave 3, relative, track 0 */
 void jln_set_layout(struct jln *s, enum jln_layout l);               /* sets the orientation, pulls the octave under the layout's top */
 void jln_octave_step(struct jln *s, int dir);                        /* +1 up / -1 down, held inside the layout's octaves */
+unsigned jln_octaves(const struct jln *s);                           /* how many octaves the layout has: the octaves are 0 .. this - 1 */
+void jln_set_octave(struct jln *s, unsigned octave);                 /* a place past the layout's last octave changes nothing */
 void jln_track_step(struct jln *s, int dir);                         /* one track left / right, no wrap */
 void jln_pad(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t y, struct jln_pad *out);
 

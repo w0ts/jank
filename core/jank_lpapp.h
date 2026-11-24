@@ -6,13 +6,28 @@
  * Buttons (Note mode, decided with the owner 2026-11-23): up / down = octave, left / right = the previous / next track (one at
  * a time, no wrap); the Note button is lit. A pad plays its note on the MIDI channel of the current track; the pad stays
  * lit while the DN2 sounds that note on that channel (a sequencer note or one of ours), and every pad with the same pitch
- * lights (the layouts overlap). The channel of each track is a table (default: track n on channel n). */
+ * lights (the layouts overlap). The channel of each track is a table (default: track n on channel n).
+ *
+ * Scale page (decided with the owner 2026-11-23: hold Note): while the Note button is held the pads are Launchpad 95's scale editor
+ * instead of notes, rows from the top: 1 the absolute-root and horizontal toggles (pads 1, 2) and the layouts (pads 5 chords, 6
+ * diatonic, 7 chromatic); 2 the black keys, the relative scale (pad 3) and the circle of fifths back (pad 7); 3 the white keys C to B
+ * and the circle of fifths forward (pad 8); 4 the octaves; 5 to 8 the scales (jank_lpscales.h). Releasing Note goes back to playing.
+ * LP95's other pads (its two guitar / not-staggered layouts, the drum rack, quick scale) have no job here. */
 #ifndef JANK_LPAPP_H
 #define JANK_LPAPP_H
 #include <stddef.h>
 #include <stdint.h>
 #include "jank_lpnote.h"
 #include "jank_lpx.h"
+
+/* the scale page's palette indexes (manual p. 12) */
+#define JLAPP_PAGE_ON 21u                /* green: what is selected */
+#define JLAPP_PAGE_LAYOUT 37u            /* cyan: a layout or toggle that is off */
+#define JLAPP_PAGE_WHITE_KEY 3u          /* white */
+#define JLAPP_PAGE_BLACK_KEY 1u          /* dim grey */
+#define JLAPP_PAGE_OCTAVE 13u            /* yellow */
+#define JLAPP_PAGE_SCALE 45u             /* blue */
+#define JLAPP_PAGE_SHIFT 9u              /* orange: the relative scale and the circle of fifths */
 
 #define JLAPP_CHANNELS 16u
 #define JLAPP_PADS 64u
@@ -36,12 +51,15 @@ struct jlapp_held {
 struct jlapp {
     struct jln n;
     const struct jln_scale *scale;
+    uint8_t page;                      /* the Note button is held: the pads are the scale page */
+    uint8_t minor_idx;                 /* the minor scale the relative pad returns to (jank_lpscales.h index) */
     uint8_t chan[JLN_TRACKS];          /* each track's MIDI channel, 0..15 */
     uint8_t dn2_cable;                 /* the cable number in the packets to the DN2 */
     struct jlapp_held held[JLAPP_PADS];
     uint8_t playing[JLAPP_CHANNELS][16]; /* from the DN2: a bit a note, per channel */
 };
 
+/* `scale` is one of jank_lpscales.h's (the page marks it) or any other */
 void jlapp_init(struct jlapp *a, const struct jln_scale *scale, uint8_t dn2_cable);
 
 /* a Launchpad pad or button; the packets for the DN2 go to out (at most max_packets, one per event); returns how many */

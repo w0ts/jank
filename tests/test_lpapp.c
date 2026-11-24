@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "jank_lpapp.h"
+#include "jank_lpscales.h"
 
 static int fails, checks;
 #define CHECK(c)                                                  \
@@ -274,8 +275,240 @@ static void test_midi_interface_choice(void)
     CHECK(jlapp_midi_interface_index(JLAPP_OTHER) == 0);
 }
 
+/* ---- the scale page (hold Note) ---- the pad coordinates are (x, y) with y = 0 the bottom row; the page's rows count from the top (y = 7 - row) */
+
+#define NOTE_BTN 5u
+
+static struct jlapp fresh_list(void)
+{
+    struct jlapp a;
+    jlapp_init(&a, jls_get(JLS_MAJOR), 0);
+    return a;
+}
+
+static void tap(struct jlapp *a, uint8_t x, uint8_t y)       /* press and release a pad on the page */
+{
+    uint8_t o[4];
+    CHECK(press(a, pad(x, y, 100), o) == 0);                 /* a page pad never plays */
+    CHECK(press(a, pad(x, y, 0), o) == 0);
+}
+
+static void test_the_note_button_opens_the_page_while_held(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    CHECK(!a.page);
+    press(&a, top(NOTE_BTN, 127), o);
+    CHECK(a.page);
+    press(&a, top(NOTE_BTN, 0), o);
+    CHECK(!a.page);
+    CHECK(press(&a, pad(0, 0, 100), o) == 1 && o[2] == 48);   /* back to playing */
+}
+
+static void test_page_pads_edit_and_do_not_play(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    press(&a, top(NOTE_BTN, 127), o);
+    tap(&a, 4, 5);                                           /* white keys, row 3: the fifth one, G */
+    CHECK(a.n.key == 7);
+    tap(&a, 0, 6);                                           /* black keys, row 2: the one right of C, C# */
+    CHECK(a.n.key == 1);
+    tap(&a, 3, 6);
+    CHECK(a.n.key == 6);                                     /* F# */
+    tap(&a, 6, 5);                                           /* B */
+    CHECK(a.n.key == 11);
+    tap(&a, 2, 5);                                           /* an E */
+    CHECK(a.n.key == 4);
+    tap(&a, 7, 6);                                           /* pad (8, row 2) does nothing */
+    CHECK(a.n.key == 4);
+    press(&a, top(NOTE_BTN, 0), o);
+    CHECK(press(&a, pad(0, 0, 100), o) == 1 && o[2] == 52);   /* off the page the same pad plays: key E, relative, octave 3: 48 + 4 */
+}
+
+static void test_page_picks_the_scale(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    press(&a, top(NOTE_BTN, 127), o);
+    tap(&a, 1, 3);                                           /* the scales start at row 5 (y = 3): index 1, Minor */
+    CHECK(jls_index_of(a.scale) == 1);
+    tap(&a, 6, 2);                                           /* row 6, the seventh: index 8 + 6 = 14 */
+    CHECK(jls_index_of(a.scale) == 14);
+    tap(&a, 7, 0);                                           /* the last place of the last row: index 31 */
+    CHECK(jls_index_of(a.scale) == 31);
+    tap(&a, 1, 3);
+    press(&a, top(NOTE_BTN, 0), o);
+    CHECK(press(&a, pad(2, 0, 100), o) == 1 && o[2] == 51);   /* Minor: the third step is a minor third: 48 + 3 */
+}
+
+static void test_page_picks_the_layout(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    press(&a, top(NOTE_BTN, 127), o);
+    tap(&a, 6, 7);                                           /* row 1, pad 7: chromatic */
+    CHECK(a.n.layout == JLN_CHROMATIC);
+    tap(&a, 1, 7);                                           /* horizontal only means something in the diatonic layout */
+    CHECK(a.n.horizontal == 1);
+    tap(&a, 4, 7);                                           /* pad 5: chords */
+    CHECK(a.n.layout == JLN_CHORDS && a.n.horizontal == 0);
+    tap(&a, 5, 7);                                           /* pad 6: diatonic */
+    CHECK(a.n.layout == JLN_DIATONIC && a.n.horizontal == 1);
+    tap(&a, 1, 7);
+    CHECK(a.n.horizontal == 0);
+    tap(&a, 1, 7);
+    CHECK(a.n.horizontal == 1);
+    tap(&a, 0, 7);                                           /* absolute root */
+    CHECK(a.n.absolute == 1);
+    tap(&a, 0, 7);
+    CHECK(a.n.absolute == 0);
+    tap(&a, 2, 7);                                           /* the unused pads change nothing */
+    tap(&a, 3, 7);
+    tap(&a, 7, 7);
+    CHECK(a.n.layout == JLN_DIATONIC && a.n.absolute == 0);
+}
+
+static void test_page_picks_the_octave(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    press(&a, top(NOTE_BTN, 127), o);
+    tap(&a, 5, 4);                                           /* row 4, pad 6: octave 5, the diatonic layout's last */
+    CHECK(a.n.octave == 5);
+    tap(&a, 6, 4);                                           /* past it: nothing */
+    CHECK(a.n.octave == 5);
+    tap(&a, 0, 4);
+    CHECK(a.n.octave == 0);
+    tap(&a, 6, 7);                                           /* chromatic has one more */
+    tap(&a, 6, 4);
+    CHECK(a.n.octave == 6);
+    tap(&a, 5, 7);                                           /* back to diatonic: the octave comes down under its top */
+    CHECK(a.n.octave == 5);
+}
+
+static void test_page_circle_of_fifths(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    press(&a, top(NOTE_BTN, 127), o);
+    tap(&a, 7, 5);                                           /* forward: a fifth up */
+    CHECK(a.n.key == 7);
+    tap(&a, 7, 5);
+    CHECK(a.n.key == 2);                                     /* D */
+    tap(&a, 6, 6);                                           /* back: a fifth down */
+    CHECK(a.n.key == 7);
+    tap(&a, 6, 6);
+    CHECK(a.n.key == 0);
+    tap(&a, 6, 6);
+    CHECK(a.n.key == 5);                                     /* F, the other way round */
+}
+
+static void test_page_relative_scale(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    press(&a, top(NOTE_BTN, 127), o);
+    tap(&a, 2, 6);                                           /* C major -> A minor */
+    CHECK(jls_index_of(a.scale) == JLS_MINOR && a.n.key == 9);
+    tap(&a, 2, 6);                                           /* and back */
+    CHECK(jls_index_of(a.scale) == JLS_MAJOR && a.n.key == 0);
+    tap(&a, 6, 2);                                           /* Harmonic Minor, in C */
+    CHECK(jls_index_of(a.scale) == JLS_HARMONIC_MINOR);
+    tap(&a, 2, 6);                                           /* -> E flat major */
+    CHECK(jls_index_of(a.scale) == JLS_MAJOR && a.n.key == 3);
+    tap(&a, 2, 6);                                           /* the minor it came from, not natural minor: C harmonic minor */
+    CHECK(jls_index_of(a.scale) == JLS_HARMONIC_MINOR && a.n.key == 0);
+    tap(&a, 4, 2);                                           /* Minor Pentatonic */
+    CHECK(jls_index_of(a.scale) == JLS_MINOR_PENTATONIC);
+    tap(&a, 2, 6);
+    CHECK(jls_index_of(a.scale) == JLS_MAJOR_PENTATONIC && a.n.key == 3);
+    tap(&a, 2, 6);
+    CHECK(jls_index_of(a.scale) == JLS_MINOR_PENTATONIC && a.n.key == 0);
+    tap(&a, 2, 3);                                           /* Dorian: no relative scale */
+    tap(&a, 2, 6);
+    CHECK(jls_index_of(a.scale) == 2 && a.n.key == 0);
+}
+
+static void test_page_lights(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    CHECK(colour(&a, 0, 5) != JLAPP_PAGE_ON);                /* off the page the pads show notes */
+    press(&a, top(NOTE_BTN, 127), o);
+    CHECK(colour(&a, 5, 7) == JLAPP_PAGE_ON);                /* diatonic */
+    CHECK(colour(&a, 4, 7) == JLAPP_PAGE_LAYOUT && colour(&a, 6, 7) == JLAPP_PAGE_LAYOUT);
+    CHECK(colour(&a, 1, 7) == JLAPP_PAGE_ON);                /* horizontal */
+    CHECK(colour(&a, 0, 7) == JLAPP_PAGE_LAYOUT);            /* relative root: absolute is off */
+    CHECK(colour(&a, 2, 7) == 0 && colour(&a, 3, 7) == 0 && colour(&a, 7, 7) == 0);
+    CHECK(colour(&a, 0, 5) == JLAPP_PAGE_ON);                /* C */
+    CHECK(colour(&a, 1, 5) == JLAPP_PAGE_WHITE_KEY);
+    CHECK(colour(&a, 0, 6) == JLAPP_PAGE_BLACK_KEY);
+    CHECK(colour(&a, 2, 6) == JLAPP_PAGE_SHIFT && colour(&a, 6, 6) == JLAPP_PAGE_SHIFT && colour(&a, 7, 5) == JLAPP_PAGE_SHIFT);
+    CHECK(colour(&a, 2, 6) != 0 && colour(&a, 7, 6) == 0);
+    CHECK(colour(&a, 3, 4) == JLAPP_PAGE_ON);                /* octave 3 */
+    CHECK(colour(&a, 0, 4) == JLAPP_PAGE_OCTAVE && colour(&a, 5, 4) == JLAPP_PAGE_OCTAVE);
+    CHECK(colour(&a, 6, 4) == 0 && colour(&a, 7, 4) == 0);   /* diatonic stops at octave 5 */
+    CHECK(colour(&a, 0, 3) == JLAPP_PAGE_ON);                /* Major */
+    CHECK(colour(&a, 1, 3) == JLAPP_PAGE_SCALE && colour(&a, 7, 0) == JLAPP_PAGE_SCALE);
+    tap(&a, 6, 7);                                           /* chromatic: its extra octave lights, horizontal goes dark */
+    CHECK(colour(&a, 6, 4) == JLAPP_PAGE_OCTAVE && colour(&a, 1, 7) == 0);
+    tap(&a, 4, 5);                                           /* G is the key: C is no longer lit, G is */
+    CHECK(colour(&a, 4, 5) == JLAPP_PAGE_ON && colour(&a, 0, 5) == JLAPP_PAGE_WHITE_KEY);
+    tap(&a, 1, 6);                                           /* a black key lights */
+    CHECK(colour(&a, 1, 6) == JLAPP_PAGE_ON && colour(&a, 4, 5) == JLAPP_PAGE_WHITE_KEY);
+}
+
+static void test_page_lights_with_a_scale_that_is_not_in_the_list(void)
+{
+    struct jlapp a = fresh();                                /* the test's own major scale */
+    uint8_t o[4];
+    press(&a, top(NOTE_BTN, 127), o);
+    for (uint8_t y = 0; y < 4; y++)
+        for (uint8_t x = 0; x < 8; x++)
+            CHECK(colour(&a, x, y) != JLAPP_PAGE_ON);        /* none of the scales is marked as selected */
+    tap(&a, 0, 6);
+    tap(&a, 2, 6);                                           /* a relative scale for a scale the page does not know: nothing */
+    CHECK(a.scale == &MAJOR);
+}
+
+static void test_a_note_down_before_the_page_still_ends(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    CHECK(press(&a, pad(0, 0, 100), o) == 1);
+    press(&a, top(NOTE_BTN, 127), o);
+    CHECK(press(&a, pad(0, 0, 0), o) == 1 && o[0] == 0x08 && o[2] == 48);   /* its Note Off still goes out with the page open */
+    press(&a, top(NOTE_BTN, 0), o);
+    CHECK(press(&a, pad(0, 0, 0), o) == 0);                  /* and a second release is nothing */
+}
+
+static void test_page_buttons_still_work_and_note_stays_lit(void)
+{
+    struct jlapp a = fresh_list();
+    uint8_t o[4];
+    struct jlx_frame f;
+    press(&a, top(NOTE_BTN, 127), o);
+    press(&a, top(0, 127), o);                               /* up: octave 4 */
+    CHECK(a.n.octave == 4);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE);
+    CHECK(f.led[JLX_TOP0 + 0].color == JLAPP_COLOR_ARROW);
+}
+
 int main(void)
 {
+    test_the_note_button_opens_the_page_while_held();
+    test_page_pads_edit_and_do_not_play();
+    test_page_picks_the_scale();
+    test_page_picks_the_layout();
+    test_page_picks_the_octave();
+    test_page_circle_of_fifths();
+    test_page_relative_scale();
+    test_page_lights();
+    test_page_lights_with_a_scale_that_is_not_in_the_list();
+    test_a_note_down_before_the_page_still_ends();
+    test_page_buttons_still_work_and_note_stays_lit();
     test_roles_by_product_name();
     test_midi_interface_choice();
     test_pad_plays_note_on_track_channel();

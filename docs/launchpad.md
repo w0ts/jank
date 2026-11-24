@@ -15,10 +15,18 @@ flashing and pulsing follow it. First slice: **Note mode on stock MIDI**, nothin
   one note lights every pad with that pitch (the layouts overlap). The arrows and the Note button are lit.
 - A pad that is down when the track changes ends its note on the channel it started on; a Launchpad that goes away ends
   every note it had down.
+- **Scale page: hold Note.** While the Note button is held the pads are Launchpad 95's scale editor, rows from the top: (1) absolute
+  root (pad 1), horizontal (pad 2, diatonic only), the layouts: chords (5), diatonic (6), chromatic (7); (2) the black keys, the
+  relative scale (pad 3), the circle of fifths back (pad 7); (3) the white keys C to B, the circle of fifths forward (pad 8); (4) the
+  octaves; (5 to 8) the scales. Selected is green; the keys are white and dim grey, the layouts cyan, the octaves yellow, the scales
+  blue, the relative and fifths pads orange. Let go of Note and the pads play again; a note that was down when the page opened still
+  ends. The scales are a **starter list of 32** (`core/jank_lpscales.h`: standard names and intervals, neither Live's nor the
+  Digitone's list). LP95's two guitar / not-staggered layouts, the drum rack and quick scale are not there. Host-tested; **not
+  verified on the Launchpad itself** (how the page looks and feels).
 
 ## What is not there yet
 
-Scale page (hold Note), the Digitone's own scale list (a placeholder major scale is used), Step, Mixer, Session, the song
+The Digitone's own scale list (the scale page uses a starter list), Step, Mixer, Session, the song
 row. Order decided with the owner: Note, Step sequencer, Mixer, then patterns and song mode last. The Digitone's current
 track, scale and step data need new commands in dn2-wishes (its test channel only answers when asked); that research is
 separate.

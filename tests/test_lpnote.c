@@ -158,8 +158,31 @@ static void test_colours(void)
     CHECK(jln_color(&none, 1) == 0);
 }
 
+/* the scale page sets an octave directly: inside the layout's octaves, a place past the last one changes nothing */
+static void test_set_octave(void)
+{
+    struct jln s;
+    jln_init(&s);
+    CHECK(jln_octaves(&s) == 6);                                 /* diatonic: octaves 0..5 */
+    jln_set_octave(&s, 5);
+    CHECK(s.octave == 5);
+    jln_set_octave(&s, 6);
+    CHECK(s.octave == 5);
+    jln_set_octave(&s, 0);
+    CHECK(s.octave == 0);
+    jln_set_layout(&s, JLN_CHROMATIC);
+    CHECK(jln_octaves(&s) == 7);
+    jln_set_octave(&s, 6);
+    CHECK(s.octave == 6);
+    jln_set_octave(&s, 7);
+    CHECK(s.octave == 6);
+    jln_set_layout(&s, JLN_CHORDS);
+    CHECK(jln_octaves(&s) == 7);
+}
+
 int main(void)
 {
+    test_set_octave();
     test_defaults();
     test_chromatic_relative();
     test_chromatic_absolute();

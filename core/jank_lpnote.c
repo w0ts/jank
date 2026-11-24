@@ -38,6 +38,14 @@ void jln_octave_step(struct jln *s, int dir)
         s->octave--;
 }
 
+unsigned jln_octaves(const struct jln *s) { return top_octave(s->layout); }
+
+void jln_set_octave(struct jln *s, unsigned octave)
+{
+    if (octave < top_octave(s->layout))
+        s->octave = (uint8_t)octave;
+}
+
 void jln_track_step(struct jln *s, int dir)
 {
     if (dir > 0 && s->track + 1u < JLN_TRACKS)
