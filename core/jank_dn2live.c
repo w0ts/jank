@@ -12,6 +12,8 @@
 #define NOTE_BYTES 6u                  /* track, step, note, velocity, length, flags */
 #define PUSH_HEAD 3u                   /* n, u16 lost */
 
+static uint32_t u32be(const uint8_t *p) { return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3]; }
+
 void jdl_init(struct jdl *d)
 {
     memset(d, 0, sizeof *d);
@@ -150,6 +152,19 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
                 d->fresh = 1;
             }
         }
+    }
+    if (r.cmd == JDL_CMD_LIVE && r.status == 0 && r.n >= JDL_STATUS_BYTES) {   /* the Digitone's own counters: what it made, sent and lost of the push */
+        const uint8_t *s = r.data;
+        d->st.valid = 1;
+        d->st.proto = s[0];
+        d->st.push = s[1];
+        d->st.lease = s[2];
+        d->st.made = u32be(s + 5);
+        d->st.sent = u32be(s + 9);
+        d->st.lost = u32be(s + 13);
+        d->st.dropped = u32be(s + 17);
+        d->st.msgs = u32be(s + 21);
+        d->st.waited = u32be(s + 25);
     }
     if (r.status == 0) {
         if (d->state != JDL_LIVE)

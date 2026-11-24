@@ -17,7 +17,7 @@ static int fails, checks;
 static void test_empty_record(void)
 {
     struct jhd d;
-    char out[512];
+    char out[1024];
     jhd_init(&d);
     CHECK(jhd_format(&d, out, sizeof out) == strlen(out));
     CHECK(strstr(out, "hostdiag_stack=unknown\n"));              /* nothing reported yet */
@@ -30,7 +30,7 @@ static void test_empty_record(void)
 static void test_memory_line(void)
 {
     struct jhd d;
-    char out[512];
+    char out[1024];
     jhd_init(&d);
     d.heap_kb = 13;                                              /* internal free heap now, its minimum since boot, the client task's stack margin */
     d.heap_min_kb = 4;
@@ -135,6 +135,16 @@ static void test_full_record(void)
     d.live_dropped = 1;
     d.live_reads = 8;
     d.live_msgs = 10;
+    d.live_ignored = 3;
+    d.live_ign_len = 41;
+    d.dn2_proto = 3;
+    d.dn2_push = 1;
+    d.dn2_lease = 9;
+    d.dn2_made = 100;
+    d.dn2_sent = 96;
+    d.dn2_lost = 4;
+    d.dn2_dropped = 2;
+    d.dn2_pushmsgs = 30;
     d.dev[1].used = 1;
     strcpy(d.dev[1].name, "Launchpad X");
     d.dev[1].vid = 0x1235;
@@ -167,6 +177,7 @@ static void test_full_record(void)
     CHECK(strstr(out, "hostdiag_events=new:3,gone:1,add:3\n"));
     CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:2,acked:1,setup:2,mode:live,reentered:1,lights:243,pads:7,dn2msgs:9\n"));
     CHECK(strstr(out, "hostdiag_live=state:live,play:1,asked:12,replies:11,plays:5,selects:3,pushes:4,notes:6,dropped:1,reads:8,msgs:10\n"));
+    CHECK(strstr(out, "hostdiag_dn2live=proto:3,push:1,lease:9,made:100,sent:96,lost:4,dropped:2,pushmsgs:30,ignored:3,last_ignored_len:41\n"));
     d.live_state = 9;                  /* a state number from a newer build prints as ?, not past the list */
     jhd_format(&d, out, sizeof out);
     CHECK(strstr(out, "hostdiag_live=state:?,"));

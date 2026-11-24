@@ -158,6 +158,14 @@ static void sync_live(void)
 {
     g_hostdiag.live_state = s_jdl.state;
     g_hostdiag.live_play = s_jdl.play_ok;
+    g_hostdiag.dn2_proto = s_jdl.st.valid ? s_jdl.st.proto : 0;   /* the Digitone's own counters, to tell where a missing push is lost */
+    g_hostdiag.dn2_push = s_jdl.st.push;
+    g_hostdiag.dn2_lease = s_jdl.st.lease;
+    g_hostdiag.dn2_made = s_jdl.st.made;
+    g_hostdiag.dn2_sent = s_jdl.st.sent;
+    g_hostdiag.dn2_lost = s_jdl.st.lost;
+    g_hostdiag.dn2_dropped = s_jdl.st.dropped;
+    g_hostdiag.dn2_pushmsgs = s_jdl.st.msgs;
     jlapp_set_live(&s_app, s_jdl.state, s_jdl.play_ok, jdl_can_read_track(&s_jdl));
 }
 
@@ -187,6 +195,9 @@ static void dn2_sysex(void)
             jlapp_tick(&s_app, now_ms());
             jlapp_on_active_track(&s_app, (unsigned)track);
         }
+    } else if (k == JDL_IN_IGNORED) {
+        g_hostdiag.live_ignored++;
+        g_hostdiag.live_ign_len = (uint16_t)s_sx.n;
     } else if (k == JDL_IN_PUSH) {
         g_hostdiag.live_pushes++;
         g_hostdiag.live_notes += (uint32_t)count;

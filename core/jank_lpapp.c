@@ -155,10 +155,14 @@ static size_t pad_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_a
     }
 }
 
+/* The track a pad of the two bottom rows stands for, laid out as the Digitone's trig keys are: tracks 1..8 in the upper of the two rows (pad row 1), 9..16 in the
+ * lower one (pad row 0) (owner 2026-11-24) */
+static uint8_t track_of_pad(uint8_t row, uint8_t col) { return (uint8_t)((JLAPP_TRACK_ROWS - 1u - row) * 8u + col); }
+
 /* a pad of the two bottom rows while the track pads are on: it plays that track's own note */
 static size_t track_pad_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
-    uint8_t t = (uint8_t)(ev->row * 8u + ev->col);
+    uint8_t t = track_of_pad(ev->row, ev->col);
     uint16_t bitv = (uint16_t)(1u << t);
     if (ev->value) {
         if ((a->track_held & bitv) || max < 1)
@@ -400,7 +404,7 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
             page_pad(a, ev->col, ev->row);
             return 0;
         }
-        if (track_pad && (ev->value || (a->track_held & (1u << (ev->row * 8u + ev->col)))))
+        if (track_pad && (ev->value || (a->track_held & (1u << track_of_pad(ev->row, ev->col)))))
             return track_pad_event(a, ev, out, max);
         return pad_event(a, ev, out, max);
     }
@@ -503,7 +507,7 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
                 continue;
             }
             if (y < JLAPP_TRACK_ROWS && (shift || chosen_shown)) {
-                f->led[JLX_PAD0 + y * 8u + x].color = track_colour(a, (uint8_t)(y * 8u + x), chosen_shown);
+                f->led[JLX_PAD0 + y * 8u + x].color = track_colour(a, track_of_pad(y, x), chosen_shown);
                 continue;
             }
             jln_pad(&a->n, a->scale, x, (uint8_t)(y - shift), &p);

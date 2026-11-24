@@ -40,7 +40,7 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
 - **A pad plays by PLAY** (command 53, in the Digitone's stage 5, 19:00-20:00 on 2026-11-24 at the earliest; 50 is its SCALE; `track, op, note, velocity`). Without live control, or on a Digitone that has no PLAY,
   **the pads play nothing and say why** (a message, at most every 2 s): REMOTE CONTROL OFF, NO LIVE CONTROL, DN2 HAS NO PLAY, DN2 NOT READY. A note ends by the
   same route, on the track it started on, whatever changed meanwhile. Lost requests are counted (`dropped:`) and never half sent.
-- **Left / right choose the Digitone's active track** (TRACK, 49) and, for a second, the 16 bottom pads show which: row 1 tracks 1-8, row 2 tracks 9-16, the
+- **Left / right choose the Digitone's active track** (TRACK, 49) and, for a second, the 16 bottom pads show which, as the Digitone's trig keys are laid out: tracks 1-8 in the upper of the two rows, 9-16 in the lower, the
   chosen one WHITE (3), the others LIGHT_BLUE_THIRD (39). When live control comes up the pads' current track is sent to the Digitone.
 - **FOLLOW: left and right together** (a press of both makes no track step; the first press's step is put back). The Launchpad's track then follows the
   Digitone's as well (TRACK with no argument reads its active track, every 250 ms, accepted by dn2-wishes for stage 5; a Digitone without it: "DN2 CANNOT

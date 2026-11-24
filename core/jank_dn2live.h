@@ -42,7 +42,17 @@ struct jdl_note {
     uint8_t track, step, note, vel, length, flags;
 };
 
+/* LIVE STATUS data (the reply to every LIVE request, 31 bytes, docs/live-control.md in dn2-wishes): u8 protocol, u8 push on (the `what` bits), u8 seconds of lease
+ * left, u8 ring size, u8 most notes a push, then u32 notes made (queued by the sequencer hook), u32 sent, u32 lost, u32 dropped, u32 push messages sent, u32 passes a
+ * push waited for room in USB's ring, u16 the next push's sequence number; all numbers big-endian (the doc's rule for the channel) */
+#define JDL_STATUS_BYTES 31u
+struct jdl_status {
+    uint8_t valid, proto, push, lease;
+    uint32_t made, sent, lost, dropped, msgs, waited;
+};
+
 struct jdl {
+    struct jdl_status st;              /* the Digitone's last LIVE STATUS */
     uint16_t seq;
     uint8_t state;                     /* enum jdl_state */
     uint8_t play_ok;                   /* PLAY has not been refused (status 2): 1 until it is */

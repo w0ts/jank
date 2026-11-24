@@ -333,8 +333,28 @@ static void test_no_read_unless_live(void)
     CHECK(!jdl_can_read_track(&d) && jdl_track_read(&d, 10, out, sizeof out) == 0);
 }
 
+static void test_the_digitones_own_counters(void)
+{
+    struct jdl d;
+    uint8_t out[64];
+    /* proto 3, push on, 9 s of lease, ring 64, 16 a push, then u32 made 100, sent 96, lost 4, dropped 2, push messages 30, waited 7, u16 next seq 0x0102 (big-endian) */
+    const uint8_t st[31] = {3, 1, 9, 64, 16, 0, 0, 0, 100, 0, 0, 0, 96, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 30, 0, 0, 0, 7, 1, 2};
+    const uint8_t big[34] = {3, 1, 9, 64, 16, 0, 0, 1, 0, 0, 0, 0, 96, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 30, 0, 0, 0, 7, 1, 2, 0xFF, 0xFF, 0xFF};
+    jdl_init(&d);
+    jdl_poll(&d, 0, out, sizeof out);
+    CHECK(!d.st.valid);
+    reply_to(&d, d.seq, JDL_CMD_LIVE, 0, st, sizeof st);
+    CHECK(d.st.valid && d.st.proto == 3 && d.st.push == 1 && d.st.lease == 9 && d.st.made == 100 && d.st.sent == 96 && d.st.lost == 4 && d.st.dropped == 2 && d.st.msgs == 30 && d.st.waited == 7);
+    CHECK(jdl_is_live(&d));
+    reply_to(&d, d.seq, JDL_CMD_LIVE, 0, big, sizeof big);          /* a longer status (a later protocol): the first 31 bytes are read the same way */
+    CHECK(d.st.made == 256 && d.st.lost == 4);
+    reply_to(&d, d.seq, JDL_CMD_LIVE, 0, st, 30);                   /* a short one: not taken, the numbers stay */
+    CHECK(d.st.made == 256);
+}
+
 int main(void)
 {
+    test_the_digitones_own_counters();
     test_reading_the_active_track();
     test_a_read_sent_before_a_select_is_stale();
     test_the_sequence_wrapping_in_the_stale_rule();

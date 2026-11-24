@@ -8,7 +8,7 @@
  * control, or without its PLAY command, the pads play nothing and say why (a message).
  *
  * Note mode: a pad plays its note on the current track (PLAY); up / down = octave; left / right = the previous / next track, one at a time, no wrap, and the
- * Digitone's active track follows. For JLAPP_SELECT_MS after a track press the 16 bottom pads show the track: row 1 tracks 1..8, row 2 tracks 9..16, the chosen
+ * Digitone's active track follows. For JLAPP_SELECT_MS after a track press the 16 bottom pads show the track, laid out as the Digitone's trig keys: tracks 1..8 in the upper of the two rows, 9..16 in the lower, the chosen
  * one white. Lights come from the Digitone's own note push: a pad lights while its pitch on the current track (a track pad: its track) sounded in the last
  * JLAPP_PUSH_LIGHT_MS, and a pad that is down is lit; every pad with the same pitch lights (the layouts overlap).
  *
