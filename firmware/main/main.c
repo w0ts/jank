@@ -84,7 +84,11 @@ void app_cfg_flush(int force)
 /* every esp_restart (the reboot command, MODE switch, USB role, updates, rollback): a deferred save first */
 static void flush_at_restart(void) { app_cfg_flush(1); }
 
-void app_reboot(void) { esp_restart(); }
+void app_reboot(void)
+{
+    restart_why_default("app_reboot");   /* a caller that knows better said so before */
+    esp_restart();
+}
 
 void app_bootloader(void)
 {
@@ -140,13 +144,14 @@ void app_diag(char *out, size_t cap)
                                       "brownout", "sdio", "usb", "jtag", "efuse", "pwr_glitch", "cpu_lockup"};
     unsigned r = (unsigned)s_reason;
     const uint8_t *id = esp_app_get_description()->app_elf_sha256;     /* which image runs: its first 4 bytes (scripts/jankwifi.py compares them with the file it sent) */
-    snprintf(out, cap, "image=%02x%02x%02x%02x\nboots=%lu\nreset=%s\nsave_pending=%u\nnvs=%s\n", id[0], id[1], id[2], id[3], (unsigned long)s_boots_now,
-             r < sizeof why / sizeof why[0] ? why[r] : "?", (unsigned)s_save_pending, s_nvs_note);
+    snprintf(out, cap, "image=%02x%02x%02x%02x\nboots=%lu\nreset=%s\nlast_restart=%s\nsave_pending=%u\nnvs=%s\n", id[0], id[1], id[2], id[3], (unsigned long)s_boots_now,
+             r < sizeof why / sizeof why[0] ? why[r] : "?", restart_why_last(), (unsigned)s_save_pending, s_nvs_note);
 }
 
 void app_main(void)
 {
     uint8_t efuse[6], mac[6], peer_mac[6];
+    restart_why_boot();                  /* what the last restart said (restartwhy.c) */
     board_init();                        /* which board, before any pin is driven (board.c) */
     power_early_init();
     count_boot();

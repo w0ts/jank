@@ -474,6 +474,7 @@ static void learn_and_restart(void)
     ESP_LOGW(TAG, "%u device(s) of no use hold pipes the controllers need: saved, restarting to leave them alone", g_hostdiag.filter.deny.n);
     usbrole_host_inflight(0);          /* a restart of ours, not a crash */
     vTaskDelay(pdMS_TO_TICKS(100));
+    restart_why_set("host-learn");
     esp_restart();
 }
 

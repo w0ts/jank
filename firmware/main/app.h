@@ -71,7 +71,13 @@ esp_err_t usb_send(const uint8_t *eth, size_t len, void *token);   /* tx_done(to
 esp_err_t usb_midi_host_start(void);
 void usb_midi_host_send(const uint8_t *packets, size_t n);
 bool usb_midi_isr(const uint8_t *bytes, size_t n);                  /* from the timer interrupt -> a task was woken */
-void usb_midi_clock_peers(int has_peers);                           /* host mode: the clock only while there are peers on the Jank / Link network (usb_lp.c) */
+/* restartwhy.c: say why before every esp_restart (at most 23 characters); restart_why_default keeps a reason already given; restart_why_boot at the start reads what the
+ * last restart said ("none": nothing was said: a power-on, a panic, a watchdog); `diag` prints it as last_restart= */
+void restart_why_set(const char *why);
+void restart_why_default(const char *why);
+void restart_why_boot(void);
+const char *restart_why_last(void);
+void usb_midi_clock_peers(int has_peers);                          /* host mode: the clock only while there are peers on the Jank / Link network (usb_lp.c) */
 void usb_midi_clock(int on);                                     /* USB MIDI CLOCK (setting usbmidi): off, none of it to USB */
 void usb_serial_write(const char *text, size_t n);                 /* the control line, as SysEx on the MIDI port */
 

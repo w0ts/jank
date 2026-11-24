@@ -365,6 +365,7 @@ static void finish(const char *text, const char *slot, bool installed)
     drive_note(slot, text);
     while (!s_eject && now_ms() - s_last_write_ms < QUIET_MS && now_ms() - done_at < FINISH_MAX_MS)
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+    restart_why_set("drive-update");
     esp_restart();                        /* the next start shows the note in UPDATE.TXT */
 }
 

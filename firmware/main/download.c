@@ -61,5 +61,6 @@ void usb_to_rom_download(void)
     phy_to_serial_jtag();
     esp_rom_delay_us(20000);          /* the pull-up is on and the host starts on it before the restart takes it away again */
     REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+    restart_why_set("download");
     esp_restart();
 }

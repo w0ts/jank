@@ -177,6 +177,7 @@ static void restart_after_update(const char *how)
     }
     usbrole_hint_stay();                              /* a unit that runs as host comes back as host: no device phase, whose restart would roll the new image back */
     vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));      /* the answer goes out first */
+    restart_why_set("ota-update");
     esp_restart();
 }
 
@@ -314,6 +315,7 @@ static void valid_task(void *arg)
         if (esp_timer_get_time() >= VALID_DEADLINE_US) {
             ESP_LOGE(TAG, "no computer spoke on the MIDI control line within %d s: restarting into the old image", (int)(VALID_DEADLINE_US / 1000000));
             vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS));
+            restart_why_set("ota-deadline");
             esp_restart();
         }
         if (!usb_up() || !usb_host_spoke())

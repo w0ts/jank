@@ -50,6 +50,7 @@ void usbrole_host_failed(uint8_t step, esp_err_t e)
     s_host_block = BLOCK_MAGIC;
     s_host_inflight = 0;               /* this restart is ours, not a crash */
     ESP_LOGE("usbrole", "host start failed at step %u: %s: restarting as a device", step, esp_err_to_name(e));
+    restart_why_set("host-failed");
     esp_restart();
 }
 
@@ -184,6 +185,7 @@ static void restart_into(uint8_t stack)
     s_host_inflight = 0;               /* a restart of ours (a computer came, or went): not a crash */
     ESP_LOGW(TAG, "restarting as %s", jur_usb_name(stack));
     vTaskDelay(pdMS_TO_TICKS(50));     /* the log out */
+    restart_why_set("role-switch");
     esp_restart();
 }
 
