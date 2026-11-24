@@ -19,6 +19,7 @@
 #include "freertos/task.h"
 #include "usb/usb_helpers.h"
 #include "usb/usb_host.h"
+#include "jank_fsclamp.h"
 #include "jank_midiq.h"
 #include "usb_host_mode.h"
 
@@ -295,6 +296,17 @@ static esp_err_t claim(struct dev *d, usb_device_handle_t h, const struct midi_e
     return ESP_OK;
 }
 
+/* A device on a full-speed link may declare its high-speed bulk sizes (the Digitone II: 512 bytes), which the library's claim refuses for good
+ * (core/jank_fsclamp.h). The wire allows 64: the declared size is corrected in the library's own heap copy of the configuration descriptor
+ * (usbh.c keeps one per device; the claim reads the same one), here in the client task before anything claims it. Returns the endpoints changed. */
+static unsigned clamp_full_speed(usb_device_handle_t h, const usb_config_desc_t *c)
+{
+    usb_device_info_t info;
+    if (usb_host_device_info(h, &info) != ESP_OK || info.speed != USB_SPEED_FULL)
+        return 0;
+    return jfc_clamp_fs_bulk((uint8_t *)(uintptr_t)c, c->wTotalLength);
+}
+
 /* a line in the probe for a device that came: who it is and how many MIDI interfaces it has (the claim fills in the rest) */
 static struct jhd_dev *probe_begin(usb_device_handle_t h, const char *name, enum jlapp_role role, const usb_config_desc_t *c, uint8_t *idx)
 {
@@ -326,6 +338,7 @@ static void add_device(uint8_t address)
     enum jlapp_role role;
     struct jhd_dev *r;
     uint8_t idx;
+    unsigned fixed;
     esp_err_t e = usb_host_device_open(s_client, address, &h);
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "open %u: %s", address, esp_err_to_name(e));
@@ -334,7 +347,9 @@ static void add_device(uint8_t address)
     usb_host_product_name(h, name, sizeof name);
     role = jlapp_role_from_name(name);
     e = usb_host_get_active_config_descriptor(h, &c);
+    fixed = e == ESP_OK ? clamp_full_speed(h, c) : 0;
     r = probe_begin(h, name, role, e == ESP_OK ? c : NULL, &idx);
+    r->clamped = (uint8_t)(fixed < UINT8_MAX ? fixed : UINT8_MAX);
     if (e == ESP_OK && role == JLAPP_OTHER && !r->ifs && !has_audio_streaming(c) && (r->vid || r->pid))
         jhf_set_add(&s_useless, r->vid, r->pid);     /* of no use to jank, and it holds a pipe of the controller's 8 (core/jank_hostfilter.h) */
     if (e == ESP_OK && d && find_midi(c, jlapp_midi_interface_index(role), role, &m) && m.out_mps >= 4u) {

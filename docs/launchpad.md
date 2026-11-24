@@ -47,6 +47,10 @@ separate.
   list kept in flash and the unit restarts once. From then on the library's enumeration filter skips the listed devices behind a hub,
   before they hold a pipe. At most 8 entries (so at most 8 such restarts, ever); `wipe settings` clears the list; `diag` shows it
   (`hostdiag_filter=...,learned:VID:PID+...`). Not verified on hardware yet.
+- The Digitone II declares **512-byte bulk endpoints on a full-speed link** (measured 2026-11-24 over Wi-Fi `diag`: `mps:512/512`), which a
+  full-speed wire cannot carry and which the USB library's claim refuses for good (`ESP_ERR_NOT_SUPPORTED`, 262, at the interface step) because
+  bulk OUT is limited to 64 bytes here. `core/jank_fsclamp.h` corrects the declared size to 64 in the library's copy of the configuration
+  descriptor before the claim (`usb_midi_host.c`); `diag` shows how many endpoints it changed (`clamp:`). Not verified on hardware yet.
 - No log leaves the unit in host mode (no USB control line, console off): what the pads do is the only readout. Over Wi-Fi
   (`docs/wifi.md`) `diag` ends with the `hostdiag_` lines live.
 
