@@ -475,7 +475,7 @@ static void test_buttons_lit(void)
     CHECK(f.led[JLX_TOP0 + 2].color == JLAPP_COLOR_ARROW_OFF && f.led[JLX_TOP0 + 3].color == JLAPP_COLOR_ARROW_ON);   /* track 1 of 16: nothing to the left */
     CHECK(f.led[JLX_TOP0 + 5].color == JLAPP_COLOR_MODE);          /* the Note button */
     CHECK(JLAPP_COLOR_ARROW_ON == 21 && JLAPP_COLOR_ARROW_OFF == 23 && JLAPP_COLOR_MODE == 37);   /* GREEN, GREEN_THIRD, LIGHT_BLUE: LP95's Note.Octave and Mode.Note */
-    CHECK(f.led[JLX_TOP0 + 4].color == 0 && f.led[JLX_TOP0 + 6].color == 0 && f.led[JLX_TOP0 + 7].color == 0);
+    CHECK(f.led[JLX_TOP0 + 4].color == 0 && f.led[JLX_TOP0 + 6].color == JLAPP_GREEN_THIRD && f.led[JLX_TOP0 + 7].color == 0);   /* Custom does something: lit, dim (melodic step is the one it leads to) */
     for (uint32_t i = 0; i < 8; i++)
         CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_RED_THIRD : 0));   /* only start / stop is lit: dim red while stopped */
     CHECK(f.led[JLX_LOGO].color == 0);
@@ -1001,13 +1001,17 @@ static void test_the_mode_buttons_light(void)
     struct jlapp_act o;
     struct jlx_frame f;
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == 0);
+    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_GREEN_THIRD);   /* a button that does something is lit: dim when its mode is off */
     acts(&a, top(CUSTOM, 127), &o);
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE_DIM && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_GREEN);   /* melodic: green */
     acts(&a, top(CUSTOM, 127), &o);
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_TOP0 + CUSTOM].color == JLAPP_AMBER);          /* drum: amber */
+    acts(&a, top(NOTE_BTN, 127), &o);                              /* a tap on Note: Note mode again; Custom stays lit, dim, in the colour of the step mode last used */
+    acts(&a, top(NOTE_BTN, 0), &o);
+    jlapp_frame(&a, &f);
+    CHECK(a.mode == JLAPP_MODE_NOTE && f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_AMBER_THIRD);
 }
 
 static void test_a_step_press_in_the_app(void)

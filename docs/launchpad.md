@@ -90,6 +90,10 @@ USB MIDI CLOCK setting is turned off); with one it starts again. Device mode (a 
 
 ### Colour language so far (to be decided with the owner)
 
+**A button that does something is always lit: dim when its mode is not on, full brightness when it is** (owner 2026-11-24). Note (light blue, dim in a step mode), Custom (the
+step mode it leads to: green melodic / amber drum, dim in Note mode), the arrows (dim at a limit), start / stop (green running, dim red stopped). A button with no job is dark
+(up / down in drum step).
+
 Launchpad 95's own colours stay as they are (scale page, Note mode). What this port adds: **green** a direction or switch that is available / on, dim green
 at a limit or off; **amber** FOLLOW (left / right); **light blue** the Note mode button and idle tracks, **blue** the current track and the scale root,
 **white** a track just chosen (for a second), **green** a note or track that sounds.

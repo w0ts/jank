@@ -647,7 +647,14 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
     f->led[JLX_TOP0 + BUTTON_RIGHT].color = a->n.track + 1u < JLN_TRACKS ? (a->follow ? JLAPP_COLOR_FOLLOW_ON : JLAPP_COLOR_ARROW_ON)
                                                                          : (a->follow ? JLAPP_COLOR_FOLLOW_OFF : JLAPP_COLOR_ARROW_OFF);
     f->led[JLX_TOP0 + BUTTON_NOTE].color = a->mode == JLAPP_MODE_NOTE ? JLAPP_COLOR_MODE : JLAPP_COLOR_MODE_DIM;
-    if (a->mode == JLAPP_MODE_STEP)    /* which step mode: melodic green, drum amber */
-        f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = a->step_kind == JLST_MELODIC ? JLAPP_GREEN : JLAPP_AMBER;
+    /* A button that does something is always lit: dim when its mode is not on, full when it is (owner 2026-11-24). Custom leads to the step mode last used (melodic at
+     * first): green for melodic, amber for drum. */
+    {
+        int on = a->mode == JLAPP_MODE_STEP;
+        if (a->step_kind == JLST_MELODIC)
+            f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = on ? JLAPP_GREEN : JLAPP_GREEN_THIRD;
+        else
+            f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = on ? JLAPP_AMBER : JLAPP_AMBER_THIRD;
+    }
     f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = a->transport ? JLAPP_GREEN : JLAPP_RED_THIRD;   /* start / stop: running green, stopped dim red */
 }
