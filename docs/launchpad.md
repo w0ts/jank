@@ -113,10 +113,10 @@ separate.
   full-speed wire cannot carry and which the USB library's claim refuses for good (`ESP_ERR_NOT_SUPPORTED`, 262, at the interface step) because
   bulk OUT is limited to 64 bytes here. `core/jank_fsclamp.h` corrects the declared size to 64 in the library's copy of the configuration
   descriptor before the claim (`usb_midi_host.c`); `diag` shows how many endpoints it changed (`clamp:`). Not verified on hardware yet.
-- A Launchpad or Digitone whose claim fails with ESP_ERR_NO_MEM (257) or NOT_SUPPORTED (262) is **tried again** 1.5 s later, up to 6 more times (on the
+- A Launchpad or Digitone whose claim fails with ESP_ERR_NO_MEM (257) or NOT_SUPPORTED (262) is **tried again** every 2 s for two minutes (60 tries; on the
   same `diag` device line; the library keeps the device attached meanwhile). Measured 2026-11-24: the Launchpad's claim failed with 257 with 20 KB of
   heap free after it had worked on the same build, in the seconds when an update client was also asking the unit questions (the Wi-Fi service allocates a
-  buffer at its first request). A passing memory shortage is the likely cause, not a proven one.
+  buffer at its first request). A passing memory shortage is the likely cause, not a proven one. After a Wi-Fi update of 2026-11-24 the claim failed for over 30 s (the first version tried for 9 s) and worked at once after a replug, which supports it.
 - No log leaves the unit in host mode (no USB control line, console off): what the pads do is the only readout. Over Wi-Fi
   (`docs/wifi.md`) `diag` ends with the `hostdiag_` lines live.
 

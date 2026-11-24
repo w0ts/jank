@@ -330,9 +330,11 @@ static struct jhd_dev *probe_begin(usb_device_handle_t h, const char *name, enum
 
 /* A controller whose claim failed for want of memory (or pipes) is tried again a moment later: the shortage can be a passing one (the Wi-Fi service's
  * buffer, allocated at its first request, landed in the same seconds as the claims: measured 2026-11-24, the Launchpad's claim failed with 257 with 20 KB
- * of heap free, after it had worked on the same build). The library keeps the device attached meanwhile; the retry reuses its line in the probe. */
-#define CLAIM_RETRY_MS 1500u
-#define CLAIM_RETRIES 6u
+ * of heap free, after it had worked on the same build). The library keeps the device attached meanwhile; the retry reuses its line in the probe.
+ * 6 tries 1.5 s apart (9 s) was too short: measured 2026-11-24, after a Wi-Fi update's restart the Launchpad's claim failed with 257 for over 30 s (the update
+ * client and diag reads were asking the unit questions) and stayed unclaimed until it was replugged, though it claimed at once then. So: every 2 s for two minutes. */
+#define CLAIM_RETRY_MS 2000u
+#define CLAIM_RETRIES 60u
 static uint8_t s_retry_addr, s_retry_left;   /* the device to try again, and how many tries remain (0: none waiting) */
 static int s_retry_idx = -1;                 /* its line in the probe */
 static TickType_t s_retry_at;
