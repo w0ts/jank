@@ -88,6 +88,8 @@ fi
 "$OUT/test_lpstep"
 "$CC" $FLAGS "$HERE/tests/test_lpmix.c" "$HERE/core/jank_lpmix.c" "$HERE/core/jank_lpx.c" "$HERE/core/jank_dn2live.c" "$HERE/core/jank_dn2rpc.c" -o "$OUT/test_lpmix"
 "$OUT/test_lpmix"
+"$CC" $FLAGS "$HERE/tests/test_lpprefs.c" "$HERE/core/jank_lpprefs.c" "$HERE/core/jank_lpapp.c" "$HERE/core/jank_lpstep.c" "$HERE/core/jank_lpmix.c" "$HERE/core/jank_lpnote.c" "$HERE/core/jank_lpscales.c" "$HERE/core/jank_lpx.c" -o "$OUT/test_lpprefs"
+"$OUT/test_lpprefs"
 "$CC" $FLAGS "$HERE/tests/test_lpout.c" "$HERE/core/jank_lpout.c" -o "$OUT/test_lpout"
 "$OUT/test_lpout"
 "$CC" $FLAGS "$HERE/tests/test_dn2rpc.c" "$HERE/core/jank_dn2rpc.c" -o "$OUT/test_dn2rpc"

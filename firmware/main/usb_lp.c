@@ -18,6 +18,9 @@
 #include "jank_dn2rpc.h"
 #include "jank_lpapp.h"
 #include "jank_lpout.h"
+#include "jank_lpprefs.h"
+#include "jank_prefs.h"
+#include "nvs.h"
 #include "jank_lpscales.h"
 #include "jank_lpx.h"
 #include "uiscreen.h"
@@ -70,11 +73,63 @@ static TickType_t s_settle_at;         /* no lights before this tick */
 static TickType_t s_try_at;            /* the next Programmer mode message is due at this tick */
 static TickType_t s_refresh_at;        /* every light is sent again at this tick (REFRESH_MS) */
 
+/* What the Launchpad part remembers across a restart (core/jank_lpprefs.h), one small blob in NVS: loaded at the start, written 400 ms after its last change and never
+ * while the transport plays (core/jank_prefs.h's rule: no flash writes then) */
+#define PREFS_NS "jlp"
+#define PREFS_KEY "p"
+static struct jlprefs s_prefs_saved, s_prefs_seen;   /* what is in flash / what was seen at the last pass */
+static struct jk_prefs_save s_prefs_save;
+
+static void prefs_load(void)
+{
+    uint8_t b[JLPREFS_SIZE];
+    size_t n = sizeof b;
+    nvs_handle_t h;
+    struct jlprefs p;
+    if (nvs_open(PREFS_NS, NVS_READONLY, &h) != ESP_OK)
+        return;
+    if (nvs_get_blob(h, PREFS_KEY, b, &n) == ESP_OK && jlprefs_unpack(&p, b, n))
+        jlprefs_apply(&s_app, &p);
+    nvs_close(h);
+}
+
+static void prefs_write(const struct jlprefs *p)
+{
+    uint8_t b[JLPREFS_SIZE];
+    nvs_handle_t h;
+    esp_err_t e = nvs_open(PREFS_NS, NVS_READWRITE, &h);
+    if (e == ESP_OK) {
+        e = nvs_set_blob(h, PREFS_KEY, b, jlprefs_pack(p, b, sizeof b));
+        if (e == ESP_OK)
+            e = nvs_commit(h);
+        nvs_close(h);
+    }
+    if (e != ESP_OK)
+        ESP_LOGW(TAG, "settings not saved: %s", esp_err_to_name(e));
+}
+
+static void prefs_pump(uint32_t t)
+{
+    struct jlprefs now;
+    jlprefs_from_app(&s_app, &now);
+    if (!jlprefs_equal(&now, &s_prefs_seen)) {   /* a change: the clock for the write starts again (a button held down makes one write) */
+        s_prefs_seen = now;
+        jk_prefs_changed(&s_prefs_save, t);
+    }
+    if (s_prefs_save.pending && jk_prefs_due(&s_prefs_save, t, bridge_is_playing(), 0) && !jlprefs_equal(&s_prefs_seen, &s_prefs_saved)) {
+        prefs_write(&s_prefs_seen);
+        s_prefs_saved = s_prefs_seen;
+    }
+}
+
 static void ensure_init(void)
 {
     if (s_ready)
         return;
     jlapp_init(&s_app, jls_get(JLS_MAJOR));   /* the Digitone's Ionian (Maj) until it says otherwise; the scale page (hold Note) changes it */
+    prefs_load();                             /* the layout, octave, track pads ... as they were */
+    jlprefs_from_app(&s_app, &s_prefs_saved);
+    s_prefs_seen = s_prefs_saved;
     jlo_init(&s_out);
     jdl_init(&s_jdl);
     jd2_sx_init(&s_sx);
@@ -501,6 +556,7 @@ void usb_lp_pump(void)
     uint8_t out[4 * BATCH];
     size_t room, n;
     live_pump();
+    prefs_pump(now_ms());
     dn2_drain();
     if (!s_lpx_up)
         return;

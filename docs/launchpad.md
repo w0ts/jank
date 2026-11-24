@@ -107,6 +107,15 @@ lower left, the sequence on top, the loop selector lower right):
 (`bridge_peers_heard`, checked each second by the ui task; `usb_midi_clock_peers` in usb.c). With none the clock stops, with one MIDI Stop after what was queued (as when the
 USB MIDI CLOCK setting is turned off); with one it starts again. Device mode (a computer on the port) is not affected.
 
+### Remembered settings (`core/jank_lpprefs.[ch]`)
+
+Owner, 2026-11-24: "jank should remember the settings, like enabling the 16 bottom pads". Kept across a restart (an update restarts the unit): the note **layout** and its
+**horizontal / absolute** switches, the **octave**, the **track pads** (the 16 bottom pads), the **step mode Custom opens** (melodic / drum), the **mixer's view** and
+**FOLLOW**. **Not** kept: the scale and the key (while the Digitone is live they come from it, so a stored pair would only be stale), the mode (it starts in Note mode), the
+mixer's bank, the step page and the track. One 10-byte blob (`jlp` / `p` in NVS: version, 8 settings, a checksum); a blob that is short, of another version, damaged or with a
+value out of range is ignored and the defaults stay. It is written **400 ms after the last change and never while the transport plays** (the rule of `core/jank_prefs.h`: no
+flash writes then, so it waits until it stops); a change that returns to what is stored writes nothing. `wipe settings` clears it. Not tried on hardware.
+
 ### Mixer (`core/jank_lpmix.[ch]`)
 
 Owner, 2026-11-24, after Launchpad 95's mixer (read from its source on the owner's Mac). **Capture** (top button 8, MINT: dim when it is not on, full when it is) enters
