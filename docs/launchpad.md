@@ -107,6 +107,26 @@ lower left, the sequence on top, the loop selector lower right):
 (`bridge_peers_heard`, checked each second by the ui task; `usb_midi_clock_peers` in usb.c). With none the clock stops, with one MIDI Stop after what was queued (as when the
 USB MIDI CLOCK setting is turned off); with one it starts again. Device mode (a computer on the port) is not affected.
 
+### Mixer (`core/jank_lpmix.[ch]`)
+
+Owner, 2026-11-24, after Launchpad 95's mixer (read from its source on the owner's Mac). **Capture** (top button 8, MINT: dim when it is not on, full when it is) enters
+it; a tap on Note or Custom leaves it. Each of the 8 pad columns is **one track as a vertical fader 8 pads high**; **up / down are the banks**: up the upper row, tracks 1-8,
+down tracks 9-16, as the Digitone's trig keys lie (it says TRACKS 1-8 / 9-16). The **scene buttons** pick the view (the one shown is bright, the others dim):
+
+| scene | view | shows | a press |
+|---|---|---|---|
+| 1 | volume | the fader, filled from the bottom (MINT) | writes that height: 8 steps (15, 31 ... 127); the lowest pad again at that step sets 0 |
+| 2 | pan | one pad, the two middle pads marked | writes the position (0, 23, 44, 64, 64, 84, 105, 127 = Launchpad 95's pan map) |
+| 3, 4, 5 | delay, reverb, chorus send | as volume | as volume |
+| 6 | mute | the column bright YELLOW, dim when muted | toggles that track's mute (the whole new mask is written) |
+| 7 | solo | the column BLUE when soloed, dim when not | toggles that track's solo |
+| 8 | (none yet; LEVEL could go here) | | |
+
+The faders **move when the Digitone's values do** (MIXER, 45, read every 300 ms while the screen is on: automation, an encoder), and a press moves its fader at once; the
+Digitone's reading is not allowed to put it back for 400 ms (its write applies at its next UI pass, up to 33 ms). **Writes are the Digitone's stage 6** (MIXER SET 56 and MUTE SET
+57, formats confirmed by its session); on a build without them a press says MIXER READ ONLY (at most every 2 s) and the faders are display only. Scene button 5 is chorus here, so
+**start / stop is not available inside the mixer**. A dual Launchpad mode is planned (one on tracks 1-8, the other on 9-16). Not tried on hardware. `diag`: `mixreads:`, `mixsets:`.
+
 ### Colour language so far (to be decided with the owner)
 
 **A button that does something is always lit: dim when its mode is not on, full brightness when it is** (owner 2026-11-24). Note (light blue, dim in a step mode), Custom (the
@@ -122,8 +142,7 @@ the Digitone's stage 4 / 5.
 
 ## What is not there yet
 
-The scale **sync** with the Digitone (the list is its own now; reading its scale and writing ours need the code in progress, below), the mixer screen (its logic and the MIXER read
-are built, not wired in), Session, the song row. A **dual Launchpad mode** is planned for later (owner 2026-11-24): in the mixer one Launchpad is tracks 1-8 and the other 9-16
+Session and the song row. (The scale sync and the mixer are built; their writes, and the scale's root, wait for the Digitone's stage 6, which is not installed yet.) A **dual Launchpad mode** is planned for later (owner 2026-11-24): in the mixer one Launchpad is tracks 1-8 and the other 9-16
 (the mixer's bank is already a parameter of its screen). Order decided with the owner: Note, Step sequencer, Mixer, then patterns and song mode last. The Digitone's current
 track, scale and step data need new commands in dn2-wishes (its test channel only answers when asked); that research is
 separate.

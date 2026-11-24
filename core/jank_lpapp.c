@@ -36,6 +36,8 @@ void jlapp_init(struct jlapp *a, const struct jln_scale *scale)
     a->play_ok = 1;
     a->step_kind = JLST_MELODIC;
     jlst_init(&a->step, JLST_MELODIC);
+    jlmx_init(&a->mix);
+    a->mix_writes = 1;
     for (uint32_t i = 0; i < JLAPP_PADS; i++)
         a->held[i].note = -1;
 }
@@ -486,6 +488,16 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
         custom_button(a);
         return 0;
     }
+    if (ev->idx == BUTTON_CAPTURE_IDX) {   /* the mixer (a tap on Note goes back to Note mode, Custom to the step modes) */
+        a->mode = JLAPP_MODE_MIXER;
+        say(a, "MIXER");
+        return 0;
+    }
+    if (a->mode == JLAPP_MODE_MIXER && (ev->idx == BUTTON_UP || ev->idx == BUTTON_DOWN)) {   /* the banks, as the Digitone's trig keys lie: up the upper row (1-8), down the lower (9-16) */
+        if (jlmx_bank_step(&a->mix, ev->idx == BUTTON_UP ? -1 : 1))
+            say(a, a->mix.bank ? "TRACKS 9-16" : "TRACKS 1-8");
+        return 0;
+    }
     if ((ev->idx == BUTTON_UP || ev->idx == BUTTON_DOWN) && !(a->mode == JLAPP_MODE_STEP && a->step_kind == JLST_DRUM)) {   /* the octave; drum step has none */
         jln_octave_step(&a->n, ev->idx == BUTTON_UP ? 1 : -1);
         say(a, "OCTAVE %u", (unsigned)a->n.octave);
@@ -493,9 +505,48 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
     return 0;                          /* the rest has no job yet */
 }
 
-/* the scene buttons (Launchpad 95's Note mode): 5 starts / stops the transport; the others have no job yet */
+/* a pad of the mixer screen: a press writes (the fader moves at once); a release is nothing. Without live control it says why, and without the Digitone's mixer writes
+ * (a build without stage 6) it says MIXER READ ONLY, at most every WHY_EVERY_MS */
+static size_t mixer_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
+{
+    struct jlmx_write w;
+    if (!ev->value)
+        return 0;
+    if (a->live_state != JDL_LIVE) {
+        say_why_not(a);
+        return 0;
+    }
+    if (!a->mix_writes) {
+        if (!a->why_on || (uint32_t)(a->now_ms - a->why_ms) >= WHY_EVERY_MS) {
+            a->why_on = 1;
+            a->why_ms = a->now_ms;
+            say(a, "MIXER READ ONLY");
+        }
+        return 0;
+    }
+    if (max < 1 || !jlmx_press(&a->mix, ev->col, ev->row, a->now_ms, &w))
+        return 0;
+    if (w.kind == JLMX_WRITE_VALUE) {
+        set_act(out, JLAPP_ACT_MIX, w.track, 0, w.value);
+        out->op = w.param;
+    } else {
+        set_act(out, JLAPP_ACT_MUTE, 0, (uint8_t)(w.mask & 0xFFu), 0);
+        out->op = w.which;
+        out->step = (uint8_t)(w.mask >> 8);
+    }
+    return 1;
+}
+
+static const char *const VIEW_NAME[JLMX_VIEWS] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND", "MUTE", "SOLO"};
+
+/* the scene buttons (Launchpad 95's Note mode): 5 starts / stops the transport; the others have no job yet. In the mixer they pick the view (jank_lpmix.h) */
 static size_t side_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
+    if (a->mode == JLAPP_MODE_MIXER) {
+        if (ev->value && jlmx_scene(&a->mix, ev->idx))
+            say(a, "%s", VIEW_NAME[a->mix.view]);
+        return 0;
+    }
     if (ev->idx != JLAPP_SIDE_START_STOP || !ev->value || max < 1)
         return 0;
     say(a, a->transport ? "STOP" : "START");
@@ -521,6 +572,8 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
             }
             return 0;
         }
+        if (a->mode == JLAPP_MODE_MIXER && !(!ev->value && step_holds(a) && ev->row < QUADRANT && ev->col < QUADRANT))   /* (a note held when the mode changed still ends below) */
+            return mixer_pad(a, ev, out, max);
         if (a->mode == JLAPP_MODE_STEP || (!ev->value && step_holds(a) && ev->row < QUADRANT && ev->col < QUADRANT))   /* a release also ends a step mode pad's note after a mode change */
             return step_pad(a, ev, out, max);
         if (track_pad && (ev->value || (a->track_held & (1u << track_of_pad(ev->row, ev->col)))))
@@ -665,12 +718,14 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         struct jln n = a->n;
         struct jlst_ctx c = step_ctx(a, &n);
         jlst_frame(&a->step, &c, f);
+    } else if (a->mode == JLAPP_MODE_MIXER && !a->page) {   /* so does the mixer */
+        jlmx_frame(&a->mix, f);
     }
     for (uint8_t y = 0; y < 8; y++)
         for (uint8_t x = 0; x < 8; x++) {
             struct jln_pad p;
             int playing;
-            if (a->mode == JLAPP_MODE_STEP && !a->page)
+            if (a->mode != JLAPP_MODE_NOTE && !a->page)
                 break;
             if (a->page) {
                 f->led[JLX_PAD0 + y * 8u + x].color = page_colour(a, x, y);
@@ -686,7 +741,10 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         }
     /* the arrows are green, and dim at the end of what they do (Launchpad 95's Note.Octave): the octave's limits, the first and last track; left and right are
      * amber while FOLLOW is on */
-    if (!(a->mode == JLAPP_MODE_STEP && a->step_kind == JLST_DRUM)) {   /* drum step has no octave */
+    if (a->mode == JLAPP_MODE_MIXER) {   /* the mixer's up / down are the banks: up goes to tracks 1-8, down to 9-16, dim where there is nothing further */
+        f->led[JLX_TOP0 + BUTTON_UP].color = a->mix.bank > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+        f->led[JLX_TOP0 + BUTTON_DOWN].color = a->mix.bank + 1u < JLMX_BANKS ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+    } else if (!(a->mode == JLAPP_MODE_STEP && a->step_kind == JLST_DRUM)) {   /* drum step has no octave */
         f->led[JLX_TOP0 + BUTTON_UP].color = a->n.octave + 1u < jln_octaves(&a->n) ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
         f->led[JLX_TOP0 + BUTTON_DOWN].color = a->n.octave > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
     }
@@ -704,5 +762,18 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         else
             f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = on ? JLAPP_AMBER : JLAPP_AMBER_THIRD;
     }
-    f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = a->transport ? JLAPP_GREEN : JLAPP_RED_THIRD;   /* start / stop: running green, stopped dim red */
+    /* the mixer's button (Launchpad 95's Mixer: MINT, dim when it is not on), always lit */
+    f->led[JLX_TOP0 + BUTTON_CAPTURE_IDX].color = a->mode == JLAPP_MODE_MIXER ? JLMX_COLOR_FADER : JLMX_COLOR_FADER_THIRD;
+    if (a->mode == JLAPP_MODE_MIXER) {   /* the scene buttons pick the view; start / stop is the other modes' */
+        for (uint8_t i = 0; i < 8u; i++)
+            f->led[JLX_SIDE0 + i].color = jlmx_scene_colour(&a->mix, i);
+    } else {
+        f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = a->transport ? JLAPP_GREEN : JLAPP_RED_THIRD;   /* start / stop: running green, stopped dim red */
+    }
 }
+
+int jlapp_mixer_wanted(const struct jlapp *a) { return a->mode == JLAPP_MODE_MIXER && a->live_state == JDL_LIVE; }
+
+void jlapp_on_mixer(struct jlapp *a, const struct jdl_mixer *m) { jlmx_on_mixer(&a->mix, m, a->now_ms); }
+
+void jlapp_set_mixer_writes(struct jlapp *a, int ok) { a->mix_writes = ok != 0; }

@@ -82,7 +82,7 @@ fi
 "$OUT/test_lpnote"
 "$CC" $FLAGS "$HERE/tests/test_lpscales.c" "$HERE/core/jank_lpscales.c" -o "$OUT/test_lpscales"
 "$OUT/test_lpscales"
-"$CC" $FLAGS "$HERE/tests/test_lpapp.c" "$HERE/core/jank_lpapp.c" "$HERE/core/jank_lpstep.c" "$HERE/core/jank_lpnote.c" "$HERE/core/jank_lpscales.c" "$HERE/core/jank_lpx.c" -o "$OUT/test_lpapp"
+"$CC" $FLAGS "$HERE/tests/test_lpapp.c" "$HERE/core/jank_lpapp.c" "$HERE/core/jank_lpstep.c" "$HERE/core/jank_lpmix.c" "$HERE/core/jank_lpnote.c" "$HERE/core/jank_lpscales.c" "$HERE/core/jank_lpx.c" -o "$OUT/test_lpapp"
 "$OUT/test_lpapp"
 "$CC" $FLAGS "$HERE/tests/test_lpstep.c" "$HERE/core/jank_lpstep.c" "$HERE/core/jank_lpnote.c" "$HERE/core/jank_lpscales.c" "$HERE/core/jank_lpx.c" -o "$OUT/test_lpstep"
 "$OUT/test_lpstep"

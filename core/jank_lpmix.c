@@ -14,8 +14,11 @@ void jlmx_init(struct jlmx *s)
     s->view = JLMX_VOL;
 }
 
-void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m)
+void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m, uint32_t now_ms)
 {
+    if (s->have && s->held && (uint32_t)(now_ms - s->hold_ms) < JLMX_HOLD_MS)
+        return;                        /* a reading from before the press was applied */
+    s->held = 0;
     s->m = *m;
     s->have = 1;
 }
@@ -61,12 +64,79 @@ static unsigned fader_height(uint8_t v)
     return v ? ((unsigned)v * PAD_ROWS + VALUE_MAX - 1u) / VALUE_MAX : 0u;
 }
 
-/* the pan's one lit position, 0 (left) .. 7 (right) */
+/* the 8 pan positions as the Digitone's 0..127 (64 the centre): Launchpad 95's PAN_VALUE_MAP (-1, -0.63, -0.32, 0, 0, 0.32, 0.63, 1) mapped onto 0..127; the two middle pads
+ * are both the centre */
+static const uint8_t PAN_MAP[PAD_ROWS] = {0, 23, 44, 64, 64, 84, 105, 127};
+
+/* the pan's one lit position, 0 (left) .. 7 (right): the position whose value is nearest (the lower of the two centre pads for the centre) */
 static unsigned pan_position(uint8_t v)
 {
-    if (v > VALUE_MAX)
-        v = VALUE_MAX;
-    return ((unsigned)v * (PAD_ROWS - 1u)) / VALUE_MAX;
+    unsigned best = 0, best_d = 255u;
+    for (unsigned p = 0; p < PAD_ROWS; p++) {
+        unsigned dist = v > PAN_MAP[p] ? (unsigned)(v - PAN_MAP[p]) : (unsigned)(PAN_MAP[p] - v);
+        if (dist < best_d) {
+            best = p;
+            best_d = dist;
+        }
+    }
+    return best;
+}
+
+/* the value of fader pad y (0 = the lowest): the pad's height of the 8, the value whose display fills exactly that many pads */
+static uint8_t fader_value(unsigned y) { return (uint8_t)(((y + 1u) * VALUE_MAX) / PAD_ROWS); }
+
+static uint8_t *value_ref(struct jdl_mix_track *t, uint8_t view)
+{
+    switch (view) {
+    case JLMX_VOL: return &t->vol;
+    case JLMX_PAN: return &t->pan;
+    case JLMX_DEL: return &t->del;
+    case JLMX_REV: return &t->rev;
+    default: return &t->chr;
+    }
+}
+
+static uint8_t param_of(uint8_t view)
+{
+    switch (view) {
+    case JLMX_VOL: return JDL_MIX_VOL;
+    case JLMX_PAN: return JDL_MIX_PAN;
+    case JLMX_DEL: return JDL_MIX_DEL;
+    case JLMX_REV: return JDL_MIX_REV;
+    default: return JDL_MIX_CHR;
+    }
+}
+
+int jlmx_press(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlmx_write *w)
+{
+    unsigned track = s->bank * JLMX_COLUMNS + x;
+    uint32_t *mask;
+    if (!s->have || x >= JLMX_COLUMNS || y >= PAD_ROWS)
+        return 0;
+    memset(w, 0, sizeof *w);
+    if (s->view == JLMX_MUTE || s->view == JLMX_SOLO) {
+        mask = s->view == JLMX_MUTE ? &s->m.mute : &s->m.solo;
+        *mask ^= 1u << track;
+        w->kind = JLMX_WRITE_MASK;
+        w->which = s->view == JLMX_MUTE ? 0u : 1u;
+        w->mask = (uint16_t)*mask;
+    } else {
+        uint8_t *v = value_ref(&s->m.t[track], s->view), nv;
+        if (s->view == JLMX_PAN)
+            nv = PAN_MAP[y];
+        else if (y == 0 && fader_height(*v) == 1u)
+            nv = 0;                    /* the lowest pad again: the fader goes to nothing */
+        else
+            nv = fader_value(y);
+        *v = nv;
+        w->kind = JLMX_WRITE_VALUE;
+        w->track = (uint8_t)track;
+        w->param = param_of(s->view);
+        w->value = nv;
+    }
+    s->held = 1;
+    s->hold_ms = now_ms;
+    return 1;
 }
 
 static uint8_t column_colour(const struct jlmx *s, unsigned track, unsigned row)

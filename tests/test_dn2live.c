@@ -670,6 +670,62 @@ static void test_setting_the_scale(void)
     CHECK(jdl_scale_set(&d, 20, 1, 0, out, sizeof out) == 0);
 }
 
+static void test_a_refused_write_on_a_build_that_has_scale_set_is_not_the_end_of_it(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64];
+    status_of_protocol(&d, 5);                                                   /* stage 6: SCALE SET exists */
+    CHECK(jdl_scale_set(&d, 10, 3, 0, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_SCALE_SET, 2, NULL, 0);                          /* refused: the screen shows a pattern that is not the playing one */
+    CHECK(d.scale_set_ok && d.scale_set_refused == 1 && jdl_is_live(&d));
+    CHECK(jdl_scale_set(&d, 20, 4, 0, out, sizeof out) > 0);                     /* the next write may still go */
+    reply_to(&d, d.seq, JDL_CMD_SCALE_SET, 2, NULL, 0);
+    CHECK(d.scale_set_ok && d.scale_set_refused == 2);
+    d = live(0);
+    status_of_protocol(&d, 4);                                                   /* stage 5: no SCALE SET: status 2 means that */
+    reply_to(&d, d.seq, JDL_CMD_SCALE_SET, 2, NULL, 0);
+    CHECK(!d.scale_set_ok && d.scale_set_refused == 0);
+}
+
+static void test_setting_a_mixer_value_and_the_mute_mask(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64], body[32];
+    size_t n = jdl_mixer_set(&d, 10, 3, JDL_MIX_PAN, 100, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[2] == JDL_CMD_MIXER_SET && body[3] == 3 && body[4] == 1 && body[5] == 100);
+    n = jdl_mixer_set(&d, 11, 255, JDL_MIX_LEVEL, 0, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[3] == 255 && body[4] == 5 && body[5] == 0);       /* the active track, LEVEL, 0 */
+    CHECK(jdl_mixer_set(&d, 12, 16, JDL_MIX_VOL, 1, out, sizeof out) == 0);                                  /* what the Digitone would refuse is not sent */
+    CHECK(jdl_mixer_set(&d, 12, 0, (enum jdl_mix_param)6, 1, out, sizeof out) == 0);
+    CHECK(jdl_mixer_set(&d, 12, 0, JDL_MIX_VOL, 128, out, sizeof out) == 0);
+    n = jdl_mute_set(&d, 13, 0, 0x8005u, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[2] == JDL_CMD_MUTE_SET && body[3] == 0 && body[4] == 0x80 && body[5] == 0x05);   /* mute, tracks 1, 3 and 16 */
+    n = jdl_mute_set(&d, 14, 1, 0, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[3] == 1 && body[4] == 0 && body[5] == 0);          /* solo: no track */
+    CHECK(jdl_mute_set(&d, 15, 2, 1, out, sizeof out) == 0);
+    CHECK(jdl_mixer_set(&d, 16, 0, JDL_MIX_VOL, 5, out, 8) == 0);                                            /* no room: nothing */
+}
+
+static void test_the_mixer_writes_stop_on_a_build_without_them_but_not_on_one_that_has_them(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64];
+    status_of_protocol(&d, 4);                                                   /* stage 5: no mixer writes */
+    CHECK(jdl_mixer_set(&d, 10, 0, JDL_MIX_VOL, 5, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_MIXER_SET, 2, NULL, 0);
+    CHECK(!d.mix_set_ok && d.mix_set_refused == 0 && jdl_is_live(&d));
+    CHECK(jdl_mixer_set(&d, 11, 0, JDL_MIX_VOL, 5, out, sizeof out) == 0 && jdl_mute_set(&d, 11, 0, 1, out, sizeof out) == 0);   /* neither goes any more */
+    d = live(0);
+    status_of_protocol(&d, 5);                                                   /* stage 6 */
+    CHECK(jdl_mute_set(&d, 10, 0, 1, out, sizeof out) > 0);
+    reply_to(&d, d.seq, JDL_CMD_MUTE_SET, 5, NULL, 0);                           /* 16 writes waiting: this one refused */
+    CHECK(d.mix_set_ok && d.mix_set_refused == 1);
+    reply_to(&d, d.seq, JDL_CMD_MIXER_SET, 2, NULL, 0);                          /* refused at the pass */
+    CHECK(d.mix_set_ok && d.mix_set_refused == 2 && jdl_is_live(&d));
+    reply_to(&d, d.seq, JDL_CMD_MIXER_SET, 0, NULL, 0);                          /* done */
+    CHECK(d.mix_set_ok && d.mix_set_refused == 2);
+}
+
 static void test_the_scale_needs_live_control(void)
 {
     struct jdl d;
@@ -684,6 +740,9 @@ int main(void)
     test_the_root_comes_with_protocol_five();
     test_a_damaged_or_refused_scale_answer();
     test_setting_the_scale();
+    test_a_refused_write_on_a_build_that_has_scale_set_is_not_the_end_of_it();
+    test_setting_a_mixer_value_and_the_mute_mask();
+    test_the_mixer_writes_stop_on_a_build_without_them_but_not_on_one_that_has_them();
     test_the_scale_needs_live_control();
     test_reading_the_mixer();
     test_a_damaged_or_refused_mixer_answer_is_not_taken();

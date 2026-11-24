@@ -20,6 +20,9 @@
 
 #define JDL_CMD_LIVE 44u
 #define JDL_CMD_MIXER 45u              /* read the mixer: every track's VOL, PAN, sends and LEVEL, the mute and solo masks */
+#define JDL_CMD_MIXER_SET 56u          /* set one value of one track (stage 6) */
+#define JDL_CMD_MUTE_SET 57u           /* set the mute or the solo mask (stage 6) */
+enum jdl_mix_param { JDL_MIX_VOL = 0, JDL_MIX_PAN = 1, JDL_MIX_DEL = 2, JDL_MIX_REV = 3, JDL_MIX_CHR = 4, JDL_MIX_LEVEL = 5 };
 #define JDL_CMD_SCALE 50u              /* read the scale (and, from protocol 5, the root) a track plays */
 #define JDL_CMD_SCALE_SET 55u          /* set it (stage 6) */
 #define JDL_SCALES 36u
@@ -102,6 +105,9 @@ struct jdl {
     uint8_t scale_fresh;
     uint8_t scale_ok;                  /* SCALE has not been refused (status 2): 1 until it is */
     uint8_t scale_set_ok;              /* SCALE SET has not been refused (an older Digitone build): 1 until it is */
+    uint32_t scale_set_refused;        /* SCALE SET answered 2 by a build that has it (protocol >= 5): that write refused, the next may go */
+    uint8_t mix_set_ok;                /* MIXER SET / MUTE SET have not been refused by a build without them: 1 until they are */
+    uint32_t mix_set_refused;          /* ... answered 2 or 5 by a build that has them: that write refused */
     struct jdl_mixer mx;               /* the last MIXER answer, until taken (mixer_fresh) */
     uint8_t mixer_fresh;
     struct jdl_page pg;                /* the last STEPS answer, until taken (page_fresh) */
@@ -145,6 +151,10 @@ int jdl_take_scale(struct jdl *d, struct jdl_scale *out);
 /* The mixer read (only while live, else 0). jdl_take_mixer: the last MIXER answer, once (1 and *out filled), else 0 */
 size_t jdl_mixer_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out);
+/* The mixer writes (Digitone stage 6; each applies at its next UI pass, 16 waiting answers status 5; a build without them answers status 2 once and they stop).
+ * MIXER SET {track 0..15 (255 = the active one), param (enum jdl_mix_param), value 0..127}; MUTE SET {which 0 mute / 1 solo, u16 mask (bit t = track t + 1)}: the whole mask */
+size_t jdl_mixer_set(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_mix_param param, uint8_t value, uint8_t *out, size_t cap);
+size_t jdl_mute_set(struct jdl *d, uint32_t now_ms, uint8_t which, uint16_t mask, uint8_t *out, size_t cap);
 
 /* Step pages and edits (only while live; 0 for invalid arguments, which the Digitone would refuse). jdl_take_page: the last STEPS answer, once (1 and *out filled), else 0 */
 size_t jdl_steps_read(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t page, uint8_t *out, size_t cap);

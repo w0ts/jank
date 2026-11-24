@@ -144,6 +144,8 @@ static void test_full_record(void)
     d.dn2_root_known = 1;
     d.scale_ok = 1;
     d.scale_set_ok = 0;
+    d.live_mixer_reads = 70;
+    d.live_mixer_sets = 5;
     d.live_edits = 12;
     d.live_pagereads = 340;
     d.live_step_busy = 2;
@@ -195,7 +197,7 @@ static void test_full_record(void)
     jhd_format(&d, out, sizeof out);
     CHECK(strstr(out, "hostdiag_scale=dn2:6,root:-1,"));
     d.dn2_root_known = 1;
-    CHECK(strstr(out, "hostdiag_steps=edits:12,reads:340,busy:2,refused:1\n"));
+    CHECK(strstr(out, "hostdiag_steps=edits:12,reads:340,busy:2,refused:1,mixreads:70,mixsets:5\n"));
     CHECK(strstr(out, "hostdiag_dn2live=proto:3,push:1,lease:9,made:100,sent:96,lost:4,dropped:2,pushmsgs:30,ignored:3,last_ignored_len:41\n"));
     d.live_state = 9;                  /* a state number from a newer build prints as ?, not past the list */
     jhd_format(&d, out, sizeof out);

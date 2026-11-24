@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include "jank_dn2live.h"
 #include "jank_lpact.h"
+#include "jank_lpmix.h"
 #include "jank_lpnote.h"
 #include "jank_lpstep.h"
 #include "jank_lpx.h"
@@ -84,7 +85,8 @@ struct jlapp_held {
 /* Modes (owner 2026-11-24): the Note button (a tap, shorter than JLAPP_TAP_MS) is Note mode; Custom goes to the step modes and cycles melodic <-> drum
  * (jank_lpstep.h); held, the Note button is the scale page in every mode. Scene button 5 (side index 4) starts / stops the transport, as Launchpad 95's Note mode.
  * Up / down are the octave in Note mode and in melodic step, nothing in drum step. */
-enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP };
+enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP, JLAPP_MODE_MIXER };
+#define BUTTON_CAPTURE_IDX 7u               /* the top button that enters the mixer (Launchpad 95's mixer button is the last one too) */
 #define JLAPP_TAP_MS 400u
 #define JLAPP_SIDE_START_STOP 4u            /* the side buttons, top (scene 1) = 0: scene 5 */
 #define BUTTON_CUSTOM_IDX 6u
@@ -118,6 +120,8 @@ struct jlapp {
     char msg[JLAPP_MSG_MAX];
     uint8_t msg_new;
     uint8_t mode;                      /* enum jlapp_mode */
+    uint8_t mix_writes;                /* the Digitone takes MIXER SET / MUTE SET (not refused by a build without them) */
+    struct jlmx mix;
     uint8_t step_kind;                 /* enum jlst_kind: the step mode Custom goes to (and the one last used) */
     uint8_t transport;                 /* the clock runs (set by the firmware) */
     uint8_t beat_ok;                   /* the session's beat is known (jlapp_set_beat) */
@@ -162,6 +166,11 @@ void jlapp_set_transport(struct jlapp *a, int playing);
 void jlapp_set_beat(struct jlapp *a, int known, uint32_t tick16);
 /* a real-time byte (Start / Continue / Stop / clock) from the Digitone's USB MIDI: the playhead follows its own transport while its clock ticks (jank_lpstep.h) */
 void jlapp_on_dn2_rt(struct jlapp *a, uint8_t byte);
+/* The mixer screen (jank_lpmix.h): jlapp_mixer_wanted is 1 while it is on and live control is up (the firmware reads MIXER every JLMX_READ_MS then); jlapp_on_mixer takes the
+ * Digitone's answer (jdl_take_mixer); jlapp_set_mixer_writes says whether MIXER SET / MUTE SET are taken (jdl.mix_set_ok): when not, a press says MIXER READ ONLY */
+int jlapp_mixer_wanted(const struct jlapp *a);
+void jlapp_on_mixer(struct jlapp *a, const struct jdl_mixer *m);
+void jlapp_set_mixer_writes(struct jlapp *a, int ok);
 /* the step modes: the pages of the current track to read now (pages[0..n), 0 outside the step modes), and a page the Digitone answered (jdl_take_page) */
 size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2]);
 void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg);

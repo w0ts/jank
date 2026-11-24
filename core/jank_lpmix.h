@@ -5,8 +5,8 @@
  *   1 volume   2 pan   3 delay send   4 reverb send   5 chorus send   6 mute   7 solo   (8: nothing yet)
  *
  * Volume and the sends fill from the bottom; pan is one pad (the centre pads marked); mute shows each track's column bright yellow, dim when it is muted; solo bright
- * blue when it is soloed, dim when not. Colours as Launchpad 95's (SkinMK2.py Mixer.*: MINT, YELLOW, BLUE). READ ONLY: the Digitone's mixer writes are its stage 6; a press
- * on a fader or a column changes nothing and says so. The values come from MIXER (jank_dn2live.h). Pure; host-tested (tests/test_lpmix.c). */
+ * blue when it is soloed, dim when not. Colours as Launchpad 95's (SkinMK2.py Mixer.*: MINT, YELLOW, BLUE). The values come from MIXER (jank_dn2live.h), so the faders
+ * move when the Digitone's values do; a press writes (MIXER SET / MUTE SET, the Digitone's stage 6) and the fader moves at once. Pure; host-tested (tests/test_lpmix.c). */
 #ifndef JANK_LPMIX_H
 #define JANK_LPMIX_H
 #include <stdint.h>
@@ -26,16 +26,35 @@
 
 enum jlmx_view { JLMX_VOL, JLMX_PAN, JLMX_DEL, JLMX_REV, JLMX_CHR, JLMX_MUTE, JLMX_SOLO, JLMX_VIEWS };
 
+#define JLMX_HOLD_MS 400u              /* after a press the Digitone's older reading is not allowed to put the fader back (its write applies at its next UI pass) */
+
 struct jlmx {
     uint8_t view;                      /* enum jlmx_view */
     uint8_t bank;                      /* 0: tracks 1-8, 1: tracks 9-16 */
     uint8_t have;                      /* a MIXER answer has come */
+    uint8_t held;                      /* a press changed the local copy at hold_ms */
+    uint32_t hold_ms;
     struct jdl_mixer m;
 };
 
+/* what a press asks the Digitone to write (jlmx_press) */
+enum jlmx_write_kind { JLMX_WRITE_NONE, JLMX_WRITE_VALUE, JLMX_WRITE_MASK };
+struct jlmx_write {
+    uint8_t kind;                      /* enum jlmx_write_kind */
+    uint8_t track;                     /* JLMX_WRITE_VALUE: the track, 0..15 */
+    uint8_t param;                     /* ... enum jdl_mix_param */
+    uint8_t value;                     /* ... 0..127 */
+    uint8_t which;                     /* JLMX_WRITE_MASK: 0 mute, 1 solo */
+    uint16_t mask;                     /* ... the whole new mask (bit t = track t + 1) */
+};
+
 void jlmx_init(struct jlmx *s);
-/* the Digitone's answer (jdl_take_mixer) */
-void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m);
+/* the Digitone's answer (jdl_take_mixer); within JLMX_HOLD_MS of a press it is not taken (the fader would jump back and forth), the next one is */
+void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m, uint32_t now_ms);
+/* A pad (x 0..7, y 0..7 from the bottom) pressed: what to write, and the local copy is changed at once (the fader moves). Volume and the sends: the pad's height,
+ * 8 steps, and the lowest pad again when the fader is already at that step sets 0; pan: the 8 positions (the two middle ones are the centre); mute / solo: the column's track
+ * toggles. 1 and *w filled, 0 when nothing is to be written (no answer from the Digitone yet) */
+int jlmx_press(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlmx_write *w);
 /* a scene button (index 0 = the top one): 1 and the view is picked if it is one of the views, else 0 */
 int jlmx_scene(struct jlmx *s, uint8_t idx);
 /* up (+1) / down (-1): the bank; 1 when it changed, 0 at the limit */

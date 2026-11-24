@@ -167,6 +167,14 @@ static void run_act(const struct jlapp_act *act)
         n = jdl_scale_set(&s_jdl, t, act->note, act->vel, sx, sizeof sx);
         g_hostdiag.live_scale_sets += n != 0;
         break;
+    case JLAPP_ACT_MIX:                /* a mixer fader (MIXER SET, stage 6) */
+        n = jdl_mixer_set(&s_jdl, t, act->track, (enum jdl_mix_param)act->op, act->vel, sx, sizeof sx);
+        g_hostdiag.live_mixer_sets += n != 0;
+        break;
+    case JLAPP_ACT_MUTE:               /* a mute / solo column: the whole new mask (MUTE SET, stage 6) */
+        n = jdl_mute_set(&s_jdl, t, act->op, (uint16_t)(act->note | ((unsigned)act->step << 8)), sx, sizeof sx);
+        g_hostdiag.live_mixer_sets += n != 0;
+        break;
     case JLAPP_ACT_TRANSPORT:          /* the ui task starts / stops the transport (it may wait for the bridge; this task must not) */
         s_transport_req = 1;
         return;
@@ -190,6 +198,7 @@ static void sync_live(void)
     g_hostdiag.dn2_dropped = s_jdl.st.dropped;
     g_hostdiag.dn2_pushmsgs = s_jdl.st.msgs;
     g_hostdiag.live_msg_ok = s_jdl.msg_ok;
+    jlapp_set_mixer_writes(&s_app, s_jdl.mix_set_ok);
     g_hostdiag.scale_ok = s_jdl.scale_ok;
     g_hostdiag.scale_set_ok = s_jdl.scale_set_ok;
     g_hostdiag.live_step_busy = s_jdl.step_busy;
@@ -226,6 +235,7 @@ static void dn2_sysex(void)
     enum jdl_in k = jdl_input(&s_jdl, s_sx.buf, s_sx.n, notes, &count);
     if (k == JDL_IN_REPLY) {
         static struct jdl_page page;
+        static struct jdl_mixer mixer;
         struct jdl_scale scale;
         g_hostdiag.live_replies++;
         track = jdl_take_active(&s_jdl);           /* FOLLOW: the answer to an active-track read */
@@ -236,6 +246,10 @@ static void dn2_sysex(void)
         if (jdl_take_page(&s_jdl, &page)) {        /* a step mode: a page of the current track */
             jlapp_tick(&s_app, now_ms());
             jlapp_on_page(&s_app, &page);
+        }
+        if (jdl_take_mixer(&s_jdl, &mixer)) {      /* the mixer screen: the faders follow the Digitone's values */
+            jlapp_tick(&s_app, now_ms());
+            jlapp_on_mixer(&s_app, &mixer);
         }
         if (jdl_take_scale(&s_jdl, &scale)) {      /* the Digitone's scale (and, from protocol 5, its root): the Launchpad follows when it changes */
             jlapp_tick(&s_app, now_ms());
@@ -307,6 +321,7 @@ static int beat_sixteenths(uint32_t t, uint32_t *tick16)
 static uint32_t s_read_ms;             /* the last active-track read (FOLLOW) */
 static uint32_t s_page_ms;             /* the last read of the step pages */
 static uint32_t s_scale_ms;            /* the last read of the Digitone's scale */
+static uint32_t s_mixer_ms;            /* the last read of the Digitone's mixer */
 #define SCALE_POLL_MS 1000u            /* ... every second: the header and one short name, about 20 bytes of data */
 #define STEP_URGENT_MS 60u             /* ... right after a track or page switch, until its pages are in (at most STEP_URGENT_TRIES reads, then back to the slow rate) */
 #define STEP_URGENT_TRIES 6u
@@ -366,6 +381,12 @@ static void live_pump(void)
         n = jdl_track_read(&s_jdl, t, sx, sizeof sx);
         s_read_ms = t;
         g_hostdiag.live_reads += n != 0;
+        dn2_send_sysex(sx, n);
+    }
+    if (jlapp_mixer_wanted(&s_app) && t - s_mixer_ms >= JLMX_READ_MS) {   /* the mixer screen is on: the Digitone's values, 106 bytes, every 300 ms */
+        n = jdl_mixer_read(&s_jdl, t, sx, sizeof sx);
+        s_mixer_ms = t;
+        g_hostdiag.live_mixer_reads += n != 0;
         dn2_send_sysex(sx, n);
     }
     if (live && t - s_scale_ms >= SCALE_POLL_MS) {   /* the Digitone's scale (and root): a cheap header-only read, once a second */

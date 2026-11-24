@@ -112,8 +112,8 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
     }
     put(out, cap, &n, "hostdiag_scale=dn2:%u,root:%d,reads:%lu,sets:%lu,read_ok:%u,set_ok:%u\n", d->dn2_scale, d->dn2_root_known ? (int)d->dn2_root : -1,
         (unsigned long)d->live_scale_reads, (unsigned long)d->live_scale_sets, d->scale_ok, d->scale_set_ok);
-    put(out, cap, &n, "hostdiag_steps=edits:%lu,reads:%lu,busy:%lu,refused:%lu\n", (unsigned long)d->live_edits, (unsigned long)d->live_pagereads,
-        (unsigned long)d->live_step_busy, (unsigned long)d->live_step_refused);
+    put(out, cap, &n, "hostdiag_steps=edits:%lu,reads:%lu,busy:%lu,refused:%lu,mixreads:%lu,mixsets:%lu\n", (unsigned long)d->live_edits, (unsigned long)d->live_pagereads,
+        (unsigned long)d->live_step_busy, (unsigned long)d->live_step_refused, (unsigned long)d->live_mixer_reads, (unsigned long)d->live_mixer_sets);
     put(out, cap, &n, "hostdiag_dn2live=proto:%u,push:%u,lease:%u,made:%lu,sent:%lu,lost:%lu,dropped:%lu,pushmsgs:%lu,ignored:%lu,last_ignored_len:%u\n",
         d->dn2_proto, d->dn2_push, d->dn2_lease, (unsigned long)d->dn2_made, (unsigned long)d->dn2_sent, (unsigned long)d->dn2_lost,
         (unsigned long)d->dn2_dropped, (unsigned long)d->dn2_pushmsgs, (unsigned long)d->live_ignored, d->live_ign_len);

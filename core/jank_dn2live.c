@@ -23,6 +23,7 @@ void jdl_init(struct jdl *d)
     d->msg_ok = 1;
     d->scale_ok = 1;
     d->scale_set_ok = 1;
+    d->mix_set_ok = 1;
 }
 
 int jdl_is_live(const struct jdl *d) { return d->state == JDL_LIVE; }
@@ -168,6 +169,28 @@ size_t jdl_mixer_read(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
     if (d->state != JDL_LIVE)
         return 0;
     return send(d, now_ms, JDL_CMD_MIXER, NULL, 0, out, cap);
+}
+
+size_t jdl_mixer_set(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_mix_param param, uint8_t value, uint8_t *out, size_t cap)
+{
+    uint8_t args[3];
+    if (d->state != JDL_LIVE || !d->mix_set_ok || (track > 15u && track != 255u) || (unsigned)param > (unsigned)JDL_MIX_LEVEL || value > 127u)
+        return 0;
+    args[0] = track;
+    args[1] = (uint8_t)param;
+    args[2] = value;
+    return send(d, now_ms, JDL_CMD_MIXER_SET, args, sizeof args, out, cap);
+}
+
+size_t jdl_mute_set(struct jdl *d, uint32_t now_ms, uint8_t which, uint16_t mask, uint8_t *out, size_t cap)
+{
+    uint8_t args[3];
+    if (d->state != JDL_LIVE || !d->mix_set_ok || which > 1u)
+        return 0;
+    args[0] = which;
+    args[1] = (uint8_t)(mask >> 8);
+    args[2] = (uint8_t)mask;
+    return send(d, now_ms, JDL_CMD_MUTE_SET, args, sizeof args, out, cap);
 }
 
 int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out)
@@ -338,14 +361,25 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         return JDL_IN_REPLY;
     }
     if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE &&
-        r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET)
+        r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET && r.cmd != JDL_CMD_MIXER_SET && r.cmd != JDL_CMD_MUTE_SET)
         return JDL_IN_IGNORED;
+    if (r.cmd == JDL_CMD_MIXER_SET || r.cmd == JDL_CMD_MUTE_SET) {   /* 2: not understood (an older build) or refused; 5: 16 writes already waiting: that write only */
+        if (r.status == ST_NOT_UNDERSTOOD || r.status == ST_BUSY) {
+            if (r.status == ST_NOT_UNDERSTOOD && !(d->st.valid && d->st.proto >= SCALE_PROTO_ROOT))
+                d->mix_set_ok = 0;     /* a build without the mixer writes */
+            else
+                d->mix_set_refused++;
+            return JDL_IN_REPLY;
+        }
+    }
     if (r.cmd == JDL_CMD_SCALE || r.cmd == JDL_CMD_SCALE_SET) {   /* a refusal (2) ends that command only: live control is fine */
         if (r.status == ST_NOT_UNDERSTOOD) {
             if (r.cmd == JDL_CMD_SCALE)
                 d->scale_ok = 0;
+            else if (d->st.valid && d->st.proto >= SCALE_PROTO_ROOT)
+                d->scale_set_refused++;    /* a build that HAS SCALE SET: status 2 is that one write refused (the screen shows a pattern that is not the playing one) */
             else
-                d->scale_set_ok = 0;
+                d->scale_set_ok = 0;       /* a build without it */
             return JDL_IN_REPLY;
         }
         if (r.status == 0) {
