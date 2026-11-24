@@ -230,6 +230,9 @@ static void run_act(const struct jlapp_act *act)
         n = jdl_mute_set(&s_jdl, t, act->op, (uint16_t)(act->note | ((unsigned)act->step << 8)), sx, sizeof sx);
         g_hostdiag.live_mixer_sets += n != 0;
         break;
+    case JLAPP_ACT_ERASE:              /* the Delete button held / let go: the Digitone erases that track's steps on its own playhead (LIVE ERASE) */
+        n = jdl_erase(&s_jdl, t, act->vel ? (uint16_t)(1u << act->track) : 0u, sx, sizeof sx);
+        break;
     case JLAPP_ACT_TRANSPORT:          /* the ui task starts / stops the transport (it may wait for the bridge; this task must not) */
         s_transport_req = 1;
         return;
@@ -479,13 +482,13 @@ void usb_lp_detach(enum jlapp_role r)
 {
     ensure_init();
     if (r == JLAPP_LPX) {
-        struct jlapp_act off[JLAPP_PADS + JLN_TRACKS];
+        struct jlapp_act off[JLAPP_PADS + JLN_TRACKS + 1u];   /* (+ the Delete button's end) */
         s_lpx_up = 0;
         g_hostdiag.lpx_up = 0;
         s_programmer_pending = 0;
         s_setup_pending = 0;
         /* its pads that were down end their notes: nothing stays sounding on the Digitone */
-        for (size_t i = 0, n = jlapp_release_acts(&s_app, off, JLAPP_PADS + JLN_TRACKS); i < n; i++)
+        for (size_t i = 0, n = jlapp_release_acts(&s_app, off, JLAPP_PADS + JLN_TRACKS + 1u); i < n; i++)
             run_act(&off[i]);
     } else if (r == JLAPP_DN2) {
         s_dn2_up = 0;

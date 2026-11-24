@@ -6,6 +6,7 @@
 
 #define SUB_STATUS 0u
 #define SUB_ON 1u
+#define SUB_ERASE 3u
 #define WHAT_PUSH_NOTES 1u
 #define ST_NOT_UNDERSTOOD 2u
 #define ST_NOT_LIVE 4u
@@ -191,6 +192,17 @@ size_t jdl_mute_set(struct jdl *d, uint32_t now_ms, uint8_t which, uint16_t mask
     args[1] = (uint8_t)(mask >> 8);
     args[2] = (uint8_t)mask;
     return send(d, now_ms, JDL_CMD_MUTE_SET, args, sizeof args, out, cap);
+}
+
+size_t jdl_erase(struct jdl *d, uint32_t now_ms, uint16_t tracks, uint8_t *out, size_t cap)
+{
+    uint8_t args[3];
+    if (d->state != JDL_LIVE)
+        return 0;
+    args[0] = SUB_ERASE;
+    args[1] = (uint8_t)(tracks >> 8);
+    args[2] = (uint8_t)tracks;
+    return send(d, now_ms, JDL_CMD_LIVE, args, sizeof args, out, cap);
 }
 
 int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out)

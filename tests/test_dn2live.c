@@ -704,6 +704,22 @@ static void test_setting_a_mixer_value_and_the_mute_mask(void)
     CHECK(n > 0 && request_body(out, n, body) == 6 && body[3] == 1 && body[4] == 0 && body[5] == 0);          /* solo: no track */
     CHECK(jdl_mute_set(&d, 15, 2, 1, out, sizeof out) == 0);
     CHECK(jdl_mixer_set(&d, 16, 0, JDL_MIX_VOL, 5, out, 8) == 0);                                            /* no room: nothing */
+    /* LIVE ERASE (44 sub 3, a u16 mask of tracks, big-endian; the Digitone's own answer to the Delete button, dn2-wishes) */
+    n = jdl_erase(&d, 17, 1u << 5, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[2] == JDL_CMD_LIVE && body[3] == 3 && body[4] == 0x00 && body[5] == 0x20);   /* track 6 */
+    n = jdl_erase(&d, 18, 1u << 15, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[3] == 3 && body[4] == 0x80 && body[5] == 0x00);   /* track 16 */
+    n = jdl_erase(&d, 19, 0, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 6 && body[3] == 3 && body[4] == 0 && body[5] == 0);          /* let go: all off */
+    CHECK(jdl_erase(&d, 20, 1, out, 8) == 0);                                                                /* no room: nothing */
+}
+
+static void test_erase_needs_live_control(void)
+{
+    struct jdl d;
+    uint8_t out[64];
+    jdl_init(&d);
+    CHECK(jdl_erase(&d, 1, 1, out, sizeof out) == 0);              /* not live: nothing is sent */
 }
 
 static void test_the_mixer_writes_stop_on_a_build_without_them_but_not_on_one_that_has_them(void)
@@ -736,6 +752,7 @@ static void test_the_scale_needs_live_control(void)
 
 int main(void)
 {
+    test_erase_needs_live_control();
     test_reading_the_scale_with_the_cheap_poll();
     test_the_root_comes_with_protocol_five();
     test_a_damaged_or_refused_scale_answer();

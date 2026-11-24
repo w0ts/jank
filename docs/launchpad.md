@@ -102,7 +102,13 @@ lower left, the sequence on top, the loop selector lower right):
 - **The quadrant flashes what plays** (owner 2026-11-24; both modes, from the Digitone's note push, 150 ms, RED as Launchpad 95's playing note): a drum track pad when
   that track plays, a melodic keyboard key when the current track plays that pitch (every key of that pitch).
 - **The quadrant also plays while the transport is stopped** (the track's own note / the key), and only selects while it runs (owner's rule). **Scene button 5 starts / stops
-  the transport** (Launchpad 95's Note mode: its start / stop; green running, dim red stopped): Jank is the transport master, the ui task calls `bridge_play`.
+  the transport** (Launchpad 95's Note mode: its start / stop; green running, dim red stopped): Jank is the transport master, the ui task calls `bridge_play`. **Measured 2026-11-24 (owner: "start stop on note mode is not working"): the unit had `peers=0`, and the rule "the clock goes to the Digitone only
+  with peers on the Jank / Link network" (`usb_midi_clock_peers`) dropped every clock and Start byte, so the button did nothing.** The button now overrides that rule while the Launchpad has
+  the transport started (`usb_midi_clock_force`, ui.c): the clock goes out until it stops it (or the transport stops some other way). Not tried on the unit after the fix (the update was rolled back, see the state notes).
+- **Delete = scene button 6, held, in Note and step modes** (owner 2026-11-24: "hold Delete wipes the current track under the playhead"; PINK_THIRD dim, PINK while held; in the mixer scene 6 is a view): the Digitone
+  **erases the track's steps as its own playhead passes them** (LIVE ERASE, 44 sub 3 with a u16 track mask, there since its lp2, dn2-wishes: it deletes each step just before it plays, never sounds it, so it is the Digitone's playhead and not Jank's
+  extrapolation; it ends on LIVE OFF, the 10 s lease, REMOTE CONTROL OFF or USB down). The track is the current one when the button went down; letting go (or the Launchpad going away) sends mask 0. Known limit (dn2-wishes): the first step after PLAY
+  is played from the record made at STOP, so it is erased on the next pass. **Record = scene button 8** (red, owner) **is not built**: the Digitone has no live-control record command yet (dn2-wishes stage 7, provisional `58 RECORD {on 0 / 1 / 255 read}`, waits for the owner's go there); the button stays dark until it has one. Step-mode recording follows the same command.
 - Reads and edits need live control; without it a step press says why (as a pad does). STEP's refusals (2) and full queue (5) are counted in `diag` (`hostdiag_steps`).
 - Velocity, length, quantise, random etc. (Launchpad 95's other scene buttons: drum 3 quant, 5/6 up/down, 7 velocity, 8 mute; melodic 4 random, 5 length, 6 octave, 7
   velocity, 8 notes; Note mode 2 undo, 8 record; mixer 1-4 volume / pan / send A / send B) are **not built yet**.

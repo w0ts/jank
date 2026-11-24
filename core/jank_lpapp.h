@@ -90,6 +90,10 @@ enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP, JLAPP_MODE_MIXER };
 #define BUTTON_CAPTURE_IDX 7u               /* the top button that enters the mixer (Launchpad 95's mixer button is the last one too) */
 #define JLAPP_TAP_MS 400u
 #define JLAPP_SIDE_START_STOP 4u            /* the side buttons, top (scene 1) = 0: scene 5 */
+#define JLAPP_SIDE_DELETE 5u                /* scene 6 (owner 2026-11-24): held, the Digitone erases the track's steps as its playhead passes; Note and step modes (the mixer's scene 6 is a view).
+                                             * Scene 8 will be Record, lit once the Digitone has a record command (dn2-wishes stage 7) */
+#define JLAPP_PINK 53u                      /* the Delete button: PINK held, PINK_THIRD otherwise (my pick, the owner asked for one) */
+#define JLAPP_PINK_THIRD 55u
 #define BUTTON_CUSTOM_IDX 6u
 
 struct jlapp {
@@ -102,6 +106,7 @@ struct jlapp {
     uint8_t minor_idx;                 /* the minor scale the relative pad returns to (jank_lpscales.h index) */
     struct jlapp_held held[JLAPP_PADS];
     uint8_t track_pads;                /* the two bottom rows are the 16 tracks (page switch) */
+    uint8_t erase_on, erase_track;     /* the Delete button is held, and the track it erases (the current track when it went down) */
     uint8_t live_state;                /* enum jdl_state, as the firmware last told (jlapp_set_live) */
     uint8_t play_ok;                   /* PLAY has not been refused */
     uint8_t can_play;                  /* live control is on and PLAY is there: a press can play */

@@ -18,7 +18,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define JDL_CMD_LIVE 44u
+#define JDL_CMD_LIVE 44u               /* sub 0 status, 1 on, 3 ERASE (a u16 mask of tracks: the Digitone deletes each step of those tracks just before it plays, on its own playhead, since its lp2) */
 #define JDL_CMD_MIXER 45u              /* read the mixer: every track's VOL, PAN, sends and LEVEL, the mute and solo masks */
 #define JDL_CMD_MIXER_SET 56u          /* set one value of one track (stage 6) */
 #define JDL_CMD_MUTE_SET 57u           /* set the mute or the solo mask (stage 6) */
@@ -155,6 +155,8 @@ int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out);
  * MIXER SET {track 0..15 (255 = the active one), param (enum jdl_mix_param), value 0..127}; MUTE SET {which 0 mute / 1 solo, u16 mask (bit t = track t + 1)}: the whole mask */
 size_t jdl_mixer_set(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_mix_param param, uint8_t value, uint8_t *out, size_t cap);
 size_t jdl_mute_set(struct jdl *d, uint32_t now_ms, uint8_t which, uint16_t mask, uint8_t *out, size_t cap);
+/* LIVE ERASE: bit t of `tracks` = erase on for track t, 0 = all off (the Delete button held / let go). The answer is LIVE STATUS. 0 unless live control is on */
+size_t jdl_erase(struct jdl *d, uint32_t now_ms, uint16_t tracks, uint8_t *out, size_t cap);
 
 /* Step pages and edits (only while live; 0 for invalid arguments, which the Digitone would refuse). jdl_take_page: the last STEPS answer, once (1 and *out filled), else 0 */
 size_t jdl_steps_read(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t page, uint8_t *out, size_t cap);

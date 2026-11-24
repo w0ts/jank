@@ -523,7 +523,7 @@ static void test_buttons_lit(void)
     CHECK(f.led[JLX_TOP0 + 6].color == JLAPP_GREEN_THIRD);        /* Custom does something: lit, dim (melodic step is the one it leads to) */
     CHECK(f.led[JLX_TOP0 + 7].color == JLMX_COLOR_FADER_THIRD);   /* Capture is the mixer's: lit, dim (MINT_THIRD) */
     for (uint32_t i = 0; i < 8; i++)
-        CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_RED_THIRD : 0));   /* only start / stop is lit: dim red while stopped */
+        CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_RED_THIRD : i == 5 ? JLAPP_PINK_THIRD : 0));   /* start / stop (dim red while stopped) and Delete (dim pink) are lit */
     CHECK(f.led[JLX_LOGO].color == 0);
     for (uint32_t i = 0; i < JLX_LEDS; i++)
         CHECK(f.led[i].mode == JLX_STATIC);
@@ -1066,6 +1066,59 @@ static void test_the_start_stop_scene_button(void)
     CHECK(f.led[JLX_SIDE0 + SCENE5].color == JLAPP_RED_THIRD);
 }
 
+/* owner 2026-11-24: Delete on scene 6, held: the Digitone erases the track's steps as its own playhead passes (LIVE ERASE); Note and step modes */
+static void test_the_delete_scene_button_is_held(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    struct jlx_frame f;
+    CHECK(JLAPP_SIDE_DELETE == 5);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == JLAPP_PINK_THIRD && f.led[JLX_SIDE0 + 7].color == 0);   /* dim; scene 8 (record) is dark until the Digitone has it */
+    acts(&a, top(3, 127), &o);                                     /* the track: the next one (index 1) */
+    CHECK(a.n.track == 1);
+    say_nothing_yet(&a);
+    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 127), &o) == 1 && o.kind == JLAPP_ACT_ERASE && o.track == 1 && o.vel == 1 && strcmp(msg(&a), "DELETE TRACK 2") == 0);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == JLAPP_PINK);                                          /* bright while held */
+    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 127), &o) == 0);        /* a second press while held: nothing */
+    acts(&a, top(3, 127), &o);                                     /* the track changes while it is held ... */
+    CHECK(a.n.track == 2);
+    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 0), &o) == 1 && o.kind == JLAPP_ACT_ERASE && o.track == 1 && o.vel == 0);   /* ... the release ends the track it erased */
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == JLAPP_PINK_THIRD);
+    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 0), &o) == 0);          /* a release with nothing held */
+}
+
+static void test_delete_in_a_step_mode_and_in_the_mixer_and_without_live_control(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o[JLAPP_ACTS_MAX + 1u];
+    struct jlx_ev ev = {JLX_SIDE, 0, 0, JLAPP_SIDE_DELETE, 127};
+    acts(&a, top(6, 127), o);                                      /* a step mode */
+    CHECK(jlapp_on_lpx_acts(&a, &ev, o, 1) == 1 && o[0].kind == JLAPP_ACT_ERASE && o[0].vel == 1);
+    acts(&a, top(BUTTON_CAPTURE_IDX, 127), o);                     /* the mixer opens with Delete held */
+    ev.value = 0;
+    CHECK(jlapp_on_lpx_acts(&a, &ev, o, 1) == 1 && o[0].kind == JLAPP_ACT_ERASE && o[0].vel == 0);   /* its release still ends it */
+    ev.value = 127;
+    CHECK(jlapp_on_lpx_acts(&a, &ev, o, 1) == 0 && a.mix.view == JLMX_MUTE);   /* in the mixer scene 6 is a view, not Delete */
+    {
+        struct jlapp b = fresh_not_live(JDL_REMOTE_OFF);           /* no live control: it says why and erases nothing */
+        say_nothing_yet(&b);
+        CHECK(jlapp_on_lpx_acts(&b, &ev, o, 1) == 0 && !b.erase_on && msg(&b)[0] != 0);
+    }
+}
+
+static void test_delete_ends_when_the_launchpad_goes_away(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o[JLAPP_PADS + JLN_TRACKS + 1u];
+    struct jlx_ev ev = {JLX_SIDE, 0, 0, JLAPP_SIDE_DELETE, 127};
+    CHECK(jlapp_on_lpx_acts(&a, &ev, o, 1) == 1 && a.erase_on);
+    CHECK(jlapp_release_acts(&a, o, JLAPP_PADS + JLN_TRACKS + 1u) == 1 && o[0].kind == JLAPP_ACT_ERASE && o[0].vel == 0 && !a.erase_on);
+    CHECK(jlapp_release_acts(&a, o, JLAPP_PADS + JLN_TRACKS + 1u) == 0);
+}
+
 static void test_the_mode_buttons_light(void)
 {
     struct jlapp a = fresh();
@@ -1499,6 +1552,9 @@ int main(void)
     test_up_and_down_are_the_octave_except_in_drum_step();
     test_a_drum_pad_on_another_track_selects_and_plays_while_stopped();
     test_the_start_stop_scene_button();
+    test_the_delete_scene_button_is_held();
+    test_delete_in_a_step_mode_and_in_the_mixer_and_without_live_control();
+    test_delete_ends_when_the_launchpad_goes_away();
     test_the_mode_buttons_light();
     test_a_step_press_in_the_app();
     test_a_drum_track_pad_changes_the_current_track();

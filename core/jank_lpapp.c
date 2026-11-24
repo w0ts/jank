@@ -545,8 +545,33 @@ static size_t mixer_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_a
 }
 
 /* the scene buttons (Launchpad 95's Note mode): 5 starts / stops the transport; the others have no job yet. In the mixer they pick the view (jank_lpmix.h) */
+/* Delete (scene 6), held: the Digitone erases the track's steps as its own playhead passes (LIVE ERASE); let go ends it, in any mode (it can be held into the mixer) */
+static size_t delete_button(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
+{
+    if (!ev->value) {
+        if (!a->erase_on || max < 1)
+            return 0;
+        a->erase_on = 0;
+        set_act(out, JLAPP_ACT_ERASE, a->erase_track, 0, 0);
+        return 1;
+    }
+    if (a->erase_on || max < 1)
+        return 0;
+    if (a->live_state != JDL_LIVE) {
+        say_why_not(a);
+        return 0;
+    }
+    a->erase_on = 1;
+    a->erase_track = a->n.track;
+    say(a, "DELETE TRACK %u", (unsigned)a->n.track + 1u);
+    set_act(out, JLAPP_ACT_ERASE, a->erase_track, 0, 1);
+    return 1;
+}
+
 static size_t side_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
+    if (ev->idx == JLAPP_SIDE_DELETE && (a->mode != JLAPP_MODE_MIXER || (!ev->value && a->erase_on)))
+        return delete_button(a, ev, out, max);
     if (a->mode == JLAPP_MODE_MIXER) {
         if (ev->value && jlmx_scene(&a->mix, ev->idx))
             say(a, "%s", VIEW_NAME[a->mix.view]);
@@ -686,6 +711,10 @@ size_t jlapp_release_acts(struct jlapp *a, struct jlapp_act *out, size_t max)
             a->track_held &= (uint16_t)~(1u << t);
             set_act(&out[n++], JLAPP_ACT_TRACK_OFF, t, 0, 0);
         }
+    if (a->erase_on && n < max) {      /* the Delete button was held: the Digitone stops erasing */
+        a->erase_on = 0;
+        set_act(&out[n++], JLAPP_ACT_ERASE, a->erase_track, 0, 0);
+    }
     return n + jlst_release(&a->step, out + n, max - n);
 }
 
@@ -778,6 +807,7 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
             f->led[JLX_SIDE0 + i].color = jlmx_scene_colour(&a->mix, i);
     } else {
         f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = a->transport ? JLAPP_GREEN : JLAPP_RED_THIRD;   /* start / stop: running green, stopped dim red */
+        f->led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color = a->erase_on ? JLAPP_PINK : JLAPP_PINK_THIRD;        /* delete: bright while held */
     }
 }
 
