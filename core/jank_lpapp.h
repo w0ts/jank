@@ -46,6 +46,8 @@
 #define JLAPP_AMBER_THIRD 11u
 
 #define JLAPP_PADS 64u
+#define JLAPP_SCALES_PER_PAGE 24u                    /* the scale page shows the Digitone's 36 scales three rows of eight at a time ... */
+#define JLAPP_SCALE_PAGES 2u                         /* ... on two pages, picked by two pads on the row above them */
 #define JLAPP_TRACK_ROWS 2u                          /* the track pads: the two bottom rows */
 #define JLAPP_SELECT_MS 1000u                        /* the bottom 16 pads show the chosen track this long after left / right */
 #define JLAPP_PUSH_LIGHT_MS 150u                     /* a pushed note lights its pad this long (the note's length is not mapped yet: not measured) */
@@ -91,6 +93,7 @@ struct jlapp {
     struct jln n;
     const struct jln_scale *scale;
     uint8_t page;                      /* the Note button is held: the pads are the scale page */
+    uint8_t scale_page;                /* which 24 scales the page shows (0: 1-24, 1: 25-36); the page of the scale in use when the page opens or the scale changes */
     uint8_t minor_idx;                 /* the minor scale the relative pad returns to (jank_lpscales.h index) */
     struct jlapp_held held[JLAPP_PADS];
     uint8_t track_pads;                /* the two bottom rows are the 16 tracks (page switch) */

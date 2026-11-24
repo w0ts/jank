@@ -74,7 +74,7 @@ static void ensure_init(void)
 {
     if (s_ready)
         return;
-    jlapp_init(&s_app, jls_get(JLS_MAJOR));   /* the starter list's major scale; the scale page (hold Note) changes it */
+    jlapp_init(&s_app, jls_get(JLS_MAJOR));   /* the Digitone's Ionian (Maj) until it says otherwise; the scale page (hold Note) changes it */
     jlo_init(&s_out);
     jdl_init(&s_jdl);
     jd2_sx_init(&s_sx);

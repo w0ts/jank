@@ -191,8 +191,9 @@ static size_t track_pad_event(struct jlapp *a, const struct jlx_ev *ev, struct j
 /* ---- the scale page (jank_lpapp.h): rows are counted from the top, as Launchpad 95 does, row 0 being the top one (pad row 7) ---- */
 static const uint8_t WHITE_KEY[7] = {0, 2, 4, 5, 7, 9, 11};      /* C D E F G A B */
 #define PAGE_ROW(y) (7u - (y))
-#define FIRST_SCALE_ROW 4u
-#define FIFTH_UP 7u                    /* the circle of fifths: a fifth up is 7 semitones, a fifth down 5 */
+#define SCALE_PAGE_ROW 4u              /* the row above the scales: the page pads (owner 2026-11-24) */
+#define FIRST_SCALE_ROW 5u             /* the Digitone's 36 scales in banks of 3 rows of 8 (JLAPP_SCALES_PER_PAGE) */
+#define FIFTH_UP 7u                   /* the circle of fifths: a fifth up is 7 semitones, a fifth down 5 */
 #define FIFTH_DOWN 5u
 #define MINOR_THIRD_UP 3u
 #define MAJOR_SIXTH_UP 9u              /* the relative major of a minor key is a minor third up, its relative minor a minor third down (9 up) */
@@ -206,8 +207,17 @@ static void set_scale(struct jlapp *a, unsigned idx)
     const struct jln_scale *s = jls_get(idx);
     if (s) {
         a->scale = s;
+        a->scale_page = (uint8_t)(idx / JLAPP_SCALES_PER_PAGE);   /* the page of the scale in use is the one shown */
         say(a, "SCALE %s", s->name);
     }
+}
+
+/* the scale page opens on the page that holds the scale in use */
+static void show_scale_page_of_scale(struct jlapp *a)
+{
+    int idx = jls_index_of(a->scale);
+    if (idx >= 0)
+        a->scale_page = (uint8_t)((unsigned)idx / JLAPP_SCALES_PER_PAGE);
 }
 
 /* major <-> the minor last used, minor pentatonic <-> major pentatonic; another scale has no relative one */
@@ -283,8 +293,16 @@ static void page_pad(struct jlapp *a, uint8_t x, uint8_t y)
     } else if (r == 3) {
         jln_set_octave(n, x);
         say(a, "OCTAVE %u", (unsigned)n->octave);
+    } else if (r == SCALE_PAGE_ROW) {  /* the scales' page pads: only browsing, the scale in use is not changed */
+        if (x < JLAPP_SCALE_PAGES) {
+            unsigned first = x * JLAPP_SCALES_PER_PAGE, last = first + JLAPP_SCALES_PER_PAGE;
+            a->scale_page = x;
+            say(a, "SCALES %u-%u", first + 1u, last < jls_count() ? last : jls_count());
+        }
     } else {
-        set_scale(a, (unsigned)(r - FIRST_SCALE_ROW) * 8u + x);
+        unsigned idx = a->scale_page * JLAPP_SCALES_PER_PAGE + (unsigned)(r - FIRST_SCALE_ROW) * 8u + x;
+        if (idx < jls_count())
+            set_scale(a, idx);
     }
 }
 
@@ -319,8 +337,10 @@ static uint8_t page_colour(const struct jlapp *a, uint8_t x, uint8_t y)
         return x < 7u ? on_off(n->key == WHITE_KEY[x], JLAPP_GREEN, JLAPP_GREEN_THIRD) : JLAPP_BLUE;
     if (r == 3)                        /* Octave */
         return x < jln_octaves(n) ? on_off(n->octave == x, JLAPP_RED, JLAPP_RED_THIRD) : 0;
+    if (r == SCALE_PAGE_ROW)           /* the page pads: AMBER, not the scales' blue */
+        return x < JLAPP_SCALE_PAGES ? on_off(x == a->scale_page, JLAPP_AMBER, JLAPP_AMBER_THIRD) : 0;
     {
-        unsigned idx = (unsigned)(r - FIRST_SCALE_ROW) * 8u + x;   /* Modus: the scales */
+        unsigned idx = a->scale_page * JLAPP_SCALES_PER_PAGE + (unsigned)(r - FIRST_SCALE_ROW) * 8u + x;   /* Modus: the scales of the page shown */
         return idx < jls_count() ? on_off((int)idx == jls_index_of(a->scale), JLAPP_BLUE, JLAPP_BLUE_THIRD) : 0;
     }
 }
@@ -423,6 +443,7 @@ static void note_button(struct jlapp *a, int down)
 {
     if (down) {
         a->page = 1;
+        show_scale_page_of_scale(a);
         a->note_used = 0;
         a->note_down_ms = a->now_ms;
         return;

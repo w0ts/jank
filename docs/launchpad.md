@@ -21,11 +21,13 @@ flashing and pulsing follow it. First slice: **Note mode**, played through the D
 - **Scale page: hold Note.** While the Note button is held the pads are Launchpad 95's scale editor, rows from the top: (1) absolute
   root (pad 1), horizontal (pad 2, diatonic only), the layouts: chords (5), diatonic (6), chromatic (7); (2) the black keys, the
   relative scale (pad 3), the circle of fifths back (pad 7); (3) the white keys C to B, the circle of fifths forward (pad 8); (4) the
-  octaves; (5 to 8) the scales. Colours as Launchpad 95's `Scale.*`, each bright when on and its "third" when off: the keys and Horizontal
+  octaves; (5) the scales' page pads; (6 to 8) the scales. Colours as Launchpad 95's `Scale.*`, each bright when on and its "third" when off: the keys and Horizontal
   GREEN, AbsoluteRoot, the layouts and the octaves RED, the scales BLUE, the relative scale and the circle of fifths plain BLUE. Let go of
   Note and the pads play again; a note that was down when the page opened still
-  ends. The scales are a **starter list of 32** (`core/jank_lpscales.h`: standard names and intervals, neither Live's nor the
-  Digitone's list). LP95's two guitar / not-staggered layouts, the drum rack and quick scale are not there. Host-tested; **not
+  ends. **The scales are the Digitone's own 36** (owner 2026-11-24; `core/jank_lpscales.h`: its names, its order, its index; the intervals are stock OS 1.12's table as the
+  Digitone session read it, not measured on the unit), **three rows of eight a page**; the row above them holds the **page pads** (2: scales 1-24 and 25-36), in AMBER
+  (bright for the page shown), a different colour from the scales. The page of the scale in use is shown when the page opens and whenever the scale changes; a page pad
+  only browses (it says SCALES 1-24 / 25-36). LP95's two guitar / not-staggered layouts, the drum rack and quick scale are not there. Host-tested; **not
   verified on the Launchpad itself** (how the page looks and feels).
 
 ## SysEx only: no MIDI channels (live control)
@@ -112,8 +114,9 @@ the Digitone's stage 4 / 5.
 
 ## What is not there yet
 
-The Digitone's own scale list (the scale page uses a starter list), Step, Mixer, Session, the song
-row. Order decided with the owner: Note, Step sequencer, Mixer, then patterns and song mode last. The Digitone's current
+The scale **sync** with the Digitone (the list is its own now; reading its scale and writing ours need the code in progress, below), the mixer screen (its logic and the MIXER read
+are built, not wired in), Session, the song row. A **dual Launchpad mode** is planned for later (owner 2026-11-24): in the mixer one Launchpad is tracks 1-8 and the other 9-16
+(the mixer's bank is already a parameter of its screen). Order decided with the owner: Note, Step sequencer, Mixer, then patterns and song mode last. The Digitone's current
 track, scale and step data need new commands in dn2-wishes (its test channel only answers when asked); that research is
 separate.
 

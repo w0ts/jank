@@ -163,15 +163,50 @@ static void test_page_picks_the_scale(void)
     struct jlapp a = fresh_list();
     uint8_t o[4];
     press(&a, top(NOTE_BTN, 127), o);
-    tap(&a, 1, 3);                                           /* the scales start at row 5 (y = 3): index 1, Minor */
-    CHECK(jls_index_of(a.scale) == 1);
-    tap(&a, 6, 2);                                           /* row 6, the seventh: index 8 + 6 = 14 */
+    tap(&a, 2, 2);                                           /* the Digitone's scales: three rows of 8 from page row 6 (y = 2): index 2, Dorian */
+    CHECK(jls_index_of(a.scale) == 2);
+    tap(&a, 6, 1);                                           /* the next row, the seventh: index 8 + 6 = 14, Combo Minor */
     CHECK(jls_index_of(a.scale) == 14);
-    tap(&a, 7, 0);                                           /* the last place of the last row: index 31 */
-    CHECK(jls_index_of(a.scale) == 31);
-    tap(&a, 1, 3);
+    tap(&a, 7, 0);                                           /* the last place of the last row of the page: index 16 + 7 = 23 */
+    CHECK(jls_index_of(a.scale) == 23);
+    tap(&a, 1, 3);                                           /* the second page pad (the row above the scales): browsing only, the scale stays */
+    CHECK(jls_index_of(a.scale) == 23 && a.scale_page == 1);
+    tap(&a, 0, 2);                                           /* the second page: index 24 + 0 */
+    CHECK(jls_index_of(a.scale) == 24);
+    tap(&a, 3, 1);                                           /* 24 + 8 + 3 = 35, the last scale */
+    CHECK(jls_index_of(a.scale) == 35);
+    tap(&a, 4, 1);                                           /* index 36 does not exist: no pad, nothing changes */
+    tap(&a, 0, 0);
+    CHECK(jls_index_of(a.scale) == 35);
+    tap(&a, 0, 3);                                           /* the first page again */
+    tap(&a, 6, 2);                                           /* Aeolian (Min), index 6 */
     press(&a, top(NOTE_BTN, 0), o);
-    CHECK(press(&a, pad(2, 0, 100), o) == 1 && o[2] == 51);   /* Minor: the third step is a minor third: 48 + 3 */
+    CHECK(jls_index_of(a.scale) == 6);
+    CHECK(press(&a, pad(2, 0, 100), o) == 1 && o[2] == 51);   /* the third step is a minor third: 48 + 3 */
+}
+
+static void test_the_scale_page_opens_on_the_page_of_the_scale_in_use(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o;
+    acts(&a, top(NOTE_BTN, 127), &o);
+    CHECK(a.scale_page == 0);                                      /* Major: the first page */
+    tap(&a, 1, 3);                                                 /* browse to the second page, without choosing */
+    CHECK(a.scale_page == 1);
+    acts(&a, top(NOTE_BTN, 0), &o);
+    acts(&a, top(NOTE_BTN, 127), &o);                              /* opened again: back on the page of the scale in use */
+    CHECK(a.scale_page == 0);
+    tap(&a, 2, 1);                                                 /* (picking on the first page ...) */
+    a.scale = jls_get(30);                                         /* ... the scale became one on the second page (as when the Digitone's scale is taken) */
+    acts(&a, top(NOTE_BTN, 0), &o);
+    acts(&a, top(NOTE_BTN, 127), &o);
+    CHECK(a.scale_page == 1);
+    CHECK(colour(&a, 0, 3) == JLAPP_AMBER_THIRD && colour(&a, 1, 3) == JLAPP_AMBER && colour(&a, 2, 3) == 0);   /* the page pads: AMBER, the shown page bright */
+    CHECK(colour(&a, 6, 2) == JLAPP_BLUE);                         /* scale 30 = 24 + 6: row y = 2, x = 6 */
+    CHECK(colour(&a, 4, 1) == 0 && colour(&a, 7, 0) == 0);         /* past the 36th: no pads */
+    CHECK(colour(&a, 3, 1) == JLAPP_BLUE_THIRD);                   /* the 36th */
+    tap(&a, 0, 3);
+    CHECK(colour(&a, 0, 3) == JLAPP_AMBER && colour(&a, 6, 2) == JLAPP_BLUE_THIRD && colour(&a, 1, 2) == JLAPP_BLUE_THIRD);
 }
 
 static void test_page_picks_the_layout(void)
@@ -245,19 +280,19 @@ static void test_page_relative_scale(void)
     CHECK(jls_index_of(a.scale) == JLS_MINOR && a.n.key == 9);
     tap(&a, 2, 6);                                           /* and back */
     CHECK(jls_index_of(a.scale) == JLS_MAJOR && a.n.key == 0);
-    tap(&a, 6, 2);                                           /* Harmonic Minor, in C */
+    tap(&a, 3, 1);                                           /* Harmonic Min (index 11 = 8 + 3), in C */
     CHECK(jls_index_of(a.scale) == JLS_HARMONIC_MINOR);
     tap(&a, 2, 6);                                           /* -> E flat major */
     CHECK(jls_index_of(a.scale) == JLS_MAJOR && a.n.key == 3);
     tap(&a, 2, 6);                                           /* the minor it came from, not natural minor: C harmonic minor */
     CHECK(jls_index_of(a.scale) == JLS_HARMONIC_MINOR && a.n.key == 0);
-    tap(&a, 4, 2);                                           /* Minor Pentatonic */
+    tap(&a, 0, 1);                                           /* Pentaton. Min (index 8) */
     CHECK(jls_index_of(a.scale) == JLS_MINOR_PENTATONIC);
     tap(&a, 2, 6);
     CHECK(jls_index_of(a.scale) == JLS_MAJOR_PENTATONIC && a.n.key == 3);
     tap(&a, 2, 6);
     CHECK(jls_index_of(a.scale) == JLS_MINOR_PENTATONIC && a.n.key == 0);
-    tap(&a, 2, 3);                                           /* Dorian: no relative scale */
+    tap(&a, 2, 2);                                           /* Dorian (index 2): no relative scale */
     tap(&a, 2, 6);
     CHECK(jls_index_of(a.scale) == 2 && a.n.key == 0);
 }
@@ -285,8 +320,9 @@ static void test_page_lights(void)
     CHECK(colour(&a, 3, 4) == JLAPP_RED);                    /* Octave 3 on */
     CHECK(colour(&a, 0, 4) == JLAPP_RED_THIRD && colour(&a, 5, 4) == JLAPP_RED_THIRD);
     CHECK(colour(&a, 6, 4) == 0 && colour(&a, 7, 4) == 0);   /* diatonic stops at octave 5 */
-    CHECK(colour(&a, 0, 3) == JLAPP_BLUE);                   /* Modus: Major on */
-    CHECK(colour(&a, 1, 3) == JLAPP_BLUE_THIRD && colour(&a, 7, 0) == JLAPP_BLUE_THIRD);
+    CHECK(colour(&a, 1, 2) == JLAPP_BLUE);                   /* Modus: Ionian (Maj), index 1, on */
+    CHECK(colour(&a, 0, 2) == JLAPP_BLUE_THIRD && colour(&a, 7, 0) == JLAPP_BLUE_THIRD);   /* Chromatic (index 0) and the 24th, off */
+    CHECK(colour(&a, 0, 3) == JLAPP_AMBER && colour(&a, 1, 3) == JLAPP_AMBER_THIRD && colour(&a, 2, 3) == 0);   /* the page pads: AMBER, the first page shown */
     tap(&a, 6, 7);                                           /* chromatic: its extra octave lights; Horizontal shows its state in every layout, as in LP95 */
     CHECK(colour(&a, 6, 4) == JLAPP_RED_THIRD && colour(&a, 1, 7) == JLAPP_GREEN && colour(&a, 6, 7) == JLAPP_RED && colour(&a, 5, 7) == JLAPP_RED_THIRD);
     tap(&a, 4, 7);                                           /* chords: Horizontal is off */
@@ -735,10 +771,14 @@ static void test_the_scale_page_says_what_it_did(void)
     CHECK(strcmp(msg(&a), "OCTAVE 3") == 0);
     tap(&a, 1, 4);
     CHECK(strcmp(msg(&a), "OCTAVE 1") == 0);
-    tap(&a, 1, 3);                                                 /* the scales: the second of the first row */
+    tap(&a, 1, 2);                                                 /* the scales: the second of the first row, Ionian (Maj) */
     CHECK(says(&a, "SCALE ", jls_get(1)->name));
-    tap(&a, 4, 0);                                                 /* the last row */
-    CHECK(a.scale == jls_get(24 + 4) && says(&a, "SCALE ", jls_get(28)->name));
+    tap(&a, 4, 0);                                                 /* the last row: 16 + 4 = 20, Phrygian Dom */
+    CHECK(a.scale == jls_get(20) && says(&a, "SCALE ", jls_get(20)->name));
+    tap(&a, 1, 3);                                                 /* the page pads say which scales they show */
+    CHECK(strcmp(msg(&a), "SCALES 25-36") == 0);
+    tap(&a, 0, 3);
+    CHECK(strcmp(msg(&a), "SCALES 1-24") == 0);
 }
 
 static void test_the_relative_scale_says_key_and_scale(void)
@@ -762,7 +802,7 @@ static void test_messages_are_short_upper_case_and_the_newest_wins(void)
     char m[JLAPP_MSG_MAX];
     CHECK(jlapp_take_message(&a, m, sizeof m) == 0);               /* nothing said yet */
     acts(&a, top(NOTE_BTN, 127), &o);
-    tap(&a, JLS_MINOR_PENTATONIC % 8, 3 - JLS_MINOR_PENTATONIC / 8);   /* a long scale name */
+    tap(&a, JLS_MINOR_PENTATONIC % 8, 2 - JLS_MINOR_PENTATONIC / 8);   /* a long scale name */
     CHECK(jlapp_take_message(&a, m, sizeof m) == strlen(m) && strlen(m) <= JLAPP_MSG_MAX - 1u && strncmp(m, "SCALE ", 6) == 0);
     for (size_t i = 0; m[i]; i++)
         CHECK(m[i] >= ' ' && m[i] <= '~' && !(m[i] >= 'a' && m[i] <= 'z'));
@@ -1140,6 +1180,7 @@ int main(void)
     test_the_note_button_opens_the_page_while_held();
     test_page_pads_edit_and_do_not_play();
     test_page_picks_the_scale();
+    test_the_scale_page_opens_on_the_page_of_the_scale_in_use();
     test_page_picks_the_layout();
     test_page_picks_the_octave();
     test_page_circle_of_fifths();
