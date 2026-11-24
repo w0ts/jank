@@ -185,6 +185,12 @@ static void sync_live(void)
     g_hostdiag.dn2_lost = s_jdl.st.lost;
     g_hostdiag.dn2_dropped = s_jdl.st.dropped;
     g_hostdiag.dn2_pushmsgs = s_jdl.st.msgs;
+    g_hostdiag.head_rt_clocks = s_app.step.rt_clocks;   /* the playhead's source: the Digitone's own MIDI transport, or Jank's */
+    g_hostdiag.head_rt_starts = s_app.step.rt_starts;
+    g_hostdiag.head_rt_stops = s_app.step.rt_stops;
+    g_hostdiag.head_rt_run = s_app.step.rt_run;
+    g_hostdiag.head_beat = s_app.beat_ok;
+    g_hostdiag.head_transport = s_app.transport;
     g_hostdiag.live_step_busy = s_jdl.step_busy;
     g_hostdiag.live_step_refused = s_jdl.step_refused;
     jlapp_set_live(&s_app, s_jdl.state, s_jdl.play_ok, jdl_can_read_track(&s_jdl));
@@ -421,8 +427,12 @@ void usb_lp_rx(enum jlapp_role r, const uint8_t *packets, size_t n)
             rx_lpx(packets + i);
         else if (r == JLAPP_DN2) {
             g_hostdiag.dn2_msgs++;
-            if (jd2_sx_feed(&s_sx, packets + i))   /* only the Digitone's SysEx is read: its MIDI (notes, clock, ...) is not, by design */
+            if (jd2_sx_feed(&s_sx, packets + i))   /* the Digitone's SysEx; of its MIDI only the real-time bytes below (no channel, no notes) */
                 dn2_sysex();
+            if ((packets[i] & 0x0Fu) == 0x0Fu) {   /* a single real-time byte: Start, Continue, Stop, clock: the step modes' playhead follows the Digitone's transport */
+                jlapp_tick(&s_app, now_ms());
+                jlapp_on_dn2_rt(&s_app, packets[i + 1]);
+            }
         }
     }
 }

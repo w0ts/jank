@@ -540,6 +540,8 @@ void jlapp_set_transport(struct jlapp *a, int playing)
     refresh_clock(a);
 }
 
+void jlapp_on_dn2_rt(struct jlapp *a, uint8_t byte) { jlst_on_rt(&a->step, byte, a->now_ms); }
+
 void jlapp_set_beat(struct jlapp *a, int known, uint32_t tick16)
 {
     a->beat_ok = known != 0;

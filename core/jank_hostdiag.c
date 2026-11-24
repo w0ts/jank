@@ -110,6 +110,8 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
             (unsigned long)d->live_plays, (unsigned long)d->live_selects, (unsigned long)d->live_pushes, (unsigned long)d->live_notes,
             (unsigned long)d->live_dropped, (unsigned long)d->live_reads, (unsigned long)d->live_msgs);
     }
+    put(out, cap, &n, "hostdiag_head=rt_clocks:%lu,rt_starts:%lu,rt_stops:%lu,rt_run:%u,beat:%u,transport:%u\n", (unsigned long)d->head_rt_clocks,
+        (unsigned long)d->head_rt_starts, (unsigned long)d->head_rt_stops, d->head_rt_run, d->head_beat, d->head_transport);
     put(out, cap, &n, "hostdiag_steps=edits:%lu,reads:%lu,busy:%lu,refused:%lu\n", (unsigned long)d->live_edits, (unsigned long)d->live_pagereads,
         (unsigned long)d->live_step_busy, (unsigned long)d->live_step_refused);
     put(out, cap, &n, "hostdiag_dn2live=proto:%u,push:%u,lease:%u,made:%lu,sent:%lu,lost:%lu,dropped:%lu,pushmsgs:%lu,ignored:%lu,last_ignored_len:%u\n",

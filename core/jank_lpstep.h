@@ -36,7 +36,9 @@
 #define JLST_COLOR_TRACK_IDLE 13u      /* YELLOW */
 #define JLST_COLOR_TRACK_CURRENT 21u   /* GREEN */
 #define JLST_COLOR_TRACK_PLAYING 5u    /* RED */
-#define JLST_COLOR_PLAYHEAD 45u        /* BLUE: the playhead on a step without a trig; RED (5) on a step that plays */
+#define JLST_RT_ALIVE_MS 500u          /* the Digitone's clock counts as running this long after its last tick */
+#define JLST_TICKS_PER_STEP 6u         /* MIDI clock: 24 a beat, a step is a sixteenth */
+#define JLST_COLOR_PLAYHEAD 45u       /* BLUE: the playhead on a step without a trig; RED (5) on a step that plays */
 #define JLST_COLOR_PLAYHEAD_NOTE 5u
 #define JLST_COLOR_PAGE_ON 21u        /* a page shown: GREEN; another page that exists GREEN_THIRD */
 #define JLST_COLOR_PAGE_OFF 23u
@@ -60,7 +62,12 @@ struct jlst {
     uint32_t head_ms;
     uint8_t run;                       /* the transport runs and the clock is known (jlst_set_clock) */
     uint32_t tick16;                   /* the clock in sixteenth notes since the session's start */
-    uint8_t offset;                    /* what a pushed note taught: the Digitone's step = (tick16 + offset) mod length */
+    uint8_t offset;                    /* what a pushed note taught: the Digitone's step = (the clock in sixteenths + offset) mod length */
+    uint8_t offset_src;                /* ... for which clock (1 Jank's session beat, 2 the Digitone's own MIDI clock): another source starts from 0 */
+    uint8_t rt_run;                    /* the Digitone sent MIDI Start (or Continue) and not Stop since */
+    uint32_t rt_ticks;                 /* its MIDI clock ticks since its Start (24 a beat, 6 a sixteenth) */
+    uint32_t rt_last_ms;               /* its last clock tick: the clock is alive for JLST_RT_ALIVE_MS after it */
+    uint32_t rt_clocks, rt_starts, rt_stops;   /* counted for diag */
 };
 
 /* what the pad logic needs from the rest of the Launchpad app */
@@ -90,6 +97,10 @@ void jlst_on_push(struct jlst *s, uint8_t track, uint8_t step, uint32_t now_ms);
  * notes); the Digitone's own playing-step byte is wrong on firmware 1.12. The step is (tick16 + offset) mod the pattern's length; a pushed note (its step is exact) corrects
  * the offset. BLUE on a step with no trig, RED on one that plays (Launchpad 95's metronome and playing colours). Not running: only the step that just played, white */
 void jlst_set_clock(struct jlst *s, int running, uint32_t tick16);
+/* The Digitone's own MIDI transport (owner 2026-11-24: "the playhead is not shown" when the sequencer was started on the Digitone, not from Jank): a real-time byte it sent
+ * (0xFA Start, 0xFB Continue, 0xFC Stop, 0xF8 clock). While its clock ticks the playhead follows IT (6 ticks a sixteenth from its Start), whoever started it; else Jank's
+ * session beat (jlst_set_clock). Read-only and channel-free: real-time bytes carry no channel. */
+void jlst_on_rt(struct jlst *s, uint8_t byte, uint32_t now_ms);
 
 /* the pads held end (the Launchpad went away or the mode changed): acts, at most max */
 size_t jlst_release(struct jlst *s, struct jlapp_act *out, size_t max);

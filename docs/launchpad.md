@@ -67,8 +67,11 @@ lower left, the sequence on top, the loop selector lower right):
   the trig (GREEN on, DARK_GREY off, dark past the pattern's length). **The playhead** (owner 2026-11-24, like Launchpad 95's) runs over the step rows while the
   transport runs: **BLUE** on a step without a trig, **RED** on one that plays (its metronome and playing colours). Its position is Jank's own clock, not the Digitone's
   playing-step byte (wrong on firmware 1.12): the session's beat x 4 (sixteenth notes, sampled by the ui task, extrapolated between samples), modulo the pattern's
-  length, and a pushed note (its step is exact) corrects the phase. Not measured on hardware: whether the Digitone's step and Jank's beat line up (they should when the
-  Digitone follows Jank's clock from a Start on the bar). Without a running clock only the step that just played shows, WHITE for 150 ms. The pages come from the Digitone
+  length, and a pushed note (its step is exact) corrects the phase. **Measured 2026-11-24: that was not enough**: with the sequencer started by the Digitone's own play key,
+  Jank's transport is stopped and no playhead showed. So the playhead **follows the Digitone's own MIDI transport** while its clock ticks (Start / Continue / Stop and 6
+  clock ticks a sixteenth, read-only, no channel involved: `jlst_on_rt`, `hostdiag_head=`), whoever started it; Jank's session beat is the fallback when the Digitone's
+  clock is silent (500 ms). Not measured on hardware: whether the steps line up (the pushed notes correct the phase). Without any clock only the step that just played
+  shows, WHITE for 150 ms. The pages come from the Digitone
   (STEPS, 46, every 400 ms for the two shown); a press is shown at once and the next read does not undo it for 300 ms; a page the Digitone has not answered is dark and
   does nothing.
 - **Lower right 4x4:** the top row of it holds four page pads (the Digitone's 64 steps): the page the top rows start at.

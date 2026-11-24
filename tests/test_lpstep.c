@@ -476,6 +476,72 @@ static void test_a_pushed_note_corrects_the_playhead(void)
     CHECK(colour(&r, 0, 6) == JLST_COLOR_PLAYHEAD);               /* step 8 */
 }
 
+/* `n` MIDI clock ticks from the Digitone, 20 ms apart from now */
+static void ticks(struct rig *r, unsigned n)
+{
+    for (unsigned i = 0; i < n; i++) {
+        r->c.now_ms += 20;
+        jlst_on_rt(&r->s, 0xF8, r->c.now_ms);
+    }
+}
+
+static void test_the_playhead_follows_the_digitones_own_transport(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_DRUM);
+    feed(&r, 0, 4, 1);
+    feed(&r, 1, 4, 0);
+    ticks(&r, 10);                                                /* clock ticks with no Start: nothing runs */
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_ON && colour(&r, 1, 7) == JLST_COLOR_OFF);   /* the steps as they are: no playhead on any of them */
+    jlst_on_rt(&r.s, 0xFA, r.c.now_ms);                           /* Start: step 0 (it has a trig) */
+    ticks(&r, 1);
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_PLAYHEAD_NOTE);
+    ticks(&r, 5);                                                 /* 6 ticks in: step 1 */
+    CHECK(colour(&r, 1, 7) == JLST_COLOR_PLAYHEAD && colour(&r, 0, 7) == JLST_COLOR_ON);
+    ticks(&r, 6 * 8);                                             /* 9 steps in: the second row */
+    CHECK(colour(&r, 1, 6) == JLST_COLOR_PLAYHEAD);
+    ticks(&r, 6 * 55);                                            /* 64 steps: back to the first */
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_PLAYHEAD_NOTE);
+    jlst_on_rt(&r.s, 0xFC, r.c.now_ms);                           /* Stop: no playhead, though clock ticks may go on */
+    ticks(&r, 3);
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_ON && r.s.rt_starts == 1 && r.s.rt_stops == 1 && r.s.rt_clocks == 10 + 1 + 5 + 48 + 330 + 3);
+    jlst_on_rt(&r.s, 0xFB, r.c.now_ms);                           /* Continue: it goes on from where it was (tick 384 + 4 more = step 64 + 0, a trig) */
+    ticks(&r, 1);
+    CHECK(r.s.rt_run && colour(&r, 0, 7) == JLST_COLOR_PLAYHEAD_NOTE);
+}
+
+static void test_the_digitones_clock_wins_over_jank_s_and_goes_away_when_it_stops_ticking(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_DRUM);
+    feed(&r, 0, 4, 0);
+    feed(&r, 1, 4, 0);
+    jlst_set_clock(&r.s, 1, 3);                                   /* Jank's session says step 3 */
+    CHECK(colour(&r, 3, 7) == JLST_COLOR_PLAYHEAD);
+    jlst_on_rt(&r.s, 0xFA, r.c.now_ms);
+    ticks(&r, 6 * 10 + 1);                                        /* the Digitone says step 10 */
+    CHECK(colour(&r, 2, 6) == JLST_COLOR_PLAYHEAD && colour(&r, 3, 7) == JLST_COLOR_OFF);
+    r.c.now_ms += JLST_RT_ALIVE_MS;                               /* its clock stopped ticking (no Stop seen): Jank's beat again */
+    CHECK(colour(&r, 3, 7) == JLST_COLOR_PLAYHEAD && colour(&r, 2, 6) == JLST_COLOR_OFF);
+}
+
+static void test_a_pushed_note_teaches_the_digitones_clock_phase(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_DRUM);
+    feed(&r, 0, 2, 0);
+    feed(&r, 1, 2, 0);
+    jlst_on_rt(&r.s, 0xFA, r.c.now_ms);
+    ticks(&r, 6 * 3 + 1);                                         /* its clock says step 3 */
+    jlst_on_push(&r.s, 0, 5, r.c.now_ms);                         /* but a note of step 5 just played: its Start was 2 steps early */
+    CHECK(colour(&r, 5, 7) == JLST_COLOR_PLAYHEAD && colour(&r, 3, 7) == JLST_COLOR_OFF);
+    ticks(&r, 6);
+    CHECK(colour(&r, 6, 7) == JLST_COLOR_PLAYHEAD);
+    jlst_on_rt(&r.s, 0xFC, r.c.now_ms);                           /* another clock source starts from no phase of its own */
+    jlst_set_clock(&r.s, 1, 3);
+    CHECK(colour(&r, 3, 7) == JLST_COLOR_PLAYHEAD);
+}
+
 static void test_without_a_clock_only_the_note_that_played_shows(void)
 {
     struct rig r;
@@ -490,6 +556,9 @@ static void test_without_a_clock_only_the_note_that_played_shows(void)
 
 int main(void)
 {
+    test_the_playhead_follows_the_digitones_own_transport();
+    test_the_digitones_clock_wins_over_jank_s_and_goes_away_when_it_stops_ticking();
+    test_a_pushed_note_teaches_the_digitones_clock_phase();
     test_the_melodic_keyboard_has_sixteen_different_notes();
     test_the_keyboard_rows_follow_the_scale_in_order();
     test_the_drum_quadrant_flashes_the_tracks_that_play();

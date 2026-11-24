@@ -147,6 +147,8 @@ int jlapp_following(const struct jlapp *a);
 void jlapp_set_transport(struct jlapp *a, int playing);
 /* the session's beat in sixteenth notes (beat x 4), `known` 0 outside a session: the step modes' playhead runs on it while the transport runs (jank_lpstep.h) */
 void jlapp_set_beat(struct jlapp *a, int known, uint32_t tick16);
+/* a real-time byte (Start / Continue / Stop / clock) from the Digitone's USB MIDI: the playhead follows its own transport while its clock ticks (jank_lpstep.h) */
+void jlapp_on_dn2_rt(struct jlapp *a, uint8_t byte);
 /* the step modes: the pages of the current track to read now (pages[0..n), 0 outside the step modes), and a page the Digitone answered (jdl_take_page) */
 size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2]);
 void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg);

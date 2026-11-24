@@ -135,6 +135,12 @@ static void test_full_record(void)
     d.live_dropped = 1;
     d.live_reads = 8;
     d.live_msgs = 10;
+    d.head_rt_clocks = 9000;
+    d.head_rt_starts = 3;
+    d.head_rt_stops = 2;
+    d.head_rt_run = 1;
+    d.head_beat = 1;
+    d.head_transport = 0;
     d.live_edits = 12;
     d.live_pagereads = 340;
     d.live_step_busy = 2;
@@ -181,6 +187,7 @@ static void test_full_record(void)
     CHECK(strstr(out, "hostdiag_events=new:3,gone:1,add:3\n"));
     CHECK(strstr(out, "hostdiag_lp=lpx:1,dn2:0,programmer:2,acked:1,setup:2,mode:live,reentered:1,lights:243,pads:7,dn2msgs:9\n"));
     CHECK(strstr(out, "hostdiag_live=state:live,play:1,asked:12,replies:11,plays:5,selects:3,pushes:4,notes:6,dropped:1,reads:8,msgs:10\n"));
+    CHECK(strstr(out, "hostdiag_head=rt_clocks:9000,rt_starts:3,rt_stops:2,rt_run:1,beat:1,transport:0\n"));
     CHECK(strstr(out, "hostdiag_steps=edits:12,reads:340,busy:2,refused:1\n"));
     CHECK(strstr(out, "hostdiag_dn2live=proto:3,push:1,lease:9,made:100,sent:96,lost:4,dropped:2,pushmsgs:30,ignored:3,last_ignored_len:41\n"));
     d.live_state = 9;                  /* a state number from a newer build prints as ?, not past the list */

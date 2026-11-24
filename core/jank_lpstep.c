@@ -198,15 +198,52 @@ static unsigned pattern_len(const struct jlst *s)
     return s->pages_known * 16u;
 }
 
+/* the clock the playhead goes by, in sixteenths, and which one it is (0: none): the Digitone's own while its ticks come, else Jank's session beat */
+static unsigned base16(const struct jlst *s, uint32_t now_ms, uint32_t *base)
+{
+    if (s->rt_run && (uint32_t)(now_ms - s->rt_last_ms) < JLST_RT_ALIVE_MS) {
+        *base = s->rt_ticks / JLST_TICKS_PER_STEP;
+        return 2;
+    }
+    if (s->run) {
+        *base = s->tick16;
+        return 1;
+    }
+    return 0;
+}
+
 void jlst_on_push(struct jlst *s, uint8_t track, uint8_t step, uint32_t now_ms)
 {
     unsigned len = pattern_len(s);
+    uint32_t base = 0;
+    unsigned src = base16(s, now_ms, &base);
     s->head_on = 1;
     s->head_track = track;
     s->head_step = step;
     s->head_ms = now_ms;
-    if (s->run && len && step < len)   /* a pushed note's step is exact: the clock's phase is learned from it */
-        s->offset = (uint8_t)((step + len - s->tick16 % len) % len);
+    if (src && len && step < len) {    /* a pushed note's step is exact: the clock's phase is learned from it */
+        s->offset = (uint8_t)((step + len - base % len) % len);
+        s->offset_src = (uint8_t)src;
+    }
+}
+
+void jlst_on_rt(struct jlst *s, uint8_t byte, uint32_t now_ms)
+{
+    if (byte == 0xFAu) {
+        s->rt_run = 1;
+        s->rt_ticks = 0;
+        s->rt_starts++;
+    } else if (byte == 0xFBu) {
+        s->rt_run = 1;
+    } else if (byte == 0xFCu) {
+        s->rt_run = 0;
+        s->rt_stops++;
+    } else if (byte == 0xF8u) {
+        s->rt_clocks++;
+        s->rt_last_ms = now_ms;
+        if (s->rt_run)
+            s->rt_ticks++;
+    }
 }
 
 void jlst_set_clock(struct jlst *s, int running, uint32_t tick16)
@@ -242,11 +279,16 @@ static uint8_t step_colour(const struct jlst *s, const struct jlst_ctx *c, unsig
     if (s->pg[p].length && abs_step >= s->pg[p].length)
         return 0;                      /* past the pattern's length */
     st = &s->pg[p].step[idx];
-    if (s->run && pattern_len(s)) {    /* the playhead: where the clock says the sequencer is, on every step, whether it plays a note or not */
-        if (abs_step == (s->tick16 + s->offset) % pattern_len(s))
-            return st->trig ? JLST_COLOR_PLAYHEAD_NOTE : JLST_COLOR_PLAYHEAD;
-    } else if (s->head_on && s->head_track == c->n->track && s->head_step == abs_step && (uint32_t)(c->now_ms - s->head_ms) < JLST_HEAD_MS) {
-        return JLST_COLOR_HEAD;        /* no clock to go by: only the step that just played a note */
+    {
+        uint32_t base = 0;
+        unsigned src = base16(s, c->now_ms, &base), len = pattern_len(s);
+        if (src && len) {              /* the playhead: where the clock says the sequencer is, on every step, whether it plays a note or not */
+            unsigned off = s->offset_src == src ? s->offset : 0u;
+            if (abs_step == (base + off) % len)
+                return st->trig ? JLST_COLOR_PLAYHEAD_NOTE : JLST_COLOR_PLAYHEAD;
+        } else if (s->head_on && s->head_track == c->n->track && s->head_step == abs_step && (uint32_t)(c->now_ms - s->head_ms) < JLST_HEAD_MS) {
+            return JLST_COLOR_HEAD;    /* no clock to go by: only the step that just played a note */
+        }
     }
     return st->trig ? JLST_COLOR_ON : JLST_COLOR_OFF;
 }
