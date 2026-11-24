@@ -393,6 +393,8 @@ static struct jlst_ctx step_ctx(const struct jlapp *a, struct jln *n)
     c.can_play = a->can_play;
     c.transport_playing = a->transport;
     c.now_ms = a->now_ms;
+    c.recent = a->recent;
+    c.recent_n = JLAPP_RECENT;
     return c;
 }
 
@@ -530,7 +532,20 @@ void jlapp_on_push(struct jlapp *a, const struct jdl_note *notes, size_t n)
     }
 }
 
-void jlapp_set_transport(struct jlapp *a, int playing) { a->transport = playing != 0; }
+static void refresh_clock(struct jlapp *a) { jlst_set_clock(&a->step, a->transport && a->beat_ok, a->tick16); }
+
+void jlapp_set_transport(struct jlapp *a, int playing)
+{
+    a->transport = playing != 0;
+    refresh_clock(a);
+}
+
+void jlapp_set_beat(struct jlapp *a, int known, uint32_t tick16)
+{
+    a->beat_ok = known != 0;
+    a->tick16 = tick16;
+    refresh_clock(a);
+}
 
 size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2])
 {

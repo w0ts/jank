@@ -36,7 +36,9 @@
 #define JLST_COLOR_TRACK_IDLE 13u      /* YELLOW */
 #define JLST_COLOR_TRACK_CURRENT 21u   /* GREEN */
 #define JLST_COLOR_TRACK_PLAYING 5u    /* RED */
-#define JLST_COLOR_PAGE_ON 21u         /* a page shown: GREEN; another page that exists GREEN_THIRD */
+#define JLST_COLOR_PLAYHEAD 45u        /* BLUE: the playhead on a step without a trig; RED (5) on a step that plays */
+#define JLST_COLOR_PLAYHEAD_NOTE 5u
+#define JLST_COLOR_PAGE_ON 21u        /* a page shown: GREEN; another page that exists GREEN_THIRD */
 #define JLST_COLOR_PAGE_OFF 23u
 
 enum jlst_kind { JLST_MELODIC, JLST_DRUM };
@@ -54,8 +56,11 @@ struct jlst {
     int16_t key_note[JLST_KEYS];       /* melodic keyboard pads held: the note they play (-1: up) */
     uint8_t key_track[JLST_KEYS];
     uint16_t track_held;               /* drum: a bit for each track pad that auditions */
-    uint8_t head_on, head_track, head_step;   /* the step that played last (absolute step number) */
+    uint8_t head_on, head_track, head_step;   /* the step that played last (absolute step number): shown white while the clock is not known */
     uint32_t head_ms;
+    uint8_t run;                       /* the transport runs and the clock is known (jlst_set_clock) */
+    uint32_t tick16;                   /* the clock in sixteenth notes since the session's start */
+    uint8_t offset;                    /* what a pushed note taught: the Digitone's step = (tick16 + offset) mod length */
 };
 
 /* what the pad logic needs from the rest of the Launchpad app */
@@ -65,6 +70,8 @@ struct jlst_ctx {
     uint8_t can_play;                  /* live control with PLAY: a quadrant pad may play */
     uint8_t transport_playing;         /* the clock runs: the quadrant pads only select */
     uint32_t now_ms;
+    const struct jlapp_recent *recent; /* what the Digitone played lately (jlapp_on_push): the quadrant flashes it */
+    unsigned recent_n;
 };
 
 void jlst_init(struct jlst *s, enum jlst_kind kind);
@@ -79,6 +86,10 @@ size_t jlst_wanted(const struct jlst *s, uint8_t pages[2]);
 void jlst_on_page(struct jlst *s, uint8_t track, const struct jdl_page *pg, uint32_t now_ms);
 /* a pushed note of the current track played step `step` (absolute, 0..127) */
 void jlst_on_push(struct jlst *s, uint8_t track, uint8_t step, uint32_t now_ms);
+/* The playhead (owner 2026-11-24: like Launchpad 95's, on the step rows): Jank is the clock, so it knows where the sequencer is: tick16 = the session's beat x 4 (sixteenth
+ * notes); the Digitone's own playing-step byte is wrong on firmware 1.12. The step is (tick16 + offset) mod the pattern's length; a pushed note (its step is exact) corrects
+ * the offset. BLUE on a step with no trig, RED on one that plays (Launchpad 95's metronome and playing colours). Not running: only the step that just played, white */
+void jlst_set_clock(struct jlst *s, int running, uint32_t tick16);
 
 /* the pads held end (the Launchpad went away or the mode changed): acts, at most max */
 size_t jlst_release(struct jlst *s, struct jlapp_act *out, size_t max);

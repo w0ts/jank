@@ -51,7 +51,8 @@
 
 static const char *TAG = "usb lp";
 
-#define LIVE_WAKE_MS 100               /* the client task wakes at least this often once the Launchpad is going: pushed notes' lights end after 150 ms, and the
+#define STEP_WAKE_MS 30                /* a step mode with the transport running */
+#define LIVE_WAKE_MS 100              /* the client task wakes at least this often once the Launchpad is going: pushed notes' lights end after 150 ms, and the
                                           overlay after a second, and nothing else would wake the task to draw it (a clock transfer might, not always) */
 #define REQUEST_MAX 48u               /* a live-control request is at most 6 + 7 + 1 + 1 bytes before its SysEx end: far under this */
 #define REQUEST_PACKETS 16u            /* ... as USB-MIDI packets */
@@ -232,6 +233,54 @@ static void dn2_sysex(void)
     sync_live();
 }
 
+/* The session's beat, for the step modes' playhead. bridge_beat takes the bridge's lock, which this task must never wait on, so the ui task samples it and hands it over
+ * here (a sequence counter makes the 64-bit read safe); between samples the position is extrapolated from the tempo. */
+static volatile uint32_t s_beat_seq;
+static int64_t s_beat_ub;
+static int32_t s_beat_mpb;
+static uint32_t s_beat_at_ms;
+static uint8_t s_beat_known;
+
+void usb_lp_beat_feed(int known, int64_t beat_ub, int32_t mpb)
+{
+    s_beat_seq++;                      /* odd: being written */
+    __sync_synchronize();
+    s_beat_known = known != 0;
+    s_beat_ub = beat_ub;
+    s_beat_mpb = mpb;
+    s_beat_at_ms = now_ms();
+    __sync_synchronize();
+    s_beat_seq++;
+}
+
+/* the beat now in sixteenth notes; 0 when there is no session (or no tempo) */
+static int beat_sixteenths(uint32_t t, uint32_t *tick16)
+{
+    int64_t beat, ub;
+    int32_t mpb;
+    uint32_t at, seq;
+    uint8_t known;
+    for (int tries = 0; tries < 3; tries++) {
+        seq = s_beat_seq;
+        __sync_synchronize();
+        known = s_beat_known;
+        ub = s_beat_ub;
+        mpb = s_beat_mpb;
+        at = s_beat_at_ms;
+        __sync_synchronize();
+        if (!(seq & 1u) && seq == s_beat_seq)
+            break;
+        known = 0;                     /* being written: this pass has no beat */
+    }
+    if (!known || mpb <= 0)
+        return 0;
+    beat = ub + (int64_t)(uint32_t)(t - at) * 1000 * 1000000 / mpb;   /* micro-beats: the elapsed microseconds over the microseconds a beat takes */
+    if (beat < 0)
+        return 0;
+    *tick16 = (uint32_t)((beat * 4) / 1000000);
+    return 1;
+}
+
 static uint32_t s_read_ms;             /* the last active-track read (FOLLOW) */
 static uint32_t s_page_ms;             /* the last read of the step pages */
 #define STEP_READ_MS 400u              /* a step mode reads its two pages this often (each answer is 104 data bytes); a press shows at once, the next read confirms it */
@@ -261,6 +310,11 @@ static void live_pump(void)
     }
     s_was_live = (uint8_t)live;
     jlapp_set_transport(&s_app, bridge_is_playing());   /* (lock-free) the start / stop scene button's light, and the lower quadrant's rule */
+    {
+        uint32_t tick16 = 0;
+        int known = beat_sixteenths(t, &tick16);
+        jlapp_set_beat(&s_app, known, tick16);          /* the step modes' playhead */
+    }
     if (live && t - s_page_ms >= STEP_READ_MS) {   /* a step mode: the pages on the top rows, of the current track */
         uint8_t pages[2];
         size_t k = jlapp_step_wanted(&s_app, pages);
@@ -444,7 +498,11 @@ uint32_t usb_lp_wait_ticks(void)
     if (left > 0)
         return (uint32_t)left;
     left = (int32_t)(s_refresh_at - xTaskGetTickCount());   /* settled: until the next refresh (the clock's transfers wake the task far oftener) */
-    if (left > (int32_t)pdMS_TO_TICKS(LIVE_WAKE_MS))        /* ... but live control is asked every second, and the lights fade by the clock */
-        left = (int32_t)pdMS_TO_TICKS(LIVE_WAKE_MS);
+    {
+        /* ... but live control is asked every second, and the lights fade by the clock; a step mode's playhead moves every sixteenth (125 ms at 120 BPM): 30 ms */
+        uint32_t cap = s_app.mode == JLAPP_MODE_STEP && s_app.transport ? STEP_WAKE_MS : LIVE_WAKE_MS;
+        if (left > (int32_t)pdMS_TO_TICKS(cap))
+            left = (int32_t)pdMS_TO_TICKS(cap);
+    }
     return left > 0 ? (uint32_t)left : 1u;
 }

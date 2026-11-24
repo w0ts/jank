@@ -189,12 +189,30 @@ void jlst_on_page(struct jlst *s, uint8_t track, const struct jdl_page *pg, uint
     }
 }
 
+/* the pattern's length in steps, from what the Digitone said for the track (0: not known) */
+static unsigned pattern_len(const struct jlst *s)
+{
+    for (unsigned i = 0; i < 2u; i++)
+        if (s->have[i] && s->pg[i].length)
+            return s->pg[i].length;
+    return s->pages_known * 16u;
+}
+
 void jlst_on_push(struct jlst *s, uint8_t track, uint8_t step, uint32_t now_ms)
 {
+    unsigned len = pattern_len(s);
     s->head_on = 1;
     s->head_track = track;
     s->head_step = step;
     s->head_ms = now_ms;
+    if (s->run && len && step < len)   /* a pushed note's step is exact: the clock's phase is learned from it */
+        s->offset = (uint8_t)((step + len - s->tick16 % len) % len);
+}
+
+void jlst_set_clock(struct jlst *s, int running, uint32_t tick16)
+{
+    s->run = running != 0;
+    s->tick16 = tick16;
 }
 
 size_t jlst_release(struct jlst *s, struct jlapp_act *out, size_t max)
@@ -223,10 +241,25 @@ static uint8_t step_colour(const struct jlst *s, const struct jlst_ctx *c, unsig
         return 0;
     if (s->pg[p].length && abs_step >= s->pg[p].length)
         return 0;                      /* past the pattern's length */
-    if (s->head_on && s->head_track == c->n->track && s->head_step == abs_step && (uint32_t)(c->now_ms - s->head_ms) < JLST_HEAD_MS)
-        return JLST_COLOR_HEAD;
     st = &s->pg[p].step[idx];
+    if (s->run && pattern_len(s)) {    /* the playhead: where the clock says the sequencer is, on every step, whether it plays a note or not */
+        if (abs_step == (s->tick16 + s->offset) % pattern_len(s))
+            return st->trig ? JLST_COLOR_PLAYHEAD_NOTE : JLST_COLOR_PLAYHEAD;
+    } else if (s->head_on && s->head_track == c->n->track && s->head_step == abs_step && (uint32_t)(c->now_ms - s->head_ms) < JLST_HEAD_MS) {
+        return JLST_COLOR_HEAD;        /* no clock to go by: only the step that just played a note */
+    }
     return st->trig ? JLST_COLOR_ON : JLST_COLOR_OFF;
+}
+
+/* a note of this track (and this pitch, unless note < 0) that the Digitone played in the last JLST_HEAD_MS */
+static int played_lately(const struct jlst_ctx *c, uint8_t track, int note)
+{
+    for (unsigned i = 0; i < c->recent_n; i++) {
+        const struct jlapp_recent *r = &c->recent[i];
+        if (r->used && r->track == track && (note < 0 || r->note == note) && (uint32_t)(c->now_ms - r->at_ms) < JLST_HEAD_MS)
+            return 1;
+    }
+    return 0;
 }
 
 static uint8_t quadrant_colour(const struct jlst *s, const struct jlst_ctx *c, uint8_t x, uint8_t y)
@@ -234,7 +267,7 @@ static uint8_t quadrant_colour(const struct jlst *s, const struct jlst_ctx *c, u
     unsigned i = y * QUAD + x;
     if (s->kind == JLST_DRUM) {
         uint8_t t = (uint8_t)((QUAD - 1u - y) * QUAD + x);
-        if (s->track_held & (1u << t))
+        if ((s->track_held & (1u << t)) || played_lately(c, t, -1))   /* a pad that is down, or a track that plays: RED, as Launchpad 95's playing note */
             return JLST_COLOR_TRACK_PLAYING;
         return t == c->n->track ? JLST_COLOR_TRACK_CURRENT : JLST_COLOR_TRACK_IDLE;
     } else {
@@ -242,8 +275,8 @@ static uint8_t quadrant_colour(const struct jlst *s, const struct jlst_ctx *c, u
         jln_pad(c->n, c->scale, x, y, &p);
         if (p.note < 0)
             return 0;
-        if (s->key_note[i] >= 0)
-            return JLN_COLOR_PLAYING;
+        if (s->key_note[i] >= 0 || played_lately(c, c->n->track, p.note))   /* a key that is down, or a pitch the track plays (every key of that pitch) */
+            return JLST_COLOR_TRACK_PLAYING;
         return p.note == s->note ? JLST_COLOR_HEAD : jln_color(&p, 0);
     }
 }

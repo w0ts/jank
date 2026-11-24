@@ -64,7 +64,11 @@ scale page in every mode, as before; a quick press that touched a page pad is no
 lower left, the sequence on top, the loop selector lower right):
 
 - **Top 4x8 = 32 steps** as the Digitone shows them: steps 1-8 on the top row, 9-16 below (one page of 16), then the next page on the two rows under it. A press toggles
-  the trig (GREEN on, DARK_GREY off, dark past the pattern's length); the step that just played (from the note push) is WHITE for 150 ms. The pages come from the Digitone
+  the trig (GREEN on, DARK_GREY off, dark past the pattern's length). **The playhead** (owner 2026-11-24, like Launchpad 95's) runs over the step rows while the
+  transport runs: **BLUE** on a step without a trig, **RED** on one that plays (its metronome and playing colours). Its position is Jank's own clock, not the Digitone's
+  playing-step byte (wrong on firmware 1.12): the session's beat x 4 (sixteenth notes, sampled by the ui task, extrapolated between samples), modulo the pattern's
+  length, and a pushed note (its step is exact) corrects the phase. Not measured on hardware: whether the Digitone's step and Jank's beat line up (they should when the
+  Digitone follows Jank's clock from a Start on the bar). Without a running clock only the step that just played shows, WHITE for 150 ms. The pages come from the Digitone
   (STEPS, 46, every 400 ms for the two shown); a press is shown at once and the next read does not undo it for 300 ms; a page the Digitone has not answered is dark and
   does nothing.
 - **Lower right 4x4:** the top row of it holds four page pads (the Digitone's 64 steps): the page the top rows start at.
@@ -72,6 +76,8 @@ lower left, the sequence on top, the loop selector lower right):
   the track the steps show GREEN (21, its step sequencer's selected note), a pad that is down RED (5, its playing note). A press selects the track the steps show and edit. **Melodic:** a 4x4 keyboard
   (the Note mode's layout, scale and octave; up / down are the octave in melodic, nothing in drum): a press picks the note a step press places. With a key picked a step
   press sets that note (STEP op 2; the same note again clears it); with none, the trig with the track's own note.
+- **The quadrant flashes what plays** (owner 2026-11-24; both modes, from the Digitone's note push, 150 ms, RED as Launchpad 95's playing note): a drum track pad when
+  that track plays, a melodic keyboard key when the current track plays that pitch (every key of that pitch).
 - **The quadrant also plays while the transport is stopped** (the track's own note / the key), and only selects while it runs (owner's rule). **Scene button 5 starts / stops
   the transport** (Launchpad 95's Note mode: its start / stop; green running, dim red stopped): Jank is the transport master, the ui task calls `bridge_play`.
 - Reads and edits need live control; without it a step press says why (as a pad does). STEP's refusals (2) and full queue (5) are counted in `diag` (`hostdiag_steps`).

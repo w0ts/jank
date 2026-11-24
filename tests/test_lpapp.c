@@ -1081,6 +1081,34 @@ static void test_the_playhead_comes_from_the_push(void)
     CHECK(colour(&a, 5, 7) == JLST_COLOR_OFF);                     /* another track's step 5 is not shown */
 }
 
+static void test_the_playhead_and_the_flashes_reach_the_step_pads(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    const struct jdl_note n[1] = {{0, 3, 50, 100, 8, 0}};
+    acts(&a, top(CUSTOM, 127), &o);                                /* melodic step */
+    read_pages(&a, 4, 0);
+    jlapp_set_transport(&a, 1);
+    jlapp_set_beat(&a, 1, 2);                                      /* the session's beat: sixteenth 2 */
+    CHECK(colour(&a, 2, 7) == JLST_COLOR_PLAYHEAD);
+    jlapp_set_beat(&a, 0, 0);                                      /* outside a session: no clock to go by */
+    CHECK(colour(&a, 2, 7) == JLST_COLOR_OFF);
+    jlapp_set_beat(&a, 1, 2);
+    jlapp_set_transport(&a, 0);                                    /* stopped: no playhead either */
+    CHECK(colour(&a, 2, 7) == JLST_COLOR_OFF);
+    jlapp_tick(&a, 100);
+    jlapp_on_push(&a, n, 1);                                       /* the current track plays D: the keyboard flashes it, RED */
+    CHECK(colour(&a, 1, 0) == JLST_COLOR_TRACK_PLAYING);
+    jlapp_tick(&a, 100 + JLST_HEAD_MS);
+    CHECK(colour(&a, 1, 0) == JLN_COLOR_IN_SCALE);
+    acts(&a, top(CUSTOM, 127), &o);                                /* drum: the track's own pad flashes */
+    jlapp_tick(&a, 1000);
+    jlapp_on_push(&a, n, 1);
+    CHECK(colour(&a, 0, 3) == JLST_COLOR_TRACK_PLAYING);
+    jlapp_tick(&a, 1000 + JLST_HEAD_MS);
+    CHECK(colour(&a, 0, 3) == JLST_COLOR_TRACK_CURRENT);
+}
+
 static void test_release_acts_in_a_step_mode(void)
 {
     struct jlapp a = fresh();
@@ -1101,6 +1129,7 @@ int main(void)
     test_a_drum_track_pad_changes_the_current_track();
     test_a_note_held_in_a_step_mode_still_ends_after_the_mode_changes();
     test_the_playhead_comes_from_the_push();
+    test_the_playhead_and_the_flashes_reach_the_step_pads();
     test_release_acts_in_a_step_mode();
     test_roles_by_product_name();
     test_midi_interface_choice();

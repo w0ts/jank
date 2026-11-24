@@ -194,6 +194,7 @@ static void scan_groups(void)
  * button's or the page's sweep holds the radio. */
 #define AUTO_CHECK_MS 250u
 #define CLOCK_PEERS_MS 1000u           /* host mode: how often the clock to the Digitone is allowed or stopped by the peers count (usb.c) */
+#define BEAT_FEED_MS 50u               /* host mode: how often the session's beat is sampled for the Launchpad's playhead (usb_lp.c extrapolates between) */
 static struct js_auto s_auto;
 
 static void auto_scan(uint32_t now)
@@ -313,12 +314,13 @@ static void pads_step(uint32_t now, int no)
 static void ui_task(void *arg)
 {
     struct jb_button b;
-    uint32_t last_auto, last_clock_check;
+    uint32_t last_auto, last_clock_check, last_beat_feed;
     (void)arg;
     jb_init(&b);
     js_auto_init(&s_auto, bridge_ms());
     last_auto = bridge_ms();
     last_clock_check = bridge_ms();
+    last_beat_feed = bridge_ms();
     uis_start(bridge_ms());
     for (;;) {
         uint32_t now = bridge_ms();
@@ -336,6 +338,14 @@ static void ui_task(void *arg)
         if ((uint32_t)(now - last_clock_check) >= CLOCK_PEERS_MS) {   /* host mode: the clock to the Digitone only while there are peers (usb.c) */
             last_clock_check = now;
             usb_midi_clock_peers(usb_is_host() ? bridge_peers_heard() > 0u : 1);
+        }
+        if (usb_is_host() && (uint32_t)(now - last_beat_feed) >= BEAT_FEED_MS) {   /* the step modes' playhead: the session's beat, sampled here (the lock), used by usb_lp.c */
+            int64_t beat_ub = 0;
+            int32_t mpb = 0;
+            int known;
+            last_beat_feed = now;
+            known = bridge_beat(&beat_ub, &mpb);
+            usb_lp_beat_feed(known, beat_ub, mpb);
         }
         if (usb_is_host() && usb_lp_transport_request())   /* the Launchpad's start / stop scene button (usb_lp.c asks; this task does the bridge's work) */
             bridge_play(!bridge_is_playing());

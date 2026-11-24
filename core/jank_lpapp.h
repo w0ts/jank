@@ -85,11 +85,6 @@ enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP };
 #define JLAPP_SIDE_START_STOP 4u            /* the side buttons, top (scene 1) = 0: scene 5 */
 #define BUTTON_CUSTOM_IDX 6u
 
-struct jlapp_recent {
-    uint32_t at_ms;
-    uint8_t track, note, used;
-};
-
 struct jlapp {
     struct jln n;
     const struct jln_scale *scale;
@@ -118,6 +113,8 @@ struct jlapp {
     uint8_t mode;                      /* enum jlapp_mode */
     uint8_t step_kind;                 /* enum jlst_kind: the step mode Custom goes to (and the one last used) */
     uint8_t transport;                 /* the clock runs (set by the firmware) */
+    uint8_t beat_ok;                   /* the session's beat is known (jlapp_set_beat) */
+    uint32_t tick16;                   /* ... in sixteenth notes */
     uint8_t note_used;                 /* a page pad was pressed while the Note button was held: its release is not a tap */
     uint32_t note_down_ms;
     struct jlst step;
@@ -148,6 +145,8 @@ int jlapp_following(const struct jlapp *a);
 
 /* the clock runs (the step modes' lower quadrant then only selects instead of playing; the start / stop scene button lights) */
 void jlapp_set_transport(struct jlapp *a, int playing);
+/* the session's beat in sixteenth notes (beat x 4), `known` 0 outside a session: the step modes' playhead runs on it while the transport runs (jank_lpstep.h) */
+void jlapp_set_beat(struct jlapp *a, int known, uint32_t tick16);
 /* the step modes: the pages of the current track to read now (pages[0..n), 0 outside the step modes), and a page the Digitone answered (jdl_take_page) */
 size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2]);
 void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg);

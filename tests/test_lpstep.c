@@ -20,6 +20,7 @@ struct rig {
     struct jlst s;
     struct jln n;
     struct jlst_ctx c;
+    struct jlapp_recent recent[8];
 };
 
 static void rig_init(struct rig *r, enum jlst_kind kind)
@@ -31,6 +32,18 @@ static void rig_init(struct rig *r, enum jlst_kind kind)
     r->c.can_play = 1;
     r->c.transport_playing = 0;
     r->c.now_ms = 1000;
+    r->c.recent = r->recent;
+    r->c.recent_n = 8;
+    memset(r->recent, 0, sizeof r->recent);
+}
+
+/* the Digitone played `note` on `track` at `now` (what jlapp_on_push records) */
+static void played(struct rig *r, uint8_t slot, uint8_t track, uint8_t note, uint32_t now)
+{
+    r->recent[slot].used = 1;
+    r->recent[slot].track = track;
+    r->recent[slot].note = note;
+    r->recent[slot].at_ms = now;
 }
 
 /* the Digitone's answer for `track`, `page` of a pattern `pages` long: trig where (step + page * 16) % 4 == 0 when `every4`, note 40 + step */
@@ -135,7 +148,7 @@ static void test_the_keys_play_only_while_the_transport_is_stopped(void)
     struct jlapp_act o[2];
     rig_init(&r, JLST_MELODIC);
     CHECK(press(&r, 1, 0, 90, o, 2) == 1 && o[0].kind == JLAPP_ACT_NOTE_ON && o[0].track == 0 && o[0].note == 50 && o[0].vel == 90);   /* stopped: it plays */
-    CHECK(colour(&r, 1, 0) == JLN_COLOR_PLAYING);
+    CHECK(colour(&r, 1, 0) == JLST_COLOR_TRACK_PLAYING);          /* a key that is down: RED, as in the drum quadrant */
     CHECK(press(&r, 1, 0, 0, o, 2) == 1 && o[0].kind == JLAPP_ACT_NOTE_OFF && o[0].note == 50);
     r.c.transport_playing = 1;
     CHECK(press(&r, 2, 0, 90, o, 2) == 0 && r.s.note == 52);      /* playing: only picks the note */
@@ -326,8 +339,109 @@ static void test_pads_off_the_grid_and_no_page_pad_hold(void)
     CHECK(press(&r, 4, 3, 0, o, 2) == 0 && r.s.first_page == 0);  /* a release of a page pad */
 }
 
+static void test_the_drum_quadrant_flashes_the_tracks_that_play(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_DRUM);
+    r.c.now_ms = 5000;
+    played(&r, 0, 2, 60, 5000);                                   /* track 3 played */
+    played(&r, 1, 15, 36, 4900);                                  /* track 16 played 100 ms ago */
+    CHECK(colour(&r, 2, 3) == JLST_COLOR_TRACK_PLAYING);          /* track 3: row 0 of the quadrant (top), column 2 */
+    CHECK(colour(&r, 3, 0) == JLST_COLOR_TRACK_PLAYING);          /* track 16: the corner */
+    CHECK(colour(&r, 1, 3) == JLST_COLOR_TRACK_IDLE);             /* a track that did not */
+    CHECK(colour(&r, 0, 3) == JLST_COLOR_TRACK_CURRENT);          /* the current one stays green when silent */
+    r.c.now_ms = 5000 + JLST_HEAD_MS - 1u;
+    CHECK(colour(&r, 2, 3) == JLST_COLOR_TRACK_PLAYING && colour(&r, 3, 0) == JLST_COLOR_TRACK_IDLE);   /* the older one has faded: 150 ms */
+    r.c.now_ms = 5000 + JLST_HEAD_MS;
+    CHECK(colour(&r, 2, 3) == JLST_COLOR_TRACK_IDLE);
+    played(&r, 2, 0, 48, r.c.now_ms);                             /* the current track plays: it flashes too, then is green again */
+    CHECK(colour(&r, 0, 3) == JLST_COLOR_TRACK_PLAYING);
+    r.c.now_ms += JLST_HEAD_MS;
+    CHECK(colour(&r, 0, 3) == JLST_COLOR_TRACK_CURRENT);
+}
+
+static void test_the_melodic_keyboard_flashes_the_pitches_that_play(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_MELODIC);
+    r.c.now_ms = 3000;
+    played(&r, 0, 0, 50, 3000);                                   /* the current track plays D (50): the key (1,0) */
+    played(&r, 1, 4, 52, 3000);                                   /* another track plays E: not this keyboard */
+    CHECK(colour(&r, 1, 0) == JLST_COLOR_TRACK_PLAYING);
+    CHECK(colour(&r, 2, 0) == JLN_COLOR_IN_SCALE);                /* E on the current track's keyboard stays as it was */
+    CHECK(colour(&r, 0, 0) == JLN_COLOR_ROOT);
+    r.c.now_ms = 3000 + JLST_HEAD_MS;
+    CHECK(colour(&r, 1, 0) == JLN_COLOR_IN_SCALE);
+    r.n.layout = JLN_CHROMATIC;                                   /* the keys overlap: (5,0) is not on a 4x4, but (0,1) = 53 and (1,1) = 54 are */
+    r.c.now_ms = 3200;
+    played(&r, 2, 0, 53, 3200);
+    CHECK(colour(&r, 0, 1) == JLST_COLOR_TRACK_PLAYING && colour(&r, 1, 1) != JLST_COLOR_TRACK_PLAYING);
+    played(&r, 3, 0, 48, 3200);                                   /* a pitch that is not in the 4x4 at all: nothing lights */
+    r.n.octave = 5;
+    CHECK(colour(&r, 0, 0) != JLST_COLOR_TRACK_PLAYING);
+}
+
+static void test_the_playhead_runs_on_the_clock(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_DRUM);
+    feed(&r, 0, 4, 1);                                            /* trigs on 0, 4, 8, 12 of page 1 */
+    feed(&r, 1, 4, 0);
+    jlst_set_clock(&r.s, 1, 0);
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_PLAYHEAD_NOTE);          /* step 0 has a trig: RED */
+    jlst_set_clock(&r.s, 1, 1);
+    CHECK(colour(&r, 1, 7) == JLST_COLOR_PLAYHEAD && colour(&r, 0, 7) == JLST_COLOR_ON);   /* step 1: BLUE on an empty step, step 0 as it is */
+    jlst_set_clock(&r.s, 1, 9);
+    CHECK(colour(&r, 1, 6) == JLST_COLOR_PLAYHEAD);               /* step 9 is the second row */
+    jlst_set_clock(&r.s, 1, 17);
+    CHECK(colour(&r, 1, 5) == JLST_COLOR_PLAYHEAD);               /* 17: the next page, third row */
+    jlst_set_clock(&r.s, 1, 64 + 2);
+    CHECK(colour(&r, 2, 7) == JLST_COLOR_PLAYHEAD);               /* a pattern of 64 steps wraps */
+    jlst_set_clock(&r.s, 1, 40);
+    {
+        unsigned lit = 0;
+        for (uint8_t y = 4; y < 8; y++)
+            for (uint8_t x = 0; x < 8; x++)
+                lit += colour(&r, x, y) == JLST_COLOR_PLAYHEAD || colour(&r, x, y) == JLST_COLOR_PLAYHEAD_NOTE;
+        CHECK(lit == 0);                                          /* step 40 is not on the two pages shown: no head on them */
+    }
+    jlst_set_clock(&r.s, 0, 5);                                   /* stopped: no playhead */
+    CHECK(colour(&r, 5, 7) == JLST_COLOR_OFF);
+}
+
+static void test_a_pushed_note_corrects_the_playhead(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_DRUM);
+    feed(&r, 0, 2, 0);                                            /* 2 pages: 32 steps */
+    feed(&r, 1, 2, 0);
+    jlst_set_clock(&r.s, 1, 100);                                 /* the session's beat says step 100 % 32 = 4 */
+    CHECK(colour(&r, 4, 7) == JLST_COLOR_PLAYHEAD);
+    jlst_on_push(&r.s, 0, 7, r.c.now_ms);                         /* but the Digitone just played step 7: its start was 3 steps later */
+    CHECK(colour(&r, 7, 7) == JLST_COLOR_PLAYHEAD && colour(&r, 4, 7) == JLST_COLOR_OFF);
+    jlst_set_clock(&r.s, 1, 101);                                 /* and it goes on from there */
+    CHECK(colour(&r, 0, 6) == JLST_COLOR_PLAYHEAD);               /* step 8 */
+}
+
+static void test_without_a_clock_only_the_note_that_played_shows(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_DRUM);
+    feed(&r, 0, 4, 1);
+    r.c.now_ms = 2000;
+    jlst_on_push(&r.s, 0, 4, 2000);                               /* transport not known to run */
+    CHECK(colour(&r, 4, 7) == JLST_COLOR_HEAD);
+    r.c.now_ms = 2000 + JLST_HEAD_MS;
+    CHECK(colour(&r, 4, 7) == JLST_COLOR_ON);
+}
+
 int main(void)
 {
+    test_the_drum_quadrant_flashes_the_tracks_that_play();
+    test_the_melodic_keyboard_flashes_the_pitches_that_play();
+    test_the_playhead_runs_on_the_clock();
+    test_a_pushed_note_corrects_the_playhead();
+    test_without_a_clock_only_the_note_that_played_shows();
     test_a_step_does_nothing_until_its_page_is_read();
     test_a_step_press_toggles_the_trig();
     test_the_step_pads_are_the_digitones_layout();

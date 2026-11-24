@@ -62,6 +62,7 @@ bool wota_key_line(const char *line);                                           
 void wota_serve(void);                                                                                 /* control task, once a pass */
 int usb_is_host(void);                                               /* the USB host stack is the one that started (the LED's double flash) */
 int usb_lp_transport_request(void);                                 /* host mode: 1 once when the Launchpad asked to start / stop (usb_lp.c, any task); the ui task acts on it */
+void usb_lp_beat_feed(int known, int64_t beat_ub, int32_t mpb);      /* host mode: the session's beat (bridge_beat, sampled by the ui task) for the step modes' playhead (usb_lp.c) */
 size_t hostdiag_text(char *out, size_t cap);                         /* hostdiag.c: what the last host session saw, for `diag` */
 int usb_host_spoke(void);                                            /* a control line came from the computer since the start */
 void usb_beat_line(const char *text, size_t n);                      /* a beat report: SysEx F0 7D 'J' 'B' 0x10 <text> F7, dropped when full */

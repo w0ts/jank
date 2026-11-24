@@ -20,4 +20,10 @@ struct jlapp_act {
     uint8_t kind, track, note, vel;
     uint8_t step, op, len;
 };
+
+/* a note the Digitone's sequencer played (its push), kept for the lights: both Note mode and the step modes flash what plays */
+struct jlapp_recent {
+    uint32_t at_ms;
+    uint8_t track, note, used;
+};
 #endif
