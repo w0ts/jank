@@ -90,10 +90,44 @@ static void save_task(void *arg)
     }
 }
 
+/* The devices the unit has learned to leave alone behind a hub (core/jank_hostfilter.h), kept apart from the record (key "skip"): it is what the
+ * next start's enumeration filter reads, and it outlives a change of the record's layout. */
+#define KEY_SKIP "skip"
+
+esp_err_t hostdiag_skiplist_save(const struct jhf_set *s)
+{
+    uint8_t b[JHF_PACK_MAX];
+    size_t n = jhf_pack(s, b);
+    nvs_handle_t h;
+    esp_err_t e = nvs_open(NS, NVS_READWRITE, &h);
+    if (e != ESP_OK)
+        return e;
+    e = nvs_set_blob(h, KEY_SKIP, b, n);
+    if (e == ESP_OK)
+        e = nvs_commit(h);
+    nvs_close(h);
+    return e;
+}
+
+/* empty on any failure: no list, an unreadable one */
+static void skiplist_load(struct jhf_set *s)
+{
+    uint8_t b[JHF_PACK_MAX];
+    size_t n = sizeof b;
+    nvs_handle_t h;
+    memset(s, 0, sizeof *s);
+    if (nvs_open(NS, NVS_READONLY, &h) != ESP_OK)
+        return;
+    if (nvs_get_blob(h, KEY_SKIP, b, &n) != ESP_OK || !jhf_unpack(s, b, n))
+        memset(s, 0, sizeof *s);
+    nvs_close(h);
+}
+
 void hostdiag_start(void)
 {
     jhd_init(&g_hostdiag);
     g_hostdiag.stack = JHD_STACK_HOST;
+    skiplist_load(&g_hostdiag.filter.deny);    /* before the library installs: its enumeration filter reads it */
     sample_mem(&g_hostdiag);
 }
 

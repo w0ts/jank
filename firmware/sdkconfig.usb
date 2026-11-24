@@ -3,6 +3,8 @@
 CONFIG_TINYUSB_MSC_ENABLED=y
 # host mode: USB-MIDI devices, through a hub too
 CONFIG_USB_HOST_HUBS_SUPPORTED=y
+# host mode: the enumeration filter (usb_hostlib.c, core/jank_hostfilter.h): a hub's other devices are left alone, they would take the pipes
+CONFIG_USB_HOST_ENABLE_ENUM_FILTER_CALLBACK=y
 # host mode's audio in: the IN FIFO biased up, its largest packet 600 bytes instead of 408 (components/usb/Kconfig,
 # USB_HOST_HW_BUFFER_BIAS); bulk OUT (MIDI) keeps one 64-byte packet, which is all a full-speed MIDI endpoint takes
 CONFIG_USB_HOST_HW_BUFFER_BIAS_IN=y

@@ -21,6 +21,7 @@ void usb_host_list_add(struct jk_usb *u, const char *name, int midi, int audio);
 extern struct jhd g_hostdiag;
 void hostdiag_start(void);
 void hostdiag_start_saver(void);                           /* the flash-saver task, made once the start-up is through */
+esp_err_t hostdiag_skiplist_save(const struct jhf_set *s); /* the devices to leave alone behind a hub, kept in flash (read again by hostdiag_start) */
 void hostdiag_trace_reset(void);                           /* a host start begins: the stage trace (RTC memory) starts afresh */
 void hostdiag_mark(uint8_t step);                          /* the internal heap, at the stage (enum jhd_step) about to run; host mode only */
 void hostdiag_fail(uint8_t step, esp_err_t e);             /* a host start failed at step (enum jhd_step): kept in flash now */

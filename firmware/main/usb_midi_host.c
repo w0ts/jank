@@ -12,6 +12,7 @@
 #include <string.h>
 #include "app.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -24,6 +25,7 @@
 #define JH_DEVICES 4u
 #define EVENTS 8u
 #define AUDIO_CLASS 1u
+#define AUDIO_STREAMING 2u
 #define MIDI_STREAMING 3u
 #define BULK 2u
 #define PACKET_MAX 64u
@@ -31,6 +33,7 @@
 #define CLIENT_PRIO 23                 /* a sent packet's completion frees the device for the next tick: soon after it */
 #define CLIENT_STACK 5120              /* the client task runs the callbacks, usb_lp.c's frame and queues included (4096 was thought tight, 6144 took 2 KB
                                           of a 13 KB internal heap): the margin it leaves is reported in diag (hostdiag_mem client_stack_free) */
+#define LEARN_DELAY_MS 3000u          /* after a controller that could not be claimed: the rest of the dock has come by then */
 #define IN_RETRIES 3                   /* a stalled or failed IN transfer is tried again this many times in a row, then given up */
 
 struct dev {
@@ -70,6 +73,9 @@ static QueueHandle_t s_events;
 static uint32_t s_dropped;
 static uint8_t s_start_step;           /* the step of usb_midi_host_start under way, for a failure's report */
 static TaskHandle_t s_client_task;
+static struct jhf_set s_useless;       /* devices seen with neither a MIDI nor an audio interface (client task only): what the unit may learn to ignore */
+static uint8_t s_learn_pending;        /* a Launchpad or a Digitone could not be claimed for want of pipes: s_learn_at says when to learn */
+static TickType_t s_learn_at;
 
 /* the probe's line for a claimed device (core/jank_hostdiag.h): lines go by arrival, so a device that was left alone keeps its own */
 static struct jhd_dev *dg(const struct dev *d) { return &g_hostdiag.dev[d->dg % JHD_DEVS]; }
@@ -171,6 +177,19 @@ static unsigned count_midi_interfaces(const usb_config_desc_t *c)
     while ((cur = usb_parse_next_descriptor(cur, c->wTotalLength, &offset)) != NULL)
         n += (unsigned)is_midi_streaming(cur);
     return n;
+}
+
+/* 1: the device has an audio streaming interface (usb_uac_host.c may want it) */
+static int has_audio_streaming(const usb_config_desc_t *c)
+{
+    const usb_standard_desc_t *cur = (const usb_standard_desc_t *)c;
+    int offset = 0;
+    while ((cur = usb_parse_next_descriptor(cur, c->wTotalLength, &offset)) != NULL) {
+        const usb_intf_desc_t *i = (const usb_intf_desc_t *)cur;
+        if (cur->bDescriptorType == USB_B_DESCRIPTOR_TYPE_INTERFACE && i->bInterfaceClass == AUDIO_CLASS && i->bInterfaceSubClass == AUDIO_STREAMING)
+            return 1;
+    }
+    return 0;
 }
 
 /* the index-th MIDI streaming interface's (alternate setting 0) first bulk OUT and IN. 1: it has an OUT endpoint */
@@ -309,6 +328,8 @@ static void add_device(uint8_t address)
     role = jlapp_role_from_name(name);
     e = usb_host_get_active_config_descriptor(h, &c);
     r = probe_begin(h, name, role, e == ESP_OK ? c : NULL, &idx);
+    if (e == ESP_OK && role == JLAPP_OTHER && !r->ifs && !has_audio_streaming(c) && (r->vid || r->pid))
+        jhf_set_add(&s_useless, r->vid, r->pid);     /* of no use to jank, and it holds a pipe of the controller's 8 (core/jank_hostfilter.h) */
     if (e == ESP_OK && d && find_midi(c, jlapp_midi_interface_index(role), role, &m) && m.out_mps >= 4u) {
         e = claim(d, h, &m, role);
         r->itf_index = m.index;
@@ -323,6 +344,10 @@ static void add_device(uint8_t address)
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "device %u left alone: %s", address, esp_err_to_name(e));
         usb_host_device_close(s_client, h);
+        if (role != JLAPP_OTHER && (e == ESP_ERR_NO_MEM || e == ESP_ERR_NOT_SUPPORTED) && !s_learn_pending) {   /* a controller, and no pipes (or memory) for it */
+            s_learn_pending = 1;
+            s_learn_at = xTaskGetTickCount() + pdMS_TO_TICKS(LEARN_DELAY_MS);
+        }
         return;
     }
     ESP_LOGI(TAG, "device %u: MIDI out%s", address, d->in ? " and in" : "");
@@ -383,12 +408,43 @@ static void on_event(const usb_host_client_event_msg_t *m, void *arg)
     xQueueSend(s_events, &ev, 0);
 }
 
+/* A controller could not be claimed (add_device), and a while later the useless devices seen go on the list that is kept in flash, and the unit
+ * restarts: the next start leaves them alone (usb_hostlib.c's filter) and their pipes are free. A restart only when something new was learned and
+ * the list was saved: a list that is full, or already holds them, ends it (core/jank_hostfilter.h). */
+static void learn_and_restart(void)
+{
+    s_learn_pending = 0;
+    if (!jhf_set_merge(&g_hostdiag.filter.deny, &s_useless))
+        return;                        /* nothing new: the controller failed for another reason */
+    if (hostdiag_skiplist_save(&g_hostdiag.filter.deny) != ESP_OK) {
+        ESP_LOGW(TAG, "list of ignored devices not saved: no restart");
+        return;
+    }
+    ESP_LOGW(TAG, "%u device(s) of no use hold pipes the controllers need: saved, restarting to leave them alone", g_hostdiag.filter.deny.n);
+    usbrole_host_inflight(0);          /* a restart of ours, not a crash */
+    vTaskDelay(pdMS_TO_TICKS(100));
+    esp_restart();
+}
+
+/* how long the client task may sleep: usb_lp.c's wish, and no longer than the wait for learning */
+static TickType_t client_wait_ticks(void)
+{
+    TickType_t w = usb_lp_wait_ticks();
+    if (s_learn_pending) {
+        int32_t left = (int32_t)(s_learn_at - xTaskGetTickCount());
+        TickType_t t = left > 0 ? (TickType_t)left : 0;
+        if (t < w)
+            w = t;
+    }
+    return w;
+}
+
 static void client_task(void *arg)
 {
     (void)arg;
     for (;;) {
         struct event ev;
-        usb_host_client_handle_events(s_client, usb_lp_wait_ticks());   /* (the callbacks run in here) */
+        usb_host_client_handle_events(s_client, client_wait_ticks());   /* (the callbacks run in here) */
         while (xQueueReceive(s_events, &ev, 0) == pdTRUE) {
             if (ev.address)
                 add_device(ev.address);
@@ -396,6 +452,8 @@ static void client_task(void *arg)
                 remove_device(ev.gone);
         }
         usb_lp_pump();                 /* what a callback, a device or the clock has made room for */
+        if (s_learn_pending && (int32_t)(xTaskGetTickCount() - s_learn_at) >= 0)
+            learn_and_restart();
     }
 }
 

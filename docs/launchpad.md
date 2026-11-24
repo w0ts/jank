@@ -41,7 +41,14 @@ separate.
 - Pipes: the controller has 8 (`usb_hostlib.c`). Hub (2) + Launchpad (control, OUT, IN) + Digitone (control, OUT, IN) = 8, so
   the **Digitone's USB audio is not used** (the beat tracker's audio client skips both devices, `usb_uac_host.c`). A Digitone
   alone, without the Launchpad, is not affected by the pipe count but is skipped the same way.
-- No log leaves the unit in host mode (no USB control line, console off): what the pads do is the only readout.
+- A multi-function USB-C dock (hub + card reader + video adapter) used up the pipes (measured 2026-11-24: the Digitone's claim failed
+  with 262, the Launchpad's with 257). The unit learns what to leave alone (`core/jank_hostfilter.h`): a device with neither a MIDI
+  nor an audio interface is noted; if a Launchpad or Digitone then cannot be claimed for want of pipes, the noted devices go on a
+  list kept in flash and the unit restarts once. From then on the library's enumeration filter skips the listed devices behind a hub,
+  before they hold a pipe. At most 8 entries (so at most 8 such restarts, ever); `wipe settings` clears the list; `diag` shows it
+  (`hostdiag_filter=...,learned:VID:PID+...`). Not verified on hardware yet.
+- No log leaves the unit in host mode (no USB control line, console off): what the pads do is the only readout. Over Wi-Fi
+  (`docs/wifi.md`) `diag` ends with the `hostdiag_` lines live.
 
 ## Files
 

@@ -12,6 +12,8 @@
  *   + 2 = 7). */
 #include <string.h>
 #include "app.h"
+#include "jank_hostdiag.h"
+#include "jank_hostfilter.h"
 #include "jank_uacdesc.h"
 #include "esp_intr_alloc.h"
 #include "esp_log.h"
@@ -26,9 +28,18 @@
 static const char *TAG = "usb host";
 static volatile uint8_t s_up;
 
+/* The library's enumeration filter (CONFIG_USB_HOST_ENABLE_ENUM_FILTER_CALLBACK, sdkconfig.usb), called with each new device's descriptor
+ * before it holds a pipe: the rule is core/jank_hostfilter.h's (a dock's card reader and video adapter would take pipes the Launchpad
+ * and the Digitone need). Its counters are in the host record, so `diag` says what was left alone. */
+static bool enum_filter(const usb_device_desc_t *dev_desc, uint8_t *bConfigurationValue)
+{
+    (void)bConfigurationValue;         /* the default configuration */
+    return jhf_proceed(&g_hostdiag.filter, dev_desc->bDeviceClass, dev_desc->idVendor, dev_desc->idProduct) != 0;
+}
+
 static void lib_task(void *arg)
 {
-    usb_host_config_t c = {.intr_flags = ESP_INTR_FLAG_LOWMED};
+    usb_host_config_t c = {.intr_flags = ESP_INTR_FLAG_LOWMED, .enum_filter_cb = enum_filter};
     TaskHandle_t parent = arg;
     esp_err_t e = usb_host_install(&c);
     if (e == ESP_OK)

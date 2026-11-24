@@ -92,6 +92,12 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
     put(out, cap, &n, "hostdiag_port=hprt:0x%08lx,conn:%lu,ena:%lu,lnsts:%lu,pwr:%lu,spd:%lu\n", (unsigned long)d->hprt, (unsigned long)(d->hprt & 1u),
         (unsigned long)((d->hprt >> 2) & 1u), (unsigned long)((d->hprt >> 10) & 3u), (unsigned long)((d->hprt >> 12) & 1u),
         (unsigned long)((d->hprt >> 17) & 3u));
+    /* the enumeration rule (jank_hostfilter.h): a hub came, devices left alone (and the last one's IDs), the learned list ('-' when empty) */
+    put(out, cap, &n, "hostdiag_filter=hub:%u,skipped:%lu,last:%04X:%04X,learned:", d->filter.hub_seen, (unsigned long)d->filter.skipped,
+        d->filter.skip_vid, d->filter.skip_pid);
+    for (unsigned i = 0; i < d->filter.deny.n && i < JHF_MAX; i++)
+        put(out, cap, &n, "%s%04X:%04X", i ? "+" : "", d->filter.deny.id[i].vid, d->filter.deny.id[i].pid);
+    put(out, cap, &n, "%s\n", d->filter.deny.n ? "" : "-");
     put(out, cap, &n, "hostdiag_events=new:%lu,gone:%lu,add:%lu\n", (unsigned long)d->new_dev, (unsigned long)d->gone_dev, (unsigned long)d->add_calls);
     put(out, cap, &n, "hostdiag_lp=lpx:%u,dn2:%u,programmer:%lu,pads:%lu,dn2msgs:%lu\n", d->lpx_up, d->dn2_up, (unsigned long)d->programmer_sent,
         (unsigned long)d->pads, (unsigned long)d->dn2_msgs);
