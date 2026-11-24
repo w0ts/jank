@@ -24,7 +24,10 @@
 #define RESERVE 4u                     /* packets left free in a queue that also carries the clock: the clock must not wait */
 #define BATCH 16u                      /* lights per call: what fits one bulk packet */
 #define SYSEX_PACKETS 3u               /* the Programmer mode message */
-#define SETTLE_MS 150                  /* after the Launchpad's answer to the Programmer mode message, before the first lights: a guess, not measured */
+#define SETTLE_MS 400                  /* after the Launchpad's answer to the Programmer mode message, before the first lights: still a guess (it was 150,
+                                          and the lights stayed dark: 2026-11-24, with the answer in and the packets right) */
+#define REFRESH_MS 2000                /* every light again this often: the Launchpad may take none while it changes modes, and the diff would otherwise
+                                          never send a light it believes delivered; the whole frame is about 330 bytes */
 #define RETRY_MS 10                    /* the Programmer mode message waits for room this long between tries */
 /* A Launchpad that was replugged stayed dark (measured 2026-11-24 over Wi-Fi diag: attached, claimed, answering the clock, no lights; the
  * message had gone out the moment it was claimed). The cause is not proven: a Launchpad whose firmware is not up yet may drop the message.
@@ -47,6 +50,7 @@ static uint8_t s_ready, s_lpx_up, s_dn2_up, s_programmer_pending;   /* pending: 
 static uint8_t s_tries;                /* Programmer mode messages sent to this Launchpad */
 static TickType_t s_settle_at;         /* no lights before this tick */
 static TickType_t s_try_at;            /* the next Programmer mode message is due at this tick */
+static TickType_t s_refresh_at;        /* every light is sent again at this tick (REFRESH_MS) */
 
 static void ensure_init(void)
 {
@@ -128,6 +132,7 @@ static void rx_lpx(const uint8_t p[4])
             g_hostdiag.programmer_acked++;
             jlx_forget(&s_shown);      /* a Launchpad that just entered the mode shows nothing we know of */
             s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
+            s_refresh_at = s_settle_at + pdMS_TO_TICKS(REFRESH_MS);
         }
         return;
     }
@@ -173,15 +178,22 @@ void usb_lp_pump(void)
             s_programmer_pending = 0;
             jlx_forget(&s_shown);
             s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
+            s_refresh_at = s_settle_at + pdMS_TO_TICKS(REFRESH_MS);
         }
         return;
     }
     if ((int32_t)(xTaskGetTickCount() - s_settle_at) < 0 || room <= RESERVE)
         return;
+    if ((int32_t)(xTaskGetTickCount() - s_refresh_at) >= 0) {   /* all the lights again, in case one was lost */
+        jlx_forget(&s_shown);
+        s_refresh_at = xTaskGetTickCount() + pdMS_TO_TICKS(REFRESH_MS);
+    }
     jlapp_frame(&s_app, &want);
     n = jlx_diff(LPX_CABLE, &s_shown, &want, out, room - RESERVE < BATCH ? room - RESERVE : BATCH);
-    if (n)
+    if (n) {
         usb_midi_host_send_to(JLAPP_LPX, out, n * 4u);
+        g_hostdiag.lights_sent += (uint32_t)n;
+    }
 }
 
 /* how long the client task may sleep: until the lights may start, or the next try for room; else until an event */
@@ -197,5 +209,8 @@ uint32_t usb_lp_wait_ticks(void)
         return pdMS_TO_TICKS(RETRY_MS) ? pdMS_TO_TICKS(RETRY_MS) : 1u;
     }
     left = (int32_t)(s_settle_at - xTaskGetTickCount());
-    return left > 0 ? (uint32_t)left : portMAX_DELAY;
+    if (left > 0)
+        return (uint32_t)left;
+    left = (int32_t)(s_refresh_at - xTaskGetTickCount());   /* settled: until the next refresh (the clock's transfers wake the task far oftener) */
+    return left > 0 ? (uint32_t)left : 1u;
 }

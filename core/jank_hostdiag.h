@@ -12,8 +12,8 @@
 
 #define JHD_DEVS 4u                    /* as many as usb_midi_host.c has slots */
 #define JHD_NAME_MAX 23u               /* as JK_USB_NAME_MAX */
-#define JHD_VERSION 7u                /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
-                                          7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
+#define JHD_VERSION 8u               /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
+                                          8: lights_sent; 7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
                                           so the size check does not catch it: bump this with every change to struct jhd or jhd_dev) */
 
 /* the steps of a host start, in order, for the one that failed (jhd_format_failure) */
@@ -71,6 +71,7 @@ struct jhd {
     uint32_t new_dev, gone_dev, add_calls;
     uint32_t programmer_sent;          /* Programmer mode messages put in the Launchpad's queue */
     uint32_t programmer_acked;         /* the Launchpad's answers to them (jlx_programmer_ack): fewer than sent means it did not take one */
+    uint32_t lights_sent;              /* light messages put in the Launchpad's queue (the whole frame is 81; it is sent again every 2 s) */
     uint32_t pads;                     /* Launchpad pad / button events decoded */
     uint32_t dn2_msgs;                 /* packets from the Digitone */
     uint32_t heap_big_b;               /* the largest free block of byte-addressable internal RAM, bytes: what a task stack or a DMA buffer needs in one piece */
