@@ -252,9 +252,60 @@ static void test_pages_of_another_track_are_dropped(void)
     jlst_on_page(&r.s, r.n.track, &other, r.c.now_ms);            /* a late answer for track 6 while the track is 1 */
     CHECK(r.s.pg[0].track == 0 && press(&r, 0, 7, 100, o, 2) == 1);
     r.n.track = 5;                                                /* the track changed: what was read is of track 1 */
-    CHECK(press(&r, 0, 7, 100, o, 2) == 0 && colour(&r, 0, 7) == 0);
+    CHECK(press(&r, 0, 7, 100, o, 2) == 0);                       /* a press never acts on another track's page */
+    CHECK(colour(&r, 4, 7) == JLST_COLOR_ON);                     /* but the pads keep showing it (step 5, a trig; step 1 was toggled off above) until the new pages come: no dark flash */
     jlst_on_page(&r.s, 5, &other, r.c.now_ms);
     CHECK(press(&r, 0, 7, 100, o, 2) == 1 && o[0].track == 5);
+}
+
+static void test_a_track_switch_does_not_blank_the_steps(void)
+{
+    struct rig r;
+    struct jdl_page next = page_of(5, 0, 4, 0);                   /* track 6: no trigs */
+    rig_init(&r, JLST_DRUM);
+    feed(&r, 0, 4, 1);
+    feed(&r, 1, 4, 1);
+    r.c.now_ms = 5000;
+    r.s.pages_ms = 5000;                                          /* the old track's pages came just now */
+    r.n.track = 5;                                                /* the track is switched */
+    CHECK(jlst_urgent(&r.s, 5) && !jlst_urgent(&r.s, 0));         /* the new track's pages are wanted at once; the old one's are in */
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_ON && colour(&r, 4, 6) == JLST_COLOR_ON && colour(&r, 1, 7) == JLST_COLOR_OFF);   /* still the old steps: no blank */
+    r.c.now_ms = 5000 + JLST_STALE_MS - 1u;
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_ON);
+    r.c.now_ms = 5000;                                            /* the first page of the new track comes */
+    jlst_on_page(&r.s, 5, &next, r.c.now_ms);
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_OFF && colour(&r, 0, 5) == JLST_COLOR_ON);   /* the first page (rows 1-2) replaced, the second (rows 3-4) still the old one for a moment */
+    CHECK(jlst_urgent(&r.s, 5));                                  /* the second page is still missing */
+    next.page = 1;
+    jlst_on_page(&r.s, 5, &next, r.c.now_ms);
+    CHECK(colour(&r, 0, 5) == JLST_COLOR_OFF && !jlst_urgent(&r.s, 5));   /* both are the new track's now */
+}
+
+static void test_steps_of_a_track_that_never_answers_go_dark_not_wrong(void)
+{
+    struct rig r;
+    rig_init(&r, JLST_DRUM);
+    feed(&r, 0, 4, 1);
+    r.c.now_ms = 3000;
+    r.s.pages_ms = 3000;                                          /* the last page came at 3000 */
+    r.n.track = 5;
+    r.c.now_ms = 3000 + JLST_STALE_MS - 1u;
+    CHECK(colour(&r, 0, 7) == JLST_COLOR_ON);
+    r.c.now_ms = 3000 + JLST_STALE_MS;
+    CHECK(colour(&r, 0, 7) == 0);                                 /* waited long enough: dark, not another track's steps */
+}
+
+static void test_urgent_with_no_pages_yet_and_a_moved_window(void)
+{
+    struct rig r;
+    struct jlapp_act o[2];
+    rig_init(&r, JLST_DRUM);
+    CHECK(jlst_urgent(&r.s, 0));                                  /* nothing read yet */
+    press(&r, 6, 3, 100, o, 2);                                   /* the window moves before the first read: page 0 is still what is wanted */
+    CHECK(jlst_urgent(&r.s, 0));
+    feed(&r, 0, 4, 0);
+    feed(&r, 1, 4, 0);
+    CHECK(jlst_urgent(&r.s, 0));                                  /* the window is on pages 3-4 (index 2): their pages are not in yet */
 }
 
 static void test_a_read_does_not_undo_a_press_for_a_moment(void)
@@ -578,6 +629,9 @@ int main(void)
     test_the_page_pads();
     test_which_pages_to_read();
     test_pages_of_another_track_are_dropped();
+    test_a_track_switch_does_not_blank_the_steps();
+    test_steps_of_a_track_that_never_answers_go_dark_not_wrong();
+    test_urgent_with_no_pages_yet_and_a_moved_window();
     test_a_read_does_not_undo_a_press_for_a_moment();
     test_a_shorter_pattern_pulls_the_window_back();
     test_the_steps_past_the_length_are_dark();

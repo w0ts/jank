@@ -298,7 +298,11 @@ static int beat_sixteenths(uint32_t t, uint32_t *tick16)
 
 static uint32_t s_read_ms;             /* the last active-track read (FOLLOW) */
 static uint32_t s_page_ms;             /* the last read of the step pages */
-#define STEP_READ_MS 400u              /* a step mode reads its two pages this often (each answer is 104 data bytes); a press shows at once, the next read confirms it */
+#define STEP_URGENT_MS 60u             /* ... right after a track or page switch, until its pages are in (at most STEP_URGENT_TRIES reads, then back to the slow rate) */
+#define STEP_URGENT_TRIES 6u
+static uint32_t s_seen_pages_ms;       /* the step modes' last page seen by the pump */
+static uint8_t s_urgent_tries;         /* urgent page reads since a page last came */
+#define STEP_READ_MS 400u             /* a step mode reads its two pages this often (each answer is 104 data bytes); a press shows at once, the next read confirms it */
 
 /* live control is asked for, and kept up, while there is a Digitone and a Launchpad; once it answers, the Digitone's active track is made the one the pads are on;
  * while FOLLOW is on the Digitone's active track is read every JLAPP_FOLLOW_MS */
@@ -330,9 +334,17 @@ static void live_pump(void)
         int known = beat_sixteenths(t, &tick16);
         jlapp_set_beat(&s_app, known, tick16);          /* the step modes' playhead */
     }
-    if (live && t - s_page_ms >= STEP_READ_MS) {   /* a step mode: the pages on the top rows, of the current track */
+    if (s_app.step.pages_ms != s_seen_pages_ms) {   /* a page came: the urgent reads have worked */
+        s_seen_pages_ms = s_app.step.pages_ms;
+        s_urgent_tries = 0;
+    }
+    /* a step mode: the pages on the top rows, of the current track. Every STEP_READ_MS; at once (STEP_URGENT_MS) when the track or the page was just switched and its pages are
+     * missing, a few times only: a Digitone that never answers STEPS must not be asked 12 times a second */
+    if (live && t - s_page_ms >= (jlapp_step_urgent(&s_app) && s_urgent_tries < STEP_URGENT_TRIES ? STEP_URGENT_MS : STEP_READ_MS)) {
         uint8_t pages[2];
         size_t k = jlapp_step_wanted(&s_app, pages);
+        if (jlapp_step_urgent(&s_app))
+            s_urgent_tries++;
         for (size_t i = 0; i < k; i++) {
             n = jdl_steps_read(&s_jdl, t, s_app.n.track, pages[i], sx, sizeof sx);
             g_hostdiag.live_pagereads += n != 0;

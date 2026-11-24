@@ -3,8 +3,7 @@
 #include "jank_lpstep.h"
 #include <string.h>
 
-#define NO_TRACK 255u
-#define VEL_OWN 255u                   /* STEP: the track's own velocity and length */
+#define VEL_OWN 255u                  /* STEP: the track's own velocity and length */
 #define LEN_OWN 255u
 #define QUAD 4u                        /* the quadrants are 4 x 4 */
 #define STEP_ROWS_FROM 4u              /* pad rows 4..7 are the steps */
@@ -15,12 +14,12 @@ void jlst_init(struct jlst *s, enum jlst_kind kind)
     memset(s, 0, sizeof *s);
     s->kind = (uint8_t)kind;
     s->note = -1;
-    s->cache_track = NO_TRACK;
     for (unsigned i = 0; i < JLST_KEYS; i++)
         s->key_note[i] = -1;
 }
 
-static int is_cached(const struct jlst *s, uint8_t track) { return s->cache_track == track; }
+/* page p holds a page of `track` */
+static int is_of(const struct jlst *s, unsigned p, uint8_t track) { return s->have[p] && s->pg[p].track == track; }
 
 static void set_act(struct jlapp_act *o, uint8_t kind, uint8_t track, uint8_t note, uint8_t vel)
 {
@@ -31,17 +30,6 @@ static void set_act(struct jlapp_act *o, uint8_t kind, uint8_t track, uint8_t no
     o->vel = vel;
 }
 
-/* the pages in the cache belong to the track of the last read: another track drops them */
-static void sync_track(struct jlst *s, uint8_t track)
-{
-    if (s->cache_track == track)
-        return;
-    s->cache_track = track;
-    s->pages_known = 0;
-    s->have[0] = s->have[1] = 0;
-    s->edit_on = 0;
-}
-
 /* ---- the steps ---- */
 
 static size_t step_press(struct jlst *s, const struct jlst_ctx *c, unsigned k, struct jlapp_act *out, size_t max)
@@ -49,8 +37,8 @@ static size_t step_press(struct jlst *s, const struct jlst_ctx *c, unsigned k, s
     unsigned p = k / 16u, idx = k % 16u, abs_page = s->first_page + p;
     uint8_t track = c->n->track, op, note = 0;
     struct jdl_step *st;
-    if (max < 1 || !is_cached(s, track) || !s->have[p] || abs_page >= s->pages_known)
-        return 0;                      /* the Digitone has not told this page yet: nothing to toggle */
+    if (max < 1 || !is_of(s, p, track) || abs_page >= s->pages_known)
+        return 0;                      /* the Digitone has not told this page of this track yet (the pads may still show the last track's): nothing to toggle */
     st = &s->pg[p].step[idx];
     if (s->kind == JLST_MELODIC && s->note >= 0) {
         if (st->trig && st->note == s->note) {
@@ -173,7 +161,6 @@ void jlst_on_page(struct jlst *s, uint8_t track, const struct jdl_page *pg, uint
 {
     if (pg->track != track || pg->page >= JLST_PAGES || pg->pages == 0 || pg->pages > JLST_PAGES)
         return;
-    sync_track(s, track);
     s->pages_known = pg->pages;
     if (s->first_page >= pg->pages) {  /* a shorter pattern: the last page */
         s->first_page = (uint8_t)(pg->pages - 1u);
@@ -182,11 +169,25 @@ void jlst_on_page(struct jlst *s, uint8_t track, const struct jdl_page *pg, uint
     for (unsigned i = 0; i < 2u; i++) {
         if (pg->page != s->first_page + i)
             continue;
-        if (s->edit_on && (uint32_t)(now_ms - s->edit_ms) < JLST_EDIT_HOLD_MS)
-            continue;                  /* what a press just changed: the next read will agree */
+        if (is_of(s, i, track) && s->edit_on && (uint32_t)(now_ms - s->edit_ms) < JLST_EDIT_HOLD_MS)
+            continue;                  /* what a press just changed (on this very track): the next read will agree */
         s->pg[i] = *pg;
         s->have[i] = 1;
+        s->pages_ms = now_ms;
+        s->edit_on = 0;                /* a page that was read replaces whatever a press showed */
     }
+}
+
+int jlst_urgent(const struct jlst *s, uint8_t track)
+{
+    uint8_t pages[2];
+    size_t n = jlst_wanted(s, pages);
+    for (size_t i = 0; i < n; i++) {
+        unsigned idx = (unsigned)pages[i] - s->first_page;   /* before the first read page 0 is wanted whatever the window says: no slot then */
+        if (idx > 1u || !is_of(s, idx, track))
+            return 1;
+    }
+    return 0;
 }
 
 /* the pattern's length in steps, from what the Digitone said for the track (0: not known) */
@@ -274,8 +275,10 @@ static uint8_t step_colour(const struct jlst *s, const struct jlst_ctx *c, unsig
 {
     unsigned p = k / 16u, idx = k % 16u, abs_page = s->first_page + p, abs_step = abs_page * 16u + idx;
     const struct jdl_step *st;
-    if (!is_cached(s, c->n->track) || !s->have[p] || abs_page >= s->pages_known)
+    if (!s->have[p] || abs_page >= s->pages_known)
         return 0;
+    if (s->pg[p].track != c->n->track && (uint32_t)(c->now_ms - s->pages_ms) >= JLST_STALE_MS)
+        return 0;                      /* the last track's steps have waited long enough for the new track's pages (no live control?): dark, not wrong */
     if (s->pg[p].length && abs_step >= s->pg[p].length)
         return 0;                      /* past the pattern's length */
     st = &s->pg[p].step[idx];

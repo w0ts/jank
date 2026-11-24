@@ -24,7 +24,8 @@
 
 #define JLST_PAGES 4u                  /* of 16 steps: the Digitone's 64 */
 #define JLST_HEAD_MS 150u              /* the step that just played is lit this long */
-#define JLST_EDIT_HOLD_MS 300u         /* a page read does not overwrite what a press just changed for this long */
+#define JLST_STALE_MS 600u             /* after a track change the old track's steps stay drawn this long, until the new track's pages come (no dark flash) */
+#define JLST_EDIT_HOLD_MS 300u        /* a page read does not overwrite what a press just changed for this long */
 #define JLST_KEYS 16u                  /* the left quadrant */
 
 /* Launchpad 95-style palette indexes */
@@ -49,10 +50,10 @@ struct jlst {
     uint8_t kind;                      /* enum jlst_kind */
     uint8_t first_page;                /* the top rows show pages first_page and first_page + 1 */
     int16_t note;                      /* melodic: the key a step press places; -1: none picked */
-    uint8_t cache_track;               /* the track the pages below are of (255: none) */
-    uint8_t pages_known;               /* the pattern's pages for that track, 0 until a read says */
-    uint8_t have[2];                   /* pg[i] holds page first_page + i */
+    uint8_t pages_known;               /* the pattern's pages (of the track last read), 0 until a read says */
+    uint8_t have[2];                   /* pg[i] holds page first_page + i, of the track pg[i].track */
     struct jdl_page pg[2];
+    uint32_t pages_ms;                 /* the last page accepted */
     uint32_t edit_ms;                  /* a press changed pg at edit_ms (edit_on) */
     uint8_t edit_on;
     int16_t key_note[JLST_KEYS];       /* melodic keyboard pads held: the note they play (-1: up) */
@@ -89,7 +90,10 @@ size_t jlst_pad(struct jlst *s, const struct jlst_ctx *c, uint8_t x, uint8_t y, 
 
 /* which pages of the current track to read now: pages[0..n); the first page is always one that exists once the pattern's length is known (page 0 before that) */
 size_t jlst_wanted(const struct jlst *s, uint8_t pages[2]);
-/* a page the Digitone answered (jdl_take_page); `track` is the current track: a page of another track is dropped */
+/* 1 while a page to show is missing or belongs to another track than `track` (it was just switched): the firmware then reads at once, not at its next tick */
+int jlst_urgent(const struct jlst *s, uint8_t track);
+/* a page the Digitone answered (jdl_take_page); `track` is the current track: a page of another track is dropped. The steps on the pads are the previous track's until
+ * its pages come (jlst_frame draws them for JLST_STALE_MS), but a press only acts on pages of the current track */
 void jlst_on_page(struct jlst *s, uint8_t track, const struct jdl_page *pg, uint32_t now_ms);
 /* a pushed note of the current track played step `step` (absolute, 0..127) */
 void jlst_on_push(struct jlst *s, uint8_t track, uint8_t step, uint32_t now_ms);

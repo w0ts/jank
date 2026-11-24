@@ -154,6 +154,8 @@ void jlapp_on_dn2_rt(struct jlapp *a, uint8_t byte);
 /* the step modes: the pages of the current track to read now (pages[0..n), 0 outside the step modes), and a page the Digitone answered (jdl_take_page) */
 size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2]);
 void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg);
+/* 1 while a step mode lacks the pages it shows (the track or the page was just switched): the firmware reads at once instead of at its next tick */
+int jlapp_step_urgent(const struct jlapp *a);
 
 /* an end for every pad that is down (the Launchpad went away): acts, at most max; returns how many */
 size_t jlapp_release_acts(struct jlapp *a, struct jlapp_act *out, size_t max);

@@ -558,6 +558,8 @@ size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2])
 
 void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg) { jlst_on_page(&a->step, a->n.track, pg, a->now_ms); }
 
+int jlapp_step_urgent(const struct jlapp *a) { return a->mode == JLAPP_MODE_STEP && a->live_state == JDL_LIVE && jlst_urgent(&a->step, a->n.track); }
+
 size_t jlapp_release_acts(struct jlapp *a, struct jlapp_act *out, size_t max)
 {
     size_t n = 0;
