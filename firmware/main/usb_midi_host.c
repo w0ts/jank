@@ -328,7 +328,17 @@ static struct jhd_dev *probe_begin(usb_device_handle_t h, const char *name, enum
     return r;
 }
 
-static void add_device(uint8_t address)
+/* A controller whose claim failed for want of memory (or pipes) is tried again a moment later: the shortage can be a passing one (the Wi-Fi service's
+ * buffer, allocated at its first request, landed in the same seconds as the claims: measured 2026-11-24, the Launchpad's claim failed with 257 with 20 KB
+ * of heap free, after it had worked on the same build). The library keeps the device attached meanwhile; the retry reuses its line in the probe. */
+#define CLAIM_RETRY_MS 1500u
+#define CLAIM_RETRIES 6u
+static uint8_t s_retry_addr, s_retry_left;   /* the device to try again, and how many tries remain (0: none waiting) */
+static int s_retry_idx = -1;                 /* its line in the probe */
+static TickType_t s_retry_at;
+
+/* reuse: -1 for a device that has just come, else its line in the probe (a retry); tries_left: retries still allowed after this one */
+static void add_device(uint8_t address, int reuse, uint8_t tries_left)
 {
     usb_device_handle_t h;
     const usb_config_desc_t *c;
@@ -347,11 +357,17 @@ static void add_device(uint8_t address)
     usb_host_product_name(h, name, sizeof name);
     role = jlapp_role_from_name(name);
     e = usb_host_get_active_config_descriptor(h, &c);
-    fixed = e == ESP_OK ? clamp_full_speed(h, c) : 0;
-    r = probe_begin(h, name, role, e == ESP_OK ? c : NULL, &idx);
-    r->clamped = (uint8_t)(fixed < UINT8_MAX ? fixed : UINT8_MAX);
-    if (e == ESP_OK && role == JLAPP_OTHER && !r->ifs && !has_audio_streaming(c) && (r->vid || r->pid))
-        jhf_set_add(&s_useless, r->vid, r->pid);     /* of no use to jank, and it holds a pipe of the controller's 8 (core/jank_hostfilter.h) */
+    if (reuse >= 0) {                  /* a retry: the same line, not a new one */
+        idx = (uint8_t)reuse;
+        r = &g_hostdiag.dev[idx % JHD_DEVS];
+        r->claim_err = -1;
+    } else {
+        fixed = e == ESP_OK ? clamp_full_speed(h, c) : 0;
+        r = probe_begin(h, name, role, e == ESP_OK ? c : NULL, &idx);
+        r->clamped = (uint8_t)(fixed < UINT8_MAX ? fixed : UINT8_MAX);
+        if (e == ESP_OK && role == JLAPP_OTHER && !r->ifs && !has_audio_streaming(c) && (r->vid || r->pid))
+            jhf_set_add(&s_useless, r->vid, r->pid);     /* of no use to jank, and it holds a pipe of the controller's 8 (core/jank_hostfilter.h) */
+    }
     if (e == ESP_OK && d && find_midi(c, jlapp_midi_interface_index(role), role, &m) && m.out_mps >= 4u) {
         r->out_mps = m.out_mps;        /* what the library is about to be asked to book (its FIFO limits are checked against these) */
         r->in_mps = m.in_mps;
@@ -369,9 +385,17 @@ static void add_device(uint8_t address)
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "device %u left alone: %s", address, esp_err_to_name(e));
         usb_host_device_close(s_client, h);
-        if (role != JLAPP_OTHER && (e == ESP_ERR_NO_MEM || e == ESP_ERR_NOT_SUPPORTED) && !s_learn_pending) {   /* a controller, and no pipes (or memory) for it */
-            s_learn_pending = 1;
-            s_learn_at = xTaskGetTickCount() + pdMS_TO_TICKS(LEARN_DELAY_MS);
+        if (role != JLAPP_OTHER && (e == ESP_ERR_NO_MEM || e == ESP_ERR_NOT_SUPPORTED)) {   /* a controller, and no pipes (or memory) for it */
+            if (!s_learn_pending) {
+                s_learn_pending = 1;
+                s_learn_at = xTaskGetTickCount() + pdMS_TO_TICKS(LEARN_DELAY_MS);
+            }
+            if (tries_left > 0) {      /* maybe a passing shortage: the same device again soon */
+                s_retry_addr = address;
+                s_retry_idx = idx;
+                s_retry_left = tries_left;
+                s_retry_at = xTaskGetTickCount() + pdMS_TO_TICKS(CLAIM_RETRY_MS);
+            }
         }
         return;
     }
@@ -461,7 +485,21 @@ static TickType_t client_wait_ticks(void)
         if (t < w)
             w = t;
     }
+    if (s_retry_left) {
+        int32_t left = (int32_t)(s_retry_at - xTaskGetTickCount());
+        TickType_t t = left > 0 ? (TickType_t)left : 0;
+        if (t < w)
+            w = t;
+    }
     return w;
+}
+
+/* the controller that could not be claimed is tried again (it may fail again, and then wait once more, up to CLAIM_RETRIES times in all) */
+static void retry_due(void)
+{
+    uint8_t tries = s_retry_left;
+    s_retry_left = 0;                  /* add_device sets it again if the claim fails again */
+    add_device(s_retry_addr, s_retry_idx, (uint8_t)(tries - 1u));
 }
 
 static void client_task(void *arg)
@@ -472,10 +510,12 @@ static void client_task(void *arg)
         usb_host_client_handle_events(s_client, client_wait_ticks());   /* (the callbacks run in here) */
         while (xQueueReceive(s_events, &ev, 0) == pdTRUE) {
             if (ev.address)
-                add_device(ev.address);
+                add_device(ev.address, -1, CLAIM_RETRIES);
             else
                 remove_device(ev.gone);
         }
+        if (s_retry_left && (int32_t)(xTaskGetTickCount() - s_retry_at) >= 0)
+            retry_due();
         usb_lp_pump();                 /* what a callback, a device or the clock has made room for */
         if (s_learn_pending && (int32_t)(xTaskGetTickCount() - s_learn_at) >= 0)
             learn_and_restart();
