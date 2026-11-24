@@ -59,13 +59,12 @@ static int floor_div(int a, int b) { return a / b - (a % b != 0 && ((a < 0) != (
 
 static int floor_mod(int a, int b) { return a - b * floor_div(a, b); }
 
-/* the pad's index along the scale, LP95's steps[0] * (origin[0] + x) + steps[1] * (origin[1] + y) */
-static int pad_index(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t y)
+/* where index 0 sits: absolute puts the bottom left pad on a fixed note (C), whatever the key */
+static int origin_of(const struct jln *s, const struct jln_scale *sc)
 {
-    int chromatic = s->layout == JLN_CHROMATIC, origin = 0, step_x, step_y, ox, oy;
-    int first = s->key;                                        /* scale[0]: the key's note */
+    int origin = 0, first = s->key;                            /* scale[0]: the key's note */
     if (s->absolute) {
-        if (chromatic) {
+        if (s->layout == JLN_CHROMATIC) {
             origin = -first;
         } else {
             for (int k = 0; k < sc->n; k++)
@@ -75,6 +74,13 @@ static int pad_index(const struct jln *s, const struct jln_scale *sc, uint8_t x,
                 }
         }
     }
+    return origin;
+}
+
+/* the pad's index along the scale, LP95's steps[0] * (origin[0] + x) + steps[1] * (origin[1] + y) */
+static int pad_index(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t y)
+{
+    int chromatic = s->layout == JLN_CHROMATIC, origin = origin_of(s, sc), step_x, step_y, ox, oy;
     if (chromatic) {                                           /* orientation fixed: a row up is a fourth */
         step_x = 1;
         step_y = CHROMATIC_ROW_STEP;
@@ -94,11 +100,11 @@ static int pad_index(const struct jln *s, const struct jln_scale *sc, uint8_t x,
     return step_x * (ox + x) + step_y * (oy + y);
 }
 
-void jln_pad(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t y, struct jln_pad *out)
+/* the note `index` steps along the scale (chromatic: semitones) from the layout's origin */
+static void pad_from_index(const struct jln *s, const struct jln_scale *sc, int index, struct jln_pad *out)
 {
     int chromatic = s->layout == JLN_CHROMATIC;
     int size = chromatic ? CHROMATIC_SIZE : sc->n;
-    int index = pad_index(s, sc, x, y);
     int k = floor_mod(index, size);
     int note_in_octave = chromatic ? s->key + k : s->key + sc->iv[k];
     int midi = (s->octave + 1) * 12 + 12 * floor_div(index, size) + note_in_octave;
@@ -108,6 +114,19 @@ void jln_pad(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t
     for (int i = 0; i < sc->n; i++)
         if (note_in_octave == s->key + sc->iv[i])
             out->in_scale = 1;
+}
+
+void jln_pad(const struct jln *s, const struct jln_scale *sc, uint8_t x, uint8_t y, struct jln_pad *out)
+{
+    pad_from_index(s, sc, pad_index(s, sc, x, y), out);
+}
+
+void jln_key(const struct jln *s, const struct jln_scale *sc, unsigned i, struct jln_pad *out)
+{
+    struct jln t = *s;
+    if (t.layout == JLN_CHORDS)        /* the chords layout's notes are the scale's steps: the keyboard has no chords */
+        t.layout = JLN_DIATONIC;
+    pad_from_index(&t, sc, origin_of(&t, sc) + (int)i, out);
 }
 
 uint64_t jln_pads_with_note(const struct jln *s, const struct jln_scale *sc, int note)

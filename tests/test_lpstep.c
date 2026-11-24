@@ -360,6 +360,47 @@ static void test_the_drum_quadrant_flashes_the_tracks_that_play(void)
     CHECK(colour(&r, 0, 3) == JLST_COLOR_TRACK_CURRENT);
 }
 
+static void test_the_melodic_keyboard_has_sixteen_different_notes(void)
+{
+    struct rig r;
+    struct jlapp_act o[2];
+    const enum jln_layout layouts[3] = {JLN_DIATONIC, JLN_CHROMATIC, JLN_CHORDS};
+    rig_init(&r, JLST_MELODIC);
+    r.c.can_play = 1;
+    for (unsigned l = 0; l < 3; l++)
+        for (uint8_t key = 0; key < 12; key += 5)
+            for (uint8_t absolute = 0; absolute < 2; absolute++) {
+                int seen[128] = {0}, n = 0;
+                jln_set_layout(&r.n, layouts[l]);
+                r.n.key = key;
+                r.n.absolute = absolute;
+                for (uint8_t y = 0; y < 4; y++)
+                    for (uint8_t x = 0; x < 4; x++) {
+                        struct jlapp_act on;
+                        size_t k = press(&r, x, y, 100, o, 2);
+                        CHECK(k == 1 && o[0].kind == JLAPP_ACT_NOTE_ON);
+                        on = o[0];
+                        CHECK(on.note < 128 && !seen[on.note]);    /* every key plays a note no other key plays */
+                        seen[on.note] = 1;
+                        n++;
+                        press(&r, x, y, 0, o, 2);
+                    }
+                CHECK(n == 16);
+            }
+}
+
+static void test_the_keyboard_rows_follow_the_scale_in_order(void)
+{
+    struct rig r;
+    struct jlapp_act o[2];
+    rig_init(&r, JLST_MELODIC);                                   /* C major, octave 3, relative: 48 50 52 53 | 55 57 59 60 | 62 64 65 67 | 69 71 72 74 */
+    static const uint8_t want[16] = {48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74};
+    for (unsigned i = 0; i < 16; i++) {
+        CHECK(press(&r, (uint8_t)(i % 4), (uint8_t)(i / 4), 100, o, 2) == 1 && o[0].note == want[i]);
+        press(&r, (uint8_t)(i % 4), (uint8_t)(i / 4), 0, o, 2);
+    }
+}
+
 static void test_the_melodic_keyboard_flashes_the_pitches_that_play(void)
 {
     struct rig r;
@@ -372,13 +413,25 @@ static void test_the_melodic_keyboard_flashes_the_pitches_that_play(void)
     CHECK(colour(&r, 0, 0) == JLN_COLOR_ROOT);
     r.c.now_ms = 3000 + JLST_HEAD_MS;
     CHECK(colour(&r, 1, 0) == JLN_COLOR_IN_SCALE);
-    r.n.layout = JLN_CHROMATIC;                                   /* the keys overlap: (5,0) is not on a 4x4, but (0,1) = 53 and (1,1) = 54 are */
+    r.n.layout = JLN_CHROMATIC;                                   /* the 16 keys are 16 different notes: 48 + 0..15 semitones, a row up is +4 */
     r.c.now_ms = 3200;
-    played(&r, 2, 0, 53, 3200);
-    CHECK(colour(&r, 0, 1) == JLST_COLOR_TRACK_PLAYING && colour(&r, 1, 1) != JLST_COLOR_TRACK_PLAYING);
-    played(&r, 3, 0, 48, 3200);                                   /* a pitch that is not in the 4x4 at all: nothing lights */
-    r.n.octave = 5;
-    CHECK(colour(&r, 0, 0) != JLST_COLOR_TRACK_PLAYING);
+    played(&r, 2, 0, 53, 3200);                                   /* 53 is key 5: (1,1), and no other key */
+    CHECK(colour(&r, 1, 1) == JLST_COLOR_TRACK_PLAYING);
+    {
+        unsigned lit = 0;
+        for (uint8_t y = 0; y < 4; y++)
+            for (uint8_t x = 0; x < 4; x++)
+                lit += colour(&r, x, y) == JLST_COLOR_TRACK_PLAYING;
+        CHECK(lit == 1);
+    }
+    played(&r, 3, 0, 70, 3200);                                   /* a pitch that is not on the 4x4 (48..63): nothing more lights */
+    {
+        unsigned lit = 0;
+        for (uint8_t y = 0; y < 4; y++)
+            for (uint8_t x = 0; x < 4; x++)
+                lit += colour(&r, x, y) == JLST_COLOR_TRACK_PLAYING;
+        CHECK(lit == 1);
+    }
 }
 
 static void test_the_playhead_runs_on_the_clock(void)
@@ -437,6 +490,8 @@ static void test_without_a_clock_only_the_note_that_played_shows(void)
 
 int main(void)
 {
+    test_the_melodic_keyboard_has_sixteen_different_notes();
+    test_the_keyboard_rows_follow_the_scale_in_order();
     test_the_drum_quadrant_flashes_the_tracks_that_play();
     test_the_melodic_keyboard_flashes_the_pitches_that_play();
     test_the_playhead_runs_on_the_clock();

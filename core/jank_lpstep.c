@@ -120,7 +120,7 @@ static size_t key_pad(struct jlst *s, const struct jlst_ctx *c, uint8_t x, uint8
     }
     if (s->key_note[i] >= 0)
         return 0;
-    jln_pad(c->n, c->scale, x, y, &p);
+    jln_key(c->n, c->scale, i, &p);    /* 16 different notes: no pitch twice, unlike Note mode's overlapping layout */
     if (p.note < 0)
         return 0;
     s->note = p.note;                  /* a step press places this note from now on */
@@ -272,7 +272,7 @@ static uint8_t quadrant_colour(const struct jlst *s, const struct jlst_ctx *c, u
         return t == c->n->track ? JLST_COLOR_TRACK_CURRENT : JLST_COLOR_TRACK_IDLE;
     } else {
         struct jln_pad p;
-        jln_pad(c->n, c->scale, x, y, &p);
+        jln_key(c->n, c->scale, i, &p);
         if (p.note < 0)
             return 0;
         if (s->key_note[i] >= 0 || played_lately(c, c->n->track, p.note))   /* a key that is down, or a pitch the track plays (every key of that pitch) */
