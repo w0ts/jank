@@ -294,16 +294,16 @@ static void test_the_arrows_and_the_scene_buttons_on_the_page(void)
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_TOP0 + UP].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + DOWN].color == JLAPP_COLOR_ARROW_OFF);
     CHECK(acts(&a, top(UP, 127), &o) == 0 && a.sess.half == 0 && strcmp(msg(&a), "BANKS A-D") == 0);
-    /* the scene buttons: Note mode's start / stop, Delete and Record; the rest dark */
-    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color == JLAPP_GREEN_THIRD && f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == JLAPP_PINK_THIRD);
-    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color == JLAPP_RED_THIRD);
+    /* the scene buttons: start / stop only (owner 2026-11-25: "rec and mute(delete/erase) should not be on session"); the rest dark */
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color == JLAPP_GREEN_THIRD && f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == 0);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color == 0);
     for (uint8_t i = 0; i < 4u; i++)
         CHECK(f.led[JLX_SIDE0 + i].color == 0);
     CHECK(f.led[JLX_SIDE0 + 6].color == 0);
     CHECK(acts(&a, side(JLAPP_SIDE_START_STOP, 127), &o) == 1 && o.kind == JLAPP_ACT_TRANSPORT);
-    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 127), &o) == 1 && o.kind == JLAPP_ACT_ERASE && o.vel == 1);
-    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 0), &o) == 1 && o.kind == JLAPP_ACT_ERASE && o.vel == 0);
-    CHECK(acts(&a, side(JLAPP_SIDE_RECORD, 127), &o) == 1 && o.kind == JLAPP_ACT_RECORD);
+    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 127), &o) == 0 && !a.erase_on);   /* no Delete on the page */
+    CHECK(acts(&a, side(JLAPP_SIDE_DELETE, 0), &o) == 0);
+    CHECK(acts(&a, side(JLAPP_SIDE_RECORD, 127), &o) == 0);                 /* no Record either */
     CHECK(acts(&a, side(0, 127), &o) == 0 && a.mode == JLAPP_MODE_SESSION);
 }
 

@@ -194,7 +194,7 @@ keeps Launchpad 95's MINT (29, MINT_THIRD 31 when off).
 
 | scene | sub mode | shows | a press |
 |---|---|---|---|
-| 1 | volume | an 8-pad fader (its colour, the empty part dark): nothing lit for 0, else the pads up to the first step the value does not pass | writes that pad's step: **Launchpad 95's volume steps** 0, .14, .31, .40, .55, .70, .85, 1.0 of the range (its -42 -24 -18 -12 -6 0 +6 dB) = 0, 18, 39, 51, 70, 89, 108, 127; the lowest pad sets 0 and lights nothing, as there |
+| 1 | volume: the track **LEVEL**, the Digitone's mixer fader (owner 2026-11-25: the sound's VOL, read first, sat near full on every track) | an 8-pad fader (its colour; the empty part in the view's dim colour, as its scene button off, owner 2026-11-25): nothing lit for 0, else the pads up to the first step the value does not pass | writes that pad's step: **Launchpad 95's volume steps** 0, .14, .31, .40, .55, .70, .85, 1.0 of the range (its -42 -24 -18 -12 -6 0 +6 dB) = 0, 18, 39, 51, 70, 89, 108, 127; the lowest pad sets 0 and lights nothing, as there |
 | 2 | pan | a bar from the two middle pads out to the value (the middle pair alone for 63 / 64) | writes the pad's step: 0, 23, 43, 64, 64, 84, 104, 127 (Launchpad 95's pan map) |
 | 3, 4, 5 | delay, reverb, chorus send | as volume | **Launchpad 95's send steps** 0, .10, .16, .24, .34, .55, .77, 1.0 = 0, 13, 21, 30, 44, 70, 98, 127 |
 | 6, 7 | **mute and solo: one screen, both buttons** (owner 2026-11-24: the whole-column version was useless; "on / off buttons for 16 tracks, both solo and mute, 4 rows") | the **lower four pad rows**, from the top: **mute 1-8, mute 9-16, solo 1-8, solo 9-16** (tracks 1-8 above 9-16, as the Digitone's trig keys); mute bright GREEN / dim when muted (Elektron's colour, owner 2026-11-25), solo BLUE when soloed / BLUE_THIRD when not; the top four rows dark; the bank does not matter | toggles that track's mute or solo (the whole new mask is written) |
@@ -252,8 +252,7 @@ opens, after a SET or a CLEAR, and when the status's chain count changes. A Digi
 cannot go); a full queue (status 5) loses that request only (counted). A MIDI Program Change cancels a chain on the Digitone. A CHAIN SET of 64 is the longest request Jank
 sends (86 bytes, 29 USB-MIDI packets): it goes out one packet at a time into the Digitone's FIFO, with no buffer for the packets.
 
-**The scene buttons** on this page are Note mode's: 5 start / stop, 6 Delete (held), 8 Record, the others dark. The page has no use for them, and they stay where the hand
-knows them; the mixer is the one page that takes them over (for its views). A note pad that was down when the page opened still ends.
+**The scene buttons** on this page: only 5, start / stop; Delete (6) and Record (8) are dark and do nothing here (owner 2026-11-25: "rec and mute(delete/erase) should not be on session"); a Delete held from another mode still ends when let go.
 
 `diag`: `hostdiag_pat=reads:<PATTERNS sent>,cues:<PATTERN sent>,ok:<reads not refused>/<PATTERN not refused>,playing:<0..127, -1 none read>`; the chain's in `hostdiag_tr`. Host-tested
 (`tests/test_lpsess.c`); **not tried on the Launchpad or the Digitone**.

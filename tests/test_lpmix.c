@@ -25,12 +25,12 @@ static struct jdl_mixer mixer(void)
     struct jdl_mixer m;
     memset(&m, 0, sizeof m);
     for (unsigned i = 0; i < JDL_TRACKS; i++) {
-        m.t[i].vol = (uint8_t)(i * 8u);        /* 0, 8, 16 .. 120 */
+        m.t[i].level = (uint8_t)(i * 8u);   /* the volume view: the track LEVEL */
+        m.t[i].vol = 127;                          /* the sound's VOL: not the volume view (owner 2026-11-25) */        /* 0, 8, 16 .. 120 */
         m.t[i].pan = 64;
         m.t[i].del = 127;
         m.t[i].rev = 1;
         m.t[i].chr = 0;
-        m.t[i].level = 100;
     }
     m.mute = 0x0005u;                          /* tracks 1 and 3 */
     m.solo = 0x8000u;                          /* track 16 */
@@ -50,11 +50,14 @@ static uint8_t colour(const struct jlmx *s, uint8_t x, uint8_t y) { return colou
 /* a fader pad tapped: pressed and let go at once (Launchpad 95's slow faders: a tap lands at once); 1 and *w the write */
 static int tap(struct jlmx *s, uint8_t x, uint8_t y, uint32_t t, struct jlmx_write *w) { return !jlmx_press(s, x, y, t, w) && jlmx_release(s, x, y, t, w); }
 
+/* a fader's empty part is its dim colour (owner 2026-11-25), not dark: lit means neither dark nor dim */
+static int is_dim(uint8_t c) { return c == JLMX_COLOR_VOL_DIM || c == JLMX_COLOR_PAN_DIM || c == JLMX_COLOR_SEND_DIM; }
+
 static unsigned lit_in_column(const struct jlmx *s, uint8_t x)
 {
     unsigned n = 0;
     for (uint8_t y = 0; y < 8; y++)
-        n += colour(s, x, y) != 0;
+        n += colour(s, x, y) != 0 && !is_dim(colour(s, x, y));
     return n;
 }
 
@@ -135,14 +138,14 @@ static void test_volume_faders_light_up_to_the_first_step_not_passed(void)
 {
     struct jdl_mixer m = mixer();
     struct jlmx s;
-    m.t[8].vol = 1;
-    m.t[9].vol = 18;
-    m.t[10].vol = 19;
-    m.t[11].vol = 127;
-    m.t[12].vol = 200;                                             /* past the range: the whole fader */
+    m.t[8].level = 1;
+    m.t[9].level = 18;
+    m.t[10].level = 19;
+    m.t[11].level = 127;
+    m.t[12].level = 200;                                             /* past the range: the whole fader */
     s = on_view(&m, JLMX_VOL);
     CHECK(lit_in_column(&s, 0) == 0);                              /* track 1: volume 0: nothing */
-    CHECK(lit_in_column(&s, 1) == 2 && colour(&s, 1, 1) == JLMX_COLOR_VOL && colour(&s, 1, 2) == 0);   /* volume 8: up to step 1 (18) */
+    CHECK(lit_in_column(&s, 1) == 2 && colour(&s, 1, 1) == JLMX_COLOR_VOL && colour(&s, 1, 2) == JLMX_COLOR_VOL_DIM);   /* volume 8: up to step 1 (18) */
     CHECK(lit_in_column(&s, 4) == 3);                              /* 32: up to step 2 (39) */
     CHECK(lit_in_column(&s, 7) == 5);                              /* 56: up to step 4 (70) */
     jlmx_bank_step(&s, 1);
@@ -179,14 +182,14 @@ static void test_pan_is_a_bar_from_the_centre(void)
     m.t[6].pan = 62;
     m.t[7].pan = 65;
     s = on_view(&m, JLMX_PAN);
-    CHECK(lit_in_column(&s, 0) == 4 && colour(&s, 0, 0) == JLMX_COLOR_PAN && colour(&s, 0, 3) == JLMX_COLOR_PAN && colour(&s, 0, 4) == 0);   /* hard left: pads 0 .. 3 */
-    CHECK(lit_in_column(&s, 1) == 4 && colour(&s, 1, 7) == JLMX_COLOR_PAN && colour(&s, 1, 4) == JLMX_COLOR_PAN && colour(&s, 1, 3) == 0);   /* hard right: pads 4 .. 7 */
+    CHECK(lit_in_column(&s, 0) == 4 && colour(&s, 0, 0) == JLMX_COLOR_PAN && colour(&s, 0, 3) == JLMX_COLOR_PAN && colour(&s, 0, 4) == JLMX_COLOR_PAN_DIM);   /* hard left: pads 0 .. 3 */
+    CHECK(lit_in_column(&s, 1) == 4 && colour(&s, 1, 7) == JLMX_COLOR_PAN && colour(&s, 1, 4) == JLMX_COLOR_PAN && colour(&s, 1, 3) == JLMX_COLOR_PAN_DIM);   /* hard right: pads 4 .. 7 */
     CHECK(lit_in_column(&s, 2) == 2 && colour(&s, 2, 3) == JLMX_COLOR_PAN && colour(&s, 2, 4) == JLMX_COLOR_PAN);                         /* centre: the two middle pads */
-    CHECK(lit_in_column(&s, 3) == 2 && colour(&s, 3, 2) == JLMX_COLOR_PAN && colour(&s, 3, 3) == JLMX_COLOR_PAN && colour(&s, 3, 1) == 0);   /* 30: pads 2 and 3 (the step 43 and the centre) */
+    CHECK(lit_in_column(&s, 3) == 2 && colour(&s, 3, 2) == JLMX_COLOR_PAN && colour(&s, 3, 3) == JLMX_COLOR_PAN && colour(&s, 3, 1) == JLMX_COLOR_PAN_DIM);   /* 30: pads 2 and 3 (the step 43 and the centre) */
     CHECK(lit_in_column(&s, 4) == 2 && colour(&s, 4, 3) == JLMX_COLOR_PAN && colour(&s, 4, 4) == JLMX_COLOR_PAN);                         /* 63 is centre too */
-    CHECK(lit_in_column(&s, 5) == 2 && colour(&s, 5, 4) == JLMX_COLOR_PAN && colour(&s, 5, 5) == JLMX_COLOR_PAN && colour(&s, 5, 6) == 0);   /* 100: pads 4 and 5 */
-    CHECK(lit_in_column(&s, 6) == 1 && colour(&s, 6, 3) == JLMX_COLOR_PAN && colour(&s, 6, 2) == 0);                                         /* 62: just left of centre: only the centre pad 3 (the step 43 is below it) */
-    CHECK(lit_in_column(&s, 7) == 1 && colour(&s, 7, 4) == JLMX_COLOR_PAN && colour(&s, 7, 5) == 0);                                         /* 65: just right: only the centre pad 4 (the step 84 is above it) */
+    CHECK(lit_in_column(&s, 5) == 2 && colour(&s, 5, 4) == JLMX_COLOR_PAN && colour(&s, 5, 5) == JLMX_COLOR_PAN && colour(&s, 5, 6) == JLMX_COLOR_PAN_DIM);   /* 100: pads 4 and 5 */
+    CHECK(lit_in_column(&s, 6) == 1 && colour(&s, 6, 3) == JLMX_COLOR_PAN && colour(&s, 6, 2) == JLMX_COLOR_PAN_DIM);                                         /* 62: just left of centre: only the centre pad 3 (the step 43 is below it) */
+    CHECK(lit_in_column(&s, 7) == 1 && colour(&s, 7, 4) == JLMX_COLOR_PAN && colour(&s, 7, 5) == JLMX_COLOR_PAN_DIM);                                         /* 65: just right: only the centre pad 4 (the step 84 is above it) */
 }
 
 /* owner 2026-11-24: mute and solo are on / off buttons for all 16 tracks, 4 rows: the lower four pad rows, from the top mute 1-8, mute 9-16, solo 1-8, solo 9-16 */
@@ -255,8 +258,8 @@ static void test_a_fader_tap_writes_its_step_and_the_fader_moves_at_once(void)
     jlmx_scene(&s, JLMX_VOL);
     CHECK(!tap(&s, 0, 3, 0, &w));                           /* nothing known yet: nothing to write */
     jlmx_on_mixer(&s, &m, 0);
-    CHECK(tap(&s, 2, 3, 100, &w) && w.kind == JLMX_WRITE_VALUE && w.track == 2 && w.param == JDL_MIX_VOL && w.value == VOL_STEP[3]);   /* pad 4 of 8 */
-    CHECK(lit_in_column(&s, 2) == 4 && colour(&s, 2, 3) == JLMX_COLOR_VOL && colour(&s, 2, 4) == 0);   /* the fader is 4 pads high now */
+    CHECK(tap(&s, 2, 3, 100, &w) && w.kind == JLMX_WRITE_VALUE && w.track == 2 && w.param == JDL_MIX_LEVEL && w.value == VOL_STEP[3]);   /* pad 4 of 8 */
+    CHECK(lit_in_column(&s, 2) == 4 && colour(&s, 2, 3) == JLMX_COLOR_VOL && colour(&s, 2, 4) == JLMX_COLOR_VOL_DIM);   /* the fader is 4 pads high now */
     CHECK(tap(&s, 2, 7, 110, &w) && w.value == 127 && lit_in_column(&s, 2) == 8);   /* the top pad: full */
     CHECK(tap(&s, 2, 1, 120, &w) && w.value == VOL_STEP[1] && lit_in_column(&s, 2) == 2);
     CHECK(tap(&s, 2, 0, 130, &w) && w.value == 0 && lit_in_column(&s, 2) == 0);     /* the lowest pad: 0, nothing lit (as Launchpad 95) */
@@ -276,7 +279,7 @@ static void test_every_fader_step_lights_exactly_the_pads_that_were_pressed(void
             continue;
         for (uint8_t y = 1; y < 8; y++) {
             CHECK(tap(&s, 0, y, 0, &w) && lit_in_column(&s, 0) == (unsigned)y + 1u && w.value == step[y]);
-            CHECK(w.param == (view == JLMX_VOL ? JDL_MIX_VOL : view == JLMX_DEL ? JDL_MIX_DEL : view == JLMX_REV ? JDL_MIX_REV : JDL_MIX_CHR));
+            CHECK(w.param == (view == JLMX_VOL ? JDL_MIX_LEVEL : view == JLMX_DEL ? JDL_MIX_DEL : view == JLMX_REV ? JDL_MIX_REV : JDL_MIX_CHR));
         }
     }
 }
@@ -320,10 +323,10 @@ static void test_the_digitones_older_reading_does_not_put_a_fader_back(void)
     tap(&s, 0, 7, 1000, &w);                                       /* track 1 volume to full */
     jlmx_on_mixer(&s, &old, 1000 + JLMX_HOLD_MS - 1u);             /* a reading from before the write was applied */
     CHECK(lit_in_column(&s, 0) == 8);                              /* not taken */
-    m.t[0].vol = 127;
+    m.t[0].level = 127;
     jlmx_on_mixer(&s, &m, 1000 + JLMX_HOLD_MS);                    /* later: taken (it agrees) */
     CHECK(lit_in_column(&s, 0) == 8);
-    m.t[0].vol = 40;                                               /* the Digitone's own change, after the hold: followed (step 3: 51) */
+    m.t[0].level = 40;                                               /* the Digitone's own change, after the hold: followed (step 3: 51) */
     jlmx_on_mixer(&s, &m, 5000);
     CHECK(lit_in_column(&s, 0) == 4);
     jlmx_on_mixer(&s, &m, 5001);
@@ -344,8 +347,8 @@ static void test_a_held_fader_pad_steps_through_ten_colours(void)
     for (uint32_t i = 0; i < 10; i++)
         CHECK(colour_at(&s, 0, 7, 1000 + i * 200u) == SHADE[i] && colour_at(&s, 0, 7, 1000 + i * 200u + 199u) == SHADE[i]);
     CHECK(colour_at(&s, 0, 7, 9000) == 3);                         /* white from 1.8 s on */
-    CHECK(colour_at(&s, 0, 6, 1500) == 0 && colour_at(&s, 1, 7, 1500) == 0 && colour_at(&s, 1, 0, 1500) == JLMX_COLOR_VOL);   /* the rest as before */
-    CHECK(s.m.t[0].vol == 0);                                      /* the fader has not moved */
+    CHECK(colour_at(&s, 0, 6, 1500) == JLMX_COLOR_VOL_DIM && colour_at(&s, 1, 7, 1500) == JLMX_COLOR_VOL_DIM && colour_at(&s, 1, 0, 1500) == JLMX_COLOR_VOL);   /* the rest as before */
+    CHECK(s.m.t[0].level == 0);                                      /* the fader has not moved */
 }
 
 /* the time held picks how long a sweep of the whole range takes (TDC_MAP, 0 .. 2 s in ten steps); the slide writes as it moves, every 100 ms */
@@ -355,7 +358,7 @@ static void test_the_time_held_picks_the_speed(void)
     struct jlmx s = on_view(&m, JLMX_VOL);
     struct jlmx_write w[JLMX_SLIDES];
     jlmx_press(&s, 0, 7, 1000, w);
-    CHECK(jlmx_release(&s, 0, 7, 2000, w) && w[0].kind == JLMX_WRITE_VALUE && w[0].track == 0 && w[0].param == JDL_MIX_VOL && w[0].value == 1);   /* 1 s: a 5 s sweep; its first 50 ms at once */
+    CHECK(jlmx_release(&s, 0, 7, 2000, w) && w[0].kind == JLMX_WRITE_VALUE && w[0].track == 0 && w[0].param == JDL_MIX_LEVEL && w[0].value == 1);   /* 1 s: a 5 s sweep; its first 50 ms at once */
     CHECK(jlmx_slides(&s, 2050, w, JLMX_SLIDES) == 1 && w[0].value == 2);
     CHECK(jlmx_slides(&s, 2100, w, JLMX_SLIDES) == 0);            /* 100 ms between steps */
     CHECK(jlmx_slides(&s, 2150, w, JLMX_SLIDES) == 1 && w[0].value == 5);
@@ -395,13 +398,13 @@ static void test_a_slide_stops_when_the_digitone_moves_the_fader_elsewhere(void)
     jlmx_press(&s, 0, 7, 0, w);
     jlmx_release(&s, 0, 7, 1000, w);                               /* 0 -> 127 in 5 s */
     CHECK(jlmx_slides(&s, 2450, w, JLMX_SLIDES) == 1 && w[0].value == 38);
-    m.t[0].vol = 20;                                               /* an older reading: on the path */
+    m.t[0].level = 20;                                               /* an older reading: on the path */
     jlmx_on_mixer(&s, &m, 2500);
-    CHECK(s.m.t[0].vol == 38 && m.t[1].vol == s.m.t[1].vol);       /* the fader stays where the slide is; the other tracks follow the reading */
+    CHECK(s.m.t[0].level == 38 && m.t[1].level == s.m.t[1].level);       /* the fader stays where the slide is; the other tracks follow the reading */
     CHECK(jlmx_slides(&s, 2550, w, JLMX_SLIDES) == 1 && w[0].value == 40);
-    m.t[0].vol = 90;                                               /* off the path: the Digitone's own change */
+    m.t[0].level = 90;                                               /* off the path: the Digitone's own change */
     jlmx_on_mixer(&s, &m, 2600);
-    CHECK(s.m.t[0].vol == 90 && jlmx_slides(&s, 2700, w, JLMX_SLIDES) == 0);   /* followed; the slide is over */
+    CHECK(s.m.t[0].level == 90 && jlmx_slides(&s, 2700, w, JLMX_SLIDES) == 0);   /* followed; the slide is over */
 }
 
 static void test_slides_run_together_and_a_new_one_replaces_the_old(void)

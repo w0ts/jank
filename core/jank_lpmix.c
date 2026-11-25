@@ -106,7 +106,7 @@ int jlmx_open(struct jlmx *s, uint8_t y)
 static uint8_t value_of(const struct jdl_mix_track *t, uint8_t view)
 {
     switch (view) {
-    case JLMX_VOL: return t->vol;
+    case JLMX_VOL: return t->level;   /* the volume view is the track LEVEL, the Digitone's mixer fader (owner 2026-11-25), not the sound's VOL */
     case JLMX_PAN: return t->pan;
     case JLMX_DEL: return t->del;
     case JLMX_REV: return t->rev;
@@ -147,7 +147,7 @@ static int pan_lit(uint8_t v, unsigned row)
 static uint8_t *value_ref(struct jdl_mix_track *t, uint8_t view)
 {
     switch (view) {
-    case JLMX_VOL: return &t->vol;
+    case JLMX_VOL: return &t->level;
     case JLMX_PAN: return &t->pan;
     case JLMX_DEL: return &t->del;
     case JLMX_REV: return &t->rev;
@@ -158,7 +158,7 @@ static uint8_t *value_ref(struct jdl_mix_track *t, uint8_t view)
 static uint8_t param_of(uint8_t view)
 {
     switch (view) {
-    case JLMX_VOL: return JDL_MIX_VOL;
+    case JLMX_VOL: return JDL_MIX_LEVEL;
     case JLMX_PAN: return JDL_MIX_PAN;
     case JLMX_DEL: return JDL_MIX_DEL;
     case JLMX_REV: return JDL_MIX_REV;
@@ -361,8 +361,8 @@ static uint8_t column_colour(const struct jlmx *s, unsigned track, unsigned row,
     }
     v = value_of(t, s->view);
     if (s->view == JLMX_PAN)
-        return pan_lit(v, row) ? view_colour(s->view) : 0;
-    return volume_lit(map_of(s->view), v, row) ? view_colour(s->view) : 0;
+        return pan_lit(v, row) ? view_colour(s->view) : view_dim(s->view);   /* the fader's empty part in its dim colour (owner 2026-11-25), as its scene button off */
+    return volume_lit(map_of(s->view), v, row) ? view_colour(s->view) : view_dim(s->view);
 }
 
 void jlmx_frame(const struct jlmx *s, uint32_t now_ms, struct jlx_frame *f)

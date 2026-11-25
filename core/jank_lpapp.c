@@ -695,14 +695,15 @@ void jlapp_set_record(struct jlapp *a, int ok, int bits_valid, uint8_t bits, uin
 
 static size_t side_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
-    if (ev->idx == JLAPP_SIDE_DELETE && (a->mode != JLAPP_MODE_MIXER || (!ev->value && a->erase_on)))
+    int own_scene = a->mode == JLAPP_MODE_MIXER || a->mode == JLAPP_MODE_SESSION;   /* the Session page has no Delete or Record (owner 2026-11-25) */
+    if (ev->idx == JLAPP_SIDE_DELETE && (!own_scene || (!ev->value && a->erase_on)))
         return delete_button(a, ev, out, max);
     if (a->mode == JLAPP_MODE_MIXER) {
         if (ev->value && jlmx_scene(&a->mix, ev->idx))
             say(a, "%s", VIEW_NAME[a->mix.view]);
         return 0;
     }
-    if (ev->idx == JLAPP_SIDE_RECORD && ev->value)
+    if (ev->idx == JLAPP_SIDE_RECORD && ev->value && a->mode != JLAPP_MODE_SESSION)
         return record_button(a, out, max);
     if (ev->idx != JLAPP_SIDE_START_STOP || !ev->value)
         return 0;
@@ -963,8 +964,10 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
             f->led[JLX_SIDE0 + i].color = jlmx_scene_colour(&a->mix, i);
     } else {
         f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = jltr_lit(&a->tr, a->live_state == JDL_LIVE) ? JLAPP_GREEN : JLAPP_GREEN_THIRD;   /* start / stop (owner 2026-11-25): always green, full while playing (the Digitone's transport while it leads), third when stopped */
-        f->led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color = a->erase_on ? JLAPP_PINK : JLAPP_PINK_THIRD;        /* delete: bright while held */
-        f->led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color = a->record_ok ? (a->record_on ? JLAPP_RED : JLAPP_RED_THIRD) : 0;   /* record: red armed / recording, dim red off, dark when the Digitone has none */
+        if (a->mode != JLAPP_MODE_SESSION) {   /* the Session page: only start / stop (owner 2026-11-25: "rec and mute(delete/erase) should not be on session") */
+            f->led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color = a->erase_on ? JLAPP_PINK : JLAPP_PINK_THIRD;        /* delete: bright while held */
+            f->led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color = a->record_ok ? (a->record_on ? JLAPP_RED : JLAPP_RED_THIRD) : 0;
+        }   /* record: red armed / recording, dim red off, dark when the Digitone has none */
     }
 }
 

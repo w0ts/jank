@@ -1521,7 +1521,8 @@ static struct jdl_mixer app_mixer(void)
     struct jdl_mixer m;
     memset(&m, 0, sizeof m);
     for (unsigned i = 0; i < JDL_TRACKS; i++) {
-        m.t[i].vol = (uint8_t)(i * 8u);
+        m.t[i].level = (uint8_t)(i * 8u);   /* the volume view: the track LEVEL */
+        m.t[i].vol = 127;                          /* the sound's VOL: not the volume view (owner 2026-11-25) */
         m.t[i].pan = 64;
         m.t[i].del = 127;
     }
@@ -1654,7 +1655,7 @@ static void test_a_held_fader_pad_slides_slowly(void)
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_PAD0 + 7 * 8 + 0].color == 13);               /* 0.4 s held: the third hold colour (YELLOW) */
     jlapp_tick(&a, 2000);
-    CHECK(acts(&a, pad(0, 7, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 0 && o.op == JDL_MIX_VOL && o.vel == 1);   /* 1 s held: a 5 s sweep */
+    CHECK(acts(&a, pad(0, 7, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 0 && o.op == JDL_MIX_LEVEL && o.vel == 1);   /* 1 s held: a 5 s sweep */
     jlapp_tick(&a, 2050);
     CHECK(jlapp_pump_acts(&a, out, JLMX_SLIDES) == 1 && out[0].kind == JLAPP_ACT_MIX && out[0].track == 0 && out[0].vel == 2);
     jlapp_tick(&a, 2100);
@@ -1682,11 +1683,11 @@ static void test_the_faders_follow_the_digitone_and_a_tap_writes(void)
     CHECK(a.mix.view == JLMX_OVERVIEW && jlapp_mixer_wanted(&a));
     acts(&a, side(0, 127), &o);                                    /* the volume sub mode */
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_PAD0 + 0 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 2 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 3 * 8 + 3].color == 0);   /* track 4: volume 24: up to Launchpad 95's step 39: 3 pads */
+    CHECK(f.led[JLX_PAD0 + 0 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 2 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 3 * 8 + 3].color == JLMX_COLOR_VOL_DIM);   /* track 4: volume 24: up to Launchpad 95's step 39: 3 pads */
     CHECK(acts(&a, pad(3, 5, 100), &o) == 0);                      /* a fader pad held: nothing yet (Launchpad 95's slow faders) */
-    CHECK(acts(&a, pad(3, 5, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 3 && o.op == JDL_MIX_VOL && o.vel == 89);   /* let go at once: pad 6 of 8, its step (-6 dB: 0.70 of the range) */
+    CHECK(acts(&a, pad(3, 5, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 3 && o.op == JDL_MIX_LEVEL && o.vel == 89);   /* let go at once: pad 6 of 8, its step (-6 dB: 0.70 of the range) */
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_PAD0 + 5 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 6 * 8 + 3].color == 0);   /* the fader moved at once */
+    CHECK(f.led[JLX_PAD0 + 5 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 6 * 8 + 3].color == JLMX_COLOR_VOL_DIM);   /* the fader moved at once */
     acts(&a, side(1, 127), &o);                                    /* pan */
     acts(&a, pad(0, 7, 100), &o);
     CHECK(acts(&a, pad(0, 7, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.op == JDL_MIX_PAN && o.vel == 127 && o.track == 0);
