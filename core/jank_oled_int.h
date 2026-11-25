@@ -15,11 +15,23 @@ void jo_fixed(double x, int digits, char *out, size_t cap);
 #define JO_ABOUT_ROWS 13
 #define JO_ABOUT_VIS_OLED 5
 #define JO_ABOUT_VIS_LCD2 9
+#define JO_ABOUT_VIS_TEXT 6             /* the DN2's text page (jank_oled_text.h): a title and 6 rows */
 struct jo_about_row {
     char label[16];                 /* drawn at the left */
     char val[32];                   /* drawn right aligned; "-" when not known */
 };
 void jo_about_rows(const struct jo_ctx *c, struct jo_about_row rows[JO_ABOUT_ROWS]);
+/* the rows a press moves ABOUT by: the layout's page, at most the text page's while c->text_view */
+int jo_about_vis(const struct jo_ctx *c);
+
+/* the bottom status line's items (HOME): the Link peers, then Wi-Fi quality as Optimist's Wi-Fi page shows it; a bad one is drawn inverted */
+#define JO_STATUS_CYCLE_MS 2000u        /* one item at a time, 2 s each */
+#define JO_STATUS_MAX 4
+struct jo_status {
+    char t[24];
+    uint8_t bad;
+};
+int jo_status_items(const struct jo_ctx *c, struct jo_status it[JO_STATUS_MAX]);
 
 /* The grid the primitives draw on: the OLED's 128 x 64, or the lcd2 layout's 320 x 240 for the one call of jo_draw_lcd2 (the emulator's
  * W and H, set per draw). Both are bit-per-pixel in the page layout, byte (y >> 3) * width + x. jo_fine is set with the lcd2 grid: the text is the
@@ -65,6 +77,9 @@ struct jo_item {
 };
 extern const struct jo_item jo_menu[JO_MENU_ITEMS];
 extern const struct jo_item jo_menu_lcd2[JO_MENU_ITEMS_LCD2];          /* the lcd2 layout's: 11 items */
+const struct jo_item *jo_menu_of(int lcd2, int *n);                     /* the layout's menu and its length */
+/* the value a menu row shows on its right ("" none): the setting's short name, the battery's percent */
+void jo_menu_value(const struct jo_ctx *c, int lcd2, const struct jo_item *it, char *out, size_t cap);
 
 struct jo_spec {
     const char *title;
@@ -88,6 +103,9 @@ struct jo_sub {
     uint8_t rows[5];                      /* enum jo_field */
 };
 extern const struct jo_sub jo_subs[3];
+int jo_sub_rows(const struct jo_sub *s, int lcd2);                      /* the rows the layout lists */
+/* the value a sub-menu row shows on its right: the edit's text, LOW CONFIDENCE as STOP / RUN */
+void jo_sub_value(const struct jo_ctx *c, enum jo_field f, int lcd2, char *out, size_t cap);
 
 /* the NETWORK screen's rows for the network's mode */
 enum jo_net_act { JO_ACT_NONE = 0, JO_ACT_MODE, JO_ACT_GROUP, JO_ACT_SSID, JO_ACT_PASS, JO_ACT_APPASS, JO_ACT_APNAME, JO_ACT_STATUS };

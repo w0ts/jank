@@ -156,6 +156,7 @@ struct jo_ctx {
     double conf_gate;                     /* the gate's own confidence, 0..1 (read with conf_graded) */
     int8_t fold_exp;                      /* AUDIO's fold, 2^fold_exp: the label X2 X4 /2 /4 on HOME; 0 and anything else: none */
     uint8_t usb_midi;                     /* USB MIDI CLOCK: 0 ON, 1 OFF */
+    uint8_t text_view;                    /* a DN2's text page (jank_oled_text.h) shows this state too: ABOUT pages by at most its 6 rows */
 };
 
 struct jo_edit {

@@ -5,7 +5,6 @@
 #include <string.h>
 
 #define NET_ICON_XR 86                  /* the network icon's right edge: a gap before the plug */
-#define STATUS_CYCLE_MS 2000u           /* the bottom line's items, 2 s each */
 #define ARMED_BLINK_MS 400u
 #define METER_MIN_DB (-90.0)
 #define SILENCE_DB (-60.0)
@@ -117,56 +116,15 @@ static void power(uint8_t *fb, const struct jo_ctx *c)
     }
 }
 
-struct item {
-    char t[24];
-    uint8_t bad;
-};
-
-/* Wi-Fi quality as Optimist's Wi-Fi page shows it; a BAD value is drawn inverted */
-static int wifi_items(const struct jo_wifiq *q, struct item *it)
-{
-    int retry = 0, lost = 0;
-    if (q->tx) {
-        retry = jo_iround(100.0 * q->retried / q->tx);
-        lost = jo_iround(100.0 * q->lost / q->tx);
-    }
-    if (q->rssi)
-        snprintf(it[0].t, sizeof it[0].t, "%d dBm  %dM", q->rssi, jo_iround(q->kbps / 1000.0));
-    else
-        snprintf(it[0].t, sizeof it[0].t, "NO SIGNAL");
-    it[0].bad = !q->rssi || q->rssi < -80;
-    if (q->tx)
-        snprintf(it[1].t, sizeof it[1].t, "RETRY %d%%", retry);
-    else
-        snprintf(it[1].t, sizeof it[1].t, "RETRY --");
-    it[1].bad = q->tx && retry >= 30;
-    if (q->tx)
-        snprintf(it[2].t, sizeof it[2].t, "LOST %d%%", lost);
-    else
-        snprintf(it[2].t, sizeof it[2].t, "LOST --");
-    it[2].bad = q->tx && lost >= 10;
-    return 3;
-}
-
-/* the bottom status line: one item at a time, cycling */
+/* the bottom status line: one item at a time, cycling; a BAD value is drawn inverted */
 static void status_line(uint8_t *fb, const struct jo_ctx *c, uint32_t now, int y)
 {
-    struct item items[4];
-    int n = 0;
-    const struct item *it;
-    memset(items, 0, sizeof items);
-    if (c->peers > 0) {
-        if (c->peers == 1)
-            snprintf(items[n].t, sizeof items[n].t, "1 LINK PEER");
-        else
-            snprintf(items[n].t, sizeof items[n].t, "%d LINK PEERS", c->peers);
-        n++;
-    }
-    if (c->has_wifiq)
-        n += wifi_items(&c->wifiq, &items[n]);
+    struct jo_status items[JO_STATUS_MAX];
+    int n = jo_status_items(c, items);
+    const struct jo_status *it;
     if (!n)
         return;
-    it = &items[(now / STATUS_CYCLE_MS) % (uint32_t)n];
+    it = &items[(now / JO_STATUS_CYCLE_MS) % (uint32_t)n];
     if (it->bad) {
         jo_rect(fb, 0, y - 1, jo_text_w(it->t, 1) + 4, 9, 1);
         jo_text(fb, it->t, 2, y, 1, 0);
@@ -274,23 +232,10 @@ static void menu(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
     title_bar(fb, "MENU", right);
     for (int k = 0; k < JO_VISIBLE; k++) {
         int i = ui->top + k, y = 11 + k * 9, sel = i == ui->cursor, v = !sel;
-        char val[12] = "";
+        char val[12];
         if (i >= JO_MENU_ITEMS)
             break;
-        switch (i) {
-        case 1: snprintf(val, sizeof val, "%s", c->lt_mode < 3 ? jo_lt_short[c->lt_mode] : ""); break;
-        case 2: snprintf(val, sizeof val, "%s", c->auto_bar ? "ON" : "OFF"); break;
-        case 3: snprintf(val, sizeof val, "%s", c->net.mode < 4 ? jo_net_short[c->net.mode] : ""); break;
-        case 4: snprintf(val, sizeof val, "%s", c->usb_role < 2 ? jo_usb_names[c->usb_role] : ""); break;
-        case 6: snprintf(val, sizeof val, "%s", c->rate < 5 ? jo_rates_short[c->rate] : ""); break;
-        case 8:
-            if (c->fitted)
-                snprintf(val, sizeof val, "%d%%", c->batt);
-            else
-                snprintf(val, sizeof val, "-");
-            break;
-        default: break;
-        }
+        jo_menu_value(c, 0, &jo_menu[i], val, sizeof val);
         if (sel)
             jo_rect(fb, 0, y - 1, JO_W, 9, 1);
         jo_text(fb, jo_menu[i].name, 4, y, 1, v);
@@ -303,13 +248,10 @@ static void sub(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
     const struct jo_sub *s = &jo_subs[ui->sub];
     title_bar(fb, s->title, NULL);
     for (int i = 0; i < s->n_oled; i++) {
-        int y = 14 + i * 11, sel = i == ui->ocur, v = !sel, g = jo_spec_get(s->rows[i], c);
+        int y = 14 + i * 11, sel = i == ui->ocur, v = !sel;
         const struct jo_spec *sp = jo_spec(s->rows[i]);
         char val[24];
-        if (sp->opts && s->rows[i] == JO_F_LOWCONF)
-            snprintf(val, sizeof val, "%s", g ? "STOP" : "RUN");
-        else
-            jo_edit_text(sp, g, val, sizeof val);
+        jo_sub_value(c, s->rows[i], 0, val, sizeof val);
         if (sel)
             jo_rect(fb, 0, y - 2, JO_W, 11, 1);
         jo_text(fb, sp->title, 4, y, 1, v);

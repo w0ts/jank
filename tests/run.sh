@@ -33,6 +33,11 @@ if command -v node >/dev/null; then
 fi
 "$CC" $FLAGS -ffp-contract=off "$HERE/tests/test_oled.c" $OLED -o "$OUT/test_oled"
 "$OUT/test_oled" "$HERE/tests/oled_ref/cases.txt" "$HERE/tests/oled_ref/cases_ink.txt"
+# The same screens as a Digitone II's text page (live control JANK PAGE), and every page of it written out to read (dn2_pages.txt).
+"$CC" $FLAGS -ffp-contract=off "$HERE/tests/test_oled_text.c" "$HERE/core/jank_oled_text.c" $OLED -o "$OUT/test_oled_text"
+"$OUT/test_oled_text"
+"$CC" $FLAGS -ffp-contract=off "$HERE/tests/dump_oled_text.c" "$HERE/core/jank_oled_text.c" $OLED -o "$OUT/dump_oled_text"
+"$OUT/dump_oled_text" "$OUT/dn2_pages.txt"
 "$CC" $FLAGS -ffp-contract=off "$HERE/tests/test_led.c" "$HERE/core/jank_led.c" $OLED $CORE -o "$OUT/test_led"
 "$OUT/test_led"
 "$CC" $FLAGS "$HERE/tests/test_clock.c" "$HERE/core/jank_clock.c" -o "$OUT/test_clock"

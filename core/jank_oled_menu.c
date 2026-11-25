@@ -162,6 +162,91 @@ const struct jo_sub jo_subs[3] = {
     {"DISPLAY", 2, 2, {JO_F_BRIGHT, JO_F_SLEEP}},
 };
 
+const struct jo_item *jo_menu_of(int lcd2, int *n)
+{
+    *n = lcd2 ? JO_MENU_ITEMS_LCD2 : JO_MENU_ITEMS;
+    return lcd2 ? jo_menu_lcd2 : jo_menu;
+}
+
+static const char *pick(const char *const *names, unsigned n, unsigned v) { return v < n ? names[v] : ""; }
+
+void jo_menu_value(const struct jo_ctx *c, int lcd2, const struct jo_item *it, char *out, size_t cap)
+{
+    const char *v = "";
+    if (it->kind == JO_ITEM_NET)
+        v = pick(jo_net_short, 4, c->net.mode);
+    else if (it->kind == JO_ITEM_INFO && it->ref == 0) {          /* BATTERY */
+        if (c->fitted)
+            snprintf(out, cap, "%d%%", c->batt);
+        else
+            snprintf(out, cap, "-");
+        return;
+    } else if (it->kind == JO_ITEM_EDIT)
+        switch (it->ref) {
+        case JO_F_LTMODE: v = pick(jo_lt_short, 3, c->lt_mode); break;
+        case JO_F_AUTOBAR: v = lcd2 ? pick(jo_autobar_short, 3, c->auto_bar) : c->auto_bar ? "ON" : "OFF"; break;
+        case JO_F_USBROLE: v = pick(jo_usb_names, 2, c->usb_role); break;
+        case JO_F_USBMIDI: v = pick(jo_off_on_names, 2, c->usb_midi); break;
+        case JO_F_RATE: v = pick(jo_rates_short, 5, c->rate); break;
+        default: break;
+        }
+    snprintf(out, cap, "%s", v);
+}
+
+int jo_sub_rows(const struct jo_sub *s, int lcd2) { return lcd2 ? s->n : s->n_oled; }
+
+void jo_sub_value(const struct jo_ctx *c, enum jo_field f, int lcd2, char *out, size_t cap)
+{
+    const struct jo_spec *sp = jo_spec_l(f, lcd2);
+    int g = jo_spec_get(f, c);
+    if (sp->opts && f == JO_F_LOWCONF)
+        snprintf(out, cap, "%s", g ? "STOP" : "RUN");
+    else
+        jo_edit_text(sp, g, out, cap);
+}
+
+/* Wi-Fi quality as Optimist's Wi-Fi page shows it */
+static int wifi_items(const struct jo_wifiq *q, struct jo_status *it)
+{
+    int retry = 0, lost = 0;
+    if (q->tx) {
+        retry = jo_iround(100.0 * q->retried / q->tx);
+        lost = jo_iround(100.0 * q->lost / q->tx);
+    }
+    if (q->rssi)
+        snprintf(it[0].t, sizeof it[0].t, "%d dBm  %dM", q->rssi, jo_iround(q->kbps / 1000.0));
+    else
+        snprintf(it[0].t, sizeof it[0].t, "NO SIGNAL");
+    it[0].bad = !q->rssi || q->rssi < -80;
+    if (q->tx)
+        snprintf(it[1].t, sizeof it[1].t, "RETRY %d%%", retry);
+    else
+        snprintf(it[1].t, sizeof it[1].t, "RETRY --");
+    it[1].bad = q->tx && retry >= 30;
+    if (q->tx)
+        snprintf(it[2].t, sizeof it[2].t, "LOST %d%%", lost);
+    else
+        snprintf(it[2].t, sizeof it[2].t, "LOST --");
+    it[2].bad = q->tx && lost >= 10;
+    return 3;
+}
+
+int jo_status_items(const struct jo_ctx *c, struct jo_status it[JO_STATUS_MAX])
+{
+    int n = 0;
+    memset(it, 0, JO_STATUS_MAX * sizeof it[0]);
+    if (c->peers > 0) {
+        if (c->peers == 1)
+            snprintf(it[n].t, sizeof it[n].t, "1 LINK PEER");
+        else
+            snprintf(it[n].t, sizeof it[n].t, "%d LINK PEERS", c->peers);
+        n++;
+    }
+    if (c->has_wifiq)
+        n += wifi_items(&c->wifiq, &it[n]);
+    return n;
+}
+
 static void stars(char *out, size_t len)
 {
     size_t n = len < 6 ? len : 6;
@@ -285,4 +370,11 @@ void jo_about_rows(const struct jo_ctx *c, struct jo_about_row rows[JO_ABOUT_ROW
         memmove(&rows[1], &rows[0], 12 * sizeof rows[0]);
         rows[0] = p;
     }
+}
+
+/* the lcd2 layout's 9 rows do not fit the text page: while it shows the state, a press moves 6 (the colour screen then shows 3 rows twice) */
+int jo_about_vis(const struct jo_ctx *c)
+{
+    int vis = c->layout_lcd2 ? JO_ABOUT_VIS_LCD2 : JO_ABOUT_VIS_OLED;
+    return c->text_view && vis > JO_ABOUT_VIS_TEXT ? JO_ABOUT_VIS_TEXT : vis;
 }

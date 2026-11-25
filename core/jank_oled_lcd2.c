@@ -409,29 +409,6 @@ static void list_row(uint8_t *fb, int y, int h, int sel, const char *left, const
         jo_text_r(fb, right, W - 8, y, 1, v);
 }
 
-static void menu_value(const struct jo_ctx *c, int i, char *out, size_t cap)
-{
-    const char *v = "";
-    char b[12];
-    switch (i) {
-    case 1: v = c->lt_mode < 3 ? jo_lt_short[c->lt_mode] : ""; break;
-    case 2: v = c->auto_bar < 3 ? jo_autobar_short[c->auto_bar] : ""; break;
-    case 3: v = c->net.mode < 4 ? jo_net_short[c->net.mode] : ""; break;
-    case 4: v = c->usb_role < 2 ? jo_usb_names[c->usb_role] : ""; break;
-    case 5: v = c->usb_midi < 2 ? jo_off_on_names[c->usb_midi] : ""; break;
-    case 7: v = c->rate < 5 ? jo_rates_short[c->rate] : ""; break;
-    case 9:
-        if (c->fitted)
-            snprintf(b, sizeof b, "%d%%", c->batt);
-        else
-            snprintf(b, sizeof b, "-");
-        v = b;
-        break;
-    default: break;
-    }
-    snprintf(out, cap, "%s", v);
-}
-
 static void menu(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
 {
     char right[8], val[12];
@@ -439,7 +416,7 @@ static void menu(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
     snprintf(right, sizeof right, "%d/%d", ui->cursor + 1, JO_MENU_ITEMS_LCD2);
     title_bar(fb, "MENU", right);
     for (int k = 0; k < ROWS && top + k < JO_MENU_ITEMS_LCD2; k++) {
-        menu_value(c, top + k, val, sizeof val);
+        jo_menu_value(c, 1, &jo_menu_lcd2[top + k], val, sizeof val);
         list_row(fb, ROW0 + k * PITCH, 18, top + k == ui->cursor, jo_menu_lcd2[top + k].name, val);
     }
 }
@@ -450,12 +427,8 @@ static void sub(uint8_t *fb, const struct jo_ui *ui, const struct jo_ctx *c)
     title_bar(fb, s->title, NULL);
     for (int i = 0; i < s->n; i++) {
         const struct jo_spec *sp = jo_spec_l(s->rows[i], 1);
-        int g = jo_spec_get(s->rows[i], c);
         char val[24];
-        if (sp->opts && s->rows[i] == JO_F_LOWCONF)
-            snprintf(val, sizeof val, "%s", g ? "STOP" : "RUN");
-        else
-            jo_edit_text(sp, g, val, sizeof val);
+        jo_sub_value(c, s->rows[i], 1, val, sizeof val);
         list_row(fb, 36 + i * 24, 22, i == ui->ocur, sp->title, val);
     }
 }

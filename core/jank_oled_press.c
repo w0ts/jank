@@ -146,8 +146,8 @@ static void press_home(struct jo_ui *ui, enum jo_btn b, int d, uint32_t now, con
 
 static void press_menu(struct jo_ui *ui, enum jo_btn b, int d, const struct jo_ctx *c)
 {
-    const struct jo_item *menu = c->layout_lcd2 ? jo_menu_lcd2 : jo_menu;
-    int n = c->layout_lcd2 ? JO_MENU_ITEMS_LCD2 : JO_MENU_ITEMS;
+    int n;
+    const struct jo_item *menu = jo_menu_of(c->layout_lcd2, &n);
     if (d) {
         ui->cursor = (uint8_t)jo_clampi(ui->cursor - d, 0, n - 1);
         ui->top = (uint8_t)jo_clampi(ui->top, ui->cursor - JO_VISIBLE + 1, ui->cursor);
@@ -229,7 +229,7 @@ void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx
     case JO_MENU: press_menu(ui, b, d, c); break;
     case JO_SUB:
         if (d)
-            ui->ocur = (uint8_t)jo_clampi(ui->ocur - d, 0, (c->layout_lcd2 ? jo_subs[ui->sub].n : jo_subs[ui->sub].n_oled) - 1);
+            ui->ocur = (uint8_t)jo_clampi(ui->ocur - d, 0, jo_sub_rows(&jo_subs[ui->sub], c->layout_lcd2) - 1);
         else if (b == JO_NO)
             ui->screen = JO_MENU;
         else
@@ -253,7 +253,7 @@ void jo_press(struct jo_ui *ui, enum jo_btn b, uint32_t now, const struct jo_ctx
         if (!d)
             ui->screen = JO_MENU;
         else if (ui->page == 1) {                     /* ABOUT: scroll when its rows do not all fit */
-            int vis = c->layout_lcd2 ? JO_ABOUT_VIS_LCD2 : JO_ABOUT_VIS_OLED;      /* a press moves one page */
+            int vis = jo_about_vis(c);                /* a press moves one page */
             int last = (JO_ABOUT_ROWS - 1) / vis * vis;         /* pages start at multiples of vis: no row on two pages */
             ui->ascroll = (uint8_t)jo_clampi(ui->ascroll - d * vis, 0, last);
         }
