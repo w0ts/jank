@@ -520,7 +520,7 @@ static void test_buttons_lit(void)
     CHECK(JLAPP_COLOR_ARROW_ON == 21 && JLAPP_COLOR_ARROW_OFF == 23 && JLAPP_COLOR_MODE == 37);   /* GREEN, GREEN_THIRD, LIGHT_BLUE: LP95's Note.Octave and Mode.Note */
     CHECK(f.led[JLX_TOP0 + 4].color == JLAPP_COLOR_PALETTE_OFF);  /* Session is the colour chart: lit, dim grey out of it */
     CHECK(f.led[JLX_TOP0 + 6].color == JLAPP_GREEN_THIRD);        /* Custom does something: lit, dim (melodic step is the one it leads to) */
-    CHECK(f.led[JLX_TOP0 + 7].color == JLMX_COLOR_FADER_THIRD);   /* Capture is the mixer's: lit, dim (MINT_THIRD) */
+    CHECK(f.led[JLX_TOP0 + 7].color == JLMX_COLOR_BUTTON_DIM);   /* Capture is the mixer's: lit, dim (MINT_THIRD) */
     for (uint32_t i = 0; i < 8; i++)
         CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_RED_THIRD : i == 5 ? JLAPP_PINK_THIRD : i == 7 ? JLAPP_RED_THIRD : 0));   /* start / stop (dim red while stopped), Delete (dim pink) and Record (dim red) are lit */
     CHECK(f.led[JLX_LOGO].color == 0);
@@ -1484,12 +1484,12 @@ static void test_capture_enters_the_mixer_and_the_buttons_follow(void)
     struct jlapp_act o;
     struct jlx_frame f;
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_TOP0 + CAPTURE].color == JLMX_COLOR_FADER_THIRD);   /* lit, dim, before it is on */
+    CHECK(f.led[JLX_TOP0 + CAPTURE].color == JLMX_COLOR_BUTTON_DIM);   /* lit, dim, before it is on */
     acts(&a, top(CAPTURE, 127), &o);
     CHECK(a.mode == JLAPP_MODE_MIXER && strcmp(msg(&a), "MIXER") == 0);
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_TOP0 + CAPTURE].color == JLMX_COLOR_FADER && f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE_DIM);
-    CHECK(f.led[JLX_SIDE0 + 0].color == JLMX_COLOR_FADER_THIRD && f.led[JLX_SIDE0 + 1].color == JLMX_COLOR_FADER_THIRD);   /* the overview is on: no sub mode is the one shown */
+    CHECK(f.led[JLX_TOP0 + CAPTURE].color == JLMX_COLOR_BUTTON && f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE_DIM);
+    CHECK(f.led[JLX_SIDE0 + 0].color == JLMX_COLOR_VOL_DIM && f.led[JLX_SIDE0 + 1].color == JLMX_COLOR_PAN_DIM && f.led[JLX_SIDE0 + 2].color == JLMX_COLOR_SEND_DIM);   /* the overview is on: no sub mode is the one shown */
     CHECK(f.led[JLX_SIDE0 + 5].color == JLMX_COLOR_MUTED && f.led[JLX_SIDE0 + 6].color == JLMX_COLOR_NOSOLO && f.led[JLX_SIDE0 + 7].color == 0);
     acts(&a, top(NOTE_BTN, 127), &o);                              /* a tap on Note: Note mode */
     jlapp_tick(&a, 100);
@@ -1499,7 +1499,7 @@ static void test_capture_enters_the_mixer_and_the_buttons_follow(void)
     acts(&a, top(6, 127), &o);                                     /* Custom: the step modes */
     CHECK(a.mode == JLAPP_MODE_STEP);
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_TOP0 + CAPTURE].color == JLMX_COLOR_FADER_THIRD);   /* dim again */
+    CHECK(f.led[JLX_TOP0 + CAPTURE].color == JLMX_COLOR_BUTTON_DIM);   /* dim again */
 }
 
 static void test_scene_buttons_pick_the_view_and_say_it(void)
@@ -1531,8 +1531,8 @@ static void test_the_mixer_opens_on_the_overview(void)
     CHECK(a.mix.view == JLMX_OVERVIEW);
     jlapp_frame(&a, &f);
     for (uint8_t x = 0; x < 8; x++) {
-        for (uint8_t y = 3; y < 8; y++)                            /* rows 1-5 from the top: volume .. chorus, MINT */
-            CHECK(f.led[JLX_PAD0 + y * 8 + x].color == JLMX_COLOR_FADER);
+        for (uint8_t y = 3; y < 8; y++)                            /* rows 1-5 from the top: volume .. chorus, each in its fader's colour */
+            CHECK(f.led[JLX_PAD0 + y * 8 + x].color == (y == 7 ? JLMX_COLOR_VOL : y == 6 ? JLMX_COLOR_PAN : JLMX_COLOR_SEND));
         CHECK(f.led[JLX_PAD0 + 2 * 8 + x].color == (x == 0 ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED));   /* row 6: mute */
         CHECK(f.led[JLX_PAD0 + 1 * 8 + x].color == JLMX_COLOR_NOSOLO);                                  /* row 7: solo */
         CHECK(f.led[JLX_PAD0 + 0 * 8 + x].color == 0);                                                  /* row 8: nothing */
@@ -1544,7 +1544,8 @@ static void test_the_mixer_opens_on_the_overview(void)
         CHECK(acts(&a, pad(2, (uint8_t)(7 - i), 100), &o) == 0 && a.mix.view == i && strcmp(msg(&a), NAME[i]) == 0);
         CHECK(acts(&a, pad(2, (uint8_t)(7 - i), 0), &o) == 0);
     }
-    CHECK(acts(&a, pad(2, 7, 100), &o) == 1 && o.kind == JLAPP_ACT_MIX && a.mix.view == JLMX_CHR);   /* in a sub mode a press is a fader press, not another opening (it writes) */
+    CHECK(acts(&a, pad(2, 7, 100), &o) == 0 && a.mix.view == JLMX_CHR);   /* in a sub mode a press is a fader press, not another opening: held ... */
+    CHECK(acts(&a, pad(2, 7, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && a.mix.view == JLMX_CHR);   /* ... and its release writes */
     acts(&a, top(CAPTURE, 127), &o);                               /* Capture again: back on the overview */
     CHECK(a.mix.view == JLMX_OVERVIEW && a.mode == JLAPP_MODE_MIXER);
     acts(&a, side(1, 127), &o);                                    /* a scene button switches from the overview */
@@ -1586,7 +1587,39 @@ static void test_up_and_down_are_the_mixers_banks(void)
     CHECK(a.n.octave == 3);                                        /* and the octave was not touched */
 }
 
-static void test_the_faders_follow_the_digitone_and_a_press_writes(void)
+/* owner 2026-11-25: Launchpad 95's slow faders through the app: the release writes the first step, jlapp_pump_acts the rest; live control lost ends the slides */
+static void test_a_held_fader_pad_slides_slowly(void)
+{
+    struct jlapp a = fresh_list();
+    struct jlapp_act o, out[JLMX_SLIDES];
+    struct jdl_mixer m = app_mixer();
+    struct jlx_frame f;
+    jlapp_tick(&a, 1000);
+    acts(&a, top(CAPTURE, 127), &o);
+    jlapp_on_mixer(&a, &m);
+    acts(&a, side(0, 127), &o);                                    /* volume */
+    CHECK(acts(&a, pad(0, 7, 100), &o) == 0);                      /* track 1 held at its top pad */
+    jlapp_tick(&a, 1400);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_PAD0 + 7 * 8 + 0].color == 13);               /* 0.4 s held: the third hold colour (YELLOW) */
+    jlapp_tick(&a, 2000);
+    CHECK(acts(&a, pad(0, 7, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 0 && o.op == JDL_MIX_VOL && o.vel == 1);   /* 1 s held: a 5 s sweep */
+    jlapp_tick(&a, 2050);
+    CHECK(jlapp_pump_acts(&a, out, JLMX_SLIDES) == 1 && out[0].kind == JLAPP_ACT_MIX && out[0].track == 0 && out[0].vel == 2);
+    jlapp_tick(&a, 2100);
+    CHECK(jlapp_pump_acts(&a, out, JLMX_SLIDES) == 0);            /* every 100 ms */
+    acts(&a, top(NOTE_BTN, 127), &o);                              /* Note mode: the slide goes on */
+    jlapp_tick(&a, 4450);
+    CHECK(jlapp_pump_acts(&a, out, JLMX_SLIDES) == 1 && out[0].vel == 63);
+    jlapp_set_live(&a, JDL_NO_LIVE, 1, 1);                         /* live control gone: the slide ends (it would jump later) */
+    jlapp_tick(&a, 4550);
+    CHECK(jlapp_pump_acts(&a, out, JLMX_SLIDES) == 0);
+    jlapp_set_live(&a, JDL_LIVE, 1, 1);
+    jlapp_tick(&a, 4650);
+    CHECK(jlapp_pump_acts(&a, out, JLMX_SLIDES) == 0);            /* and does not come back */
+}
+
+static void test_the_faders_follow_the_digitone_and_a_tap_writes(void)
 {
     struct jlapp a = fresh_list();
     struct jlapp_act o;
@@ -1598,13 +1631,14 @@ static void test_the_faders_follow_the_digitone_and_a_press_writes(void)
     CHECK(a.mix.view == JLMX_OVERVIEW && jlapp_mixer_wanted(&a));
     acts(&a, side(0, 127), &o);                                    /* the volume sub mode */
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_PAD0 + 0 * 8 + 3].color == JLMX_COLOR_FADER && f.led[JLX_PAD0 + 2 * 8 + 3].color == JLMX_COLOR_FADER && f.led[JLX_PAD0 + 3 * 8 + 3].color == 0);   /* track 4: volume 24: up to Launchpad 95's step 39: 3 pads */
-    CHECK(acts(&a, pad(3, 5, 100), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 3 && o.op == JDL_MIX_VOL && o.vel == 89);   /* a press: pad 6 of 8, its step (-6 dB: 0.70 of the range) */
+    CHECK(f.led[JLX_PAD0 + 0 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 2 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 3 * 8 + 3].color == 0);   /* track 4: volume 24: up to Launchpad 95's step 39: 3 pads */
+    CHECK(acts(&a, pad(3, 5, 100), &o) == 0);                      /* a fader pad held: nothing yet (Launchpad 95's slow faders) */
+    CHECK(acts(&a, pad(3, 5, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.track == 3 && o.op == JDL_MIX_VOL && o.vel == 89);   /* let go at once: pad 6 of 8, its step (-6 dB: 0.70 of the range) */
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_PAD0 + 5 * 8 + 3].color == JLMX_COLOR_FADER && f.led[JLX_PAD0 + 6 * 8 + 3].color == 0);   /* the fader moved at once */
-    CHECK(acts(&a, pad(3, 5, 0), &o) == 0);                        /* a release: nothing */
+    CHECK(f.led[JLX_PAD0 + 5 * 8 + 3].color == JLMX_COLOR_VOL && f.led[JLX_PAD0 + 6 * 8 + 3].color == 0);   /* the fader moved at once */
     acts(&a, side(1, 127), &o);                                    /* pan */
-    CHECK(acts(&a, pad(0, 7, 100), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.op == JDL_MIX_PAN && o.vel == 127 && o.track == 0);
+    acts(&a, pad(0, 7, 100), &o);
+    CHECK(acts(&a, pad(0, 7, 0), &o) == 1 && o.kind == JLAPP_ACT_MIX && o.op == JDL_MIX_PAN && o.vel == 127 && o.track == 0);
     acts(&a, side(5, 127), &o);                                    /* the mute / solo screen */
     CHECK(acts(&a, pad(2, 3, 100), &o) == 1 && o.kind == JLAPP_ACT_MUTE && o.op == 0 && o.note == 0x05 && o.step == 0);   /* mute 1-8: track 3 muted too: tracks 1 and 3 */
     acts(&a, side(6, 127), &o);                                    /* the other scene button: the same screen */
@@ -1657,7 +1691,8 @@ int main(void)
     test_the_mixer_opens_on_the_overview();
     test_the_overviews_mute_and_solo_rows_toggle_tracks_and_row_8_does_nothing();
     test_up_and_down_are_the_mixers_banks();
-    test_the_faders_follow_the_digitone_and_a_press_writes();
+    test_the_faders_follow_the_digitone_and_a_tap_writes();
+    test_a_held_fader_pad_slides_slowly();
     test_a_mixer_without_writes_or_without_live_control_says_so();
     test_the_mixer_is_not_wanted_in_the_other_modes();
     test_a_note_held_when_the_mixer_opens_still_ends();

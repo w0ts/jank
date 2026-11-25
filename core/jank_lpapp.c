@@ -534,13 +534,30 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
 
 static const char *const VIEW_NAME[JLMX_VIEWS] = {"VOLUME", "PAN", "DELAY SEND", "REVERB SEND", "CHORUS SEND", "MUTE AND SOLO", "MUTE AND SOLO"};
 
-/* a pad of the mixer screen: a press writes (the fader moves at once); a release is nothing. A value row of the overview opens its sub mode (no write). Without live control
- * it says why, and without the Digitone's mixer writes (a build without stage 6) it says MIXER READ ONLY, at most every WHY_EVERY_MS */
+static void mix_act(struct jlapp_act *out, const struct jlmx_write *w)
+{
+    if (w->kind == JLMX_WRITE_VALUE) {
+        set_act(out, JLAPP_ACT_MIX, w->track, 0, w->value);
+        out->op = w->param;
+    } else {
+        set_act(out, JLAPP_ACT_MUTE, 0, (uint8_t)(w->mask & 0xFFu), 0);
+        out->op = w->which;
+        out->step = (uint8_t)(w->mask >> 8);
+    }
+}
+
+/* a pad of the mixer screen: mute / solo write at the press; a fader pad is held and its release starts the slow fader (jank_lpmix.h), whose first step is written then.
+ * A value row of the overview opens its sub mode (no write). Without live control it says why, and without the Digitone's mixer writes (a build without stage 6) it says
+ * MIXER READ ONLY, at most every WHY_EVERY_MS */
 static size_t mixer_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
     struct jlmx_write w;
-    if (!ev->value)
-        return 0;
+    if (!ev->value) {
+        if (max < 1 || a->live_state != JDL_LIVE || !a->mix_writes || !jlmx_release(&a->mix, ev->col, ev->row, a->now_ms, &w))
+            return 0;
+        mix_act(out, &w);
+        return 1;
+    }
     if (jlmx_open(&a->mix, ev->row)) {
         say(a, "%s", VIEW_NAME[a->mix.view]);
         return 0;
@@ -559,15 +576,22 @@ static size_t mixer_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_a
     }
     if (max < 1 || !jlmx_press(&a->mix, ev->col, ev->row, a->now_ms, &w))
         return 0;
-    if (w.kind == JLMX_WRITE_VALUE) {
-        set_act(out, JLAPP_ACT_MIX, w.track, 0, w.value);
-        out->op = w.param;
-    } else {
-        set_act(out, JLAPP_ACT_MUTE, 0, (uint8_t)(w.mask & 0xFFu), 0);
-        out->op = w.which;
-        out->step = (uint8_t)(w.mask >> 8);
-    }
+    mix_act(out, &w);
     return 1;
+}
+
+size_t jlapp_pump_acts(struct jlapp *a, struct jlapp_act *out, size_t max)
+{
+    struct jlmx_write w[JLMX_SLIDES];
+    size_t n;
+    if (a->live_state != JDL_LIVE || !a->mix_writes) {
+        jlmx_stop_slides(&a->mix);     /* nothing could be written: a slide does not wait to jump later */
+        return 0;
+    }
+    n = jlmx_slides(&a->mix, a->now_ms, w, max < JLMX_SLIDES ? max : JLMX_SLIDES);
+    for (size_t i = 0; i < n; i++)
+        mix_act(&out[i], &w[i]);
+    return n;
 }
 
 /* the scene buttons (Launchpad 95's Note mode): 5 starts / stops the transport; the others have no job yet. In the mixer they pick the view (jank_lpmix.h) */
@@ -829,7 +853,7 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         struct jlst_ctx c = step_ctx(a, &n);
         jlst_frame(&a->step, &c, f);
     } else if (a->mode == JLAPP_MODE_MIXER && !a->page) {   /* so does the mixer */
-        jlmx_frame(&a->mix, f);
+        jlmx_frame(&a->mix, a->now_ms, f);
     } else if (a->mode == JLAPP_MODE_PALETTE && !a->page) {   /* and the colour chart: the palette index is the colour */
         for (uint8_t y = 0; y < 8; y++)
             for (uint8_t x = 0; x < 8; x++)
@@ -877,7 +901,7 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
             f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = on ? JLAPP_AMBER : JLAPP_AMBER_THIRD;
     }
     /* the mixer's button (Launchpad 95's Mixer: MINT, dim when it is not on), always lit */
-    f->led[JLX_TOP0 + BUTTON_CAPTURE_IDX].color = a->mode == JLAPP_MODE_MIXER ? JLMX_COLOR_FADER : JLMX_COLOR_FADER_THIRD;
+    f->led[JLX_TOP0 + BUTTON_CAPTURE_IDX].color = a->mode == JLAPP_MODE_MIXER ? JLMX_COLOR_BUTTON : JLMX_COLOR_BUTTON_DIM;
     f->led[JLX_TOP0 + BUTTON_SESSION_IDX].color = a->mode == JLAPP_MODE_PALETTE ? JLAPP_COLOR_PALETTE_ON : JLAPP_COLOR_PALETTE_OFF;   /* the colour chart: white in it, dim grey out of it */
     if (a->mode == JLAPP_MODE_MIXER) {   /* the scene buttons pick the view; start / stop is the other modes' */
         for (uint8_t i = 0; i < 8u; i++)

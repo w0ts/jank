@@ -143,16 +143,20 @@ buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm
 
 | row (from the top) | shows | a press |
 |---|---|---|
-| 1 - 5 | volume, pan, delay, reverb, chorus: MINT | **opens that sub mode** (the same as its scene button; the owner chose this over Launchpad 95's reset-to-default, which needs the Digitone's defaults) |
+| 1 - 5 | volume, pan, delay, reverb, chorus, each in its fader's colour (below) | **opens that sub mode** (the same as its scene button; the owner chose this over Launchpad 95's reset-to-default, which needs the Digitone's defaults) |
 | 6 | mute: bright YELLOW, dim when the track is muted | toggles that track's mute (the whole new mask is written) |
 | 7 | solo: BLUE when soloed, BLUE_THIRD when not | toggles that track's solo |
 | 8 | dark | nothing |
+
+**Colours** (owner 2026-11-25, picked on the Session colour chart; Launchpad 95 has MINT for all three): **volume 25** (row 4 col 2), **pan 17** (row 3 col 2), **the
+three sends 60** (row 8 col 5); their dim versions, for a scene button whose view is not shown, are the palette group's third: 27, 19, 63 (not checked by eye yet). Capture
+keeps Launchpad 95's MINT (29, MINT_THIRD 31 when off).
 
 **The scene buttons** (right side) switch to the sub modes, from the overview or from each other (the one shown is bright, the others dim; on the overview all are dim):
 
 | scene | sub mode | shows | a press |
 |---|---|---|---|
-| 1 | volume | an 8-pad fader (MINT, the empty part dark): nothing lit for 0, else the pads up to the first step the value does not pass | writes that pad's step: **Launchpad 95's volume steps** 0, .14, .31, .40, .55, .70, .85, 1.0 of the range (its -42 -24 -18 -12 -6 0 +6 dB) = 0, 18, 39, 51, 70, 89, 108, 127; the lowest pad sets 0 and lights nothing, as there |
+| 1 | volume | an 8-pad fader (its colour, the empty part dark): nothing lit for 0, else the pads up to the first step the value does not pass | writes that pad's step: **Launchpad 95's volume steps** 0, .14, .31, .40, .55, .70, .85, 1.0 of the range (its -42 -24 -18 -12 -6 0 +6 dB) = 0, 18, 39, 51, 70, 89, 108, 127; the lowest pad sets 0 and lights nothing, as there |
 | 2 | pan | a bar from the two middle pads out to the value (the middle pair alone for 63 / 64) | writes the pad's step: 0, 23, 43, 64, 64, 84, 104, 127 (Launchpad 95's pan map) |
 | 3, 4, 5 | delay, reverb, chorus send | as volume | **Launchpad 95's send steps** 0, .10, .16, .24, .34, .55, .77, 1.0 = 0, 13, 21, 30, 44, 70, 98, 127 |
 | 6, 7 | **mute and solo: one screen, both buttons** (owner 2026-11-24: the whole-column version was useless; "on / off buttons for 16 tracks, both solo and mute, 4 rows") | the **lower four pad rows**, from the top: **mute 1-8, mute 9-16, solo 1-8, solo 9-16** (tracks 1-8 above 9-16, as the Digitone's trig keys); mute bright YELLOW / dim when muted, solo BLUE when soloed / BLUE_THIRD when not; the top four rows dark; the bank does not matter | toggles that track's mute or solo (the whole new mask is written) |
@@ -160,8 +164,17 @@ buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm
 
 (The steps are Launchpad 95's fractions of its range laid on the Digitone's 0..127; the Digitone's own volume and send curves are **not measured**.)
 
-The faders **move when the Digitone's values do** (MIXER, 45, read every 300 ms while the screen is on: automation, an encoder), and a press moves its fader at once; the
-Digitone's reading is not allowed to put it back for 400 ms (its write applies at its next UI pass, up to 33 ms). **Writes are the Digitone's stage 6** (MIXER SET 56 and MUTE SET
+**Slow faders** (owner 2026-11-25: "fader mode (hold long to make fader move slower) is not implemented like on lp95"). In Launchpad 95 this is its device mode's
+(`DeviceControllerStrip.py` with `ENABLE_TDC`, `ParameterSlides.py`; its mixer faders jump); here it is on every fader view (volume, pan, sends). A fader pad pressed is
+only held, and steps through ten colours, one every 0.2 s: RED, AMBER, YELLOW, GREEN, MINT, LIGHT_BLUE, BLUE, PINK, PURPLE, WHITE (`Device.ColorSteps`). Let go, the fader
+travels to that pad's step: the time held picks how long a sweep of the whole 0..127 takes, **0, 0.75, 1.5, 3, 5, 8, 12, 17, 25, 40 s** (`TDC_MAP`, 0 to 2 s held in ten
+steps), so a tap (under 0.22 s) lands at once and a 2-second hold takes 40 s end to end. The slide writes MIXER SET as it moves, every 100 ms (`jlapp_pump_acts`), its first
+50 ms at the release; it keeps going when the view, the bank or the mode changes; a new release on the same track and fader replaces it; and it **stops when the Digitone's
+value leaves the path it has travelled** (its own knob moved it), as Launchpad 95's slides stop when something else moves the parameter. Up to 16 slides at once. A pad held
+when the screen changes does nothing at its release. Without live control or the mixer writes the slides end. Host-tested; needs stage 6 to be heard.
+
+The faders **move when the Digitone's values do** (MIXER, 45, read every 300 ms while the screen is on: automation, an encoder), and a tap moves its fader at once; the
+Digitone's reading is not allowed to put it back for 400 ms (its write applies at its next UI pass, up to 33 ms), nor while a slide runs on the path it travelled. **Writes are the Digitone's stage 6** (MIXER SET 56 and MUTE SET
 57, formats confirmed by its session); on a build without them a press says MIXER READ ONLY (at most every 2 s) and the faders are display only. Scene button 5 is chorus here, so
 **start / stop is not available inside the mixer**. A dual Launchpad mode is planned (one on tracks 1-8, the other on 9-16). Not tried on hardware. `diag`: `mixreads:`, `mixsets:`.
 

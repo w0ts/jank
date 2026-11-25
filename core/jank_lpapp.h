@@ -193,6 +193,9 @@ void jlapp_on_dn2_rt(struct jlapp *a, uint8_t byte);
 int jlapp_mixer_wanted(const struct jlapp *a);
 void jlapp_on_mixer(struct jlapp *a, const struct jdl_mixer *m);
 void jlapp_set_mixer_writes(struct jlapp *a, int ok);
+/* the mixer's slow faders (jank_lpmix.h): the MIXER SET writes due now (call it often, after jlapp_tick: a slide moves every JLMX_SLIDE_TICK_MS); how many filled in out.
+ * Without live control or the Digitone's mixer writes the slides end */
+size_t jlapp_pump_acts(struct jlapp *a, struct jlapp_act *out, size_t max);
 /* The Digitone's record state, as the firmware last knows it (jdl: record_ok, st.rec_valid / rec_bits, record_busy): the Record button's light follows the armed / recording bits
  * (when the Digitone sends them: protocol 6), a refusal count that grew says GRID / STEP REC IS ON and puts the light back, and a Digitone that has no RECORD darkens the button
  * (it says RECORD: DN2 TOO OLD once) */

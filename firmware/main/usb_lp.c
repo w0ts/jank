@@ -570,6 +570,12 @@ void usb_lp_pump(void)
     if (!s_lpx_up)
         return;
     jlapp_tick(&s_app, now_ms());      /* the track overlay and the pushed notes' lights run out with it */
+    {
+        static struct jlapp_act slides[JLMX_SLIDES];                 /* (every slide can be due in the same tick) */
+        size_t made = jlapp_pump_acts(&s_app, slides, JLMX_SLIDES);   /* the mixer's slow faders: their MIXER SET as they move */
+        for (size_t i = 0; i < made; i++)
+            run_act(&slides[i]);
+    }
     room = usb_midi_host_room(JLAPP_LPX);
     if (s_programmer_pending) {        /* the whole message or none of it: a cut SysEx would leave the Launchpad in Live mode */
         if ((int32_t)(xTaskGetTickCount() - s_try_at) < 0 || room < SYSEX_PACKETS)

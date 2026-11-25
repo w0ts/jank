@@ -19,12 +19,23 @@
 static const uint8_t VOL_MAP[PAD_ROWS] = {0, 18, 39, 51, 70, 89, 108, 127};
 static const uint8_t SEND_MAP[PAD_ROWS] = {0, 13, 21, 30, 44, 70, 98, 127};
 static const uint8_t PAN_MAP[PAD_ROWS] = {0, 23, 43, 64, 64, 84, 104, 127};
+/* Launchpad 95's slow faders (Settings.py TDC_MAP, in ms): how long a sweep of the whole range takes, by the time the pad was held (0 .. 2 s in ten steps) */
+static const uint32_t SWEEP_MS[JLMX_HOLD_STEPS] = {0, 750, 1500, 3000, 5000, 8000, 12000, 17000, 25000, 40000};
+/* ... and a held pad's colours (SkinMK2.py Device.ColorSteps, ColorsMK2.py: RED AMBER YELLOW GREEN MINT LIGHT_BLUE BLUE PINK PURPLE WHITE) */
+static const uint8_t HOLD_COLOUR[JLMX_HOLD_STEPS] = {5, 9, 13, 21, 29, 37, 45, 53, 48, 3};
+#define FULL_RANGE 127u
 
 void jlmx_init(struct jlmx *s)
 {
     memset(s, 0, sizeof *s);
     s->view = JLMX_OVERVIEW;
 }
+
+static uint8_t value_of(const struct jdl_mix_track *t, uint8_t view);
+static uint8_t *value_ref(struct jdl_mix_track *t, uint8_t view);
+
+/* a pad held when the screen changes does nothing at its release (Launchpad 95: _end_timed_press when the column is remapped) */
+static void drop_holds(struct jlmx *s) { memset(s->hold, 0, sizeof s->hold); }
 
 void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m, uint32_t now_ms)
 {
@@ -33,6 +44,19 @@ void jlmx_on_mixer(struct jlmx *s, const struct jdl_mixer *m, uint32_t now_ms)
     s->held = 0;
     s->m = *m;
     s->have = 1;
+    for (unsigned i = 0; i < JLMX_SLIDES; i++) {   /* a slide's fader shows where the slide is, unless the Digitone moved it off the path (its knob): then the slide ends */
+        struct jlmx_slide *sl = &s->slide[i];
+        uint8_t r, lo, hi;
+        if (!sl->on)
+            continue;
+        r = value_of(&s->m.t[sl->track], sl->view);
+        lo = sl->from < sl->sent ? sl->from : sl->sent;
+        hi = sl->from < sl->sent ? sl->sent : sl->from;
+        if (r + 1u < lo || r > hi + 1u)
+            sl->on = 0;                /* (a reading a few steps old is still on the path: the slide goes on) */
+        else
+            *value_ref(&s->m.t[sl->track], sl->view) = sl->sent;
+    }
 }
 
 int jlmx_scene(struct jlmx *s, uint8_t idx)
@@ -40,19 +64,26 @@ int jlmx_scene(struct jlmx *s, uint8_t idx)
     if (idx >= JLMX_VIEWS)
         return 0;
     s->view = idx;
+    drop_holds(s);
     return 1;
 }
 
-void jlmx_overview(struct jlmx *s) { s->view = JLMX_OVERVIEW; }
+void jlmx_overview(struct jlmx *s)
+{
+    s->view = JLMX_OVERVIEW;
+    drop_holds(s);
+}
 
 int jlmx_bank_step(struct jlmx *s, int dir)
 {
     if (dir > 0 && s->bank + 1u < JLMX_BANKS) {
         s->bank++;
+        drop_holds(s);
         return 1;
     }
     if (dir < 0 && s->bank > 0u) {
         s->bank--;
+        drop_holds(s);
         return 1;
     }
     return 0;
@@ -67,6 +98,7 @@ int jlmx_open(struct jlmx *s, uint8_t y)
     if (s->view != JLMX_OVERVIEW || y >= PAD_ROWS || r > OVERVIEW_LAST_VALUE_ROW)
         return 0;
     s->view = (uint8_t)r;              /* the rows are in the scene buttons' order: volume, pan, delay, reverb, chorus */
+    drop_holds(s);
     return 1;
 }
 
@@ -165,24 +197,131 @@ int jlmx_press(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlm
         if (y >= MUTE_SOLO_ROWS)
             return 0;                  /* the screen is the lower four pad rows; the rest is dark */
         toggle_mask(s, mute_solo_track(y, x), y < MUTE_SOLO_ROWS / 2u, w);
-    } else {
-        uint8_t nv = map_of(s->view)[y];   /* the pad's step: pressing the lowest sets 0 and darkens the fader, as Launchpad 95 does */
-        *value_ref(&s->m.t[track], s->view) = nv;
-        w->kind = JLMX_WRITE_VALUE;
-        w->track = (uint8_t)track;
-        w->param = param_of(s->view);
-        w->value = nv;
+    } else {                           /* a fader pad: held until its release (jlmx_release) */
+        s->hold[x] = (struct jlmx_held){1, y, (uint8_t)track, s->view, now_ms};
+        return 0;
     }
     s->held = 1;
     s->hold_ms = now_ms;
     return 1;
 }
 
+static void value_write(struct jlmx *s, uint8_t track, uint8_t view, uint8_t v, struct jlmx_write *w)
+{
+    *value_ref(&s->m.t[track], view) = v;
+    memset(w, 0, sizeof *w);
+    w->kind = JLMX_WRITE_VALUE;
+    w->track = track;
+    w->param = param_of(view);
+    w->value = v;
+}
+
+/* where a slide is at now: 127 every sweep_ms from start_ms, never past its target */
+static uint8_t slide_at(const struct jlmx_slide *sl, uint32_t now_ms)
+{
+    uint64_t moved = (uint64_t)(uint32_t)(now_ms - sl->start_ms) * FULL_RANGE / sl->sweep_ms;
+    if (sl->from < sl->target)
+        return moved >= (uint64_t)(sl->target - sl->from) ? sl->target : (uint8_t)(sl->from + moved);
+    return moved >= (uint64_t)(sl->from - sl->target) ? sl->target : (uint8_t)(sl->from - moved);
+}
+
+/* the slide of this track and fader (it is replaced), else a free one, else the oldest */
+static struct jlmx_slide *slide_for(struct jlmx *s, uint8_t track, uint8_t view)
+{
+    struct jlmx_slide *free_one = NULL, *oldest = &s->slide[0];
+    for (unsigned i = 0; i < JLMX_SLIDES; i++) {
+        struct jlmx_slide *sl = &s->slide[i];
+        if (sl->on && sl->track == track && sl->view == view)
+            return sl;
+        if (!sl->on && !free_one)
+            free_one = sl;
+        if (sl->serial < oldest->serial)
+            oldest = sl;
+    }
+    return free_one ? free_one : oldest;
+}
+
+/* a slide that has arrived: done, and the Digitone's older readings are kept off the fader a moment (as after a press) */
+static void slide_done(struct jlmx *s, struct jlmx_slide *sl, uint32_t now_ms)
+{
+    sl->on = 0;
+    s->held = 1;
+    s->hold_ms = now_ms;
+}
+
+int jlmx_release(struct jlmx *s, uint8_t x, uint8_t y, uint32_t now_ms, struct jlmx_write *w)
+{
+    struct jlmx_held h;
+    struct jlmx_slide *sl;
+    uint32_t held_ms;
+    uint8_t target, step;
+    if (x >= JLMX_COLUMNS || !s->hold[x].on || s->hold[x].y != y)
+        return 0;
+    h = s->hold[x];
+    s->hold[x].on = 0;
+    held_ms = now_ms - h.ms;
+    step = held_ms >= JLMX_HOLD_STEP_MS * JLMX_HOLD_STEPS ? JLMX_HOLD_STEPS - 1u : (uint8_t)(held_ms * (JLMX_HOLD_STEPS - 1u) / (JLMX_HOLD_STEP_MS * JLMX_HOLD_STEPS));
+    target = map_of(h.view)[h.y];      /* the pad's step: the lowest sets 0 and darkens the fader, as Launchpad 95 does */
+    sl = slide_for(s, h.track, h.view);
+    if (sl->on && sl->track == h.track && sl->view == h.view)
+        sl->on = 0;                    /* a new press on the same fader replaces its slide */
+    if (!SWEEP_MS[step]) {             /* a tap: there at once */
+        value_write(s, h.track, h.view, target, w);
+        s->held = 1;
+        s->hold_ms = now_ms;
+        return 1;
+    }
+    *sl = (struct jlmx_slide){1, h.track, h.view, value_of(&s->m.t[h.track], h.view), target, 0, now_ms - JLMX_SLIDE_FIRST_MS, SWEEP_MS[step], ++s->slide_serial};
+    sl->sent = slide_at(sl, now_ms);
+    value_write(s, h.track, h.view, sl->sent, w);
+    if (sl->sent == target)
+        slide_done(s, sl, now_ms);
+    return 1;
+}
+
+size_t jlmx_slides(struct jlmx *s, uint32_t now_ms, struct jlmx_write *w, size_t max)
+{
+    size_t n = 0;
+    if ((uint32_t)(now_ms - s->tick_ms) < JLMX_SLIDE_TICK_MS)
+        return 0;
+    s->tick_ms = now_ms;
+    for (unsigned i = 0; i < JLMX_SLIDES && n < max; i++) {
+        struct jlmx_slide *sl = &s->slide[i];
+        uint8_t v;
+        if (!sl->on)
+            continue;
+        v = slide_at(sl, now_ms);
+        if (v == sl->sent)
+            continue;                  /* a slow slide: not a whole step yet */
+        sl->sent = v;
+        value_write(s, sl->track, sl->view, v, &w[n++]);
+        if (v == sl->target)
+            slide_done(s, sl, now_ms);
+    }
+    return n;
+}
+
+void jlmx_stop_slides(struct jlmx *s)
+{
+    memset(s->slide, 0, sizeof s->slide);
+    drop_holds(s);
+}
+
+/* a fader view's colour (the owner's picks), bright or dim */
+static uint8_t view_colour(uint8_t view, int bright)
+{
+    if (view == JLMX_VOL)
+        return bright ? JLMX_COLOR_VOL : JLMX_COLOR_VOL_DIM;
+    if (view == JLMX_PAN)
+        return bright ? JLMX_COLOR_PAN : JLMX_COLOR_PAN_DIM;
+    return bright ? JLMX_COLOR_SEND : JLMX_COLOR_SEND_DIM;
+}
+
 static uint8_t overview_colour(const struct jlmx *s, unsigned track, unsigned row)
 {
     unsigned r = row_from_top((uint8_t)row);
-    if (r <= OVERVIEW_LAST_VALUE_ROW)  /* Launchpad 95's Mixer.Volume / Pan / Sends: MINT, a pad that opens its fader screen */
-        return JLMX_COLOR_FADER;
+    if (r <= OVERVIEW_LAST_VALUE_ROW)  /* a pad that opens its fader screen, in that fader's colour (Launchpad 95: Mixer.Volume / Pan / Sends, all MINT) */
+        return view_colour((uint8_t)r, 1);
     if (r == OVERVIEW_MUTE_ROW)
         return (s->m.mute >> track) & 1u ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED;
     if (r == OVERVIEW_SOLO_ROW)
@@ -190,9 +329,10 @@ static uint8_t overview_colour(const struct jlmx *s, unsigned track, unsigned ro
     return 0;
 }
 
-static uint8_t column_colour(const struct jlmx *s, unsigned track, unsigned row)
+static uint8_t column_colour(const struct jlmx *s, unsigned track, unsigned row, uint32_t now_ms)
 {
     const struct jdl_mix_track *t = &s->m.t[track];
+    const struct jlmx_held *h = &s->hold[track % JLMX_COLUMNS];
     uint8_t v;
     if (s->view == JLMX_OVERVIEW)
         return overview_colour(s, track, row);
@@ -205,24 +345,28 @@ static uint8_t column_colour(const struct jlmx *s, unsigned track, unsigned row)
             return (s->m.solo >> of) & 1u ? JLMX_COLOR_SOLO : JLMX_COLOR_NOSOLO;
         return (s->m.mute >> of) & 1u ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED;
     }
+    if (h->on && h->track == track && h->view == s->view && h->y == row) {   /* the held pad: its hold colour, one more every JLMX_HOLD_STEP_MS */
+        uint32_t step = (uint32_t)(now_ms - h->ms) / JLMX_HOLD_STEP_MS;
+        return HOLD_COLOUR[step < JLMX_HOLD_STEPS ? step : JLMX_HOLD_STEPS - 1u];
+    }
     v = value_of(t, s->view);
     if (s->view == JLMX_PAN)
-        return pan_lit(v, row) ? JLMX_COLOR_FADER : 0;
-    return volume_lit(map_of(s->view), v, row) ? JLMX_COLOR_FADER : 0;
+        return pan_lit(v, row) ? view_colour(s->view, 1) : 0;
+    return volume_lit(map_of(s->view), v, row) ? view_colour(s->view, 1) : 0;
 }
 
-void jlmx_frame(const struct jlmx *s, struct jlx_frame *f)
+void jlmx_frame(const struct jlmx *s, uint32_t now_ms, struct jlx_frame *f)
 {
     for (uint8_t x = 0; x < JLMX_COLUMNS; x++)
         for (uint8_t y = 0; y < PAD_ROWS; y++)
-            f->led[JLX_PAD0 + y * 8u + x].color = s->have ? column_colour(s, s->bank * JLMX_COLUMNS + x, y) : 0;
+            f->led[JLX_PAD0 + y * 8u + x].color = s->have ? column_colour(s, s->bank * JLMX_COLUMNS + x, y, now_ms) : 0;
 }
 
 uint8_t jlmx_scene_colour(const struct jlmx *s, uint8_t idx)
 {
     int on = s->view == idx;
     if (idx <= JLMX_CHR)
-        return on ? JLMX_COLOR_FADER : JLMX_COLOR_FADER_THIRD;
+        return view_colour(idx, on);
     on = is_mute_solo(s->view);        /* scene buttons 6 and 7 are the same screen: both bright while it is shown */
     if (idx == JLMX_MUTE)
         return on ? JLMX_COLOR_UNMUTED : JLMX_COLOR_MUTED;
