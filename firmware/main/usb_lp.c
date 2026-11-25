@@ -57,8 +57,8 @@ static const char *TAG = "usb lp";
 #define STEP_WAKE_MS 30                /* a step mode with the transport running */
 #define LIVE_WAKE_MS 100              /* the client task wakes at least this often once the Launchpad is going: pushed notes' lights end after 150 ms, and the
                                           overlay after a second, and nothing else would wake the task to draw it (a clock transfer might, not always) */
-#define REQUEST_MAX 48u               /* a live-control request is at most 6 + 7 + 1 + 1 bytes before its SysEx end: far under this */
-#define REQUEST_PACKETS 16u            /* ... as USB-MIDI packets */
+#define REQUEST_MAX 40u               /* a live-control request (the longest, a MESSAGE of 20 characters: 6 + 28 + 1 bytes) */
+#define CHAIN_REQUEST_MAX 96u         /* ... a CHAIN SET of 64 patterns: 6 + 79 + 1 bytes (its own buffer, in run_act only) */
 
 static struct jlapp s_app;
 static struct jlx_frame s_shown;
@@ -150,42 +150,46 @@ static void dn2_drain(void)
         usb_midi_host_send_to(JLAPP_DN2, out, 4u * n);
 }
 
-/* bytes: whole packets, in order; with no Digitone there is nobody to play and they are dropped */
-static void dn2_send(const uint8_t *packets, size_t bytes)
-{
-    if (!s_dn2_up)
-        return;
-    for (size_t i = 0; i + 4u <= bytes; i += 4u)
-        if (!jlo_push(&s_out, packets + i))
-            ESP_LOGW(TAG, "packets for the Digitone: FIFO full");
-    dn2_drain();
-}
-
 /* a live-control request (a whole SysEx) for the Digitone, all of it or none: a cut SysEx would leave its parser waiting for an end. g_hostdiag.live_dropped counts
- * the ones that found no room */
+ * the ones that found no room; with no Digitone there is nobody to play and it is dropped */
 static void dn2_send_sysex(const uint8_t *sx, size_t n)
 {
-    uint8_t pk[4 * REQUEST_PACKETS];
-    size_t bytes;
+    uint8_t pk[4];
     if (!s_dn2_up || !n)
         return;
-    bytes = jd2_sysex_to_packets(DN2_CABLE, sx, n, pk, sizeof pk);
-    if (!bytes || bytes / 4u > JLO_PACKETS - jlo_count(&s_out)) {
+    if (JD2_SYSEX_PACKETS(n) > JLO_PACKETS - jlo_count(&s_out)) {
         g_hostdiag.live_dropped++;
         return;
     }
     g_hostdiag.live_asked++;
-    dn2_send(pk, bytes);
+    for (size_t k = 0; jd2_sysex_packet(DN2_CABLE, sx, n, k, pk); k++)   /* a packet at a time: no buffer for a long one (a CHAIN SET is 29 packets) */
+        if (!jlo_push(&s_out, pk))
+            ESP_LOGW(TAG, "packets for the Digitone: FIFO full");
+    dn2_drain();
 }
 
-static volatile uint8_t s_transport_req;   /* the Launchpad's start / stop scene button was pressed: the ui task acts on it */
+static volatile uint8_t s_transport_req;   /* enum usb_lp_req (app.h): what the ui task is to do with Jank's session */
+static volatile uint8_t s_peers;           /* the ui task's count of Link / Jank radio peers, more than 0 (usb_lp_peers_feed) */
+static volatile uint8_t s_dn2_leads;       /* the Digitone leads the transport (no peers, its TRANSPORT answered): no clock is forced on for it */
 
 int usb_lp_transport_request(void)
 {
-    if (!s_transport_req)
-        return 0;
-    s_transport_req = 0;
-    return 1;
+    int r = s_transport_req;
+    s_transport_req = USB_LP_REQ_NONE;
+    return r;
+}
+
+void usb_lp_peers_feed(int peers) { s_peers = (uint8_t)(peers != 0); }
+
+int usb_lp_dn2_leads(void) { return s_dn2_leads; }
+
+/* what Jank's session must do because the Digitone's own keys started / stopped it while Link leads (jank_lptrans.h): the ui task does it */
+static void follow_dn2(int req)
+{
+    if (req == JLTR_NO_REQUEST)
+        return;
+    s_transport_req = req ? USB_LP_REQ_START : USB_LP_REQ_STOP;
+    g_hostdiag.tr_follows++;
 }
 
 /* what a pad press or a button asks of the Digitone: always live control (SysEx), never a MIDI channel (jank_lpapp.h). A request that cannot be made (live
@@ -241,8 +245,21 @@ static void run_act(const struct jlapp_act *act)
         n = jdl_erase(&s_jdl, t, act->vel ? (uint16_t)(1u << act->track) : 0u, sx, sizeof sx);
         break;
     case JLAPP_ACT_TRANSPORT:          /* the ui task starts / stops the transport (it may wait for the bridge; this task must not) */
-        s_transport_req = 1;
+        s_transport_req = USB_LP_REQ_TOGGLE;
         return;
+    case JLAPP_ACT_DN2_TRANSPORT:      /* the Digitone leads (no peers): its own PLAY / STOP (TRANSPORT, 61, provisional); Jank's session and clock are not touched */
+        n = jdl_transport(&s_jdl, t, act->vel, sx, sizeof sx);
+        g_hostdiag.tr_sent += n != 0;
+        break;
+    case JLAPP_ACT_CHAIN: {            /* the Session page's chain (CHAIN, 59, provisional): SET the list built, or CLEAR */
+        static uint8_t big[CHAIN_REQUEST_MAX];   /* (static: the client task's stack is small; only this task sends) */
+        size_t k;
+        const uint8_t *list = jlapp_chain_list(&s_app, &k);
+        n = act->vel == JDL_CHAIN_SET ? jdl_chain_set(&s_jdl, t, list, k, big, sizeof big) : jdl_chain_clear(&s_jdl, t, big, sizeof big);
+        g_hostdiag.chain_sent += n != 0;
+        dn2_send_sysex(big, n);
+        return;
+    }
     default:
         return;
     }
@@ -266,6 +283,12 @@ static void sync_live(void)
     jlapp_set_mixer_writes(&s_app, s_jdl.mix_set_ok);
     jlapp_set_record(&s_app, s_jdl.record_ok, s_jdl.st.rec_valid, s_jdl.st.rec_bits, s_jdl.record_busy);
     jlapp_set_patterns(&s_app, s_jdl.patterns_ok, s_jdl.pattern_ok);
+    jlapp_set_stage8(&s_app, s_jdl.transport_ok, s_jdl.chain_ok);
+    jlapp_set_peers(&s_app, s_peers);
+    s_dn2_leads = (uint8_t)jlapp_dn2_leads(&s_app);
+    g_hostdiag.tr_ok = s_jdl.transport_ok;
+    g_hostdiag.chain_ok = s_jdl.chain_ok;
+    g_hostdiag.tr_peers = s_peers;
     g_hostdiag.pat_reads_ok = s_jdl.patterns_ok;
     g_hostdiag.pat_cue_ok = s_jdl.pattern_ok;
     g_hostdiag.scale_ok = s_jdl.scale_ok;
@@ -308,6 +331,7 @@ static void dn2_sysex(void)
         struct jdl_scale scale;
         struct jdl_patterns bank;
         struct jdl_pattern cue;
+        static struct jdl_chain chain;
         g_hostdiag.live_replies++;
         track = jdl_take_active(&s_jdl);           /* FOLLOW: the answer to an active-track read */
         if (track >= 0) {
@@ -326,7 +350,23 @@ static void dn2_sysex(void)
             jlapp_on_patterns(&s_app, &bank);
             g_hostdiag.dn2_pattern = bank.playing;
         }
-        if (jdl_take_pattern(&s_jdl, &cue)) {       /* ... the playing and the cued pattern (PATTERN, 60) */
+        {
+            struct jdl_live7 l7;
+            int tr = jdl_take_transport(&s_jdl);
+            jlapp_tick(&s_app, now_ms());
+            if (tr >= 0) {                          /* TRANSPORT's answer: the Digitone's transport (stage 8) */
+                g_hostdiag.dn2_tr = (uint8_t)tr;
+                follow_dn2(jlapp_on_dn2_transport(&s_app, tr));
+            }
+            if (jdl_take_live7(&s_jdl, &l7)) {      /* a protocol-7 status: its transport, the playing and next patterns, the chain's count */
+                g_hostdiag.dn2_tr = l7.transport;
+                g_hostdiag.dn2_pattern = l7.playing;
+                follow_dn2(jlapp_on_live7(&s_app, &l7));
+            }
+            if (jdl_take_chain(&s_jdl, &chain))     /* the Session page's chain (CHAIN, 59) */
+                jlapp_on_chain(&s_app, &chain);
+        }
+        if (jdl_take_pattern(&s_jdl, &cue)) {       /* ... the playing and the next pattern (PATTERN, 60) */
             jlapp_on_pattern(&s_app, &cue);
             g_hostdiag.dn2_pattern = cue.playing;
         }
@@ -407,7 +447,9 @@ static uint32_t s_mixer_ms;            /* the last read of the Digitone's mixer 
 static uint32_t s_seen_pages_ms;       /* the step modes' last page seen by the pump */
 static uint8_t s_urgent_tries;         /* urgent page reads since a page last came */
 #define STEP_READ_MS 400u             /* a step mode reads its two pages this often (each answer is 104 data bytes); a press shows at once, the next read confirms it */
-#define SESSION_REQS_MAX 4u            /* the Session page's requests in one pass: at most the playing bank, the PATTERN read and one bank again (jlss_due) */
+#define SESSION_REQS_MAX 5u            /* the Session page's requests in one pass: at most the chain, the playing bank, the PATTERN read and one bank again (jlss_due) */
+#define TR_READ_MS 500u                /* the Digitone's transport is read this often while it leads and its status does not carry it (protocol < 7) */
+static uint32_t s_tr_ms;
 
 /* live control is asked for, and kept up, while there is a Digitone and a Launchpad; once it answers, the Digitone's active track is made the one the pads are on;
  * while FOLLOW is on the Digitone's active track is read every JLAPP_FOLLOW_MS */
@@ -431,7 +473,11 @@ static void live_pump(void)
         n = jdl_probe_play(&s_jdl, t, sx, sizeof sx);
         g_hostdiag.live_plays += n != 0;
         dn2_send_sysex(sx, n);
+        n = jdl_probe_transport(&s_jdl, t, sx, sizeof sx);   /* ... and TRANSPORT (stage 8): who leads is known before the first start / stop */
+        g_hostdiag.tr_sent += n != 0;
+        dn2_send_sysex(sx, n);
     }
+    jlapp_tick(&s_app, t);
     s_was_live = (uint8_t)live;
     jlapp_set_transport(&s_app, bridge_is_playing());   /* (lock-free) the start / stop scene button's light, and the lower quadrant's rule */
     {
@@ -469,13 +515,21 @@ static void live_pump(void)
         g_hostdiag.live_mixer_reads += n != 0;
         dn2_send_sysex(sx, n);
     }
+    if (live && jlapp_dn2_leads(&s_app) && !s_jdl.st.p7_valid && t - s_tr_ms >= TR_READ_MS) {   /* the Digitone leads but its status has no transport (protocol 6): read it */
+        n = jdl_transport(&s_jdl, t, JDL_TR_READ, sx, sizeof sx);
+        s_tr_ms = t;
+        g_hostdiag.tr_sent += n != 0;
+        dn2_send_sysex(sx, n);
+    }
     if (live) {                        /* the Session page is shown: every bank once when it opens, then the playing pattern's bank every 500 ms (jank_lpsess.h); closed: nothing */
         struct jlss_req r;
-        jlapp_tick(&s_app, t);
         for (unsigned k = 0; k < SESSION_REQS_MAX && jlapp_session_due(&s_app, &r); k++) {
             if (r.kind == JLSS_REQ_BANK) {
                 n = jdl_patterns_read(&s_jdl, t, r.bank, sx, sizeof sx);
                 g_hostdiag.live_pat_reads += n != 0;
+            } else if (r.kind == JLSS_REQ_CHAIN_READ) {
+                n = jdl_chain_read(&s_jdl, t, r.bank, sx, sizeof sx);
+                g_hostdiag.chain_sent += n != 0;
             } else {
                 n = jdl_pattern(&s_jdl, t, 0, JDL_PATTERN_READ, sx, sizeof sx);
                 g_hostdiag.live_pat_cues += n != 0;

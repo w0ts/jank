@@ -19,7 +19,9 @@ enum jlapp_act_kind {
     JLAPP_ACT_RECORD,                  /* the Record button: vel = 1 arm / 0 off (RECORD, 58: the Digitone's own live record) */
     JLAPP_ACT_ERASE,                 /* the Delete button: track, vel = 1 on / 0 off: the Digitone erases that track's steps as its playhead passes (LIVE ERASE, 44 sub 3) */
     JLAPP_ACT_SCALE,                   /* the Launchpad changed the scale or the key: note = the scale's index (0..35), vel = the root (0..11): the Digitone follows (SCALE SET) */
-    JLAPP_ACT_PATTERN                  /* a Session page pad: note = the pattern (0..127), vel = how (enum jdl_pattern_how; a press cues: 0) (PATTERN, 60, provisional) */
+    JLAPP_ACT_PATTERN,                 /* a Session page pad: note = the pattern (0..127), vel = how (enum jdl_pattern_how; a press cues: 0) (PATTERN, 60, provisional) */
+    JLAPP_ACT_DN2_TRANSPORT,           /* start / stop while the Digitone leads: vel = the op (enum jdl_transport_op) (TRANSPORT, 61, provisional); no clock, no Start byte */
+    JLAPP_ACT_CHAIN                    /* the Session page's chain: vel = JDL_CHAIN_SET (the list: jlapp_chain_list) or JDL_CHAIN_CLEAR (CHAIN, 59, provisional) */
 };
 
 struct jlapp_act {

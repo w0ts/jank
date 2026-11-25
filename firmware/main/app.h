@@ -66,7 +66,11 @@ void wota_start(void);                                                          
 bool wota_key_line(const char *line);                                                                  /* "ota key ...": handled and answered -> true */
 void wota_serve(void);                                                                                 /* control task, once a pass */
 int usb_is_host(void);                                               /* the USB host stack is the one that started (the LED's double flash) */
-int usb_lp_transport_request(void);                                 /* host mode: 1 once when the Launchpad asked to start / stop (usb_lp.c, any task); the ui task acts on it */
+/* host mode (usb_lp.c, any task): what the ui task is to do with Jank's session, once: the Launchpad's start / stop (toggle), or the Digitone's own keys while Link leads */
+enum usb_lp_req { USB_LP_REQ_NONE = 0, USB_LP_REQ_TOGGLE = 1, USB_LP_REQ_START = 2, USB_LP_REQ_STOP = 3 };
+int usb_lp_transport_request(void);
+void usb_lp_peers_feed(int peers);                                   /* host mode: the ui task's peers count (bridge_peers_heard) > 0: Link leads the transport (core/jank_lptrans.h) */
+int usb_lp_dn2_leads(void);                                          /* host mode: no peers and the Digitone has TRANSPORT: it leads, and no clock is forced on for it */
 void usb_lp_beat_feed(int known, int64_t beat_ub, int32_t mpb);      /* host mode: the session's beat (bridge_beat, sampled by the ui task) for the step modes' playhead (usb_lp.c) */
 size_t hostdiag_text(char *out, size_t cap);                         /* hostdiag.c: what the last host session saw, for `diag` */
 int usb_host_spoke(void);                                            /* a control line came from the computer since the start */

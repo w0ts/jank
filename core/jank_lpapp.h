@@ -34,6 +34,7 @@
 #include "jank_lpnote.h"
 #include "jank_lpsess.h"
 #include "jank_lpstep.h"
+#include "jank_lptrans.h"
 #include "jank_lpx.h"
 
 /* The colours are Launchpad 95's (SkinMK2.py), as palette indexes (manual p. 12) under the names its ColorsMK2.py gives them; "on" is the bright one and "off"
@@ -85,7 +86,7 @@ struct jlapp_held {
 };
 
 /* Modes (owner 2026-11-24): the Note button (a tap, shorter than JLAPP_TAP_MS) is Note mode; Custom goes to the step modes and cycles melodic <-> drum
- * (jank_lpstep.h); held, the Note button is the scale page in every mode. Scene button 5 (side index 4) starts / stops the transport, as Launchpad 95's Note mode.
+ * (jank_lpstep.h); held, the Note button is the scale page in every mode. Scene button 5 (side index 4) starts / stops the transport, as Launchpad 95's Note mode (the Digitone's or Jank's session: jank_lptrans.h).
  * Up / down are the octave in Note mode and in melodic step, nothing in drum step. */
 enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP, JLAPP_MODE_MIXER, JLAPP_MODE_PALETTE, JLAPP_MODE_SESSION };
 /* The Session button (owner 2026-11-25): a short press (let go within JLAPP_SESSION_HOLD_MS) is the Session page (jank_lpsess.h: the Digitone's patterns; again: back to the
@@ -127,6 +128,8 @@ struct jlapp {
     uint8_t sess_down;                 /* Session is down since sess_down_ms, and has not opened the chart yet */
     uint32_t sess_down_ms;
     uint8_t pat_reads_ok, pat_cue_ok;  /* the Digitone takes PATTERNS / PATTERN (not refused) */
+    uint8_t chain_ok, live7;           /* ... CHAIN (not refused); its LIVE STATUS is protocol 7 (the patterns and the transport come with it) */
+    struct jltr tr;                    /* who starts and stops (jank_lptrans.h) */
     struct jlss sess;
     uint8_t record_ok;                 /* the Digitone has RECORD (not refused by a build without it) */
     uint8_t record_on;                 /* the Record button is lit: armed or recording (the Digitone's LIVE STATUS, or the press until it answers) */
@@ -218,6 +221,17 @@ int jlapp_session_due(struct jlapp *a, struct jlss_req *r);
 void jlapp_on_patterns(struct jlapp *a, const struct jdl_patterns *p);
 void jlapp_on_pattern(struct jlapp *a, const struct jdl_pattern *p);
 void jlapp_set_patterns(struct jlapp *a, int reads_ok, int cue_ok);
+/* The Digitone's stage 8 (jank_lptrans.h, jank_lpsess.h): jlapp_set_peers: Link (or Jank radio) peers are there (Link leads); jlapp_set_stage8: TRANSPORT and CHAIN are taken (a
+ * refusal says TRANSP: DN2 TOO OLD / CHAIN: DN2 TOO OLD once); jlapp_on_dn2_transport: TRANSPORT's answer; jlapp_on_live7: a protocol-7 status (the transport, the playing and
+ * next patterns, the chain count). Both return what Jank's own session must do (1 start, 0 stop, JLTR_NO_REQUEST nothing): only while Link leads and the Digitone's own keys
+ * changed its transport. jlapp_on_chain: CHAIN's answer; jlapp_chain_list: the chain a JLAPP_ACT_CHAIN SET sends; jlapp_dn2_leads: no peers, and TRANSPORT is there */
+void jlapp_set_peers(struct jlapp *a, int peers);
+void jlapp_set_stage8(struct jlapp *a, int transport_ok, int chain_ok);
+int jlapp_on_dn2_transport(struct jlapp *a, int state);
+int jlapp_on_live7(struct jlapp *a, const struct jdl_live7 *s);
+void jlapp_on_chain(struct jlapp *a, const struct jdl_chain *c);
+const uint8_t *jlapp_chain_list(const struct jlapp *a, size_t *n);
+int jlapp_dn2_leads(const struct jlapp *a);
 /* the step modes: the pages of the current track to read now (pages[0..n), 0 outside the step modes), and a page the Digitone answered (jdl_take_page) */
 size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2]);
 void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg);

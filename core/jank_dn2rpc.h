@@ -26,7 +26,7 @@ size_t jd2_pack7(const uint8_t *in, size_t n, uint8_t *out);
 size_t jd2_unpack7(const uint8_t *in, size_t n, uint8_t *out);
 
 /* any request, F0 .. F7: `cmd` with nargs bytes of arguments (at most JD2_ARGS_MAX), into out (cap bytes); returns its length, 0 if it does not fit */
-#define JD2_ARGS_MAX 24u               /* a MESSAGE (live control 54) is a duration and 20 characters: 21 */
+#define JD2_ARGS_MAX 68u               /* the longest: a CHAIN SET (live control 59): op, n and 64 patterns: 66 (a MESSAGE is 21) */
 size_t jd2_request(uint16_t seq, uint8_t cmd, const uint8_t *args, size_t nargs, uint8_t *out, size_t cap);
 
 /* a PEEK request, F0 .. F7, into out (cap bytes); returns its length, 0 if len is not 1..JD2_PEEK_MAX or it does not fit */
@@ -47,6 +47,9 @@ int jd2_peek_data(const struct jd2_reply *r, uint32_t *address, const uint8_t **
 /* a SysEx (F0 .. F7) as USB-MIDI event packets on a cable: 4 bytes each, code 4 for three bytes with more to come, 5 / 6 / 7 for
  * the last 1 / 2 / 3. Returns the bytes written (a multiple of 4), 0 if it does not fit in cap */
 size_t jd2_sysex_to_packets(uint8_t cable, const uint8_t *sx, size_t n, uint8_t *out, size_t cap);
+/* the same one packet at a time: packet k (0 = the first) into out; 1, or 0 past the end. A long SysEx goes out without a buffer for all its packets */
+#define JD2_SYSEX_PACKETS(n) (((n) + 2u) / 3u)
+size_t jd2_sysex_packet(uint8_t cable, const uint8_t *sx, size_t n, size_t k, uint8_t out[4]);
 
 /* the packets of a SysEx put together again */
 struct jd2_sx {

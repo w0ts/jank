@@ -826,9 +826,9 @@ static void test_selecting_a_pattern(void)
     CHECK(n > 0 && request_body(out, n, body) == 5 && body[3] == 0 && body[4] == 255);                         /* a read: the pattern byte is 0 */
     CHECK(jdl_pattern(&d, 13, 128, JDL_PATTERN_CUE, out, sizeof out) == 0 && jdl_pattern(&d, 13, 1, 2, out, sizeof out) == 0);   /* what the Digitone would refuse */
     reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){5, 17}, 2);
-    CHECK(jdl_take_pattern(&d, &p) && p.playing == 5 && p.cued == 17 && !jdl_take_pattern(&d, &p));
+    CHECK(jdl_take_pattern(&d, &p) && p.playing == 5 && p.next == 17 && !jdl_take_pattern(&d, &p));
     reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){17, 255}, 2);                                          /* nothing cued */
-    CHECK(jdl_take_pattern(&d, &p) && p.playing == 17 && p.cued == JDL_NO_PATTERN);
+    CHECK(jdl_take_pattern(&d, &p) && p.playing == 17 && p.next == JDL_NO_PATTERN);
     reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){17, 200}, 2);                                          /* damaged: not taken */
     reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){17}, 1);
     CHECK(!jdl_take_pattern(&d, &p));
@@ -837,6 +837,126 @@ static void test_selecting_a_pattern(void)
     CHECK(jdl_pattern(&d, 20, 3, JDL_PATTERN_CUE, out, sizeof out) == 0 && jdl_patterns_read(&d, 20, 0, out, sizeof out) > 0);
     jdl_init(&d);                                                                                              /* live control asked for afresh: tried again */
     CHECK(d.pattern_ok && jdl_pattern(&d, 21, 3, JDL_PATTERN_CUE, out, sizeof out) == 0);                      /* (not live yet) */
+}
+
+/* TRANSPORT (61, stage 8, provisional): the ops, the answer, the probe once per connection, the refusal (as RECORD's) */
+static void test_transport(void)
+{
+    struct jdl d = live(0);
+    uint8_t out[64], body[16];
+    size_t n = jdl_transport(&d, 10, JDL_TR_PLAY, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[2] == JDL_CMD_TRANSPORT && body[3] == 1);
+    n = jdl_transport(&d, 11, JDL_TR_STOP, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[3] == 0);
+    n = jdl_transport(&d, 12, JDL_TR_PAUSE, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[3] == 2);
+    CHECK(jdl_transport(&d, 13, 3, out, sizeof out) == 0);                                                     /* no op 3 */
+    CHECK(jdl_take_transport(&d) == -1);
+    reply_to(&d, d.seq, JDL_CMD_TRANSPORT, 0, (uint8_t[]){JDL_TR_PAUSED}, 1);
+    CHECK(jdl_take_transport(&d) == JDL_TR_PAUSED && jdl_take_transport(&d) == -1);                           /* once */
+    reply_to(&d, d.seq, JDL_CMD_TRANSPORT, 0, (uint8_t[]){7}, 1);                                              /* not a state */
+    CHECK(jdl_take_transport(&d) == -1);
+    n = jdl_probe_transport(&d, 20, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[3] == 255 && jdl_probe_transport(&d, 21, out, sizeof out) == 0);   /* a read, once */
+    reply_to(&d, d.seq, JDL_CMD_TRANSPORT, 2, NULL, 0);                                                        /* a build without it */
+    CHECK(!d.transport_ok && jdl_is_live(&d) && jdl_transport(&d, 30, JDL_TR_PLAY, out, sizeof out) == 0);
+    jdl_init(&d);
+    CHECK(d.transport_ok && !d.transport_probed && jdl_probe_transport(&d, 1, out, sizeof out) == 0);          /* afresh, but not before live */
+}
+
+/* CHAIN (59, stage 8, provisional): SET's bytes (2..64 patterns, the longest request there is), CLEAR, READ, the answer, a full queue, a build without it */
+static void test_chain(void)
+{
+    struct jdl d = live(0);
+    struct jdl_chain c;
+    uint8_t out[128], body[96], pats[JDL_CHAIN_MAX + 1], data[JDL_CHAIN_HEAD + 3];
+    size_t n = jdl_chain_set(&d, 10, (const uint8_t[]){0, 17, 127}, 3, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 8 && body[2] == JDL_CMD_CHAIN && body[3] == 0 && body[4] == 3 && body[5] == 0 && body[6] == 17 && body[7] == 127);
+    for (unsigned i = 0; i <= JDL_CHAIN_MAX; i++)
+        pats[i] = (uint8_t)i;
+    n = jdl_chain_set(&d, 11, pats, JDL_CHAIN_MAX, out, sizeof out);                                           /* 64: 66 argument bytes */
+    CHECK(n > 0 && n <= 96u && request_body(out, n, body) == 3u + 2u + JDL_CHAIN_MAX && body[4] == 64 && body[3 + 2 + 63] == 63);
+    CHECK(jdl_chain_set(&d, 12, pats, JDL_CHAIN_MAX + 1u, out, sizeof out) == 0 && jdl_chain_set(&d, 12, pats, 1, out, sizeof out) == 0);   /* 2..64 only */
+    pats[1] = 128;
+    CHECK(jdl_chain_set(&d, 12, pats, 2, out, sizeof out) == 0);                                               /* no pattern 128 */
+    n = jdl_chain_clear(&d, 13, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[3] == 1);
+    n = jdl_chain_read(&d, 14, 8, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 5 && body[3] == 255 && body[4] == 8);
+    data[0] = 1;                                                                                               /* mode 1, 5 patterns, at the 2nd (position 1), from the 1st: 3 of them */
+    data[1] = 0;
+    data[2] = 5;
+    data[3] = 0;
+    data[4] = 1;
+    data[5] = 0;
+    data[6] = 3;
+    data[7] = 4;
+    data[8] = 9;
+    data[9] = 120;
+    reply_to(&d, d.seq, JDL_CMD_CHAIN, 0, data, sizeof data);
+    CHECK(jdl_take_chain(&d, &c) && c.mode == 1 && c.count == 5 && c.pos == 1 && c.first == 0 && c.k == 3 && !jdl_take_chain(&d, &c));
+    CHECK(c.member[0] == 0x10 && c.member[1] == 0x02 && c.member[15] == 0x01);                                  /* patterns 4, 9, 120 */
+    reply_to(&d, d.seq, JDL_CMD_CHAIN, 0, data, sizeof data - 1u);                                             /* k says 3, 2 are there */
+    CHECK(!jdl_take_chain(&d, &c));
+    reply_to(&d, d.seq, JDL_CMD_CHAIN, 5, NULL, 0);                                                            /* the queue is full: that request only */
+    CHECK(d.chain_ok && d.chain_busy == 1 && jdl_is_live(&d));
+    reply_to(&d, d.seq, JDL_CMD_CHAIN, 2, NULL, 0);                                                            /* a build without CHAIN */
+    CHECK(!d.chain_ok && jdl_is_live(&d) && jdl_chain_read(&d, 20, 0, out, sizeof out) == 0 && jdl_chain_clear(&d, 20, out, sizeof out) == 0);
+}
+
+/* PATTERN's stage-8 answer: playing, next (255 = the same), mode, running, jump armed */
+static void test_the_pattern_answer_of_stage_8(void)
+{
+    struct jdl d = live(0);
+    struct jdl_pattern p;
+    reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){5, 255, 2, 1, 1}, 5);
+    CHECK(jdl_take_pattern(&d, &p) && p.playing == 5 && p.next == JDL_NO_PATTERN && p.mode == 2 && p.running == 1 && p.armed == 1);
+}
+
+/* a LIVE STATUS of protocol `proto`, `len` bytes, with the protocol-7 bytes filled */
+static void status7(struct jdl *d, uint32_t t, uint8_t proto, size_t len)
+{
+    uint8_t st[JDL_P7_COUNTERS_BYTES] = {0};
+    st[0] = proto;
+    st[1] = 1;
+    st[2] = 10;
+    st[72] = JDL_REC_ARMED;
+    st[73] = JDL_TR_PLAYING;           /* transport */
+    st[74] = 37;                       /* playing C06 */
+    st[75] = 40;                       /* next C09 */
+    st[76] = 1;                        /* mode */
+    st[78] = 4;                        /* chain count 4 */
+    st[80] = 2;                        /* chain position 2 */
+    st[84] = 9;                        /* writes applied 9 */
+    st[88] = 1;                        /* refused 1 */
+    jdl_poll(d, t, (uint8_t[64]){0}, 64);
+    reply_to(d, d->seq, JDL_CMD_LIVE, 0, st, len);
+}
+
+/* LIVE STATUS protocol 7 (stage 8, provisional): the 73 bytes, then transport, playing, next, mode, chain count and position, two counters; 5 and 6 as before; the status asked
+ * every 250 ms once it says 7 */
+static void test_the_status_of_protocol_7(void)
+{
+    struct jdl d = live(0);
+    struct jdl_live7 s;
+    uint8_t out[64];
+    status7(&d, 5000, 7, JDL_P7_COUNTERS_BYTES);
+    CHECK(d.st.proto == 7 && d.st.rec_valid && d.st.rec_bits == JDL_REC_ARMED);                               /* protocol 6's byte as before */
+    CHECK(jdl_take_live7(&d, &s) && !jdl_take_live7(&d, &s));
+    CHECK(s.transport == JDL_TR_PLAYING && s.playing == 37 && s.next == 40 && s.mode == 1 && s.chain_count == 4 && s.chain_pos == 2);
+    CHECK(s.counters && s.applied == 9 && s.refused == 1);
+    status7(&d, 10000, 7, JDL_P7_BYTES);                                                                       /* without the counters */
+    CHECK(jdl_take_live7(&d, &s) && !s.counters && s.chain_count == 4);
+    status7(&d, 15000, 7, JDL_P7_BYTES - 1u);                                                                  /* too short for the chain position: no protocol-7 part */
+    CHECK(!d.st.p7_valid && !jdl_take_live7(&d, &s) && d.st.rec_valid);
+    status7(&d, 20000, 6, JDL_P7_COUNTERS_BYTES);                                                              /* protocol 6, long: the bytes are not read */
+    CHECK(!d.st.p7_valid && !jdl_take_live7(&d, &s) && d.st.rec_valid);
+    CHECK(jdl_poll(&d, 20000 + JDL_STATUS_FAST_MS, out, sizeof out) == 0);                                     /* protocol 6: every 4 s */
+    status7(&d, 30000, 7, JDL_P7_BYTES);
+    CHECK(jdl_poll(&d, 30000 + JDL_STATUS_FAST_MS - 1u, out, sizeof out) == 0);
+    CHECK(jdl_poll(&d, 30000 + JDL_STATUS_FAST_MS, out, sizeof out) > 0);                                      /* protocol 7: every 250 ms */
+    jdl_pattern(&d, 30000 + 2u * JDL_STATUS_FAST_MS - 10u, 1, JDL_PATTERN_CUE, out, sizeof out);               /* (another request does not delay it) */
+    CHECK(jdl_poll(&d, 30000 + 2u * JDL_STATUS_FAST_MS, out, sizeof out) > 0);
 }
 
 static void test_the_scale_needs_live_control(void)
@@ -853,6 +973,10 @@ int main(void)
     test_record();
     test_reading_the_patterns();
     test_selecting_a_pattern();
+    test_transport();
+    test_chain();
+    test_the_pattern_answer_of_stage_8();
+    test_the_status_of_protocol_7();
     test_reading_the_scale_with_the_cheap_poll();
     test_the_root_comes_with_protocol_five();
     test_a_damaged_or_refused_scale_answer();
