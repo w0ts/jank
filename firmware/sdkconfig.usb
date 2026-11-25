@@ -5,6 +5,10 @@ CONFIG_TINYUSB_MSC_ENABLED=y
 CONFIG_USB_HOST_HUBS_SUPPORTED=y
 # host mode: the enumeration filter (usb_hostlib.c, core/jank_hostfilter.h): a hub's other devices are left alone, they would take the pipes
 CONFIG_USB_HOST_ENABLE_ENUM_FILTER_CALLBACK=y
+# a device's whole configuration descriptor must fit one control transfer, or it is not enumerated at all: a Digitone II in "USB + audio" (5 interfaces,
+# two audio streams) or Overbridge mode was never seen with the default 256 (owner 2026-11-25: "if the digitone in usb + audio mode, or overbridge mode
+# launchpad does nothing"). Costs internal DMA RAM per control buffer (the enumeration's, one per opened device): measured on the unit in host mode (diag)
+CONFIG_USB_HOST_CONTROL_TRANSFER_MAX_SIZE=1024
 # host mode's audio in: the IN FIFO biased up, its largest packet 600 bytes instead of 408 (components/usb/Kconfig,
 # USB_HOST_HW_BUFFER_BIAS); bulk OUT (MIDI) keeps one 64-byte packet, which is all a full-speed MIDI endpoint takes
 CONFIG_USB_HOST_HW_BUFFER_BIAS_IN=y
