@@ -384,9 +384,9 @@ static void test_clearing_the_chain_and_its_refusals(void)
         acts(&a, pad((uint8_t)(i % 8u), (uint8_t)(i % 7u), 100), &o);
     msg(&a);
     CHECK(acts(&a, pad(1, 1, 100), &o) == 0 && strcmp(msg(&a), "CHAIN FULL (64)") == 0);
-    jlapp_set_stage8(&a, 1, 0);                                                                        /* a Digitone without CHAIN: said once */
-    CHECK(strcmp(msg(&a), "CHAIN: DN2 TOO OLD") == 0);
-    CHECK(acts(&a, pad(0, 7, 0), &o) == 0 && strcmp(msg(&a), "CHAIN: DN2 TOO OLD") == 0);              /* and at the release: nothing sent */
+    jlapp_set_stage8(&a, 1, 0);                                                                        /* a Digitone without CHAIN: the probe itself says nothing */
+    CHECK(msg(&a)[0] == 0);
+    CHECK(acts(&a, pad(0, 7, 0), &o) == 0 && strcmp(msg(&a), "CHAIN: DN2 TOO OLD") == 0);              /* the release says it: nothing sent */
 }
 
 /* the chain read when the page opens (after the banks), in parts when it is long, again when the status's count changes */

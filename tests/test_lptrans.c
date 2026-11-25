@@ -145,8 +145,8 @@ static void test_the_app_without_peers(void)
         struct jdl_live7 s = st7(JDL_TR_STOPPED);
         CHECK(jlapp_on_live7(&a, &s) == JLTR_NO_REQUEST && scene5(&a) == JLAPP_GREEN_THIRD);
     }
-    jlapp_set_stage8(&a, 0, 1);                                                            /* the Digitone refuses TRANSPORT: as before, said once */
-    CHECK(strcmp(msg(&a), "TRANSP: DN2 TOO OLD") == 0 && !jlapp_dn2_leads(&a));
+    jlapp_set_stage8(&a, 0, 1);                                                            /* the Digitone refuses TRANSPORT: as before, and silently (the probe runs at each live-control start) */
+    CHECK(msg(&a)[0] == 0 && !jlapp_dn2_leads(&a));
     jlapp_set_stage8(&a, 0, 1);
     CHECK(msg(&a)[0] == 0);
     CHECK(press_start_stop(&a, &o) == 1 && o.kind == JLAPP_ACT_TRANSPORT);                 /* Jank's session (and its forced clock), as before stage 8 */

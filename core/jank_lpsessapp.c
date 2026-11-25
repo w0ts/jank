@@ -151,10 +151,8 @@ int jlapp_dn2_leads(const struct jlapp *a) { return jltr_dn2_leads(&a->tr, a->li
 
 void jlapp_set_stage8(struct jlapp *a, int transport_ok, int chain_ok)
 {
-    if (a->tr.cmd_ok && !transport_ok)  /* scene 5 is Jank's session again, as before stage 8 (no message at the presses: they still do something) */
-        jlapp_say(a, "TRANSP: DN2 TOO OLD");
-    if (a->chain_ok && !chain_ok)
-        jlapp_say(a, "CHAIN: DN2 TOO OLD");
+    /* silent: the probe runs each time live control comes up, and a Digitone without stage 8 would show the same refusal every time (owner's screen). Scene 5 is
+     * then Jank's session as before stage 8; a chain or a cue press says "... DN2 TOO OLD" itself */
     a->tr.cmd_ok = transport_ok != 0;
     if (!transport_ok)
         a->tr.has_cmd = 0;

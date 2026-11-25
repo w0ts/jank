@@ -131,7 +131,7 @@ hands it to `usb_lp.c` every second).
   counts only when it differs from what Jank's session does, and not within 1 s of a change Jank made itself (its Start reaches the Digitone, whose transport then changes:
   that must not come back as a request). Not measured: what a Digitone with CLOCK RECEIVE on does with its own PLAY key while it follows a clock.
 - **Who leads is only decided after TRANSPORT has answered**: Jank reads it once when live control comes up. Until then, and on a Digitone that refuses it (status 2:
-  "TRANSP: DN2 TOO OLD", said once; no more TRANSPORT requests until live control is asked for afresh), scene 5 is Jank's session with the forced clock, as before stage 8.
+  nothing said (the probe runs at each live-control start; owner's screen); no more TRANSPORT requests until live control is asked for afresh), scene 5 is Jank's session with the forced clock, as before stage 8.
 - **LIVE STATUS protocol 7** (provisional): the 73 bytes of protocol 6 unchanged, then `u8 transport, u8 playing pattern, u8 next (255 = the same), u8 mode, u16 chain count,
   u16 chain position (0xFFFF cued), u32 writes applied, u32 writes refused`. Read when the protocol says 7 and the answer is long enough (the two counters only when they are
   there); protocols 5 and 6 read as before, and Record still follows byte 72. Once the Digitone says protocol 7, Jank asks LIVE STATUS every 250 ms instead of every 4 s (it
@@ -247,7 +247,7 @@ u16 count, u16 position, u8 first, u8 k, k x pattern`). **Hold a pad and press o
 in the order pressed (it says CHAIN 2: B03, ...; up / down may switch pages meanwhile; at most 64, then CHAIN FULL (64)); **letting go of the held pad sends the chain**
 (CHAIN SET, it says CHAIN OF 3). The chain's patterns are GREEN_THIRD while it is built and after. **To clear the chain: hold the playing pattern's pad alone for a second**
 and let go (CHAIN CLEAR, it says CHAIN CLEARED); any other pad held alone only cues. The chain is read (CHAIN READ, in parts when one answer does not hold it) when the page
-opens, after a SET or a CLEAR, and when the status's chain count changes. A Digitone without CHAIN answers 2: CHAIN: DN2 TOO OLD (once, and at the release of a chain that
+opens, after a SET or a CLEAR, and when the status's chain count changes. A Digitone without CHAIN answers 2: nothing said for the probe, CHAIN: DN2 TOO OLD (at the release of a chain that
 cannot go); a full queue (status 5) loses that request only (counted). A MIDI Program Change cancels a chain on the Digitone. A CHAIN SET of 64 is the longest request Jank
 sends (86 bytes, 29 USB-MIDI packets): it goes out one packet at a time into the Digitone's FIFO, with no buffer for the packets.
 
