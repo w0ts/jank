@@ -15,9 +15,10 @@ const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); n++; };
 // ---- the parameter
 eq(Flavour.parse(''), null, 'no query: no flavour');
 eq(Flavour.parse(undefined), null, 'no search at all: no flavour');
-eq(Flavour.parse('?flavour=launchpad'), 'launchpad', 'flavour=launchpad');
-eq(Flavour.parse('?tag=v1&flavour=launchpad'), 'launchpad', 'among other parameters');
-eq(Flavour.parse('?flavour=LaunchPad%20'), 'launchpad', 'case and spaces do not matter');
+eq(Flavour.parse('?flavour=jank-dn2-launchpadx'), 'jank-dn2-launchpadx', 'flavour=jank-dn2-launchpadx');
+eq(Flavour.parse('?flavour=launchpad'), 'jank-dn2-launchpadx', 'the older name still works');
+eq(Flavour.parse('?tag=v1&flavour=launchpad'), 'jank-dn2-launchpadx', 'among other parameters');
+eq(Flavour.parse('?flavour=LaunchPad%20'), 'jank-dn2-launchpadx', 'case and spaces do not matter');
 eq(Flavour.parse('?flavour='), null, 'empty: no flavour');
 eq(Flavour.parse('?flavour=drum'), null, 'a flavour the page does not know: the plain page');
 eq(Flavour.parse('?flavor=launchpad'), null, 'only "flavour" is read');
@@ -38,9 +39,9 @@ const releases = [
 ];
 eq(Flavour.releasesFor(null, releases, 'auto'), releases.filter((r) => r.boards && r.boards.auto), 'no flavour: the list as the page always made it');
 eq(Flavour.releasesFor(null, releases, 'auto').map((r) => r.tag), ['v0.0.3', 'v0.0.1', 'test-build'], 'no flavour: v0.0.1 is listed');
-eq(Flavour.releasesFor('launchpad', releases, 'auto').map((r) => r.tag), ['v0.0.3'], 'launchpad: only releases after v0.0.1, for the board');
-eq(Flavour.releasesFor('launchpad', releases.slice(2), 'auto'), [], 'launchpad: none when only v0.0.1 is there');
-ok(/Launchpad/.test(Flavour.noneText('launchpad')) && Flavour.noneText(null) === null, 'what the page says when none fits');
+eq(Flavour.releasesFor('jank-dn2-launchpadx', releases, 'auto').map((r) => r.tag), ['v0.0.3'], 'launchpad: only releases after v0.0.1, for the board');
+eq(Flavour.releasesFor('jank-dn2-launchpadx', releases.slice(2), 'auto'), [], 'launchpad: none when only v0.0.1 is there');
+ok(/Launchpad/.test(Flavour.noneText('jank-dn2-launchpadx')) && Flavour.noneText(null) === null, 'what the page says when none fits');
 
 // ---- set usb host, against a unit whose uptime runs with the fake clock
 function unit({ uptime = 3, answers = true, refuse = false, reads = 'host', noUptime = false } = {}) {
@@ -100,18 +101,19 @@ async function main() {
       ok(tag && /\bhidden\b/.test(tag[0]), `#${id}: in the page, hidden unless the flavour is asked for`);
     }
   }
-  const next = html.match(/<section id="next-launchpad"[\s\S]*?<\/section>/)[0];
+  const next = html.match(/<section id="next-jank-dn2-launchpadx"[\s\S]*?<\/section>/)[0];
   ok(/id="fl-host"[^>]*disabled/.test(next) && /set usb host/.test(next), 'step 1: the Set USB host button, disabled until the page enables it');
   ok(/powered USB hub/.test(next) && /Launchpad X/.test(next) && /Digitone II/.test(next), 'step 2: the hub, the Launchpad and the Digitone');
   ok(/live control/.test(next) && /lp7/.test(next) && /stage 8/.test(next) && /REMOTE CONTROL/.test(next), 'step 3: what the Digitone needs');
   ok(/href="https:\/\/w0ts\.github\.io\/dn2-wishes\/controller\.html/.test(html), 'a link to the Wishes site\'s Controller page');
   ok(/<title>Jank · Install<\/title>/.test(html), 'the title stays the Install page\'s');
   // the picker (owner 2026-11-25: "can the installer pick them ?"): its options from Flavour.list, and the query each choice opens
-  eq(Flavour.list(), [{ name: 'launchpad', label: 'Launchpad X controller for the Digitone II' }]);
-  eq(Flavour.search('launchpad'), '?flavour=launchpad');
+  eq(Flavour.list(), [{ name: 'jank-dn2-launchpadx', label: 'jank-dn2-launchpadx (Launchpad X + Digitone II)' }]);
+  eq(Flavour.search('jank-dn2-launchpadx'), '?flavour=jank-dn2-launchpadx');
+  eq(Flavour.search('launchpad'), '', 'the picker only offers the current names');
   eq(Flavour.search(''), '');
   eq(Flavour.search('nope'), '');
-  eq(Flavour.parse(Flavour.search('launchpad')), 'launchpad');
+  eq(Flavour.parse(Flavour.search('jank-dn2-launchpadx')), 'jank-dn2-launchpadx');
   ok(/<select id="fl-pick"/.test(html) && /What it is for/.test(html), 'the picker is on the page');
   ok(/Flavour\.list\(\)/.test(html) && /Flavour\.search\(pick\.value\)/.test(html), 'it is filled from Flavour.list and opens Flavour.search');
   console.log(`flavour: ${n} checks passed`);

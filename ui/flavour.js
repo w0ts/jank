@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-// The Install page's flavours: `install.html?flavour=launchpad` installs the SAME firmware (no other build) and adds a heading,
+// The Install page's flavours (owner 2026-11-25: "jank and jank-dn2-launchpadx"; one image while everything fits, separate builds later when more
+// controllers or machines come): `install.html?flavour=jank-dn2-launchpadx` (the older `?flavour=launchpad` too) installs the SAME firmware (no other build) and adds a heading,
 // its own text and the next steps for one use: jank as the USB host of a Launchpad X and a Digitone II (docs/launchpad.md).
 // Without the parameter (or with one this page does not know) the page is exactly the plain Install page.
 // Also the one control line the flavour sends, `set usb host` (stored; docs/usb.md "Host mode"), as scripts/ctl.py sends it, on
@@ -10,8 +11,9 @@ const Flavour = (() => {
   // after: only releases newer than this tag carry what the flavour needs (v0.0.1 has no Launchpad support: firmware/main/usb_lp.c
   // came later); none: what the page says when no listed release has it
   const FLAVOURS = {
-    launchpad: { label: 'Launchpad X controller for the Digitone II', after: 'v0.0.1', none: 'No release with Launchpad support yet: v0.0.1 does not have it. It comes with the next release.' },
+    'jank-dn2-launchpadx': { label: 'jank-dn2-launchpadx (Launchpad X + Digitone II)', after: 'v0.0.1', none: 'No release with Launchpad support yet: v0.0.1 does not have it. It comes with the next release.' },
   };
+  const ALIASES = { launchpad: 'jank-dn2-launchpadx' };
   // a new image confirms itself once it has run 20 s and a computer has spoken on the control line (firmware/main/ota.c
   // valid_task); a start as host does not confirm it. 25 s, as the page's update does, before the role changes
   const CONFIRM_S = 25, STEP_MS = 2500;
@@ -28,6 +30,8 @@ const Flavour = (() => {
     try { v = new URLSearchParams(search || '').get('flavour'); } catch (e) { return null; }
     if (v === null) return null;
     v = v.trim().toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(ALIASES, v))
+        v = ALIASES[v];                // an older name, from links made before the rename
     return Object.prototype.hasOwnProperty.call(FLAVOURS, v) ? v : null;
   }
 

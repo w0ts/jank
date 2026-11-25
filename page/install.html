@@ -25,7 +25,7 @@
     <div class="row"><label>Install <select id="fl-pick" title="The same firmware either way: the choice sets the text and the steps after the install"></select></label></div>
   </section>
 
-  <section id="flavour-launchpad" hidden>
+  <section id="flavour-jank-dn2-launchpadx" hidden>
     <h2>Launchpad X controller for the Digitone II</h2>
     <p>Jank as a small USB host: a Novation Launchpad X plays and drives an Elektron Digitone II running the Wishes firmware, through the Digitone's live control, with Jank as the clock. This page installs the same Jank firmware as the plain Install page; nothing in the image is different. What it adds are the steps after the install: Jank set to USB host, the wiring, and what the Digitone needs. The modes and buttons: <a href="https://github.com/w0ts/jank/blob/main/docs/launchpad.md">docs/launchpad.md</a> and the <a href="https://w0ts.github.io/dn2-wishes/controller.html">Controller page of the Wishes site</a>.</p>
     <p>Beat follow (below) is not needed for this; leave its box unticked unless you want it for something else.</p>
@@ -58,7 +58,7 @@
     <p>The releases and their notes: <a href="https://github.com/w0ts/jank/releases">github.com/w0ts/jank/releases</a>. Building it yourself: <a href="https://github.com/w0ts/jank/blob/main/docs/firmware.md">docs/firmware.md</a>.</p>
   </section>
 
-  <section id="next-launchpad" hidden>
+  <section id="next-jank-dn2-launchpadx" hidden>
     <h2>Next steps</h2>
     <ol class="steps">
       <li><b>Set Jank to USB host</b>, with Jank plugged into this computer. The button sends <code>set usb host</code> on Jank's control line over USB MIDI (as <code>scripts/ctl.py set usb host</code> does) and reads it back. It first talks to Jank until it has run 25 s, so a new firmware confirms itself before it can start as host. The setting is stored; on a computer Jank stays a USB device, so this page can still reach it. (A bare XIAO whose role was never chosen becomes host by itself; the button makes it explicit. The jank mini 3 needs it.)
@@ -321,7 +321,8 @@ if (typeof module !== 'undefined') module.exports = MidiOta;
 </script>
 <script>
 // SPDX-License-Identifier: MIT
-// The Install page's flavours: `install.html?flavour=launchpad` installs the SAME firmware (no other build) and adds a heading,
+// The Install page's flavours (owner 2026-11-25: "jank and jank-dn2-launchpadx"; one image while everything fits, separate builds later when more
+// controllers or machines come): `install.html?flavour=jank-dn2-launchpadx` (the older `?flavour=launchpad` too) installs the SAME firmware (no other build) and adds a heading,
 // its own text and the next steps for one use: jank as the USB host of a Launchpad X and a Digitone II (docs/launchpad.md).
 // Without the parameter (or with one this page does not know) the page is exactly the plain Install page.
 // Also the one control line the flavour sends, `set usb host` (stored; docs/usb.md "Host mode"), as scripts/ctl.py sends it, on
@@ -332,8 +333,9 @@ const Flavour = (() => {
   // after: only releases newer than this tag carry what the flavour needs (v0.0.1 has no Launchpad support: firmware/main/usb_lp.c
   // came later); none: what the page says when no listed release has it
   const FLAVOURS = {
-    launchpad: { label: 'Launchpad X controller for the Digitone II', after: 'v0.0.1', none: 'No release with Launchpad support yet: v0.0.1 does not have it. It comes with the next release.' },
+    'jank-dn2-launchpadx': { label: 'jank-dn2-launchpadx (Launchpad X + Digitone II)', after: 'v0.0.1', none: 'No release with Launchpad support yet: v0.0.1 does not have it. It comes with the next release.' },
   };
+  const ALIASES = { launchpad: 'jank-dn2-launchpadx' };
   // a new image confirms itself once it has run 20 s and a computer has spoken on the control line (firmware/main/ota.c
   // valid_task); a start as host does not confirm it. 25 s, as the page's update does, before the role changes
   const CONFIRM_S = 25, STEP_MS = 2500;
@@ -350,6 +352,8 @@ const Flavour = (() => {
     try { v = new URLSearchParams(search || '').get('flavour'); } catch (e) { return null; }
     if (v === null) return null;
     v = v.trim().toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(ALIASES, v))
+        v = ALIASES[v];                // an older name, from links made before the rename
     return Object.prototype.hasOwnProperty.call(FLAVOURS, v) ? v : null;
   }
 
@@ -418,7 +422,7 @@ let releases = [], busy = false;
 const chosen = () => { const r = releases.find((x) => x.tag === tag.value); return r && r.boards && r.boards[BOARD]; };
 const say = (t, bad) => { note.textContent = t; note.classList.toggle("bad", !!bad); };
 const canSerial = "serial" in navigator && window.isSecureContext;
-// ?flavour=launchpad (ui/flavour.js): the same firmware, its own text and next steps; null: the plain page
+// ?flavour=jank-dn2-launchpadx (ui/flavour.js; ?flavour=launchpad too): the same firmware, its own text and next steps; null: the plain page
 const flavour = Flavour.parse(location.search);
 const hostBtn = flavour && $("fl-host"), hostNote = flavour && $("fl-note");
 function show() {
@@ -613,7 +617,7 @@ async function runHost() {
 }
 // the picker (owner 2026-11-25): the same firmware; a choice opens the page with or without ?flavour=..., so a link and the picker are one path
 const pick = $("fl-pick");
-pick.replaceChildren(new Option("Jank (standard)", ""), ...Flavour.list().map((f) => new Option(f.label, f.name)));
+pick.replaceChildren(new Option("jank", ""), ...Flavour.list().map((f) => new Option(f.label, f.name)));
 pick.value = flavour || "";
 pick.addEventListener("change", () => { location.href = location.pathname + Flavour.search(pick.value); });
 if (flavour) {
