@@ -28,6 +28,8 @@ void jdl_init(struct jdl *d)
     d->scale_set_ok = 1;
     d->mix_set_ok = 1;
     d->record_ok = 1;
+    d->patterns_ok = 1;
+    d->pattern_ok = 1;
 }
 
 int jdl_is_live(const struct jdl *d) { return d->state == JDL_LIVE; }
@@ -215,6 +217,61 @@ size_t jdl_record(struct jdl *d, uint32_t now_ms, uint8_t on, uint8_t *out, size
     return send(d, now_ms, JDL_CMD_RECORD, &on, 1, out, cap);
 }
 
+size_t jdl_patterns_read(struct jdl *d, uint32_t now_ms, uint8_t bank, uint8_t *out, size_t cap)
+{
+    if (d->state != JDL_LIVE || !d->patterns_ok || (bank >= JDL_BANKS && bank != JDL_BANK_PLAYING))
+        return 0;
+    return send(d, now_ms, JDL_CMD_PATTERNS, &bank, 1, out, cap);
+}
+
+size_t jdl_pattern(struct jdl *d, uint32_t now_ms, uint8_t pattern, uint8_t how, uint8_t *out, size_t cap)
+{
+    uint8_t args[2];
+    if (d->state != JDL_LIVE || !d->pattern_ok || pattern >= JDL_PATTERNS || (how > JDL_PATTERN_JUMP && how != JDL_PATTERN_READ))
+        return 0;
+    args[0] = how == JDL_PATTERN_READ ? 0u : pattern;
+    args[1] = how;
+    return send(d, now_ms, JDL_CMD_PATTERN, args, sizeof args, out, cap);
+}
+
+int jdl_take_patterns(struct jdl *d, struct jdl_patterns *out)
+{
+    if (!d->patterns_fresh)
+        return 0;
+    *out = d->pb;
+    d->patterns_fresh = 0;
+    return 1;
+}
+
+int jdl_take_pattern(struct jdl *d, struct jdl_pattern *out)
+{
+    if (!d->pattern_fresh)
+        return 0;
+    *out = d->pc;
+    d->pattern_fresh = 0;
+    return 1;
+}
+
+/* PATTERNS' data: `u8 bank, u8 playing, u16 mask`; PATTERN's: `u8 playing, u8 cued` */
+static void take_patterns(struct jdl *d, const struct jd2_reply *r)
+{
+    if (r->n < 4u || r->data[0] >= JDL_BANKS || r->data[1] >= JDL_PATTERNS)
+        return;
+    d->pb.bank = r->data[0];
+    d->pb.playing = r->data[1];
+    d->pb.mask = (uint16_t)((r->data[2] << 8) | r->data[3]);
+    d->patterns_fresh = 1;
+}
+
+static void take_pattern(struct jdl *d, const struct jd2_reply *r)
+{
+    if (r->n < 2u || r->data[0] >= JDL_PATTERNS || (r->data[1] >= JDL_PATTERNS && r->data[1] != JDL_NO_PATTERN))
+        return;
+    d->pc.playing = r->data[0];
+    d->pc.cued = r->data[1];
+    d->pattern_fresh = 1;
+}
+
 int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out)
 {
     if (!d->mixer_fresh)
@@ -383,8 +440,24 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         return JDL_IN_REPLY;
     }
     if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE &&
-        r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET && r.cmd != JDL_CMD_MIXER_SET && r.cmd != JDL_CMD_MUTE_SET && r.cmd != JDL_CMD_RECORD)
+        r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET && r.cmd != JDL_CMD_MIXER_SET && r.cmd != JDL_CMD_MUTE_SET && r.cmd != JDL_CMD_RECORD &&
+        r.cmd != JDL_CMD_PATTERNS && r.cmd != JDL_CMD_PATTERN)
         return JDL_IN_IGNORED;
+    if (r.cmd == JDL_CMD_PATTERNS || r.cmd == JDL_CMD_PATTERN) {   /* 2: a build without it (our arguments are always valid): that command stops, live control is fine */
+        if (r.status == ST_NOT_UNDERSTOOD) {
+            if (r.cmd == JDL_CMD_PATTERNS)
+                d->patterns_ok = 0;
+            else
+                d->pattern_ok = 0;
+            return JDL_IN_REPLY;
+        }
+        if (r.status == 0) {
+            if (r.cmd == JDL_CMD_PATTERNS)
+                take_patterns(d, &r);
+            else
+                take_pattern(d, &r);
+        }
+    }
     if (r.cmd == JDL_CMD_RECORD) {     /* 2: a build without RECORD (live control itself is fine); 6: GRID or STEP RECORDING is on, that request only */
         if (r.status == ST_NOT_UNDERSTOOD) {
             d->record_ok = 0;

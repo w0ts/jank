@@ -108,8 +108,34 @@ struct jdl_scale {
     uint8_t has_root, root, key_mode;  /* root and key mode: only from protocol 5 */
 };
 
+/* The patterns (the Session page). PATTERNS (51, the Digitone's stage 4, works today): `u8 bank (0..7, 255 = the playing pattern's bank)` -> `u8 bank, u8 playing pattern
+ * (0..127), u16 mask` (bit k: pattern 16 x bank + k holds a trig; big-endian); status 2: bank over 7 (or a build without it). It costs the Digitone up to about 0.8 ms per
+ * bank in its MIDI task. PATTERN (60, PROVISIONAL: asked of the Digitone's developers 2026-11-25, not built there; Jank sends it as RECORD was sent before the Digitone had
+ * it): `u8 pattern 0..127, u8 how (0 cue: switch at the playing pattern's end, 1 jump, 255 read)` -> `u8 playing pattern, u8 cued pattern (255 none)`; a build without it
+ * answers status 2 once and no more are sent until live control is asked for afresh (jdl_init). Never a MIDI Program Change (owner: "sysex"). */
+#define JDL_CMD_PATTERNS 51u
+#define JDL_CMD_PATTERN 60u
+#define JDL_BANKS 8u                   /* A..H, 16 patterns each */
+#define JDL_BANK_PATTERNS 16u
+#define JDL_PATTERNS 128u
+#define JDL_BANK_PLAYING 255u          /* PATTERNS: the bank of the playing pattern */
+#define JDL_NO_PATTERN 255u            /* PATTERN: nothing cued */
+enum jdl_pattern_how { JDL_PATTERN_CUE = 0, JDL_PATTERN_JUMP = 1, JDL_PATTERN_READ = 255 };
+struct jdl_patterns {
+    uint8_t bank, playing;             /* the bank read (0..7), the playing pattern (0..127) */
+    uint16_t mask;                     /* bit k: pattern 16 x bank + k holds a trig */
+};
+struct jdl_pattern {
+    uint8_t playing, cued;             /* the playing pattern, the cued one (JDL_NO_PATTERN: none) */
+};
+
 struct jdl {
     struct jdl_status st;              /* the Digitone's last LIVE STATUS */
+    struct jdl_patterns pb;            /* the last PATTERNS answer, until taken (patterns_fresh) */
+    struct jdl_pattern pc;             /* the last PATTERN answer, until taken (pattern_fresh) */
+    uint8_t patterns_fresh, pattern_fresh;
+    uint8_t patterns_ok;               /* PATTERNS has not been refused (status 2): 1 until it is */
+    uint8_t pattern_ok;                /* PATTERN has not been refused by a build without it: 1 until it is */
     struct jdl_scale sc;               /* the last SCALE answer (or SCALE SET's), until taken (scale_fresh) */
     uint8_t scale_fresh;
     uint8_t scale_ok;                  /* SCALE has not been refused (status 2): 1 until it is */
@@ -168,6 +194,12 @@ size_t jdl_mixer_set(struct jdl *d, uint32_t now_ms, uint8_t track, enum jdl_mix
 size_t jdl_mute_set(struct jdl *d, uint32_t now_ms, uint8_t which, uint16_t mask, uint8_t *out, size_t cap);
 /* RECORD (58): on 0 / 1 (255 reads). 0 unless live control is on and the Digitone has not said it lacks RECORD */
 size_t jdl_record(struct jdl *d, uint32_t now_ms, uint8_t on, uint8_t *out, size_t cap);
+/* PATTERNS (51): bank 0..7 or JDL_BANK_PLAYING; 0 unless live and not refused. PATTERN (60, provisional): pattern 0..127, how an enum jdl_pattern_how (a read sends pattern 0);
+ * 0 unless live and not refused. jdl_take_patterns / jdl_take_pattern: the last answer, once (1 and *out filled), else 0 */
+size_t jdl_patterns_read(struct jdl *d, uint32_t now_ms, uint8_t bank, uint8_t *out, size_t cap);
+size_t jdl_pattern(struct jdl *d, uint32_t now_ms, uint8_t pattern, uint8_t how, uint8_t *out, size_t cap);
+int jdl_take_patterns(struct jdl *d, struct jdl_patterns *out);
+int jdl_take_pattern(struct jdl *d, struct jdl_pattern *out);
 /* LIVE ERASE: bit t of `tracks` = erase on for track t, 0 = all off (the Delete button held / let go). The answer is LIVE STATUS. 0 unless live control is on */
 size_t jdl_erase(struct jdl *d, uint32_t now_ms, uint16_t tracks, uint8_t *out, size_t cap);
 
