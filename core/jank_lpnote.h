@@ -42,14 +42,14 @@ struct jln_pad {
 
 /* Launchpad palette indexes (manual p. 12): the colours of Live's Note mode */
 /* the colours of Launchpad 95's Note mode (SkinMK2.py Note.Pads and Note.Feedback; the indexes are its ColorsMK2.py's names) */
-#define JLN_COLOR_ROOT 45u             /* BLUE */
+#define JLN_COLOR_ROOT 49u             /* PURPLE_HALF (owner 2026-11-25, picked on the Session colour chart: "root note must be bright"; was Launchpad 95's BLUE 45) */
 #define JLN_COLOR_HIGHLIGHT 37u        /* LIGHT_BLUE: the scale's 3rd and 5th step (Note.Pads.Highlight) */
 #define JLN_COLOR_IN_SCALE 38u         /* LIGHT_BLUE_HALF */
-/* Notes outside the scale: DARK_GREY, Launchpad 95's own (owner 2026-11-24: "white we cannot use it for off scale notes"; white is the track pads' colour); and, when the
- * reference is the major scale, the notes that are in natural minor but not in major (the flat 3rd, 6th and 7th) a very dark purple. The reference is the current scale, except
+/* Notes outside the scale: 43, picked by the owner (2026-11-24: "white we cannot use it for off scale notes"; white is the track pads' colour); and, when the
+ * reference is the major scale, the notes that are in natural minor but not in major (the flat 3rd, 6th and 7th): 46, also picked by the owner. The reference is the current scale, except
  * the Digitone's "Chromatic" (all 12 notes: nothing would stand out), where it is the MAJOR scale of the key. */
-#define JLN_COLOR_OUT_OF_SCALE 1u      /* DARK_GREY (#3c3c3c on the Launchpad X, per a firmware reference) */
-#define JLN_COLOR_MINOR_ONLY 51u       /* the palette's darkest purple, one step below PURPLE_THIRD 50 (owner: amber too loud, PURPLE_HALF 49 and PURPLE_THIRD 50 "still too bright"); 55 is darker still. The RGB of 50 / 51 is not measured here */
+#define JLN_COLOR_OUT_OF_SCALE 43u     /* (owner 2026-11-25, picked on the Session colour chart; was DARK_GREY 1) */
+#define JLN_COLOR_MINOR_ONLY 46u       /* BLUE_HALF (owner 2026-11-25, picked on the Session colour chart; before: amber too loud, PURPLE_HALF 49 / PURPLE_THIRD 50 too bright, then 51) */
 #define JLN_COLOR_PLAYING 21u          /* GREEN: a note the DN2 is sounding */
 
 void jln_init(struct jln *s);                                        /* diatonic, C, octave 3, relative, track 0 */

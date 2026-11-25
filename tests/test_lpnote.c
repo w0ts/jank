@@ -157,11 +157,11 @@ static void test_colours(void)
     root.highlight = 1;                                          /* a root that is also a highlight (a scale whose 3rd step is the root an octave up): the root wins */
     CHECK(jln_color(&root, 0) == JLN_COLOR_ROOT);
     CHECK(jln_color(&high, 1) == JLN_COLOR_PLAYING);
-    CHECK(jln_color(&out, 0) == JLN_COLOR_OUT_OF_SCALE && jln_color(&none, 0) == 0);          /* a note outside the scale is DARK_GREY (not white: owner), no note at all is dark */
-    CHECK(JLN_COLOR_ROOT == 45 && JLN_COLOR_IN_SCALE == 38 && JLN_COLOR_OUT_OF_SCALE == 1 && JLN_COLOR_MINOR_ONLY == 51 && JLN_COLOR_PLAYING == 21);   /* BLUE, LIGHT_BLUE_HALF, DARK_GREY, the darkest purple, GREEN */
+    CHECK(jln_color(&out, 0) == JLN_COLOR_OUT_OF_SCALE && jln_color(&none, 0) == 0);          /* a note outside the scale is 43 (not white: owner), no note at all is dark */
+    CHECK(JLN_COLOR_ROOT == 49 && JLN_COLOR_IN_SCALE == 38 && JLN_COLOR_OUT_OF_SCALE == 43 && JLN_COLOR_MINOR_ONLY == 46 && JLN_COLOR_PLAYING == 21);   /* the owner's picks from the colour chart (2026-11-25): root 49, off scale 43, minor-only 46; LIGHT_BLUE_HALF, GREEN */
     CHECK(JLN_COLOR_OUT_OF_SCALE != 3 && JLN_COLOR_MINOR_ONLY != JLN_COLOR_OUT_OF_SCALE);   /* never white; the two are told apart */
     out.minor_only = 1;
-    CHECK(jln_color(&out, 0) == JLN_COLOR_MINOR_ONLY);           /* minor but not major: dim PURPLE */
+    CHECK(jln_color(&out, 0) == JLN_COLOR_MINOR_ONLY);           /* minor but not major: 46 */
     CHECK(jln_color(&root, 1) == JLN_COLOR_PLAYING && jln_color(&out, 1) == JLN_COLOR_PLAYING);   /* playing wins over everything */
     CHECK(jln_color(&none, 1) == 0);
 }
