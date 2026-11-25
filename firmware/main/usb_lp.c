@@ -195,6 +195,30 @@ static void follow_dn2(int req)
 
 /* what a pad press or a button asks of the Digitone: always live control (SysEx), never a MIDI channel (jank_lpapp.h). A request that cannot be made (live
  * control is not on any more) is dropped: the Digitone ends the notes of a lapsed lease itself */
+/* Jank's clock sent a MIDI Stop (its ticker stopped playing): while Link leads, the Digitone it reached is PAUSED by it; TRANSPORT STOP follows JLTR_STOP_FOLLOW_MS later
+ * so it ends stopped, as its own STOP key (owner 2026-11-25; core/jank_lptrans.h jltr_stop_follows) */
+static void stop_follow(uint32_t t, int live, uint8_t *sx, size_t cap)
+{
+    static uint8_t was_playing, pending;
+    static uint32_t stop_ms;
+    int playing = midi_is_playing();
+    if (was_playing && !playing) {
+        pending = 1;
+        stop_ms = t;
+    }
+    if (playing)
+        pending = 0;
+    was_playing = (uint8_t)(playing != 0);
+    if (pending && t - stop_ms >= JLTR_STOP_FOLLOW_MS) {
+        size_t n = 0;
+        pending = 0;
+        if (jltr_stop_follows(&s_app.tr, live))
+            n = jdl_transport(&s_jdl, t, JDL_TR_STOP, sx, cap);
+        g_hostdiag.tr_stop_follows += n != 0;
+        dn2_send_sysex(sx, n);
+    }
+}
+
 static void run_act(const struct jlapp_act *act)
 {
     uint8_t sx[REQUEST_MAX];
@@ -481,6 +505,7 @@ static void live_pump(void)
     jlapp_tick(&s_app, t);
     s_was_live = (uint8_t)live;
     jlapp_set_transport(&s_app, bridge_is_playing());   /* (lock-free) the start / stop scene button's light, and the lower quadrant's rule */
+    stop_follow(t, live, sx, sizeof sx);
     {
         uint32_t tick16 = 0;
         int known = beat_sixteenths(t, &tick16);

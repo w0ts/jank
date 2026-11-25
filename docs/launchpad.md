@@ -129,7 +129,9 @@ hands it to `usb_lp.c` every second).
   the setting on and peers there; read from the code, not measured with peers). **The Digitone's own PLAY / STOP keys** (seen as a change of its transport in the
   status) **start / stop Jank's session too** (the ui task calls `bridge_play`), so all stay together. **The guard against a loop:** a change of the Digitone's transport
   counts only when it differs from what Jank's session does, and not within 1 s of a change Jank made itself (its Start reaches the Digitone, whose transport then changes:
-  that must not come back as a request). Not measured: what a Digitone with CLOCK RECEIVE on does with its own PLAY key while it follows a clock.
+  that must not come back as a request). **Jank's Stop ends the Digitone stopped, not paused** (owner 2026-11-25): a MIDI Stop leaves it PAUSED (stock's state after an
+  external Stop, so a Continue would resume), so 30 ms after Jank's clock sent its Stop, a TRANSPORT STOP (61, op 0, its STOP key) follows, on a Digitone with stage 8
+  (`jltr_stop_follows`, usb_lp.c `stop_follow`; counted as `tstop` in `hostdiag_tr`). Not measured: what a Digitone with CLOCK RECEIVE on does with its own PLAY key while it follows a clock.
 - **Who leads is only decided after TRANSPORT has answered**: Jank reads it once when live control comes up. Until then, and on a Digitone that refuses it (status 2:
   nothing said (the probe runs at each live-control start; owner's screen); no more TRANSPORT requests until live control is asked for afresh), scene 5 is Jank's session with the forced clock, as before stage 8.
 - **LIVE STATUS protocol 7** (provisional): the 73 bytes of protocol 6 unchanged, then `u8 transport, u8 playing pattern, u8 next (255 = the same), u8 mode, u16 chain count,
@@ -137,7 +139,7 @@ hands it to `usb_lp.c` every second).
   there); protocols 5 and 6 read as before, and Record still follows byte 72. Once the Digitone says protocol 7, Jank asks LIVE STATUS every 250 ms instead of every 4 s (it
   carries the transport and the patterns; what that costs the Digitone is not measured).
 - `diag`: `hostdiag_tr=sent:<TRANSPORT sent>,ok:<not refused>,dn2:<0 stopped, 1 playing, 2 paused, -1 none read>,peers:<1: Link leads>,follows:<starts / stops the Digitone's keys
-  asked of Jank's session>,chains:<CHAIN sent>,chain_ok:<not refused>`. Host-tested (`tests/test_lptrans.c`); not tried on hardware.
+  asked of Jank's session>,chains:<CHAIN sent>,chain_ok:<not refused>,tstop:<TRANSPORT STOPs after Jank's MIDI Stop>`. Host-tested (`tests/test_lptrans.c`); not tried on hardware.
 - **Delete = scene button 6, held, in Note and step modes** (owner 2026-11-24: "hold Delete wipes the current track under the playhead"; PINK_THIRD dim, PINK while held; in the mixer scene 6 is a view): the Digitone
   **erases the track's steps as its own playhead passes them** (LIVE ERASE, 44 sub 3 with a u16 track mask, there since its lp2, dn2-wishes: it deletes each step just before it plays, never sounds it, so it is the Digitone's playhead and not Jank's
   extrapolation; it ends on LIVE OFF, the 10 s lease, REMOTE CONTROL OFF or USB down). The track is the current one when the button went down; letting go (or the Launchpad going away) sends mask 0. **In the step modes (melodic and drum) a step pad pressed while Delete is held clears that step** (owner: "delete should clear pressed steps in step seq";

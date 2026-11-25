@@ -18,6 +18,7 @@
 #define JLTR_GUARD_MS 1000u            /* after a change Jank made, the Digitone's transport following it is not sent back */
 #define JLTR_HOLD_MS 500u              /* after a TRANSPORT press, an older status does not undo the light */
 #define JLTR_NO_REQUEST (-1)
+#define JLTR_STOP_FOLLOW_MS 30u        /* Jank's clock sent its MIDI Stop this long ago: TRANSPORT STOP follows (the MIDI Stop is out first) */
 
 struct jltr {
     uint8_t peers;                     /* Link (or Jank radio) peers: Link leads */
@@ -42,6 +43,9 @@ int jltr_on_dn2(struct jltr *t, unsigned state, int answer, uint32_t now_ms);
 void jltr_lost(struct jltr *t);
 /* Jank's own session plays or not (often; a change starts the guard) */
 void jltr_set_jank(struct jltr *t, int playing, uint32_t now_ms);
+/* Jank's clock just sent a MIDI Stop, which leaves the Digitone PAUSED (stock's state after an external Stop: a Continue would resume). 1: TRANSPORT STOP is to follow so it
+ * ends stopped, as its own STOP key does (owner 2026-11-25): Link leads (peers: the Stop reached it), the Digitone has TRANSPORT (answered, not refused), live control up */
+int jltr_stop_follows(const struct jltr *t, int live);
 /* scene 5's light: 1 full (playing), 0 dim: the Digitone's transport while it leads and is known, else Jank's session */
 int jltr_lit(const struct jltr *t, int live);
 #endif

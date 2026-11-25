@@ -245,7 +245,7 @@ static void test_the_transport_line(void)
     char out[2048];
     const char *l;
     jhd_init(&d);
-    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_tr=sent:0,ok:0,dn2:-1,peers:0,follows:0,chains:0,chain_ok:0\n"));   /* nothing read: -1 */
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_tr=sent:0,ok:0,dn2:-1,peers:0,follows:0,chains:0,chain_ok:0,tstop:0\n"));   /* nothing read: -1 */
     d.tr_sent = 12;
     d.tr_ok = 1;
     d.dn2_tr = 2;                      /* paused */
@@ -253,12 +253,13 @@ static void test_the_transport_line(void)
     d.tr_follows = 3;
     d.chain_sent = 5;
     d.chain_ok = 1;
-    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_pat=") < strstr(out, "hostdiag_tr=sent:12,ok:1,dn2:2,peers:1,follows:3,chains:5,chain_ok:1\n"));
-    d.tr_sent = d.tr_follows = d.chain_sent = 0xFFFFFFFFu;   /* at its longest */
+    d.tr_stop_follows = 4;
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_pat=") < strstr(out, "hostdiag_tr=sent:12,ok:1,dn2:2,peers:1,follows:3,chains:5,chain_ok:1,tstop:4\n"));
+    d.tr_sent = d.tr_follows = d.chain_sent = d.tr_stop_follows = 0xFFFFFFFFu;   /* at its longest */
     d.dn2_tr = 9;                      /* not a state: -1 */
     jhd_format(&d, out, sizeof out);
     l = strstr(out, "hostdiag_tr=");
-    CHECK(l && strstr(l, ",dn2:-1,") && (size_t)(strchr(l, '\n') - l) + 1u <= 105u);
+    CHECK(l && strstr(l, ",dn2:-1,") && (size_t)(strchr(l, '\n') - l) + 1u <= 122u);   /* (+17: tstop, owner 2026-11-25) */
 }
 
 static void test_roles_and_claim_error(void)

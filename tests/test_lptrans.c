@@ -180,6 +180,27 @@ static void test_the_app_before_the_answer_and_with_peers(void)
     CHECK(jlapp_dn2_leads(&a));
 }
 
+/* owner 2026-11-25: Jank's MIDI Stop leaves the Digitone paused; TRANSPORT STOP follows it, only while Link leads (the Stop reached it) and the Digitone has TRANSPORT */
+static void test_a_stop_follows_jank_s_midi_stop(void)
+{
+    struct jltr t;
+    jltr_init(&t);
+    CHECK(!jltr_stop_follows(&t, 1));                             /* no answer to TRANSPORT yet, no peers */
+    jltr_set_peers(&t, 1);
+    CHECK(!jltr_stop_follows(&t, 1));                             /* peers, but TRANSPORT not answered: an older Digitone */
+    CHECK(jltr_on_dn2(&t, JDL_TR_PLAYING, 1, 0) == JLTR_NO_REQUEST);   /* TRANSPORT's answer */
+    CHECK(jltr_stop_follows(&t, 1));
+    CHECK(!jltr_stop_follows(&t, 0));                             /* live control down */
+    jltr_set_peers(&t, 0);
+    CHECK(!jltr_stop_follows(&t, 1));                             /* no peers: the Digitone leads, Jank's clock never reached it */
+    jltr_set_peers(&t, 1);
+    t.cmd_ok = 0;                                                 /* refused */
+    CHECK(!jltr_stop_follows(&t, 1));
+    t.cmd_ok = 1;
+    jltr_lost(&t);                                                /* another connection: it must answer again */
+    CHECK(!jltr_stop_follows(&t, 1));
+}
+
 int main(void)
 {
     test_who_leads();
@@ -187,6 +208,7 @@ int main(void)
     test_with_peers_the_digitones_keys_move_the_session();
     test_the_app_without_peers();
     test_the_app_before_the_answer_and_with_peers();
+    test_a_stop_follows_jank_s_midi_stop();
     printf("test_lptrans: %d checks, %d failed\n", checks, fails);
     return fails;
 }

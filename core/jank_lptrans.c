@@ -63,6 +63,8 @@ void jltr_set_jank(struct jltr *t, int playing, uint32_t now_ms)
     t->guard_ms = now_ms;
 }
 
+int jltr_stop_follows(const struct jltr *t, int live) { return live && t->peers && t->cmd_ok && t->has_cmd; }
+
 int jltr_lit(const struct jltr *t, int live)
 {
     if (jltr_dn2_leads(t, live) && t->known)

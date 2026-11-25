@@ -94,6 +94,7 @@ struct jhd {
     uint32_t live_pat_reads, live_pat_cues;   /* the Session page: PATTERNS reads sent, PATTERN requests sent (cues and reads) */
     uint8_t pat_reads_ok, pat_cue_ok;  /* PATTERNS / PATTERN not refused */
     uint8_t dn2_pattern;               /* the Digitone's playing pattern as last read (0..127; 255 none yet) */
+    uint32_t tr_stop_follows;          /* TRANSPORT STOPs sent after Jank's MIDI Stop (Link leads: the Digitone ends stopped, not paused) */
     uint32_t tr_sent, tr_follows;      /* TRANSPORT requests sent (presses, reads); Jank session starts / stops the Digitone's own keys asked for (Link leads) */
     uint32_t chain_sent;               /* CHAIN requests sent (SET, CLEAR, READ) */
     uint8_t tr_ok, chain_ok, tr_peers; /* TRANSPORT / CHAIN not refused; peers there (Link leads) */
