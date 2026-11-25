@@ -39,6 +39,7 @@ void jlapp_init(struct jlapp *a, const struct jln_scale *scale)
     jlmx_init(&a->mix);
     a->mix_writes = 1;
     a->record_ok = 1;
+    a->dn2_present = 1;
     a->pat_reads_ok = 1;
     a->pat_cue_ok = 1;
     jlss_init(&a->sess);
@@ -356,7 +357,7 @@ static uint8_t page_colour(const struct jlapp *a, uint8_t x, uint8_t y)
         if (x == 6)
             return on_off(n->layout == JLN_CHROMATIC, JLAPP_RED, JLAPP_RED_THIRD);
         if (x == 7)                    /* the track pads (not Launchpad 95's: its drum rack pad is here): dim green off, then the mode's own colour */
-            return a->track_pads == JLAPP_TRACKS_TRIGGER ? JLAPP_COLOR_TRIG_IDLE : a->track_pads == JLAPP_TRACKS_SELECT ? JLAPP_COLOR_TRACK_IDLE : JLAPP_GREEN_THIRD;
+            return a->track_pads == JLAPP_TRACKS_TRIGGER ? JLAPP_COLOR_TRIG_IDLE : a->track_pads == JLAPP_TRACKS_SELECT ? JLAPP_COLOR_TRACK_IDLE : JLAPP_COLOR_MODE;   /* off: Note mode's light blue (owner 2026-11-25) */
         return 0;
     }
     if (r == 1) {
@@ -934,11 +935,15 @@ static uint8_t track_pad_colour(const struct jlapp *a, uint8_t t)
     return t == a->n.track ? JLAPP_COLOR_TRIG_CURRENT : JLAPP_COLOR_TRIG_IDLE;
 }
 
+void jlapp_set_dn2(struct jlapp *a, int present) { a->dn2_present = present != 0; }
+
 void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
 {
     uint8_t own[16], shift = note_shift(a);
     int chosen_shown = select_shown(a);
     memset(f, 0, sizeof *f);
+    if (!a->dn2_present)
+        return;                        /* no Digitone: everything dark */
     memset(own, 0, sizeof own);
     for (uint32_t i = 0; i < JLAPP_PADS; i++) {
         const struct jlapp_held *h = &a->held[i];

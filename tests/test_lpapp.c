@@ -321,7 +321,7 @@ static void test_page_lights(void)
     CHECK(colour(&a, 1, 7) == JLAPP_GREEN);                  /* Horizontal on */
     CHECK(colour(&a, 0, 7) == JLAPP_RED_THIRD);              /* AbsoluteRoot off */
     CHECK(colour(&a, 2, 7) == 0 && colour(&a, 3, 7) == 0);   /* pads this port has no job for */
-    CHECK(colour(&a, 7, 7) == JLAPP_GREEN_THIRD);            /* the track pads switch: off */
+    CHECK(colour(&a, 7, 7) == JLAPP_COLOR_MODE);             /* the track pads switch: off, Note mode light blue */
     CHECK(colour(&a, 0, 5) == JLAPP_GREEN);                  /* the key C: Key on */
     CHECK(colour(&a, 1, 5) == JLAPP_GREEN_THIRD);            /* D: Key off */
     CHECK(colour(&a, 0, 6) == JLAPP_GREEN_THIRD);            /* C#: a black key, the same Key off */
@@ -583,7 +583,7 @@ static void test_the_track_pads_switch(void)
     struct jlapp a = fresh();
     struct jlapp_act o;
     acts(&a, top(NOTE_BTN, 127), &o);
-    CHECK(colour(&a, 7, 7) == JLAPP_GREEN_THIRD && a.track_pads == JLAPP_TRACKS_OFF);
+    CHECK(colour(&a, 7, 7) == JLAPP_COLOR_MODE && a.track_pads == JLAPP_TRACKS_OFF);   /* off: Note mode's light blue (owner 2026-11-25) */
     CHECK(acts(&a, pad(7, 7, 127), &o) == 0 && a.track_pads == JLAPP_TRACKS_TRIGGER && colour(&a, 7, 7) == JLAPP_COLOR_TRIG_IDLE);   /* owner 2026-11-25: OFF -> TRIGGER (yellow) */
     CHECK(strcmp(msg(&a), "TRACK PADS TRIGGER") == 0);
     acts(&a, pad(7, 7, 0), &o);
@@ -592,8 +592,28 @@ static void test_the_track_pads_switch(void)
     CHECK(a.track_pads == JLAPP_TRACKS_SELECT && colour(&a, 7, 7) == JLAPP_COLOR_TRACK_IDLE && strcmp(msg(&a), "TRACK PADS SELECT") == 0);   /* -> SELECT (white) */
     acts(&a, pad(7, 7, 0), &o);
     acts(&a, pad(7, 7, 127), &o);
-    CHECK(a.track_pads == JLAPP_TRACKS_OFF && colour(&a, 7, 7) == JLAPP_GREEN_THIRD && strcmp(msg(&a), "TRACK PADS OFF") == 0);   /* -> OFF */
+    CHECK(a.track_pads == JLAPP_TRACKS_OFF && colour(&a, 7, 7) == JLAPP_COLOR_MODE && strcmp(msg(&a), "TRACK PADS OFF") == 0);   /* -> OFF */
     CHECK(JLAPP_COLOR_TRIG_IDLE == 13 && JLAPP_COLOR_TRIG_CURRENT == 21 && JLAPP_COLOR_TRIG_PLAYING == 5 && JLAPP_COLOR_TRACK_IDLE == 3);   /* yellow as the drum quadrant; white */
+}
+
+/* owner 2026-11-25: "when DN2 is disconnected, LP should be black" */
+static void test_the_launchpad_is_dark_without_the_digitone(void)
+{
+    struct jlapp a = fresh();
+    struct jlx_frame f;
+    unsigned lit = 0;
+    jlapp_tick(&a, 1000);
+    jlapp_frame(&a, &f);
+    for (unsigned i = 0; i < sizeof f.led / sizeof f.led[0]; i++)
+        lit += f.led[i].color != 0;
+    CHECK(lit > 0);                                                /* with the Digitone: lit */
+    jlapp_set_dn2(&a, 0);
+    jlapp_frame(&a, &f);
+    for (unsigned i = 0; i < sizeof f.led / sizeof f.led[0]; i++)
+        CHECK(f.led[i].color == 0);                                /* without: every light off */
+    jlapp_set_dn2(&a, 1);
+    jlapp_frame(&a, &f);
+    CHECK(f.led[JLX_PAD0].color != 0);                             /* back */
 }
 
 /* owner 2026-11-25: SELECT mode: a track pad selects its track (nothing sounds), lit WHITE, the current one AMBER */
@@ -1303,7 +1323,7 @@ static void test_a_step_press_in_the_app(void)
     acts(&a, top(CUSTOM, 127), &o);                                /* Custom again: the drum step mode */
     CHECK(colour(&a, 0, 3) == JLST_COLOR_TRACK_CURRENT);           /* the quadrant is the tracks: track 1 top left of it */
     acts(&a, top(NOTE_BTN, 127), &o);
-    CHECK(colour(&a, 7, 7) == JLAPP_GREEN_THIRD);                  /* held: the scale page covers the steps */
+    CHECK(colour(&a, 7, 7) == JLAPP_COLOR_MODE);                   /* held: the scale page covers the steps (track pads off: light blue) */
     jlapp_tick(&a, JLAPP_TAP_MS);
     acts(&a, top(NOTE_BTN, 0), &o);                                /* held long: still the step mode */
     CHECK(a.mode == JLAPP_MODE_STEP && jlapp_step_wanted(&a, pages) == 2);
@@ -1779,6 +1799,7 @@ int main(void)
     test_the_track_pads_switch();
     test_the_track_pads_play_each_tracks_own_note();
     test_the_track_pads_select_mode();
+    test_the_launchpad_is_dark_without_the_digitone();
     test_the_layout_moves_up_two_rows();
     test_without_live_control_the_pads_are_silent_and_say_why();
     test_the_track_pads_say_why_too();

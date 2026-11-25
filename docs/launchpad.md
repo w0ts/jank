@@ -62,8 +62,10 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
   as its own setting says. A build without SCALE SET answers status 2 once and no more are sent. **Formats are the Digitone session's planned ones for stage 6** (the SCALE
   reply has the root and key mode from `data[6]` when LIVE STATUS says protocol >= 5; confirmed by them); stage 6 is not installed yet, so only the reading of the scale index
   can work today. `diag`: `hostdiag_scale=dn2:<index>,root:<0..11 or -1>,reads:,sets:,read_ok:,set_ok:`. Not tried on hardware.
+- **No Digitone, no lights** (owner 2026-11-25: "when DN2 is disconnected, LP should be black"): while no Digitone is attached every light of the Launchpad is
+  off (`jlapp_set_dn2`, from the attach / detach).
 - **Track pads (hold Note, pad 8 of the top row) cycle OFF -> TRIGGER -> SELECT** (owner 2026-11-25: "should cycle between: on/trigger/select. the pads are
-  yellow (like drum sequencer yellow) when in trigger mode. and white in select mode"); the switch is dim green off, yellow in TRIGGER, white in SELECT, and says
+  yellow (like drum sequencer yellow) when in trigger mode. and white in select mode"); the switch is Note mode's light blue (37) off, yellow in TRIGGER, white in SELECT, and says
   TRACK PADS OFF / TRIGGER / SELECT. With them on, the two bottom rows are the 16 tracks and the note layout moves up to the six rows left. **TRIGGER**: a pad
   plays its track on its own default note (PLAY op 2, ended with op 0 and note 255, confirmed by dn2-wishes), lit as the drum quadrant: YELLOW (13), the current
   track GREEN (21), a track that sounds or is held RED. **SELECT**: a pad selects its track (as the scale page's track rows; nothing sounds), lit WHITE, the

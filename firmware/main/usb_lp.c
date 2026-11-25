@@ -127,6 +127,7 @@ static void ensure_init(void)
     if (s_ready)
         return;
     jlapp_init(&s_app, jls_get(JLS_MAJOR));   /* the Digitone's Ionian (Maj) until it says otherwise; the scale page (hold Note) changes it */
+    jlapp_set_dn2(&s_app, 0);                 /* no Digitone yet: the Launchpad stays dark until it comes (usb_lp_attach) */
     prefs_load();                             /* the layout, octave, track pads ... as they were */
     jlprefs_from_app(&s_app, &s_prefs_saved);
     s_prefs_seen = s_prefs_saved;
@@ -507,6 +508,7 @@ void usb_lp_attach(enum jlapp_role r)
     } else if (r == JLAPP_DN2) {
         s_dn2_up = 1;
         g_hostdiag.dn2_up = 1;
+        jlapp_set_dn2(&s_app, 1);
         jlo_clear(&s_out);
         jdl_init(&s_jdl);              /* live control is asked for afresh (usb_lp_pump) */
         jd2_sx_init(&s_sx);
@@ -529,6 +531,7 @@ void usb_lp_detach(enum jlapp_role r)
     } else if (r == JLAPP_DN2) {
         s_dn2_up = 0;
         g_hostdiag.dn2_up = 0;
+        jlapp_set_dn2(&s_app, 0);      /* the Launchpad goes dark (owner 2026-11-25) */
         jlo_clear(&s_out);
         jdl_init(&s_jdl);
         sync_live();

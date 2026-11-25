@@ -135,6 +135,7 @@ struct jlapp {
     uint32_t sess_down_ms;
     uint8_t pat_reads_ok, pat_cue_ok;  /* the Digitone takes PATTERNS / PATTERN (not refused) */
     struct jlss sess;
+    uint8_t dn2_present;               /* jlapp_set_dn2: 0 = no Digitone, the Launchpad dark */
     uint8_t record_ok;                 /* the Digitone has RECORD (not refused by a build without it) */
     uint8_t record_on;                 /* the Record button is lit: armed or recording (the Digitone's LIVE STATUS, or the press until it answers) */
     uint8_t record_hold;               /* a press at record_ms: LIVE STATUS is not taken for JLAPP_RECORD_HOLD_MS */
@@ -211,6 +212,9 @@ void jlapp_on_dn2_rt(struct jlapp *a, uint8_t byte);
 int jlapp_mixer_wanted(const struct jlapp *a);
 void jlapp_on_mixer(struct jlapp *a, const struct jdl_mixer *m);
 void jlapp_set_mixer_writes(struct jlapp *a, int ok);
+/* the Digitone is attached (1) or not (0; owner 2026-11-25: "when DN2 is disconnected, LP should be black"): without it every light of the Launchpad is off.
+ * jlapp_init starts with 1; the firmware sets 0 at the start and follows the Digitone's attach / detach */
+void jlapp_set_dn2(struct jlapp *a, int present);
 /* the mixer's slow faders (jank_lpmix.h): the MIXER SET writes due now (call it often, after jlapp_tick: a slide moves every JLMX_SLIDE_TICK_MS); how many filled in out.
  * Without live control or the Digitone's mixer writes the slides end */
 size_t jlapp_pump_acts(struct jlapp *a, struct jlapp_act *out, size_t max);
