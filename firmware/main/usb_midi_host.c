@@ -11,7 +11,6 @@
  * interface is its second one (its first is DAW). Every other device stays output only: the clock. */
 #include <string.h>
 #include "app.h"
-#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -391,14 +390,8 @@ static void add_device(uint8_t address, int reuse, uint8_t tries_left)
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "device %u left alone: %s", address, esp_err_to_name(e));
         usb_host_device_close(s_client, h);
-        if (role != JLAPP_OTHER) {
-            void *probe = heap_caps_aligned_alloc(512, 512, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);   /* what each pipe's descriptor list needs: could it be had? */
-            g_hostdiag.fail_aligned = probe != NULL;
-            heap_caps_free(probe);
-            g_hostdiag.fail_dma_free = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-            g_hostdiag.fail_dma_big = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+        if (role != JLAPP_OTHER)
             s_claim_fails++;           /* (jhr_step: a few in a row and the port is cycled) */
-        }
         if (role != JLAPP_OTHER && (e == ESP_ERR_NO_MEM || e == ESP_ERR_NOT_SUPPORTED)) {   /* a controller, and no pipes (or memory) for it */
             if (!s_learn_pending) {
                 s_learn_pending = 1;

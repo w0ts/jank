@@ -23,7 +23,7 @@ static void test_empty_record(void)
     CHECK(strstr(out, "hostdiag_stack=unknown\n"));              /* nothing reported yet */
     CHECK(strstr(out, "hostdiag_filter=hub:0,skipped:0,last:0000:0000,learned:-\n"));      /* nothing learned: a dash */
     CHECK(strstr(out, "hostdiag_events=new:0,gone:0,add:0\n"));
-    CHECK(strstr(out, "hostdiag_mem=heap:0,heap_min:0,largest:0,client_stack_free:0,recovers:0,held_ms:0,fail_dma:0/0/0\n"));
+    CHECK(strstr(out, "hostdiag_mem=heap:0,heap_min:0,largest:0,client_stack_free:0,recovers:0\n"));
     CHECK(!strstr(out, "hostdiag_dev"));                         /* no device lines for unused slots */
 }
 
@@ -37,12 +37,9 @@ static void test_memory_line(void)
     d.client_stack_free = 1800;
     d.heap_big_b = 7168;                                         /* the largest single block: what a stack or a DMA buffer needs in one piece */
     CHECK(jhd_format(&d, out, sizeof out) > 0);
-    CHECK(strstr(out, "hostdiag_mem=heap:13,heap_min:4,largest:7168,client_stack_free:1800,recovers:0,held_ms:0,fail_dma:0/0/0\n"));
+    CHECK(strstr(out, "hostdiag_mem=heap:13,heap_min:4,largest:7168,client_stack_free:1800,recovers:0\n"));
     d.recovers = 2;                                              /* software replugs since the start (core/jank_hostrecover.h) */
-    d.held_ms = 21500;                                           /* the port powered 21.5 s after an update's restart */
-    d.fail_dma_free = 9000;                                      /* at the failed claim: DMA heap free, its largest block, an aligned block could not be had */
-    d.fail_dma_big = 4096;
-    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, ",client_stack_free:1800,recovers:2,held_ms:21500,fail_dma:9000/4096/0\n"));
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, ",client_stack_free:1800,recovers:2\n"));
 }
 
 /* why a host start failed (kept apart in flash, so it outlives the restart that follows it) */

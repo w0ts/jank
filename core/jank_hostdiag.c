@@ -117,8 +117,8 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
     put(out, cap, &n, "hostdiag_dn2live=proto:%u,push:%u,lease:%u,made:%lu,sent:%lu,lost:%lu,dropped:%lu,pushmsgs:%lu,ignored:%lu,last_ignored_len:%u\n",
         d->dn2_proto, d->dn2_push, d->dn2_lease, (unsigned long)d->dn2_made, (unsigned long)d->dn2_sent, (unsigned long)d->dn2_lost,
         (unsigned long)d->dn2_dropped, (unsigned long)d->dn2_pushmsgs, (unsigned long)d->live_ignored, d->live_ign_len);
-    put(out, cap, &n, "hostdiag_mem=heap:%u,heap_min:%u,largest:%lu,client_stack_free:%u,recovers:%u,held_ms:%lu,fail_dma:%lu/%lu/%u\n", d->heap_kb, d->heap_min_kb,
-        (unsigned long)d->heap_big_b, d->client_stack_free, d->recovers, (unsigned long)d->held_ms, (unsigned long)d->fail_dma_free, (unsigned long)d->fail_dma_big, d->fail_aligned);
+    put(out, cap, &n, "hostdiag_mem=heap:%u,heap_min:%u,largest:%lu,client_stack_free:%u,recovers:%u\n", d->heap_kb, d->heap_min_kb, (unsigned long)d->heap_big_b,
+        d->client_stack_free, d->recovers);
     for (unsigned i = 0; i < JHD_DEVS; i++) {
         const struct jhd_dev *v = &d->dev[i];
         char name[JHD_NAME_MAX + 2];

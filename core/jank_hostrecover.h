@@ -27,14 +27,4 @@ void jhr_init(struct jhr *s);
 enum jhr_act jhr_step(struct jhr *s, unsigned fails, uint32_t now_ms);
 /* how long until jhr_step has something to do on its own (the port to power on again); UINT32_MAX: nothing */
 uint32_t jhr_wait_ms(const struct jhr *s, uint32_t now_ms);
-
-/* After an UPDATE's restart the root port starts unpowered (owner 2026-11-25, fix A): the cycle above did not help (the Launchpad did not even enumerate again),
- * and the claims failed only after Wi-Fi updates, while the update client was still talking to the unit in its first seconds; a restart of another kind with
- * the same devices claimed both at once. So the devices are enumerated once the update is confirmed and the Wi-Fi requests have stopped: at least
- * JHR_HOLD_MIN_MS after the start, JHR_HOLD_QUIET_MS after the last request, never later than JHR_HOLD_MAX_MS. Cause not proven: diag measures it (fail_dma). */
-#define JHR_HOLD_MIN_MS 15000u
-#define JHR_HOLD_QUIET_MS 5000u
-#define JHR_HOLD_MAX_MS 45000u
-/* 1: the port may be powered now. since_request_ms: since the last Wi-Fi request (UINT32_MAX: none yet); confirmed: the new image is no longer on probation */
-int jhr_hold_over(uint32_t since_start_ms, int confirmed, uint32_t since_request_ms);
 #endif

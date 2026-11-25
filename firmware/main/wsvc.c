@@ -67,21 +67,6 @@ esp_err_t wsvc_start(void)
 
 void wsvc_binary_enable(int on) { s_bin.on = (uint8_t)(on != 0 && s_bin.data != NULL); }
 
-static volatile uint32_t s_last_ms;    /* the last request's time (ms since the start); 0: none yet */
-
-uint32_t wsvc_since_request_ms(void)
-{
-    uint32_t last = s_last_ms;
-    return last ? pdTICKS_TO_MS(xTaskGetTickCount()) - last : UINT32_MAX;
-}
-
-static int stamp(int taken)
-{
-    if (taken)
-        s_last_ms = pdTICKS_TO_MS(xTaskGetTickCount()) | 1u;   /* (never 0) */
-    return taken;
-}
-
 int wsvc_take_binary(struct jw_req *rq, const uint8_t **frame, size_t *n)
 {
     if (!s_bin.data || !__atomic_load_n(&s_bin.full, __ATOMIC_ACQUIRE))
@@ -89,7 +74,7 @@ int wsvc_take_binary(struct jw_req *rq, const uint8_t **frame, size_t *n)
     *rq = s_bin.rq;
     *frame = s_bin.data;
     *n = s_bin.len;
-    return stamp(1);
+    return 1;
 }
 
 void wsvc_release_binary(void) { __atomic_store_n(&s_bin.full, 0, __ATOMIC_RELEASE); }
@@ -151,7 +136,7 @@ size_t wsvc_next_frame(const uint8_t mac[6], uint32_t ip, uint8_t *out, size_t c
     return jw_reply_frame(mac, ip, &to, r.index_last & 0x7Fu, (r.index_last & 0x80u) != 0, r.text, r.n, out, cap);
 }
 
-int wsvc_take_request(struct jw_req *rq) { return stamp(s_req && xQueueReceive(s_req, rq, 0) == pdTRUE); }
+int wsvc_take_request(struct jw_req *rq) { return s_req && xQueueReceive(s_req, rq, 0) == pdTRUE; }
 
 int wsvc_put_reply(const struct jw_req *to, unsigned index, int last, const char *text, size_t n)
 {
