@@ -20,6 +20,13 @@
     <nav class="site" aria-label="Jank pages"><a href="./">About</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="install.html" aria-current="page">Install</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="device.html">Device</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="build.html">Build</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="https://github.com/w0ts/jank" aria-label="GitHub" title="The Jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></nav>
   </header>
 
+  <section id="flavour-launchpad" hidden>
+    <h2>Launchpad X controller for the Digitone II</h2>
+    <p>Jank as a small USB host: a Novation Launchpad X plays and drives an Elektron Digitone II running the Wishes firmware, through the Digitone's live control, with Jank as the clock. This page installs the same Jank firmware as the plain Install page; nothing in the image is different. What it adds are the steps after the install: Jank set to USB host, the wiring, and what the Digitone needs. The modes and buttons: <a href="https://github.com/w0ts/jank/blob/main/docs/launchpad.md">docs/launchpad.md</a> and the <a href="https://w0ts.github.io/dn2-wishes/controller.html">Controller page of the Wishes site</a>.</p>
+    <p>Beat follow (below) is not needed for this; leave its box unticked unless you want it for something else.</p>
+    <div class="row"><button id="fl-show" class="quiet" type="button">Jank is installed already: show the next steps</button></div>
+  </section>
+
   <section>
     <h2>Flash from the browser</h2>
     <p>Chrome or Edge on a computer, a USB-C cable that carries data. One firmware for both devices: it finds out at the start which one it runs on. Its settings are kept.</p>
@@ -46,9 +53,20 @@
     <p>The releases and their notes: <a href="https://github.com/w0ts/jank/releases">github.com/w0ts/jank/releases</a>. Building it yourself: <a href="https://github.com/w0ts/jank/blob/main/docs/firmware.md">docs/firmware.md</a>.</p>
   </section>
 
+  <section id="next-launchpad" hidden>
+    <h2>Next steps</h2>
+    <ol class="steps">
+      <li><b>Set Jank to USB host</b>, with Jank plugged into this computer. The button sends <code>set usb host</code> on Jank's control line over USB MIDI (as <code>scripts/ctl.py set usb host</code> does) and reads it back. It first talks to Jank until it has run 25 s, so a new firmware confirms itself before it can start as host. The setting is stored; on a computer Jank stays a USB device, so this page can still reach it. (A bare XIAO whose role was never chosen becomes host by itself; the button makes it explicit. The jank mini 3 needs it.)
+        <div class="row"><button id="fl-host" type="button" disabled>Set USB host over USB MIDI</button><span id="fl-note" class="note"></span></div></li>
+      <li><b>Unplug Jank from the computer.</b> Connect it to the upstream (computer) port of a powered USB hub, and the Launchpad X and the Digitone II to the hub's other ports. Use a plain hub with USB ports only: Jank's USB controller has just enough channels for the hub, the Launchpad and the Digitone. Jank has no power of its own as host: a bare XIAO takes its 5 V from a hub that supplies its upstream cable, or from 5 V on its 5V pin, never while a computer is on its USB port (<a href="https://github.com/w0ts/jank/blob/main/docs/usb.md#host-mode">docs/usb.md</a>). In host mode Jank has no USB link to a computer; plugged into a computer again, it starts as a device.</li>
+      <li><b>The Digitone II</b> needs the Wishes firmware with live control (live control stage 7, the test build v0.71.1-lp7, or later), and SETTINGS &gt; SYSTEM &gt; USB CONFIG &gt; REMOTE CONTROL on (the default in Wishes). Start / stop led by the Digitone, the Session page's pattern cues and chains need live control stage 8, which is not out yet. See the <a href="https://w0ts.github.io/dn2-wishes/controller.html#install">Wishes site's Controller page</a>.</li>
+    </ol>
+  </section>
+
 </main>
 <!--@include ui/beatw.js-->
 <!--@include ui/midiota.js-->
+<!--@include ui/flavour.js-->
 <script type="module">
 // The releases the site carries: firmware/index.json (scripts/site_tree.py, from the releases' assets), newest first:
 // { releases: [ { tag, boards: { auto: { parts: [ { path, offset } ], beatw: { offset, size } } } } ] }: one image for the
@@ -67,16 +85,21 @@ let releases = [], busy = false;
 const chosen = () => { const r = releases.find((x) => x.tag === tag.value); return r && r.boards && r.boards[BOARD]; };
 const say = (t, bad) => { note.textContent = t; note.classList.toggle("bad", !!bad); };
 const canSerial = "serial" in navigator && window.isSecureContext;
+// ?flavour=launchpad (ui/flavour.js): the same firmware, its own text and next steps; null: the plain page
+const flavour = Flavour.parse(location.search);
+const hostBtn = flavour && $("fl-host"), hostNote = flavour && $("fl-note");
 function show() {
   const b = chosen();
   flash.disabled = busy || !b || !canSerial;
   midi.disabled = busy || !b || !canMidi;
+  if (hostBtn) hostBtn.disabled = busy || !canMidi;
   if (busy) return;
-  say(!releases.length ? "No release yet." : !b ? "This release has no firmware for the Install page."
+  say(!releases.length ? "No release yet." : flavour && !Flavour.releasesFor(flavour, releases, BOARD).length ? Flavour.noneText(flavour)
+    : !b ? "This release has no firmware for the Install page."
     : !canSerial && !canMidi ? "This browser cannot flash: use Chrome or Edge on a computer, on the https page." : "");
 }
 function fill() {
-  const list = releases.filter((r) => r.boards && r.boards[BOARD]);
+  const list = Flavour.releasesFor(flavour, releases, BOARD);
   tag.replaceChildren(...(list.length ? list : [{ tag: "-" }]).map((r) => new Option(r.tag, r.tag)));
   tag.disabled = !list.length;
   show();
@@ -119,6 +142,7 @@ async function run() {
     await loader.writeFlash({ fileArray, flashMode: "keep", flashFreq: "keep", flashSize: "keep", eraseAll: false, compress: true,
       reportProgress: (i, written) => { done[i] = written; const n = done.reduce((a, x) => a + x, 0); bar.value = n / total; say("Writing... " + Math.round(100 * n / total) + " %"); } });
     say("Done" + (beat.checked ? ", with beat follow" : "") + ": unplug the device and plug it back in.");
+    nextSteps("Flashed. Unplug Jank and plug it back into this computer, then press Set USB host.");
   } catch (e) {
     say(e && e.name === "NotFoundError" ? "No port chosen." : "Not flashed: " + (e && e.message ? e.message : e), true);
   } finally {
@@ -150,15 +174,16 @@ async function jankLine(access, waitMs) {
     await sleep(500);
   }
 }
-// `get` -> { key: value } up to its "ok", or null
-async function getInfo(dev) {
+// `get` (or another command) -> { key: value } up to its "ok", or null (no answer, or an "err" line)
+async function getInfo(dev, command) {
   dev.lines.drop();
-  dev.send("get");
+  dev.send(command || "get");
   const out = {}, end = Date.now() + 3000;
   while (Date.now() < end) {
     const l = await dev.lines.next(end - Date.now());
     if (l === null) break;
     if (l === "ok") return out;
+    if (l.startsWith("err ")) return null;
     const k = l.indexOf("=");
     if (k > 0) out[l.slice(0, k)] = l.slice(k + 1);
   }
@@ -213,6 +238,7 @@ async function runMidi() {
     const after = dev ? await getInfo(dev) : null;
     say("Done" + (after && after.version ? ": version " + after.version + (before && before.version ? " (was " + before.version + ")" : "") : "")
       + (blob ? ", with beat follow" : "") + ".");
+    nextSteps("Updated. Jank is still plugged in: press Set USB host.");
   } catch (e) {
     say(e && e.name === "SecurityError" ? "MIDI was not allowed: allow it in the browser and press again." : "Not updated: " + (e && e.message ? e.message : e), true);
   } finally {
@@ -220,6 +246,43 @@ async function runMidi() {
     busy = false;
     show();
   }
+}
+// ---- the flavour's next steps (only with ?flavour=...) ----
+const hsay = (t, bad) => { hostNote.textContent = t; hostNote.classList.toggle("bad", !!bad); };
+function nextSteps(text) {
+  if (!flavour) return;
+  const box = $("next-" + flavour);
+  box.hidden = false;
+  if (text && hostNote) hsay(text);
+  box.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+// `set usb host` on the Jank plugged into this computer, over the control line the update uses (Flavour.setUsbHost)
+async function runHost() {
+  busy = true;
+  show();
+  let dev = null;
+  try {
+    hsay("Allow MIDI in the browser's question, then wait.");
+    const access = await navigator.requestMIDIAccess({ sysex: true });
+    hsay("Looking for Jank on USB MIDI...");
+    dev = await jankLine(access, 20000);
+    if (!dev) throw new Error("no Jank on USB MIDI: plug it into this computer (not the hub) and press again");
+    const host = await Flavour.setUsbHost((c) => getInfo(dev, c), sleep, hsay);
+    hsay(host ? "Done: Jank is set to USB host. Unplug it and connect it to the hub (step 2)."
+      : "Jank answered, but its settings do not say usb=host: press again, or use scripts/ctl.py set usb host.", !host);
+  } catch (e) {
+    hsay(e && e.name === "SecurityError" ? "MIDI was not allowed: allow it in the browser and press again." : "Not set: " + (e && e.message ? e.message : e), true);
+  } finally {
+    if (dev) dev.close();
+    busy = false;
+    show();
+  }
+}
+if (flavour) {
+  $("flavour-" + flavour).hidden = false;
+  $("fl-show").addEventListener("click", () => nextSteps(""));
+  hostBtn.addEventListener("click", runHost);
+  if (!canMidi) hsay("This browser has no Web MIDI: use Chrome or Edge on a computer, on the https page.", true);
 }
 tag.addEventListener("change", show);
 flash.addEventListener("click", run);

@@ -40,7 +40,7 @@ page/jank.html: page/src/jank.html $(wildcard ui/*) scripts/inline_ui.py
 page/index.html: page/src/index.html ui/common.css scripts/inline_ui.py
 	python3 scripts/inline_ui.py page/src/index.html -o page/index.html
 
-page/install.html: page/src/install.html ui/common.css scripts/inline_ui.py
+page/install.html: page/src/install.html ui/common.css ui/beatw.js ui/midiota.js ui/flavour.js scripts/inline_ui.py
 	python3 scripts/inline_ui.py page/src/install.html -o page/install.html
 
 page/build.html: page/src/build.html $(wildcard page/src/buildparts/*) ui/common.css scripts/inline_ui.py scripts/photo_todo.py
