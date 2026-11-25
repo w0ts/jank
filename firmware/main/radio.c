@@ -11,6 +11,7 @@
 #include <string.h>
 #include "app.h"
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_private/wifi.h"
@@ -86,9 +87,9 @@ static esp_err_t on_eth(void *buf, uint16_t len, void *eb)
 #define RETRY_US (5ull * 1000000ull)
 ESP_EVENT_DEFINE_BASE(JANK_RADIO_EVENT);
 #define JANK_RADIO_RETRY 0
-static wifi_ap_record_t s_aps[SCAN_MAX];
-static struct jk_seen s_seen[SCAN_MAX];
-static struct jk_nets s_saved;         /* app_nets_get's copy */
+static wifi_ap_record_t *s_aps;        /* SCAN_MAX each, and the list copy: PSRAM (radio_start_network), internal RAM is short in host mode */
+static struct jk_seen *s_seen;
+static struct jk_nets *s_saved;        /* app_nets_get's copy */
 static uint32_t s_tried;
 static int s_cur = -1;
 static uint8_t s_scanning;             /* our scan runs */
@@ -110,8 +111,8 @@ static void scan_saved(void)
     esp_timer_stop(s_retry);
     if (s_scanning || s_connecting || s_up)
         return;
-    app_nets_get(&s_saved);
-    if (!s_saved.n) {                  /* none saved: look again later (one may be added) */
+    app_nets_get(s_saved);
+    if (!s_saved->n) {                  /* none saved: look again later (one may be added) */
         retry_later();
         return;
     }
@@ -130,7 +131,7 @@ static void on_retry(void *arg)
 static void join(int i)
 {
     wifi_config_t c = {0};
-    const struct jk_saved_net *t = &s_saved.net[i];
+    const struct jk_saved_net *t = &s_saved->net[i];
     esp_timer_stop(s_retry);
     strlcpy((char *)c.sta.ssid, t->ssid, sizeof c.sta.ssid);
     strlcpy((char *)c.sta.password, t->pass, sizeof c.sta.password);
@@ -159,7 +160,7 @@ static void join_heard(const wifi_event_sta_scan_done_t *done)
         strlcpy(s_seen[k].ssid, (const char *)s_aps[k].ssid, sizeof s_seen[k].ssid);
         s_seen[k].rssi = s_aps[k].rssi;
     }
-    i = jk_nets_pick(&s_saved, s_seen, n, s_tried);
+    i = jk_nets_pick(s_saved, s_seen, n, s_tried);
     if (i < 0) {                       /* none heard, or all failed: a new round later */
         s_tried = 0;
         retry_later();
@@ -217,6 +218,11 @@ esp_err_t radio_start_network(const uint8_t mac[6], radio_eth_fn rx)
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
     esp_err_t e;
     s_eth = rx;
+    s_aps = heap_caps_malloc(SCAN_MAX * sizeof *s_aps, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_seen = heap_caps_malloc(SCAN_MAX * sizeof *s_seen, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_saved = app_nets_alloc();
+    if (!s_aps || !s_seen || !s_saved)
+        return ESP_ERR_NO_MEM;
     e = esp_timer_create(&retry, &s_retry);
     if (e == ESP_OK)
         e = esp_netif_init();

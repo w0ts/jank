@@ -67,6 +67,7 @@ static struct jo_ui s_ui;
 static struct jo_input s_in;
 static struct jo_ctx s_ctx;
 static struct jk_snapshot s_snap;
+static struct jk_nets *s_nets_view;    /* the saved networks for s_snap in ctl_set (PSRAM, app_nets_view) */
 /* the frame drawn: on the colour screen lcd.c's (9.6 KB, in PSRAM with its frames and ink planes), on an OLED our own 1 KB
  * from the heap once the screen is found (the driver keeps its own copy) */
 static uint8_t *s_oled_fb;
@@ -175,6 +176,7 @@ static int ctl_set(const char *fmt, ...)
     vsnprintf(line, sizeof line, fmt, ap);
     va_end(ap);
     app_cfg_get(&cfg);
+    s_snap.nets = app_nets_view(&s_nets_view);   /* (`set ssid` refuses an 11th network) */
     if (jk_ctl_line(line, &cfg, &s_snap, bridge_ms(), out, sizeof out) != JK_CTL_CFG_CHANGED) {
         ESP_LOGW(TAG, "%s: %s", line, out);
         return -1;

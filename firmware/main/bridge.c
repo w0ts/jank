@@ -390,7 +390,6 @@ void bridge_snapshot(struct jk_snapshot *s)
      * the bridge's task (frames, Link) must never wait behind a Wi-Fi API call (the timing audit's fix 3) */
     radio_network_info(&rssi, &channel);
     radio_network_ssid(s->wifi_ssid, sizeof s->wifi_ssid);
-    app_nets_get(&s->nets);            /* (the settings' lock and a 1 KB copy: outside the bridge's lock too) */
     xSemaphoreTake(s_lock, portMAX_DELAY);
     int64_t now = midi_now_us();
     s->b = s_b;

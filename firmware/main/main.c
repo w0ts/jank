@@ -4,6 +4,7 @@
 #include <string.h>
 #include "app.h"
 #include "esp_attr.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_system.h"
@@ -29,8 +30,8 @@ static void must(esp_err_t e, int line)
 static SemaphoreHandle_t s_cfg_lock;
 static SemaphoreHandle_t s_set_lock;   /* app_cfg_set and app_cfg_flush: one save at a time, in order */
 static struct jk_cfg s_cfg;
-static struct jk_nets s_nets;          /* the saved Wi-Fi networks (s_cfg_lock) */
-static struct jk_nets s_nets_work;     /* a copy to change or save (s_set_lock) */
+static struct jk_nets *s_nets;         /* the saved Wi-Fi networks (s_cfg_lock), in PSRAM (app_nets_alloc) */
+static struct jk_nets *s_nets_work;    /* a copy to change or save (s_set_lock) */
 static uint8_t s_save_pending;         /* a change made while playing, not saved yet (s_set_lock) */
 
 void app_cfg_get(struct jk_cfg *c)
@@ -40,25 +41,42 @@ void app_cfg_get(struct jk_cfg *c)
     xSemaphoreGive(s_cfg_lock);
 }
 
+struct jk_nets *app_nets_alloc(void)
+{
+    struct jk_nets *s = heap_caps_malloc(sizeof *s, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s)
+        jk_nets_init(s);
+    return s;
+}
+
+const struct jk_nets *app_nets_view(struct jk_nets **view)
+{
+    if (!*view)
+        *view = app_nets_alloc();
+    if (*view)
+        app_nets_get(*view);
+    return *view;
+}
+
 void app_nets_get(struct jk_nets *s)
 {
     xSemaphoreTake(s_cfg_lock, portMAX_DELAY);
-    *s = s_nets;
+    *s = *s_nets;
     xSemaphoreGive(s_cfg_lock);
 }
 
 static void nets_publish(const struct jk_nets *s)
 {
     xSemaphoreTake(s_cfg_lock, portMAX_DELAY);
-    s_nets = *s;
+    *s_nets = *s;
     xSemaphoreGive(s_cfg_lock);
 }
 
 static void save_nets(void)            /* (s_set_lock) */
 {
     esp_err_t e;
-    app_nets_get(&s_nets_work);
-    e = store_save_nets(&s_nets_work);
+    app_nets_get(s_nets_work);
+    e = store_save_nets(s_nets_work);
     if (e != ESP_OK)
         ESP_LOGE(TAG, "saved networks not saved: %s", esp_err_to_name(e));
 }
@@ -81,9 +99,9 @@ static void cfg_set_locked(const struct jk_cfg *c)   /* (s_set_lock) */
     struct jk_cfg old;
     enum jk_save d;
     app_cfg_get(&old);
-    app_nets_get(&s_nets_work);
-    if (jk_nets_take_cfg(&s_nets_work, c))       /* `set ssid` / `set pass`: that network is saved (or its new password) */
-        nets_publish(&s_nets_work);
+    app_nets_get(s_nets_work);
+    if (jk_nets_take_cfg(s_nets_work, c))        /* `set ssid` / `set pass`: that network is saved (or its new password) */
+        nets_publish(s_nets_work);
     d = jk_save_on_change(&s_save_pending, jk_cfg_stored_differs(&old, c), bridge_is_playing(), c->usb != old.usb);
     if (d == JK_SAVE_NOW)
         save(c);
@@ -106,14 +124,14 @@ int app_nets_forget(const char *ssid)
     struct jk_cfg c;
     int changed;
     xSemaphoreTake(s_set_lock, portMAX_DELAY);
-    app_nets_get(&s_nets_work);
-    if (jk_nets_forget(&s_nets_work, ssid)) {
+    app_nets_get(s_nets_work);
+    if (jk_nets_forget(s_nets_work, ssid)) {
         xSemaphoreGive(s_set_lock);
         return -1;
     }
-    nets_publish(&s_nets_work);
+    nets_publish(s_nets_work);
     app_cfg_get(&c);
-    changed = jk_cfg_after_forget(&c, &s_nets_work);
+    changed = jk_cfg_after_forget(&c, s_nets_work);
     if (changed)
         cfg_set_locked(&c);            /* ssid / pass were the forgotten one's: the first saved one now, saved with the list */
     else if (bridge_is_playing())
@@ -202,9 +220,12 @@ void app_main(void)
     MUST(esp_register_shutdown_handler(flush_at_restart));
     MUST(nvs_up());
     store_load(&s_cfg);
-    store_load_nets(&s_nets);
-    if (jk_nets_take_cfg(&s_nets, &s_cfg))       /* a firmware without the list ran before: its network is the first saved one */
-        if (store_save_nets(&s_nets) != ESP_OK)
+    s_nets = app_nets_alloc();
+    s_nets_work = app_nets_alloc();
+    MUST(s_nets && s_nets_work ? ESP_OK : ESP_ERR_NO_MEM);
+    store_load_nets(s_nets);
+    if (jk_nets_take_cfg(s_nets, &s_cfg))        /* a firmware without the list ran before: its network is the first saved one */
+        if (store_save_nets(s_nets) != ESP_OK)
             ESP_LOGE(TAG, "saved networks not saved");   /* (kept in memory; saved with the next settings change) */
     usb_midi_clock(s_cfg.usbmidi);
     MUST(esp_efuse_mac_get_default(efuse));

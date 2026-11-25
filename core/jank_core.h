@@ -380,7 +380,8 @@ struct jk_snapshot {
     int8_t wifi_rssi;
     uint8_t wifi_channel;
     char wifi_ssid[JK_SSID_MAX + 1];  /* the saved network joined (`status` wifi_ssid=); empty while none is */
-    struct jk_nets nets;              /* the saved networks (`get` nets= net_<i>=, and `set ssid` refuses an 11th) */
+    const struct jk_nets *nets;       /* the saved networks (`get` nets= net_<i>=, and `set ssid` refuses an 11th); NULL: none. A pointer, not
+                                       * the 1 KB list: the firmware's snapshots sit in internal RAM, short in USB host mode */
     uint32_t midi_ticks;              /* MIDI clocks sent */
     uint32_t midi_resync;             /* the clock had to jump to the session */
     struct jk_beat beat;
