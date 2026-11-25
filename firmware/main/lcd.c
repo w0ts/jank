@@ -48,7 +48,7 @@
 static const char *TAG = "lcd";
 static esp_lcd_panel_handle_t s_panel;
 static SemaphoreHandle_t s_free;        /* counts the free chunk buffers (2) */
-static DMA_ATTR uint16_t s_buf[2][CHUNK_PIXELS];
+static uint16_t (*s_buf)[CHUNK_PIXELS];   /* the two chunk buffers the SPI DMA sends from: internal DMA RAM, taken only on a board with the screen (planes_up) */
 static unsigned s_next_buf;
 static SemaphoreHandle_t s_lock;
 static TaskHandle_t s_task;
@@ -162,6 +162,13 @@ static int planes_up(void)
         ESP_LOGE(TAG, "no PSRAM for the frames (%u bytes)", (unsigned)(planes + frames));
         return 0;
     }
+    s_buf = heap_caps_malloc(2u * sizeof *s_buf, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (!s_buf) {
+        ESP_LOGE(TAG, "no DMA RAM for the chunk buffers (%u bytes)", (unsigned)(2u * sizeof *s_buf));
+        heap_caps_free(s_mem);
+        s_mem = NULL;
+        return 0;
+    }
     s_ui_ink = s_mem;
     s_pend_ink = s_mem + JO_LCD2_INK_BYTES;
     s_work_ink = s_mem + 2u * JO_LCD2_INK_BYTES;
@@ -191,6 +198,8 @@ int lcd_open(void)
         ESP_LOGE(TAG, "screen does not start: %s", esp_err_to_name(e));
         s_panel = NULL;
         heap_caps_free(s_mem);
+        heap_caps_free(s_buf);
+        s_buf = NULL;
         s_mem = s_ui_fb = s_ui_ink = NULL;
         return 0;
     }

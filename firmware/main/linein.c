@@ -34,6 +34,7 @@
 #include "esp_adc/adc_continuous.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_attr.h"
+#include "esp_heap_caps.h"
 #include "esp_cpu.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -64,7 +65,7 @@ struct slot {
 };
 
 /* the interrupt's and the task's (single producer, single consumer, both on core 0) */
-static struct slot s_ring[SLOTS];
+static struct slot *s_ring;            /* SLOTS of them, internal RAM (the interrupt writes them), taken only on a board with a LINE IN (la_start) */
 static volatile uint32_t s_wr, s_rd;
 static volatile uint32_t s_isr_seq, s_isr_dropped, s_isr_cycles;
 static uint8_t s_line_ch;
@@ -377,6 +378,9 @@ static void line_task(void *arg)
 
 static esp_err_t la_start(void)
 {
+    s_ring = heap_caps_calloc(SLOTS, sizeof *s_ring, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!s_ring)
+        return ESP_ERR_NO_MEM;
     /* core 0: the task allocates the ADC's interrupt, which belongs to the core that allocates it */
     return xTaskCreatePinnedToCore(line_task, "linein", LINE_STACK, NULL, LINE_PRIO, &s_task, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

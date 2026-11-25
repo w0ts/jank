@@ -12,8 +12,14 @@ CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
 CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n
 CONFIG_ESP_WIFI_ENABLE_SAE_PK=n
 CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
-CONFIG_ESP_WIFI_IRAM_OPT=y
-CONFIG_ESP_WIFI_RX_IRAM_OPT=y
+# Internal RAM for the USB host (owner 2026-11-25, "let's try to optimise"; measured: Wi-Fi's start took 41.8 KB of the heap in host mode, and the
+# controllers' claims failed for want of internal DMA RAM). Wi-Fi here carries the control lines, MIDI, Link and updates: light traffic. So its code
+# runs from flash, not IRAM (the two options: about 25 KB by ESP-IDF's notes), and it keeps 4 static RX buffers (1.6 KB of internal DMA RAM each)
+# with a Block Ack window to match (ESP-IDF: the window not larger than the static buffers)
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=4
+CONFIG_ESP_WIFI_RX_BA_WIN=4
 CONFIG_BT_ENABLED=n
 CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=y
 # no flash writes while playing (the timing audit): Wi-Fi keeps nothing in NVS (radio.c sets WIFI_STORAGE_RAM as well)
