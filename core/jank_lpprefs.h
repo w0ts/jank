@@ -11,8 +11,9 @@
 #include <stdint.h>
 #include "jank_lpapp.h"
 
-#define JLPREFS_VERSION 1u
-#define JLPREFS_SIZE 10u               /* version, 8 settings, checksum */
+#define JLPREFS_VERSION 2u
+#define JLPREFS_SIZE 11u               /* version, 9 settings, checksum */
+#define JLPREFS_SIZE_V1 10u            /* version 1 (before fixed velocity, 2026-11-25): still read, fixed velocity off */
 
 struct jlprefs {
     uint8_t layout;                    /* enum jln_layout */
@@ -22,6 +23,7 @@ struct jlprefs {
     uint8_t step_kind;                 /* enum jlst_kind: the step mode Custom opens */
     uint8_t mix_view;                  /* enum jlmx_view */
     uint8_t follow;
+    uint8_t fixed_vel;
 };
 
 void jlprefs_defaults(struct jlprefs *p);                                    /* diatonic, horizontal, relative, octave 3, no track pads, melodic, volume, no follow */

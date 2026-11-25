@@ -318,6 +318,9 @@ static void page_pad(struct jlapp *a, uint8_t x, uint8_t y)
             say(a, "HORIZONTAL %s", n->horizontal ? "ON" : "OFF");
         } else if (x == 1) {
             say(a, "DIATONIC ONLY");
+        } else if (x == 2) {           /* fixed velocity (owner 2026-11-25): Note mode, the step modes' keyboard; the track pads always play at the track's VEL */
+            a->fixed_vel ^= 1u;
+            say(a, "FIXED VELOCITY %s", a->fixed_vel ? "ON" : "OFF");
         } else if (x == 4) {
             layout_pad(a, JLN_CHORDS, "CHORDS");
         } else if (x == 5) {
@@ -370,6 +373,8 @@ static uint8_t page_colour(const struct jlapp *a, uint8_t x, uint8_t y)
             return on_off(n->absolute, JLAPP_RED, JLAPP_RED_THIRD);
         if (x == 1)                    /* Horizontal (LP95 shows it in every layout, though only the diatonic one takes it) */
             return on_off(n->horizontal, JLAPP_GREEN, JLAPP_GREEN_THIRD);
+        if (x == 2)                    /* fixed velocity (not Launchpad 95's) */
+            return on_off(a->fixed_vel, JLAPP_COLOR_FIXED_VEL, JLAPP_COLOR_FIXED_VEL_OFF);
         if (x == 4)                    /* Mode: the layouts */
             return on_off(n->layout == JLN_CHORDS, JLAPP_RED, JLAPP_RED_THIRD);
         if (x == 5)
@@ -710,7 +715,7 @@ static size_t side_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
     return jlapp_start_stop(a, out, max);   /* the Digitone's TRANSPORT, or Jank's session (jank_lptrans.h) */
 }
 
-size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
+static size_t lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
     if (ev->kind == JLX_SIDE)
         return side_event(a, ev, out, max);
@@ -749,6 +754,16 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
     if (ev->kind == JLX_TOP)
         return button_event(a, ev, out, max);
     return 0;
+}
+
+size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
+{
+    size_t n = lpx_acts(a, ev, out, max);
+    if (a->fixed_vel)                  /* fixed velocity: every note the pads start plays at the track's own VEL (PLAY's velocity 0, docs/live-control.md 53) */
+        for (size_t i = 0; i < n; ++i)
+            if (out[i].kind == JLAPP_ACT_NOTE_ON)
+                out[i].vel = 0;
+    return n;
 }
 
 /* ---- from the Digitone ---- */

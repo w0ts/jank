@@ -46,6 +46,7 @@ static void test_pack_and_unpack_round_trip(void)
     p.step_kind = JLST_DRUM;
     p.mix_view = JLMX_SOLO;
     p.follow = 1;
+    p.fixed_vel = 1;
     CHECK(jlprefs_pack(&p, b, sizeof b) == JLPREFS_SIZE && b[0] == JLPREFS_VERSION);
     CHECK(jlprefs_unpack(&q, b, JLPREFS_SIZE) && jlprefs_equal(&p, &q));
     CHECK(jlprefs_pack(&p, b, JLPREFS_SIZE - 1u) == 0);            /* no room */
@@ -55,6 +56,23 @@ static void test_pack_and_unpack_round_trip(void)
     jlprefs_pack(&p, b, sizeof b);
     jlprefs_defaults(&q);
     CHECK(!jlprefs_unpack(&q, b, JLPREFS_SIZE) && q.track_pads == JLAPP_TRACKS_OFF);
+}
+
+/* a blob saved before fixed velocity (version 1, 10 bytes) is still read, the switch off; a v1 header on an 11-byte blob is not */
+static void test_a_version_1_blob_is_still_read(void)
+{
+    uint8_t v1[JLPREFS_SIZE_V1] = {1u, JLN_CHORDS, 0u, 1u, 5u, 1u, JLST_DRUM, JLMX_SOLO, 1u, 0u};
+    uint8_t x = 0xA5u, longer[JLPREFS_SIZE];
+    struct jlprefs q;
+    for (unsigned i = 0; i < 9u; i++)
+        x = (uint8_t)((x << 1 | x >> 7) ^ v1[i]);
+    v1[9] = x;
+    jlprefs_defaults(&q);
+    q.fixed_vel = 1;
+    CHECK(jlprefs_unpack(&q, v1, sizeof v1) && q.layout == JLN_CHORDS && q.absolute == 1 && q.octave == 5 && q.step_kind == JLST_DRUM && q.mix_view == JLMX_SOLO && q.follow == 1 && q.fixed_vel == 0);
+    memcpy(longer, v1, sizeof v1);
+    longer[10] = 0;
+    CHECK(!jlprefs_unpack(&q, longer, sizeof longer));
 }
 
 static void test_a_blob_that_is_not_ours_is_not_used(void)
@@ -70,7 +88,7 @@ static void test_a_blob_that_is_not_ours_is_not_used(void)
     CHECK(!jlprefs_unpack(&q, b, JLPREFS_SIZE + 1u) && jlprefs_equal(&q, &keep));           /* long */
     CHECK(!jlprefs_unpack(&q, b, 0) && jlprefs_equal(&q, &keep));
     memcpy(c, b, sizeof b);
-    c[0] = 2;                                                      /* another version */
+    c[0] = 3;                                                      /* another version */
     CHECK(!jlprefs_unpack(&q, c, sizeof c) && jlprefs_equal(&q, &keep));
     for (unsigned i = 1; i < JLPREFS_SIZE; i++) {                  /* any one byte damaged: the checksum says */
         memcpy(c, b, sizeof b);
@@ -81,27 +99,27 @@ static void test_a_blob_that_is_not_ours_is_not_used(void)
 
 static void test_a_blob_with_a_value_out_of_range_is_not_used(void)
 {
-    static const uint8_t LIMIT[8] = {JLN_CHORDS, 1, 1, 6, JLAPP_TRACKS_SELECT, JLST_DRUM, JLMX_OVERVIEW, 1};   /* (track pads: OFF, TRIGGER, SELECT) */
+    static const uint8_t LIMIT[9] = {JLN_CHORDS, 1, 1, 6, JLAPP_TRACKS_SELECT, JLST_DRUM, JLMX_OVERVIEW, 1, 1};   /* (track pads: OFF, TRIGGER, SELECT; the last: fixed velocity) */
     struct jlprefs p, q;
     uint8_t b[JLPREFS_SIZE];
-    for (unsigned field = 0; field < 8u; field++) {
+    for (unsigned field = 0; field < 9u; field++) {
         jlprefs_defaults(&p);
         jlprefs_pack(&p, b, sizeof b);
         b[1 + field] = (uint8_t)(LIMIT[field] + 1u);               /* one past the largest allowed (with a checksum that matches, as a buggy writer would make it) */
         {
             uint8_t x = 0xA5u;
-            for (unsigned i = 0; i < 9u; i++)
+            for (unsigned i = 0; i < 10u; i++)
                 x = (uint8_t)((x << 1 | x >> 7) ^ b[i]);
-            b[9] = x;
+            b[10] = x;
         }
         jlprefs_defaults(&q);
         CHECK(!jlprefs_unpack(&q, b, sizeof b));
         b[1 + field] = LIMIT[field];                               /* the largest allowed itself is fine */
         {
             uint8_t x = 0xA5u;
-            for (unsigned i = 0; i < 9u; i++)
+            for (unsigned i = 0; i < 10u; i++)
                 x = (uint8_t)((x << 1 | x >> 7) ^ b[i]);
-            b[9] = x;
+            b[10] = x;
         }
         CHECK(jlprefs_unpack(&q, b, sizeof b));
     }
@@ -119,12 +137,13 @@ static void test_the_apps_settings_survive_a_restart(void)
     a.step_kind = JLST_DRUM;
     a.mix.view = JLMX_PAN;
     a.follow = 1;
+    a.fixed_vel = 1;
     jlprefs_from_app(&a, &p);
     jlprefs_pack(&p, blob, sizeof blob);                           /* ... the unit restarts ... */
     CHECK(jlprefs_unpack(&q, blob, sizeof blob));
     jlprefs_apply(&b, &q);
     CHECK(b.n.layout == JLN_CHROMATIC && b.n.octave == 6 && b.n.absolute == 1 && b.track_pads == 1 && b.step_kind == JLST_DRUM && b.step.kind == JLST_DRUM &&
-          b.mix.view == JLMX_PAN && b.follow == 1);
+          b.mix.view == JLMX_PAN && b.follow == 1 && b.fixed_vel == 1);
     jlprefs_from_app(&b, &q);
     CHECK(jlprefs_equal(&p, &q));                                  /* and nothing looks changed: no write for it */
 }
@@ -170,6 +189,7 @@ int main(void)
 {
     test_the_defaults_are_the_apps_starting_state();
     test_pack_and_unpack_round_trip();
+    test_a_version_1_blob_is_still_read();
     test_a_blob_that_is_not_ours_is_not_used();
     test_a_blob_with_a_value_out_of_range_is_not_used();
     test_the_apps_settings_survive_a_restart();

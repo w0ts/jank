@@ -15,7 +15,7 @@
  * Left and right together (owner 2026-11-24) switch FOLLOW: the Launchpad's current track follows the Digitone's (read every JLAPP_FOLLOW_MS, jdl_track_read) as
  * well as the other way round; left and right then show in AMBER. The two presses make no track step. Not available (a message) while the Digitone cannot be asked.
  *
- * Scale page (hold Note): Launchpad 95's scale editor instead of notes, rows from the top: 1 the absolute-root and horizontal toggles (pads 1, 2), the layouts
+ * Scale page (hold Note): Launchpad 95's scale editor instead of notes, rows from the top: 1 the absolute-root and horizontal toggles (pads 1, 2), fixed velocity (pad 3), the layouts
  * (pads 5 chords, 6 diatonic, 7 chromatic) and the TRACK PADS switch (pad 8); 2 the black keys, the relative scale (pad 3) and the circle of fifths back (pad 7);
  * 3 the white keys C to B and the circle of fifths forward (pad 8); 4 the scale pages (three amber pads); 5 and 6 the scales (jank_lpscales.h); 7 and 8 the 16 tracks, a press
  * SELECTS one (owner 2026-11-24: the octave row is gone, up / down do the octave): tracks 1-8 on row 7, 9-16 on row 8, WHITE, the selected one AMBER. Releasing Note goes back to playing.
@@ -55,6 +55,8 @@
 #define JLAPP_COLOR_CUSTOM_DRUM_DIM 15u              /* YELLOW_THIRD */
 #define JLAPP_AMBER 9u
 #define JLAPP_AMBER_THIRD 11u
+#define JLAPP_COLOR_FIXED_VEL JLAPP_AMBER            /* the Note page's pad 3, fixed velocity on (my pick, not the owner's yet) ... */
+#define JLAPP_COLOR_FIXED_VEL_OFF JLAPP_AMBER_THIRD  /* ... and off */
 
 #define JLAPP_PADS 64u
 #define JLAPP_SCALES_PER_PAGE 16u                    /* the scale page shows the Digitone's 36 scales two rows of eight at a time ... */
@@ -154,6 +156,7 @@ struct jlapp {
     uint8_t can_play;                  /* live control is on and PLAY is there: a press can play */
     uint8_t push;                      /* live control is on: the lights come from its note push */
     uint8_t follow;                    /* FOLLOW is on */
+    uint8_t fixed_vel;                 /* fixed velocity (the Note page's pad 3, owner 2026-11-25): the pads' notes play at the track's own VEL, not the press */
     uint8_t read_ok;                   /* the Digitone can be asked for its active track */
     uint8_t buttons;                   /* bit 0 left, bit 1 right: held (for the two together) */
     uint8_t before[2];                 /* the track before the left / right press (the pair puts it back) */

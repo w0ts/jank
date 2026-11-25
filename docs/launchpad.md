@@ -21,7 +21,7 @@ flashing and pulsing follow it. First slice: **Note mode**, played through the D
 - A pad that is down when the track changes ends its note on the track it started on; a Launchpad that goes away ends
   every note it had down.
 - **Scale page: hold Note.** While the Note button is held the pads are Launchpad 95's scale editor, rows from the top: (1) absolute
-  root (pad 1), horizontal (pad 2, diatonic only), the layouts: chords (5), diatonic (6), chromatic (7); (2) the black keys, the
+  root (pad 1), horizontal (pad 2, diatonic only), **fixed velocity (pad 3**, owner 2026-11-25: Note mode's pads and the step modes' keyboard play at the track's own VEL, not the press; the 16 track pads always do; AMBER on, its third off; remembered), the layouts: chords (5), diatonic (6), chromatic (7); (2) the black keys, the
   relative scale (pad 3), the circle of fifths back (pad 7); (3) the white keys C to B, the circle of fifths forward (pad 8); (4) the
   scales' page pads; (5, 6) the scales; (7, 8) **the 16 tracks, a press selects one** (owner 2026-11-24; the octave row Launchpad 95 has here is gone, up / down do the octave):
   tracks 1-8 in row 7, 9-16 in row 8, as the Digitone's trig keys, the selected one AMBER, the others WHITE (RED while it sounds); it says TRACK n and the Digitone's active track follows.

@@ -235,8 +235,7 @@ static void test_page_picks_the_layout(void)
     CHECK(a.n.absolute == 1);
     tap(&a, 0, 7);
     CHECK(a.n.absolute == 0);
-    tap(&a, 2, 7);                                           /* the unused pads change nothing */
-    tap(&a, 3, 7);
+    tap(&a, 3, 7);                                           /* the unused pads change nothing */
     tap(&a, 7, 7);
     CHECK(a.n.layout == JLN_DIATONIC && a.n.absolute == 0);
 }
@@ -320,7 +319,7 @@ static void test_page_lights(void)
     CHECK(colour(&a, 4, 7) == JLAPP_RED_THIRD && colour(&a, 6, 7) == JLAPP_RED_THIRD);
     CHECK(colour(&a, 1, 7) == JLAPP_GREEN);                  /* Horizontal on */
     CHECK(colour(&a, 0, 7) == JLAPP_RED_THIRD);              /* AbsoluteRoot off */
-    CHECK(colour(&a, 2, 7) == 0 && colour(&a, 3, 7) == 0);   /* pads this port has no job for */
+    CHECK(colour(&a, 2, 7) == JLAPP_COLOR_FIXED_VEL_OFF && colour(&a, 3, 7) == 0);   /* fixed velocity off; a pad this port has no job for */
     CHECK(colour(&a, 7, 7) == JLAPP_COLOR_MODE);             /* the track pads switch: off, Note mode light blue */
     CHECK(colour(&a, 0, 5) == JLAPP_GREEN);                  /* the key C: Key on */
     CHECK(colour(&a, 1, 5) == JLAPP_GREEN_THIRD);            /* D: Key off */
@@ -435,6 +434,30 @@ static void test_a_pad_plays_a_note_on_the_current_track(void)
     CHECK(acts(&a, pad(0, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF && o.track == 0 && o.note == 48);
     acts(&a, top(3, 127), &o);                                    /* right: track 2 */
     CHECK(acts(&a, pad(1, 0, 64), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.track == 1 && o.note == 50 && o.vel == 64);
+}
+
+/* owner 2026-11-25: the Note page's pad 3 fixes the velocity: Note mode and the step modes' keyboard send 0, the Digitone's "the track's VEL" */
+static void test_fixed_velocity_plays_at_the_track_vel(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    acts(&a, top(NOTE_BTN, 127), &o);                             /* the page, held */
+    tap(&a, 2, 7);                                                /* row 1, pad 3 */
+    CHECK(a.fixed_vel == 1 && strcmp(msg(&a), "FIXED VELOCITY ON") == 0 && colour(&a, 2, 7) == JLAPP_COLOR_FIXED_VEL);
+    acts(&a, top(NOTE_BTN, 0), &o);
+    CHECK(acts(&a, pad(0, 0, 100), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.note == 48 && o.vel == 0);
+    CHECK(acts(&a, pad(0, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF && o.note == 48);
+    acts(&a, top(6u, 127), &o);                               /* Custom: melodic step, its keyboard too */
+    CHECK(a.mode == JLAPP_MODE_STEP && acts(&a, pad(1, 0, 90), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.vel == 0);
+    CHECK(acts(&a, pad(1, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF);
+    acts(&a, top(NOTE_BTN, 127), &o);
+    jlapp_tick(&a, 100);
+    acts(&a, top(NOTE_BTN, 0), &o);                               /* a tap: back to Note mode */
+    acts(&a, top(NOTE_BTN, 127), &o);
+    tap(&a, 2, 7);                                                /* off again */
+    CHECK(a.fixed_vel == 0 && strcmp(msg(&a), "FIXED VELOCITY OFF") == 0 && colour(&a, 2, 7) == JLAPP_COLOR_FIXED_VEL_OFF);
+    acts(&a, top(NOTE_BTN, 0), &o);
+    CHECK(acts(&a, pad(0, 0, 64), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.vel == 64);   /* the press again */
 }
 
 static void test_release_goes_to_the_note_and_the_track_it_started(void)
@@ -1788,6 +1811,7 @@ int main(void)
     test_a_note_down_before_the_page_still_ends();
     test_page_buttons_still_work_and_note_stays_lit();
     test_a_pad_plays_a_note_on_the_current_track();
+    test_fixed_velocity_plays_at_the_track_vel();
     test_release_goes_to_the_note_and_the_track_it_started();
     test_same_pitch_on_two_pads();
     test_pad_outside_midi_range_is_silent();

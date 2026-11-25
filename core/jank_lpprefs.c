@@ -36,14 +36,22 @@ size_t jlprefs_pack(const struct jlprefs *p, uint8_t *out, size_t cap)
     out[6] = p->step_kind;
     out[7] = p->mix_view;
     out[8] = p->follow;
-    out[9] = checksum(out, 9);
+    out[9] = p->fixed_vel;
+    out[10] = checksum(out, 10);
     return JLPREFS_SIZE;
 }
 
 int jlprefs_unpack(struct jlprefs *p, const uint8_t *in, size_t n)
 {
     struct jlprefs t;
-    if (n != JLPREFS_SIZE || in[0] != JLPREFS_VERSION || in[9] != checksum(in, 9))
+    size_t body;
+    if (n == JLPREFS_SIZE && in[0] == JLPREFS_VERSION)
+        body = JLPREFS_SIZE - 1u;
+    else if (n == JLPREFS_SIZE_V1 && in[0] == 1u)   /* saved before fixed velocity: kept, the switch off */
+        body = JLPREFS_SIZE_V1 - 1u;
+    else
+        return 0;
+    if (in[body] != checksum(in, body))
         return 0;
     t.layout = in[1];
     t.horizontal = in[2];
@@ -53,7 +61,9 @@ int jlprefs_unpack(struct jlprefs *p, const uint8_t *in, size_t n)
     t.step_kind = in[6];
     t.mix_view = in[7];
     t.follow = in[8];
-    if (t.layout > JLN_CHORDS || t.horizontal > 1u || t.absolute > 1u || t.octave > 6u || t.track_pads >= JLAPP_TRACKS_MODES || t.step_kind > JLST_DRUM || t.mix_view > JLMX_OVERVIEW ||
+    t.fixed_vel = body > 9u ? in[9] : 0u;
+    if (t.fixed_vel > 1u ||
+        t.layout > JLN_CHORDS || t.horizontal > 1u || t.absolute > 1u || t.octave > 6u || t.track_pads >= JLAPP_TRACKS_MODES || t.step_kind > JLST_DRUM || t.mix_view > JLMX_OVERVIEW ||
         t.follow > 1u)
         return 0;
     *p = t;
@@ -72,6 +82,7 @@ void jlprefs_from_app(const struct jlapp *a, struct jlprefs *p)
     p->step_kind = a->step_kind;
     p->mix_view = a->mix.view;
     p->follow = a->follow;
+    p->fixed_vel = a->fixed_vel;
 }
 
 void jlprefs_apply(struct jlapp *a, const struct jlprefs *p)
@@ -85,4 +96,5 @@ void jlprefs_apply(struct jlapp *a, const struct jlprefs *p)
     a->step.kind = p->step_kind;
     a->mix.view = p->mix_view;
     a->follow = p->follow;
+    a->fixed_vel = p->fixed_vel;
 }
