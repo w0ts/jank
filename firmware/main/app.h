@@ -53,6 +53,7 @@ esp_err_t wsvc_start(void);
 int wsvc_input(const uint8_t mac[6], uint32_t ip, uint32_t mask, const uint8_t *eth, size_t len, uint8_t *out, size_t out_cap, size_t *out_len);
 void ctl_wake(void);                   /* ctl.c: the control task looks at the Wi-Fi request queue now, not at its next tick */
 size_t wsvc_next_frame(const uint8_t mac[6], uint32_t ip, uint8_t *out, size_t cap);                  /* the next answer datagram's frame, 0: none */
+uint32_t wsvc_since_request_ms(void);                                                                   /* since the last Wi-Fi request or update frame; UINT32_MAX: none yet */
 int wsvc_take_request(struct jw_req *rq);                                                              /* control task */
 int wsvc_put_reply(const struct jw_req *to, unsigned index, int last, const char *text, size_t n);   /* control task: 1 queued */
 /* the signed update's datagrams (core/jank_wota.h): the bridge task copies one into the single slot (wsvc_input), the control task takes it, and

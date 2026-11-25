@@ -248,6 +248,15 @@ separate.
   enumerated again, as a replug does on the USB side (their power is the hub's: jank cannot switch it). At most 3 times a start, a minute apart
   (`core/jank_hostrecover.h`); `diag` counts them, `hostdiag_mem=...,recovers:N`. Only failed claims start it: a device that is claimed and silent is left alone (a
   Digitone without live control is silent too). Host-tested; on the unit it shows only when the trap comes back.
+  **Tried on the unit 2026-11-25: it did not help.** After the next update the Launchpad's claim failed again (257, `where:1`), the cycle ran (`recovers:1`), the
+  Digitone left and came back, but the Launchpad did not even enumerate again (`hostdiag_events=new:3,gone:1`, `hostdiag_libdevs=2`: the hub and the Digitone).
+  The Digitone, claimed, stayed silent only because live control waits for the Launchpad. 257 is an allocation that failed (a missing channel is 262): each pipe
+  needs two descriptor lists in internal DMA memory aligned to 512 bytes, and the enumeration needs the same. The replug that fixed it made the unit restart
+  (`last_restart=role-switch`), and after that restart both claimed at once.
+- **The port waits after an update** (fix A, owner 2026-11-25): after a restart whose reason is `ota-update`, the USB host starts with the root port unpowered and
+  powers it once the new image is confirmed and the Wi-Fi requests have stopped for 5 s, at least 15 s and at most 45 s after the start
+  (`core/jank_hostrecover.h` jhr_hold_over); `diag`: `held_ms:` when it was powered. **And the cause is measured** (B): at a failed controller claim, `diag`
+  `fail_dma:<free>/<largest>/<aligned>` gives the internal DMA heap free, its largest block, and 1 when a 512-byte block aligned to 512 could be had. Not tried yet.
 - No log leaves the unit in host mode (no USB control line, console off): what the pads do is the only readout. Over Wi-Fi
   (`docs/wifi.md`) `diag` ends with the `hostdiag_` lines live.
 

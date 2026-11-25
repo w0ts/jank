@@ -21,6 +21,13 @@ enum jhr_act jhr_step(struct jhr *s, unsigned fails, uint32_t now_ms)
     return JHR_POWER_OFF;
 }
 
+int jhr_hold_over(uint32_t since_start_ms, int confirmed, uint32_t since_request_ms)
+{
+    if (since_start_ms >= JHR_HOLD_MAX_MS)
+        return 1;
+    return since_start_ms >= JHR_HOLD_MIN_MS && confirmed && since_request_ms >= JHR_HOLD_QUIET_MS;
+}
+
 uint32_t jhr_wait_ms(const struct jhr *s, uint32_t now_ms)
 {
     uint32_t gone;

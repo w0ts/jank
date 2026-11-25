@@ -49,11 +49,23 @@ static void test_the_clock_wraps(void)
     CHECK(jhr_step(&s, 3, 400u) == JHR_NONE && jhr_step(&s, 3, 500u) == JHR_POWER_ON);   /* 1001 ms later, across the wrap */
 }
 
+/* fix A: after an update's restart the port waits for the confirmation and a quiet Wi-Fi, 15 s at least, 45 s at most */
+static void test_the_port_waits_after_an_update(void)
+{
+    CHECK(!jhr_hold_over(0, 0, UINT32_MAX) && !jhr_hold_over(14999, 1, UINT32_MAX));   /* never before 15 s */
+    CHECK(jhr_hold_over(15000, 1, UINT32_MAX));                    /* confirmed, no request at all: on */
+    CHECK(!jhr_hold_over(20000, 0, 60000));                        /* not confirmed yet: wait */
+    CHECK(!jhr_hold_over(20000, 1, 4999) && jhr_hold_over(20000, 1, 5000));   /* the update client still asking: wait until it is quiet for 5 s */
+    CHECK(jhr_hold_over(45000, 0, 0) && jhr_hold_over(90000, 0, 0));   /* 45 s whatever happens */
+    CHECK(!jhr_hold_over(44999, 0, 0));
+}
+
 int main(void)
 {
     test_a_cycle_after_three_failed_claims_then_power_back_on();
     test_at_most_three_cycles_a_minute_apart();
     test_the_clock_wraps();
+    test_the_port_waits_after_an_update();
     printf("test_hostrecover: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

@@ -14,8 +14,11 @@
 #include "app.h"
 #include "jank_hostdiag.h"
 #include "jank_hostfilter.h"
+#include "jank_hostrecover.h"
 #include "jank_uacdesc.h"
 #include "esp_intr_alloc.h"
+#include "esp_ota_ops.h"
+#include "esp_timer.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -37,11 +40,40 @@ static bool enum_filter(const usb_device_desc_t *dev_desc, uint8_t *bConfigurati
     return jhf_proceed(&g_hostdiag.filter, dev_desc->bDeviceClass, dev_desc->idVendor, dev_desc->idProduct) != 0;
 }
 
+#define HOLD_POLL_MS 250u
+static uint8_t s_hold;                 /* an update's restart: the root port stays unpowered until jhr_hold_over (core/jank_hostrecover.h, fix A) */
+
+static int image_confirmed(void)
+{
+    esp_ota_img_states_t st;
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    return !run || esp_ota_get_state_partition(run, &st) != ESP_OK || st != ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+/* the hold after an update: the port powered once the update is confirmed and the Wi-Fi requests have stopped (or at the latest) */
+static void hold_due(void)
+{
+    uint32_t up = (uint32_t)(esp_timer_get_time() / 1000);
+    esp_err_t e;
+    if (!jhr_hold_over(up, image_confirmed(), wsvc_since_request_ms()))
+        return;
+    s_hold = 0;
+    g_hostdiag.held_ms = up;
+    e = usb_host_lib_set_root_port_power(true);
+    if (e == ESP_OK)
+        ESP_LOGI(TAG, "after the update: the USB port powered at %lu ms", (unsigned long)up);
+    else
+        ESP_LOGE(TAG, "root port on after the update: %s", esp_err_to_name(e));
+}
+
 static void lib_task(void *arg)
 {
     usb_host_config_t c = {.intr_flags = ESP_INTR_FLAG_LOWMED, .enum_filter_cb = enum_filter};
     TaskHandle_t parent = arg;
-    esp_err_t e = usb_host_install(&c);
+    esp_err_t e;
+    s_hold = strcmp(restart_why_last(), "ota-update") == 0;
+    c.root_port_unpowered = s_hold != 0;
+    e = usb_host_install(&c);
     if (e == ESP_OK)
         s_up = 1;                      /* before the caller hears of it: a second start sees it installed */
     xTaskNotify(parent, (uint32_t)e, eSetValueWithOverwrite);
@@ -52,7 +84,9 @@ static void lib_task(void *arg)
     }
     for (;;) {
         uint32_t flags = 0;
-        e = usb_host_lib_handle_events(portMAX_DELAY, &flags);
+        e = usb_host_lib_handle_events(s_hold ? pdMS_TO_TICKS(HOLD_POLL_MS) : portMAX_DELAY, &flags);
+        if (s_hold)
+            hold_due();
         if (e != ESP_OK && e != ESP_ERR_TIMEOUT)
             ESP_LOGW(TAG, "events: %s", esp_err_to_name(e));
         if (flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS)
