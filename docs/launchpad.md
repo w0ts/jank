@@ -242,6 +242,13 @@ separate.
   same `diag` device line; the library keeps the device attached meanwhile). Measured 2026-11-24: the Launchpad's claim failed with 257 with 20 KB of
   heap free after it had worked on the same build, in the seconds when an update client was also asking the unit questions (the Wi-Fi service allocates a
   buffer at its first request). A passing memory shortage is the likely cause, not a proven one. After a Wi-Fi update of 2026-11-24 the claim failed for over 30 s (the first version tried for 9 s) and worked at once after a replug, which supports it.
+- **The restart after an update** (owner 2026-11-25: "it should recover dn2 and lp automatically"). That day every Wi-Fi update with both plugged in ended with the
+  Launchpad's claim failing (257 at the interface claim, `where:1`) until a replug. Tried on the unit and dropped: cycling the root port (the Launchpad did not
+  even enumerate again), and keeping the port off until the update was confirmed and Wi-Fi quiet (28 s: the same failure). Every restart of another kind
+  (power-on, the role switch a replug makes) claimed both at once. Measured at the failed claim (`diag` `hostdiag_mem=...,fail_dma:<free>/<largest>/<aligned>`):
+  9675 bytes of internal DMA heap free, its largest block 2944, one 512-aligned 512-byte block available, while a claim books two descriptor lists aligned to 512
+  per endpoint: the update's start leaves the heap cut up (what in that start does it is not found). So **in host mode, 5 s after a new image is confirmed, the
+  unit restarts once more** (`ota.c` restart_after_confirm, `last_restart=post-update`), as host at once; the image is no longer on probation.
 - No log leaves the unit in host mode (no USB control line, console off): what the pads do is the only readout. Over Wi-Fi
   (`docs/wifi.md`) `diag` ends with the `hostdiag_` lines live.
 

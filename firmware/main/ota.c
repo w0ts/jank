@@ -266,8 +266,39 @@ void ota_idle(void)
 
 static volatile uint8_t s_confirmed;   /* this image has been confirmed (by the computer over USB, or by a signed request over Wi-Fi): valid_task has nothing left to do */
 
+/* The restart after a confirmed update, in USB host mode (owner 2026-11-25: "it should recover dn2 and lp automatically"). After every Wi-Fi update with the
+ * Launchpad and the Digitone plugged in, the Launchpad's interface claim failed with ESP_ERR_NO_MEM (257) until a replug, retried or not; holding the USB
+ * port off for 28 s after the start, and cycling it, changed nothing; every restart of another kind (power-on, the role switch a replug makes) claimed both at
+ * once. Measured at the failed claim (diag fail_dma): 9.7 KB of internal DMA heap free, its largest block 2.9 KB, while a claim books four descriptor lists
+ * aligned to 512 bytes: the update's start leaves the heap cut up (cause inside the start not found). So once the new image is confirmed the unit restarts once
+ * more, an ordinary restart, as host at once; the image is no longer on probation, so nothing rolls back. POST_UPDATE_RESTART_US lets the sender read the
+ * image it asked about first. */
+#define POST_UPDATE_RESTART_US (5 * 1000 * 1000)
+
+static void post_update_restart(void *arg)
+{
+    (void)arg;
+    ESP_LOGW(TAG, "update confirmed: one ordinary restart, for a clean USB host start");
+    usbrole_hint_stay();
+    restart_why_set("post-update");
+    esp_restart();
+}
+
+static void restart_after_confirm(void)
+{
+    static const esp_timer_create_args_t args = {.callback = post_update_restart, .name = "post_update"};
+    esp_timer_handle_t t;
+    if (!usb_is_host())
+        return;                        /* a device on a computer: its claims are the computer's, no trap */
+    if (esp_timer_create(&args, &t) != ESP_OK || esp_timer_start_once(t, POST_UPDATE_RESTART_US) != ESP_OK)
+        ESP_LOGE(TAG, "no restart after the update: replug the controllers if they do not answer");
+}
+
 void ota_mark_valid(void)
 {
+    esp_ota_img_states_t st;
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    int was_pending = run && esp_ota_get_state_partition(run, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
     esp_err_t r = esp_ota_mark_app_valid_cancel_rollback();
     if (r != ESP_OK)
         ESP_LOGE(TAG, "mark valid: %s", esp_err_to_name(r));
@@ -275,6 +306,8 @@ void ota_mark_valid(void)
         ESP_LOGI(TAG, "this image is confirmed");
     s_confirmed = 1;
     drive_note_forget();
+    if (r == ESP_OK && was_pending)
+        restart_after_confirm();
 }
 
 /* The Wi-Fi update's confirm (a signed request from the sender, after the unit came back from its restart): the image on probation is
