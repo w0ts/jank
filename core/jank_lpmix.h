@@ -5,7 +5,7 @@
  *   1 volume   2 pan   3 delay send   4 reverb send   5 chorus send   6 mute   7 solo   (8: nothing yet)
  *
  * Overview, a pad row per thing, from the top in the scene buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm): rows 1-5 volume, pan, delay,
- * reverb, chorus, in their colours, a press opens that sub mode; row 6 mute (bright YELLOW, dim when muted) and row 7 solo (bright BLUE when soloed, dim when not), a press toggles that
+ * reverb, chorus, in their colours, a press opens that sub mode; row 6 mute (bright GREEN, dim when muted, as Elektron) and row 7 solo (bright BLUE when soloed, dim when not), a press toggles that
  * track; row 8 dark. Sub modes: volume, delay, reverb and chorus are 8-pad faders with Launchpad 95's value steps (volume dB steps, its send steps; the bottom pad is 0 and
  * lights nothing), pan a bar from the centre pair out to the value. Scene buttons 6 and 7 both show the MUTE / SOLO screen: on / off buttons for all 16 tracks in the lower four
  * pad rows, from the top mute 1-8, mute 9-16, solo 1-8, solo 9-16 (the top four rows dark; the bank does not matter). Colours as Launchpad 95's (SkinMK2.py Mixer.*: MINT, YELLOW,
@@ -38,8 +38,8 @@
 #define JLMX_COLOR_VOL_DIM 27u
 #define JLMX_COLOR_PAN_DIM 19u
 #define JLMX_COLOR_SEND_DIM 63u
-#define JLMX_COLOR_UNMUTED 13u         /* YELLOW */
-#define JLMX_COLOR_MUTED 15u           /* YELLOW_THIRD */
+#define JLMX_COLOR_UNMUTED 21u         /* GREEN (owner 2026-11-25: "use green for mute (this is what elektron uses)"; was Launchpad 95's YELLOW) */
+#define JLMX_COLOR_MUTED 23u           /* GREEN_THIRD */
 #define JLMX_COLOR_SOLO 45u            /* BLUE */
 #define JLMX_COLOR_NOSOLO 47u          /* BLUE_THIRD */
 
@@ -111,7 +111,7 @@ int jlmx_scene(struct jlmx *s, uint8_t idx);
 int jlmx_bank_step(struct jlmx *s, int dir);
 /* the 64 pads of the screen (led[JLX_PAD0 ..]), a held fader pad in its hold colour at now_ms; nothing known yet: dark */
 void jlmx_frame(const struct jlmx *s, uint32_t now_ms, struct jlx_frame *f);
-/* the colour of scene button idx: a view button its fader's colour while its view is shown, that colour's third otherwise; mute YELLOW, solo BLUE (full when their screen is shown);
+/* the colour of scene button idx: a view button its fader's colour while its view is shown, that colour's third otherwise; mute GREEN, solo BLUE (full when their screen is shown);
  * 0 for a button with no job */
 uint8_t jlmx_scene_colour(const struct jlmx *s, uint8_t idx);
 #endif

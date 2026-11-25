@@ -947,13 +947,13 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
                                                                          : (a->follow ? JLAPP_COLOR_FOLLOW_OFF : JLAPP_COLOR_ARROW_OFF);
     f->led[JLX_TOP0 + BUTTON_NOTE].color = a->mode == JLAPP_MODE_NOTE ? JLAPP_COLOR_MODE : JLAPP_COLOR_MODE_DIM;
     /* A button that does something is always lit: dim when its mode is not on, full when it is (owner 2026-11-24). Custom leads to the step mode last used (melodic at
-     * first): green for melodic, amber for drum. */
+     * first): deep blue for melodic, yellow for drum (owner 2026-11-25). */
     {
         int on = a->mode == JLAPP_MODE_STEP;
         if (a->step_kind == JLST_MELODIC)
-            f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = on ? JLAPP_GREEN : JLAPP_GREEN_THIRD;
+            f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = on ? JLAPP_COLOR_CUSTOM_MELODIC : JLAPP_COLOR_CUSTOM_MELODIC_DIM;
         else
-            f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = on ? JLAPP_AMBER : JLAPP_AMBER_THIRD;
+            f->led[JLX_TOP0 + BUTTON_CUSTOM_IDX].color = on ? JLAPP_COLOR_CUSTOM_DRUM : JLAPP_COLOR_CUSTOM_DRUM_DIM;
     }
     /* the mixer's button (Launchpad 95's Mixer: MINT, dim when it is not on), always lit */
     f->led[JLX_TOP0 + BUTTON_CAPTURE_IDX].color = a->mode == JLAPP_MODE_MIXER ? JLMX_COLOR_BUTTON : JLMX_COLOR_BUTTON_DIM;

@@ -48,6 +48,11 @@
 #define JLAPP_RED_THIRD 7u
 #define JLAPP_BLUE 45u
 #define JLAPP_BLUE_THIRD 47u
+/* Custom, by the step mode it leads to (owner 2026-11-25: "yellow for drum mode, deep blue for note mode"): full while that step mode is on, third otherwise */
+#define JLAPP_COLOR_CUSTOM_MELODIC JLAPP_BLUE
+#define JLAPP_COLOR_CUSTOM_MELODIC_DIM JLAPP_BLUE_THIRD
+#define JLAPP_COLOR_CUSTOM_DRUM 13u                  /* YELLOW */
+#define JLAPP_COLOR_CUSTOM_DRUM_DIM 15u              /* YELLOW_THIRD */
 #define JLAPP_AMBER 9u
 #define JLAPP_AMBER_THIRD 11u
 

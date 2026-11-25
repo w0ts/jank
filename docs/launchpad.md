@@ -179,7 +179,7 @@ buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm
 | row (from the top) | shows | a press |
 |---|---|---|
 | 1 - 5 | volume, pan, delay, reverb, chorus, each in its fader's colour (below) | **opens that sub mode** (the same as its scene button; the owner chose this over Launchpad 95's reset-to-default, which needs the Digitone's defaults) |
-| 6 | mute: bright YELLOW, dim when the track is muted | toggles that track's mute (the whole new mask is written) |
+| 6 | mute: bright GREEN, dim when the track is muted (owner 2026-11-25: Elektron's mute colour; was Launchpad 95's yellow) | toggles that track's mute (the whole new mask is written) |
 | 7 | solo: BLUE when soloed, BLUE_THIRD when not | toggles that track's solo |
 | 8 | dark | nothing |
 
@@ -197,7 +197,7 @@ keeps Launchpad 95's MINT (29, MINT_THIRD 31 when off).
 | 1 | volume | an 8-pad fader (its colour, the empty part dark): nothing lit for 0, else the pads up to the first step the value does not pass | writes that pad's step: **Launchpad 95's volume steps** 0, .14, .31, .40, .55, .70, .85, 1.0 of the range (its -42 -24 -18 -12 -6 0 +6 dB) = 0, 18, 39, 51, 70, 89, 108, 127; the lowest pad sets 0 and lights nothing, as there |
 | 2 | pan | a bar from the two middle pads out to the value (the middle pair alone for 63 / 64) | writes the pad's step: 0, 23, 43, 64, 64, 84, 104, 127 (Launchpad 95's pan map) |
 | 3, 4, 5 | delay, reverb, chorus send | as volume | **Launchpad 95's send steps** 0, .10, .16, .24, .34, .55, .77, 1.0 = 0, 13, 21, 30, 44, 70, 98, 127 |
-| 6, 7 | **mute and solo: one screen, both buttons** (owner 2026-11-24: the whole-column version was useless; "on / off buttons for 16 tracks, both solo and mute, 4 rows") | the **lower four pad rows**, from the top: **mute 1-8, mute 9-16, solo 1-8, solo 9-16** (tracks 1-8 above 9-16, as the Digitone's trig keys); mute bright YELLOW / dim when muted, solo BLUE when soloed / BLUE_THIRD when not; the top four rows dark; the bank does not matter | toggles that track's mute or solo (the whole new mask is written) |
+| 6, 7 | **mute and solo: one screen, both buttons** (owner 2026-11-24: the whole-column version was useless; "on / off buttons for 16 tracks, both solo and mute, 4 rows") | the **lower four pad rows**, from the top: **mute 1-8, mute 9-16, solo 1-8, solo 9-16** (tracks 1-8 above 9-16, as the Digitone's trig keys); mute bright GREEN / dim when muted (Elektron's colour, owner 2026-11-25), solo BLUE when soloed / BLUE_THIRD when not; the top four rows dark; the bank does not matter | toggles that track's mute or solo (the whole new mask is written) |
 | 8 | (none yet; LEVEL could go here) | | |
 
 (The steps are Launchpad 95's fractions of its range laid on the Digitone's 0..127; the Digitone's own volume and send curves are **not measured**.)
@@ -261,7 +261,7 @@ knows them; the mixer is the one page that takes them over (for its views). A no
 ### Colour language so far (to be decided with the owner)
 
 **A button that does something is always lit: dim when its mode is not on, full brightness when it is** (owner 2026-11-24). Note (light blue, dim in a step mode), Custom (the
-step mode it leads to: green melodic / amber drum, dim in Note mode), the arrows (dim at a limit), start / stop (green running, green third stopped). A button with no job is dark
+step mode it leads to: deep blue (45) melodic / yellow (13) drum, owner 2026-11-25, dim in Note mode), the arrows (dim at a limit), start / stop (green running, green third stopped). A button with no job is dark
 (up / down in drum step).
 
 Launchpad 95's own colours stay as they are (scale page, Note mode). What this port adds: **green** a direction or switch that is available / on, dim green

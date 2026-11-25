@@ -519,7 +519,7 @@ static void test_buttons_lit(void)
     CHECK(f.led[JLX_TOP0 + 5].color == JLAPP_COLOR_MODE);          /* the Note button */
     CHECK(JLAPP_COLOR_ARROW_ON == 21 && JLAPP_COLOR_ARROW_OFF == 23 && JLAPP_COLOR_MODE == 37);   /* GREEN, GREEN_THIRD, LIGHT_BLUE: LP95's Note.Octave and Mode.Note */
     CHECK(f.led[JLX_TOP0 + 4].color == JLAPP_COLOR_PALETTE_OFF);  /* Session is the colour chart: lit, dim grey out of it */
-    CHECK(f.led[JLX_TOP0 + 6].color == JLAPP_GREEN_THIRD);        /* Custom does something: lit, dim (melodic step is the one it leads to) */
+    CHECK(f.led[JLX_TOP0 + 6].color == JLAPP_COLOR_CUSTOM_MELODIC_DIM);   /* Custom does something: lit, dim (melodic step is the one it leads to) */
     CHECK(f.led[JLX_TOP0 + 7].color == JLMX_COLOR_BUTTON_DIM);   /* Capture is the mixer's: lit, dim (MINT_THIRD) */
     for (uint32_t i = 0; i < 8; i++)
         CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_GREEN_THIRD : i == 5 ? JLAPP_PINK_THIRD : i == 7 ? JLAPP_RED_THIRD : 0));   /* start / stop (dim green while stopped, owner 2026-11-25), Delete (dim pink) and Record (dim red) are lit */
@@ -1277,17 +1277,18 @@ static void test_the_mode_buttons_light(void)
     struct jlapp_act o;
     struct jlx_frame f;
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_GREEN_THIRD);   /* a button that does something is lit: dim when its mode is off */
+    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_COLOR_CUSTOM_MELODIC_DIM);   /* a button that does something is lit: dim when its mode is off */
     acts(&a, top(CUSTOM, 127), &o);
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE_DIM && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_GREEN);   /* melodic: green */
+    CHECK(f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE_DIM && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_COLOR_CUSTOM_MELODIC);   /* melodic: deep blue (owner 2026-11-25) */
     acts(&a, top(CUSTOM, 127), &o);
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_TOP0 + CUSTOM].color == JLAPP_AMBER);          /* drum: amber */
+    CHECK(f.led[JLX_TOP0 + CUSTOM].color == JLAPP_COLOR_CUSTOM_DRUM);   /* drum: yellow (owner 2026-11-25) */
+    CHECK(JLAPP_COLOR_CUSTOM_MELODIC == 45 && JLAPP_COLOR_CUSTOM_MELODIC_DIM == 47 && JLAPP_COLOR_CUSTOM_DRUM == 13 && JLAPP_COLOR_CUSTOM_DRUM_DIM == 15);
     acts(&a, top(NOTE_BTN, 127), &o);                              /* a tap on Note: Note mode again; Custom stays lit, dim, in the colour of the step mode last used */
     acts(&a, top(NOTE_BTN, 0), &o);
     jlapp_frame(&a, &f);
-    CHECK(a.mode == JLAPP_MODE_NOTE && f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_AMBER_THIRD);
+    CHECK(a.mode == JLAPP_MODE_NOTE && f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE && f.led[JLX_TOP0 + CUSTOM].color == JLAPP_COLOR_CUSTOM_DRUM_DIM);
 }
 
 /* the whole path in the app: Delete (scene 6) held in a step mode: a step pad press clears that step (a trig is cleared, an empty step stays empty) while the track wipe runs */
