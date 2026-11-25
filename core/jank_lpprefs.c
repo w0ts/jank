@@ -53,7 +53,7 @@ int jlprefs_unpack(struct jlprefs *p, const uint8_t *in, size_t n)
     t.step_kind = in[6];
     t.mix_view = in[7];
     t.follow = in[8];
-    if (t.layout > JLN_CHORDS || t.horizontal > 1u || t.absolute > 1u || t.octave > 6u || t.track_pads > 1u || t.step_kind > JLST_DRUM || t.mix_view > JLMX_OVERVIEW ||
+    if (t.layout > JLN_CHORDS || t.horizontal > 1u || t.absolute > 1u || t.octave > 6u || t.track_pads >= JLAPP_TRACKS_MODES || t.step_kind > JLST_DRUM || t.mix_view > JLMX_OVERVIEW ||
         t.follow > 1u)
         return 0;
     *p = t;

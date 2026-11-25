@@ -49,6 +49,12 @@ static void test_pack_and_unpack_round_trip(void)
     CHECK(jlprefs_pack(&p, b, sizeof b) == JLPREFS_SIZE && b[0] == JLPREFS_VERSION);
     CHECK(jlprefs_unpack(&q, b, JLPREFS_SIZE) && jlprefs_equal(&p, &q));
     CHECK(jlprefs_pack(&p, b, JLPREFS_SIZE - 1u) == 0);            /* no room */
+    p.track_pads = JLAPP_TRACKS_SELECT;                            /* the third track pads mode (owner 2026-11-25) is kept too */
+    CHECK(jlprefs_pack(&p, b, sizeof b) == JLPREFS_SIZE && jlprefs_unpack(&q, b, JLPREFS_SIZE) && q.track_pads == JLAPP_TRACKS_SELECT);
+    p.track_pads = JLAPP_TRACKS_MODES;                             /* a mode that does not exist: the blob is not used */
+    jlprefs_pack(&p, b, sizeof b);
+    jlprefs_defaults(&q);
+    CHECK(!jlprefs_unpack(&q, b, JLPREFS_SIZE) && q.track_pads == JLAPP_TRACKS_OFF);
 }
 
 static void test_a_blob_that_is_not_ours_is_not_used(void)
@@ -75,7 +81,7 @@ static void test_a_blob_that_is_not_ours_is_not_used(void)
 
 static void test_a_blob_with_a_value_out_of_range_is_not_used(void)
 {
-    static const uint8_t LIMIT[8] = {JLN_CHORDS, 1, 1, 6, 1, JLST_DRUM, JLMX_OVERVIEW, 1};
+    static const uint8_t LIMIT[8] = {JLN_CHORDS, 1, 1, 6, JLAPP_TRACKS_SELECT, JLST_DRUM, JLMX_OVERVIEW, 1};   /* (track pads: OFF, TRIGGER, SELECT) */
     struct jlprefs p, q;
     uint8_t b[JLPREFS_SIZE];
     for (unsigned field = 0; field < 8u; field++) {

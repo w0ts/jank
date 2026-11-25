@@ -19,7 +19,9 @@
  * (pads 5 chords, 6 diatonic, 7 chromatic) and the TRACK PADS switch (pad 8); 2 the black keys, the relative scale (pad 3) and the circle of fifths back (pad 7);
  * 3 the white keys C to B and the circle of fifths forward (pad 8); 4 the scale pages (three amber pads); 5 and 6 the scales (jank_lpscales.h); 7 and 8 the 16 tracks, a press
  * SELECTS one (owner 2026-11-24: the octave row is gone, up / down do the octave): tracks 1-8 on row 7, 9-16 on row 8, WHITE, the selected one AMBER. Releasing Note goes back to playing.
- * With the track pads on, the two bottom rows play the 16 tracks on their own default note (PLAY's op 2) and the note layout moves up to the six rows left.
+ * TRACK PADS (owner 2026-11-25: "should cycle between: on/trigger/select"): pad 8 cycles OFF -> TRIGGER -> SELECT. With them on, the two bottom rows are the 16 tracks
+ * and the note layout moves up to the six rows left. TRIGGER: a pad plays its track on its own default note (PLAY's op 2), lit as the drum quadrant (YELLOW, the
+ * current track GREEN, one that sounds RED). SELECT: a pad selects its track (as the scale page's track rows), lit WHITE, the current track AMBER, one that sounds RED.
  *
  * Messages (what the Launchpad 95 shows in Live's status bar): each change of the scale page, each octave and track step, FOLLOW, and a press that cannot play
  * leave a message of at most JLAPP_MSG_MAX - 1 characters, upper case, 7-bit; the newest replaces an unread one. The firmware shows it on Jank's own screen if
@@ -63,6 +65,11 @@
 #define JLAPP_COLOR_TRACK_IDLE 3u                    /* WHITE */
 #define JLAPP_COLOR_TRACK_CURRENT 9u                 /* AMBER */
 #define JLAPP_COLOR_TRACK_PLAYING 5u                 /* RED */
+/* the track pads in TRIGGER mode (owner 2026-11-25: "yellow (like drum sequencer yellow)"): the drum quadrant's colours (jank_lpstep.h JLST_COLOR_TRACK_*) */
+#define JLAPP_COLOR_TRIG_IDLE 13u                    /* YELLOW */
+#define JLAPP_COLOR_TRIG_CURRENT 21u                 /* GREEN */
+#define JLAPP_COLOR_TRIG_PLAYING 5u                  /* RED */
+enum jlapp_tracks { JLAPP_TRACKS_OFF, JLAPP_TRACKS_TRIGGER, JLAPP_TRACKS_SELECT, JLAPP_TRACKS_MODES };
 
 /* the arrow buttons' and the mode button's palette indexes: Note.Octave On / Off, and Mode.Note On (LIGHT_BLUE) */
 #define JLAPP_COLOR_ARROW_ON JLAPP_GREEN             /* a direction that can still be taken */
@@ -120,7 +127,7 @@ struct jlapp {
     uint8_t dn2_idx, dn2_root, dn2_has_root;   /* ... and what it said last: only a CHANGE of it is taken, so a scale chosen here is not undone by an unchanged reading */
     uint8_t minor_idx;                 /* the minor scale the relative pad returns to (jank_lpscales.h index) */
     struct jlapp_held held[JLAPP_PADS];
-    uint8_t track_pads;                /* the two bottom rows are the 16 tracks (page switch) */
+    uint8_t track_pads;                /* enum jlapp_tracks: the two bottom rows are the 16 tracks, to trigger or to select (page switch, pad 8) */
     uint8_t erase_on, erase_track;     /* the Delete button is held, and the track it erases (the current track when it went down) */
     uint8_t palette_page, palette_prev;   /* the colour chart's page (0: indexes 0-63, 1: 64-127) and the mode Session came from */
     uint8_t sess_prev;                 /* the mode the Session page came from */

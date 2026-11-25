@@ -62,9 +62,12 @@ sends is not read at all. (The clock stays MIDI: Jank is the clock.)
   as its own setting says. A build without SCALE SET answers status 2 once and no more are sent. **Formats are the Digitone session's planned ones for stage 6** (the SCALE
   reply has the root and key mode from `data[6]` when LIVE STATUS says protocol >= 5; confirmed by them); stage 6 is not installed yet, so only the reading of the scale index
   can work today. `diag`: `hostdiag_scale=dn2:<index>,root:<0..11 or -1>,reads:,sets:,read_ok:,set_ok:`. Not tried on hardware.
-- **Track pads (hold Note, pad 8 of the top row, GREEN when on):** the two bottom rows play the 16 tracks on each track's own default note (PLAY op 2, ended
-  with op 0 and note 255, confirmed by dn2-wishes); the note layout moves up to the six rows left. Colours as the track overlay above: the current track AMBER, a track that sounds or
-  is held RED, the rest WHITE. (The drum step quadrant keeps Launchpad 95's drum rack colours, yellow / green / red, as asked: green there is the selected track.)
+- **Track pads (hold Note, pad 8 of the top row) cycle OFF -> TRIGGER -> SELECT** (owner 2026-11-25: "should cycle between: on/trigger/select. the pads are
+  yellow (like drum sequencer yellow) when in trigger mode. and white in select mode"); the switch is dim green off, yellow in TRIGGER, white in SELECT, and says
+  TRACK PADS OFF / TRIGGER / SELECT. With them on, the two bottom rows are the 16 tracks and the note layout moves up to the six rows left. **TRIGGER**: a pad
+  plays its track on its own default note (PLAY op 2, ended with op 0 and note 255, confirmed by dn2-wishes), lit as the drum quadrant: YELLOW (13), the current
+  track GREEN (21), a track that sounds or is held RED. **SELECT**: a pad selects its track (as the scale page's track rows; nothing sounds), lit WHITE, the
+  current track AMBER, one that sounds RED. The setting is remembered (an older stored "on" is TRIGGER). (The drum step quadrant keeps Launchpad 95's drum rack colours, yellow / green / red, as asked: green there is the selected track.)
 - **Lights come from the Digitone's own note push**: a note pad lights for the pitch the current track played, a track pad for its track, each for 150 ms (the
   pushed note's length is not mapped yet, so it is a fixed time, not measured).
 - **Messages** (what Launchpad 95 writes in Live's status bar; at most 20 characters, upper case): every change on the scale page (ABSOLUTE ROOT ON, HORIZONTAL

@@ -583,13 +583,32 @@ static void test_the_track_pads_switch(void)
     struct jlapp a = fresh();
     struct jlapp_act o;
     acts(&a, top(NOTE_BTN, 127), &o);
-    CHECK(colour(&a, 7, 7) == JLAPP_GREEN_THIRD && !a.track_pads);
-    CHECK(acts(&a, pad(7, 7, 127), &o) == 0 && a.track_pads && colour(&a, 7, 7) == JLAPP_GREEN);
-    CHECK(strcmp(msg(&a), "TRACK PADS ON") == 0);
+    CHECK(colour(&a, 7, 7) == JLAPP_GREEN_THIRD && a.track_pads == JLAPP_TRACKS_OFF);
+    CHECK(acts(&a, pad(7, 7, 127), &o) == 0 && a.track_pads == JLAPP_TRACKS_TRIGGER && colour(&a, 7, 7) == JLAPP_COLOR_TRIG_IDLE);   /* owner 2026-11-25: OFF -> TRIGGER (yellow) */
+    CHECK(strcmp(msg(&a), "TRACK PADS TRIGGER") == 0);
     acts(&a, pad(7, 7, 0), &o);
-    CHECK(a.track_pads);                                           /* a release changes nothing */
+    CHECK(a.track_pads == JLAPP_TRACKS_TRIGGER);                   /* a release changes nothing */
     acts(&a, pad(7, 7, 127), &o);
-    CHECK(!a.track_pads && colour(&a, 7, 7) == JLAPP_GREEN_THIRD && strcmp(msg(&a), "TRACK PADS OFF") == 0);
+    CHECK(a.track_pads == JLAPP_TRACKS_SELECT && colour(&a, 7, 7) == JLAPP_COLOR_TRACK_IDLE && strcmp(msg(&a), "TRACK PADS SELECT") == 0);   /* -> SELECT (white) */
+    acts(&a, pad(7, 7, 0), &o);
+    acts(&a, pad(7, 7, 127), &o);
+    CHECK(a.track_pads == JLAPP_TRACKS_OFF && colour(&a, 7, 7) == JLAPP_GREEN_THIRD && strcmp(msg(&a), "TRACK PADS OFF") == 0);   /* -> OFF */
+    CHECK(JLAPP_COLOR_TRIG_IDLE == 13 && JLAPP_COLOR_TRIG_CURRENT == 21 && JLAPP_COLOR_TRIG_PLAYING == 5 && JLAPP_COLOR_TRACK_IDLE == 3);   /* yellow as the drum quadrant; white */
+}
+
+/* owner 2026-11-25: SELECT mode: a track pad selects its track (nothing sounds), lit WHITE, the current one AMBER */
+static void test_the_track_pads_select_mode(void)
+{
+    struct jlapp a = fresh();
+    struct jlapp_act o;
+    switch_track_pads(&a);
+    switch_track_pads(&a);                                         /* TRIGGER, then SELECT */
+    CHECK(a.track_pads == JLAPP_TRACKS_SELECT);
+    CHECK(colour(&a, 0, 1) == JLAPP_COLOR_TRACK_CURRENT && colour(&a, 3, 1) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 3, 0) == JLAPP_COLOR_TRACK_IDLE);   /* track 1 current */
+    CHECK(acts(&a, pad(3, 0, 100), &o) == 1 && o.kind == JLAPP_ACT_SELECT && o.track == 11 && a.n.track == 11);   /* bottom row, pad 4: track 12 */
+    CHECK(colour(&a, 3, 0) == JLAPP_COLOR_TRACK_CURRENT && colour(&a, 0, 1) == JLAPP_COLOR_TRACK_IDLE);
+    CHECK(acts(&a, pad(3, 0, 0), &o) == 0);                        /* the release: nothing (no note was started) */
+    CHECK(acts(&a, pad(1, 1, 100), &o) == 1 && o.kind == JLAPP_ACT_SELECT && a.n.track == 1);   /* upper track row, pad 2: track 2 */
 }
 
 static void test_the_track_pads_play_each_tracks_own_note(void)
@@ -604,8 +623,8 @@ static void test_the_track_pads_play_each_tracks_own_note(void)
     CHECK(acts(&a, pad(3, 0, 90), &o) == 1 && o.kind == JLAPP_ACT_TRACK_ON && o.track == 11);   /* the lower row: tracks 9..16 */
     CHECK(colour(&a, 3, 0) == JLAPP_COLOR_TRACK_PLAYING);          /* held: RED */
     CHECK(acts(&a, pad(3, 0, 0), &o) == 1 && o.track == 11);
-    CHECK(colour(&a, 3, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 0, 1) == JLAPP_COLOR_TRACK_CURRENT);   /* the current track is blue */
-    CHECK(colour(&a, 5, 1) == JLAPP_COLOR_TRACK_IDLE);
+    CHECK(colour(&a, 3, 0) == JLAPP_COLOR_TRIG_IDLE && colour(&a, 0, 1) == JLAPP_COLOR_TRIG_CURRENT);   /* the current track is blue */
+    CHECK(colour(&a, 5, 1) == JLAPP_COLOR_TRIG_IDLE);
 }
 
 static void test_the_layout_moves_up_two_rows(void)
@@ -697,9 +716,9 @@ static void test_pushed_notes_light_the_track_pads(void)
     jlapp_tick(&a, 500);
     jlapp_on_push(&a, n, 2);
     CHECK(colour(&a, 4, 0) == JLAPP_COLOR_TRACK_PLAYING && colour(&a, 4, 1) == JLAPP_COLOR_TRACK_PLAYING);   /* RED: tracks 5 and 13 */
-    CHECK(colour(&a, 5, 0) == JLAPP_COLOR_TRACK_IDLE);
+    CHECK(colour(&a, 5, 0) == JLAPP_COLOR_TRIG_IDLE);
     jlapp_tick(&a, 500 + JLAPP_PUSH_LIGHT_MS);
-    CHECK(colour(&a, 4, 0) == JLAPP_COLOR_TRACK_IDLE && colour(&a, 4, 1) == JLAPP_COLOR_TRACK_IDLE);
+    CHECK(colour(&a, 4, 0) == JLAPP_COLOR_TRIG_IDLE && colour(&a, 4, 1) == JLAPP_COLOR_TRIG_IDLE);
 }
 
 static void test_the_overlay_over_the_track_pads_then_back(void)
@@ -709,9 +728,9 @@ static void test_the_overlay_over_the_track_pads_then_back(void)
     switch_track_pads(&a);
     jlapp_tick(&a, 2000);
     acts(&a, top(3, 127), &o);
-    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CURRENT && colour(&a, 0, 1) == JLAPP_COLOR_TRACK_IDLE);
+    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRIG_CURRENT && colour(&a, 0, 1) == JLAPP_COLOR_TRIG_IDLE);
     jlapp_tick(&a, 2000 + JLAPP_SELECT_MS);
-    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRACK_CURRENT);
+    CHECK(colour(&a, 1, 1) == JLAPP_COLOR_TRIG_CURRENT);
 }
 
 static void test_a_push_with_junk_and_the_ring(void)
@@ -767,7 +786,7 @@ static void test_the_scale_page_says_what_it_did(void)
     tap(&a, 5, 7);
     CHECK(strcmp(msg(&a), "LAYOUT DIATONIC") == 0);
     tap(&a, 7, 7);
-    CHECK(strcmp(msg(&a), "TRACK PADS ON") == 0);
+    CHECK(strcmp(msg(&a), "TRACK PADS TRIGGER") == 0);
     tap(&a, 0, 6);                                                 /* a black key */
     CHECK(strcmp(msg(&a), "KEY C#") == 0);
     tap(&a, 2, 5);                                                 /* a white key */
@@ -818,7 +837,7 @@ static void test_messages_are_short_upper_case_and_the_newest_wins(void)
     CHECK(jlapp_take_message(&a, m, sizeof m) == 0);               /* taken: gone */
     tap(&a, 0, 7);
     tap(&a, 7, 7);                                                 /* two in a row: only the newest */
-    CHECK(jlapp_take_message(&a, m, sizeof m) > 0 && strcmp(m, "TRACK PADS ON") == 0);
+    CHECK(jlapp_take_message(&a, m, sizeof m) > 0 && strcmp(m, "TRACK PADS TRIGGER") == 0);
     tap(&a, 0, 7);
     CHECK(jlapp_take_message(&a, m, 5) == 4 && strcmp(m, "ABSO") == 0);   /* a small buffer: cut, still terminated */
     CHECK(jlapp_take_message(&a, m, 0) == 0);
@@ -1759,6 +1778,7 @@ int main(void)
     test_a_limit_shows_the_track_but_selects_nothing();
     test_the_track_pads_switch();
     test_the_track_pads_play_each_tracks_own_note();
+    test_the_track_pads_select_mode();
     test_the_layout_moves_up_two_rows();
     test_without_live_control_the_pads_are_silent_and_say_why();
     test_the_track_pads_say_why_too();

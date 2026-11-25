@@ -186,10 +186,18 @@ static size_t pad_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_a
 static uint8_t track_of_pad(uint8_t row, uint8_t col) { return (uint8_t)((JLAPP_TRACK_ROWS - 1u - row) * 8u + col); }
 
 /* a pad of the two bottom rows while the track pads are on: it plays that track's own note */
+static size_t chose_track(struct jlapp *a, uint8_t before, int announce, struct jlapp_act *out, size_t max);
+
 static size_t track_pad_event(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
 {
     uint8_t t = track_of_pad(ev->row, ev->col);
     uint16_t bitv = (uint16_t)(1u << t);
+    if (a->track_pads == JLAPP_TRACKS_SELECT && ev->value) {   /* SELECT: the pad's track becomes the current one, nothing sounds */
+        uint8_t before = a->n.track;
+        a->note_used = 1;
+        a->n.track = t;
+        return chose_track(a, before, 1, out, max);
+    }
     if (ev->value) {
         if ((a->track_held & bitv) || max < 1)
             return 0;
@@ -296,8 +304,9 @@ static void page_pad(struct jlapp *a, uint8_t x, uint8_t y)
         } else if (x == 6) {
             layout_pad(a, JLN_CHROMATIC, "CHROMATIC");
         } else if (x == 7) {
-            a->track_pads ^= 1u;
-            say(a, "TRACK PADS %s", a->track_pads ? "ON" : "OFF");
+            static const char *const NAME[JLAPP_TRACKS_MODES] = {"OFF", "TRIGGER", "SELECT"};
+            a->track_pads = (uint8_t)((a->track_pads + 1u) % JLAPP_TRACKS_MODES);   /* OFF -> TRIGGER -> SELECT (owner 2026-11-25) */
+            say(a, "TRACK PADS %s", NAME[a->track_pads]);
         }
     } else if (r == 1) {
         if (is_black_key_pad(x)) {
@@ -346,8 +355,8 @@ static uint8_t page_colour(const struct jlapp *a, uint8_t x, uint8_t y)
             return on_off(n->layout == JLN_DIATONIC, JLAPP_RED, JLAPP_RED_THIRD);
         if (x == 6)
             return on_off(n->layout == JLN_CHROMATIC, JLAPP_RED, JLAPP_RED_THIRD);
-        if (x == 7)                    /* the track pads (not Launchpad 95's: its drum rack pad is here) */
-            return on_off(a->track_pads, JLAPP_GREEN, JLAPP_GREEN_THIRD);
+        if (x == 7)                    /* the track pads (not Launchpad 95's: its drum rack pad is here): dim green off, then the mode's own colour */
+            return a->track_pads == JLAPP_TRACKS_TRIGGER ? JLAPP_COLOR_TRIG_IDLE : a->track_pads == JLAPP_TRACKS_SELECT ? JLAPP_COLOR_TRACK_IDLE : JLAPP_GREEN_THIRD;
         return 0;
     }
     if (r == 1) {
@@ -915,6 +924,16 @@ static uint8_t track_colour(const struct jlapp *a, uint8_t t)
     return t == a->n.track ? JLAPP_COLOR_TRACK_CURRENT : JLAPP_COLOR_TRACK_IDLE;
 }
 
+/* the track pads in Note mode: TRIGGER in the drum quadrant's colours, else (SELECT, or the overlay of a track chosen with the pads off) as the track rows */
+static uint8_t track_pad_colour(const struct jlapp *a, uint8_t t)
+{
+    if (a->track_pads != JLAPP_TRACKS_TRIGGER)
+        return track_colour(a, t);
+    if ((a->track_held & (1u << t)) || (a->push && pushed(a, t, -1)))
+        return JLAPP_COLOR_TRIG_PLAYING;
+    return t == a->n.track ? JLAPP_COLOR_TRIG_CURRENT : JLAPP_COLOR_TRIG_IDLE;
+}
+
 void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
 {
     uint8_t own[16], shift = note_shift(a);
@@ -950,7 +969,7 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
                 continue;
             }
             if (y < JLAPP_TRACK_ROWS && (shift || chosen_shown)) {
-                f->led[JLX_PAD0 + y * 8u + x].color = track_colour(a, track_of_pad(y, x));
+                f->led[JLX_PAD0 + y * 8u + x].color = track_pad_colour(a, track_of_pad(y, x));
                 continue;
             }
             jln_pad(&a->n, a->scale, x, (uint8_t)(y - shift), &p);
