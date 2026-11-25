@@ -149,10 +149,11 @@ buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm
 | 8 | dark | nothing |
 
 **Colours** (owner 2026-11-25, picked on the Session colour chart; Launchpad 95 has MINT for all three): **volume 25** (row 4 col 2), **pan 17** (row 3 col 2), **the
-three sends 60** (row 8 col 5); their dim versions, for a scene button whose view is not shown, are the palette group's third: 27, 19, 63 (not checked by eye yet). Capture
+three sends 60** (row 8 col 5); a scene button shows its fader's colour, and **yellow (12, the palette's light yellow; 13 is mute's) while its view is shown** (owner
+2026-11-25: "scene change color when i select them in mixer. the should be some kind of yellow"). Capture
 keeps Launchpad 95's MINT (29, MINT_THIRD 31 when off).
 
-**The scene buttons** (right side) switch to the sub modes, from the overview or from each other (the one shown is bright, the others dim; on the overview all are dim):
+**The scene buttons** (right side) switch to the sub modes, from the overview or from each other (the one shown is yellow, the others their fader's colour):
 
 | scene | sub mode | shows | a press |
 |---|---|---|---|

@@ -307,21 +307,21 @@ void jlmx_stop_slides(struct jlmx *s)
     drop_holds(s);
 }
 
-/* a fader view's colour (the owner's picks), bright or dim */
-static uint8_t view_colour(uint8_t view, int bright)
+/* a fader view's colour (the owner's picks) */
+static uint8_t view_colour(uint8_t view)
 {
     if (view == JLMX_VOL)
-        return bright ? JLMX_COLOR_VOL : JLMX_COLOR_VOL_DIM;
+        return JLMX_COLOR_VOL;
     if (view == JLMX_PAN)
-        return bright ? JLMX_COLOR_PAN : JLMX_COLOR_PAN_DIM;
-    return bright ? JLMX_COLOR_SEND : JLMX_COLOR_SEND_DIM;
+        return JLMX_COLOR_PAN;
+    return JLMX_COLOR_SEND;
 }
 
 static uint8_t overview_colour(const struct jlmx *s, unsigned track, unsigned row)
 {
     unsigned r = row_from_top((uint8_t)row);
     if (r <= OVERVIEW_LAST_VALUE_ROW)  /* a pad that opens its fader screen, in that fader's colour (Launchpad 95: Mixer.Volume / Pan / Sends, all MINT) */
-        return view_colour((uint8_t)r, 1);
+        return view_colour((uint8_t)r);
     if (r == OVERVIEW_MUTE_ROW)
         return (s->m.mute >> track) & 1u ? JLMX_COLOR_MUTED : JLMX_COLOR_UNMUTED;
     if (r == OVERVIEW_SOLO_ROW)
@@ -351,8 +351,8 @@ static uint8_t column_colour(const struct jlmx *s, unsigned track, unsigned row,
     }
     v = value_of(t, s->view);
     if (s->view == JLMX_PAN)
-        return pan_lit(v, row) ? view_colour(s->view, 1) : 0;
-    return volume_lit(map_of(s->view), v, row) ? view_colour(s->view, 1) : 0;
+        return pan_lit(v, row) ? view_colour(s->view) : 0;
+    return volume_lit(map_of(s->view), v, row) ? view_colour(s->view) : 0;
 }
 
 void jlmx_frame(const struct jlmx *s, uint32_t now_ms, struct jlx_frame *f)
@@ -366,7 +366,7 @@ uint8_t jlmx_scene_colour(const struct jlmx *s, uint8_t idx)
 {
     int on = s->view == idx;
     if (idx <= JLMX_CHR)
-        return view_colour(idx, on);
+        return on ? JLMX_COLOR_SCENE_ON : view_colour(idx);   /* the one shown: yellow (owner 2026-11-25) */
     on = is_mute_solo(s->view);        /* scene buttons 6 and 7 are the same screen: both bright while it is shown */
     if (idx == JLMX_MUTE)
         return on ? JLMX_COLOR_UNMUTED : JLMX_COLOR_MUTED;
