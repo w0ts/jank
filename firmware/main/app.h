@@ -222,5 +222,9 @@ void app_cfg_get(struct jk_cfg *c);
 void app_cfg_set(const struct jk_cfg *c);                     /* saved first (or once stopped, while playing), then published */
 void app_cfg_flush(int force);
 void app_nets_get(struct jk_nets *s);                        /* the saved Wi-Fi networks */
+/* a list in PSRAM (1 KB, internal RAM is short in USB host mode), empty; NULL: no memory */
+struct jk_nets *app_nets_alloc(void);
+/* the saved networks into *view, allocated on the first call (app_nets_alloc): for a snapshot's nets; NULL: no memory */
+const struct jk_nets *app_nets_view(struct jk_nets **view);
 int app_nets_forget(const char *ssid);                       /* 0 forgotten and saved, -1 not saved */                               /* a deferred save, once stopped (force: a restart follows) */
 #endif

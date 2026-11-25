@@ -47,6 +47,9 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
     return 0;
 }
 
+static const struct jk_nets NO_NETS;
+static const struct jk_nets *nets_of(const struct jk_snapshot *s) { return s->nets ? s->nets : &NO_NETS; }
+
 int jk_nets_take_cfg(struct jk_nets *s, const struct jk_cfg *c)
 {
     int i = jk_nets_find(s, c->ssid);
@@ -180,9 +183,10 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
         c->pause_db, on_off(c->rate), c->follower ? "robust" : "tuned", SKIP_NAME[c->skip < 3u ? c->skip : 0u], on_off(c->graded), on_off(c->newsong));
     put(w, "usb=%s\nsource=%s\nline_gain=%d\n", jur_usb_name(c->usb), jur_src_name(c->source), c->line_gain_db);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
-    put(w, "nets=%u\n", (unsigned)s->nets.n);                 /* the saved networks, by name (never their passwords) */
-    for (uint8_t i = 0; i < s->nets.n && i < JK_NETS_MAX; i++)
-        put(w, "net_%u=%s\n", (unsigned)(i + 1u), s->nets.net[i].ssid);
+    const struct jk_nets *nets = nets_of(s);
+    put(w, "nets=%u\n", (unsigned)nets->n);                   /* the saved networks, by name (never their passwords) */
+    for (uint8_t i = 0; i < nets->n && i < JK_NETS_MAX; i++)
+        put(w, "net_%u=%s\n", (unsigned)(i + 1u), nets->net[i].ssid);
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "board=%s\nversion=%s\nok\n", s->board, JK_VERSION);
 }
@@ -565,7 +569,7 @@ static enum jk_ctl_action cmd_set(char *args, struct jk_cfg *cfg, const struct j
     if (val)
         *val++ = 0;
     if (val && !strcmp(args, "ssid"))
-        return set_ssid(val, cfg, &snap->nets, w);
+        return set_ssid(val, cfg, nets_of(snap), w);
     if (!val && !strcmp(args, "pass"))     /* an open network */
         next.pass[0] = 0;
     else if (!val || set_value(&next, args, val)) {
@@ -805,7 +809,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
     else if (!strncmp(s, "set ", 4))
         return cmd_set(s + 4, cfg, snap, &w);
     else if (!strncmp(s, "forget ", 7)) {
-        if (jk_nets_find(&snap->nets, s + 7) < 0) {
+        if (jk_nets_find(nets_of(snap), s + 7) < 0) {
             put(&w, "err not saved\n");
             return JK_CTL_NONE;
         }

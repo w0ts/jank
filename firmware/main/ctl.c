@@ -33,6 +33,7 @@ static MessageBufferHandle_t s_in;
 static volatile uint32_t s_beats;      /* passes of the task: it is alive and taking lines */
 static struct jk_snapshot s_snap;
 static char s_out[OUT_MAX];
+static struct jk_nets *s_nets_view;    /* the saved networks for s_snap (PSRAM, app_nets_view) */
 
 void ctl_serial_rx(const uint8_t *data, size_t n)
 {
@@ -156,6 +157,7 @@ static void run_line(const char *line)
 #endif
     app_cfg_get(&cfg);
     bridge_snapshot(&s_snap);
+    s_snap.nets = app_nets_view(&s_nets_view);
     usbrole_snapshot(&s_snap.usb);
     uis_sys(&s_snap.sys);
     s_snap.lead = (uint8_t)uis_lead_get();

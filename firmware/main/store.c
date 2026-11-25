@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Settings in NVS: one blob with a version. Anything unreadable falls back to the defaults. */
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include "app.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "jank_conf.h"
 #include "jank_usbrole.h"
@@ -109,39 +111,46 @@ void store_load(struct jk_cfg *c)
     nvs_close(h);
 }
 
-static uint8_t s_nets_buf[JK_NETS_PACK_MAX];   /* (one caller at a time: the start, then app_cfg_set's lock) */
+/* the packed list's buffer (JK_NETS_PACK_MAX, about 1 KB) for one load or save, in PSRAM: internal RAM is short in host mode */
+static uint8_t *nets_buf(void) { return heap_caps_malloc(JK_NETS_PACK_MAX, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
 
 void store_load_nets(struct jk_nets *s)
 {
-    size_t n = sizeof s_nets_buf;
+    size_t n = JK_NETS_PACK_MAX;
+    uint8_t *b;
     nvs_handle_t h;
     esp_err_t e;
     jk_nets_init(s);
-    e = nvs_open(NS, NVS_READONLY, &h);
-    if (e != ESP_OK)
+    b = nets_buf();
+    if (!b) {
+        ESP_LOGE(TAG, "saved networks: no memory to read them");
         return;
-    e = nvs_get_blob(h, KEY_NETS, s_nets_buf, &n);
-    if (e == ESP_OK && jk_nets_unpack(s, s_nets_buf, n))
-        ESP_LOGW(TAG, "saved networks unreadable, %u bytes: none", (unsigned)n);
-    else if (e != ESP_OK && e != ESP_ERR_NVS_NOT_FOUND)
-        ESP_LOGW(TAG, "saved networks: %s", esp_err_to_name(e));
-    nvs_close(h);
+    }
+    e = nvs_open(NS, NVS_READONLY, &h);
+    if (e == ESP_OK) {
+        e = nvs_get_blob(h, KEY_NETS, b, &n);
+        if (e == ESP_OK && jk_nets_unpack(s, b, n))
+            ESP_LOGW(TAG, "saved networks unreadable, %u bytes: none", (unsigned)n);
+        else if (e != ESP_OK && e != ESP_ERR_NVS_NOT_FOUND)
+            ESP_LOGW(TAG, "saved networks: %s", esp_err_to_name(e));
+        nvs_close(h);
+    }
+    free(b);
 }
 
 esp_err_t store_save_nets(const struct jk_nets *s)
 {
-    size_t n = jk_nets_pack(s, s_nets_buf, sizeof s_nets_buf);
+    uint8_t *b = nets_buf();
+    size_t n = b ? jk_nets_pack(s, b, JK_NETS_PACK_MAX) : 0;
     nvs_handle_t h;
-    esp_err_t e;
-    if (!n)
-        return ESP_ERR_INVALID_SIZE;
-    e = nvs_open(NS, NVS_READWRITE, &h);
-    if (e != ESP_OK)
-        return e;
-    e = nvs_set_blob(h, KEY_NETS, s_nets_buf, n);
-    if (e == ESP_OK)
-        e = nvs_commit(h);
-    nvs_close(h);
+    esp_err_t e = !b ? ESP_ERR_NO_MEM : !n ? ESP_ERR_INVALID_SIZE : nvs_open(NS, NVS_READWRITE, &h);
+    if (e == ESP_OK) {
+        e = nvs_set_blob(h, KEY_NETS, b, n);
+        if (e == ESP_OK)
+            e = nvs_commit(h);
+        nvs_close(h);
+    }
+    free(b);
     return e;
 }
 
