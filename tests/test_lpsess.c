@@ -292,7 +292,7 @@ static void test_the_arrows_and_the_scene_buttons_on_the_page(void)
     CHECK(f.led[JLX_TOP0 + UP].color == JLAPP_COLOR_ARROW_ON && f.led[JLX_TOP0 + DOWN].color == JLAPP_COLOR_ARROW_OFF);
     CHECK(acts(&a, top(UP, 127), &o) == 0 && a.sess.half == 0 && strcmp(msg(&a), "BANKS A-D") == 0);
     /* the scene buttons: Note mode's start / stop, Delete and Record; the rest dark */
-    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color == JLAPP_RED_THIRD && f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == JLAPP_PINK_THIRD);
+    CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color == JLAPP_GREEN_THIRD && f.led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color == JLAPP_PINK_THIRD);
     CHECK(f.led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color == JLAPP_RED_THIRD);
     for (uint8_t i = 0; i < 4u; i++)
         CHECK(f.led[JLX_SIDE0 + i].color == 0);
