@@ -242,12 +242,6 @@ separate.
   same `diag` device line; the library keeps the device attached meanwhile). Measured 2026-11-24: the Launchpad's claim failed with 257 with 20 KB of
   heap free after it had worked on the same build, in the seconds when an update client was also asking the unit questions (the Wi-Fi service allocates a
   buffer at its first request). A passing memory shortage is the likely cause, not a proven one. After a Wi-Fi update of 2026-11-24 the claim failed for over 30 s (the first version tried for 9 s) and worked at once after a replug, which supports it.
-- **Software replug** (owner 2026-11-25: "it should recover dn2 and lp automatically"; again after the update of that day: the Launchpad's claim failed with 257 at the
-  interface claim, `where:1`, and the Digitone, claimed, said nothing until both were replugged). When a Launchpad's or the Digitone's claims fail 3 times in a row
-  (about 6 s of retries), the root port is powered off and, 1 s later, on again (`usb_host_lib_set_root_port_power`): the hub and every device on it leave and are
-  enumerated again, as a replug does on the USB side (their power is the hub's: jank cannot switch it). At most 3 times a start, a minute apart
-  (`core/jank_hostrecover.h`); `diag` counts them, `hostdiag_mem=...,recovers:N`. Only failed claims start it: a device that is claimed and silent is left alone (a
-  Digitone without live control is silent too). Host-tested; on the unit it shows only when the trap comes back.
 - No log leaves the unit in host mode (no USB control line, console off): what the pads do is the only readout. Over Wi-Fi
   (`docs/wifi.md`) `diag` ends with the `hostdiag_` lines live.
 

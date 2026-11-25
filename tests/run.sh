@@ -100,8 +100,6 @@ fi
 "$OUT/test_fsclamp"
 "$CC" $FLAGS "$HERE/tests/test_hostfilter.c" "$HERE/core/jank_hostfilter.c" -o "$OUT/test_hostfilter"
 "$OUT/test_hostfilter"
-"$CC" $FLAGS "$HERE/tests/test_hostrecover.c" "$HERE/core/jank_hostrecover.c" -o "$OUT/test_hostrecover"
-"$OUT/test_hostrecover"
 "$CC" $FLAGS "$HERE/tests/test_hostdiag.c" "$HERE/core/jank_hostdiag.c" "$HERE/core/jank_hostfilter.c" -o "$OUT/test_hostdiag"
 "$OUT/test_hostdiag"
 "$CC" $FLAGS "$HERE/tests/test_sha256.c" "$HERE/core/jank_sha256.c" -o "$OUT/test_sha256"

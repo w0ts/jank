@@ -12,8 +12,8 @@
 
 #define JHD_DEVS 4u                    /* as many as usb_midi_host.c has slots */
 #define JHD_NAME_MAX 23u               /* as JK_USB_NAME_MAX */
-#define JHD_VERSION 19u             /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
-                                          19: recovers; 18: the mixer counters; 17: the scale sync; 16: live_msgs_sent, live_msg_ok; 15: the playhead's source (head_); 14: the step counters; 13: live_ignored and the dn2_ status; 12: live_reads, live_msgs; 11: the live_ fields; 10: setup_sent; 9: lp_mode, lp_reentered; 8: lights_sent; 7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
+#define JHD_VERSION 18u             /* the record's layout: a saved record of another version is not read (2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
+                                          18: the mixer counters; 17: the scale sync; 16: live_msgs_sent, live_msg_ok; 15: the playhead's source (head_); 14: the step counters; 13: live_ignored and the dn2_ status; 12: live_reads, live_msgs; 11: the live_ fields; 10: setup_sent; 9: lp_mode, lp_reentered; 8: lights_sent; 7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
                                           so the size check does not catch it: bump this with every change to struct jhd or jhd_dev) */
 
 /* the steps of a host start, in order, for the one that failed (jhd_format_failure) */
@@ -103,7 +103,6 @@ struct jhd {
     uint16_t heap_kb;                  /* internal heap free now (task stacks and USB buffers come from it), KB */
     uint16_t heap_min_kb;              /* its lowest since the start */
     uint16_t client_stack_free;        /* the MIDI client task's stack never used (high-water mark), bytes */
-    uint8_t recovers;                  /* software replugs since the start (core/jank_hostrecover.h): the root port cycled because a controller did not claim */
     struct jhd_dev dev[JHD_DEVS];
 };
 
