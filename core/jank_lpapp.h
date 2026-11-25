@@ -32,6 +32,7 @@
 #include "jank_lpact.h"
 #include "jank_lpmix.h"
 #include "jank_lpnote.h"
+#include "jank_lpsess.h"
 #include "jank_lpstep.h"
 #include "jank_lpx.h"
 
@@ -86,11 +87,15 @@ struct jlapp_held {
 /* Modes (owner 2026-11-24): the Note button (a tap, shorter than JLAPP_TAP_MS) is Note mode; Custom goes to the step modes and cycles melodic <-> drum
  * (jank_lpstep.h); held, the Note button is the scale page in every mode. Scene button 5 (side index 4) starts / stops the transport, as Launchpad 95's Note mode.
  * Up / down are the octave in Note mode and in melodic step, nothing in drum step. */
-enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP, JLAPP_MODE_MIXER, JLAPP_MODE_PALETTE };
-/* The Session button (owner 2026-11-24: "while we dont have anything on session button, put all the colors in there, it will help us to pick colors"): a colour chart, the
- * Launchpad X's 128 palette indexes on the 64 pads, two pages. Session shows indexes 0-63 (reading order, 0 top left), again 64-127, again goes back to the mode it came from;
- * a pad pressed says its index (COLOUR 51). Note, Custom and Capture leave it as always. Session is lit: WHITE in the chart, DARK_GREY (dim) out of it. */
+enum jlapp_mode { JLAPP_MODE_NOTE, JLAPP_MODE_STEP, JLAPP_MODE_MIXER, JLAPP_MODE_PALETTE, JLAPP_MODE_SESSION };
+/* The Session button (owner 2026-11-25): a short press (let go within JLAPP_SESSION_HOLD_MS) is the Session page (jank_lpsess.h: the Digitone's patterns; again: back to the
+ * mode it came from); HELD for JLAPP_SESSION_HOLD_MS it opens the colour chart (owner 2026-11-24: "put all the colors in there, it will help us to pick colors"), at once
+ * while still held: the Launchpad X's 128 palette indexes on the 64 pads, two pages, indexes 0-63 (reading order, 0 top left); in the chart a Session press shows 64-127,
+ * the next goes back to the mode it came from; a pad pressed says its index (COLOUR 51). Note, Custom and Capture leave both as always. Session is lit: WHITE on the page or
+ * in the chart, DARK_GREY (dim) otherwise. On the Session page the scene buttons are Note mode's (5 start / stop, 6 Delete, 8 Record; the rest dark): the page has no use
+ * for them, and they stay where the hand knows them (the mixer is the one page that takes them over, for its views). */
 #define BUTTON_SESSION_IDX 4u
+#define JLAPP_SESSION_HOLD_MS 1000u
 #define JLAPP_PALETTE_PAGES 2u
 #define JLAPP_COLOR_PALETTE_ON 3u
 #define JLAPP_COLOR_PALETTE_OFF 1u
@@ -118,6 +123,11 @@ struct jlapp {
     uint8_t track_pads;                /* the two bottom rows are the 16 tracks (page switch) */
     uint8_t erase_on, erase_track;     /* the Delete button is held, and the track it erases (the current track when it went down) */
     uint8_t palette_page, palette_prev;   /* the colour chart's page (0: indexes 0-63, 1: 64-127) and the mode Session came from */
+    uint8_t sess_prev;                 /* the mode the Session page came from */
+    uint8_t sess_down;                 /* Session is down since sess_down_ms, and has not opened the chart yet */
+    uint32_t sess_down_ms;
+    uint8_t pat_reads_ok, pat_cue_ok;  /* the Digitone takes PATTERNS / PATTERN (not refused) */
+    struct jlss sess;
     uint8_t record_ok;                 /* the Digitone has RECORD (not refused by a build without it) */
     uint8_t record_on;                 /* the Record button is lit: armed or recording (the Digitone's LIVE STATUS, or the press until it answers) */
     uint8_t record_hold;               /* a press at record_ms: LIVE STATUS is not taken for JLAPP_RECORD_HOLD_MS */
@@ -156,7 +166,8 @@ struct jlapp {
 /* `scale` is one of jank_lpscales.h's (the page marks it) or any other */
 void jlapp_init(struct jlapp *a, const struct jln_scale *scale);
 
-/* the clock the select overlay and the push lights run on: call before the other calls with the current time (a wrap of the 32 bits is fine) */
+/* the clock the select overlay and the push lights run on: call before the other calls with the current time (a wrap of the 32 bits is fine). Session held for
+ * JLAPP_SESSION_HOLD_MS opens the colour chart here (with its message): call it often while the Launchpad is up */
 void jlapp_tick(struct jlapp *a, uint32_t now_ms);
 
 /* what live control is: `state` an enum jdl_state, `play_ok` PLAY has not been refused, `read_ok` the active track can be read (jdl_can_read_track). Live
@@ -200,6 +211,13 @@ size_t jlapp_pump_acts(struct jlapp *a, struct jlapp_act *out, size_t max);
  * (when the Digitone sends them: protocol 6), a refusal count that grew says GRID / STEP REC IS ON and puts the light back, and a Digitone that has no RECORD darkens the button
  * (it says RECORD: DN2 TOO OLD once) */
 void jlapp_set_record(struct jlapp *a, int ok, int bits_valid, uint8_t bits, uint32_t busy_count);
+/* The Session page (jank_lpsess.h). jlapp_session_due: the next read to send now (1 and *r filled; call again until 0), only while the page is shown and live control is up;
+ * jlapp_on_patterns / jlapp_on_pattern take the Digitone's answers (jdl_take_patterns / jdl_take_pattern); jlapp_set_patterns says whether PATTERNS and PATTERN are taken
+ * (jdl.patterns_ok, jdl.pattern_ok): a Digitone that refuses PATTERN says PATTERN: DN2 TOO OLD (then at each press) and its pads send nothing */
+int jlapp_session_due(struct jlapp *a, struct jlss_req *r);
+void jlapp_on_patterns(struct jlapp *a, const struct jdl_patterns *p);
+void jlapp_on_pattern(struct jlapp *a, const struct jdl_pattern *p);
+void jlapp_set_patterns(struct jlapp *a, int reads_ok, int cue_ok);
 /* the step modes: the pages of the current track to read now (pages[0..n), 0 outside the step modes), and a page the Digitone answered (jdl_take_page) */
 size_t jlapp_step_wanted(const struct jlapp *a, uint8_t pages[2]);
 void jlapp_on_page(struct jlapp *a, const struct jdl_page *pg);

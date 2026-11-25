@@ -13,6 +13,7 @@ void jhd_init(struct jhd *d)
     memset(d, 0, sizeof *d);
     d->version = JHD_VERSION;
     d->stack = JHD_STACK_UNKNOWN;
+    d->dn2_pattern = 255u;
 }
 
 int jhd_valid(const void *p, size_t n) { return p && n == sizeof(struct jhd) && ((const uint8_t *)p)[0] == JHD_VERSION; }
@@ -114,6 +115,9 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
         (unsigned long)d->live_scale_reads, (unsigned long)d->live_scale_sets, d->scale_ok, d->scale_set_ok);
     put(out, cap, &n, "hostdiag_steps=edits:%lu,reads:%lu,busy:%lu,refused:%lu,mixreads:%lu,mixsets:%lu\n", (unsigned long)d->live_edits, (unsigned long)d->live_pagereads,
         (unsigned long)d->live_step_busy, (unsigned long)d->live_step_refused, (unsigned long)d->live_mixer_reads, (unsigned long)d->live_mixer_sets);
+    /* the Session page (short: `diag` has 2040 bytes in all): PATTERNS reads, PATTERN requests, both not refused (reads/cue), the playing pattern (-1: none read) */
+    put(out, cap, &n, "hostdiag_pat=reads:%lu,cues:%lu,ok:%u/%u,playing:%d\n", (unsigned long)d->live_pat_reads, (unsigned long)d->live_pat_cues, d->pat_reads_ok,
+        d->pat_cue_ok, d->dn2_pattern < 128u ? (int)d->dn2_pattern : -1);
     put(out, cap, &n, "hostdiag_dn2live=proto:%u,push:%u,lease:%u,made:%lu,sent:%lu,lost:%lu,dropped:%lu,pushmsgs:%lu,ignored:%lu,last_ignored_len:%u\n",
         d->dn2_proto, d->dn2_push, d->dn2_lease, (unsigned long)d->dn2_made, (unsigned long)d->dn2_sent, (unsigned long)d->dn2_lost,
         (unsigned long)d->dn2_dropped, (unsigned long)d->dn2_pushmsgs, (unsigned long)d->live_ignored, d->live_ign_len);
