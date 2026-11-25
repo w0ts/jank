@@ -10,11 +10,17 @@ const Flavour = (() => {
   // after: only releases newer than this tag carry what the flavour needs (v0.0.1 has no Launchpad support: firmware/main/usb_lp.c
   // came later); none: what the page says when no listed release has it
   const FLAVOURS = {
-    launchpad: { after: 'v0.0.1', none: 'No release with Launchpad support yet: v0.0.1 does not have it. It comes with the next release.' },
+    launchpad: { label: 'Launchpad X controller for the Digitone II', after: 'v0.0.1', none: 'No release with Launchpad support yet: v0.0.1 does not have it. It comes with the next release.' },
   };
   // a new image confirms itself once it has run 20 s and a computer has spoken on the control line (firmware/main/ota.c
   // valid_task); a start as host does not confirm it. 25 s, as the page's update does, before the role changes
   const CONFIRM_S = 25, STEP_MS = 2500;
+
+  /** the flavours for the page's picker (owner 2026-11-25: "can the installer pick them ?"), in order: [{ name, label }] */
+  function list() { return Object.keys(FLAVOURS).map((name) => ({ name, label: FLAVOURS[name].label })); }
+
+  /** the query for a choice of the picker: "?flavour=NAME" for a flavour, "" for the plain page (an unknown name too) */
+  function search(name) { return Object.prototype.hasOwnProperty.call(FLAVOURS, name) ? '?flavour=' + encodeURIComponent(name) : ''; }
 
   /** the flavour a page address's query asks for (location.search), or null */
   function parse(search) {
@@ -68,6 +74,6 @@ const Flavour = (() => {
     return !!g && g.usb === 'host';
   }
 
-  return { FLAVOURS, CONFIRM_S, parse, newer, releasesFor, noneText, setUsbHost };
+  return { FLAVOURS, CONFIRM_S, list, search, parse, newer, releasesFor, noneText, setUsbHost };
 })();
 if (typeof module !== 'undefined') module.exports = Flavour;

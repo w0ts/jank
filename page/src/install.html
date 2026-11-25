@@ -20,6 +20,11 @@
     <nav class="site" aria-label="Jank pages"><a href="./">About</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="install.html" aria-current="page">Install</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="device.html">Device</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="build.html">Build</a><span class="sep" role="separator" aria-orientation="vertical"></span><a href="https://github.com/w0ts/jank" aria-label="GitHub" title="The Jank's source code and documentation on GitHub."><svg class="gh" viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></nav>
   </header>
 
+  <section>
+    <h2>What it is for</h2>
+    <div class="row"><label>Install <select id="fl-pick" title="The same firmware either way: the choice sets the text and the steps after the install"></select></label></div>
+  </section>
+
   <section id="flavour-launchpad" hidden>
     <h2>Launchpad X controller for the Digitone II</h2>
     <p>Jank as a small USB host: a Novation Launchpad X plays and drives an Elektron Digitone II running the Wishes firmware, through the Digitone's live control, with Jank as the clock. This page installs the same Jank firmware as the plain Install page; nothing in the image is different. What it adds are the steps after the install: Jank set to USB host, the wiring, and what the Digitone needs. The modes and buttons: <a href="https://github.com/w0ts/jank/blob/main/docs/launchpad.md">docs/launchpad.md</a> and the <a href="https://w0ts.github.io/dn2-wishes/controller.html">Controller page of the Wishes site</a>.</p>
@@ -278,6 +283,11 @@ async function runHost() {
     show();
   }
 }
+// the picker (owner 2026-11-25): the same firmware; a choice opens the page with or without ?flavour=..., so a link and the picker are one path
+const pick = $("fl-pick");
+pick.replaceChildren(new Option("Jank (standard)", ""), ...Flavour.list().map((f) => new Option(f.label, f.name)));
+pick.value = flavour || "";
+pick.addEventListener("change", () => { location.href = location.pathname + Flavour.search(pick.value); });
 if (flavour) {
   $("flavour-" + flavour).hidden = false;
   $("fl-show").addEventListener("click", () => nextSteps(""));

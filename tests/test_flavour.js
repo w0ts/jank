@@ -106,6 +106,14 @@ async function main() {
   ok(/live control/.test(next) && /lp7/.test(next) && /stage 8/.test(next) && /REMOTE CONTROL/.test(next), 'step 3: what the Digitone needs');
   ok(/href="https:\/\/w0ts\.github\.io\/dn2-wishes\/controller\.html/.test(html), 'a link to the Wishes site\'s Controller page');
   ok(/<title>Jank · Install<\/title>/.test(html), 'the title stays the Install page\'s');
+  // the picker (owner 2026-11-25: "can the installer pick them ?"): its options from Flavour.list, and the query each choice opens
+  eq(Flavour.list(), [{ name: 'launchpad', label: 'Launchpad X controller for the Digitone II' }]);
+  eq(Flavour.search('launchpad'), '?flavour=launchpad');
+  eq(Flavour.search(''), '');
+  eq(Flavour.search('nope'), '');
+  eq(Flavour.parse(Flavour.search('launchpad')), 'launchpad');
+  ok(/<select id="fl-pick"/.test(html) && /What it is for/.test(html), 'the picker is on the page');
+  ok(/Flavour\.list\(\)/.test(html) && /Flavour\.search\(pick\.value\)/.test(html), 'it is filled from Flavour.list and opens Flavour.search');
   console.log(`flavour: ${n} checks passed`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
