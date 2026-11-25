@@ -280,6 +280,13 @@ eq(box.networkLine({ net: "wifi", ssid: "Home" }), "Wi-Fi network Home");
 eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "0" }), "Looking for Home");
 eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "1", wifi_ip: "0.0.0.0" }), "On Home, waiting for an address");
 eq(box.networkLine({ net: "wifi", ssid: "Home", wifi: "1", wifi_ip: "192.168.1.5", wifi_rssi: "-50", wifi_channel: "6" }), "On Home, 192.168.1.5, -50 dBm, channel 6");
+// several saved networks (owner 2026-11-25): get lists them by name, status says the one joined
+eq(box.savedNetworks({ nets: "0" }), []);
+eq(box.savedNetworks({ ssid: "Home" }), []);                                   // a firmware without the list
+eq(box.savedNetworks({ nets: "2", net_1: "Home", net_2: "Office Guests" }), ["Home", "Office Guests"]);
+eq(box.networkLine({ net: "wifi", ssid: "Home", nets: "2", net_1: "Home", net_2: "Office Guests", wifi: "0" }), "Looking for a saved network");
+eq(box.networkLine({ net: "wifi", ssid: "Home", nets: "1", net_1: "Home", wifi: "0" }), "Looking for Home");
+eq(box.networkLine({ net: "wifi", ssid: "Home", wifi_ssid: "Office Guests", wifi: "1", wifi_ip: "10.0.0.7", wifi_rssi: "-61", wifi_channel: "11" }), "On Office Guests, 10.0.0.7, -61 dBm, channel 11");
 eq(box.splitLines("", "ab"), { lines: [], rest: "ab" });
 eq(box.splitLines("ab", "c\nd"), { lines: ["abc"], rest: "d" });
 eq(box.splitLines("", "a\r\nb\n"), { lines: ["a", "b"], rest: "" });

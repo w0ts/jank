@@ -461,6 +461,10 @@ header #c-midi[aria-pressed="true"] { color: var(--on); background: var(--accent
         <label title="8 to 63 characters, sent over USB only; empty keeps the saved one. The device keeps it in its flash, unencrypted, and never sends it back.">Password <input id="net-pass" type="password" maxlength="63" autocomplete="off" placeholder="stays as it is if empty"></label>
       </div>
       <p class="note" id="net-note">2.4 GHz only. The Jank keeps the password in its flash, unencrypted, and never sends it back.</p>
+      <table id="net-saved-table" hidden>
+        <thead><tr><th title="Every network given above is kept, up to 10. At start-up, and when the connection is lost, the Jank joins the one it hears best.">Saved networks (up to 10); the Jank joins the one it hears best</th><th></th></tr></thead>
+        <tbody id="net-saved"></tbody>
+      </table>
       <div class="buttons">
         <button id="net-apply" disabled title="Sends the Join choice (Jank mode, or the Wi-Fi name and password) to the device and restarts it; give it a few seconds. Kept after the restart.">Save and restart</button>
       </div>
@@ -613,13 +617,24 @@ function networkCommands(mode, ssid, pass, passStored) {
   return commands;
 }
 
-/* the line under Network, from get (and status over USB) */
+/* the line under Network, from get (and status over USB). On: the saved network joined (status wifi_ssid; a firmware without
+ * the saved list has none: its one ssid) */
 function networkLine(v) {
+  const saved = savedNetworks(v);
   if (v.net !== "wifi") return "MODE JANK, group " + v.group;
   if (v.wifi === undefined) return "Wi-Fi network " + v.ssid;
-  if (v.wifi !== "1") return "Looking for " + v.ssid;
-  if (v.wifi_ip === "0.0.0.0") return "On " + v.ssid + ", waiting for an address";
-  return "On " + v.ssid + ", " + v.wifi_ip + ", " + v.wifi_rssi + " dBm, channel " + v.wifi_channel;
+  if (v.wifi !== "1") return "Looking for " + (saved.length > 1 ? "a saved network" : v.ssid);
+  const on = v.wifi_ssid || v.ssid;
+  if (v.wifi_ip === "0.0.0.0") return "On " + on + ", waiting for an address";
+  return "On " + on + ", " + v.wifi_ip + ", " + v.wifi_rssi + " dBm, channel " + v.wifi_channel;
+}
+
+/* the saved Wi-Fi networks' names, from get (nets=<n>, net_1= .. net_<n>=); none from a firmware without the list */
+function savedNetworks(v) {
+  const n = Number(v.nets) || 0;
+  const names = [];
+  for (let i = 1; i <= n; i++) if (v["net_" + i] !== undefined) names.push(v["net_" + i]);
+  return names;
 }
 
 /* the control line in SysEx, as core/jank_sysex.c: F0 7D 'J' 'K' <7-bit text> F7, 30 characters a frame; text runs across frames */
@@ -863,6 +878,28 @@ function takeHome(text) {
   S.homeAt = performance.now();
 }
 
+function showSavedNetworks(names) {
+  $("net-saved-table").hidden = !names.length;
+  $("net-saved").replaceChildren(...names.map((name) => {
+    const forget = document.createElement("button");
+    forget.className = "quiet";
+    forget.textContent = "Forget";
+    forget.title = "Removes " + name + " and its password from the Jank. Kept after a restart.";
+    forget.addEventListener("click", () => forgetNetwork(name));
+    return cells(document.createElement("tr"), [name, forget]);
+  }));
+}
+
+async function forgetNetwork(name) {
+  try {
+    await send("forget " + name);
+    showSettings(await send("get"));
+    say("Forgot " + name + ".");
+  } catch (e) {
+    say(e.message, true);
+  }
+}
+
 function showSettings({ values: v }) {
   S.lastGet = v;
   if (document.activeElement !== $("net-mode") && v.net) $("net-mode").value = v.net;
@@ -872,6 +909,7 @@ function showSettings({ values: v }) {
     if (document.activeElement !== el && v[key] !== undefined) el.value = key === "beat_latency" ? latField(v) : v[key];
   }
   $("net-state").textContent = networkLine(v);
+  showSavedNetworks(savedNetworks(v));
   if (v.beat_latency_src) $("c-beat_latency_src").textContent = latNote(v.beat_latency_src, v);
   $("s-version").textContent = v.version ? "Version " + v.version + ", address " + v.mac : "-";
 }

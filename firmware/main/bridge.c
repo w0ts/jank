@@ -389,6 +389,8 @@ void bridge_snapshot(struct jk_snapshot *s)
     /* the Wi-Fi driver's own call outside the bridge's lock: the HOME push and the control line take this snapshot, and
      * the bridge's task (frames, Link) must never wait behind a Wi-Fi API call (the timing audit's fix 3) */
     radio_network_info(&rssi, &channel);
+    radio_network_ssid(s->wifi_ssid, sizeof s->wifi_ssid);
+    app_nets_get(&s->nets);            /* (the settings' lock and a 1 KB copy: outside the bridge's lock too) */
     xSemaphoreTake(s_lock, portMAX_DELAY);
     int64_t now = midi_now_us();
     s->b = s_b;
@@ -579,7 +581,7 @@ esp_err_t bridge_start(const struct jk_cfg *cfg, const uint8_t mac[6], const uin
     e = usb_start(mac, on_usb, on_usb_tx_done, ctl_serial_rx);
     if (e != ESP_OK)
         return e;
-    e = s_on_network ? radio_start_network(mac, cfg->ssid, cfg->pass, on_network) : radio_start(mac, s_b.channel, on_air);
+    e = s_on_network ? radio_start_network(mac, on_network) : radio_start(mac, s_b.channel, on_air);
     if (e != ESP_OK)
         return e;
     if (xTaskCreatePinnedToCore(bridge_task, "bridge", 6144, NULL, TASK_PRIO, NULL, 0) != pdPASS)

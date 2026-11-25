@@ -17,6 +17,8 @@ void power_early_init(void);
 /* store.c: settings in NVS */
 void store_load(struct jk_cfg *c);
 esp_err_t store_save(const struct jk_cfg *c);
+void store_load_nets(struct jk_nets *s);                     /* the saved Wi-Fi networks (key "nets"); none stored or unreadable: empty */
+esp_err_t store_save_nets(const struct jk_nets *s);
 
 /* radio.c: raw 802.11 on one channel */
 typedef void (*radio_rx_fn)(const uint8_t *frame, size_t len, int8_t rssi);
@@ -26,11 +28,14 @@ esp_err_t radio_set_mac(const uint8_t mac[6], uint32_t channel);
 esp_err_t radio_tx(const uint8_t *frame, size_t len);
 /* a normal network instead of MODE JANK's air: Ethernet frames both ways */
 typedef void (*radio_eth_fn)(const uint8_t *eth, size_t len);
-esp_err_t radio_start_network(const uint8_t mac[6], const char *ssid, const char *pass, radio_eth_fn rx);
+/* an ordinary station on the saved network it hears best (app_nets_get, core/jank_nets.h jk_nets_pick): it scans at the
+ * start and whenever a connection fails or is lost and does not come back, skipping a network that failed this round */
+esp_err_t radio_start_network(const uint8_t mac[6], radio_eth_fn rx);
 esp_err_t radio_network_tx(const uint8_t *eth, size_t len);
 esp_err_t radio_network_set_mac(const uint8_t mac[6]);
 int radio_network_up(void);
 void radio_network_info(int8_t *rssi, uint8_t *channel);
+void radio_network_ssid(char *out, size_t cap);              /* the saved network joined; "" while none is */
 
 /* usb.c: CDC-NCM + USB MIDI, whose SysEx carries the control line */
 typedef void (*usb_frame_fn)(const uint8_t *eth, size_t len);
@@ -171,5 +176,7 @@ void usb_to_rom_download(void);                              /* does not return 
 /* main.c: the settings' one owner */
 void app_cfg_get(struct jk_cfg *c);
 void app_cfg_set(const struct jk_cfg *c);                     /* saved first (or once stopped, while playing), then published */
-void app_cfg_flush(int force);                               /* a deferred save, once stopped (force: a restart follows) */
+void app_cfg_flush(int force);
+void app_nets_get(struct jk_nets *s);                        /* the saved Wi-Fi networks */
+int app_nets_forget(const char *ssid);                       /* 0 forgotten and saved, -1 not saved */                               /* a deferred save, once stopped (force: a restart follows) */
 #endif

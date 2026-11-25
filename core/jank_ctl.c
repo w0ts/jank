@@ -46,6 +46,23 @@ int jk_cfg_set_name(struct jk_cfg *c, const char *name)
     return 0;
 }
 
+int jk_nets_take_cfg(struct jk_nets *s, const struct jk_cfg *c)
+{
+    int i = jk_nets_find(s, c->ssid);
+    if (!c->ssid[0] || (i >= 0 && !strcmp(s->net[i].pass, c->pass)))
+        return 0;
+    return jk_nets_put(s, c->ssid, c->pass) >= 0;   /* (a full list: `set ssid` refused it already) */
+}
+
+int jk_cfg_after_forget(struct jk_cfg *c, const struct jk_nets *s)
+{
+    if (!c->ssid[0] || jk_nets_find(s, c->ssid) >= 0)
+        return 0;
+    strcpy(c->ssid, s->n ? s->net[0].ssid : "");
+    strcpy(c->pass, s->n ? s->net[0].pass : "");
+    return 1;
+}
+
 int jk_cfg_stored_differs(const struct jk_cfg *a, const struct jk_cfg *b)
 {
     return memcmp(a, b, JK_CFG_STORED) != 0 || a->usb != b->usb || a->source != b->source || a->autobar != b->autobar
@@ -162,6 +179,9 @@ static void cmd_get(const struct jk_cfg *c, const struct jk_snapshot *s, struct 
         c->pause_db, on_off(c->rate), c->follower ? "robust" : "tuned", SKIP_NAME[c->skip < 3u ? c->skip : 0u], on_off(c->graded), on_off(c->newsong));
     put(w, "usb=%s\nsource=%s\nline_gain=%d\n", jur_usb_name(c->usb), jur_src_name(c->source), c->line_gain_db);
     put(w, "net=%s\nssid=%s\npass=%s\n", c->net == JK_NET_WIFI ? "wifi" : "jank", c->ssid, c->pass[0] ? "set" : "none");
+    put(w, "nets=%u\n", (unsigned)s->nets.n);                 /* the saved networks, by name (never their passwords) */
+    for (uint8_t i = 0; i < s->nets.n && i < JK_NETS_MAX; i++)
+        put(w, "net_%u=%s\n", (unsigned)(i + 1u), s->nets.net[i].ssid);
     put_mac(w, "mac", s->b.mac, "\n");
     put(w, "board=%s\nversion=%s\nok\n", s->board, JK_VERSION);
 }
@@ -334,7 +354,7 @@ static void cmd_status(const struct jk_cfg *c, const struct jk_snapshot *s, uint
     put_air(b, now_ms, w);
     put(w, "wifi=%u\n", s->wifi_up);
     put_ip(w, "wifi_ip", s->wifi_ip);
-    put(w, "wifi_rssi=%d\nwifi_channel=%u\n", s->wifi_rssi, s->wifi_channel);
+    put(w, "wifi_rssi=%d\nwifi_channel=%u\nwifi_ssid=%s\n", s->wifi_rssi, s->wifi_channel, s->wifi_ssid);
     put_bridge_stats(&b->st, w);
     put(w, "tx_fail=%lu\nqueue_full=%lu\nscan_lost=%lu\n", (unsigned long)s->tx_fail, (unsigned long)s->queue_full, (unsigned long)s->scan_lost);
     put(w, "lat_air_us=%lu\nlat_air_max_us=%lu\nlat_usb_us=%lu\nlat_usb_max_us=%lu\n", (unsigned long)s->lat_air_us, (unsigned long)s->lat_air_max_us, (unsigned long)s->lat_usb_us, (unsigned long)s->lat_usb_max_us);
@@ -513,12 +533,34 @@ static int set_value(struct jk_cfg *c, const char *key, const char *val)
     return set_number(c, key, val);
 }
 
-static enum jk_ctl_action cmd_set(char *args, struct jk_cfg *cfg, struct writer *w)
+/* `set ssid`: the network to join or edit. A saved one comes with its password; a new one has none until `set pass`
+ * (an open network), and is refused when JK_NETS_MAX are saved */
+static enum jk_ctl_action set_ssid(const char *val, struct jk_cfg *cfg, const struct jk_nets *nets, struct writer *w)
+{
+    struct jk_cfg next = *cfg;
+    int i = jk_nets_find(nets, val);
+    if (set_text(next.ssid, val, 1, JK_SSID_MAX)) {
+        put(w, "err bad setting\n");
+        return JK_CTL_NONE;
+    }
+    if (i < 0 && nets->n >= JK_NETS_MAX) {
+        put(w, "err networks full: forget one\n");
+        return JK_CTL_NONE;
+    }
+    strcpy(next.pass, i >= 0 ? nets->net[i].pass : "");
+    *cfg = next;
+    put(w, "ok\n");
+    return JK_CTL_CFG_CHANGED;
+}
+
+static enum jk_ctl_action cmd_set(char *args, struct jk_cfg *cfg, const struct jk_snapshot *snap, struct writer *w)
 {
     struct jk_cfg next = *cfg;
     char *val = strchr(args, ' ');
     if (val)
         *val++ = 0;
+    if (val && !strcmp(args, "ssid"))
+        return set_ssid(val, cfg, &snap->nets, w);
     if (!val && !strcmp(args, "pass"))     /* an open network */
         next.pass[0] = 0;
     else if (!val || set_value(&next, args, val)) {
@@ -596,6 +638,19 @@ int jk_ctl_tempo(const char *line, int32_t *mpb)
     if (!s || strncmp(s, "tempo ", 6) || parse_bpm_x100(s + 6, &x100) || x100 < JK_BPM_MIN_X100 || x100 > JK_BPM_MAX_X100)
         return -1;
     *mpb = (int32_t)((6000000000ull + x100 / 2u) / x100);
+    return 0;
+}
+
+int jk_ctl_forget(const char *line, char *ssid)
+{
+    char buf[80], *s = trim(line, buf, sizeof buf);
+    size_t n;
+    if (!s || strncmp(s, "forget ", 7))
+        return -1;
+    n = strlen(s + 7);
+    if (!n || n > JK_SSID_MAX)
+        return -1;
+    memcpy(ssid, s + 7, n + 1u);
     return 0;
 }
 
@@ -743,7 +798,15 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         return JK_CTL_DISPLAY;
     }
     else if (!strncmp(s, "set ", 4))
-        return cmd_set(s + 4, cfg, &w);
+        return cmd_set(s + 4, cfg, snap, &w);
+    else if (!strncmp(s, "forget ", 7)) {
+        if (jk_nets_find(&snap->nets, s + 7) < 0) {
+            put(&w, "err not saved\n");
+            return JK_CTL_NONE;
+        }
+        put(&w, "ok\n");
+        return JK_CTL_FORGET;
+    }
     else if (!strcmp(s, "scan"))
         return JK_CTL_SCAN;
     else if (!strcmp(s, "play") || !strcmp(s, "stop"))
@@ -775,7 +838,7 @@ enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struc
         else
             put(&w, "err home line too long\n");
     } else if (!strcmp(s, "help"))
-        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|lead|sleep|bright|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|pause_db|rate|follower|skip|graded|newsong|burn|usb|source|line_gain|net|ssid|pass <value>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
+        put(&w, "get\nstatus\nabout\nhome\nbeat\nscan\nset group|name|filter|peer|transport|lead|sleep|bright|quantum|offset|beat|beat_latency|beat_latency_usb|lat_trim|autobar|usbmidi|lowconf|threshold|pause_db|rate|follower|skip|graded|newsong|burn|usb|source|line_gain|net|ssid|pass <value>\nforget <ssid>\ntempo <bpm>\nplay\nstop\nfold x2|/2|1\nnudge beat +-0.5..3\nnudge ms +-1..10\nreboot\nbootloader\nok\n");
     else if (!strcmp(s, "reboot") || !strcmp(s, "bootloader")) {
         put(&w, "ok\n");
         return s[0] == 'r' ? JK_CTL_REBOOT : JK_CTL_BOOTLOADER;
