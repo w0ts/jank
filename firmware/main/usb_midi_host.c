@@ -20,6 +20,7 @@
 #include "usb/usb_helpers.h"
 #include "usb/usb_host.h"
 #include "jank_fsclamp.h"
+#include "jank_hostrecover.h"
 #include "jank_midiq.h"
 #include "usb_host_mode.h"
 
@@ -76,6 +77,8 @@ static uint32_t s_dropped;
 static uint8_t s_start_step;           /* the step of usb_midi_host_start under way, for a failure's report */
 static TaskHandle_t s_client_task;
 static struct jhf_set s_useless;       /* devices seen with neither a MIDI nor an audio interface (client task only): what the unit may learn to ignore */
+static struct jhr s_recover;           /* the software replug (core/jank_hostrecover.h) */
+static unsigned s_claim_fails;         /* a controller's claims that failed in a row (since a success or a replug) */
 static uint8_t s_learn_pending;        /* a Launchpad or a Digitone could not be claimed for want of pipes: s_learn_at says when to learn */
 static TickType_t s_learn_at;
 
@@ -387,6 +390,8 @@ static void add_device(uint8_t address, int reuse, uint8_t tries_left)
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "device %u left alone: %s", address, esp_err_to_name(e));
         usb_host_device_close(s_client, h);
+        if (role != JLAPP_OTHER)
+            s_claim_fails++;           /* (jhr_step: a few in a row and the port is cycled) */
         if (role != JLAPP_OTHER && (e == ESP_ERR_NO_MEM || e == ESP_ERR_NOT_SUPPORTED)) {   /* a controller, and no pipes (or memory) for it */
             if (!s_learn_pending) {
                 s_learn_pending = 1;
@@ -401,6 +406,8 @@ static void add_device(uint8_t address, int reuse, uint8_t tries_left)
         }
         return;
     }
+    if (role != JLAPP_OTHER)
+        s_claim_fails = 0;
     ESP_LOGI(TAG, "device %u: MIDI out%s", address, d->in ? " and in" : "");
     if (d->in) {
         usb_lp_attach(d->role);
@@ -494,7 +501,31 @@ static TickType_t client_wait_ticks(void)
         if (t < w)
             w = t;
     }
+    {
+        uint32_t ms = jhr_wait_ms(&s_recover, pdTICKS_TO_MS(xTaskGetTickCount()));
+        if (ms != UINT32_MAX && pdMS_TO_TICKS(ms) < w)
+            w = pdMS_TO_TICKS(ms);
+    }
     return w;
+}
+
+/* The software replug (core/jank_hostrecover.h): a controller that keeps failing its claim, the root port off, then on again; the devices leave (remove_device) and come
+ * back as new ones (add_device) */
+static void recover_due(void)
+{
+    enum jhr_act a = jhr_step(&s_recover, s_claim_fails, pdTICKS_TO_MS(xTaskGetTickCount()));
+    esp_err_t e;
+    if (a == JHR_NONE)
+        return;
+    if (a == JHR_POWER_OFF) {
+        s_retry_left = 0;              /* the device comes back as a new one */
+        s_claim_fails = 0;
+        g_hostdiag.recovers = s_recover.count;
+        ESP_LOGW(TAG, "a controller does not claim: the root port off and on again (software replug %u of %u)", s_recover.count, JHR_MAX);
+    }
+    e = usb_host_lib_set_root_port_power(a == JHR_POWER_ON);
+    if (e != ESP_OK)
+        ESP_LOGW(TAG, "root port %s: %s", a == JHR_POWER_ON ? "on" : "off", esp_err_to_name(e));
 }
 
 /* the controller that could not be claimed is tried again (it may fail again, and then wait once more, up to CLAIM_RETRIES times in all) */
@@ -519,6 +550,7 @@ static void client_task(void *arg)
         }
         if (s_retry_left && (int32_t)(xTaskGetTickCount() - s_retry_at) >= 0)
             retry_due();
+        recover_due();
         usb_lp_pump();                 /* what a callback, a device or the clock has made room for */
         if (s_learn_pending && (int32_t)(xTaskGetTickCount() - s_learn_at) >= 0)
             learn_and_restart();
