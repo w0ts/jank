@@ -234,7 +234,7 @@ static void test_scene_buttons(void)
     jlmx_scene(&s, 1);
     CHECK(jlmx_scene_colour(&s, 1) == JLMX_COLOR_PAN && jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL_DIM);
     jlmx_scene(&s, 4);
-    CHECK(jlmx_scene_colour(&s, 4) == JLMX_COLOR_SEND && jlmx_scene_colour(&s, 3) == JLMX_COLOR_SEND_DIM && jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL_DIM);
+    CHECK(jlmx_scene_colour(&s, 4) == JLMX_COLOR_SEND_ON && jlmx_scene_colour(&s, 3) == JLMX_COLOR_SEND_DIM && jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL_DIM);
     CHECK(jlmx_scene_colour(&s, 5) == JLMX_COLOR_MUTED && jlmx_scene_colour(&s, 6) == JLMX_COLOR_NOSOLO);
     jlmx_scene(&s, 5);                                             /* the mute / solo screen: scene buttons 6 and 7 are both on */
     CHECK(jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED && jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO && jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL_DIM);
@@ -242,8 +242,8 @@ static void test_scene_buttons(void)
     CHECK(jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO && jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED);
     CHECK(jlmx_scene_colour(&s, 7) == 0);
     CHECK(JLMX_COLOR_UNMUTED == 21 && JLMX_COLOR_MUTED == 23 && JLMX_COLOR_SOLO == 45 && JLMX_COLOR_NOSOLO == 47);   /* GREEN, GREEN_THIRD (owner: Elektron's mute colour), BLUE, BLUE_THIRD */
-    CHECK(JLMX_COLOR_VOL == 25 && JLMX_COLOR_PAN == 17 && JLMX_COLOR_SEND == 60);   /* the owner's picks (2026-11-25) */
-    CHECK(JLMX_COLOR_VOL_DIM == 27 && JLMX_COLOR_PAN_DIM == 19 && JLMX_COLOR_SEND_DIM == 63 && JLMX_COLOR_BUTTON == 29 && JLMX_COLOR_BUTTON_DIM == 31);   /* the faders' thirds; MINT, MINT_THIRD */
+    CHECK(JLMX_COLOR_VOL == 25 && JLMX_COLOR_PAN == 17 && JLMX_COLOR_SEND == 50 && JLMX_COLOR_SEND_ON == 49 && JLMX_COLOR_SEND_DIM == 51);   /* the owner's picks (2026-11-25) */
+    CHECK(JLMX_COLOR_VOL_DIM == 27 && JLMX_COLOR_PAN_DIM == 19 && JLMX_COLOR_SEND_DIM == 51 && JLMX_COLOR_BUTTON == 29 && JLMX_COLOR_BUTTON_DIM == 31);   /* the faders' thirds; MINT, MINT_THIRD */
 }
 
 static void test_a_fader_tap_writes_its_step_and_the_fader_moves_at_once(void)

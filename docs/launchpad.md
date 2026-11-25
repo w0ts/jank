@@ -184,7 +184,7 @@ buttons' order (Launchpad 95: volume, pan, send A, send B, stop, mute, solo, arm
 | 8 | dark | nothing |
 
 **Colours** (owner 2026-11-25, picked on the Session colour chart; Launchpad 95 has MINT for all three): **volume 25** (row 4 col 2), **pan 17** (row 3 col 2), **the
-three sends 60** (row 8 col 5); the view buttons (scene 1-5) are **in their fader's colour: full (25 / 17 / 60) while their view is shown, that colour's third (27 / 19 / 63) otherwise** (owner
+three sends 50** (purple, row 7 col 3; first 60, row 8 col 5, which showed red on its scene button); the view buttons (scene 1-5) are **in their fader's colour: full (25 / 17, the sends 49) while their view is shown, the third (27 / 19, the sends 51) otherwise; the send faders 50 (owner's chart picks)** (owner
 2026-11-25, after a first all-yellow version: "the scene button color must match their relative faders") (owner 2026-11-25: "scene change
 color when i select them in mixer. the should be some kind of yellow", then "each color has full, half, third brightness level ... please use that": the
 palette's groups of four are light, full, half, third, e.g. RED 4 5 6 7; one hue, its brightness gives the state). Capture
