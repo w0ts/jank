@@ -317,6 +317,16 @@ static uint8_t view_colour(uint8_t view)
     return JLMX_COLOR_SEND;
 }
 
+/* ... and that colour's third (a view button whose view is not shown) */
+static uint8_t view_dim(uint8_t view)
+{
+    if (view == JLMX_VOL)
+        return JLMX_COLOR_VOL_DIM;
+    if (view == JLMX_PAN)
+        return JLMX_COLOR_PAN_DIM;
+    return JLMX_COLOR_SEND_DIM;
+}
+
 static uint8_t overview_colour(const struct jlmx *s, unsigned track, unsigned row)
 {
     unsigned r = row_from_top((uint8_t)row);
@@ -366,7 +376,7 @@ uint8_t jlmx_scene_colour(const struct jlmx *s, uint8_t idx)
 {
     int on = s->view == idx;
     if (idx <= JLMX_CHR)
-        return on ? JLMX_COLOR_SCENE_ON : JLMX_COLOR_SCENE_OFF;   /* one yellow, full or third (owner 2026-11-25) */
+        return on ? view_colour(idx) : view_dim(idx);   /* its fader's colour, full or third (owner 2026-11-25) */
     on = is_mute_solo(s->view);        /* scene buttons 6 and 7 are the same screen: both bright while it is shown */
     if (idx == JLMX_MUTE)
         return on ? JLMX_COLOR_UNMUTED : JLMX_COLOR_MUTED;

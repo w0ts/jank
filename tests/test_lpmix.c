@@ -226,23 +226,24 @@ static void test_scene_buttons(void)
     struct jlmx s;
     jlmx_init(&s);
     CHECK(!jlmx_scene(&s, 7) && !jlmx_scene(&s, 200) && s.view == JLMX_OVERVIEW);   /* the 8th has no job; a wild index changes nothing */
-    for (uint8_t i = 0; i < 5; i++)
-        CHECK(jlmx_scene_colour(&s, i) == JLMX_COLOR_SCENE_OFF);   /* on the overview no view is the one shown: all yellow, third */
+    CHECK(jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL_DIM && jlmx_scene_colour(&s, 1) == JLMX_COLOR_PAN_DIM);   /* on the overview no view is shown: each its fader's colour, third */
+    for (uint8_t i = 2; i < 5; i++)
+        CHECK(jlmx_scene_colour(&s, i) == JLMX_COLOR_SEND_DIM);
     jlmx_scene(&s, 0);
-    CHECK(jlmx_scene_colour(&s, 0) == JLMX_COLOR_SCENE_ON && jlmx_scene_colour(&s, 1) == JLMX_COLOR_SCENE_OFF);   /* the view shown: yellow full (owner) */
+    CHECK(jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL && jlmx_scene_colour(&s, 1) == JLMX_COLOR_PAN_DIM);   /* the view shown: its fader's colour, full (owner) */
     jlmx_scene(&s, 1);
-    CHECK(jlmx_scene_colour(&s, 1) == JLMX_COLOR_SCENE_ON && jlmx_scene_colour(&s, 0) == JLMX_COLOR_SCENE_OFF);
+    CHECK(jlmx_scene_colour(&s, 1) == JLMX_COLOR_PAN && jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL_DIM);
     jlmx_scene(&s, 4);
-    CHECK(jlmx_scene_colour(&s, 4) == JLMX_COLOR_SCENE_ON && jlmx_scene_colour(&s, 3) == JLMX_COLOR_SCENE_OFF && jlmx_scene_colour(&s, 0) == JLMX_COLOR_SCENE_OFF);
+    CHECK(jlmx_scene_colour(&s, 4) == JLMX_COLOR_SEND && jlmx_scene_colour(&s, 3) == JLMX_COLOR_SEND_DIM && jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL_DIM);
     CHECK(jlmx_scene_colour(&s, 5) == JLMX_COLOR_MUTED && jlmx_scene_colour(&s, 6) == JLMX_COLOR_NOSOLO);
     jlmx_scene(&s, 5);                                             /* the mute / solo screen: scene buttons 6 and 7 are both on */
-    CHECK(jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED && jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO && jlmx_scene_colour(&s, 0) == JLMX_COLOR_SCENE_OFF);
+    CHECK(jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED && jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO && jlmx_scene_colour(&s, 0) == JLMX_COLOR_VOL_DIM);
     jlmx_scene(&s, 6);
     CHECK(jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO && jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED);
     CHECK(jlmx_scene_colour(&s, 7) == 0);
     CHECK(JLMX_COLOR_UNMUTED == 13 && JLMX_COLOR_MUTED == 15 && JLMX_COLOR_SOLO == 45 && JLMX_COLOR_NOSOLO == 47);   /* LP95's YELLOW, YELLOW_THIRD, BLUE, BLUE_THIRD */
     CHECK(JLMX_COLOR_VOL == 25 && JLMX_COLOR_PAN == 17 && JLMX_COLOR_SEND == 60);   /* the owner's picks (2026-11-25) */
-    CHECK(JLMX_COLOR_SCENE_ON == 13 && JLMX_COLOR_SCENE_OFF == 15 && JLMX_COLOR_BUTTON == 29 && JLMX_COLOR_BUTTON_DIM == 31);   /* YELLOW full / third; MINT, MINT_THIRD */
+    CHECK(JLMX_COLOR_VOL_DIM == 27 && JLMX_COLOR_PAN_DIM == 19 && JLMX_COLOR_SEND_DIM == 63 && JLMX_COLOR_BUTTON == 29 && JLMX_COLOR_BUTTON_DIM == 31);   /* the faders' thirds; MINT, MINT_THIRD */
 }
 
 static void test_a_fader_tap_writes_its_step_and_the_fader_moves_at_once(void)

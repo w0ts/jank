@@ -33,8 +33,11 @@
 #define JLMX_COLOR_VOL 25u             /* the owner's picks (Session chart, first page, row 4 col 2 / row 3 col 2 / row 8 col 5); the empty part of a fader is dark */
 #define JLMX_COLOR_PAN 17u
 #define JLMX_COLOR_SEND 60u            /* delay, reverb and chorus */
-#define JLMX_COLOR_SCENE_ON 13u        /* the view buttons (scene 1-5), all YELLOW (owner 2026-11-25): full while their view is shown, third otherwise. The palette's */
-#define JLMX_COLOR_SCENE_OFF 15u       /* groups of four are light, full, half, third (RED 4 5 6 7): one hue, its brightness says the state, as mute's button */
+/* the view buttons (scene 1-5) in their fader's colour (owner 2026-11-25: "the scene button color must match their relative faders"): full (the fader's own) while
+ * the view is shown, the same colour's third otherwise (the palette's groups of four are light, full, half, third: RED 4 5 6 7; 60 is the light one of 60..63) */
+#define JLMX_COLOR_VOL_DIM 27u
+#define JLMX_COLOR_PAN_DIM 19u
+#define JLMX_COLOR_SEND_DIM 63u
 #define JLMX_COLOR_UNMUTED 13u         /* YELLOW */
 #define JLMX_COLOR_MUTED 15u           /* YELLOW_THIRD */
 #define JLMX_COLOR_SOLO 45u            /* BLUE */
@@ -108,7 +111,7 @@ int jlmx_scene(struct jlmx *s, uint8_t idx);
 int jlmx_bank_step(struct jlmx *s, int dir);
 /* the 64 pads of the screen (led[JLX_PAD0 ..]), a held fader pad in its hold colour at now_ms; nothing known yet: dark */
 void jlmx_frame(const struct jlmx *s, uint32_t now_ms, struct jlx_frame *f);
-/* the colour of scene button idx: a view button YELLOW full while its view is shown, YELLOW third otherwise; mute YELLOW, solo BLUE (full when their screen is shown);
+/* the colour of scene button idx: a view button its fader's colour while its view is shown, that colour's third otherwise; mute YELLOW, solo BLUE (full when their screen is shown);
  * 0 for a button with no job */
 uint8_t jlmx_scene_colour(const struct jlmx *s, uint8_t idx);
 #endif
