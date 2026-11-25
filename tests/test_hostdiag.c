@@ -226,6 +226,7 @@ static void test_the_pattern_line(void)
     d.dn2_pattern = 37;
     CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_pat=reads:120,cues:4,ok:1/0,playing:37\n"));
     CHECK(strstr(out, "hostdiag_steps=") < strstr(out, "hostdiag_pat=") && strstr(out, "hostdiag_pat=") < strstr(out, "hostdiag_dn2live="));
+    CHECK(strstr(out, "hostdiag_rt=start:0,stop:0,due:0,clock:0,gated_start:0,gated_stop:0\n") && strstr(out, "hostdiag_rt=") < strstr(out, "hostdiag_pat="));   /* the realtime bytes to the hosted devices */
     d.live_pat_reads = 0xFFFFFFFFu;    /* at its longest */
     d.live_pat_cues = 0xFFFFFFFFu;
     d.dn2_pattern = 127;

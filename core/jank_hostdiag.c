@@ -117,6 +117,8 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
     put(out, cap, &n, "hostdiag_steps=edits:%lu,reads:%lu,busy:%lu,refused:%lu,mixreads:%lu,mixsets:%lu\n", (unsigned long)d->live_edits, (unsigned long)d->live_pagereads,
         (unsigned long)d->live_step_busy, (unsigned long)d->live_step_refused, (unsigned long)d->live_mixer_reads, (unsigned long)d->live_mixer_sets);
     /* the Session page (short: `diag` has 2040 bytes in all): PATTERNS reads, PATTERN requests, both not refused (reads/cue), the playing pattern (-1: none read) */
+    put(out, cap, &n, "hostdiag_rt=start:%lu,stop:%lu,due:%lu,clock:%lu,gated_start:%lu,gated_stop:%lu\n", (unsigned long)d->rt_start, (unsigned long)d->rt_stop,
+        (unsigned long)d->rt_stop_due, (unsigned long)d->rt_clock, (unsigned long)d->rt_gated_start, (unsigned long)d->rt_gated_stop);
     put(out, cap, &n, "hostdiag_pat=reads:%lu,cues:%lu,ok:%u/%u,playing:%d\n", (unsigned long)d->live_pat_reads, (unsigned long)d->live_pat_cues, d->pat_reads_ok,
         d->pat_cue_ok, d->dn2_pattern < 128u ? (int)d->dn2_pattern : -1);
     /* stage 8: TRANSPORT sent / not refused / the Digitone's state (-1 none read), peers (1: Link leads), the Digitone's keys followed, CHAIN sent / not refused */

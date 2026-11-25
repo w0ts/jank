@@ -144,8 +144,17 @@ bool IRAM_ATTR usb_midi_isr(const uint8_t *bytes, size_t n)
     BaseType_t woken = pdFALSE;
     uint32_t head = s_head;
     uint32_t tail = __atomic_load_n(&s_tail, __ATOMIC_ACQUIRE);
-    if (!n || !s_task || !CLOCK_OUT())
+    if (!n || !s_task)
         return false;
+    if (!CLOCK_OUT()) {                 /* (counted: a Start / Stop the clock made while the gate is closed is not sent; diag hostdiag_rt) */
+        for (size_t i = 0; i < n; ++i) {
+            if (bytes[i] == 0xFAu)
+                g_hostdiag.rt_gated_start++;
+            else if (bytes[i] == 0xFCu)
+                g_hostdiag.rt_gated_stop++;
+        }
+        return false;
+    }
     if (RING_SIZE - (head - tail) < n) {
         ++s_dropped;
         return false;
@@ -188,8 +197,18 @@ static void send_clock(void)
     if (s_stop_due && !CLOCK_OUT()) {   /* USB MIDI CLOCK just turned off (or no peers left): a Stop after what was queued */
         s_stop_due = 0;
         b[n++] = 0xFCu;
+        if (s_host)
+            g_hostdiag.rt_stop_due++;
     }
     if (n && s_host) {
+        for (size_t i = 0; i < n; ++i) {   /* what goes to the hosted devices (diag hostdiag_rt) */
+            if (b[i] == 0xFAu)
+                g_hostdiag.rt_start++;
+            else if (b[i] == 0xFCu)
+                g_hostdiag.rt_stop++;
+            else if (b[i] == 0xF8u)
+                g_hostdiag.rt_clock++;
+        }
         uint8_t packets[(RING_SIZE + 1u) * 4u];
         usb_midi_host_send(packets, jx_realtime_packets(b, n, packets, sizeof packets));
     } else if (n && tud_midi_mounted()) {
