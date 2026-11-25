@@ -107,6 +107,14 @@ static void test_sysex_packets_golden(void)
         CHECK(jd2_sysex_to_packets(0, three, 3, out, sizeof out) == 4 && out[0] == 0x07 && out[1] == 0xF0 && out[3] == 0xF7);
         CHECK(jd2_sysex_to_packets(0, one_end, 4, out, sizeof out) == 8 && out[0] == 0x04 && out[4] == 0x05 && out[5] == 0xF7);
     }
+    {
+        uint8_t one[4];                                                       /* one packet at a time: the same packets, and nothing past the end */
+        size_t k = 0;
+        CHECK(jd2_sysex_to_packets(0, sx, n, out, sizeof out) == 4u * JD2_SYSEX_PACKETS(n));
+        for (; jd2_sysex_packet(0, sx, n, k, one); k++)
+            CHECK(!memcmp(one, out + 4u * k, 4));
+        CHECK(k == JD2_SYSEX_PACKETS(n));
+    }
 }
 
 static int feed_all(struct jd2_sx *s, const uint8_t *packets, size_t bytes)

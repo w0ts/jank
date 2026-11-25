@@ -81,11 +81,33 @@ struct jdl_page {
  * left, u8 ring size, u8 most notes a push, then u32 notes made (queued by the sequencer hook), u32 sent, u32 lost, u32 dropped, u32 push messages sent, u32 passes a
  * push waited for room in USB's ring, u16 the next push's sequence number; all numbers big-endian (the doc's rule for the channel) */
 #define JDL_STATUS_BYTES 31u
+/* Protocol 7 (the Digitone's stage 8, PROVISIONAL layout: final only after its lp8 build passes): the 73 bytes of protocol 6 unchanged, then u8 transport state (enum
+ * jdl_transport_state), u8 playing pattern, u8 next pattern (255 = the same), u8 pattern mode, u16 chain count, u16 chain position (0xFFFF cued), then u32 writes applied, u32
+ * writes refused. Read when protocol >= 7 and the answer is long enough (the counters only when they are there); protocols 5 and 6 read as before */
+#define JDL_P7_BYTE 73u
+#define JDL_P7_BYTES 81u               /* through the chain position */
+#define JDL_P7_COUNTERS_BYTES 89u
+struct jdl_live7 {
+    uint8_t transport, playing, next, mode;
+    uint16_t chain_count, chain_pos;
+    uint8_t counters;                  /* the two counters below came */
+    uint32_t applied, refused;
+};
 struct jdl_status {
     uint8_t valid, proto, push, lease;
     uint32_t made, sent, lost, dropped, msgs, waited;
     uint8_t rec_valid, rec_bits;       /* protocol >= 6: the record byte (JDL_REC_*) */
+    uint8_t p7_valid;                  /* protocol >= 7: p7 holds the last answer's */
+    struct jdl_live7 p7;
 };
+
+/* TRANSPORT (61, the Digitone's stage 8, PROVISIONAL): `u8 op` 0 STOP (its [STOP] key), 1 PLAY (start, or continue when paused; nothing when playing), 2 PAUSE, 255 read ->
+ * `u8 state` (0 stopped, 1 playing, 2 paused). It runs the Digitone's own key code. A build without it answers status 2 once; none is sent after that until jdl_init */
+#define JDL_CMD_TRANSPORT 61u
+enum jdl_transport_op { JDL_TR_STOP = 0, JDL_TR_PLAY = 1, JDL_TR_PAUSE = 2, JDL_TR_READ = 255 };
+enum jdl_transport_state { JDL_TR_STOPPED = 0, JDL_TR_PLAYING = 1, JDL_TR_PAUSED = 2 };
+/* With protocol 7 the LIVE STATUS is asked this often instead of JDL_KEEPALIVE_MS: it carries the transport and the patterns (not measured: what it costs the Digitone) */
+#define JDL_STATUS_FAST_MS 250u
 
 /* The mixer (MIXER, 45, no arguments -> 106 bytes: u32 mute mask (bit t = track t+1), u32 solo mask, u8 active track, u8 16, then 16 x {VOL, PAN, DEL send, REV send, CHR
  * send, LEVEL}, each 0..127; PAN 64 is the centre; LEVEL is real from the Digitone's stage 4). A read only: writing needs the Digitone's stage 6. */
@@ -111,8 +133,12 @@ struct jdl_scale {
 /* The patterns (the Session page). PATTERNS (51, the Digitone's stage 4, works today): `u8 bank (0..7, 255 = the playing pattern's bank)` -> `u8 bank, u8 playing pattern
  * (0..127), u16 mask` (bit k: pattern 16 x bank + k holds a trig; big-endian); status 2: bank over 7 (or a build without it). It costs the Digitone up to about 0.8 ms per
  * bank in its MIDI task. PATTERN (60, PROVISIONAL: asked of the Digitone's developers 2026-11-25, not built there; Jank sends it as RECORD was sent before the Digitone had
- * it): `u8 pattern 0..127, u8 how (0 cue: switch at the playing pattern's end, 1 jump, 255 read)` -> `u8 playing pattern, u8 cued pattern (255 none)`; a build without it
- * answers status 2 once and no more are sent until live control is asked for afresh (jdl_init). Never a MIDI Program Change (owner: "sysex"). */
+ * it; stage 8's provisional format): `u8 pattern 0..127, u8 how (0 cue: switch at the playing pattern's end, 1 jump, 255 read)` -> `u8 playing, u8 next (255 = the same),
+ * u8 mode, u8 running, u8 jump armed`; a build without it answers status 2 once and no more are sent until live control is asked for afresh (jdl_init). Never a MIDI Program
+ * Change (owner: "sysex").
+ * CHAIN (59, stage 8, PROVISIONAL): `u8 op` 0 SET `u8 n (2..64), n x pattern` (stock's PTN + held TRIG chain; it loops), 1 CLEAR, 255 READ `u8 first` -> `u8 mode, u16 count,
+ * u16 position (0xFFFF cued), u8 first, u8 k, k x pattern`. Status 2 (a build without it: stops it as PATTERN's), 5 (queue full: that request), 4 / 7 (live control's). A MIDI
+ * Program Change cancels a chain. */
 #define JDL_CMD_PATTERNS 51u
 #define JDL_CMD_PATTERN 60u
 #define JDL_BANKS 8u                   /* A..H, 16 patterns each */
@@ -126,11 +152,28 @@ struct jdl_patterns {
     uint16_t mask;                     /* bit k: pattern 16 x bank + k holds a trig */
 };
 struct jdl_pattern {
-    uint8_t playing, cued;             /* the playing pattern, the cued one (JDL_NO_PATTERN: none) */
+    uint8_t playing, next;             /* the playing pattern, the next one (JDL_NO_PATTERN: the same, nothing cued) */
+    uint8_t mode, running, armed;      /* PATTERN's other bytes (0 when the answer is shorter) */
+};
+#define JDL_CMD_CHAIN 59u
+#define JDL_CHAIN_MIN 2u
+#define JDL_CHAIN_MAX 64u
+enum jdl_chain_op { JDL_CHAIN_SET = 0, JDL_CHAIN_CLEAR = 1, JDL_CHAIN_READ = 255 };
+#define JDL_CHAIN_HEAD 7u              /* mode, count, position, first, k */
+struct jdl_chain {
+    uint8_t mode, first, k;            /* this answer holds the chain's patterns first .. first + k - 1 */
+    uint16_t count, pos;
+    uint8_t member[JDL_PATTERNS / 8u]; /* bit p: pattern p is among those k */
 };
 
 struct jdl {
     struct jdl_status st;              /* the Digitone's last LIVE STATUS */
+    uint8_t live7_fresh;               /* a protocol-7 status came and was not taken (jdl_take_live7) */
+    uint8_t transport_ok, transport_fresh, transport_state;   /* TRANSPORT (61) not refused; its last answer, until taken */
+    uint8_t transport_probed;          /* TRANSPORT has been read once on this connection (jdl_probe_transport) */
+    uint8_t chain_ok, chain_fresh;     /* CHAIN (59) not refused; its last answer, until taken */
+    uint32_t chain_busy;               /* CHAIN answered 5 (queue full): that request lost */
+    struct jdl_chain ch;
     struct jdl_patterns pb;            /* the last PATTERNS answer, until taken (patterns_fresh) */
     struct jdl_pattern pc;             /* the last PATTERN answer, until taken (pattern_fresh) */
     uint8_t patterns_fresh, pattern_fresh;
@@ -155,7 +198,7 @@ struct jdl {
     uint8_t play_ok;                   /* PLAY has not been refused (status 2): 1 until it is */
     uint8_t msg_ok;                    /* MESSAGE has not been refused (status 2: a Digitone build without it): 1 until it is */
     uint8_t asked;                     /* a live request has been sent, at sent_ms */
-    uint32_t sent_ms;
+    uint32_t sent_ms, status_ms;       /* the last request of any kind (the lease), the last LIVE STATUS asked (the fast status of protocol 7) */
     uint16_t read_seq, select_seq;     /* the last active-track read and the last select sent */
     uint8_t has_read, has_select;
     uint8_t read_ok;                   /* the no-argument TRACK read has not been refused (status 2): 1 until it is */
@@ -174,7 +217,7 @@ int jdl_is_live(const struct jdl *d);
 int jdl_can_play(const struct jdl *d);                       /* live, and PLAY has not been refused */
 
 /* the request to send now, F0 .. F7 into out, its length; 0 when there is nothing to send yet. LIVE ON while not live (every JDL_ASK_MS, every JDL_IDLE_ASK_MS
- * after a 7 or a 2), a LIVE STATUS every JDL_KEEPALIVE_MS while live */
+ * after a 7 or a 2), a LIVE STATUS every JDL_KEEPALIVE_MS while live (every JDL_STATUS_FAST_MS once the Digitone said protocol 7) */
 size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
 /* a request, only while live (else 0): the active track, a PLAY. A request also keeps the lease */
 size_t jdl_track(struct jdl *d, uint32_t now_ms, uint8_t track, uint8_t *out, size_t cap);
@@ -200,6 +243,19 @@ size_t jdl_patterns_read(struct jdl *d, uint32_t now_ms, uint8_t bank, uint8_t *
 size_t jdl_pattern(struct jdl *d, uint32_t now_ms, uint8_t pattern, uint8_t how, uint8_t *out, size_t cap);
 int jdl_take_patterns(struct jdl *d, struct jdl_patterns *out);
 int jdl_take_pattern(struct jdl *d, struct jdl_pattern *out);
+/* TRANSPORT (61): op an enum jdl_transport_op; 0 unless live and not refused. jdl_probe_transport: one read right after live control comes up (its refusal, or the state, is
+ * known before the first press); once per connection. jdl_take_transport: the last answer's state, once, else -1 */
+size_t jdl_transport(struct jdl *d, uint32_t now_ms, uint8_t op, uint8_t *out, size_t cap);
+size_t jdl_probe_transport(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
+int jdl_take_transport(struct jdl *d);
+/* CHAIN (59): SET n (JDL_CHAIN_MIN..JDL_CHAIN_MAX) patterns 0..127, CLEAR, READ from `first`; 0 unless live, not refused and valid. jdl_take_chain: the last answer (its READ
+ * part), once */
+size_t jdl_chain_set(struct jdl *d, uint32_t now_ms, const uint8_t *patterns, size_t n, uint8_t *out, size_t cap);
+size_t jdl_chain_clear(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
+size_t jdl_chain_read(struct jdl *d, uint32_t now_ms, uint8_t first, uint8_t *out, size_t cap);
+int jdl_take_chain(struct jdl *d, struct jdl_chain *out);
+/* the protocol-7 part of the last LIVE STATUS, once per status (1 and *out filled), else 0 */
+int jdl_take_live7(struct jdl *d, struct jdl_live7 *out);
 /* LIVE ERASE: bit t of `tracks` = erase on for track t, 0 = all off (the Delete button held / let go). The answer is LIVE STATUS. 0 unless live control is on */
 size_t jdl_erase(struct jdl *d, uint32_t now_ms, uint16_t tracks, uint8_t *out, size_t cap);
 

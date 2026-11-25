@@ -30,7 +30,11 @@ void jdl_init(struct jdl *d)
     d->record_ok = 1;
     d->patterns_ok = 1;
     d->pattern_ok = 1;
+    d->transport_ok = 1;
+    d->chain_ok = 1;
 }
+
+static int proto7(const struct jdl *d) { return d->st.valid && d->st.proto >= 7u; }
 
 int jdl_is_live(const struct jdl *d) { return d->state == JDL_LIVE; }
 
@@ -52,8 +56,10 @@ size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
     static const uint8_t on[2] = {SUB_ON, WHAT_PUSH_NOTES}, status[1] = {SUB_STATUS};
     switch (d->state) {
     case JDL_LIVE:
-        if (since >= JDL_KEEPALIVE_MS)
+        if (since >= JDL_KEEPALIVE_MS || (proto7(d) && (uint32_t)(now_ms - d->status_ms) >= JDL_STATUS_FAST_MS)) {
+            d->status_ms = now_ms;
             return send(d, now_ms, JDL_CMD_LIVE, status, sizeof status, out, cap);
+        }
         return 0;
     case JDL_REMOTE_OFF:
     case JDL_NO_LIVE:
@@ -268,8 +274,132 @@ static void take_pattern(struct jdl *d, const struct jd2_reply *r)
     if (r->n < 2u || r->data[0] >= JDL_PATTERNS || (r->data[1] >= JDL_PATTERNS && r->data[1] != JDL_NO_PATTERN))
         return;
     d->pc.playing = r->data[0];
-    d->pc.cued = r->data[1];
+    d->pc.next = r->data[1];
+    d->pc.mode = r->n > 2u ? r->data[2] : 0u;
+    d->pc.running = r->n > 3u ? r->data[3] : 0u;
+    d->pc.armed = r->n > 4u ? r->data[4] : 0u;
     d->pattern_fresh = 1;
+}
+
+size_t jdl_transport(struct jdl *d, uint32_t now_ms, uint8_t op, uint8_t *out, size_t cap)
+{
+    if (d->state != JDL_LIVE || !d->transport_ok || (op > JDL_TR_PAUSE && op != JDL_TR_READ))
+        return 0;
+    return send(d, now_ms, JDL_CMD_TRANSPORT, &op, 1, out, cap);
+}
+
+size_t jdl_probe_transport(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
+{
+    size_t n;
+    if (d->transport_probed)
+        return 0;
+    n = jdl_transport(d, now_ms, JDL_TR_READ, out, cap);
+    if (n)
+        d->transport_probed = 1;
+    return n;
+}
+
+int jdl_take_transport(struct jdl *d)
+{
+    if (!d->transport_fresh)
+        return -1;
+    d->transport_fresh = 0;
+    return d->transport_state;
+}
+
+size_t jdl_chain_set(struct jdl *d, uint32_t now_ms, const uint8_t *patterns, size_t n, uint8_t *out, size_t cap)
+{
+    uint8_t args[2u + JDL_CHAIN_MAX];
+    if (d->state != JDL_LIVE || !d->chain_ok || !patterns || n < JDL_CHAIN_MIN || n > JDL_CHAIN_MAX)
+        return 0;
+    for (size_t i = 0; i < n; i++) {
+        if (patterns[i] >= JDL_PATTERNS)
+            return 0;
+        args[2u + i] = patterns[i];
+    }
+    args[0] = JDL_CHAIN_SET;
+    args[1] = (uint8_t)n;
+    return send(d, now_ms, JDL_CMD_CHAIN, args, 2u + n, out, cap);
+}
+
+size_t jdl_chain_clear(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
+{
+    static const uint8_t op = JDL_CHAIN_CLEAR;
+    if (d->state != JDL_LIVE || !d->chain_ok)
+        return 0;
+    return send(d, now_ms, JDL_CMD_CHAIN, &op, 1, out, cap);
+}
+
+size_t jdl_chain_read(struct jdl *d, uint32_t now_ms, uint8_t first, uint8_t *out, size_t cap)
+{
+    uint8_t args[2] = {JDL_CHAIN_READ, first};
+    if (d->state != JDL_LIVE || !d->chain_ok || first >= JDL_CHAIN_MAX)
+        return 0;
+    return send(d, now_ms, JDL_CMD_CHAIN, args, sizeof args, out, cap);
+}
+
+int jdl_take_chain(struct jdl *d, struct jdl_chain *out)
+{
+    if (!d->chain_fresh)
+        return 0;
+    *out = d->ch;
+    d->chain_fresh = 0;
+    return 1;
+}
+
+int jdl_take_live7(struct jdl *d, struct jdl_live7 *out)
+{
+    if (!d->live7_fresh)
+        return 0;
+    *out = d->st.p7;
+    d->live7_fresh = 0;
+    return 1;
+}
+
+static uint16_t u16be(const uint8_t *p) { return (uint16_t)((p[0] << 8) | p[1]); }
+
+/* CHAIN's answer: `u8 mode, u16 count, u16 position, u8 first, u8 k, k x pattern` (a SET's or a CLEAR's answer of that shape is taken too) */
+static void take_chain(struct jdl *d, const struct jd2_reply *r)
+{
+    struct jdl_chain *c = &d->ch;
+    uint8_t k;
+    if (r->n < JDL_CHAIN_HEAD)
+        return;
+    k = r->data[6];
+    if (r->n < JDL_CHAIN_HEAD + (size_t)k || k > JDL_CHAIN_MAX)
+        return;
+    memset(c, 0, sizeof *c);
+    c->mode = r->data[0];
+    c->count = u16be(r->data + 1);
+    c->pos = u16be(r->data + 3);
+    c->first = r->data[5];
+    c->k = k;
+    for (unsigned i = 0; i < k; i++) {
+        uint8_t p = r->data[JDL_CHAIN_HEAD + i];
+        if (p < JDL_PATTERNS)
+            c->member[p >> 3] |= (uint8_t)(1u << (p & 7u));
+    }
+    d->chain_fresh = 1;
+}
+
+/* the protocol-7 bytes after the 73 of protocol 6 */
+static void take_live7(struct jdl *d, const uint8_t *s, size_t n)
+{
+    struct jdl_live7 *p = &d->st.p7;
+    d->st.p7_valid = d->st.proto >= 7u && n >= JDL_P7_BYTES;
+    if (!d->st.p7_valid)
+        return;
+    s += JDL_P7_BYTE;
+    p->transport = s[0];
+    p->playing = s[1];
+    p->next = s[2];
+    p->mode = s[3];
+    p->chain_count = u16be(s + 4);
+    p->chain_pos = u16be(s + 6);
+    p->counters = n >= JDL_P7_COUNTERS_BYTES;
+    p->applied = p->counters ? u32be(s + 8) : 0u;
+    p->refused = p->counters ? u32be(s + 12) : 0u;
+    d->live7_fresh = 1;
 }
 
 int jdl_take_mixer(struct jdl *d, struct jdl_mixer *out)
@@ -441,8 +571,27 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
     }
     if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE &&
         r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET && r.cmd != JDL_CMD_MIXER_SET && r.cmd != JDL_CMD_MUTE_SET && r.cmd != JDL_CMD_RECORD &&
-        r.cmd != JDL_CMD_PATTERNS && r.cmd != JDL_CMD_PATTERN)
+        r.cmd != JDL_CMD_PATTERNS && r.cmd != JDL_CMD_PATTERN && r.cmd != JDL_CMD_TRANSPORT && r.cmd != JDL_CMD_CHAIN)
         return JDL_IN_IGNORED;
+    if (r.cmd == JDL_CMD_TRANSPORT || r.cmd == JDL_CMD_CHAIN) {   /* stage 8: 2 = a build without it (our arguments are always valid); 5 = CHAIN's queue is full */
+        if (r.status == ST_NOT_UNDERSTOOD) {
+            if (r.cmd == JDL_CMD_TRANSPORT)
+                d->transport_ok = 0;
+            else
+                d->chain_ok = 0;
+            return JDL_IN_REPLY;
+        }
+        if (r.status == ST_BUSY) {
+            d->chain_busy += r.cmd == JDL_CMD_CHAIN;
+            return JDL_IN_REPLY;
+        }
+        if (r.status == 0 && r.cmd == JDL_CMD_TRANSPORT && r.n >= 1u && r.data[0] <= JDL_TR_PAUSED) {
+            d->transport_state = r.data[0];
+            d->transport_fresh = 1;
+        }
+        if (r.status == 0 && r.cmd == JDL_CMD_CHAIN)
+            take_chain(d, &r);
+    }
     if (r.cmd == JDL_CMD_PATTERNS || r.cmd == JDL_CMD_PATTERN) {   /* 2: a build without it (our arguments are always valid): that command stops, live control is fine */
         if (r.status == ST_NOT_UNDERSTOOD) {
             if (r.cmd == JDL_CMD_PATTERNS)
@@ -541,6 +690,7 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         d->st.waited = u32be(s + 25);
         d->st.rec_valid = s[0] >= RECORD_PROTO && r.n > JDL_REC_BYTE;   /* protocol 6: the record byte at the end */
         d->st.rec_bits = d->st.rec_valid ? s[JDL_REC_BYTE] : 0u;
+        take_live7(d, s, r.n);         /* protocol 7: the transport, the patterns, the chain */
     }
     if (r.status == 0) {
         if (d->state != JDL_LIVE)

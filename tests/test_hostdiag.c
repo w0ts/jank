@@ -237,6 +237,29 @@ static void test_the_pattern_line(void)
     CHECK(strstr(out, ",playing:-1\n") != NULL);
 }
 
+/* stage 8's line: TRANSPORT sent / not refused / the Digitone's state, peers, the Digitone's keys followed, CHAIN sent / not refused */
+static void test_the_transport_line(void)
+{
+    struct jhd d;
+    char out[2048];
+    const char *l;
+    jhd_init(&d);
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_tr=sent:0,ok:0,dn2:-1,peers:0,follows:0,chains:0,chain_ok:0\n"));   /* nothing read: -1 */
+    d.tr_sent = 12;
+    d.tr_ok = 1;
+    d.dn2_tr = 2;                      /* paused */
+    d.tr_peers = 1;
+    d.tr_follows = 3;
+    d.chain_sent = 5;
+    d.chain_ok = 1;
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_pat=") < strstr(out, "hostdiag_tr=sent:12,ok:1,dn2:2,peers:1,follows:3,chains:5,chain_ok:1\n"));
+    d.tr_sent = d.tr_follows = d.chain_sent = 0xFFFFFFFFu;   /* at its longest */
+    d.dn2_tr = 9;                      /* not a state: -1 */
+    jhd_format(&d, out, sizeof out);
+    l = strstr(out, "hostdiag_tr=");
+    CHECK(l && strstr(l, ",dn2:-1,") && (size_t)(strchr(l, '\n') - l) + 1u <= 105u);
+}
+
 static void test_roles_and_claim_error(void)
 {
     struct jhd d;
@@ -295,6 +318,7 @@ int main(void)
     test_failure_text();
     test_full_record();
     test_the_pattern_line();
+    test_the_transport_line();
     test_roles_and_claim_error();
     test_truncation_and_hostile_names();
     test_valid_blob();

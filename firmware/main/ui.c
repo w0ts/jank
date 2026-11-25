@@ -337,9 +337,11 @@ static void ui_task(void *arg)
             auto_scan(now);
         }
         if ((uint32_t)(now - last_clock_check) >= CLOCK_PEERS_MS) {   /* host mode: the clock to the Digitone only while there are peers (usb.c) */
+            uint32_t peers = usb_is_host() ? bridge_peers_heard() : 1u;
             last_clock_check = now;
-            usb_midi_clock_peers(usb_is_host() ? bridge_peers_heard() > 0u : 1);
-            if (lp_started && !bridge_is_playing()) {   /* the transport was stopped by some other means: the Launchpad's override ends too */
+            usb_midi_clock_peers(peers > 0u);
+            usb_lp_peers_feed(peers > 0u);     /* the transport rule (core/jank_lptrans.h): no peers, the Digitone leads; peers, Link does */
+            if (lp_started && (!bridge_is_playing() || (!peers && usb_lp_dn2_leads()))) {   /* stopped by other means, or the Digitone leads now: the forced clock ends */
                 usb_midi_clock_force(0);
                 lp_started = 0;
             }
@@ -352,14 +354,19 @@ static void ui_task(void *arg)
             known = bridge_beat(&beat_ub, &mpb);
             usb_lp_beat_feed(known, beat_ub, mpb);
         }
-        if (usb_is_host() && usb_lp_transport_request()) {   /* the Launchpad's start / stop scene button (usb_lp.c asks; this task does the bridge's work) */
-            int start = !bridge_is_playing();
-            if (start)
-                usb_midi_clock_force(1);       /* an explicit start reaches the Digitone even with no peers (usb.c); before the Start byte is made */
-            bridge_play(start);
-            if (!start)
-                usb_midi_clock_force(0);       /* after the Stop byte */
-            lp_started = start;
+        if (usb_is_host()) {
+            int req = usb_lp_transport_request();
+            if (req == USB_LP_REQ_TOGGLE) {   /* the Launchpad's start / stop scene button while Link leads, or before the Digitone's TRANSPORT (usb_lp.c asks; this task does the bridge's work) */
+                int start = !bridge_is_playing();
+                if (start)
+                    usb_midi_clock_force(1);       /* an explicit start reaches the Digitone even with no peers (usb.c); before the Start byte is made */
+                bridge_play(start);
+                if (!start)
+                    usb_midi_clock_force(0);       /* after the Stop byte */
+                lp_started = start;
+            } else if (req == USB_LP_REQ_START || req == USB_LP_REQ_STOP) {   /* Link leads and the Digitone's own PLAY / STOP keys moved: Jank's session follows (the clock goes: peers) */
+                bridge_play(req == USB_LP_REQ_START);
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }

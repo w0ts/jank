@@ -106,21 +106,28 @@ int jd2_peek_data(const struct jd2_reply *r, uint32_t *address, const uint8_t **
     return 1;
 }
 
+size_t jd2_sysex_packet(uint8_t cable, const uint8_t *sx, size_t n, size_t k, uint8_t out[4])
+{
+    size_t i = 3u * k, left, take;
+    if (i >= n)
+        return 0;
+    left = n - i;
+    take = left > 3u ? 3u : left;
+    out[0] = (uint8_t)((cable << 4) | (left > 3u ? CIN_SYSEX_MORE : CIN_SYSEX_END1 + (take - 1u)));
+    out[1] = sx[i];
+    out[2] = take > 1u ? sx[i + 1] : 0;
+    out[3] = take > 2u ? sx[i + 2] : 0;
+    return 1;
+}
+
 size_t jd2_sysex_to_packets(uint8_t cable, const uint8_t *sx, size_t n, uint8_t *out, size_t cap)
 {
-    size_t o = 0;
+    size_t k = 0;
     if (!n || cap < 4u * ((n + 2u) / 3u))
         return 0;
-    for (size_t i = 0; i < n;) {
-        size_t left = n - i, take = left > 3u ? 3u : left;
-        out[o] = (uint8_t)((cable << 4) | (left > 3u ? CIN_SYSEX_MORE : CIN_SYSEX_END1 + (take - 1u)));
-        out[o + 1] = sx[i];
-        out[o + 2] = take > 1u ? sx[i + 1] : 0;
-        out[o + 3] = take > 2u ? sx[i + 2] : 0;
-        o += 4;
-        i += take;
-    }
-    return o;
+    while (jd2_sysex_packet(cable, sx, n, k, out + 4u * k))
+        k++;
+    return 4u * k;
 }
 
 void jd2_sx_init(struct jd2_sx *s) { memset(s, 0, sizeof *s); }

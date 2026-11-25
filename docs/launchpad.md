@@ -110,6 +110,34 @@ lower left, the sequence on top, the loop selector lower right):
   the transport** (Launchpad 95's Note mode: its start / stop; green running, green third when stopped, owner 2026-11-25): Jank is the transport master, the ui task calls `bridge_play`. **Measured 2026-11-24 (owner: "start stop on note mode is not working"): the unit had `peers=0`, and the rule "the clock goes to the Digitone only
   with peers on the Jank / Link network" (`usb_midi_clock_peers`) dropped every clock and Start byte, so the button did nothing.** The button now overrides that rule while the Launchpad has
   the transport started (`usb_midi_clock_force`, ui.c): the clock goes out until it stops it (or the transport stops some other way). Not tried on the unit after the fix (the update was rolled back, see the state notes).
+  **Since the Digitone's stage 8 the transport rule below decides who scene 5 starts** (owner 2026-11-25); the paragraph above is what happens with Link leading, or with a
+  Digitone that has no TRANSPORT.
+
+### Who starts and stops: the transport rule (`core/jank_lptrans.[ch]`)
+
+Owner, 2026-11-25: "if there are no link peers, then DN2 is master. but if there are then link is", and "play and rec button state should be synced bi-directionally".
+"Peers" is the count that already lets the clock out to the Digitone (`bridge_peers_heard`: Link peers on a Wi-Fi network, the Jank radio's peers otherwise; the ui task
+hands it to `usb_lp.c` every second).
+
+- **No peers: the Digitone leads.** Scene 5 sends **TRANSPORT** (61, the Digitone's stage 8, **provisional** until its lp8 build passes: `u8 op` 0 STOP, 1 PLAY (start, or
+  continue when paused; nothing when playing), 2 PAUSE, 255 read -> `u8 state` 0 stopped, 1 playing, 2 paused; it runs the Digitone's own key code): PLAY when the Digitone
+  is stopped or paused, STOP when it plays. Jank's own session is not touched and **no clock and no Start byte go to the Digitone** (nothing asks the ui task for a start, so
+  nothing forces the clock on; the peers rule keeps it off, which matches what was measured on the unit: with no peers, no clock reached the Digitone). The light follows
+  **the Digitone's transport**: from the LIVE STATUS of protocol 7, or, before protocol 7, a TRANSPORT read every 500 ms; a press shows at once and an older status does not
+  put it back for 500 ms. A clock Jank had forced on earlier (a start from before) ends at the next peers check.
+- **Peers there: Link leads.** Scene 5 starts / stops Jank's session as before, and the clock (Start and 0xF8 at Link's tempo) goes to the Digitone (`CLOCK_OUT` in usb.c:
+  the setting on and peers there; read from the code, not measured with peers). **The Digitone's own PLAY / STOP keys** (seen as a change of its transport in the
+  status) **start / stop Jank's session too** (the ui task calls `bridge_play`), so all stay together. **The guard against a loop:** a change of the Digitone's transport
+  counts only when it differs from what Jank's session does, and not within 1 s of a change Jank made itself (its Start reaches the Digitone, whose transport then changes:
+  that must not come back as a request). Not measured: what a Digitone with CLOCK RECEIVE on does with its own PLAY key while it follows a clock.
+- **Who leads is only decided after TRANSPORT has answered**: Jank reads it once when live control comes up. Until then, and on a Digitone that refuses it (status 2:
+  "TRANSP: DN2 TOO OLD", said once; no more TRANSPORT requests until live control is asked for afresh), scene 5 is Jank's session with the forced clock, as before stage 8.
+- **LIVE STATUS protocol 7** (provisional): the 73 bytes of protocol 6 unchanged, then `u8 transport, u8 playing pattern, u8 next (255 = the same), u8 mode, u16 chain count,
+  u16 chain position (0xFFFF cued), u32 writes applied, u32 writes refused`. Read when the protocol says 7 and the answer is long enough (the two counters only when they are
+  there); protocols 5 and 6 read as before, and Record still follows byte 72. Once the Digitone says protocol 7, Jank asks LIVE STATUS every 250 ms instead of every 4 s (it
+  carries the transport and the patterns; what that costs the Digitone is not measured).
+- `diag`: `hostdiag_tr=sent:<TRANSPORT sent>,ok:<not refused>,dn2:<0 stopped, 1 playing, 2 paused, -1 none read>,peers:<1: Link leads>,follows:<starts / stops the Digitone's keys
+  asked of Jank's session>,chains:<CHAIN sent>,chain_ok:<not refused>`. Host-tested (`tests/test_lptrans.c`); not tried on hardware.
 - **Delete = scene button 6, held, in Note and step modes** (owner 2026-11-24: "hold Delete wipes the current track under the playhead"; PINK_THIRD dim, PINK while held; in the mixer scene 6 is a view): the Digitone
   **erases the track's steps as its own playhead passes them** (LIVE ERASE, 44 sub 3 with a u16 track mask, there since its lp2, dn2-wishes: it deletes each step just before it plays, never sounds it, so it is the Digitone's playhead and not Jank's
   extrapolation; it ends on LIVE OFF, the 10 s lease, REMOTE CONTROL OFF or USB down). The track is the current one when the button went down; letting go (or the Launchpad going away) sends mask 0. **In the step modes (melodic and drum) a step pad pressed while Delete is held clears that step** (owner: "delete should clear pressed steps in step seq";
@@ -195,27 +223,38 @@ A-D / SESSION OFF). Held for a second, Session is the colour chart instead (abov
 **What it shows.** The Digitone's 128 patterns are 8 banks, A to H, of 16. Each bank takes two pad rows, four banks a page: from the top A01-A08, A09-A16, then B, C and
 D the same way. **Up / down** switch to banks E-H and back (it says BANKS A-D / BANKS E-H); the arrows are green where they can go, dim green at the limit, as in the
 mixer. The lights are Launchpad 95's session skin (`SkinMK2.py`, Session): **the playing pattern GREEN (21), pulsing**; **a cued pattern GREEN, flashing** (with dark);
-**a pattern that holds trigs RED_THIRD (7)**; an empty pattern dark. A bank that has not been read yet is dark too.
+**a pattern of the chain GREEN_THIRD (23)**; **a pattern that holds trigs RED_THIRD (7)**; an empty pattern dark. A bank that has not been read yet is dark too.
 
 **Where it comes from.** PATTERNS (51, the Digitone's stage 4, there today): `u8 bank (0..7, 255 = the playing pattern's bank)` -> `u8 bank, u8 playing pattern, u16 mask`
 (bit k: pattern 16 x bank + k holds a trig). It costs the Digitone up to about 0.8 ms per bank in its MIDI task, so Jank asks sparingly: **when the page opens, every bank
 once** (one request at least 60 ms after the other, so the page fills within about a second), **then only the playing pattern's bank (255) every 500 ms** while the page is shown, and
 **nothing while it is closed**. A bank whose answer never came is asked again with the next 500 ms read, one at a time. When live control lapses the page goes dark; when it
-comes back the banks are read again. Other banks' trigs are only read when the page opens (a pattern filled on the Digitone meanwhile shows the next time).
+comes back the banks are read again. Other banks' trigs are only read when the page opens (a pattern filled on the Digitone meanwhile shows the next time). **With the LIVE
+STATUS of protocol 7** the playing and next patterns come with the status (every 250 ms): no PATTERN read, and the playing bank is read only every 2 s (for its trigs).
 
-**A press cues that pattern**: PATTERN `60 {u8 pattern 0..127, u8 how: 0 cue (switch at the playing pattern's end), 1 jump, 255 read}` -> `{u8 playing pattern, u8 cued
-pattern (255 none)}`, with how = 0 (it says CUE B10). **PATTERN 60 is provisional**: asked of the Digitone's developers on 2026-11-25 and not built there yet; Jank sends
-it in that format, as RECORD was built before the Digitone had it. Never a MIDI Program Change (owner: "sysex. we should not rely on this settings"). The pad flashes at
-once, and stops when the pattern plays (the 500 ms read says so) or when the Digitone names another cue or none. While the page is shown Jank also reads PATTERN (how 255)
+**A press cues that pattern**: PATTERN `60 {u8 pattern 0..127, u8 how: 0 cue (switch at the playing pattern's end), 1 jump, 255 read}` -> `{u8 playing, u8 next (255 =
+the same), u8 mode, u8 running, u8 jump armed}` (stage 8's format), with how = 0 (it says CUE B10). **PATTERN 60 is provisional**: the Digitone's stage 8, final only after
+its lp8 build passes; Jank sends it in that format, as RECORD was built before the Digitone had it. Never a MIDI Program Change (owner: "sysex. we should not rely on this settings"). The pad flashes at
+once, and stops when the pattern plays (the 500 ms read or the status says so) or when the Digitone names another next pattern, or none (a "none" within 0.5 s of the
+press is taken as older than it). While the page is shown Jank also reads PATTERN (how 255)
 with each 500 ms read, so a cue made on the Digitone itself flashes too; that read also goes once when the page opens, so a Digitone without PATTERN is found out before
 the first press. **A Digitone without it** answers status 2: the page says **PATTERN: DN2 TOO OLD** (and again at each press), its pads send nothing, and no more PATTERN
 requests go until live control is asked for afresh (the Digitone or the Launchpad plugged in again); the reading of the banks goes on. Without live control a press says why,
-as a note pad does. **Chains** (the Digitone's 59 CHAIN) are not there: not built on the Digitone yet.
+as a note pad does.
+
+**Chains** (CHAIN, 59, stage 8, provisional: `u8 op` 0 SET `u8 n (2..64), n x pattern` (stock's PTN + held TRIG chain; it loops), 1 CLEAR, 255 READ `u8 first` -> `u8 mode,
+u16 count, u16 position, u8 first, u8 k, k x pattern`). **Hold a pad and press others**: the held pad is cued at once and is the chain's first pattern, the others follow
+in the order pressed (it says CHAIN 2: B03, ...; up / down may switch pages meanwhile; at most 64, then CHAIN FULL (64)); **letting go of the held pad sends the chain**
+(CHAIN SET, it says CHAIN OF 3). The chain's patterns are GREEN_THIRD while it is built and after. **To clear the chain: hold the playing pattern's pad alone for a second**
+and let go (CHAIN CLEAR, it says CHAIN CLEARED); any other pad held alone only cues. The chain is read (CHAIN READ, in parts when one answer does not hold it) when the page
+opens, after a SET or a CLEAR, and when the status's chain count changes. A Digitone without CHAIN answers 2: CHAIN: DN2 TOO OLD (once, and at the release of a chain that
+cannot go); a full queue (status 5) loses that request only (counted). A MIDI Program Change cancels a chain on the Digitone. A CHAIN SET of 64 is the longest request Jank
+sends (86 bytes, 29 USB-MIDI packets): it goes out one packet at a time into the Digitone's FIFO, with no buffer for the packets.
 
 **The scene buttons** on this page are Note mode's: 5 start / stop, 6 Delete (held), 8 Record, the others dark. The page has no use for them, and they stay where the hand
 knows them; the mixer is the one page that takes them over (for its views). A note pad that was down when the page opened still ends.
 
-`diag`: `hostdiag_pat=reads:<PATTERNS sent>,cues:<PATTERN sent>,ok:<reads not refused>/<PATTERN not refused>,playing:<0..127, -1 none read>`. Host-tested
+`diag`: `hostdiag_pat=reads:<PATTERNS sent>,cues:<PATTERN sent>,ok:<reads not refused>/<PATTERN not refused>,playing:<0..127, -1 none read>`; the chain's in `hostdiag_tr`. Host-tested
 (`tests/test_lpsess.c`); **not tried on the Launchpad or the Digitone**.
 
 ### Colour language so far (to be decided with the owner)
@@ -233,7 +272,7 @@ the Digitone's stage 4 / 5.
 
 ## What is not there yet
 
-Chains on the Session page (the Digitone's 59 CHAIN) and the song row; the Session page's cue waits for the Digitone's PATTERN 60. (The scale sync and the mixer are built; their writes, and the scale's root, wait for the Digitone's stage 6, which is not installed yet.) A **dual Launchpad mode** is planned for later (owner 2026-11-24): in the mixer one Launchpad is tracks 1-8 and the other 9-16
+The song row. The Digitone's stage 8 (TRANSPORT 61, PATTERN 60, CHAIN 59, LIVE STATUS protocol 7) is built against provisional formats: final only after its lp8 build passes. (The scale sync and the mixer are built; their writes, and the scale's root, wait for the Digitone's stage 6, which is not installed yet.) A **dual Launchpad mode** is planned for later (owner 2026-11-24): in the mixer one Launchpad is tracks 1-8 and the other 9-16
 (the mixer's bank is already a parameter of its screen). Order decided with the owner: Note, Step sequencer, Mixer, then patterns and song mode last. The Digitone's current
 track, scale and step data need new commands in dn2-wishes (its test channel only answers when asked); that research is
 separate.
@@ -298,5 +337,5 @@ separate.
 ## Files
 
 `core/jank_lpx.[ch]` (the Launchpad's protocol), `core/jank_lpnote.[ch]` (layouts), `core/jank_lpapp.[ch]` (what a press asks for, as acts,
-what the pads show), `core/jank_lpsess.[ch]` (the Session page), `core/jank_dn2live.[ch]` and `core/jank_dn2rpc.[ch]` (the Digitone's live control: the requests, the answers, the note push), `firmware/main/usb_lp.c` (the one state and the two devices), `firmware/main/usb_midi_host.c` (IN endpoints,
-interface choice). Host tests: `tests/test_lpx.c`, `test_lpnote.c`, `test_lpapp.c`, `test_lpsess.c`, `test_dn2live.c`, `test_dn2rpc.c` (in `tests/run.sh`).
+what the pads show), `core/jank_lpsess.[ch]` (the Session page), `core/jank_lpsessapp.c` (its buttons and pads in the app), `core/jank_lptrans.[ch]` (who starts and stops), `core/jank_dn2live.[ch]` and `core/jank_dn2rpc.[ch]` (the Digitone's live control: the requests, the answers, the note push), `firmware/main/usb_lp.c` (the one state and the two devices), `firmware/main/usb_midi_host.c` (IN endpoints,
+interface choice). Host tests: `tests/test_lpx.c`, `test_lpnote.c`, `test_lpapp.c`, `test_lpsess.c`, `test_lptrans.c`, `test_dn2live.c`, `test_dn2rpc.c` (in `tests/run.sh`).
