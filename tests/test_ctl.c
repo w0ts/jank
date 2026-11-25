@@ -47,6 +47,18 @@ static int ends(const char *s, const char *tail)
     return a >= b && !strcmp(s + a - b, tail);
 }
 
+/* ten saved networks, every name at its longest (the longest `get`) */
+static void full_nets(struct jk_nets *s)
+{
+    char ssid[JK_SSID_MAX + 1];
+    jk_nets_init(s);
+    for (int i = 0; i < (int)JK_NETS_MAX; i++) {
+        memset(ssid, 'a' + i, JK_SSID_MAX);
+        ssid[JK_SSID_MAX] = 0;
+        CHECK(jk_nets_put(s, ssid, "password1") == i);
+    }
+}
+
 static void test_defaults(void)
 {
     setup();
@@ -140,6 +152,7 @@ static void test_lead(void)
     cfg.name[0] = 0;
     memset(cfg.name, 'n', JK_NAME_MAX);
     memset(cfg.ssid, 's', JK_SSID_MAX);
+    full_nets(&snap.nets);
     CHECK(jk_ctl_line("get", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest get: %zu bytes (limit %u)\n", strlen(big), (unsigned)JK_CTL_OUT_MAX);
     CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
@@ -179,6 +192,7 @@ static void test_display(void)
     memset(snap.board, 'x', 11);
     memset(cfg.name, 'n', JK_NAME_MAX);
     memset(cfg.ssid, 's', JK_SSID_MAX);
+    full_nets(&snap.nets);
     CHECK(jk_ctl_line("get", &cfg, &snap, 1000, big, sizeof big) == JK_CTL_NONE);
     printf("longest get: %zu bytes (limit %u)\n", strlen(big), (unsigned)JK_CTL_OUT_MAX);
     CHECK(strlen(big) < JK_CTL_OUT_MAX && ends(big, "ok\n"));
@@ -210,6 +224,44 @@ static void test_network_settings(void)
     CHECK(run("set net cable") == JK_CTL_NONE && cfg.net == JK_NET_WIFI);
     CHECK(run("set pass") == JK_CTL_CFG_CHANGED && cfg.pass[0] == 0);
     CHECK(run("set net jank") == JK_CTL_CFG_CHANGED && cfg.net == JK_NET_JANK);
+}
+
+/* owner 2026-11-25: up to 10 saved networks; an 11th is refused, `forget` makes room. The firmware saves the network of
+ * `set ssid` / `set pass` into the list when it stores the settings (jk_nets_take_cfg, done here by hand) */
+static void test_saved_networks(void)
+{
+    char name[JK_SSID_MAX + 1];
+    setup();
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nnets=0\n") && !strstr(out, "net_1="));
+    CHECK(run("set ssid Home") == JK_CTL_CFG_CHANGED && run("set pass password1") == JK_CTL_CFG_CHANGED);
+    CHECK(jk_nets_take_cfg(&snap.nets, &cfg) == 1 && snap.nets.n == 1 && jk_nets_take_cfg(&snap.nets, &cfg) == 0);
+    CHECK(run("set ssid Office Guests") == JK_CTL_CFG_CHANGED && !strcmp(cfg.ssid, "Office Guests") && cfg.pass[0] == 0);   /* new: no password yet */
+    CHECK(run("set pass Made-up100%Pass:)") == JK_CTL_CFG_CHANGED && jk_nets_take_cfg(&snap.nets, &cfg) == 1 && snap.nets.n == 2);
+    CHECK(!strcmp(snap.nets.net[1].pass, "Made-up100%Pass:)"));
+    CHECK(run("set ssid Home") == JK_CTL_CFG_CHANGED && !strcmp(cfg.pass, "password1"));   /* a saved one comes back with its password */
+    CHECK(jk_nets_take_cfg(&snap.nets, &cfg) == 0 && snap.nets.n == 2);
+    CHECK(run("set pass password2") == JK_CTL_CFG_CHANGED && jk_nets_take_cfg(&snap.nets, &cfg) == 1 && !strcmp(snap.nets.net[0].pass, "password2"));
+    CHECK(run("get") == JK_CTL_NONE && strstr(out, "\nnets=2\nnet_1=Home\nnet_2=Office Guests\n"));
+    CHECK(!strstr(out, "password") && !strstr(out, "Made-up"));          /* the passwords never come back */
+    for (int i = 2; i < (int)JK_NETS_MAX; i++) {
+        snprintf(name, sizeof name, "net %d", i);
+        CHECK(jk_nets_put(&snap.nets, name, "password1") == i);
+    }
+    CHECK(run("set ssid eleventh") == JK_CTL_NONE && !strcmp(out, "err networks full: forget one\n") && !strcmp(cfg.ssid, "Home"));
+    CHECK(run("set ssid net 5") == JK_CTL_CFG_CHANGED && !strcmp(cfg.ssid, "net 5"));   /* a saved one is still taken */
+    CHECK(run("forget nowhere") == JK_CTL_NONE && !strcmp(out, "err not saved\n"));
+    CHECK(run("forget net 5") == JK_CTL_FORGET && !strcmp(out, "ok\n") && !jk_ctl_forget(" forget net 5 \r\n", name) && !strcmp(name, "net 5"));
+    CHECK(jk_nets_forget(&snap.nets, name) == 0 && snap.nets.n == 9);
+    CHECK(jk_cfg_after_forget(&cfg, &snap.nets) == 1 && !strcmp(cfg.ssid, "Home") && !strcmp(cfg.pass, "password2"));   /* the first saved one */
+    CHECK(jk_cfg_after_forget(&cfg, &snap.nets) == 0);
+    CHECK(run("set ssid eleventh") == JK_CTL_CFG_CHANGED);               /* there is room again */
+    CHECK(jk_ctl_forget("forget", name) == -1 && jk_ctl_forget("forget ", name) == -1 && jk_ctl_forget("get", name) == -1);
+    CHECK(run("forget") == JK_CTL_NONE && !strcmp(out, "err unknown command\n"));
+    jk_nets_init(&snap.nets);
+    CHECK(jk_cfg_after_forget(&cfg, &snap.nets) == 1 && cfg.ssid[0] == 0 && cfg.pass[0] == 0);   /* none left */
+    CHECK(run("help") == JK_CTL_NONE && strstr(out, "\nforget <ssid>\n"));
+    strcpy(snap.wifi_ssid, "Office Guests");
+    CHECK(run("status") == JK_CTL_NONE && strstr(out, "\nwifi_ssid=Office Guests\n"));
 }
 
 static void test_status_wifi(void)
@@ -662,6 +714,7 @@ static void test_status_size(void)
     snap.wifi_ip = snap.link_ip = 0xFFFFFFFFu;
     snap.wifi_rssi = -128;
     snap.wifi_channel = 255;
+    memset(snap.wifi_ssid, 'w', JK_SSID_MAX);
     snap.link_peers = 4294967295u;
     snap.mpb = 1;
     snap.beat_ub = snap.start_ub = INT64_MIN + 1;
@@ -855,6 +908,7 @@ static void test_about(void)
 int main(void)
 {
     test_defaults();
+    test_saved_networks();
     test_lowconf();
     test_follow();
     test_beat();

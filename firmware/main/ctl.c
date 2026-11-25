@@ -178,6 +178,11 @@ static void run_line(const char *line)
                 uis_sleep_set(v);
         }
     }
+    if (a == JK_CTL_FORGET) {
+        char ssid[JK_SSID_MAX + 1];
+        if (jk_ctl_forget(line, ssid) || app_nets_forget(ssid))
+            strcpy(s_out, "err not saved\n");
+    }
     if (a == JK_CTL_SCAN) {
         run_scan();
         return;

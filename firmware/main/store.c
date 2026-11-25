@@ -15,6 +15,8 @@
                                         * defaults) */
 #define KEY_USB_SET "usbset"           /* the USB role was chosen (jk_cfg.usb_set): its own key, so "usb1" stays the size an older firmware reads */
 #define KEY_LAT "lat1"                 /* beat_latency per audio source, the auto bases (core/jank_lat.h jla_pack) */
+#define KEY_NETS "nets"                /* the saved Wi-Fi networks (core/jank_nets.h jk_nets_pack): apart from the blob, which keeps
+                                        * ssid / pass (the network last set) for a firmware without the list */
 #define KEY_TRIM "latt"                /* the AUDIO SHIFTs on top (jla_pack_trim, M2h): none stored (an older firmware's): 0 */
 /* what is stored is the struct up to the beat-follow bench settings: a stick flashed with this build keeps its group, name
  * and Wi-Fi, and one flashed back to the release reads the same blob (no setting of the bench build is saved) */
@@ -105,6 +107,42 @@ void store_load(struct jk_cfg *c)
     }
     load_lat(h, c);
     nvs_close(h);
+}
+
+static uint8_t s_nets_buf[JK_NETS_PACK_MAX];   /* (one caller at a time: the start, then app_cfg_set's lock) */
+
+void store_load_nets(struct jk_nets *s)
+{
+    size_t n = sizeof s_nets_buf;
+    nvs_handle_t h;
+    esp_err_t e;
+    jk_nets_init(s);
+    e = nvs_open(NS, NVS_READONLY, &h);
+    if (e != ESP_OK)
+        return;
+    e = nvs_get_blob(h, KEY_NETS, s_nets_buf, &n);
+    if (e == ESP_OK && jk_nets_unpack(s, s_nets_buf, n))
+        ESP_LOGW(TAG, "saved networks unreadable, %u bytes: none", (unsigned)n);
+    else if (e != ESP_OK && e != ESP_ERR_NVS_NOT_FOUND)
+        ESP_LOGW(TAG, "saved networks: %s", esp_err_to_name(e));
+    nvs_close(h);
+}
+
+esp_err_t store_save_nets(const struct jk_nets *s)
+{
+    size_t n = jk_nets_pack(s, s_nets_buf, sizeof s_nets_buf);
+    nvs_handle_t h;
+    esp_err_t e;
+    if (!n)
+        return ESP_ERR_INVALID_SIZE;
+    e = nvs_open(NS, NVS_READWRITE, &h);
+    if (e != ESP_OK)
+        return e;
+    e = nvs_set_blob(h, KEY_NETS, s_nets_buf, n);
+    if (e == ESP_OK)
+        e = nvs_commit(h);
+    nvs_close(h);
+    return e;
 }
 
 esp_err_t store_save(const struct jk_cfg *c)

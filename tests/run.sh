@@ -8,9 +8,9 @@ mkdir -p "$OUT"
 CC="${CC:-cc}"
 FLAGS="-std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -I$HERE/core"
 
-CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_home.c $HERE/core/jank_usbrole.c $HERE/core/jank_hold.c $HERE/core/jank_fold.c $HERE/core/jank_lat.c"
+CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_home.c $HERE/core/jank_usbrole.c $HERE/core/jank_hold.c $HERE/core/jank_fold.c $HERE/core/jank_lat.c $HERE/core/jank_nets.c"
 LINK="$HERE/third_party/link/link.c $HERE/core/jank_start.c"
-for t in core ctl ui lat; do
+for t in core ctl ui lat nets; do
     "$CC" $FLAGS "$HERE/tests/test_$t.c" $CORE -o "$OUT/test_$t"
     "$OUT/test_$t"
 done

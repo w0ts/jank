@@ -63,3 +63,14 @@ bar line, the MIDI clock with it); the sound coming or going keeps it, its tempo
 
 `set net wifi` (with `set ssid`, `set pass`) makes the stick a station on an ordinary network instead, after a restart:
 the Link peer then talks on that network. `set net jank` goes back to group mode.
+
+**Saved networks** (owner 2026-11-25: "allow to save up to 5 or 10 networks"; 10 picked). Every network given with
+`set ssid` / `set pass` (the page's Wi-Fi name and password, the screen's NETWORK and PASSKEY) is kept, up to 10
+(`core/jank_nets.h`, NVS key `nets`, apart from the settings blob, which keeps the last one set as `ssid` / `pass` for an
+older firmware). `set ssid` of a saved network brings its password back; a new one has none until `set pass` (an open
+network). An 11th is refused, `err networks full: forget one` (the owner's choice over dropping the oldest):
+`forget <ssid>` removes one (the page's Forget buttons under Network). `get` lists them by name, `nets=<n>` and
+`net_1=` .. `net_<n>=`, never their passwords; `status` says the one joined, `wifi_ssid=`. At start-up the unit scans and
+joins the saved network it hears best; one that fails is skipped for that round, the next best is tried, and with none
+left a new round starts 5 s later. A connection that is lost tries the same network once, then scans the same way. A
+firmware that had one network makes it the first saved one at its first start.

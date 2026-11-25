@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "jank_lat.h"
+#include "jank_nets.h"
 
 #define JK_VERSION "0.0.1"
 
@@ -140,6 +141,7 @@ enum jk_net {
 #define JK_SSID_MAX 32u
 #define JK_PASS_MIN 8u
 #define JK_PASS_MAX 63u
+_Static_assert(JK_SSID_MAX == JK_NETS_SSID_MAX && JK_PASS_MAX == JK_NETS_PASS_MAX, "a saved network holds what ssid and pass hold");
 #define JK_QUANTUM_MAX 16u
 #define JK_OFFSET_MAX_10US 10000       /* +-100 ms */
 #define JK_BEAT_LATENCY_MIN_MS (-300)   /* negative: the stick hears the audio after the speakers do (player --xiao) */
@@ -381,6 +383,8 @@ struct jk_snapshot {
     uint32_t wifi_ip;                 /* the address DHCP gave, host order; 0: none yet */
     int8_t wifi_rssi;
     uint8_t wifi_channel;
+    char wifi_ssid[JK_SSID_MAX + 1];  /* the saved network joined (`status` wifi_ssid=); empty while none is */
+    struct jk_nets nets;              /* the saved networks (`get` nets= net_<i>=, and `set ssid` refuses an 11th) */
     uint32_t midi_ticks;              /* MIDI clocks sent */
     uint32_t midi_resync;             /* the clock had to jump to the session */
     struct jk_beat beat;
@@ -406,7 +410,9 @@ enum jk_ctl_action {
     JK_CTL_LEAD,                      /* `set lead on|off`, out is "ok\n": the caller stores the menu's FOLLOW+LEAD preference (jk_ctl_lead), cfg is untouched */
     JK_CTL_DISPLAY,                   /* `set sleep <v>` / `set bright <n>`, out is "ok\n": the caller stores the menu's SCREEN OFF / BRIGHTNESS preference (jk_ctl_display), cfg is untouched */
     JK_CTL_NUDGE,                     /* out is empty: the caller nudges the beat (jk_ctl_nudge), answers nudge_beats=<b> ok or err */
-    JK_CTL_WIPE                       /* `wipe settings`, out is "ok\n": the caller erases every stored setting and restarts (USB control line only) */
+    JK_CTL_WIPE,                      /* `wipe settings`, out is "ok\n": the caller erases every stored setting and restarts (USB control line only) */
+    JK_CTL_FORGET                     /* `forget <ssid>`, a saved network (snap->nets): out is "ok\n", the caller forgets it (jk_ctl_forget gives the
+                                       * name) and stores the list; one that is not saved is answered err here */
 };
 enum jk_ctl_action jk_ctl_line(const char *line, struct jk_cfg *cfg, const struct jk_snapshot *snap, uint32_t now_ms, char *out, size_t cap);
 #define JK_BPM_MIN_X100 2000u          /* the BPM the tempo command takes, hundredths: Link's own clamp, 20..999 */
@@ -423,6 +429,13 @@ int jk_ctl_display(const char *line, int *bright, int *v);
  * 0.5 to 3 (+0.5, -0.5, 1, -1.5) -> 0 and the half beats (+-1..+-6); -1 not one. The caller nudges (core/jank_beatlink.h
  * jbl_nudge) and answers `nudge_beats=<total>`, the estimator's view before it, ok; or err link mode, no beat, at the limit */
 int jk_ctl_nudge(const char *line, int *halves);
+/* "forget <ssid>" -> 0 and the name (JK_SSID_MAX + 1 bytes); -1 not one */
+int jk_ctl_forget(const char *line, char *ssid);
+/* The saved networks and the settings' ssid / pass (the network last set, the one the screen and `get` show). Saving the
+ * settings saves that network too (or its new password): 1 when the list changed. After a `forget`, a ssid that is no
+ * longer saved becomes the first saved one (with its password), or none: 1 when cfg changed. */
+int jk_nets_take_cfg(struct jk_nets *s, const struct jk_cfg *c);
+int jk_cfg_after_forget(struct jk_cfg *c, const struct jk_nets *s);
 /* "nudge ms <n>": the AUDIO SHIFT (M2h), the current audio source's shift += n (1..JK_NUDGE_MS_STEP_MAX either way) on top
  * of its auto base, which it never changes; the sum kept within JK_BEAT_LATENCY_MIN_MS..MAX (jank_lat.h; stored, saved once
  * stopped). jk_ctl_line answers beat_latency=<sum> lat_auto=<base> lat_trim=<shift> ok (a change: JK_CTL_CFG_CHANGED), or
