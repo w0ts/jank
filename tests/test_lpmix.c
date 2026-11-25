@@ -245,7 +245,7 @@ static void test_scene_buttons(void)
     CHECK(jlmx_scene_colour(&s, 6) == JLMX_COLOR_SOLO && jlmx_scene_colour(&s, 5) == JLMX_COLOR_UNMUTED);
     CHECK(jlmx_scene_colour(&s, 7) == 0);
     CHECK(JLMX_COLOR_UNMUTED == 21 && JLMX_COLOR_MUTED == 23 && JLMX_COLOR_SOLO == 45 && JLMX_COLOR_NOSOLO == 47);   /* GREEN, GREEN_THIRD (owner: Elektron's mute colour), BLUE, BLUE_THIRD */
-    CHECK(JLMX_COLOR_VOL == 25 && JLMX_COLOR_PAN == 17 && JLMX_COLOR_SEND == 50 && JLMX_COLOR_SEND_ON == 49 && JLMX_COLOR_SEND_DIM == 51);   /* the owner's picks (2026-11-25) */
+    CHECK(JLMX_COLOR_VOL == 25 && JLMX_COLOR_PAN == 17 && JLMX_COLOR_SEND == 50 && JLMX_COLOR_SEND_ON == 48 && JLMX_COLOR_SEND_DIM == 51);   /* the owner's picks (2026-11-25) */
     CHECK(JLMX_COLOR_VOL_DIM == 27 && JLMX_COLOR_PAN_DIM == 19 && JLMX_COLOR_SEND_DIM == 51 && JLMX_COLOR_BUTTON == 29 && JLMX_COLOR_BUTTON_DIM == 31);   /* the faders' thirds; MINT, MINT_THIRD */
 }
 

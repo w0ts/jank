@@ -9,7 +9,7 @@
  * track; row 8 dark. Sub modes: volume, delay, reverb and chorus are 8-pad faders with Launchpad 95's value steps (volume dB steps, its send steps; the bottom pad is 0 and
  * lights nothing), pan a bar from the centre pair out to the value. Scene buttons 6 and 7 both show the MUTE / SOLO screen: on / off buttons for all 16 tracks in the lower four
  * pad rows, from the top mute 1-8, mute 9-16, solo 1-8, solo 9-16 (the top four rows dark; the bank does not matter). Colours as Launchpad 95's (SkinMK2.py Mixer.*: MINT, YELLOW,
- * BLUE), except the faders' own colours (owner 2026-11-25, picked on the Session colour chart): volume 25, pan 17, the three sends 50 (purple; scene button 49 on, 51 off). The values come from MIXER
+ * BLUE), except the faders' own colours (owner 2026-11-25, picked on the Session colour chart): volume 25, pan 17, the three sends 50 (purple; scene button 48 on, 51 off). The values come from MIXER
  * (jank_dn2live.h), so the faders move when the Digitone's values do. Mute and solo write at the press (MUTE SET, the Digitone's stage 6).
  *
  * The faders are SLOW FADERS, as Launchpad 95's device mode does it (owner 2026-11-25: "hold long to make fader move slower"; its DeviceControllerStrip with ENABLE_TDC and
@@ -38,7 +38,7 @@
 #define JLMX_COLOR_VOL_DIM 27u
 #define JLMX_COLOR_PAN_DIM 19u
 #define JLMX_COLOR_SEND_DIM 51u        /* ... a send's scene button when its view is not shown (chart row 7 col 4) */
-#define JLMX_COLOR_SEND_ON 49u         /* ... and when it is (chart row 7 col 2): the sends' own pick, not the fader's colour */
+#define JLMX_COLOR_SEND_ON 48u         /* ... and when it is (chart row 7 col 1; first 49, row 7 col 2): the sends' own pick, not the fader's colour */
 #define JLMX_COLOR_UNMUTED 21u         /* GREEN (owner 2026-11-25: "use green for mute (this is what elektron uses)"; was Launchpad 95's YELLOW) */
 #define JLMX_COLOR_MUTED 23u           /* GREEN_THIRD */
 #define JLMX_COLOR_SOLO 45u            /* BLUE */
