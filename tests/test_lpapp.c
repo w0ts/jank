@@ -1489,7 +1489,7 @@ static void test_capture_enters_the_mixer_and_the_buttons_follow(void)
     CHECK(a.mode == JLAPP_MODE_MIXER && strcmp(msg(&a), "MIXER") == 0);
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_TOP0 + CAPTURE].color == JLMX_COLOR_BUTTON && f.led[JLX_TOP0 + NOTE_BTN].color == JLAPP_COLOR_MODE_DIM);
-    CHECK(f.led[JLX_SIDE0 + 0].color == JLMX_COLOR_VOL && f.led[JLX_SIDE0 + 1].color == JLMX_COLOR_PAN && f.led[JLX_SIDE0 + 2].color == JLMX_COLOR_SEND);   /* the overview is on: no sub mode is the one shown */
+    CHECK(f.led[JLX_SIDE0 + 0].color == JLMX_COLOR_SCENE_OFF && f.led[JLX_SIDE0 + 1].color == JLMX_COLOR_SCENE_OFF && f.led[JLX_SIDE0 + 2].color == JLMX_COLOR_SCENE_OFF);   /* the overview is on: no sub mode is the one shown */
     CHECK(f.led[JLX_SIDE0 + 5].color == JLMX_COLOR_MUTED && f.led[JLX_SIDE0 + 6].color == JLMX_COLOR_NOSOLO && f.led[JLX_SIDE0 + 7].color == 0);
     acts(&a, top(NOTE_BTN, 127), &o);                              /* a tap on Note: Note mode */
     jlapp_tick(&a, 100);

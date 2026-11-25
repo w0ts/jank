@@ -366,7 +366,7 @@ uint8_t jlmx_scene_colour(const struct jlmx *s, uint8_t idx)
 {
     int on = s->view == idx;
     if (idx <= JLMX_CHR)
-        return on ? JLMX_COLOR_SCENE_ON : view_colour(idx);   /* the one shown: yellow (owner 2026-11-25) */
+        return on ? JLMX_COLOR_SCENE_ON : JLMX_COLOR_SCENE_OFF;   /* one yellow, full or third (owner 2026-11-25) */
     on = is_mute_solo(s->view);        /* scene buttons 6 and 7 are the same screen: both bright while it is shown */
     if (idx == JLMX_MUTE)
         return on ? JLMX_COLOR_UNMUTED : JLMX_COLOR_MUTED;
