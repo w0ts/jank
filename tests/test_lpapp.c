@@ -522,7 +522,7 @@ static void test_buttons_lit(void)
     CHECK(f.led[JLX_TOP0 + 6].color == JLAPP_GREEN_THIRD);        /* Custom does something: lit, dim (melodic step is the one it leads to) */
     CHECK(f.led[JLX_TOP0 + 7].color == JLMX_COLOR_BUTTON_DIM);   /* Capture is the mixer's: lit, dim (MINT_THIRD) */
     for (uint32_t i = 0; i < 8; i++)
-        CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_RED_THIRD : i == 5 ? JLAPP_PINK_THIRD : i == 7 ? JLAPP_RED_THIRD : 0));   /* start / stop (dim red while stopped), Delete (dim pink) and Record (dim red) are lit */
+        CHECK(f.led[JLX_SIDE0 + i].color == (i == 4 ? JLAPP_GREEN_THIRD : i == 5 ? JLAPP_PINK_THIRD : i == 7 ? JLAPP_RED_THIRD : 0));   /* start / stop (dim green while stopped, owner 2026-11-25), Delete (dim pink) and Record (dim red) are lit */
     CHECK(f.led[JLX_LOGO].color == 0);
     for (uint32_t i = 0; i < JLX_LEDS; i++)
         CHECK(f.led[i].mode == JLX_STATIC);
@@ -1062,7 +1062,7 @@ static void test_the_start_stop_scene_button(void)
     CHECK(acts(&a, side(SCENE5, 127), &o) == 1 && strcmp(msg(&a), "STOP") == 0);
     jlapp_set_transport(&a, 0);
     jlapp_frame(&a, &f);
-    CHECK(f.led[JLX_SIDE0 + SCENE5].color == JLAPP_RED_THIRD);
+    CHECK(f.led[JLX_SIDE0 + SCENE5].color == JLAPP_GREEN_THIRD);   /* stopped: green, third (owner 2026-11-25) */
 }
 
 /* owner 2026-11-24: Delete on scene 6, held: the Digitone erases the track's steps as its own playhead passes (LIVE ERASE); Note and step modes */

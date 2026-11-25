@@ -102,7 +102,7 @@ lower left, the sequence on top, the loop selector lower right):
 - **The quadrant flashes what plays** (owner 2026-11-24; both modes, from the Digitone's note push, 150 ms, RED as Launchpad 95's playing note): a drum track pad when
   that track plays, a melodic keyboard key when the current track plays that pitch (every key of that pitch).
 - **The quadrant also plays while the transport is stopped** (the track's own note / the key), and only selects while it runs (owner's rule). **Scene button 5 starts / stops
-  the transport** (Launchpad 95's Note mode: its start / stop; green running, dim red stopped): Jank is the transport master, the ui task calls `bridge_play`. **Measured 2026-11-24 (owner: "start stop on note mode is not working"): the unit had `peers=0`, and the rule "the clock goes to the Digitone only
+  the transport** (Launchpad 95's Note mode: its start / stop; green running, green third when stopped, owner 2026-11-25): Jank is the transport master, the ui task calls `bridge_play`. **Measured 2026-11-24 (owner: "start stop on note mode is not working"): the unit had `peers=0`, and the rule "the clock goes to the Digitone only
   with peers on the Jank / Link network" (`usb_midi_clock_peers`) dropped every clock and Start byte, so the button did nothing.** The button now overrides that rule while the Launchpad has
   the transport started (`usb_midi_clock_force`, ui.c): the clock goes out until it stops it (or the transport stops some other way). Not tried on the unit after the fix (the update was rolled back, see the state notes).
 - **Delete = scene button 6, held, in Note and step modes** (owner 2026-11-24: "hold Delete wipes the current track under the playhead"; PINK_THIRD dim, PINK while held; in the mixer scene 6 is a view): the Digitone
@@ -183,7 +183,7 @@ Digitone's reading is not allowed to put it back for 400 ms (its write applies a
 ### Colour language so far (to be decided with the owner)
 
 **A button that does something is always lit: dim when its mode is not on, full brightness when it is** (owner 2026-11-24). Note (light blue, dim in a step mode), Custom (the
-step mode it leads to: green melodic / amber drum, dim in Note mode), the arrows (dim at a limit), start / stop (green running, dim red stopped). A button with no job is dark
+step mode it leads to: green melodic / amber drum, dim in Note mode), the arrows (dim at a limit), start / stop (green running, green third stopped). A button with no job is dark
 (up / down in drum step).
 
 Launchpad 95's own colours stay as they are (scale page, Note mode). What this port adds: **green** a direction or switch that is available / on, dim green

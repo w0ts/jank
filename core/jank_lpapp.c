@@ -907,7 +907,7 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         for (uint8_t i = 0; i < 8u; i++)
             f->led[JLX_SIDE0 + i].color = jlmx_scene_colour(&a->mix, i);
     } else {
-        f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = a->transport ? JLAPP_GREEN : JLAPP_RED_THIRD;   /* start / stop: running green, stopped dim red */
+        f->led[JLX_SIDE0 + JLAPP_SIDE_START_STOP].color = a->transport ? JLAPP_GREEN : JLAPP_GREEN_THIRD;   /* start / stop (owner 2026-11-25): always green, full while playing, third when stopped */
         f->led[JLX_SIDE0 + JLAPP_SIDE_DELETE].color = a->erase_on ? JLAPP_PINK : JLAPP_PINK_THIRD;        /* delete: bright while held */
         f->led[JLX_SIDE0 + JLAPP_SIDE_RECORD].color = a->record_ok ? (a->record_on ? JLAPP_RED : JLAPP_RED_THIRD) : 0;   /* record: red armed / recording, dim red off, dark when the Digitone has none */
     }
