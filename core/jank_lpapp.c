@@ -39,15 +39,32 @@ void jlapp_init(struct jlapp *a, const struct jln_scale *scale)
     jlmx_init(&a->mix);
     a->mix_writes = 1;
     a->record_ok = 1;
+    a->pat_reads_ok = 1;
+    a->pat_cue_ok = 1;
+    jlss_init(&a->sess);
     for (uint32_t i = 0; i < JLAPP_PADS; i++)
         a->held[i].note = -1;
 }
 
-void jlapp_tick(struct jlapp *a, uint32_t now_ms) { a->now_ms = now_ms; }
+static void open_chart(struct jlapp *a);
+
+void jlapp_tick(struct jlapp *a, uint32_t now_ms)
+{
+    a->now_ms = now_ms;
+    if (a->sess_down && (uint32_t)(now_ms - a->sess_down_ms) >= JLAPP_SESSION_HOLD_MS) {   /* Session held: the colour chart, while it is still down */
+        a->sess_down = 0;
+        open_chart(a);
+    }
+}
 
 void jlapp_set_live(struct jlapp *a, int state, int play_ok, int read_ok)
 {
+    int was_live = a->live_state == JDL_LIVE;
     a->live_state = (uint8_t)state;
+    if (state == (int)JDL_LIVE && !was_live && a->mode == JLAPP_MODE_SESSION)
+        jlss_open(&a->sess);           /* live control is back on the Session page: everything is read again */
+    if (state != (int)JDL_LIVE && was_live)
+        jlss_forget(&a->sess);         /* what the page showed may not be true any more */
     if (state != (int)JDL_LIVE)
         a->dn2_seen = 0;               /* the next reading after live control is back is a first one again */
     a->play_ok = play_ok != 0;
@@ -476,21 +493,75 @@ static size_t step_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_ac
     return n;
 }
 
-/* Session: the colour chart (jank_lpapp.h): the first page, the second, then back to the mode it came from */
-static void session_button(struct jlapp *a)
+static void say_chart_page(struct jlapp *a) { say(a, "COLOURS %u-%u", (unsigned)a->palette_page * 64u, (unsigned)a->palette_page * 64u + 63u); }
+
+/* Session held: the colour chart (jank_lpapp.h), on its first page; it goes back to the mode it came from (the Session page too) */
+static void open_chart(struct jlapp *a)
 {
-    if (a->mode != JLAPP_MODE_PALETTE) {
-        a->palette_prev = a->mode;
-        a->palette_page = 0;
-        a->mode = JLAPP_MODE_PALETTE;
-    } else if (a->palette_page + 1u < JLAPP_PALETTE_PAGES) {
-        a->palette_page++;
-    } else {
-        a->mode = a->palette_prev;
-        say(a, "COLOURS OFF");
+    a->palette_prev = a->mode;
+    a->palette_page = 0;
+    a->mode = JLAPP_MODE_PALETTE;
+    say_chart_page(a);
+}
+
+static void open_session(struct jlapp *a, uint8_t from)
+{
+    a->sess_prev = from;
+    a->mode = JLAPP_MODE_SESSION;
+    jlss_open(&a->sess);               /* every bank read again: patterns may have been filled or cleared since */
+    say(a, "SESSION %s", a->sess.half ? "BANKS E-H" : "BANKS A-D");
+}
+
+/* Session (jank_lpapp.h): in the chart a press turns its page, then leaves it, as before. Elsewhere the press only starts the clock: let go within JLAPP_SESSION_HOLD_MS, it
+ * is the Session page (or, on it, back to where it came from); held that long, jlapp_tick opens the chart */
+static void session_button(struct jlapp *a, int down)
+{
+    if (down) {
+        if (a->mode != JLAPP_MODE_PALETTE) {
+            a->sess_down = 1;
+            a->sess_down_ms = a->now_ms;
+        } else if (a->palette_page + 1u < JLAPP_PALETTE_PAGES) {
+            a->palette_page++;
+            say_chart_page(a);
+        } else {
+            a->mode = a->palette_prev;
+            if (a->mode == JLAPP_MODE_SESSION)
+                jlss_open(&a->sess);
+            say(a, "COLOURS OFF");
+        }
         return;
     }
-    say(a, "COLOURS %u-%u", (unsigned)a->palette_page * 64u, (unsigned)a->palette_page * 64u + 63u);
+    if (!a->sess_down)                 /* the release of a chart press, or of the hold that opened the chart */
+        return;
+    a->sess_down = 0;
+    if (a->mode != JLAPP_MODE_SESSION) {
+        open_session(a, a->mode);
+        return;
+    }
+    a->mode = a->sess_prev;
+    say(a, "SESSION OFF");
+}
+
+/* a pad of the Session page pressed: the Digitone cues its pattern (PATTERN how 0), which flashes at once */
+static size_t session_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_act *out, size_t max)
+{
+    uint8_t p = jlss_pattern_of_pad(&a->sess, ev->col, ev->row);
+    char name[4];
+    if (a->live_state != JDL_LIVE) {
+        say_why_not(a);
+        return 0;
+    }
+    if (!a->pat_cue_ok) {
+        say(a, "PATTERN: DN2 TOO OLD");
+        return 0;
+    }
+    if (max < 1)
+        return 0;
+    jlss_cue(&a->sess, p);
+    jlss_name(p, name);
+    say(a, "CUE %s", name);
+    set_act(out, JLAPP_ACT_PATTERN, 0, p, JDL_PATTERN_CUE);
+    return 1;
 }
 
 /* the palette index on a pad of the chart (y from the bottom, 0 the bottom row): reading order from the top left */
@@ -504,12 +575,12 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
     }
     if (ev->idx == BUTTON_LEFT || ev->idx == BUTTON_RIGHT)
         return track_button(a, ev->idx - BUTTON_LEFT, ev->idx == BUTTON_LEFT ? -1 : 1, ev->value != 0, out, max);
-    if (!ev->value)
-        return 0;
-    if (ev->idx == BUTTON_SESSION_IDX) {
-        session_button(a);
+    if (ev->idx == BUTTON_SESSION_IDX) {   /* its release counts: a short press and a hold are two things */
+        session_button(a, ev->value != 0);
         return 0;
     }
+    if (!ev->value)
+        return 0;
     if (ev->idx == BUTTON_CUSTOM_IDX) {
         custom_button(a);
         return 0;
@@ -523,6 +594,11 @@ static size_t button_event(struct jlapp *a, const struct jlx_ev *ev, struct jlap
     if (a->mode == JLAPP_MODE_MIXER && (ev->idx == BUTTON_UP || ev->idx == BUTTON_DOWN)) {   /* the banks, as the Digitone's trig keys lie: up the upper row (1-8), down the lower (9-16) */
         if (jlmx_bank_step(&a->mix, ev->idx == BUTTON_UP ? -1 : 1))
             say(a, a->mix.bank ? "TRACKS 9-16" : "TRACKS 1-8");
+        return 0;
+    }
+    if (a->mode == JLAPP_MODE_SESSION && (ev->idx == BUTTON_UP || ev->idx == BUTTON_DOWN)) {   /* the Session page's banks: up A-D, down E-H */
+        if (jlss_half_step(&a->sess, ev->idx == BUTTON_UP ? -1 : 1))
+            say(a, a->sess.half ? "BANKS E-H" : "BANKS A-D");
         return 0;
     }
     if ((ev->idx == BUTTON_UP || ev->idx == BUTTON_DOWN) && !(a->mode == JLAPP_MODE_STEP && a->step_kind == JLST_DRUM)) {   /* the octave; drum step has none */
@@ -702,6 +778,8 @@ size_t jlapp_on_lpx_acts(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
             say(a, "COLOUR %u", (unsigned)palette_index(a, ev->col, ev->row));
             return 0;
         }
+        if (a->mode == JLAPP_MODE_SESSION && ev->value)   /* the Session page: a press cues (a release still ends a note that was down when it opened, below) */
+            return session_pad(a, ev, out, max);
         if (a->mode == JLAPP_MODE_MIXER && !(!ev->value && step_holds(a) && ev->row < QUADRANT && ev->col < QUADRANT))   /* (a note held when the mode changed still ends below) */
             return mixer_pad(a, ev, out, max);
         if (a->mode == JLAPP_MODE_STEP || (!ev->value && step_holds(a) && ev->row < QUADRANT && ev->col < QUADRANT))   /* a release also ends a step mode pad's note after a mode change */
@@ -858,6 +936,8 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
         for (uint8_t y = 0; y < 8; y++)
             for (uint8_t x = 0; x < 8; x++)
                 f->led[JLX_PAD0 + y * 8u + x].color = palette_index(a, x, y);
+    } else if (a->mode == JLAPP_MODE_SESSION && !a->page) {   /* and the Session page: the patterns */
+        jlss_frame(&a->sess, f);
     }
     for (uint8_t y = 0; y < 8; y++)
         for (uint8_t x = 0; x < 8; x++) {
@@ -882,6 +962,9 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
     if (a->mode == JLAPP_MODE_MIXER) {   /* the mixer's up / down are the banks: up goes to tracks 1-8, down to 9-16, dim where there is nothing further */
         f->led[JLX_TOP0 + BUTTON_UP].color = a->mix.bank > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
         f->led[JLX_TOP0 + BUTTON_DOWN].color = a->mix.bank + 1u < JLMX_BANKS ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+    } else if (a->mode == JLAPP_MODE_SESSION) {   /* the Session page's: up banks A-D, down E-H, as the mixer's */
+        f->led[JLX_TOP0 + BUTTON_UP].color = a->sess.half > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
+        f->led[JLX_TOP0 + BUTTON_DOWN].color = a->sess.half + 1u < JLSS_HALVES ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
     } else if (!(a->mode == JLAPP_MODE_STEP && a->step_kind == JLST_DRUM)) {   /* drum step has no octave */
         f->led[JLX_TOP0 + BUTTON_UP].color = a->n.octave + 1u < jln_octaves(&a->n) ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
         f->led[JLX_TOP0 + BUTTON_DOWN].color = a->n.octave > 0u ? JLAPP_COLOR_ARROW_ON : JLAPP_COLOR_ARROW_OFF;
@@ -902,7 +985,7 @@ void jlapp_frame(const struct jlapp *a, struct jlx_frame *f)
     }
     /* the mixer's button (Launchpad 95's Mixer: MINT, dim when it is not on), always lit */
     f->led[JLX_TOP0 + BUTTON_CAPTURE_IDX].color = a->mode == JLAPP_MODE_MIXER ? JLMX_COLOR_BUTTON : JLMX_COLOR_BUTTON_DIM;
-    f->led[JLX_TOP0 + BUTTON_SESSION_IDX].color = a->mode == JLAPP_MODE_PALETTE ? JLAPP_COLOR_PALETTE_ON : JLAPP_COLOR_PALETTE_OFF;   /* the colour chart: white in it, dim grey out of it */
+    f->led[JLX_TOP0 + BUTTON_SESSION_IDX].color = a->mode == JLAPP_MODE_PALETTE || a->mode == JLAPP_MODE_SESSION ? JLAPP_COLOR_PALETTE_ON : JLAPP_COLOR_PALETTE_OFF;   /* white on the page or in the chart, dim grey otherwise */
     if (a->mode == JLAPP_MODE_MIXER) {   /* the scene buttons pick the view; start / stop is the other modes' */
         for (uint8_t i = 0; i < 8u; i++)
             f->led[JLX_SIDE0 + i].color = jlmx_scene_colour(&a->mix, i);
@@ -918,3 +1001,24 @@ int jlapp_mixer_wanted(const struct jlapp *a) { return a->mode == JLAPP_MODE_MIX
 void jlapp_on_mixer(struct jlapp *a, const struct jdl_mixer *m) { jlmx_on_mixer(&a->mix, m, a->now_ms); }
 
 void jlapp_set_mixer_writes(struct jlapp *a, int ok) { a->mix_writes = ok != 0; }
+
+int jlapp_session_due(struct jlapp *a, struct jlss_req *r)
+{
+    if (a->mode != JLAPP_MODE_SESSION || a->live_state != JDL_LIVE)
+        return 0;
+    return jlss_due(&a->sess, a->now_ms, a->pat_reads_ok, a->pat_cue_ok, r);
+}
+
+void jlapp_on_patterns(struct jlapp *a, const struct jdl_patterns *p) { jlss_on_patterns(&a->sess, p); }
+
+void jlapp_on_pattern(struct jlapp *a, const struct jdl_pattern *p) { jlss_on_pattern(&a->sess, p); }
+
+void jlapp_set_patterns(struct jlapp *a, int reads_ok, int cue_ok)
+{
+    if (a->pat_cue_ok && !cue_ok) {    /* a Digitone without PATTERN: its pads cue nothing (said again at each press) */
+        a->sess.cued = JDL_NO_PATTERN;
+        say(a, "PATTERN: DN2 TOO OLD");
+    }
+    a->pat_cue_ok = cue_ok != 0;
+    a->pat_reads_ok = reads_ok != 0;
+}

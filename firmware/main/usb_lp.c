@@ -233,6 +233,10 @@ static void run_act(const struct jlapp_act *act)
     case JLAPP_ACT_RECORD:             /* the Record button: the Digitone's own live record (RECORD, 58) */
         n = jdl_record(&s_jdl, t, act->vel ? 1u : 0u, sx, sizeof sx);
         break;
+    case JLAPP_ACT_PATTERN:            /* a Session page pad: the Digitone cues that pattern (PATTERN, 60, provisional; a build without it refuses once and no more go) */
+        n = jdl_pattern(&s_jdl, t, act->note, act->vel, sx, sizeof sx);
+        g_hostdiag.live_pat_cues += n != 0;
+        break;
     case JLAPP_ACT_ERASE:            /* the Delete button held / let go: the Digitone erases that track's steps on its own playhead (LIVE ERASE) */
         n = jdl_erase(&s_jdl, t, act->vel ? (uint16_t)(1u << act->track) : 0u, sx, sizeof sx);
         break;
@@ -261,6 +265,9 @@ static void sync_live(void)
     g_hostdiag.live_msg_ok = s_jdl.msg_ok;
     jlapp_set_mixer_writes(&s_app, s_jdl.mix_set_ok);
     jlapp_set_record(&s_app, s_jdl.record_ok, s_jdl.st.rec_valid, s_jdl.st.rec_bits, s_jdl.record_busy);
+    jlapp_set_patterns(&s_app, s_jdl.patterns_ok, s_jdl.pattern_ok);
+    g_hostdiag.pat_reads_ok = s_jdl.patterns_ok;
+    g_hostdiag.pat_cue_ok = s_jdl.pattern_ok;
     g_hostdiag.scale_ok = s_jdl.scale_ok;
     g_hostdiag.scale_set_ok = s_jdl.scale_set_ok;
     g_hostdiag.live_step_busy = s_jdl.step_busy;
@@ -299,6 +306,8 @@ static void dn2_sysex(void)
         static struct jdl_page page;
         static struct jdl_mixer mixer;
         struct jdl_scale scale;
+        struct jdl_patterns bank;
+        struct jdl_pattern cue;
         g_hostdiag.live_replies++;
         track = jdl_take_active(&s_jdl);           /* FOLLOW: the answer to an active-track read */
         if (track >= 0) {
@@ -312,6 +321,14 @@ static void dn2_sysex(void)
         if (jdl_take_mixer(&s_jdl, &mixer)) {      /* the mixer screen: the faders follow the Digitone's values */
             jlapp_tick(&s_app, now_ms());
             jlapp_on_mixer(&s_app, &mixer);
+        }
+        if (jdl_take_patterns(&s_jdl, &bank)) {     /* the Session page: a bank's patterns, and the playing one */
+            jlapp_on_patterns(&s_app, &bank);
+            g_hostdiag.dn2_pattern = bank.playing;
+        }
+        if (jdl_take_pattern(&s_jdl, &cue)) {       /* ... the playing and the cued pattern (PATTERN, 60) */
+            jlapp_on_pattern(&s_app, &cue);
+            g_hostdiag.dn2_pattern = cue.playing;
         }
         if (jdl_take_scale(&s_jdl, &scale)) {      /* the Digitone's scale (and, from protocol 5, its root): the Launchpad follows when it changes */
             jlapp_tick(&s_app, now_ms());
@@ -390,6 +407,7 @@ static uint32_t s_mixer_ms;            /* the last read of the Digitone's mixer 
 static uint32_t s_seen_pages_ms;       /* the step modes' last page seen by the pump */
 static uint8_t s_urgent_tries;         /* urgent page reads since a page last came */
 #define STEP_READ_MS 400u             /* a step mode reads its two pages this often (each answer is 104 data bytes); a press shows at once, the next read confirms it */
+#define SESSION_REQS_MAX 4u            /* the Session page's requests in one pass: at most the playing bank, the PATTERN read and one bank again (jlss_due) */
 
 /* live control is asked for, and kept up, while there is a Digitone and a Launchpad; once it answers, the Digitone's active track is made the one the pads are on;
  * while FOLLOW is on the Digitone's active track is read every JLAPP_FOLLOW_MS */
@@ -450,6 +468,20 @@ static void live_pump(void)
         s_mixer_ms = t;
         g_hostdiag.live_mixer_reads += n != 0;
         dn2_send_sysex(sx, n);
+    }
+    if (live) {                        /* the Session page is shown: every bank once when it opens, then the playing pattern's bank every 500 ms (jank_lpsess.h); closed: nothing */
+        struct jlss_req r;
+        jlapp_tick(&s_app, t);
+        for (unsigned k = 0; k < SESSION_REQS_MAX && jlapp_session_due(&s_app, &r); k++) {
+            if (r.kind == JLSS_REQ_BANK) {
+                n = jdl_patterns_read(&s_jdl, t, r.bank, sx, sizeof sx);
+                g_hostdiag.live_pat_reads += n != 0;
+            } else {
+                n = jdl_pattern(&s_jdl, t, 0, JDL_PATTERN_READ, sx, sizeof sx);
+                g_hostdiag.live_pat_cues += n != 0;
+            }
+            dn2_send_sysex(sx, n);
+        }
     }
     if (live && t - s_scale_ms >= SCALE_POLL_MS) {   /* the Digitone's scale (and root): a cheap header-only read, once a second */
         n = jdl_scale_read(&s_jdl, t, sx, sizeof sx);
@@ -569,7 +601,8 @@ void usb_lp_pump(void)
     dn2_drain();
     if (!s_lpx_up)
         return;
-    jlapp_tick(&s_app, now_ms());      /* the track overlay and the pushed notes' lights run out with it */
+    jlapp_tick(&s_app, now_ms());      /* the track overlay and the pushed notes' lights run out with it; Session held opens the colour chart */
+    deliver_messages();                /* what no Launchpad press made: the chart's, a refusal the Digitone's answer revealed (RECORD, PATTERN: DN2 TOO OLD) */
     {
         static struct jlapp_act slides[JLMX_SLIDES];                 /* (every slide can be due in the same tick) */
         size_t made = jlapp_pump_acts(&s_app, slides, JLMX_SLIDES);   /* the mixer's slow faders: their MIXER SET as they move */

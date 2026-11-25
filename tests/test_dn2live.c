@@ -786,6 +786,59 @@ static void test_record(void)
     CHECK(jdl_record(&d, 1, 1, out, sizeof out) == 0);                                                         /* not live: nothing */
 }
 
+/* PATTERNS (51, the Digitone's stage 4): the request per bank or for the playing pattern's bank, the answer, a damaged one, a build without it */
+static void test_reading_the_patterns(void)
+{
+    struct jdl d = live(0);
+    struct jdl_patterns p;
+    uint8_t out[64], body[16];
+    size_t n = jdl_patterns_read(&d, 10, 3, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[2] == JDL_CMD_PATTERNS && body[3] == 3);            /* bank D */
+    n = jdl_patterns_read(&d, 11, JDL_BANK_PLAYING, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 4 && body[3] == 255);                                         /* the playing pattern's bank */
+    CHECK(jdl_patterns_read(&d, 12, 8, out, sizeof out) == 0);                                                 /* no bank I */
+    CHECK(!jdl_take_patterns(&d, &p));
+    reply_to(&d, d.seq, JDL_CMD_PATTERNS, 0, (uint8_t[]){2, 37, 0x80, 0x21}, 4);                                /* bank C, C06 playing, C01 C06 C16 hold trigs */
+    CHECK(jdl_take_patterns(&d, &p) && p.bank == 2 && p.playing == 37 && p.mask == 0x8021u);
+    CHECK(!jdl_take_patterns(&d, &p));                                                                         /* taken once */
+    reply_to(&d, d.seq, JDL_CMD_PATTERNS, 0, (uint8_t[]){2, 37, 0x80}, 3);                                     /* one byte short */
+    reply_to(&d, d.seq, JDL_CMD_PATTERNS, 0, (uint8_t[]){8, 37, 0, 0}, 4);                                     /* a bank that does not exist */
+    reply_to(&d, d.seq, JDL_CMD_PATTERNS, 0, (uint8_t[]){2, 128, 0, 0}, 4);                                    /* a pattern that does not exist */
+    CHECK(!jdl_take_patterns(&d, &p));
+    reply_to(&d, d.seq, JDL_CMD_PATTERNS, 2, NULL, 0);                                                         /* refused: that read stops, live control is fine */
+    CHECK(!d.patterns_ok && jdl_is_live(&d) && jdl_can_play(&d) && d.pattern_ok);
+    CHECK(jdl_patterns_read(&d, 20, 0, out, sizeof out) == 0);
+    jdl_init(&d);
+    CHECK(jdl_patterns_read(&d, 1, 0, out, sizeof out) == 0);                                                  /* not live: nothing */
+}
+
+/* PATTERN (60, provisional): cue, jump, read; the answer; the refusal of a build without it (as RECORD's) */
+static void test_selecting_a_pattern(void)
+{
+    struct jdl d = live(0);
+    struct jdl_pattern p;
+    uint8_t out[64], body[16];
+    size_t n = jdl_pattern(&d, 10, 17, JDL_PATTERN_CUE, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 5 && body[2] == JDL_CMD_PATTERN && body[3] == 17 && body[4] == 0);   /* B02, cued */
+    n = jdl_pattern(&d, 11, 127, JDL_PATTERN_JUMP, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 5 && body[3] == 127 && body[4] == 1);
+    n = jdl_pattern(&d, 12, 99, JDL_PATTERN_READ, out, sizeof out);
+    CHECK(n > 0 && request_body(out, n, body) == 5 && body[3] == 0 && body[4] == 255);                         /* a read: the pattern byte is 0 */
+    CHECK(jdl_pattern(&d, 13, 128, JDL_PATTERN_CUE, out, sizeof out) == 0 && jdl_pattern(&d, 13, 1, 2, out, sizeof out) == 0);   /* what the Digitone would refuse */
+    reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){5, 17}, 2);
+    CHECK(jdl_take_pattern(&d, &p) && p.playing == 5 && p.cued == 17 && !jdl_take_pattern(&d, &p));
+    reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){17, 255}, 2);                                          /* nothing cued */
+    CHECK(jdl_take_pattern(&d, &p) && p.playing == 17 && p.cued == JDL_NO_PATTERN);
+    reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){17, 200}, 2);                                          /* damaged: not taken */
+    reply_to(&d, d.seq, JDL_CMD_PATTERN, 0, (uint8_t[]){17}, 1);
+    CHECK(!jdl_take_pattern(&d, &p));
+    reply_to(&d, d.seq, JDL_CMD_PATTERN, 2, NULL, 0);                                                          /* a build without PATTERN */
+    CHECK(!d.pattern_ok && d.patterns_ok && jdl_is_live(&d));                                                  /* live control and the reads go on */
+    CHECK(jdl_pattern(&d, 20, 3, JDL_PATTERN_CUE, out, sizeof out) == 0 && jdl_patterns_read(&d, 20, 0, out, sizeof out) > 0);
+    jdl_init(&d);                                                                                              /* live control asked for afresh: tried again */
+    CHECK(d.pattern_ok && jdl_pattern(&d, 21, 3, JDL_PATTERN_CUE, out, sizeof out) == 0);                      /* (not live yet) */
+}
+
 static void test_the_scale_needs_live_control(void)
 {
     struct jdl d;
@@ -798,6 +851,8 @@ int main(void)
 {
     test_erase_needs_live_control();
     test_record();
+    test_reading_the_patterns();
+    test_selecting_a_pattern();
     test_reading_the_scale_with_the_cheap_poll();
     test_the_root_comes_with_protocol_five();
     test_a_damaged_or_refused_scale_answer();

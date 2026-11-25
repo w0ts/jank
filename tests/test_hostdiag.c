@@ -211,6 +211,32 @@ static void test_full_record(void)
     CHECK(!strstr(out, "hostdiag_dev0"));
 }
 
+/* the Session page's line: PATTERNS reads, PATTERN requests, not refused (reads / cue), the playing pattern; short, `diag` has 2040 bytes in all */
+static void test_the_pattern_line(void)
+{
+    struct jhd d;
+    char out[2048];
+    const char *l;
+    jhd_init(&d);
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_pat=reads:0,cues:0,ok:0/0,playing:-1\n"));   /* nothing read yet: -1 */
+    d.live_pat_reads = 120;
+    d.live_pat_cues = 4;
+    d.pat_reads_ok = 1;
+    d.pat_cue_ok = 0;                  /* a Digitone without PATTERN 60 */
+    d.dn2_pattern = 37;
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_pat=reads:120,cues:4,ok:1/0,playing:37\n"));
+    CHECK(strstr(out, "hostdiag_steps=") < strstr(out, "hostdiag_pat=") && strstr(out, "hostdiag_pat=") < strstr(out, "hostdiag_dn2live="));
+    d.live_pat_reads = 0xFFFFFFFFu;    /* at its longest */
+    d.live_pat_cues = 0xFFFFFFFFu;
+    d.dn2_pattern = 127;
+    jhd_format(&d, out, sizeof out);
+    l = strstr(out, "hostdiag_pat=");
+    CHECK(l && strchr(l, '\n') && (size_t)(strchr(l, '\n') - l) + 1u <= 66u);
+    d.dn2_pattern = 200;               /* not a pattern: -1 */
+    jhd_format(&d, out, sizeof out);
+    CHECK(strstr(out, ",playing:-1\n") != NULL);
+}
+
 static void test_roles_and_claim_error(void)
 {
     struct jhd d;
@@ -268,6 +294,7 @@ int main(void)
     test_trace_text();
     test_failure_text();
     test_full_record();
+    test_the_pattern_line();
     test_roles_and_claim_error();
     test_truncation_and_hostile_names();
     test_valid_blob();

@@ -113,8 +113,10 @@ lower left, the sequence on top, the loop selector lower right):
   does not start the sequencer: it arms, and the Digitone records while its sequencer plays; PLAY's notes are recorded as its keys' are (its quantise setting, PLAY's velocity, on the track PLAYED, so the drum track pads and the melodic keyboard record in the step modes too). Off = what [PLAY] does during live record. The light: RED when armed or recording,
   RED_THIRD when not, **dark on a Digitone without RECORD** (it answers 2: the button says `RECORD: DN2 TOO OLD`). The light follows the Digitone's own state (LIVE STATUS protocol 6, 73 bytes, byte 72: bit 0 armed, 1 recording, 2 quantised, 3 GRID, 4 STEP; read with the 4 s keep-alive; a press holds the light for 1 s so an older status does not put it back);
   status 6 (GRID or STEP RECORDING is on) says `GRID/STEP REC IS ON` and puts the light off. Host-tested only; not tried on a Digitone.
-- **Session button (top, 5th) = a colour chart** (owner 2026-11-24, to pick colours): the Launchpad X's 128 palette indexes on the 64 pads, reading order, index 0 top left. Session shows 0-63, again 64-127, again back to the mode it came from; a pad says its index (`COLOUR 51`) on Jank's screen or the Digitone's.
-  Session is lit: white in the chart, dim grey out of it. Note, Custom and Capture leave it as always.
+- **Session button (top, 5th): a short press is the Session page (below); held for a second it is the colour chart** (owner 2026-11-24, to pick colours; held since
+  2026-11-25): the Launchpad X's 128 palette indexes on the 64 pads, reading order, index 0 top left. Holding Session opens it on 0-63 (it opens at the second, while the
+  button is still down); in the chart Session shows 64-127, then goes back to the mode it came from (the Session page too); a pad says its index (`COLOUR 51`) on Jank's
+  screen or the Digitone's. Session is lit: white on the Session page or in the chart, dim grey otherwise. Note, Custom and Capture leave both as always.
 - Reads and edits need live control; without it a step press says why (as a pad does). STEP's refusals (2) and full queue (5) are counted in `diag` (`hostdiag_steps`).
 - Velocity, length, quantise, random etc. (Launchpad 95's other scene buttons: drum 3 quant, 5/6 up/down, 7 velocity, 8 mute; melodic 4 random, 5 length, 6 octave, 7
   velocity, 8 notes; Note mode 2 undo, 8 record; mixer 1-4 volume / pan / send A / send B) are **not built yet**.
@@ -180,6 +182,37 @@ Digitone's reading is not allowed to put it back for 400 ms (its write applies a
 57, formats confirmed by its session); on a build without them a press says MIXER READ ONLY (at most every 2 s) and the faders are display only. Scene button 5 is chorus here, so
 **start / stop is not available inside the mixer**. A dual Launchpad mode is planned (one on tracks 1-8, the other on 9-16). Not tried on hardware. `diag`: `mixreads:`, `mixsets:`.
 
+### Session page: the patterns (`core/jank_lpsess.[ch]`)
+
+Owner, 2026-11-25. **A short press on Session** (let go within a second) opens the page; another short press goes back to the mode it came from (it says SESSION BANKS
+A-D / SESSION OFF). Held for a second, Session is the colour chart instead (above).
+
+**What it shows.** The Digitone's 128 patterns are 8 banks, A to H, of 16. Each bank takes two pad rows, four banks a page: from the top A01-A08, A09-A16, then B, C and
+D the same way. **Up / down** switch to banks E-H and back (it says BANKS A-D / BANKS E-H); the arrows are green where they can go, dim green at the limit, as in the
+mixer. The lights are Launchpad 95's session skin (`SkinMK2.py`, Session): **the playing pattern GREEN (21), pulsing**; **a cued pattern GREEN, flashing** (with dark);
+**a pattern that holds trigs RED_THIRD (7)**; an empty pattern dark. A bank that has not been read yet is dark too.
+
+**Where it comes from.** PATTERNS (51, the Digitone's stage 4, there today): `u8 bank (0..7, 255 = the playing pattern's bank)` -> `u8 bank, u8 playing pattern, u16 mask`
+(bit k: pattern 16 x bank + k holds a trig). It costs the Digitone up to about 0.8 ms per bank in its MIDI task, so Jank asks sparingly: **when the page opens, every bank
+once** (one request at least 60 ms after the other, so the page fills within about a second), **then only the playing pattern's bank (255) every 500 ms** while the page is shown, and
+**nothing while it is closed**. A bank whose answer never came is asked again with the next 500 ms read, one at a time. When live control lapses the page goes dark; when it
+comes back the banks are read again. Other banks' trigs are only read when the page opens (a pattern filled on the Digitone meanwhile shows the next time).
+
+**A press cues that pattern**: PATTERN `60 {u8 pattern 0..127, u8 how: 0 cue (switch at the playing pattern's end), 1 jump, 255 read}` -> `{u8 playing pattern, u8 cued
+pattern (255 none)}`, with how = 0 (it says CUE B10). **PATTERN 60 is provisional**: asked of the Digitone's developers on 2026-11-25 and not built there yet; Jank sends
+it in that format, as RECORD was built before the Digitone had it. Never a MIDI Program Change (owner: "sysex. we should not rely on this settings"). The pad flashes at
+once, and stops when the pattern plays (the 500 ms read says so) or when the Digitone names another cue or none. While the page is shown Jank also reads PATTERN (how 255)
+with each 500 ms read, so a cue made on the Digitone itself flashes too; that read also goes once when the page opens, so a Digitone without PATTERN is found out before
+the first press. **A Digitone without it** answers status 2: the page says **PATTERN: DN2 TOO OLD** (and again at each press), its pads send nothing, and no more PATTERN
+requests go until live control is asked for afresh (the Digitone or the Launchpad plugged in again); the reading of the banks goes on. Without live control a press says why,
+as a note pad does. **Chains** (the Digitone's 59 CHAIN) are not there: not built on the Digitone yet.
+
+**The scene buttons** on this page are Note mode's: 5 start / stop, 6 Delete (held), 8 Record, the others dark. The page has no use for them, and they stay where the hand
+knows them; the mixer is the one page that takes them over (for its views). A note pad that was down when the page opened still ends.
+
+`diag`: `hostdiag_pat=reads:<PATTERNS sent>,cues:<PATTERN sent>,ok:<reads not refused>/<PATTERN not refused>,playing:<0..127, -1 none read>`. Host-tested
+(`tests/test_lpsess.c`); **not tried on the Launchpad or the Digitone**.
+
 ### Colour language so far (to be decided with the owner)
 
 **A button that does something is always lit: dim when its mode is not on, full brightness when it is** (owner 2026-11-24). Note (light blue, dim in a step mode), Custom (the
@@ -195,7 +228,7 @@ the Digitone's stage 4 / 5.
 
 ## What is not there yet
 
-Session and the song row. (The scale sync and the mixer are built; their writes, and the scale's root, wait for the Digitone's stage 6, which is not installed yet.) A **dual Launchpad mode** is planned for later (owner 2026-11-24): in the mixer one Launchpad is tracks 1-8 and the other 9-16
+Chains on the Session page (the Digitone's 59 CHAIN) and the song row; the Session page's cue waits for the Digitone's PATTERN 60. (The scale sync and the mixer are built; their writes, and the scale's root, wait for the Digitone's stage 6, which is not installed yet.) A **dual Launchpad mode** is planned for later (owner 2026-11-24): in the mixer one Launchpad is tracks 1-8 and the other 9-16
 (the mixer's bank is already a parameter of its screen). Order decided with the owner: Note, Step sequencer, Mixer, then patterns and song mode last. The Digitone's current
 track, scale and step data need new commands in dn2-wishes (its test channel only answers when asked); that research is
 separate.
@@ -260,5 +293,5 @@ separate.
 ## Files
 
 `core/jank_lpx.[ch]` (the Launchpad's protocol), `core/jank_lpnote.[ch]` (layouts), `core/jank_lpapp.[ch]` (what a press asks for, as acts,
-what the pads show), `core/jank_dn2live.[ch]` and `core/jank_dn2rpc.[ch]` (the Digitone's live control: the requests, the answers, the note push), `firmware/main/usb_lp.c` (the one state and the two devices), `firmware/main/usb_midi_host.c` (IN endpoints,
-interface choice). Host tests: `tests/test_lpx.c`, `test_lpnote.c`, `test_lpapp.c`, `test_dn2live.c`, `test_dn2rpc.c` (in `tests/run.sh`).
+what the pads show), `core/jank_lpsess.[ch]` (the Session page), `core/jank_dn2live.[ch]` and `core/jank_dn2rpc.[ch]` (the Digitone's live control: the requests, the answers, the note push), `firmware/main/usb_lp.c` (the one state and the two devices), `firmware/main/usb_midi_host.c` (IN endpoints,
+interface choice). Host tests: `tests/test_lpx.c`, `test_lpnote.c`, `test_lpapp.c`, `test_lpsess.c`, `test_dn2live.c`, `test_dn2rpc.c` (in `tests/run.sh`).

@@ -1180,7 +1180,16 @@ static void test_the_record_button(void)
     }
 }
 
-/* owner 2026-11-24: the Session button is a colour chart: the 128 palette indexes on the pads, two pages */
+/* Session held for JLAPP_SESSION_HOLD_MS (owner 2026-11-25: a short press is the Session page now): the chart opens while it is still down */
+static void hold_session(struct jlapp *a)
+{
+    struct jlapp_act o;
+    uint32_t t = a->now_ms;
+    acts(a, top(BUTTON_SESSION_IDX, 127), &o);
+    jlapp_tick(a, t + JLAPP_SESSION_HOLD_MS);
+}
+
+/* owner 2026-11-24: the Session button is a colour chart: the 128 palette indexes on the pads, two pages (owner 2026-11-25: held) */
 static void test_the_session_button_is_a_colour_chart(void)
 {
     struct jlapp a = fresh();
@@ -1189,7 +1198,8 @@ static void test_the_session_button_is_a_colour_chart(void)
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_TOP0 + BUTTON_SESSION_IDX].color == JLAPP_COLOR_PALETTE_OFF);
     say_nothing_yet(&a);
-    CHECK(acts(&a, top(BUTTON_SESSION_IDX, 127), &o) == 0 && a.mode == JLAPP_MODE_PALETTE && strcmp(msg(&a), "COLOURS 0-63") == 0);
+    hold_session(&a);
+    CHECK(a.mode == JLAPP_MODE_PALETTE && strcmp(msg(&a), "COLOURS 0-63") == 0);
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_TOP0 + BUTTON_SESSION_IDX].color == JLAPP_COLOR_PALETTE_ON);
     CHECK(f.led[JLX_PAD0 + 7 * 8 + 0].color == 0 && f.led[JLX_PAD0 + 7 * 8 + 1].color == 1 && f.led[JLX_PAD0 + 7 * 8 + 7].color == 7);   /* the top row: 0 .. 7, index 0 top left */
@@ -1210,13 +1220,14 @@ static void test_the_session_button_is_a_colour_chart(void)
     jlapp_frame(&a, &f);
     CHECK(f.led[JLX_PAD0].color == JLN_COLOR_ROOT && f.led[JLX_TOP0 + BUTTON_SESSION_IDX].color == JLAPP_COLOR_PALETTE_OFF);   /* the note pads again */
     acts(&a, top(6, 127), &o);                                               /* from a step mode ... */
-    acts(&a, top(BUTTON_SESSION_IDX, 127), &o);
+    hold_session(&a);
+    acts(&a, top(BUTTON_SESSION_IDX, 0), &o);
     acts(&a, top(BUTTON_SESSION_IDX, 127), &o);
     acts(&a, top(BUTTON_SESSION_IDX, 127), &o);
     CHECK(a.mode == JLAPP_MODE_STEP);                                        /* ... back to it */
-    acts(&a, top(BUTTON_SESSION_IDX, 127), &o);
+    hold_session(&a);
     acts(&a, top(NOTE_BTN, 127), &o);                                        /* a tap on Note leaves the chart for Note mode */
-    jlapp_tick(&a, 100);
+    jlapp_tick(&a, a.now_ms + 100u);
     acts(&a, top(NOTE_BTN, 0), &o);
     CHECK(a.mode == JLAPP_MODE_NOTE);
 }
