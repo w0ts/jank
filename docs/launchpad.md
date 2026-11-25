@@ -244,6 +244,9 @@ separate.
   same `diag` device line; the library keeps the device attached meanwhile). Measured 2026-11-24: the Launchpad's claim failed with 257 with 20 KB of
   heap free after it had worked on the same build, in the seconds when an update client was also asking the unit questions (the Wi-Fi service allocates a
   buffer at its first request). A passing memory shortage is the likely cause, not a proven one. After a Wi-Fi update of 2026-11-24 the claim failed for over 30 s (the first version tried for 9 s) and worked at once after a replug, which supports it.
+- **An IN transfer that keeps failing is never given up** (2026-11-25, the Digitone session's report of a Digitone that stopped answering while still
+  listed): after 3 retries at once it is tried again after 200 ms, doubling up to 2 s, for as long as the device is attached (`usb_midi_host.c`
+  in_retry_due). The diag's device lines now count them: `in_err:` the errors, `in_status:` the last status (they were never filled before).
 - **The restart after an update** (owner 2026-11-25: "it should recover dn2 and lp automatically"). That day every Wi-Fi update with both plugged in ended with the
   Launchpad's claim failing (257 at the interface claim, `where:1`) until a replug. Tried on the unit and dropped: cycling the root port (the Launchpad did not
   even enumerate again), and keeping the port off until the update was confirmed and Wi-Fi quiet (28 s: the same failure). Every restart of another kind

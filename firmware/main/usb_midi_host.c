@@ -36,7 +36,10 @@
 #define CLIENT_STACK 5120              /* the client task runs the callbacks, usb_lp.c's frame and queues included (4096 was thought tight, 6144 took 2 KB
                                           of a 13 KB internal heap): the margin it leaves is reported in diag (hostdiag_mem client_stack_free) */
 #define LEARN_DELAY_MS 3000u          /* after a controller that could not be claimed: the rest of the dock has come by then */
-#define IN_RETRIES 3                   /* a stalled or failed IN transfer is tried again this many times in a row, then given up */
+#define IN_RETRIES 3                   /* a stalled or failed IN transfer is tried again at once this many times in a row, */
+#define IN_BACKOFF_MS 200u             /* ... then again after a wait that doubles from this, */
+#define IN_BACKOFF_MAX_MS 2000u        /* ... up to this, for as long as the device is attached: never given up (a Digitone that stopped
+                                        * answering while still listed, reported by its session 2026-11-25: an IN loop given up was a suspect) */
 
 struct dev {
     usb_device_handle_t h;
@@ -48,7 +51,9 @@ struct dev {
     uint16_t in_mps;
     volatile uint8_t busy;             /* the OUT transfer is out */
     volatile uint8_t in_busy;          /* the IN transfer is out */
-    uint8_t in_fails;                  /* IN transfers in a row that ended in an error (retried IN_RETRIES times) */
+    uint8_t in_fails;                  /* IN transfers in a row that ended in an error */
+    uint8_t in_waiting;                /* the IN transfer waits for in_retry_at (the backoff) */
+    TickType_t in_retry_at;
     uint8_t leaked;                    /* an IN transfer was still out when the device went: its callback still points here, the slot is not reused */
     uint8_t dg;                        /* its line in the probe (g_hostdiag.dev) */
     enum jlapp_role role;
@@ -128,8 +133,17 @@ static int submit_in(struct dev *d)
     return 1;
 }
 
-/* (the client task) what a device with a role sent: to usb_lp.c, then the next transfer. A stall or an error is tried again
- * (the endpoint cleared) IN_RETRIES times in a row; a cancelled transfer or a device that is gone ends the loop */
+/* the wait before IN try number `fails` (past the IN_RETRIES at once): IN_BACKOFF_MS doubled each time, at most IN_BACKOFF_MAX_MS */
+static uint32_t in_backoff_ms(uint8_t fails)
+{
+    unsigned extra = fails > IN_RETRIES ? fails - IN_RETRIES - 1u : 0u;
+    uint32_t ms = IN_BACKOFF_MS << (extra < 4u ? extra : 4u);
+    return ms < IN_BACKOFF_MAX_MS ? ms : IN_BACKOFF_MAX_MS;
+}
+
+/* (the client task) what a device with a role sent: to usb_lp.c, then the next transfer. A stall or an error is tried again (the
+ * endpoint cleared): IN_RETRIES times at once, then after a growing wait (in_retry_due), for as long as the device is attached;
+ * a cancelled transfer or a device that is gone ends the loop. diag counts the errors (in_err) and keeps the last status (in_status) */
 static void on_in(usb_transfer_t *t)
 {
     struct dev *d = t->context;
@@ -142,11 +156,20 @@ static void on_in(usb_transfer_t *t)
             memcpy(dg(d)->in_last, t->data_buffer + whole - 4u, 4);
             usb_lp_rx(d->role, t->data_buffer, whole);
         }
-    } else if (d->h && (st == USB_TRANSFER_STATUS_STALL || st == USB_TRANSFER_STATUS_ERROR || st == USB_TRANSFER_STATUS_OVERFLOW)
-               && d->in_fails < IN_RETRIES) {
-        d->in_fails++;
-        ESP_LOGW(TAG, "IN transfer of '%s' ended with status %d: try %u", d->name, (int)st, d->in_fails);
+    } else if (d->h && (st == USB_TRANSFER_STATUS_STALL || st == USB_TRANSFER_STATUS_ERROR || st == USB_TRANSFER_STATUS_OVERFLOW)) {
+        dg(d)->in_errors++;
+        dg(d)->in_last_status = (uint8_t)st;
+        if (d->in_fails < UINT8_MAX)
+            d->in_fails++;
         usb_host_endpoint_clear(d->h, d->in_ep);
+        if (d->in_fails > IN_RETRIES) {          /* failing for a while: again after the backoff, from the client task's loop */
+            ESP_LOGW(TAG, "IN transfer of '%s' ended with status %d: again in %lu ms", d->name, (int)st, (unsigned long)in_backoff_ms(d->in_fails));
+            d->in_retry_at = xTaskGetTickCount() + pdMS_TO_TICKS(in_backoff_ms(d->in_fails));
+            d->in_waiting = 1;
+            d->in_busy = 0;
+            return;
+        }
+        ESP_LOGW(TAG, "IN transfer of '%s' ended with status %d: try %u", d->name, (int)st, d->in_fails);
     } else {
         if (d->h)
             ESP_LOGW(TAG, "IN transfer of '%s' ended with status %d: no more input from it", d->name, (int)st);
@@ -155,6 +178,34 @@ static void on_in(usb_transfer_t *t)
     }
     if (!d->h || !submit_in(d))
         d->in_busy = 0;
+}
+
+/* (the client task) the IN transfers whose backoff is over go out again */
+static void in_retry_due(void)
+{
+    for (uint32_t i = 0; i < JH_DEVICES; i++) {
+        struct dev *d = &s_dev[i];
+        if (!d->in_waiting || (int32_t)(xTaskGetTickCount() - d->in_retry_at) < 0)
+            continue;
+        d->in_waiting = 0;
+        if (d->h && d->in && !d->in_busy)
+            submit_in(d);
+    }
+}
+
+/* the earliest IN backoff that ends, as ticks from now; portMAX_DELAY: none waits */
+static TickType_t in_wait_ticks(void)
+{
+    TickType_t w = portMAX_DELAY;
+    for (uint32_t i = 0; i < JH_DEVICES; i++) {
+        int32_t left;
+        if (!s_dev[i].in_waiting)
+            continue;
+        left = (int32_t)(s_dev[i].in_retry_at - xTaskGetTickCount());
+        if ((TickType_t)(left > 0 ? left : 0) < w)
+            w = (TickType_t)(left > 0 ? left : 0);
+    }
+    return w;
 }
 
 static struct dev *free_place(void)
@@ -279,6 +330,7 @@ static esp_err_t claim(struct dev *d, usb_device_handle_t h, const struct midi_e
     d->busy = 0;
     d->in_busy = 0;
     d->in_fails = 0;
+    d->in_waiting = 0;
     d->role = d->in ? role : JLAPP_OTHER;      /* a role needs the IN endpoint: without it the device is the clock's only */
     d->in_ep = 0;
     if (d->in) {
@@ -502,6 +554,8 @@ static TickType_t client_wait_ticks(void)
         if (t < w)
             w = t;
     }
+    if (in_wait_ticks() < w)
+        w = in_wait_ticks();
     return w;
 }
 
@@ -527,6 +581,7 @@ static void client_task(void *arg)
         }
         if (s_retry_left && (int32_t)(xTaskGetTickCount() - s_retry_at) >= 0)
             retry_due();
+        in_retry_due();
         usb_lp_pump();                 /* what a callback, a device or the clock has made room for */
         if (s_learn_pending && (int32_t)(xTaskGetTickCount() - s_learn_at) >= 0)
             learn_and_restart();
