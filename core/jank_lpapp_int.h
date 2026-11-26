@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Inside the Launchpad app (jank_lpapp.h), shared by its files: jank_lpapp.c (Note mode, the buttons, the lights), jank_lpsessapp.c (the Session button, the colour chart, who
- * starts and stops) and the unit's Session page: jank_lpsess.c (the Digitone's patterns) or jank_lpclips.c (clips, JLAPP_CLIPS). Not for the firmware. */
+/* Inside the Launchpad app (jank_lpapp.h), shared by its files: jank_lpapp.c (Note mode, the buttons, the lights) and the unit's Session page: jank_lpsessapp.c (the
+ * Digitone's patterns, jank_lpsess.h) or jank_lpclips.c (clips, jank_lpunit.h JLAPP_CLIPS). Not for the firmware. */
 #ifndef JANK_LPAPP_INT_H
 #define JANK_LPAPP_INT_H
 #include "jank_lpapp.h"
@@ -9,12 +9,6 @@
 void jlapp_say(struct jlapp *a, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 /* why a press cannot do anything (no live control ...), at most every 2 s */
 void jlapp_say_why_not(struct jlapp *a);
-void jlapp_set_act(struct jlapp_act *o, uint8_t kind, uint8_t track, uint8_t note, uint8_t vel);
-
-/* jank_lpsessapp.c: Session held (jlapp_tick), the Session button, the start / stop scene button */
-void jlapp_open_chart(struct jlapp *a);
-void jlapp_session_button(struct jlapp *a, int down);
-size_t jlapp_start_stop(struct jlapp *a, struct jlapp_act *out, size_t max);
 
 /* The Session page, the unit's: its struct is a->sess, with `half` (0: the top 8 rows of its 16, 1: the others; up / down, jank_lpapp.c) */
 #if JLAPP_CLIPS

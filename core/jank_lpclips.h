@@ -16,8 +16,8 @@
 #define JLCL_COLOR_PLAYING 21u         /* GREEN, pulsing (flashing: a stop is queued) */
 #define JLCL_COLOR_FILLED 7u           /* RED_THIRD */
 #define JLCL_COLOR_SCENE 11u           /* AMBER_THIRD: a stored scene */
-#if JLCL_TRACKS < 1 || JLCL_TRACKS > 7
-#error "JLCL_TRACKS: 1..7 (the 8th column holds the scenes)"
+#if JLCL_TRACKS < 1 || JLCL_TRACKS > 7 || JLCL_SLOTS != 16
+#error "JLCL_TRACKS: 1..7 (the 8th column holds the scenes); JLCL_SLOTS: 16 (two halves of 8 rows)"
 #endif
 
 struct jlcl_track {

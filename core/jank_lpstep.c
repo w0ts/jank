@@ -21,6 +21,7 @@ void jlst_init(struct jlst *s, enum jlst_kind kind)
 /* page p holds a page of `track` */
 static int is_of(const struct jlst *s, unsigned p, uint8_t track) { return s->have[p] && s->pg[p].track == track; }
 
+/* (jank_lpact.h) the one copy, here: every file that makes acts links this one */
 void jlapp_set_act(struct jlapp_act *o, uint8_t kind, uint8_t track, uint8_t note, uint8_t vel)
 {
     memset(o, 0, sizeof *o);

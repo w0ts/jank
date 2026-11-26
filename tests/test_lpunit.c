@@ -68,7 +68,7 @@ static void test_the_configuration(void)
     CHECK(JLAPP_CLIPS == 1 && JLCL_SLOTS == 16u && JLCL_TRACKS <= 7u && JLN_TRACKS <= 16u);
     CHECK(JLAPP_TRACK_ROWS == (JLN_TRACKS > 8u ? 2u : 1u) && JLMX_BANKS == JLAPP_TRACK_ROWS);
     CHECK(jls_count() == 16u && jls_get(JLS_MINOR) && !strcmp(jls_get(JLS_MINOR)->name, "MIN") && jls_mask(JLS_MAJOR) == 0xAB5u);
-    CHECK(!JLN_NO_TRACK(JLN_TRACKS - 1u) && JLN_NO_TRACK(JLN_TRACKS));
+    CHECK(!JLN_NO_TRACK(JLN_TRACKS - 1u) && JLN_NO_TRACK(JLN_TRACKS) == (JLN_TRACKS < 16u));   /* (constant 0 with 16) */
 }
 
 /* the track pads (TRIGGER and SELECT) and the select overlay: the unit's tracks, the rest dark and doing nothing */

@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Launchpad X -> Digitone II, Note mode: what a pad press asks of the Digitone, what the buttons do, what the pads show, and the short messages that say what a
  * press did. Pure: it takes decoded Launchpad events and the Digitone's live-control news, and gives back acts (jlapp_act), an LED frame (jank_lpx.h) and
- * messages; the USB side is firmware/main. Host-tested (tests/test_lpapp.c).
+ * messages; the USB side is firmware/main. Host-tested (tests/test_lpapp.c). Another unit (the FM-1) builds it with its own configuration (jank_lpunit.h: its
+ * tracks, the clips page) and an adapter of its own: docs/launchpad.md, "Using the core on another unit" (tests/test_lpunit.c).
  *
  * SysEx only (owner 2026-11-24): the Digitone is played and told what track to use through its live control (jank_dn2live.h, SETTINGS > SYSTEM > USB CONFIG >
  * REMOTE CONTROL ON), never through MIDI channels, which depend on how the Digitone is set up and would mix with the MIDI it gets otherwise. Without live
