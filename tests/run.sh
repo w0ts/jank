@@ -6,7 +6,8 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${JANK_SCRATCH:-$HERE/worktrees/jank-scratch}/hosttest"
 mkdir -p "$OUT"
 CC="${CC:-cc}"
-FLAGS="-std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -I$HERE/core"
+BASEFLAGS="-std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all"
+FLAGS="$BASEFLAGS -I$HERE/core"
 
 CORE="$HERE/core/jank_core.c $HERE/core/jank_ctl.c $HERE/core/jank_ui.c $HERE/core/jank_home.c $HERE/core/jank_usbrole.c $HERE/core/jank_hold.c $HERE/core/jank_fold.c $HERE/core/jank_lat.c $HERE/core/jank_nets.c"
 LINK="$HERE/third_party/link/link.c $HERE/core/jank_start.c"
@@ -101,6 +102,21 @@ fi
 "$OUT/test_lpprefs"
 "$CC" $FLAGS "$HERE/tests/test_lpout.c" "$HERE/core/jank_lpout.c" -o "$OUT/test_lpout"
 "$OUT/test_lpout"
+# The Launchpad core on another unit (docs/launchpad.md, "Using the core on another unit"): no C library header in any jank_lp* file; the FM-1's file set copied as it
+# copies it (its own scales: tests/lpunit/), built as ONE unit (tests/lpunit_unity.c) freestanding with only the compiler's stddef / stdint, then tested with its
+# configuration (15 tracks, 4 clip columns, no Record or Delete) and with 4 tracks.
+if grep -l '#include <\(string\|stdio\|stdarg\|stdlib\)\.h>' "$HERE"/core/jank_lp*.[ch]; then echo "lpunit: a C library header in the Launchpad core (above)"; exit 1; fi
+U="$OUT/lpunit"
+rm -rf "$U" && mkdir -p "$U"
+cp "$HERE"/core/jank_lp{unit,str,act,app_int}.h "$HERE"/core/jank_dn2live.h "$HERE"/core/jank_lp{x,note,app,step,mix,trans,clips,prefs}.[ch] "$HERE"/tests/lpunit/jank_lpscales.[ch] "$U"/
+FM1="-DJLN_TRACKS=15 -DJLCL_TRACKS=4 -DJLAPP_CLIPS=1 -DJLAPP_RECORD=0 -DJLAPP_ERASE=0"
+SYSINC="$("$CC" -print-resource-dir 2>/dev/null)/include"   # clang's own headers (gcc: -print-file-name=include)
+[ -d "$SYSINC" ] || SYSINC="$("$CC" -print-file-name=include)"
+"$CC" -std=c11 -fsyntax-only -ffreestanding -nostdinc -isystem "$SYSINC" -Wall -Wextra -Werror $FM1 -I"$U" "$HERE/tests/lpunit_unity.c"
+"$CC" $BASEFLAGS $FM1 -I"$U" "$HERE/tests/test_lpunit.c" -o "$OUT/test_lpunit"
+"$OUT/test_lpunit"
+"$CC" $BASEFLAGS -DJLN_TRACKS=4 -DJLAPP_CLIPS=1 -I"$U" "$HERE/tests/test_lpunit.c" -o "$OUT/test_lpunit4"
+"$OUT/test_lpunit4"
 "$CC" $FLAGS "$HERE/tests/test_dn2rpc.c" "$HERE/core/jank_dn2rpc.c" -o "$OUT/test_dn2rpc"
 "$OUT/test_dn2rpc"
 "$CC" $FLAGS "$HERE/tests/test_dn2live.c" "$HERE/core/jank_dn2live.c" "$HERE/core/jank_dn2live9.c" "$HERE/core/jank_dn2rpc.c" -o "$OUT/test_dn2live"
