@@ -18,8 +18,30 @@ static int fails, checks;
 
 static void test_keys(void)
 {
+    struct jdm_press p[JDM_PRESSES_MAX];
     CHECK(jdm_button(JDL_KC_UP) == JO_UP && jdm_button(JDL_KC_DOWN) == JO_DOWN && jdm_button(JDL_KC_NO) == JO_NO && jdm_button(JDL_KC_YES) == JO_YES);
-    CHECK(jdm_button(JDL_KC_LEFT) < 0 && jdm_button(JDL_KC_RIGHT) < 0 && jdm_button(JDL_KC_FUNC) < 0 && jdm_button(41) < 0 && jdm_button(0) < 0);
+    CHECK(jdm_button(JDL_KC_LEFT) == JO_NO && jdm_button(JDL_KC_RIGHT) == JO_YES);   /* owner 2026-11-26 */
+    CHECK(jdm_button(JDL_KC_FUNC) < 0 && jdm_button(41) < 0 && jdm_button(48) < 0 && jdm_button(0) < 0);   /* FUNC, the encoder pushes: not used */
+    CHECK(jdm_key_presses(&(struct jdl_key){JDL_KEY_PRESS, JDL_KC_LEFT, 0}, p) == 1 && p[0].button == JO_NO && p[0].down == 1);
+    CHECK(jdm_key_presses(&(struct jdl_key){JDL_KEY_RELEASE, JDL_KC_RIGHT, 0}, p) == 1 && p[0].button == JO_YES && p[0].down == 0);
+    CHECK(jdm_key_presses(&(struct jdl_key){JDL_KEY_PRESS, 41, 0}, p) == 0);                      /* an encoder push */
+    CHECK(jdm_key_presses(&(struct jdl_key){JDL_KEY_PRESS, JDL_KC_FUNC, 0}, p) == 0);
+    CHECK(jdm_key_presses(&(struct jdl_key){7, JDL_KC_UP, 0}, p) == 0);                           /* not a kind */
+}
+
+/* an encoder turn (owner 2026-11-26): a press of UP per step clockwise, of DOWN per step the other way, a few steps at most per event, any of the eight encoders */
+static void test_turns(void)
+{
+    struct jdm_press p[JDM_PRESSES_MAX];
+    size_t n = jdm_key_presses(&(struct jdl_key){JDL_KEY_TURN, 41, 2}, p);
+    CHECK(n == 4 && p[0].button == JO_UP && p[0].down && p[1].button == JO_UP && !p[1].down && p[2].down && !p[3].down);
+    n = jdm_key_presses(&(struct jdl_key){JDL_KEY_TURN, 48, -1}, p);
+    CHECK(n == 2 && p[0].button == JO_DOWN && p[0].down && !p[1].down);
+    CHECK(jdm_key_presses(&(struct jdl_key){JDL_KEY_TURN, 45, 0}, p) == 0);                       /* no step */
+    n = jdm_key_presses(&(struct jdl_key){JDL_KEY_TURN, 42, 100}, p);
+    CHECK(n == 2 * JDM_TURN_STEPS && p[2 * JDM_TURN_STEPS - 1].button == JO_UP);                 /* a fast turn: a few steps at most */
+    n = jdm_key_presses(&(struct jdl_key){JDL_KEY_TURN, 43, -128}, p);
+    CHECK(n == 2 * JDM_TURN_STEPS && p[0].button == JO_DOWN);
 }
 
 static void test_open(void)
@@ -81,8 +103,8 @@ static void test_start_request(void)
     CHECK(jdm_link_step(&m, 20011, 0, 0, 0, 0) == JDL_LINK_OFF);
     jdm_on_request(&m, &(struct jdl_link_req){JDL_LR_START, 0, 0, 10}, 30000, 0, 0, 400, &a);   /* Link does not lead: no start */
     CHECK(a.answer == JDL_LINK_CANCEL && a.session == JDM_SESSION_NONE && !m.pending);
-    jdm_on_request(&m, &(struct jdl_link_req){JDL_LR_START, 0, 0, 11}, 40000, 1, 1, 400, &a);   /* Jank's clock already runs: start it again on the bar line */
-    CHECK(a.answer == JDL_LINK_PENDING && a.session == JDM_SESSION_RESYNC);
+    jdm_on_request(&m, &(struct jdl_link_req){JDL_LR_START, 0, 0, 11}, 40000, 1, 1, 400, &a);   /* Jank's clock already runs: a Start for the Digitone alone */
+    CHECK(a.answer == JDL_LINK_PENDING && a.ms == 400 && a.session == JDM_SESSION_USB_START);   /* (the same time: that bar line) */
 }
 
 static void test_stop_request(void)
@@ -120,6 +142,7 @@ static void test_ms_to_bar(void)
 int main(void)
 {
     test_keys();
+    test_turns();
     test_open();
     test_link_mode_follows_the_lead();
     test_start_request();

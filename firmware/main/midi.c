@@ -172,7 +172,14 @@ static bool IRAM_ATTR on_alarm(gptimer_handle_t timer, const gptimer_alarm_event
         bench_pins(&f);                  /* right after the UART starts the byte: the edge sits with the start bit */
     if (s_clk_pin >= 0)
         pulse_pins(&f);                  /* the same place: the edge sits with the start bit; the fall is a second timer's */
-    woken = usb_midi_isr(f.bytes, f.n);
+    if (f.usb_start && f.n < sizeof f.bytes + 1u) {   /* a Start for the USB-hosted devices alone (LINK MODE: a Digitone joins), before this tick's clock */
+        uint8_t usb[sizeof f.bytes + 1u];
+        usb[0] = JC_START;
+        for (unsigned i = 0; i < f.n; i++)
+            usb[1u + i] = f.bytes[i];
+        woken = usb_midi_isr(usb, f.n + 1u);
+    } else
+        woken = usb_midi_isr(f.bytes, f.n);
     arm(timer, f.next - CLK_LEAD_US, now);
     s_busy_cyc += esp_cpu_get_cycle_count() - c_in;     /* core 1's load: this interrupt's cycles (two counter reads and an add) */
     return woken;
@@ -359,6 +366,14 @@ void midi_resync(void)
 {
     portENTER_CRITICAL(&s_mux);
     jc_resync(&s_tick);
+    portEXIT_CRITICAL(&s_mux);
+}
+
+/* LINK MODE: a Digitone asks to start while the clock already plays: a Start for the USB-hosted devices alone on the next bar line (jank_clock.h jc_usb_start) */
+void midi_usb_start(void)
+{
+    portENTER_CRITICAL(&s_mux);
+    jc_usb_start(&s_tick);
     portEXIT_CRITICAL(&s_mux);
 }
 

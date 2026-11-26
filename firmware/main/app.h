@@ -139,6 +139,7 @@ void midi_publish(const struct jc_map *m);
 void midi_want(int play);
 int midi_start_pending(void);                        /* a MIDI start waits for its bar line */
 void midi_resync(void);
+void midi_usb_start(void);                           /* a Start for the USB-hosted devices alone on the next bar line, while the clock plays (LINK MODE: a Digitone joins) */
 void midi_stats(uint32_t *ticks, uint32_t *resyncs);
 int midi_is_playing(void);                           /* a MIDI start went out (or waits for its bar line), no stop since */
 

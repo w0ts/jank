@@ -37,6 +37,7 @@ struct jc_ticker {
     uint8_t playing;                   /* a MIDI start went out, no stop since */
     uint8_t want_start, want_stop;
     uint8_t resync;                    /* the button: stop at the next tick, start at the next bar line after it */
+    uint8_t want_usb_start;            /* a Start for the USB-hosted devices alone at the next bar line (jc_usb_start) */
     uint32_t sent;                     /* clocks */
     uint32_t resyncs;
 };
@@ -44,6 +45,7 @@ struct jc_ticker {
 struct jc_fire {
     uint8_t bytes[3];
     uint8_t n;
+    uint8_t usb_start;                 /* a Start (0xFA) for the USB-hosted devices alone, before this tick's bytes (jc_usb_start); the other outputs get bytes only */
     int64_t next;                      /* due time of the next call */
 };
 
@@ -58,6 +60,10 @@ void jc_want(struct jc_ticker *c, int play);
 /* the button's click: MIDI stop (0xFC) before the next clock, always, then start (0xFA) just before the clock of the
  * first bar line after that tick, whatever the session's transport; clocks go on all the way */
 void jc_resync(struct jc_ticker *c);
+/* a Digitone asks to start while the clock already plays (LINK MODE, owner 2026-11-26 "only the Digitone"): a Start for the USB-hosted devices alone (jc_fire.usb_start)
+ * on the next bar line, by a real Start's rules (not in a stop's tick, not on a tick scheduled before a jump of the session); the MIDI outs, the clock pins and USB
+ * device mode go on untouched. Dropped when the clock does not play at that tick (or stops): a start of the clock's own (jc_want) reaches every output anyway */
+void jc_usb_start(struct jc_ticker *c);
 /* Link's Start Stop Sync, or with auto transport whether a session is joined; alone (M2l: the stick's own session in
  * LINK mode too), auto follows that session's start / stop, which only the user's Start / Stop set */
 int jc_should_play(int auto_transport, int link_playing, uint32_t link_peers);

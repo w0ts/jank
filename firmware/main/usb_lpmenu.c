@@ -63,7 +63,7 @@ static void link_request(struct jdl *d, uint32_t t, const struct jdl_link_req *r
     switch (a.session) {
     case JDM_SESSION_START: usb_lp_session(USB_LP_REQ_START); break;   /* its MIDI Start goes out on the bar line */
     case JDM_SESSION_STOP: usb_lp_session(USB_LP_REQ_STOP); break;     /* the MIDI Stop, then TRANSPORT STOP (usb_lp.c stop_follow) */
-    case JDM_SESSION_RESYNC: midi_resync(); break;                     /* the clock already runs: stop, and start again on the bar line */
+    case JDM_SESSION_USB_START: midi_usb_start(); break;               /* the clock already runs: a Start for the USB devices alone on the bar line */
     case JDM_SESSION_DN2_STOP: {                                       /* nothing runs here: the Digitone's own STOP */
         size_t n = jdl_transport(d, t, JDL_TR_STOP, sx, sizeof sx);
         g_hostdiag.tr_sent += n != 0;
@@ -82,11 +82,11 @@ void lpm_input(struct jdl *d, uint32_t t)
     struct jdl_live8 l8;
     if (jdl_take_keys(d, &keys))
         for (unsigned i = 0; i < keys.n; i++) {
-            int b = jdm_button(keys.k[i].code);
-            if (b < 0 || (keys.k[i].kind != JDL_KEY_PRESS && keys.k[i].kind != JDL_KEY_RELEASE))
-                continue;              /* (LEFT, RIGHT, FUNC and the encoders are not the menu's) */
-            uis_dn2_key((enum jo_btn)b, keys.k[i].kind == JDL_KEY_PRESS);
-            g_hostdiag.menu_keys++;
+            struct jdm_press p[JDM_PRESSES_MAX];
+            size_t n = jdm_key_presses(&keys.k[i], p);   /* (LEFT is NO, RIGHT YES, a turn UP / DOWN presses; FUNC and the encoder pushes: nothing) */
+            for (size_t k = 0; k < n; k++)
+                uis_dn2_key((enum jo_btn)p[k].button, p[k].down);
+            g_hostdiag.menu_keys += n != 0;
         }
     if (jdl_take_open(d, &o))
         jdm_on_open(&s_jdm, &o);

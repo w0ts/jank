@@ -276,6 +276,7 @@ struct jdl {
     uint32_t step_busy, step_refused;  /* STEP / STEPS answered 5 (queue full) / 2 (refused) */
     uint16_t seq;
     uint8_t state;                     /* enum jdl_state */
+    uint8_t no_push;                   /* LIVE ON without the note push (jdl_want_push) */
     uint8_t play_ok;                   /* PLAY has not been refused (status 2): 1 until it is */
     uint8_t msg_ok;                    /* MESSAGE has not been refused (status 2: a Digitone build without it): 1 until it is */
     uint8_t asked;                     /* a live request has been sent, at sent_ms */
@@ -314,6 +315,9 @@ void jdl9_status(struct jdl *d, const uint8_t *s, size_t n);
 #define JDL_JANK_PAGE_SX_MAX (6u + (3u + JDL_PAGE_ARGS_MAX) + (3u + JDL_PAGE_ARGS_MAX + 6u) / 7u + 1u)   /* 271: the longest page's SysEx */
 
 void jdl_init(struct jdl *d);
+/* LIVE ON asks for the note push (the Launchpad's lights) only while on (jdl_init: on); the Digitone alone (Jank's menu, LINK MODE) needs none. Taken at the next
+ * LIVE ON */
+void jdl_want_push(struct jdl *d, int on);
 int jdl_is_live(const struct jdl *d);
 int jdl_can_play(const struct jdl *d);                       /* live, and PLAY has not been refused */
 

@@ -93,8 +93,9 @@ static int JC_ISR on_bar(int64_t n, uint32_t bar)
  * waits for the moved grid's bar line (M2k: a start on the old bar line would read as the moved grid's 3) */
 static void JC_ISR collect(struct jc_ticker *c, struct jc_fire *o, int may_start)
 {
-    int stop_now = c->resync || (c->want_stop && c->playing);
+    int stop_now = c->resync || (c->want_stop && c->playing), started = 0;
     o->n = 0;
+    o->usb_start = 0;
     if (stop_now)
         o->bytes[o->n++] = JC_STOP;
     if (stop_now || c->want_stop)
@@ -109,6 +110,15 @@ static void JC_ISR collect(struct jc_ticker *c, struct jc_fire *o, int may_start
         o->bytes[o->n++] = JC_START;
         c->playing = 1;
         c->want_start = 0;
+        started = 1;
+    }
+    if (c->want_usb_start) {                  /* the USB devices alone: on a bar line while playing; a Start of everyone's (or a stop) ends the wish */
+        if (!c->playing || stop_now || started)
+            c->want_usb_start = 0;
+        else if (may_start && on_bar(c->n, c->bar_ticks)) {
+            o->usb_start = 1;
+            c->want_usb_start = 0;
+        }
     }
     o->bytes[o->n++] = JC_CLOCK;
     c->sent++;
@@ -151,6 +161,8 @@ void jc_want(struct jc_ticker *c, int play)
 }
 
 void jc_resync(struct jc_ticker *c) { c->resync = 1; }
+
+void jc_usb_start(struct jc_ticker *c) { c->want_usb_start = 1; }
 
 int jc_should_play(int auto_transport, int link_playing, uint32_t link_peers)
 {

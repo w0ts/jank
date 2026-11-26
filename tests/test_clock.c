@@ -306,6 +306,99 @@ static void test_start_on_the_bar(void)
     }
 }
 
+/* LINK MODE, a Digitone that asks to start while the clock already plays (owner 2026-11-26 "only the Digitone"): a Start for the USB devices alone, on the next bar
+ * line, before that tick's clock; the bytes every output gets stay the clock alone. Not while stopped, not in a stop's tick, not twice */
+static int run_to_usb_start(struct jc_ticker *c, const struct jc_map *m, int64_t *t, int ticks)
+{
+    struct jc_fire f;
+    int at = -1;
+    for (int k = 0; k < ticks; k++) {
+        int64_t n = c->n;
+        jc_step(c, m, *t, &f);
+        CHECK(f.n == 1 && f.bytes[0] == JC_CLOCK);           /* the MIDI outs, the pins, device mode: the clock alone */
+        if (f.usb_start) {
+            CHECK(at < 0);
+            at = (int)n;
+        }
+        *t = f.next;
+    }
+    return at;
+}
+
+static void test_usb_start(void)
+{
+    struct jc_map m;
+    struct jc_ticker c;
+    struct jc_fire f;
+    int64_t t;
+    jc_map_make(&m, 0, 240000, 500000, 0);      /* tick 6 */
+    jc_ticker_init(&c, 4);
+    CHECK(jc_begin(&c, &m, -1) == 0);
+    t = c.t_due;
+    jc_want(&c, 1);
+    for (int k = 0; k < 120; k++) {             /* playing from tick 96 */
+        jc_step(&c, &m, t, &f);
+        CHECK(!f.usb_start);
+        t = f.next;
+    }
+    CHECK(c.playing && c.n == 126);
+    jc_usb_start(&c);
+    CHECK(run_to_usb_start(&c, &m, &t, 200) == 192);   /* the next bar line, once */
+    CHECK(c.playing && !c.want_usb_start);
+    jc_usb_start(&c);                           /* a stop before the bar line: nothing for the USB devices */
+    jc_want(&c, 0);
+    jc_step(&c, &m, t, &f);
+    CHECK(f.n == 2 && f.bytes[0] == JC_STOP && !f.usb_start && !c.want_usb_start);
+    t = f.next;
+    jc_usb_start(&c);                           /* stopped: dropped at the next tick (a start of the clock's own reaches every output) */
+    jc_step(&c, &m, t, &f);
+    CHECK(!f.usb_start && !c.want_usb_start);
+    t = f.next;
+    jc_want(&c, 1);                             /* a start waiting and a USB start asked with it: the start alone, for everyone */
+    jc_usb_start(&c);
+    for (int k = 0; k < 200; k++) {
+        jc_step(&c, &m, t, &f);
+        CHECK(!f.usb_start);
+        t = f.next;
+    }
+    CHECK(c.playing && !c.want_usb_start);
+}
+
+/* a USB start asked just before a jump of the session (an AUTO BAR move): not on the tick scheduled from the old map, on the moved grid's bar line, as a start */
+static void test_usb_start_after_a_move(void)
+{
+    struct jc_map m;
+    struct jc_ticker c;
+    struct jc_fire f;
+    const int64_t tick = 500000 / 24;
+    int64_t t, move_t, at_t = -1, at_n = -1;
+    jc_map_make(&m, 0, 3000000, 500000, 0);     /* beat 3 at 0: the bar line 0.5 s ahead */
+    jc_ticker_init(&c, 4);
+    CHECK(jc_begin(&c, &m, -1) == 0);
+    c.playing = 1;                              /* the clock plays */
+    t = c.t_due;
+    jc_usb_start(&c);
+    move_t = 500000 - tick / 2;                 /* the move lands half a tick before the old bar line */
+    for (int k = 0; k < 300; k++) {
+        int64_t n = c.n;
+        if (t >= move_t && move_t > 0) {
+            jc_map_make(&m, move_t, 3000000 + 2000000 + (move_t * 1000000) / 500000, 500000, 0);   /* +2 beats */
+            move_t = 0;
+        }
+        jc_step(&c, &m, t, &f);
+        if (f.usb_start) {
+            CHECK(at_n < 0);
+            at_n = n;
+            at_t = t;
+        }
+        t = f.next;
+    }
+    {
+        int64_t ub = 5000000 + (at_t * 1000000) / 500000, pos = ((ub + 500000) / 1000000) % 4;
+        CHECK(at_n >= 0 && at_n % 96 == 0 && pos == 0);   /* the moved grid's 1 */
+    }
+}
+
 /* M2k: AUTO BAR moves the session 2 beats just before the old bar line, a start waiting: the start must not go out on
  * the tick scheduled from the old map (it would read as the moved grid's 3) but on the moved grid's bar line */
 static void test_start_after_a_move(void)
@@ -504,6 +597,8 @@ int main(void)
     test_half_beat_move();
     test_start_on_the_bar();
     test_start_after_a_move();
+    test_usb_start();
+    test_usb_start_after_a_move();
     test_click_resync();
     test_free_run_through_a_scan();
     test_negative_beats_bar();

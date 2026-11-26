@@ -501,29 +501,34 @@ static uint8_t s_urgent_tries;         /* urgent page reads since a page last ca
 #define TR_READ_MS 500u                /* the Digitone's transport is read this often while it leads and its status does not carry it (protocol < 7) */
 static uint32_t s_tr_ms;
 
-/* live control is asked for, and kept up, while there is a Digitone and a Launchpad; once it answers, the Digitone's active track is made the one the pads are on;
- * while FOLLOW is on the Digitone's active track is read every JLAPP_FOLLOW_MS */
+/* live control is asked for, and kept up, while there is a Digitone: with a Launchpad, and alone too (owner 2026-11-26: Jank's menu and LINK MODE need no Launchpad;
+ * alone, LIVE ON asks for no note push). The Launchpad's own requests go only while it is there: once live control answers, the Digitone's active track is made the
+ * one the pads are on and PLAY is probed; while FOLLOW is on the Digitone's active track is read every JLAPP_FOLLOW_MS; the step pages, the mixer, the Session page,
+ * the scale. The transport rule (TRANSPORT probed, the TRANSPORT STOP after Jank's Stop while Link leads) runs either way */
 static void live_pump(void)
 {
     uint8_t sx[REQUEST_MAX];
     size_t n;
     uint32_t t = now_ms();
     int live;
-    if (!s_dn2_up || !s_lpx_up)
+    if (!s_dn2_up)
         return;
+    jdl_want_push(&s_jdl, s_lpx_up);
     dn2_send_sysex(sx, jdl_poll(&s_jdl, t, sx, sizeof sx));
     live = jdl_is_live(&s_jdl);
     sync_live();
-    if (live && !s_was_live) {
+    if (live && !s_was_live && s_lpx_up) {   /* (a Launchpad that comes later starts live control afresh: usb_lp_attach) */
         n = jdl_track(&s_jdl, t, s_app.n.track, sx, sizeof sx);
         g_hostdiag.live_selects += n != 0;
         dn2_send_sysex(sx, n);
     }
-    if (live) {                        /* once per connection: does this Digitone have PLAY? known before the first press (the reply comes within a few ms) */
+    if (live && s_lpx_up) {            /* once per connection: does this Digitone have PLAY? known before the first press (the reply comes within a few ms) */
         n = jdl_probe_play(&s_jdl, t, sx, sizeof sx);
         g_hostdiag.live_plays += n != 0;
         dn2_send_sysex(sx, n);
-        n = jdl_probe_transport(&s_jdl, t, sx, sizeof sx);   /* ... and TRANSPORT (stage 8): who leads is known before the first start / stop */
+    }
+    if (live) {                        /* ... and TRANSPORT (stage 8): who leads is known before the first start / stop */
+        n = jdl_probe_transport(&s_jdl, t, sx, sizeof sx);
         g_hostdiag.tr_sent += n != 0;
         dn2_send_sysex(sx, n);
     }
@@ -532,6 +537,8 @@ static void live_pump(void)
     s_was_live = (uint8_t)live;
     jlapp_set_transport(&s_app, bridge_is_playing());   /* (lock-free) the start / stop scene button's light, and the lower quadrant's rule */
     stop_follow(t, live, sx, sizeof sx);
+    if (!s_lpx_up)
+        return;                        /* the rest is the Launchpad's */
     {
         uint32_t tick16 = 0;
         int known = beat_sixteenths(t, &tick16);
@@ -634,8 +641,6 @@ void usb_lp_detach(enum jlapp_role r)
         g_hostdiag.lpx_up = 0;
         s_programmer_pending = 0;
         s_setup_pending = 0;
-        lpm_init();                    /* live control is not kept without a Launchpad: the JANK page cannot be served (it says NOT CONNECTED) */
-        lpm_sync(&s_jdl);
         /* its pads that were down end their notes: nothing stays sounding on the Digitone */
         for (size_t i = 0, n = jlapp_release_acts(&s_app, off, JLAPP_PADS + JLN_TRACKS + 1u); i < n; i++)
             run_act(&off[i]);
@@ -772,8 +777,8 @@ void usb_lp_pump(void)
 uint32_t usb_lp_wait_ticks(void)
 {
     int32_t left;
-    if (!s_lpx_up)
-        return portMAX_DELAY;
+    if (!s_lpx_up)                     /* the Digitone alone: live control is asked every second and kept by a status every 250 ms or 4 s (its answers may not come) */
+        return s_dn2_up ? pdMS_TO_TICKS(LIVE_WAKE_MS) : portMAX_DELAY;
     if (s_programmer_pending) {        /* until the next message is due, then every RETRY_MS while it waits for room */
         left = (int32_t)(s_try_at - xTaskGetTickCount());
         if (left > 0)

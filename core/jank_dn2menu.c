@@ -13,10 +13,34 @@ int jdm_button(uint8_t code)
     switch (code) {
     case JDL_KC_UP: return JO_UP;
     case JDL_KC_DOWN: return JO_DOWN;
-    case JDL_KC_NO: return JO_NO;
-    case JDL_KC_YES: return JO_YES;
+    case JDL_KC_NO:
+    case JDL_KC_LEFT: return JO_NO;
+    case JDL_KC_YES:
+    case JDL_KC_RIGHT: return JO_YES;
     default: return -1;
     }
+}
+
+size_t jdm_key_presses(const struct jdl_key *k, struct jdm_press out[JDM_PRESSES_MAX])
+{
+    size_t n = 0;
+    if (k->kind == JDL_KEY_TURN) {
+        int steps = k->delta < 0 ? -(int)k->delta : k->delta;
+        uint8_t b = k->delta > 0 ? JO_UP : JO_DOWN;
+        if (steps > JDM_TURN_STEPS)
+            steps = JDM_TURN_STEPS;
+        for (int i = 0; i < steps; i++) {
+            out[n++] = (struct jdm_press){b, 1};
+            out[n++] = (struct jdm_press){b, 0};
+        }
+        return n;
+    }
+    if (k->kind == JDL_KEY_PRESS || k->kind == JDL_KEY_RELEASE) {
+        int b = jdm_button(k->code);
+        if (b >= 0)
+            out[n++] = (struct jdm_press){(uint8_t)b, (uint8_t)(k->kind == JDL_KEY_PRESS)};
+    }
+    return n;
 }
 
 void jdm_init(struct jdm *m)
@@ -87,7 +111,7 @@ void jdm_on_request(struct jdm *m, const struct jdl_link_req *r, uint32_t now, i
         if (again)
             return;
         a->record = (r->flags & JDL_LR_RECORD) != 0;
-        a->session = playing ? JDM_SESSION_RESYNC : JDM_SESSION_START;
+        a->session = playing ? JDM_SESSION_USB_START : JDM_SESSION_START;
         m->pending = 1;
         m->pending_until = now + ms_to_bar + JDM_START_GRACE_MS;
         return;

@@ -5,10 +5,10 @@
  *
  *   The page    the Digitone opens it from its SETTINGS (JANK, below SYSTEM) and says so (OPEN); a page goes at each OPEN with open 1 (it is pushed again every
  *               second until one arrives), and whenever the page changes. The Digitone's UP, DOWN, NO and YES are Jank's four buttons, down and up, so holds,
- *               combos and repeats are jank_oled_input.c's own (the Digitone sends no repeats).
+ *               combos and repeats are jank_oled_input.c's own (the Digitone sends no repeats); LEFT is NO, RIGHT YES, an encoder turn presses UP / DOWN.
  *   LINK MODE   on while Link leads (peers there and LINK TRANSPORT is FOLLOW+LEAD), off otherwise. The Digitone's PLAY / STOP then ask (LINK REQUEST): a start is
- *               answered PENDING with the time to the bar line and Jank's session starts (its MIDI Start goes out on the bar line); RECORD held: the Digitone's
- *               RECORD first. Under Link, PLAY while playing is a STOP (owner 2026-11-25: starts happen on the bar line), answered ACK; Jank's session stops and
+ *               answered PENDING with the time to the bar line and Jank's session starts (its MIDI Start goes out on the bar line; if Jank's clock already runs,
+ *               a Start for the USB-hosted devices alone on that bar line); RECORD held: the Digitone's RECORD first. Under Link, PLAY while playing is a STOP (owner 2026-11-25: starts happen on the bar line), answered ACK; Jank's session stops and
  *               the Digitone ends stopped (usb_lp.c stop_follow). A request pushed again (the answer was late) is answered again, not acted on twice. */
 #ifndef JANK_DN2MENU_H
 #define JANK_DN2MENU_H
@@ -20,8 +20,18 @@
 #define JDM_UNSENT 255u
 #define JDM_SEND_NONE 254u             /* jdm_link_step: nothing to send */
 
-/* a Digitone key code as one of Jank's buttons (jank_oled.h enum jo_btn), -1 for the keys the menu does not use (LEFT, RIGHT, FUNC, the encoders) */
+/* a Digitone key code as one of Jank's buttons (jank_oled.h enum jo_btn): UP, DOWN, NO, YES, and (owner 2026-11-26) LEFT as NO, RIGHT as YES; -1 for the keys the
+ * menu does not use (FUNC, the encoder pushes) */
 int jdm_button(uint8_t code);
+
+/* One key event as Jank's button events (down / up): a key's own; an encoder turn (any of A-H, owner 2026-11-26) as one press, down then up, of UP per step of a
+ * positive delta and of DOWN per step of a negative one, at most JDM_TURN_STEPS; nothing for the keys the menu does not use. Returns the count */
+#define JDM_TURN_STEPS 4
+#define JDM_PRESSES_MAX (2 * JDM_TURN_STEPS)
+struct jdm_press {
+    uint8_t button, down;
+};
+size_t jdm_key_presses(const struct jdl_key *k, struct jdm_press out[JDM_PRESSES_MAX]);
 
 struct jdm {
     uint8_t open, reason;              /* the Digitone shows the JANK page: its last OPEN (or its status) */
@@ -49,14 +59,15 @@ int jdm_link_step(struct jdm *m, uint32_t now, int leads, int playing, int statu
 /* the op jdm_link_step gave could not be sent: it is tried again */
 void jdm_link_unsent(struct jdm *m);
 
-enum jdm_session { JDM_SESSION_NONE = 0, JDM_SESSION_START, JDM_SESSION_STOP, JDM_SESSION_RESYNC, JDM_SESSION_DN2_STOP };
+enum jdm_session { JDM_SESSION_NONE = 0, JDM_SESSION_START, JDM_SESSION_STOP, JDM_SESSION_USB_START, JDM_SESSION_DN2_STOP };
 struct jdm_act {
     uint8_t record;                    /* RECORD (58) op 1, before the rest */
     uint8_t answer;                    /* JDL_LINK_PENDING (ms, id), JDL_LINK_ACK (id) or JDL_LINK_CANCEL */
     uint16_t ms;
     uint8_t id;
-    uint8_t session;                   /* enum jdm_session: START / STOP Jank's session (the ui task), RESYNC (its clock already runs: start again on the bar line, so
-                                          the Digitone gets a Start), DN2_STOP (nothing runs on Jank's side: the Digitone's TRANSPORT STOP) */
+    uint8_t session;                   /* enum jdm_session: START / STOP Jank's session (the ui task), USB_START (its clock already runs: a Start for the USB-hosted
+                                          devices alone on the bar line, owner 2026-11-26 "only the Digitone"; jank_clock.h jc_usb_start), DN2_STOP (nothing runs on
+                                          Jank's side: the Digitone's TRANSPORT STOP) */
 };
 /* a LINK REQUEST: what to answer and do. ms_to_bar: jdm_ms_to_bar's */
 void jdm_on_request(struct jdm *m, const struct jdl_link_req *r, uint32_t now, int leads, int playing, uint16_t ms_to_bar, struct jdm_act *a);

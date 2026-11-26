@@ -37,6 +37,8 @@ void jdl_init(struct jdl *d)
     d->link_ok = 1;
 }
 
+void jdl_want_push(struct jdl *d, int on) { d->no_push = (uint8_t)!on; }
+
 static int proto7(const struct jdl *d) { return d->st.valid && d->st.proto >= 7u; }
 
 int jdl_is_live(const struct jdl *d) { return d->state == JDL_LIVE; }
@@ -56,7 +58,8 @@ static size_t send(struct jdl *d, uint32_t now_ms, uint8_t cmd, const uint8_t *a
 size_t jdl_poll(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap)
 {
     uint32_t since = now_ms - d->sent_ms;
-    static const uint8_t on[2] = {SUB_ON, WHAT_PUSH_NOTES}, status[1] = {SUB_STATUS};
+    static const uint8_t status[1] = {SUB_STATUS};
+    const uint8_t on[2] = {SUB_ON, d->no_push ? 0u : WHAT_PUSH_NOTES};
     switch (d->state) {
     case JDL_LIVE:
         if (since >= JDL_KEEPALIVE_MS || (proto7(d) && (uint32_t)(now_ms - d->status_ms) >= JDL_STATUS_FAST_MS)) {

@@ -264,8 +264,53 @@ static void test_status_p8(void)
     CHECK(input(&d, d.seq, JDL_CMD_LIVE | 0x80u, 0, s, sizeof s) == JDL_IN_REPLY && !d.p8_valid);   /* protocol 7: none */
 }
 
+/* the Digitone alone (owner 2026-11-26: Jank's menu and LINK MODE without a Launchpad): LIVE ON asks for no note push (what 0, "off" in dn2-wishes' table); with a
+ * Launchpad it asks for the push as before; jdl_init asks for it */
+static void test_push_choice(void)
+{
+    struct jdl d;
+    uint8_t out[64], body[32];
+    size_t n;
+    jdl_init(&d);
+    n = jdl_poll(&d, 1000, out, sizeof out);
+    CHECK(request_body(out, n, body) == 5u && body[2] == JDL_CMD_LIVE && body[3] == 1 && body[4] == 1);   /* with a Launchpad: the push */
+    jdl_init(&d);
+    jdl_want_push(&d, 0);
+    n = jdl_poll(&d, 1000, out, sizeof out);
+    CHECK(request_body(out, n, body) == 5u && body[2] == JDL_CMD_LIVE && body[3] == 1 && body[4] == 0);   /* the Digitone alone: none */
+    n = jdl_poll(&d, 1000 + JDL_ASK_MS, out, sizeof out);                        /* asked again: the same */
+    CHECK(request_body(out, n, body) == 5u && body[4] == 0);
+    jdl_want_push(&d, 1);                                                         /* a Launchpad came */
+    n = jdl_poll(&d, 1000 + 2u * JDL_ASK_MS, out, sizeof out);
+    CHECK(request_body(out, n, body) == 5u && body[4] == 1);
+    CHECK(input(&d, d.seq, JDL_CMD_LIVE | 0x80u, 0, NULL, 0) == JDL_IN_REPLY && jdl_is_live(&d));
+    jdl_want_push(&d, 0);                                                         /* live: the keep-alive is a STATUS, not a LIVE ON */
+    n = jdl_poll(&d, 1000 + 2u * JDL_ASK_MS + JDL_KEEPALIVE_MS, out, sizeof out);
+    CHECK(request_body(out, n, body) == 4u && body[3] == 0);
+    jdl_init(&d);
+    CHECK(!d.no_push);
+}
+
+/* LINK MODE's request lengths, exactly as dn2-wishes reads them (confirmed from its code 2026-11-26): ops 0, 1, 3, 255 no argument; 2 u16 ms + u8 id; 4 u8 id */
+static void test_link_mode_lengths(void)
+{
+    struct jdl d = live();
+    uint8_t out[64], body[32];
+    static const uint8_t bare[4] = {JDL_LINK_OFF, JDL_LINK_ON, JDL_LINK_CANCEL, JDL_LINK_READ};
+    for (int i = 0; i < 4; i++) {
+        size_t n = jdl_link_mode(&d, 2000, bare[i], 1234, 7, out, sizeof out);   /* (ms and id given: not sent for these) */
+        CHECK(request_body(out, n, body) == 4u && body[2] == JDL_CMD_LINK_MODE && body[3] == bare[i]);
+    }
+    CHECK(request_body(out, jdl_link_mode(&d, 2000, JDL_LINK_PENDING, 0xFFFF, 255, out, sizeof out), body) == 7u && body[4] == 0xFF && body[5] == 0xFF && body[6] == 255);
+    CHECK(request_body(out, jdl_link_mode(&d, 2000, JDL_LINK_ACK, 9, 0, out, sizeof out), body) == 5u && body[4] == 0);
+    for (unsigned op = 5; op < 255; op++)                                         /* anything else: not sent (the Digitone answers 2) */
+        CHECK(jdl_link_mode(&d, 2000, (uint8_t)op, 0, 0, out, sizeof out) == 0);
+}
+
 int main(void)
 {
+    test_push_choice();
+    test_link_mode_lengths();
     test_page_bytes();
     test_longest_page();
     test_refused_bits();

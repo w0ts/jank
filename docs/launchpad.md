@@ -41,7 +41,9 @@ Owner, 2026-11-24: playing must not depend on how the Digitone's MIDI channels a
 of dn2-wishes, `docs/live-control.md` there; `core/jank_dn2live.[ch]` here; needs SETTINGS > SYSTEM > USB CONFIG > REMOTE CONTROL ON). The MIDI the Digitone
 sends is not read at all. (The clock stays MIDI: Jank is the clock.)
 
-- Jank asks for live control (LIVE ON, with the note push) as soon as both devices are up, keeps it (a request at least every 4 s; the lease is 10 s) and
+- Jank asks for live control (LIVE ON, with the note push while a Launchpad is there) as soon as the Digitone is up, **with a Launchpad or alone** (owner 2026-11-26:
+  Jank's menu and LINK MODE need no Launchpad; alone, no note push, and none of the Launchpad's own requests: the track select when live control comes up, the PLAY
+  probe, the step pages, FOLLOW, the mixer, the Session page, the scale; a Launchpad that comes later starts live control afresh), keeps it (a request at least every 4 s; the lease is 10 s) and
   asks again every second until it answers; if the Digitone says REMOTE CONTROL is off, or has no live control, it asks again every 5 s. `diag` shows it:
   `hostdiag_live=state:live,play:1,asked:..,replies:..,plays:..,selects:..,pushes:..,notes:..,dropped:..,reads:..,msgs:..`.
 - **A pad plays by PLAY** (command 53, in the Digitone's stage 5, 19:00-20:00 on 2026-11-24 at the earliest; 50 is its SCALE; `track, op, note, velocity`). Without live control, or on a Digitone that has no PLAY,
@@ -182,13 +184,14 @@ menu (JANK, below SYSTEM: the Digitone's side); **all of Jank's menu items**; an
   layout's, all eleven items** (owner 2026-11-26: USB MIDI CLOCK OUT, AUDIO > PAUSE LEVEL, AUTO BAR's three, SOURCE's four). While the page is open, ABOUT pages by 6 rows
   (`jo_ctx.text_view`, `jo_about_vis`; owner: OK), so the colour screen shows three rows twice then.
 - **Keys** (63, pushed): the Digitone's UP, DOWN, NO and YES are Jank's four buttons, down and up, so the holds, the NO + UP / DOWN and YES + UP / DOWN combos, the hints and the
-  repeats are `jank_oled_input.c`'s own (the Digitone sends no repeats). LEFT, RIGHT, FUNC and the encoders are not used. A Digitone key also brings the UI out of SCREEN OFF
+  repeats are `jank_oled_input.c`'s own (the Digitone sends no repeats). **LEFT is NO, RIGHT is YES; an encoder turn (any of A-H) is one press of UP per step clockwise,
+  of DOWN per step the other way, at most 4 per event** (owner 2026-11-26; `jdm_key_presses`); FUNC and the encoder pushes are not used. A Digitone key also brings the UI out of SCREEN OFF
   first, so its press is never spent on waking Jank's own screen. While the page is closed a key going down is dropped; one still down when it closes is let go.
 - **Open and close** (64): the Digitone pushes OPEN when its page opens or closes (closed by its panel keys TEMPO, TRK, PAGE, PTN, SONG, LEVEL, VOICE, ARP, PLUS, STACK,
   MINUS and the page keys: reason 1), and again every second while open until a page arrives; Jank reads it once when live control comes up (`jdl_probe_jank`), and the
   status of protocol 8 corrects an OPEN that was lost. A page goes after each OPEN (made after it: never one from before) and whenever the page changes (at most every
   30 ms, the screens' own frame rule). When live control is lost the Digitone keeps the page open showing NOT CONNECTED and pushes OPEN (reason 3) when it is back.
-  **Live control is still kept only while a Launchpad is there** (as before), so without a Launchpad the page says NOT CONNECTED.
+  Live control, and with it the page and LINK MODE, runs with the Digitone alone too (above).
 - **Two tasks** (thread safety): the keys come in through a FreeRTOS queue from the USB client task to the ui task (`uis_dn2.c`); the ui task runs the screens (also on a
   unit with no screen while the page is open: `ui.c` `uis_dn2_active`), makes the page and publishes it in one buffer with a sequence number (odd while written; the client
   task reads it again then) and wakes the client task (`usb_midi_host_wake`), which sends it (`usb_lpmenu.c`). The page's buffers are taken from PSRAM when the board has it
@@ -197,8 +200,10 @@ menu (JANK, below SYSTEM: the Digitone's side); **all of Jank's menu items**; an
   said again when live control comes back, and again (at most every second) when the Digitone's status says the other. In LINK MODE the Digitone's PLAY / STOP keys **ask**
   (LINK REQUEST, 66, pushed: op 0 stop, 1 start, flags RECORD held / a second STOP / was paused, the request id) and Jank answers every request:
   - **a start**: RECORD (58) op 1 first when RECORD was held; then **PENDING** `u16 ms, id` with the time to the session's next bar line (the beat the ui task samples, the
-    quantum; the Digitone blinks), and Jank's session starts (the ui task's `bridge_play(1)`; its MIDI Start goes out on the bar line). If Jank's clock already runs, it starts
-    again on the bar line instead (`midi_resync`), so the Digitone gets its Start. A start that has not happened 500 ms after its bar line (no session), or that Link stopped
+    quantum; the Digitone blinks), and Jank's session starts (the ui task's `bridge_play(1)`; its MIDI Start goes out on the bar line). **If Jank's clock already runs, a
+    Start goes to the USB-hosted devices alone** on that bar line (owner 2026-11-26 "only the Digitone"; a Launchpad ignores it): `jank_clock.h` `jc_usb_start`, by a real
+    Start's rules (not in a stop's tick, not on a tick scheduled before a jump of the session), 0xFA before that tick's 0xF8, counted in `hostdiag_rt` `start:`; the MIDI
+    outs, the clock pins and USB device mode go on untouched (midi.c `midi_usb_start`, the clock interrupt). A start that has not happened 500 ms after its bar line (no session), or that Link stopped
     leading meanwhile, is **CANCEL**led. With Link not leading, a start is answered CANCEL and nothing starts.
   - **a stop** (owner: under Link, PLAY while playing is a STOP, not a pause; a pause request, not asked for, is taken as a stop): **ACK** `id`, and Jank's session stops (its
     MIDI Stop, then TRANSPORT STOP 30 ms later, as above: the Digitone ends stopped); with nothing running on Jank's side, the Digitone's own TRANSPORT STOP.

@@ -13,7 +13,7 @@
 
 static const char *TAG = "uis dn2";
 
-#define KEYS 16u                        /* key events waiting for the ui task (the Digitone pushes at most 8 at once) */
+#define KEYS 64u                        /* button events waiting for the ui task (a push holds at most 8 key events, a turn is up to 8 button events) */
 static QueueHandle_t s_keys;            /* (button << 1) | down */
 static volatile uint8_t s_open;
 static volatile uint32_t s_opens;       /* the client task's count of OPENs: each wants a page made afresh */
