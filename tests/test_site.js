@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // The site's pages (page/index.html About, page/install.html Install, page/jank.html Device, page/build.html Build): the same header on each, tabs in
 // order, the open one marked, the built files equal their templates, every relative link and image resolves.
+// About, Install and Build mark <!--w0ts:header-->: the shared w0ts site builder fills it from site.json's "nav" (the same
+// tabs); the Device page keeps its own header (the firmware embeds the same file).
 'use strict';
 const assert = require('assert');
 const fs = require('fs');
@@ -17,11 +19,15 @@ for (const [file, name, src] of PAGES) {
   const html = fs.readFileSync(path.join(root, 'page', file), 'utf8');
   ok(html === load(path.join(root, 'page', src)), `page/${file} is the expansion of page/${src}: run make page`);
   ok(html.includes(`<title>Jank · ${name}</title>`), `${file}: title`);
-  ok(/<div class="titlebar"><h1><a href="https:\/\/w0ts.github.io\/">w0ts<\/a> \/ Jank<\/h1><\/div>/.test(html), `${file}: title bar`);
+  if (file === 'jank.html') ok(/<div class="titlebar"><h1><a href="https:\/\/w0ts.github.io\/">w0ts<\/a> \/ Jank<\/h1><\/div>/.test(html), `${file}: title bar`);
+  ok(/--accent: #9770c6/.test(html), `${file}: Jank's accent`);
+  if (file !== 'jank.html') {
+    ok(html.split('<!--w0ts:header-->').length === 2 && html.split('<!--w0ts:switcher-->').length === 2, `${file}: the w0ts header and switcher marks, once each`);
+    continue;
+  }
   const tabs = tabsOf(html);
   ok(tabs.map(t => t.href).join() === './,install.html,device.html,build.html,https://github.com/w0ts/jank', `${file}: tab links, GitHub last`);
   ok(tabs.filter(t => t.cur).map(t => t.text).join() === name, `${file}: only ${name} is the current tab`);
-  ok(/--accent: #9770c6/.test(html), `${file}: Jank's accent`);
   ok(!/<a [^>]*href="[^"]*"[^>]*target=/.test(navOf(html)), `${file}: tabs open in the same tab`);
 }
 // what is published: every relative link and image of each page names a file the publish script puts there
@@ -34,8 +40,13 @@ for (const [pub, file] of Object.entries(published)) {
     ok(Object.keys(published).includes(there) || fs.existsSync(path.join(root, 'page', there)), `${pub}: ${t} resolves`);
   }
 }
-const script = fs.readFileSync(path.join(root, 'scripts', 'site_tree.py'), 'utf8');
-for (const [pub, file] of Object.entries(published)) ok(script.includes(`"${pub}": "page/${file}"`), `site_tree.py puts page/${file} at ${pub}`);
+// site.json lays them out (the shared w0ts site builder): the same names, and the tabs in the same order
+const site = JSON.parse(fs.readFileSync(path.join(root, 'site.json'), 'utf8'));
+const copies = site.build.filter(a => a.copy);
+for (const [pub, file] of Object.entries(published)) {
+  ok(copies.some(a => (pub === file ? [].concat(a.copy).includes(`page/${file}`) && !a.as : a.copy === `page/${file}` && a.as === pub)), `site.json puts page/${file} at ${pub}`);
+}
+ok(site.nav.map(e => e.href).join() === ',install.html,device.html,build.html' && site.nav.map(e => e.label).join() === 'About,Install,Device,Build', 'site.json: the tabs, in order');
 // every inline script of every page parses (2026-11-22: an included .js inside an extra <script> pair broke the Install
 // page's converter in the browser, "Unexpected token '<'"); module scripts through `node --check` as a module
 const vm = require('vm');

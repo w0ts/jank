@@ -3,6 +3,7 @@
 """Lay out the site https://w0ts.github.io/jank/ in a folder, for the Pages workflow (.github/workflows/pages.yml).
 
   python3 -I scripts/site_tree.py OUT [--no-firmware]
+  python3 -I scripts/site_tree.py OUT --firmware-only   (firmware/ alone, into a laid-out OUT: site.json's last step)
 
 The pages from page/ (committed: `make page` builds them), the device page with the w0ts project switcher (the copy the
 firmware embeds stays without it: it loads nothing from outside, tests/test_page.js), page/img/, .nojekyll, and
@@ -94,6 +95,12 @@ def main(argv: list[str]) -> int:
         print(__doc__, file=sys.stderr)
         return 2
     out = Path(args[0])
+    if "--firmware-only" in argv:          # (the shared w0ts site builder lays out the pages: site.json; this adds firmware/)
+        if (out / "firmware").exists():
+            raise SystemExit(f"{out}/firmware: already there")
+        tags = firmware(out)
+        print(f"site_tree: {out}: firmware for {', '.join(tags) or 'no release'}")
+        return 0
     if out.exists() and any(out.iterdir()):
         raise SystemExit(f"{out}: not empty")
     out.mkdir(parents=True, exist_ok=True)

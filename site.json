@@ -1,0 +1,22 @@
+{
+  "site": {"name": "Jank", "prefix": "jank", "repo": "https://github.com/w0ts/jank"},
+  "nav": [
+    {"href": "", "label": "About"},
+    {"href": "install.html", "label": "Install"},
+    {"href": "device.html", "label": "Device"},
+    {"href": "build.html", "label": "Build"}
+  ],
+  "checks": [
+    {"run": "for f in index install build jank; do python3 scripts/inline_ui.py \"page/src/$f.html\" -o \"$WORK/$f.html\" && cmp -s \"$WORK/$f.html\" \"page/$f.html\" || { echo \"page/$f.html is not what make page makes from page/src: run make page\" >&2; exit 1; }; done",
+     "why": "page/ is committed (the firmware embeds page/jank.html): it must be what make page makes"}
+  ],
+  "build": [
+    {"copy": ["page/index.html", "page/install.html", "page/build.html"],
+     "why": "the w0ts header goes into their <!--w0ts:header-->"},
+    {"copy": "page/jank.html", "as": "device.html", "switcher": true,
+     "why": "the Device page keeps its own header (connect button, the hosted-page link): the firmware embeds the same file, which loads nothing from outside; the site's copy gets the switcher"},
+    {"copy": "page/img/", "to": "img/"},
+    {"run": "python3 -I scripts/site_tree.py \"$OUT\" --firmware-only", "needs": ["gh", "network"],
+     "why": "firmware/ for the Install page's flasher, from the GitHub releases (GH_TOKEN in the workflow)"}
+  ]
+}
