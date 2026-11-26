@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The Launchpad's Session page (jank_lpsess.h). */
 #include "jank_lpsess.h"
-#include <string.h>
+#include "jank_lpstr.h"
 
 #define ROWS_PER_BANK 2u
 #define PADS_PER_ROW 8u

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* The Launchpad app's packets for the Digitone, in order (jank_lpout.h). */
 #include "jank_lpout.h"
-#include <string.h>
+#include "jank_lpstr.h"
 
 void jlo_init(struct jlo *q) { memset(q, 0, sizeof *q); }
 

@@ -1,57 +1,25 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The Launchpad app's Session button and page (jank_lpsess.h), the colour chart's opening, and who starts and stops (jank_lptrans.h): the part of jank_lpapp.h that talks to
- * the Digitone's stage 4 and stage 8 commands. */
-#include <string.h>
+/* The Digitone's Session page in the Launchpad app (jank_lpsess.h, the page hooks of jank_lpapp_int.h): its pads, its answers, and the Digitone's stage 8 (TRANSPORT, CHAIN,
+ * the protocol-7 status). The unit's file: another unit has jank_lpclips.c instead (jank_lpunit.h JLAPP_CLIPS). */
 #include "jank_lpapp_int.h"
 
-static void say_chart_page(struct jlapp *a) { jlapp_say(a, "COLOURS %u-%u", (unsigned)a->palette_page * 64u, (unsigned)a->palette_page * 64u + 63u); }
-
-/* Session held: the colour chart (jank_lpapp.h), on its first page; it goes back to the mode it came from (the Session page too) */
-void jlapp_open_chart(struct jlapp *a)
+void jlapp_page_init(struct jlapp *a)
 {
-    a->palette_prev = a->mode;
-    a->palette_page = 0;
-    a->mode = JLAPP_MODE_PALETTE;
-    say_chart_page(a);
+    jlss_init(&a->sess);
+    a->pat_reads_ok = 1;
+    a->pat_cue_ok = 1;
+    a->chain_ok = 1;
 }
 
-static void open_session(struct jlapp *a, uint8_t from)
+void jlapp_page_open(struct jlapp *a, int live)
 {
-    a->sess_prev = from;
-    a->mode = JLAPP_MODE_SESSION;
-    jlss_open(&a->sess);               /* every bank read again: patterns may have been filled or cleared since */
-    jlapp_say(a, "SESSION %s", a->sess.half ? "BANKS E-H" : "BANKS A-D");
+    if (live)
+        jlss_open(&a->sess);
+    else
+        jlss_forget(&a->sess);
 }
 
-/* Session (jank_lpapp.h): in the chart a press turns its page, then leaves it, as before. Elsewhere the press only starts the clock: let go within JLAPP_SESSION_HOLD_MS, it
- * is the Session page (or, on it, back to where it came from); held that long, jlapp_tick opens the chart */
-void jlapp_session_button(struct jlapp *a, int down)
-{
-    if (down) {
-        if (a->mode != JLAPP_MODE_PALETTE) {
-            a->sess_down = 1;
-            a->sess_down_ms = a->now_ms;
-        } else if (a->palette_page + 1u < JLAPP_PALETTE_PAGES) {
-            a->palette_page++;
-            say_chart_page(a);
-        } else {
-            a->mode = a->palette_prev;
-            if (a->mode == JLAPP_MODE_SESSION)
-                jlss_open(&a->sess);
-            jlapp_say(a, "COLOURS OFF");
-        }
-        return;
-    }
-    if (!a->sess_down)                 /* the release of a chart press, or of the hold that opened the chart */
-        return;
-    a->sess_down = 0;
-    if (a->mode != JLAPP_MODE_SESSION) {
-        open_session(a, a->mode);
-        return;
-    }
-    a->mode = a->sess_prev;
-    jlapp_say(a, "SESSION OFF");
-}
+void jlapp_page_frame(const struct jlapp *a, struct jlx_frame *f) { jlss_frame(&a->sess, f); }
 
 /* the held pad let go: the chain built on it goes (CHAIN SET), or the playing pattern held alone clears the chain (CHAIN CLEAR) */
 static size_t session_release(struct jlapp *a, uint8_t pad, struct jlapp_act *out, size_t max)
@@ -143,7 +111,7 @@ void jlapp_set_patterns(struct jlapp *a, int reads_ok, int cue_ok)
     a->pat_reads_ok = reads_ok != 0;
 }
 
-/* ---- who starts and stops (jank_lptrans.h) ---- */
+/* ---- the Digitone's TRANSPORT (jank_lptrans.h) ---- */
 
 void jlapp_set_peers(struct jlapp *a, int peers) { jltr_set_peers(&a->tr, peers); }
 
@@ -172,20 +140,4 @@ int jlapp_on_live7(struct jlapp *a, const struct jdl_live7 *s)
     jlss_on_next(&a->sess, s->playing, s->next, a->now_ms);
     jlss_on_chain_count(&a->sess, s->chain_count);
     return jltr_on_dn2(&a->tr, s->transport, 0, a->now_ms);
-}
-
-/* scene 5: while the Digitone leads, its TRANSPORT (PLAY / STOP: no clock, no Start byte from Jank); else Jank's session, as before */
-size_t jlapp_start_stop(struct jlapp *a, struct jlapp_act *out, size_t max)
-{
-    uint8_t op;
-    if (max < 1)
-        return 0;
-    if (jltr_press(&a->tr, a->live_state == JDL_LIVE, a->now_ms, &op)) {
-        jlapp_say(a, op == JDL_TR_PLAY ? "START" : "STOP");
-        jlapp_set_act(out, JLAPP_ACT_DN2_TRANSPORT, 0, 0, op);
-        return 1;
-    }
-    jlapp_say(a, a->transport ? "STOP" : "START");
-    jlapp_set_act(out, JLAPP_ACT_TRANSPORT, a->n.track, 0, 0);
-    return 1;
 }
