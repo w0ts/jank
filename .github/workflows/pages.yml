@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # The site, https://w0ts.github.io/jank/, from main: the committed pages (page/, `make page`), the device page with the
 # w0ts project switcher, img/, and firmware/ for the Install page made from the GitHub releases' assets
-# (site.json, laid out by the shared w0ts site builder: w0ts/w0ts.github.io, builder/w0ts_site.py at a pinned tag, which
+# (site.json, laid out by the shared w0ts site builder: w0ts/w0ts.github.io, builder/w0ts_site.py from its main, which
 # also fills in the w0ts header; firmware/ is its last step, scripts/site_tree.py --firmware-only). No branch holds the site. It runs when the pages change on main, after a release
 # (release.yml starts it), or by hand from the Actions tab.
 name: pages
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: w0ts/w0ts.github.io
-          ref: builder-v1
+          ref: main
           path: .w0ts-site
       - name: Lay out the site
         env:
