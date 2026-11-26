@@ -71,7 +71,7 @@ struct jhd {
     uint32_t new_dev, gone_dev, add_calls;
     uint32_t programmer_sent;          /* Programmer mode messages put in the Launchpad's queue */
     uint32_t programmer_acked;         /* the Launchpad's answers to them (jlx_programmer_ack): fewer than sent means it did not take one */
-    uint32_t setup_sent;               /* the LED-feedback and sleep-off messages (jlx_setup) sent after an answer: without them it shows no light */
+    uint32_t setup_sent;               /* the LED-feedback and sleep-off messages (the model's setup list, jlx_sysex) sent after an answer: without them it shows no light */
     uint32_t lights_sent;              /* light messages put in the Launchpad's queue (the whole frame is 81; it is sent again every 2 s) */
     uint8_t lp_mode;                   /* the mode the Launchpad last reported: 0 nothing yet, 1 Live, 2 Programmer (a Live answer makes the unit enter Programmer again) */
     uint8_t lp_reentered;              /* times it was found in Live mode after it had been put in Programmer mode (capped at 255) */

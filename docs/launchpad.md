@@ -341,7 +341,7 @@ separate.
   the unit sent everything on cable 0 at first and the LEDs stayed dark (the Launchpad answered the Programmer message, reported Programmer mode and took
   every light message without an error). (An earlier version of this file said the Launchpad has two interfaces: wrong, only the code's clamp to the last
   interface kept it working.)
-- Programmer mode: `F0 00 20 29 02 0C 0E 01 F7` (0 = Live mode). **Measured** (2026-11-24, Wi-Fi `diag`): the Launchpad X sends the
+- Programmer mode: `F0 00 20 29 02 0C 0E 01 F7` (0 = Live mode; the other models: next section). **Measured** (2026-11-24, Wi-Fi `diag`): the Launchpad X sends the
   same message back (three packets, the last `07 0E 01 F7`). A replugged Launchpad stayed dark after the unit sent the message the
   moment it was claimed (cause not proven; a firmware that is not up yet is the guess). So the unit waits 500 ms after a Launchpad
   appears, sends the message, waits for the answer before any light, and sends it again every 400 ms (at most 4 times, then the lights
@@ -349,16 +349,42 @@ separate.
 - **Two more messages are needed before any light shows** (measured 2026-11-24: with the Launchpad in Programmer mode, answering, and taking about 40
   light messages a second, every LED stayed dark, from the unit and from a Mac alike; Launchpad 95's `Launchpad.py` sends them and the pads then
   lit): `F0 00 20 29 02 0C 0A 00 01 F7` (LED feedback: the pads' own light off, the host's messages on) and `F0 00 20 29 02 0C 09 01 F7` (sleep
-  mode off). The unit sends both after the Launchpad's answer (`jlx_setup`, `diag` `setup:`), then waits 400 ms, then the lights, and every 2 s it
+  mode off). The unit sends both after the Launchpad's answer (the model's setup list, `diag` `setup:`), then waits 400 ms, then the lights, and every 2 s it
   sends all lights again and asks which mode the Launchpad is in (`diag` `mode:`; a Live answer makes it enter Programmer mode again, `reentered:`).
 - A pad is `10 x row + column` (rows 1..8 from the bottom): 11..88. Top buttons CC 91..98 (up, down, left, right, session,
   note, custom, capture), side buttons CC 89 (top) down to 19, logo CC 99. A pad sends Note On, velocity 0 for the release.
 - A light is a Note On (a CC for the buttons) on channel 1 static, 2 flashing, 3 pulsing; the velocity is the palette index
   (0 off). A flash flips between the static colour (A) and the flashing one (B), so a flash is sent as A then B.
 
+## Other RGB Launchpads: Mini MK3, MK2, Pro (owner 2026-11-26)
+
+Same pads and numbers as the X, same 128-colour palette (the four programmer's reference manuals' colour tables agree index for index), so they
+share all of jank's pages; what differs is one row each of `jlx_models` (`core/jank_lpx.c`), from Novation's manuals and Launchpad 95's
+`Launchpad.py` (Mini MK3, MK2):
+
+| | X | Mini MK3 | MK2 | Pro (MK1) |
+|---|---|---|---|---|
+| USB product name | Launchpad X | Launchpad Mini MK3 | Launchpad MK2 | Launchpad Pro (not "... MK3", another protocol) |
+| SysEx header `F0 00 20 29 02 ..` | 0C | 0D | 18 | 10 |
+| cable for lights | 1 (MIDI) | 1 (MIDI) | 0 (its only one) | 1 (Standalone) |
+| into the mode | `0E 01` | `0E 01` | `22 00` (Session layout) | `21 01` (Standalone), `2C 03` (Programmer layout) |
+| then | `0A 00 01`, `09 01` | the same | nothing | nothing |
+| its answer / the 2 s check | `0E 01` / `0E` | the same | none | `2F 03` / `2F` |
+| top buttons | CC 91..98 | CC 91..98 | CC 104..111 | CC 91..98 |
+| side buttons | CC 89..19 | CC 89..19 | **Notes** 89..19 | CC 89..19 |
+| logo (CC 99) | yes | yes | none | its side LED |
+| flash / pulse | channel 2 / 3 | channel 2 / 3 | channel 2 / 3 | **SysEx** `23 <led> <colour>` / `28 ..` |
+| pads send velocity | yes | no (127) | no (127) | yes (and aftertouch, not read) |
+
+Pads that send no velocity play at the track's own VEL (fixed velocity on, whatever the Note page's pad 3 says). The Pro's 16 other buttons
+(left column CC 10..80, bottom row CC 1..8) do nothing yet (owner: like an X at first). The Pro Programmer layout's flash and pulse switch between
+the given colour and the current one, so a pulse is sent as off first. **None of the three has been plugged into jank yet**: the product names,
+their USB interfaces and pipes (the X and the Digitone already use all 8), the Pro's answer to `2F`, the Pro's power draw on the hub, and the
+colours by eye are to be checked on the hardware (`diag` `hostdiag_dev`, `hostdiag_lp`).
+
 ## Not verified on hardware
 
-- That the product strings are "Launchpad X" / "Digitone..." (roles are told apart by those substrings).
+- That the product strings are "Launchpad X" / "Digitone..." (roles are told apart by those substrings; the other Launchpads: above).
 - The Digitone's cable number for its live-control SysEx (0 assumed; the lights no longer depend on its MIDI notes, they come from the push).
 - That the Launchpad takes lights right after the Programmer mode message (a 150 ms wait is a guess, `usb_lp.c`).
 - Pipes: the controller has 8 (`usb_hostlib.c`). Hub (2) + Launchpad (control, OUT, IN) + Digitone (control, OUT, IN) = 8, so

@@ -6,7 +6,7 @@
  * both). Power is not jank's: on a XIAO the 5V pin is the socket's VBUS with no diode, and a hub has its own; jank mini 2.2
  * puts only a current-limited 5 V signal on VBUS (usbrole.c).
  *
- * A Launchpad X and a Digitone (told apart by product name, core/jank_lpapp.h) are also read: their bulk IN endpoint is
+ * A Launchpad (X, Mini MK3, MK2, Pro: core/jank_lpx.h) and a Digitone (told apart by product name, core/jank_lpapp.h) are also read: their bulk IN endpoint is
  * opened and what they send goes to usb_lp.c, which plays the Digitone from the Launchpad's pads. The Launchpad's MIDI
  * interface is its second one (its first is DAW). Every other device stays output only: the clock. */
 #include <string.h>
@@ -463,7 +463,7 @@ static void add_device(uint8_t address, int reuse, uint8_t tries_left)
     }
     ESP_LOGI(TAG, "device %u: MIDI out%s", address, d->in ? " and in" : "");
     if (d->in) {
-        usb_lp_attach(d->role);
+        usb_lp_attach(d->role, name);
         submit_in(d);
     }
 }

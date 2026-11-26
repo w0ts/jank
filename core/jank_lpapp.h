@@ -157,6 +157,7 @@ struct jlapp {
     uint8_t push;                      /* live control is on: the lights come from its note push */
     uint8_t follow;                    /* FOLLOW is on */
     uint8_t fixed_vel;                 /* fixed velocity (the Note page's pad 3, owner 2026-11-25): the pads' notes play at the track's own VEL, not the press */
+    uint8_t no_vel;                    /* the Launchpad's pads send no velocity (Mini MK3, MK2: always 127): fixed velocity whatever fixed_vel says */
     uint8_t read_ok;                   /* the Digitone can be asked for its active track */
     uint8_t buttons;                   /* bit 0 left, bit 1 right: held (for the two together) */
     uint8_t before[2];                 /* the track before the left / right press (the pair puts it back) */

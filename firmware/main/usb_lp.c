@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* USB host mode: a Launchpad X plays a Digitone II (Note mode) through the Digitone's live control, SysEx only: no MIDI channel, and none of the Digitone's MIDI
+/* USB host mode: a Launchpad (X, Mini MK3, MK2 or Pro: core/jank_lpx.h) plays a Digitone II (Note mode) through the Digitone's live control, SysEx only: no MIDI channel, and none of the Digitone's MIDI
  * is read. The logic is core/jank_lpapp.h's and core/jank_dn2live.h's (host-tested); this is the part that owns the one state, feeds it what the two devices
  * send and puts what it makes into their queues (usb_midi_host.c). Everything here runs in that file's client task (the USB Host Library's callbacks come from it), so the
  * state needs no lock; the queues take their own. Nothing here waits: the client task also serves the clock's transfers.
@@ -30,12 +30,10 @@
 /* The Launchpad X has ONE USB-MIDI streaming interface (diag: ifs:1) with TWO cables, the high nibble of every USB-MIDI packet: 0 is the "DAW" port, 1 the
  * "MIDI" port (a Mac lists them as "LPX DAW" and "LPX MIDI"). Programmer mode's lights, and its setup messages, take effect on cable 1. Measured
  * 2026-11-24: the unit sent everything on cable 0 and the LEDs stayed dark although the Launchpad answered, took the messages without an error and
- * reported Programmer mode; the same messages on the Mac's "LPX MIDI" port (cable 1) lit the pads. */
-#define LPX_CABLE 1u
+ * reported Programmer mode; the same messages on the Mac's "LPX MIDI" port (cable 1) lit the pads. Each model's cable is in its jlx_model. */
 #define DN2_CABLE 0u
 #define RESERVE 4u                     /* packets left free in a queue that also carries the clock: the clock must not wait */
 #define BATCH 16u                      /* lights per call: what fits one bulk packet */
-#define SYSEX_PACKETS 3u               /* the Programmer mode message */
 #define SETTLE_MS 400                  /* after the Launchpad's answer to the Programmer mode message, before the first lights: still a guess (it was 150,
                                           and the lights stayed dark: 2026-11-24, with the answer in and the packets right) */
 #define REFRESH_MS 2000                /* every light again this often: the Launchpad may take none while it changes modes, and the diff would otherwise
@@ -63,13 +61,14 @@ static const char *TAG = "usb lp";
 
 static struct jlapp s_app;
 static struct jlx_frame s_shown;
+static const struct jlx_model *s_m = &jlx_models[0];   /* the Launchpad plugged in (usb_lp_attach) */
 static struct jlo s_out;               /* for the Digitone */
 static struct jdl s_jdl;               /* the Digitone's live control: pads play and select the track by SysEx, not by MIDI channel (core/jank_dn2live.h) */
 static struct jd2_sx s_sx;             /* the Digitone's SysEx, put together from its packets */
 static uint8_t s_was_live;             /* live control was on at the last pump: a change to on sends the current track */
 static uint8_t s_ready, s_lpx_up, s_dn2_up, s_programmer_pending;   /* pending: the Launchpad has not answered the Programmer mode message yet */
 static uint8_t s_tries;                /* Programmer mode messages sent to this Launchpad */
-static uint8_t s_setup_pending;        /* it is in Programmer mode: the LED-feedback and sleep-off messages (jlx_setup) are still to go, before any light */
+static uint8_t s_setup_pending;        /* it is in Programmer mode: the LED-feedback and sleep-off messages (the model's setup list, jlx_sysex) are still to go, before any light */
 static TickType_t s_settle_at;         /* no lights before this tick */
 static TickType_t s_try_at;            /* the next Programmer mode message is due at this tick */
 static TickType_t s_refresh_at;        /* every light is sent again at this tick (REFRESH_MS) */
@@ -604,10 +603,14 @@ static void live_pump(void)
     }
 }
 
-void usb_lp_attach(enum jlapp_role r)
+void usb_lp_attach(enum jlapp_role r, const char *product)
 {
     ensure_init();
     if (r == JLAPP_LPX) {
+        s_m = jlx_model_find(product);  /* (the role came from the same name: jlapp_role_from_name) */
+        if (!s_m)
+            s_m = &jlx_models[0];
+        s_app.no_vel = (uint8_t)!s_m->velocity;   /* pads that always send 127 play at the track's VEL */
         s_lpx_up = 1;
         g_hostdiag.lpx_up = 1;
         s_programmer_pending = 1;      /* sent by usb_lp_pump, after a wait and when its queue has room */
@@ -618,7 +621,7 @@ void usb_lp_attach(enum jlapp_role r)
         s_was_live = 0;
         s_tries = 0;
         s_try_at = xTaskGetTickCount() + pdMS_TO_TICKS(ATTACH_WAIT_MS);
-        ESP_LOGI(TAG, "Launchpad X");
+        ESP_LOGI(TAG, "%s", s_m->name);
     } else if (r == JLAPP_DN2) {
         s_dn2_up = 1;
         g_hostdiag.dn2_up = 1;
@@ -667,7 +670,7 @@ static void rx_lpx(const uint8_t p[4])
     const uint8_t msg[3] = {p[1], p[2], p[3]};
     int mode;
     size_t made;
-    if (jlx_programmer_ack(p, &mode)) {   /* its answer to the Programmer mode message, or to the mode query: the mode it is in now */
+    if (jlx_programmer_ack(s_m, p, &mode)) {   /* its answer to the Programmer mode message, or to the mode query: the mode it is in now */
         g_hostdiag.lp_mode = (uint8_t)(mode ? 2 : 1);
         if (mode && s_programmer_pending) {   /* the setup messages, then the lights (usb_lp_pump) */
             s_programmer_pending = 0;
@@ -732,23 +735,25 @@ void usb_lp_pump(void)
     }
     room = usb_midi_host_room(JLAPP_LPX);
     if (s_programmer_pending) {        /* the whole message or none of it: a cut SysEx would leave the Launchpad in Live mode */
-        if ((int32_t)(xTaskGetTickCount() - s_try_at) < 0 || room < SYSEX_PACKETS)
+        if ((int32_t)(xTaskGetTickCount() - s_try_at) < 0 || room < jlx_sysex(s_m, s_m->start, NULL) / 4u)
             return;
-        usb_midi_host_send_to(JLAPP_LPX, out, jlx_programmer(LPX_CABLE, 1, out));
+        usb_midi_host_send_to(JLAPP_LPX, out, jlx_sysex(s_m, s_m->start, out));
         g_hostdiag.programmer_sent++;
         s_tries++;
         s_try_at = xTaskGetTickCount() + pdMS_TO_TICKS(ACK_WAIT_MS);
-        if (s_tries >= ACK_TRIES) {    /* it never answered: the setup and the lights go anyway */
+        if (!s_m->ack || s_tries >= ACK_TRIES) {   /* it answers nothing (the MK2), or it never answered: the setup and the lights go anyway */
             s_programmer_pending = 0;
             s_setup_pending = 1;
         }
         return;
     }
     if (s_setup_pending) {             /* Launchpad 95's two messages after Programmer mode: without them the Launchpad shows no light (jank_lpx.h) */
-        if (room < JLX_SETUP_PACKETS + RESERVE)
+        if (room < jlx_sysex(s_m, s_m->setup, NULL) / 4u + RESERVE)
             return;
-        usb_midi_host_send_to(JLAPP_LPX, out, jlx_setup(LPX_CABLE, out));
-        g_hostdiag.setup_sent++;
+        if ((n = jlx_sysex(s_m, s_m->setup, out)) != 0) {   /* (the X's and Mini MK3's; the others need none) */
+            usb_midi_host_send_to(JLAPP_LPX, out, n);
+            g_hostdiag.setup_sent++;
+        }
         s_setup_pending = 0;
         jlx_forget(&s_shown);          /* a Launchpad that just entered the mode shows nothing we know of */
         s_settle_at = xTaskGetTickCount() + pdMS_TO_TICKS(SETTLE_MS);
@@ -760,13 +765,14 @@ void usb_lp_pump(void)
     if ((int32_t)(xTaskGetTickCount() - s_refresh_at) >= 0) {   /* all the lights again, in case one was lost; and which mode is it in? (a Launchpad in Live mode takes no lights) */
         jlx_forget(&s_shown);
         s_refresh_at = xTaskGetTickCount() + pdMS_TO_TICKS(REFRESH_MS);
-        if (room >= SYSEX_PACKETS + RESERVE) {      /* the whole query, and the clock's reserve left: else it waits for the next refresh */
-            usb_midi_host_send_to(JLAPP_LPX, out, jlx_mode_query(LPX_CABLE, out));
+        n = jlx_sysex(s_m, s_m->query, NULL) / 4u;  /* (none for the MK2: it has no mode to fall out of) */
+        if (n && room >= n + RESERVE) {      /* the whole query, and the clock's reserve left: else it waits for the next refresh */
+            usb_midi_host_send_to(JLAPP_LPX, out, jlx_sysex(s_m, s_m->query, out));
             return;                    /* the lights follow on the next pass: the queue has 3 packets fewer room now */
         }
     }
     jlapp_frame(&s_app, &want);
-    n = jlx_diff(LPX_CABLE, &s_shown, &want, out, room - RESERVE < BATCH ? room - RESERVE : BATCH);
+    n = jlx_diff(s_m, &s_shown, &want, out, room - RESERVE < BATCH ? room - RESERVE : BATCH);
     if (n) {
         usb_midi_host_send_to(JLAPP_LPX, out, n * 4u);
         g_hostdiag.lights_sent += (uint32_t)n;

@@ -93,8 +93,11 @@ static void test_roles_by_product_name(void)
     CHECK(jlapp_role_from_name("Novation Launchpad X") == JLAPP_LPX);
     CHECK(jlapp_role_from_name("Digitone II") == JLAPP_DN2);
     CHECK(jlapp_role_from_name("Elektron Digitone II") == JLAPP_DN2);
-    CHECK(jlapp_role_from_name("Launchpad Mini MK3") == JLAPP_OTHER);   /* other Launchpads have other layouts */
-    CHECK(jlapp_role_from_name("Launchpad Pro MK3") == JLAPP_OTHER);
+    CHECK(jlapp_role_from_name("Launchpad Mini MK3") == JLAPP_LPX);     /* the RGB ones that share the X's numbers (core/jank_lpx.h) */
+    CHECK(jlapp_role_from_name("Launchpad MK2") == JLAPP_LPX);
+    CHECK(jlapp_role_from_name("Launchpad Pro") == JLAPP_LPX);
+    CHECK(jlapp_role_from_name("Launchpad Pro MK3") == JLAPP_OTHER);    /* another protocol */
+    CHECK(jlapp_role_from_name("Launchpad Mini") == JLAPP_OTHER);       /* red / green */
     CHECK(jlapp_role_from_name("OP-Z") == JLAPP_OTHER);
     CHECK(jlapp_role_from_name("") == JLAPP_OTHER && jlapp_role_from_name(NULL) == JLAPP_OTHER);
 }
@@ -458,6 +461,15 @@ static void test_fixed_velocity_plays_at_the_track_vel(void)
     CHECK(a.fixed_vel == 0 && strcmp(msg(&a), "FIXED VELOCITY OFF") == 0 && colour(&a, 2, 7) == JLAPP_COLOR_FIXED_VEL_OFF);
     acts(&a, top(NOTE_BTN, 0), &o);
     CHECK(acts(&a, pad(0, 0, 64), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.vel == 64);   /* the press again */
+    CHECK(acts(&a, pad(0, 0, 0), &o) == 1 && o.kind == JLAPP_ACT_NOTE_OFF);
+    a.no_vel = 1;                                                 /* a Launchpad whose pads send 127 (Mini MK3, MK2): fixed whatever the pad says */
+    CHECK(acts(&a, pad(0, 0, 127), &o) == 1 && o.kind == JLAPP_ACT_NOTE_ON && o.vel == 0);
+    acts(&a, top(NOTE_BTN, 127), &o);
+    CHECK(colour(&a, 2, 7) == JLAPP_COLOR_FIXED_VEL);
+    tap(&a, 2, 7);
+    CHECK(a.fixed_vel == 1 && strcmp(msg(&a), "FIXED VELOCITY ON") == 0);
+    tap(&a, 2, 7);
+    CHECK(a.fixed_vel == 0 && strcmp(msg(&a), "FIXED VELOCITY ON") == 0 && colour(&a, 2, 7) == JLAPP_COLOR_FIXED_VEL);   /* still on */
 }
 
 static void test_release_goes_to_the_note_and_the_track_it_started(void)

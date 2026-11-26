@@ -39,8 +39,8 @@ void usb_midi_host_send_to(enum jlapp_role r, const uint8_t *packets, size_t n);
 size_t usb_midi_host_room(enum jlapp_role r);                                      /* packets still fitting in its queue; 0 if none */
 void usb_midi_host_wake(void);                                                     /* any task: the client task runs its pass now (a page for the Digitone is ready) */
 
-/* usb_lp.c: Launchpad X -> Digitone II, Note mode (core/jank_lpapp.h), called from usb_midi_host.c's client task only */
-void usb_lp_attach(enum jlapp_role r);
+/* usb_lp.c: Launchpad -> Digitone II, Note mode (core/jank_lpapp.h), called from usb_midi_host.c's client task only */
+void usb_lp_attach(enum jlapp_role r, const char *product);                    /* product: the USB product name (which Launchpad: core/jank_lpx.h) */
 void usb_lp_detach(enum jlapp_role r);
 void usb_lp_rx(enum jlapp_role r, const uint8_t *packets, size_t n);               /* 4-byte USB-MIDI packets the device sent */
 void usb_lp_pump(void);                                                          /* waiting packets for the Digitone, more lights: as the queues have room */
