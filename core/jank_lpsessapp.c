@@ -41,13 +41,15 @@ static size_t session_release(struct jlapp *a, uint8_t pad, struct jlapp_act *ou
     if (k == JLSS_RELEASE_CLEAR) {
         jlss_chain_cleared(&a->sess);
         jlapp_say(a, "CHAIN CLEARED");
-        jlapp_set_act(out, JLAPP_ACT_CHAIN, 0, 0, JDL_CHAIN_CLEAR);
+        jlapp_act(out, JLAPP_ACT_CHAIN, 0, 0);
+        out->vel = JDL_CHAIN_CLEAR;
         return 1;
     }
     jlss_chain_list(&a->sess, &n);
     jlss_chain_sent(&a->sess);         /* shown at once, read back; the list stays until the next press (the firmware reads it with jlapp_chain_list) */
     jlapp_say(a, "CHAIN OF %u", (unsigned)n);
-    jlapp_set_act(out, JLAPP_ACT_CHAIN, 0, (uint8_t)n, JDL_CHAIN_SET);
+    jlapp_act(out, JLAPP_ACT_CHAIN, 0, (uint8_t)n);
+    out->vel = JDL_CHAIN_SET;
     return 1;
 }
 
@@ -81,7 +83,8 @@ size_t jlapp_session_pad(struct jlapp *a, const struct jlx_ev *ev, struct jlapp_
         return 0;
     jlss_cue(&a->sess, p, a->now_ms);
     jlapp_say(a, "CUE %s", name);
-    jlapp_set_act(out, JLAPP_ACT_PATTERN, 0, p, JDL_PATTERN_CUE);
+    jlapp_act(out, JLAPP_ACT_PATTERN, 0, p);
+    out->vel = JDL_PATTERN_CUE;
     return 1;
 }
 

@@ -104,12 +104,12 @@ fi
 "$OUT/test_lpout"
 # The Launchpad core on another unit (docs/launchpad.md, "Using the core on another unit"): no C library header in any jank_lp* file; the FM-1's file set copied as it
 # copies it (its own scales: tests/lpunit/), built as ONE unit (tests/lpunit_unity.c) freestanding with only the compiler's stddef / stdint, then tested with its
-# configuration (15 tracks, 4 clip columns, no Record or Delete) and with 4 tracks.
+# configuration (15 tracks, 4 clip columns, no Record or Delete, the X alone, no fixed velocity, no remembered settings) and with 4 tracks.
 if grep -l '#include <\(string\|stdio\|stdarg\|stdlib\)\.h>' "$HERE"/core/jank_lp*.[ch]; then echo "lpunit: a C library header in the Launchpad core (above)"; exit 1; fi
 U="$OUT/lpunit"
 rm -rf "$U" && mkdir -p "$U"
-cp "$HERE"/core/jank_lp{unit,str,act,app_int}.h "$HERE"/core/jank_dn2live.h "$HERE"/core/jank_lp{x,note,app,step,mix,trans,clips,prefs}.[ch] "$HERE"/tests/lpunit/jank_lpscales.[ch] "$U"/
-FM1="-DJLN_TRACKS=15 -DJLCL_TRACKS=4 -DJLAPP_CLIPS=1 -DJLAPP_RECORD=0 -DJLAPP_ERASE=0"
+cp "$HERE"/core/jank_lp{unit,str,act,app_int}.h "$HERE"/core/jank_dn2live.h "$HERE"/core/jank_lp{x,note,app,step,mix,clips}.[ch] "$HERE"/tests/lpunit/jank_lpscales.[ch] "$U"/
+FM1="-DJLN_TRACKS=15 -DJLCL_TRACKS=4 -DJLAPP_CLIPS=1 -DJLAPP_RECORD=0 -DJLAPP_ERASE=0 -DJLX_ONLY_X=1 -DJLAPP_FIXED_VEL=0"
 SYSINC="$("$CC" -print-resource-dir 2>/dev/null)/include"   # clang's own headers (gcc: -print-file-name=include)
 [ -d "$SYSINC" ] || SYSINC="$("$CC" -print-file-name=include)"
 "$CC" -std=c11 -fsyntax-only -ffreestanding -nostdinc -isystem "$SYSINC" -Wall -Wextra -Werror $FM1 -I"$U" "$HERE/tests/lpunit_unity.c"

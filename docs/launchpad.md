@@ -340,6 +340,8 @@ run-time choice. `core/jank_lpunit.h` holds the configuration, its `#ifndef` def
 | `JLCL_TRACKS` | `JLN_TRACKS` | 4 | the clips page's track columns, 1..7 |
 | `JLCL_SLOTS` | 16 | 16 | a track's slots, and the scenes |
 | `JLAPP_RECORD`, `JLAPP_ERASE` | 1 | 0 | scene 8 Record, scene 6 Delete; 0: dark, doing nothing, their code compiled away |
+| `JLX_ONLY_X` | 0 | 1 | 1: the Launchpad X alone: the other models' table, SysEx and code paths (`core/jank_lpx.h`) compiled away |
+| `JLAPP_FIXED_VEL` | 1 | 0 | the scale page's pad 3, fixed velocity (and the Mini MK3 / MK2 playing fixed); 0: dark, doing nothing |
 
 **The clips page** (`JLAPP_CLIPS` 1, as Ableton's session view): the tracks in columns `0..JLCL_TRACKS-1`, a track's 16 slots in the rows, 8 at a time from the top (up /
 down: slots 1-8 / 9-16, it says SLOTS 9-16), the scenes 1-8 / 9-16 on the rightmost column; the scene buttons stay start / stop, as on the Digitone's page. Lights as the
@@ -347,16 +349,19 @@ Digitone's page: the playing slot GREEN pulsing (flashing when a stop is queued)
 scene AMBER_THIRD (my pick, not the owner's yet). A slot pressed: `JLAPP_ACT_CLIP {track, note = slot, vel = when, 0: at the pattern's end}` (TRACK 2 CLIP 5); the
 playing slot: a stop (note 255, TRACK 2 STOP); a scene pad: `JLAPP_ACT_SCENE {note = scene}` (SCENE 3). It shows only the unit's news, `jlapp_on_clips`.
 
+With `JLAPP_CLIPS` 1 what only the Digitone has is compiled away too: its transport (TRANSPORT while it leads, `jank_lptrans.[ch]`: scene 5 is the unit's own start /
+stop, lit while `jlapp_set_transport` says it plays), its MIDI clock for the playhead (`jlapp_on_dn2_rt`: the playhead runs on `jlapp_set_beat`), and jank's device
+roles (`jlapp_role_from_name`, `jlapp_midi_interface_index`: a unit tells a Launchpad by `jlx_model_find`).
+
 **Files.** Copied as they are: `jank_lpunit.h`, `jank_lpstr.h`, `jank_lpact.h`, `jank_lpapp_int.h`, `jank_lpx.[ch]`, `jank_lpnote.[ch]`, `jank_lpapp.[ch]`,
-`jank_lpstep.[ch]`, `jank_lpmix.[ch]`, `jank_lptrans.[ch]`, `jank_lpclips.[ch]`, `jank_lpprefs.[ch]` (to remember the settings) and `jank_dn2live.h` (its types and
-constants: no code). **Replaced: `jank_lpscales.[ch]`**, the unit's own list with the same four functions (`jls_count`, `jls_get`, `jls_index_of`, `jls_mask`),
+`jank_lpstep.[ch]`, `jank_lpmix.[ch]`, `jank_lpclips.[ch]` and `jank_dn2live.h` (its types and constants: no code). **Replaced: `jank_lpscales.[ch]`**, the unit's own list with the same four functions (`jls_count`, `jls_get`, `jls_index_of`, `jls_mask`),
 `JLS_COUNT` and the indexes the relative-scale pad uses (`JLS_MAJOR`, `JLS_MINOR`, `JLS_HARMONIC_MINOR`, `JLS_MELODIC_MINOR`, `JLS_MAJOR_PENTATONIC`,
 `JLS_MINOR_PENTATONIC`; a unit without one gives it `JLS_COUNT`); the scale page shows `JLS_COUNT` scales 16 a page, and an index anywhere (`JLAPP_ACT_SCALE`,
-`jlapp_on_dn2_scale`) is the unit's. **Not copied:** `jank_lpsess.[ch]` and `jank_lpsessapp.c` (the Digitone's Session page, its stage 8), `jank_lpout.[ch]` (jank's
-USB queue). The files need no C library: only the compiler's `<stddef.h>` / `<stdint.h>` and memset, memcpy, memcmp (declared in `jank_lpstr.h`); the messages have their
+`jlapp_on_dn2_scale`) is the unit's. **Not copied:** `jank_lpsess.[ch]` and `jank_lpsessapp.c` (the Digitone's Session page, its stage 8), `jank_lptrans.[ch]` (the
+Digitone's transport), `jank_lpprefs.[ch]` (jank's remembered settings; the FM-1 keeps none: Optimist 2026-11-26), `jank_lpout.[ch]` (jank's USB queue). The files need no C library: only the compiler's `<stddef.h>` / `<stdint.h>` and memset, memcpy, memcmp (declared in `jank_lpstr.h`); the messages have their
 own `%s` / `%u` formatter on the compiler's varargs. They also build as one unit (the FM-1 includes the `.c` files into one): no file-static name or macro clashes.
-`tests/run.sh` checks all of it: no C library header in a `jank_lp*` file, the set above compiled as one unit freestanding, and `tests/test_lpunit.c` with 15 tracks and 4
-clip columns, and with 4 tracks.
+`tests/run.sh` checks all of it: no C library header in a `jank_lp*` file, the set above compiled as one unit freestanding, and `tests/test_lpunit.c` with the FM-1's
+configuration (15 tracks, 4 clip columns, the X alone, no fixed velocity), and with 4 tracks and jank's other defaults.
 
 **The adapter** (the unit's own code around the core):
 - Start: `jlapp_init(a, jls_get(<scale>))`, then `jlapp_set_live(a, JDL_LIVE, 1, read_ok)`: live, PLAY there (`read_ok` 1 when it answers FOLLOW: while
@@ -365,10 +370,10 @@ clip columns, and with 4 tracks.
   to the Launchpad, `jlapp_take_message` to its message line; `jlapp_release_acts` when the Launchpad goes away.
 - **Acts to carry out:** NOTE_ON / NOTE_OFF (track, note, vel; vel 0: the track's own), TRACK_ON / TRACK_OFF (the track's own note), SELECT, STEP (track, step, op 0
   clear / 1 trig / 2 note, note; vel and len 255: the track's), MIX (track, op = `enum jdl_mix_param`, vel = 0..127; VOL is the volume view's LEVEL), MUTE (op 0 mute /
-  1 solo, the whole mask = note | step << 8), SCALE (note = its index, vel = the root), TRANSPORT (start / stop: the unit leads its own), CLIP, SCENE. Never made: RECORD and
-  ERASE (compiled away), PATTERN, CHAIN, DN2_TRANSPORT (they wait for the Digitone's answers).
+  1 solo, the whole mask = note | step << 8), SCALE (note = its index, vel = the root), TRANSPORT (start / stop: the unit leads its own), CLIP, SCENE. Never made: RECORD,
+  ERASE and DN2_TRANSPORT (compiled away), PATTERN and CHAIN (the Digitone's Session page).
 - **News to give:** `jlapp_on_push` (each note it plays: track, step, note) for the lights and the playhead's phase; `jlapp_set_transport(playing)` (scene 5's light,
-  the step modes' clock) with `jlapp_set_beat(1, sixteenths)` for the playhead (or its MIDI clock through `jlapp_on_dn2_rt`: 0xFA, 0xFB, 0xFC, 0xF8); while
+  the step modes' clock) with `jlapp_set_beat(1, sixteenths)` for the playhead; while
   `jlapp_step_wanted` names pages, each through `jlapp_on_page` (`struct jdl_page`: the track's 16 steps of that page, its pages and length), at once while
   `jlapp_step_urgent`; while `jlapp_mixer_wanted`, `jlapp_on_mixer` (`struct jdl_mixer`: per track level, pan, the three sends; the mute and solo masks) every
   `JLMX_READ_MS` or on a change; `jlapp_on_dn2_scale(index, 1, root)` when its scale changes; `jlapp_on_clips(a, tracks, scenes)` (per track the playing slot,
@@ -378,9 +383,14 @@ clip columns, and with 4 tracks.
   lanes 0..10 (14 ACCENT), each a track of its own: a note on is that lane's hit, the pitch ignored; mute, solo, pan and VOL per lane; the length and the clips are track
   3's (`JLCL_TRACKS` 4: the lanes share its clip column).
 
-**Size** (measured 2026-11-26, ESP32-S3 gcc 14.2, `-Os`, each file alone): the FM-1's configuration 15,258 bytes of text, no data or bss (jank_lpapp 7,446, lpstep
-2,244, lpmix 2,089, lpx 1,327, lpnote 810, lpprefs 540, lpclips 419, lptrans 383; its scale list not counted; as one unit 15,832; a linker that drops unused functions
-takes less: e.g. `jlapp_set_record`, `jlapp_role_from_name`). jank's own files: 18,324 bytes (main: 18,359); the jank image 0x17f420 (main 0x17f530: 272 bytes smaller).
+**Size.** The owner (2026-11-26, through Optimist): "my point was more to make the code more compact. not remove features". So the same features in less code: shared
+helpers (one act maker returning its count, the tracks-off and recently-played loops once for Note mode and the step modes, one "why not" clock, one ON / OFF message),
+the scale page's presses and lights in one function, the mixer's views as tables (a view's field is its MIXER SET parameter), the note colours from 12-bit scale masks,
+the small fields of `struct jlapp`, `jlst` and `jlmx` before their arrays (short offsets, shorter code), and `jln_pads_with_note` (used by a test only) moved into its
+test. `jlapp_set_act` became `jlapp_act(out, kind, track, note)`, returning 1; the vel, op, step and len are set after it. Measured 2026-11-26, the FM-1's set as one unit
+(its flags; the scale list not counted): ESP32-S3 gcc 14.2 `-Os` 13,627 bytes of text and rodata before (2d52079, with `jank_lptrans`, without `jank_lpprefs`), 11,341
+after (-16.8 %); clang `-Oz` with tests/lpunit's scale list: thumbv7m 13,585 -> 11,444, rv32imc 16,587 -> 14,366. The jank image 0x17ee10 (2d52079: 0x17f420, 1,552
+bytes smaller).
 
 ## What is not there yet
 

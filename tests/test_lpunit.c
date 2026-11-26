@@ -335,21 +335,22 @@ static void test_the_formatter(void)
     jlapp_say(&a, "x%uy", 123u);
     CHECK(jlapp_take_message(&a, m, 3) == 2 && !strcmp(m, "X1") && jlapp_take_message(&a, m, sizeof m) == 0);
     CHECK(jlx_has("Launchpad X MIDI", "Launchpad X") && !jlx_has("Launchpad", "Launchpad X") && jlx_has("", "") && jlx_has("ab", "") && !jlx_has("", "a"));
-    CHECK(jlapp_role_from_name("Launchpad Pro MK3") == JLAPP_OTHER && jlapp_role_from_name("Launchpad Mini MK3") == JLAPP_LPX);
 }
 
-/* the remembered settings work the same with the unit's tracks */
-static void test_prefs(void)
+/* The FM-1 (Optimist 2026-11-26: "the X only", fixed velocity and the remembered settings out): the X alone is found, the other models are not; the scale page's pad 3 is
+ * dark and does nothing, a pad plays at its press's velocity. The 4-track build keeps them (jank's defaults) */
+static void test_x_only_and_no_fixed_velocity(void)
 {
-    struct jlapp a = t_fresh(), b = t_fresh();
-    struct jlprefs p, q;
-    uint8_t blob[JLPREFS_SIZE];
-    a.track_pads = JLAPP_TRACKS_SELECT;
-    a.fixed_vel = 1;
-    jlprefs_from_app(&a, &p);
-    CHECK(jlprefs_pack(&p, blob, sizeof blob) == JLPREFS_SIZE && jlprefs_unpack(&q, blob, sizeof blob) && jlprefs_equal(&p, &q));
-    jlprefs_apply(&b, &q);
-    CHECK(b.track_pads == JLAPP_TRACKS_SELECT && b.fixed_vel == 1);
+    struct jlapp a = t_fresh();
+    struct jlapp_act o[2];
+    CHECK(jlx_model_find("Launchpad X MIDI") == &jlx_models[0] && !jlx_model_find("Launchpad Pro MK3"));
+    CHECK((jlx_model_find("Launchpad Mini MK3") == NULL) == JLX_ONLY_X && JLX_MODELS == (JLX_ONLY_X ? 1u : 4u));
+    t_button(&a, JLX_TOP, TOP_NOTE, 127);
+    t_msg(&a);
+    CHECK(t_pad(&a, 2, 7, 100, o) == 0 && (t_colour(&a, 2, 7) == 0) == !JLAPP_FIXED_VEL && !strcmp(t_msg(&a), JLAPP_FIXED_VEL ? "FIXED VELOCITY ON" : ""));
+    t_button(&a, JLX_TOP, TOP_NOTE, 0);
+    a.no_vel = 1;                      /* (a Mini MK3's pads: fixed unless the X alone is built) */
+    CHECK(t_pad(&a, 0, JLAPP_TRACK_ROWS + 1u, 77, o) == 1 && o[0].kind == JLAPP_ACT_NOTE_ON && o[0].vel == (JLAPP_FIXED_VEL || !JLX_ONLY_X ? 0 : 77));
 }
 
 int main(void)
@@ -363,7 +364,7 @@ int main(void)
     test_a_note_held_into_the_clips_page_ends();
     test_record_and_delete_absent();
     test_the_formatter();
-    test_prefs();
+    test_x_only_and_no_fixed_velocity();
     printf("test_lpunit (%u tracks, %u clip columns): %d checks, %d failed\n", (unsigned)JLN_TRACKS, (unsigned)JLCL_TRACKS, checks, fails);
     return fails;
 }

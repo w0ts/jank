@@ -18,6 +18,22 @@ static int fails, checks;
     } while (0)
 
 static const struct jln_scale MAJOR = {"Major", 7, {0, 2, 4, 5, 7, 9, 11}};
+
+/* the pads (bit y * 8 + x) that play `note`: one note lights every pad with that pitch (the layouts overlap); 0 for a note out of 0..127 */
+static uint64_t jln_pads_with_note(const struct jln *s, const struct jln_scale *sc, int note)
+{
+    uint64_t mask = 0;
+    if (note < 0 || note > 127)
+        return 0;
+    for (uint8_t y = 0; y < 8; y++)
+        for (uint8_t x = 0; x < 8; x++) {
+            struct jln_pad p;
+            jln_pad(s, sc, x, y, &p);
+            if (p.note == note)
+                mask |= 1ull << (y * 8u + x);
+        }
+    return mask;
+}
 static const struct jln_scale PENT = {"Pent", 5, {0, 3, 5, 7, 10}};
 
 static struct jln state(enum jln_layout l, uint8_t key, uint8_t octave, uint8_t absolute)
