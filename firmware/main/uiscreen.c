@@ -2,7 +2,7 @@
 /* The device's own UI on the firmware (uiscreen.h): core/jank_oled.h's screens and buttons fed from the firmware's state,
  * their setters carried out through the control line's own `set` (jk_ctl_line on a copy of the settings, then
  * app_cfg_set: saved at once while stopped, once stopped while playing), so the device, the control line and the
- * control page always agree. Everything runs in the ui task (core 0).
+ * control page always agree. Everything runs in the ui task (core 0); the Digitone's page (uis_dn2.c) is made here from the same state.
  *
  * What the firmware has and what it does not (the screens show both the same way):
  *   AUTO BAR, SOURCE, USB, GROUP, NETWORK JANK / CLIENT (a restart), its SSID and passkey, MIDI OUT 1's offset (`offset`),
@@ -31,6 +31,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "jank_oled_int.h"
+#include "jank_oled_text.h"
 #include "jank_prefs.h"
 #include "jank_usbrole.h"
 #include "nvs.h"
@@ -371,6 +372,19 @@ int uis_bright_get(void)
 void uis_sleep_set(int v) { s_sleep_req = (int8_t)v; }
 void uis_bright_set(int v) { s_bright_req = (int16_t)v; }
 
+/* the Digitone's keys as the buttons are (uis_dn2.c brings them from the USB client task); a key also brings the UI out of SCREEN OFF first, so its press is not
+ * spent on waking a screen the Digitone does not show */
+static void dn2_keys_in(uint32_t now)
+{
+    enum jo_btn b;
+    int down;
+    while (uis_dn2_next_key(&b, &down)) {
+        if (down)
+            s_in.last_input = now;
+        uis_button(b, down, now);
+    }
+}
+
 /* the user's last Start (1) / Stop (0) of the outputs: read once at boot (bridge_start), written by every user press (bridge_play) */
 int uis_started_get(void) { return s_prefs.started; }
 void uis_started_set(int on) { s_play_req = on ? 1 : 0; }
@@ -395,7 +409,8 @@ static const struct jo_ctx *build_ctx(void *user, uint32_t now)
     c->has_link_bpm = s_snap.mpb > 0;
     c->link_bpm = s_snap.mpb > 0 ? (double)((6000000000ull + (uint64_t)s_snap.mpb / 2u) / (uint32_t)s_snap.mpb) / 100.0 : 0.0;
     c->conf = audio ? b->conf_pct / 100.0 : 0.0;
-    c->layout_lcd2 = BOARD_LCD;
+    c->layout_lcd2 = BOARD_LCD || !s_screen;   /* a unit with no screen of its own: the colour layout's menus, all of jank's items (owner 2026-11-26, for the Digitone's page) */
+    c->text_view = (uint8_t)uis_dn2_is_open();   /* the Digitone shows this state too: ABOUT pages by 6 rows */
     c->conf_unknown = !audio;
     c->has_peak = (uint8_t)audio;       /* the input's peak over the last second, as the input gives it (no LEVEL offset) */
     c->peak_db = b->peak_db;
@@ -566,6 +581,7 @@ uint8_t uis_contrast(void) { return (uint8_t)((s_prefs.bright * 255u + 50u) / 10
 
 void uis_init(void)
 {
+    uis_dn2_init();
     prefs_load();
     midi_set_clk_rate(s_prefs.rate);
     esp_register_shutdown_handler(prefs_flush_at_restart);
@@ -672,6 +688,7 @@ static void step(uint32_t now, struct uis_led *led)
 {
     uint8_t *fb = s_fb;
     const struct jo_ctx *c;
+    dn2_keys_in(now);
     jo_input_tick(&s_in, &s_ui, now, &HOST);
     prefs_step(now);
     show_posted_message(now);
@@ -679,6 +696,8 @@ static void step(uint32_t now, struct uis_led *led)
         app_reboot();
         return;
     }
+    if (uis_dn2_page_wanted())
+        s_want_frame = 1;               /* an OPEN asks for a page: at once */
     if (!(s_want_frame && now - s_last_frame >= FRAME_MIN_MS) && now - s_last_frame < FRAME_MS)
         return;
     s_want_frame = 0;
@@ -692,6 +711,11 @@ static void step(uint32_t now, struct uis_led *led)
     led->batt_pct = s_snap.batt_pct;
     led->on_usb = c->usb;
     led->valid = 1;
+    if (uis_dn2_is_open()) {           /* the Digitone's page of this state (uis_dn2.c sends it on when it changed) */
+        struct jot_page page;
+        jot_render(&page, &s_ui, c, now);
+        uis_dn2_publish(&page);
+    }
     if (!s_screen)
         return;
     if (jo_asleep(&s_in, c, now)) {

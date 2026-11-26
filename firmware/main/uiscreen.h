@@ -33,4 +33,18 @@ int uis_bright_get(void);
 void uis_sleep_set(int v);           /* set sleep / set bright: applied and saved (400 ms rule) by the ui task */
 void uis_bright_set(int v);
 void uis_sys(struct jk_sys *out);    /* the ABOUT screen's sampled numbers, for the control line's `about` (any task) */
+
+/* The Digitone's screen as this UI's (uis_dn2.c; owner 2026-11-25, core/jank_oled_text.h; usb_lpmenu.c, in the USB client task, talks to the Digitone): its keys come in
+ * through a queue, the page goes out through a buffer with a sequence number. While the page is open the ui task runs the screens also on a unit with no screen */
+void uis_dn2_init(void);                                   /* uis_init */
+void uis_dn2_key(enum jo_btn b, int down);                 /* client task: one of the Digitone's four keys down / up (dropped when the queue is full) */
+void uis_dn2_open(int open, uint32_t opens);               /* client task: the page is open and live control is up; opens counts its OPENs (each: a page afresh) */
+struct jot_page;
+/* client task: the last page, its number, and the OPENs count it was made for (a page made before the last OPEN is stale); 0 when there is none */
+int uis_dn2_page(struct jot_page *out, uint32_t *seq, uint32_t *opens);
+int uis_dn2_is_open(void);                                 /* ui task: the page is open */
+int uis_dn2_active(void);                                  /* ui task: open, or one of its keys still down: the screens run */
+int uis_dn2_page_wanted(void);                             /* ui task: an OPEN asks for a page made afresh */
+int uis_dn2_next_key(enum jo_btn *b, int *down);           /* ui task: the next key event, 1; 0 none */
+void uis_dn2_publish(const struct jot_page *page);         /* ui task: the page of the state now (kept and sent on only when it changed, or an OPEN asked) */
 #endif

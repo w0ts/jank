@@ -8,7 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define JLO_PACKETS 64u                /* one Launchpad's 64 pads can all be down */
+#define JLO_PACKETS 128u               /* one Launchpad's 64 pads can all be down; a whole JANK PAGE (62) of 7 full lines is 91 packets (a SysEx goes in whole or not at all) */
 
 struct jlo {
     uint8_t b[JLO_PACKETS][4];

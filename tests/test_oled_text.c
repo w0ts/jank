@@ -52,7 +52,7 @@ static void check_page(const struct jot_page *p, const char *what)
         CHECK(len <= JOT_LINE_MAX, "%s: line %d has %zu characters", what, i, len);
         CHECK(i < p->n || !len, "%s: line %d '%s' past n %u", what, i, s, p->n);
         CHECK(len <= JOT_FIT || dn2_px(s) <= DN2_PX, "%s: line %d '%s' is %d px", what, i, s, dn2_px(s));
-        CHECK(!p->right[i] || (p->right[i] >= 3 && p->right[i] < len && !memcmp(s + p->right[i] - 2, "  ", 2) && s[p->right[i]] != ' '),
+        CHECK(!p->right[i] || (p->right[i] >= 3 && p->right[i] < len && strstr(s, "  ") == s + p->right[i] - 2 && s[p->right[i]] != ' '),
               "%s: line %d '%s' right part at %u", what, i, s, p->right[i]);
         CHECK(!(p->right[i] && (p->centred >> i & 1u)), "%s: line %d both centred and split", what, i);
         for (size_t k = 0; k < len; k++)
@@ -81,8 +81,8 @@ static void test_home_link(void)
     world_init(&w, 0);
     p = render(&w, 0, "home link");
     CHECK(p->flags == 0 && p->sel == JOT_NONE && p->cursor == JOT_NONE && p->n == 7 && p->centred == 0, "home: flags %u sel %u n %u", p->flags, p->sel, p->n);
-    LINE(p, 0, "PLAY  BOTH  USB 80%");
-    RIGHT(p, 0, 12);
+    LINE(p, 0, "PLAY BOTH  USB 80%");
+    RIGHT(p, 0, 11);
     LINE(p, 1, "JANK GRP 1  ===");
     RIGHT(p, 1, 12);
     LINE(p, 2, "");
@@ -91,20 +91,20 @@ static void test_home_link(void)
     LINE(p, 6, "2 LINK PEERS");
     w.c.running = 0;
     w.c.armed = 1;
-    LINE(render(&w, 0, "armed"), 0, "ARMED  BOTH  USB 80%");
+    LINE(render(&w, 0, "armed"), 0, "ARMED BOTH  USB 80%");
     w.c.armed = 0;
     w.c.held = 1;
-    LINE(render(&w, 0, "held"), 0, "STOP  BOTH  USB 80%");
+    LINE(render(&w, 0, "held"), 0, "STOP BOTH  USB 80%");
     w.c.held = 0;
     w.c.lt_mode = 0;
     w.c.usb = 0;
-    LINE(render(&w, 0, "paused"), 0, "PAUSE  IGNORE  80%");
+    LINE(render(&w, 0, "paused"), 0, "PAUSE IGNORE  80%");
     w.c.fitted = 0;
     w.c.has_link_bpm = 0;
     w.c.has_beat = 0;
     w.c.wifi = JO_WIFI_WEAK;
     p = render(&w, 0, "no bpm");
-    LINE(p, 0, "PAUSE  IGNORE");
+    LINE(p, 0, "PAUSE IGNORE");
     RIGHT(p, 0, 0);
     LINE(p, 1, "JANK GRP 1  =--");
     LINE(p, 3, "--- BPM");
@@ -525,7 +525,7 @@ static void test_overlays(void)
     world_init(&w, 0);
     w.ui.hint = JO_NO;
     p = render(&w, 0, "hint");
-    LINE(p, 0, "PLAY  BOTH  USB 80%");
+    LINE(p, 0, "PLAY BOTH  USB 80%");
     LINE(p, 2, "NUDGE BEAT");
     LINE(p, 3, "UP: 1/2 BEAT EARLY");
     LINE(p, 4, "DOWN: 1/2 BEAT LATE");

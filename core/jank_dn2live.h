@@ -166,8 +166,89 @@ struct jdl_chain {
     uint8_t member[JDL_PATTERNS / 8u]; /* bit p: pattern p is among those k */
 };
 
+/* Stage 9 (dn2-wishes lp9, built and passing its emulator, not on the hardware yet; owner 2026-11-25): Jank's own menu on the Digitone's screen, driven by its keys
+ * (core/jank_oled_text.h, core/jank_dn2menu.h), and LINK MODE: while Link leads, the Digitone's PLAY / STOP ask Jank to start / stop the session.
+ *   62 JANK PAGE   host -> DN2: u8 flags (bit 0 CLOSE, bit 1 line 0 is a title), u8 sel (255 none), u8 cursor column of line sel (255 none: the row is inverted;
+ *                  set: only that cell), u8 n (0..7), n x {u8 length byte (below), the characters 0x20..0x7e}. At most 228 bytes; no data back
+ *   63 JANK KEY    push 0xBF: u8 n (1..8), n x {u8 kind (1 down, 2 up, 3 turn), u8 code, s8 delta}. Repeats are not sent: Jank repeats
+ *   64 JANK OPEN   push 0xC0 (and the reply to a request 64): u8 open, u8 reason (0 the menu, 1 a key, 2 the host's CLOSE, 3 lease lost, 4 a dialog or the screen
+ *                  saver), u16 pages drawn. Pushed again every second while open until a page arrives; when live control comes back, open 1 reason 3
+ *   65 LINK MODE   host -> DN2: u8 op: 0 OFF, 1 ON, 2 PENDING u16 ms (to the bar line) + u8 request id (answers a start: the Digitone blinks), 3 CANCEL (ends a pending
+ *                  request), 4 ACK u8 request id (answers a stop), 255 READ -> u8 on, u8 pending, u8 transport state
+ *   66 LINK REQUEST push 0xC2: u8 op (0 stop, 1 start; 2 pause is not used: owner, stop), u8 flags (JDL_LR_*), u8 state, u8 request id. Pushed again once after
+ *                  500 ms when not answered. Always answered (PENDING or ACK)
+ * All pushes share one sequence counter (LIVE STATUS bytes 29..30). A build without stage 9 answers 62 / 64 / 65 with status 2 once: none is sent after that
+ * until jdl_init. */
+#define JDL_CMD_JANK_PAGE 62u
+#define JDL_CMD_JANK_KEY 63u
+#define JDL_CMD_JANK_OPEN 64u
+#define JDL_CMD_LINK_MODE 65u
+#define JDL_CMD_LINK_REQUEST 66u
+/* a page line's length byte (dn2-wishes, confirmed 2026-11-26): bits 0..4 the length, bit 5 always 0; bit 6 the line is centred; bit 7 split at the FIRST double space,
+ * the left part at the left, the rest right-aligned at the right edge, the two spaces not drawn. Bits 6 and 7 together, or bit 5, are refused (status 2): never sent.
+ * A build that refuses the bits (lp9) answers a page that has them with status 2: it is sent again without, and pages stay plain on that connection */
+#define JDL_LINE_LEN 0x1Fu
+#define JDL_LINE_CENTRED 0x40u
+#define JDL_LINE_SPLIT 0x80u
+#define JDL_PAGE_CLOSE 0x01u
+#define JDL_PAGE_TITLE 0x02u
+#define JDL_PAGE_LINES 7u
+#define JDL_PAGE_COLS 31u
+#define JDL_PAGE_ARGS_MAX (4u + JDL_PAGE_LINES * (1u + JDL_PAGE_COLS))   /* 228 */
+#define JDL_KEYS_MAX 8u
+enum jdl_key_kind { JDL_KEY_PRESS = 1, JDL_KEY_RELEASE = 2, JDL_KEY_TURN = 3 };
+/* the key codes (dn2-wishes stage 9); encoder pushes 41..48, turns (kind 3) carry the encoder's code */
+enum jdl_key_code { JDL_KC_YES = 10, JDL_KC_UP = 11, JDL_KC_NO = 12, JDL_KC_LEFT = 13, JDL_KC_DOWN = 14, JDL_KC_RIGHT = 15, JDL_KC_FUNC = 17 };
+struct jdl_key {
+    uint8_t kind, code;
+    int8_t delta;
+};
+struct jdl_keys {
+    uint8_t n;
+    struct jdl_key k[JDL_KEYS_MAX];
+};
+enum jdl_open_reason { JDL_OPEN_MENU = 0, JDL_OPEN_KEY = 1, JDL_OPEN_HOST_CLOSE = 2, JDL_OPEN_LEASE = 3, JDL_OPEN_DIALOG = 4 };
+struct jdl_open {
+    uint8_t open, reason;
+    uint16_t drawn;                    /* pages the Digitone drew */
+};
+enum jdl_link_op { JDL_LINK_OFF = 0, JDL_LINK_ON = 1, JDL_LINK_PENDING = 2, JDL_LINK_CANCEL = 3, JDL_LINK_ACK = 4, JDL_LINK_READ = 255 };
+enum jdl_link_req_op { JDL_LR_STOP = 0, JDL_LR_START = 1, JDL_LR_PAUSE = 2 };
+#define JDL_LR_RECORD 0x01u            /* RECORD was held: RECORD (58) op 1 first */
+#define JDL_LR_SECOND_STOP 0x02u       /* a second STOP within 400 ms */
+#define JDL_LR_WAS_PAUSED 0x04u
+struct jdl_link_req {
+    uint8_t op, flags, state, id;
+};
+/* LIVE STATUS protocol 8 (116 bytes): protocol 7's 89 unchanged (byte 0 says 8), then from byte 89: u8 jank open, u8 reason, u8 sel shown (255 none), u16 pages drawn,
+ * u32 pages received (62), u32 key events pushed, u32 key events lost, u8 link on, u8 start pending, u8 last request op (255 none), u8 its flags, u8 its id, u8 acked,
+ * u32 requests made */
+#define JDL_P8_BYTE 89u
+#define JDL_P8_BYTES 116u
+struct jdl_live8 {
+    uint8_t open, reason, sel;
+    uint16_t drawn;
+    uint32_t pages, keys, keys_lost;
+    uint8_t link_on, pending, req_op, req_flags, req_id, acked;
+    uint32_t requests;
+};
+
 struct jdl {
     struct jdl_status st;              /* the Digitone's last LIVE STATUS */
+    uint8_t p8_valid;                  /* protocol >= 8: p8 holds the last status's stage-9 part */
+    uint8_t p8_fresh;                  /* ... and it was not taken yet (jdl_take_live8) */
+    struct jdl_live8 p8;
+    uint8_t jank_ok;                   /* JANK PAGE / OPEN not refused (a build without stage 9): 1 until they are */
+    uint8_t align_ok;                  /* pages carry the placing bits: 1 until a page with them is refused (status 2), then plain pages on this connection */
+    uint8_t page_resend;               /* that refusal came: the page must go again, plain (jdl_take_page_resend) */
+    uint8_t page_bits;                 /* a page with placing bits has been sent; page_seq: the last one's sequence number */
+    uint16_t page_seq;
+    uint8_t link_ok;                   /* LINK MODE not refused: 1 until it is */
+    uint8_t jank_probed;               /* JANK OPEN has been read once on this connection (jdl_probe_jank) */
+    struct jdl_keys keys;              /* the last key push, until taken (keys_fresh) */
+    struct jdl_open open;              /* the last OPEN (push or reply), until taken (open_fresh) */
+    struct jdl_link_req lreq;          /* the last LINK REQUEST, until taken (lreq_fresh) */
+    uint8_t keys_fresh, open_fresh, lreq_fresh;
     uint8_t live7_fresh;               /* a protocol-7 status came and was not taken (jdl_take_live7) */
     uint8_t transport_ok, transport_fresh, transport_state;   /* TRANSPORT (61) not refused; its last answer, until taken */
     uint8_t transport_probed;          /* TRANSPORT has been read once on this connection (jdl_probe_transport) */
@@ -209,8 +290,28 @@ struct jdl {
 enum jdl_in {
     JDL_IN_IGNORED,                    /* not a frame of the channel */
     JDL_IN_REPLY,                      /* a reply: the state may have changed */
-    JDL_IN_PUSH                        /* a note push: *count notes in the array given */
+    JDL_IN_PUSH,                       /* a note push: *count notes in the array given */
+    JDL_IN_JANK                        /* stage 9: keys, OPEN (pushed, or the read's answer) or a LINK REQUEST (jdl_take_keys / jdl_take_open / jdl_take_link_request) */
 };
+
+/* Stage 9 (core/jank_dn2live9.c). jdl_jank_page: the page (core/jank_oled_text.h) as a JANK PAGE, with the placing bits while align_ok; 0 unless live and not refused.
+ * jdl_probe_jank: one OPEN read when live control comes up (is the page open, and is stage 9 there); once per connection. jdl_link_mode: op an enum jdl_link_op (ms and
+ * id for PENDING, id for ACK); 0 unless live and not refused. The takes: the last push (or OPEN reply), once (1 and *out filled), else 0. jdl_take_page_resend: 1 once
+ * after a page with placing bits was refused (send the page again: it goes plain now) */
+struct jot_page;
+size_t jdl_jank_page(struct jdl *d, uint32_t now_ms, const struct jot_page *p, uint8_t *out, size_t cap);
+size_t jdl_probe_jank(struct jdl *d, uint32_t now_ms, uint8_t *out, size_t cap);
+size_t jdl_link_mode(struct jdl *d, uint32_t now_ms, uint8_t op, uint16_t ms, uint8_t id, uint8_t *out, size_t cap);
+int jdl_take_keys(struct jdl *d, struct jdl_keys *out);
+int jdl_take_open(struct jdl *d, struct jdl_open *out);
+int jdl_take_link_request(struct jdl *d, struct jdl_link_req *out);
+int jdl_take_page_resend(struct jdl *d);
+int jdl_take_live8(struct jdl *d, struct jdl_live8 *out);     /* the protocol-8 part of the last LIVE STATUS, once per status */
+/* (jank_dn2live.c's jdl_input calls these) a stage-9 frame: 1 when taken (*kind what jdl_input returns), 0 when it is not one; the protocol-8 part of a LIVE STATUS */
+struct jd2_reply;
+int jdl9_input(struct jdl *d, const struct jd2_reply *r, enum jdl_in *kind);
+void jdl9_status(struct jdl *d, const uint8_t *s, size_t n);
+#define JDL_JANK_PAGE_SX_MAX (6u + (3u + JDL_PAGE_ARGS_MAX) + (3u + JDL_PAGE_ARGS_MAX + 6u) / 7u + 1u)   /* 271: the longest page's SysEx */
 
 void jdl_init(struct jdl *d);
 int jdl_is_live(const struct jdl *d);

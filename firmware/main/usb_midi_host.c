@@ -683,6 +683,14 @@ void usb_midi_host_send_to(enum jlapp_role r, const uint8_t *packets, size_t n)
     xSemaphoreGive(s_lock);
 }
 
+/* (any task) the client task leaves its wait for one pass (usb_lp_pump): the ui task's new page for the Digitone goes out now, not at the next transfer. The client
+ * stays registered for good once registered, so the handle never goes stale */
+void usb_midi_host_wake(void)
+{
+    if (s_client)
+        usb_host_client_unblock(s_client);
+}
+
 /* the packets still fitting in the queue of the device that has the role */
 size_t usb_midi_host_room(enum jlapp_role r)
 {

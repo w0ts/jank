@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Every screen of the device's UI as the DN2's text page (core/jank_oled_text.h), for a person to read: each page twice side by side, as
- * the agreed JANK PAGE (62) draws it (left-aligned, what the text says) and with the placing the page carries (centred lines, values on the
- * right), both in 31 columns. '>' marks the inverted line, '_' the editor's cursor cell. The colour layout's menus first (every item; the
+/* Every screen of the device's UI as the DN2's text page (core/jank_oled_text.h), for a person to read: each page twice side by side, the
+ * text as sent (left-aligned: a Digitone that refuses the placing bits) and placed as the JANK PAGE's (62) length bytes say (centred lines,
+ * values on the right), both in 31 columns. '>' marks the inverted line, '_' the editor's cursor cell. The colour layout's menus first (every item; the
  * ones a unit with no screen would use), then the OLED layout's where they differ. Usage: dump_oled_text PAGES_TXT */
 #include <stdarg.h>
 #include <stdio.h>
@@ -299,8 +299,8 @@ int main(int argc, char **argv)
         return 2;
     }
     fprintf(s_out, "jank's menu on a Digitone II: every screen as the JANK PAGE (62) carries it (tests/dump_oled_text.c, made-up names).\n"
-                   "Left: as the agreed format draws it (the text as sent, left-aligned). Right: with the placing the page carries beside the\n"
-                   "text (centred lines; a value the OLED puts on the right at the right edge), which the format would need a way to send.\n"
+                   "Left: the text as sent, left-aligned (what a Digitone that refuses the placing bits draws). Right: placed as the line's\n"
+                   "length byte says (bit 6 centred; bit 7 the part after the first double space at the right edge, the two spaces not drawn).\n"
                    "31 columns stand for the DN2's width in capitals (4 px each); the ruler's '+' is column 21 (any 21 characters always fit).\n"
                    "'>' the inverted line (sel), '_' the TEXT editor's cursor cell.\n");
     colour();

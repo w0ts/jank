@@ -160,6 +160,56 @@ hands it to `usb_lp.c` every second).
 (`bridge_peers_heard`, checked each second by the ui task; `usb_midi_clock_peers` in usb.c). With none the clock stops, with one MIDI Stop after what was queued (as when the
 USB MIDI CLOCK setting is turned off); with one it starts again. Device mode (a computer on the port) is not affected.
 
+### Jank's menu on the Digitone, and LINK MODE (the Digitone's stage 9)
+
+Owner, 2026-11-25 / 26: Jank's own menu on the Digitone's screen, as text lines in the Digitone's own font (not a bitmap), driven by its keys, opened from its SETTINGS
+menu (JANK, below SYSTEM: the Digitone's side); **all of Jank's menu items**; and LINK MODE built with it. The Digitone's side is dn2-wishes' stage 9 (lp9 / lp9b),
+**built and passing its emulator, not installed**: nothing here is tried on hardware.
+
+- **The page** (`core/jank_oled_text.[ch]`, `jot_render`): the state the screens draw (the same `jo_ui`, the same `jo_press`) as up to 7 lines of up to 31 characters 0x20..0x7e,
+  in the same order as the OLED shows them; line 0 is a title where the OLED has a title bar; the OLED's inverted row is `sel`; the character editor gives its cursor column
+  (only that cell is inverted, the Digitone's rule). Pictures become characters: the transport icon a word (PLAY, ARMED, STOP, PAUSE; ARMED is steady, the Digitone blinks its
+  own PLAY while a start is pending), the signal and the meters `=` / `-` with a `|` notch, the beat boxes `1 [2] 3 4`, AUTO BAR `BAR LOCKED 90%`; SETUP's QR code has no text
+  form (its name and address are there). The fits are the OLED's (a value is cut where the OLED cuts it), so a line keeps to 21 characters where the OLED's text fits. The
+  Digitone's font is proportional and a space is 2 px (dn2-wishes `msg.c`, measured there), so placing cannot be done with spaces: **each line's length byte says it**
+  (owner's pick "right edge, as jank", confirmed by dn2-wishes 2026-11-26): bits 0-4 the length, bit 5 always 0, **bit 6 centred**, **bit 7 split at the first double space**
+  (the left part at the left, the rest right-aligned at the right edge, the two spaces not drawn); never 6 and 7 together. The renderer makes the first double space of a split
+  line its split (a run of spaces in a name becomes one there). **A build that refuses the bits** (lp9) answers status 2: the page goes again without them, and pages stay plain
+  for the rest of that live-control connection (`jdl_take_page_resend`, `align_ok`); a plain page refused means no stage 9 (`jank_ok`), and no page is sent until live control is
+  asked for afresh. The longest page is 271 bytes of SysEx, 91 packets: the Digitone's packet FIFO is 128 packets (`JLO_PACKETS`, was 64) and a page goes in whole or waits.
+  `tests/dump_oled_text.c` writes every screen's page (`dn2_pages.txt` in the host tests' output).
+- **The menus**: the ones `jo_press` walks. A unit with a screen keeps its own (the OLED's ten items; the colour screen's eleven); **a unit with no screen uses the colour
+  layout's, all eleven items** (owner 2026-11-26: USB MIDI CLOCK OUT, AUDIO > PAUSE LEVEL, AUTO BAR's three, SOURCE's four). While the page is open, ABOUT pages by 6 rows
+  (`jo_ctx.text_view`, `jo_about_vis`; owner: OK), so the colour screen shows three rows twice then.
+- **Keys** (63, pushed): the Digitone's UP, DOWN, NO and YES are Jank's four buttons, down and up, so the holds, the NO + UP / DOWN and YES + UP / DOWN combos, the hints and the
+  repeats are `jank_oled_input.c`'s own (the Digitone sends no repeats). LEFT, RIGHT, FUNC and the encoders are not used. A Digitone key also brings the UI out of SCREEN OFF
+  first, so its press is never spent on waking Jank's own screen. While the page is closed a key going down is dropped; one still down when it closes is let go.
+- **Open and close** (64): the Digitone pushes OPEN when its page opens or closes (closed by its panel keys TEMPO, TRK, PAGE, PTN, SONG, LEVEL, VOICE, ARP, PLUS, STACK,
+  MINUS and the page keys: reason 1), and again every second while open until a page arrives; Jank reads it once when live control comes up (`jdl_probe_jank`), and the
+  status of protocol 8 corrects an OPEN that was lost. A page goes after each OPEN (made after it: never one from before) and whenever the page changes (at most every
+  30 ms, the screens' own frame rule). When live control is lost the Digitone keeps the page open showing NOT CONNECTED and pushes OPEN (reason 3) when it is back.
+  **Live control is still kept only while a Launchpad is there** (as before), so without a Launchpad the page says NOT CONNECTED.
+- **Two tasks** (thread safety): the keys come in through a FreeRTOS queue from the USB client task to the ui task (`uis_dn2.c`); the ui task runs the screens (also on a
+  unit with no screen while the page is open: `ui.c` `uis_dn2_active`), makes the page and publishes it in one buffer with a sequence number (odd while written; the client
+  task reads it again then) and wakes the client task (`usb_midi_host_wake`), which sends it (`usb_lpmenu.c`). The page's buffers are taken from PSRAM when the board has it
+  (internal RAM is tight), at the first page.
+- **LINK MODE** (65, `core/jank_dn2menu.[ch]`): **on while Link leads** (peers there, the transport rule above, **and LINK TRANSPORT is FOLLOW+LEAD**), off otherwise;
+  said again when live control comes back, and again (at most every second) when the Digitone's status says the other. In LINK MODE the Digitone's PLAY / STOP keys **ask**
+  (LINK REQUEST, 66, pushed: op 0 stop, 1 start, flags RECORD held / a second STOP / was paused, the request id) and Jank answers every request:
+  - **a start**: RECORD (58) op 1 first when RECORD was held; then **PENDING** `u16 ms, id` with the time to the session's next bar line (the beat the ui task samples, the
+    quantum; the Digitone blinks), and Jank's session starts (the ui task's `bridge_play(1)`; its MIDI Start goes out on the bar line). If Jank's clock already runs, it starts
+    again on the bar line instead (`midi_resync`), so the Digitone gets its Start. A start that has not happened 500 ms after its bar line (no session), or that Link stopped
+    leading meanwhile, is **CANCEL**led. With Link not leading, a start is answered CANCEL and nothing starts.
+  - **a stop** (owner: under Link, PLAY while playing is a STOP, not a pause; a pause request, not asked for, is taken as a stop): **ACK** `id`, and Jank's session stops (its
+    MIDI Stop, then TRANSPORT STOP 30 ms later, as above: the Digitone ends stopped); with nothing running on Jank's side, the Digitone's own TRANSPORT STOP.
+  - A request pushed again (the Digitone does once after 500 ms without an answer) is answered again, never acted on twice. RECORD + PLAY: the Digitone's GRID RECORDING stays
+    on until Jank's RECORD 58 op 1 (and after a CANCEL, as stock).
+- **LIVE STATUS protocol 8** (116 bytes; protocol 7's 89 unchanged, byte 0 says 8): `u8 jank open, u8 reason, u8 sel shown, u16 pages drawn, u32 pages received, u32 key events
+  pushed, u32 key events lost, u8 link on, u8 start pending, u8 last request op, u8 its flags, u8 its id, u8 acked, u32 requests made`. All pushes share one sequence counter
+  (bytes 29..30).
+- `diag`: `hostdiag_menu=open:<0/1>/<reason>,ok:<page not refused>/<bits not refused>,keys:<key events taken>,pages:<sent>,link:<LINK MODE sent: 0, 1, -1 not yet>,reqs:<LINK
+  REQUESTs acted on>,cancels:,dn2:<pages the Digitone received>/<key events it lost>`. Host-tested: `tests/test_oled_text.c`, `test_dn2live9.c`, `test_dn2menu.c`.
+
 ### Remembered settings (`core/jank_lpprefs.[ch]`)
 
 Owner, 2026-11-24: "jank should remember the settings, like enabling the 16 bottom pads". Kept across a restart (an update restarts the unit): the note **layout** and its
@@ -339,5 +389,8 @@ separate.
 ## Files
 
 `core/jank_lpx.[ch]` (the Launchpad's protocol), `core/jank_lpnote.[ch]` (layouts), `core/jank_lpapp.[ch]` (what a press asks for, as acts,
-what the pads show), `core/jank_lpsess.[ch]` (the Session page), `core/jank_lpsessapp.c` (its buttons and pads in the app), `core/jank_lptrans.[ch]` (who starts and stops), `core/jank_dn2live.[ch]` and `core/jank_dn2rpc.[ch]` (the Digitone's live control: the requests, the answers, the note push), `firmware/main/usb_lp.c` (the one state and the two devices), `firmware/main/usb_midi_host.c` (IN endpoints,
-interface choice). Host tests: `tests/test_lpx.c`, `test_lpnote.c`, `test_lpapp.c`, `test_lpsess.c`, `test_lptrans.c`, `test_dn2live.c`, `test_dn2rpc.c` (in `tests/run.sh`).
+what the pads show), `core/jank_lpsess.[ch]` (the Session page), `core/jank_lpsessapp.c` (its buttons and pads in the app), `core/jank_lptrans.[ch]` (who starts and stops), `core/jank_dn2live.[ch]` and `core/jank_dn2rpc.[ch]` (the Digitone's live control: the requests, the answers, the note push), `core/jank_dn2live9.c` (its stage 9: the JANK
+page, keys, OPEN, LINK MODE), `core/jank_oled_text.[ch]` (the screens as the page's lines), `core/jank_dn2menu.[ch]` (the menu and LINK MODE logic), `firmware/main/usb_lp.c` (the one state and the two devices), `firmware/main/usb_lpmenu.c`
+(stage 9 in the client task), `firmware/main/uis_dn2.c` (the keys' queue and the page's buffer between the client task and the ui task), `firmware/main/usb_midi_host.c` (IN endpoints,
+interface choice). Host tests: `tests/test_lpx.c`, `test_lpnote.c`, `test_lpapp.c`, `test_lpsess.c`, `test_lptrans.c`, `test_dn2live.c`, `test_dn2live9.c`, `test_dn2menu.c`,
+`test_dn2rpc.c`, `test_oled_text.c` (in `tests/run.sh`).

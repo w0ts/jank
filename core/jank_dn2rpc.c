@@ -40,23 +40,31 @@ size_t jd2_unpack7(const uint8_t *in, size_t n, uint8_t *out)
     return o;
 }
 
+/* the request's body is u16 seq, cmd, then the arguments: packed from where they are (no copy: a JANK PAGE's 228 bytes would sit on a small task's stack) */
+static uint8_t body_at(const uint8_t head[3], const uint8_t *args, size_t i) { return i < 3u ? head[i] : args[i - 3u]; }
+
 size_t jd2_request(uint16_t seq, uint8_t cmd, const uint8_t *args, size_t nargs, uint8_t *out, size_t cap)
 {
-    uint8_t body[3u + JD2_ARGS_MAX];
+    const uint8_t head[3] = {(uint8_t)(seq >> 8), (uint8_t)seq, cmd};
     size_t n, blen = 3u + nargs;
     if (nargs > JD2_ARGS_MAX || (nargs && !args))
         return 0;
-    body[0] = (uint8_t)(seq >> 8);
-    body[1] = (uint8_t)seq;
-    body[2] = cmd;
-    if (nargs)
-        memcpy(body + 3, args, nargs);
     n = sizeof HEADER + blen + (blen + 6u) / 7u + 1u;
     if (cap < n)
         return 0;
     memcpy(out, HEADER, sizeof HEADER);
     n = sizeof HEADER;
-    n += jd2_pack7(body, blen, out + n);
+    for (size_t i = 0; i < blen; i += 7u) {       /* jd2_pack7, a group at a time */
+        size_t g = blen - i < 7u ? blen - i : 7u, hdr_at = n++;
+        uint8_t hdr = 0;
+        for (size_t k = 0; k < g; k++) {
+            uint8_t v = body_at(head, args, i + k);
+            if (v & 0x80u)
+                hdr |= (uint8_t)(1u << (6u - k));
+            out[n++] = v & 0x7Fu;
+        }
+        out[hdr_at] = hdr;
+    }
     out[n++] = SX_END;
     return n;
 }

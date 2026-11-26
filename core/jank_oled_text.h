@@ -29,7 +29,7 @@ struct jot_page {
     uint8_t cursor;                       /* the TEXT editor's cursor: a column of line `sel` (only that cell inverted), JOT_NONE none */
     uint8_t n;                            /* lines sent, 0..JOT_LINES (trailing empty lines are not) */
     uint8_t centred;                      /* bit i: line i is centred on the OLED */
-    uint8_t right[JOT_LINES];             /* where line i's right-aligned part starts (after two spaces), 0 none */
+    uint8_t right[JOT_LINES];             /* where line i's right-aligned part starts, 0 none: right after the line's FIRST double space (the DN2 splits there) */
     char line[JOT_LINES][JOT_LINE_MAX + 1];
 };
 

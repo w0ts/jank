@@ -197,9 +197,25 @@ static void test_generic_request(void)
     CHECK(jd2_request(1, 44, args, 5, out, 8) == 0);                                                 /* does not fit */
 }
 
+/* the longest request (a JANK PAGE, 228 bytes of arguments, with top bits set): the frame JD2_REQUEST_MAX says, and it unpacks back to the same bytes */
+static void test_longest_request(void)
+{
+    uint8_t args[JD2_ARGS_MAX], out[JD2_REQUEST_MAX(JD2_ARGS_MAX)], body[3u + JD2_ARGS_MAX];
+    size_t n;
+    for (size_t i = 0; i < sizeof args; i++)
+        args[i] = (uint8_t)(i * 37u + 0x80u * (i % 3u == 0u));
+    n = jd2_request(0x8081, 62, args, sizeof args, out, sizeof out);
+    CHECK(n == sizeof out && n == 271u && out[n - 1] == 0xF7);
+    for (size_t i = 6; i + 1u < n; i++)
+        CHECK(out[i] < 0x80u);                                                                       /* 7-bit inside the frame */
+    CHECK(jd2_unpack7(out + 6, n - 7, body) == sizeof body && body[0] == 0x80 && body[1] == 0x81 && body[2] == 62 && !memcmp(body + 3, args, sizeof args));
+    CHECK(jd2_request(0x8081, 62, args, sizeof args, out, sizeof out - 1u) == 0);                    /* one byte short */
+}
+
 int main(void)
 {
     test_generic_request();
+    test_longest_request();
     test_pack7_golden_and_round_trip();
     test_peek_request_golden();
     test_parse_reply_golden();

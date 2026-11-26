@@ -32,6 +32,9 @@ void jdl_init(struct jdl *d)
     d->pattern_ok = 1;
     d->transport_ok = 1;
     d->chain_ok = 1;
+    d->jank_ok = 1;
+    d->align_ok = 1;
+    d->link_ok = 1;
 }
 
 static int proto7(const struct jdl *d) { return d->st.valid && d->st.proto >= 7u; }
@@ -561,6 +564,11 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         *count = k;
         return JDL_IN_PUSH;
     }
+    {
+        enum jdl_in kind;
+        if (jdl9_input(d, &r, &kind))  /* stage 9: the keys, OPEN, a LINK REQUEST; a refusal of the page, OPEN or LINK MODE */
+            return kind;
+    }
     if (r.cmd == JDL_CMD_PLAY && r.status == ST_NOT_UNDERSTOOD) {   /* a Digitone with live control but no PLAY: the pads play by MIDI channel then */
         d->play_ok = 0;
         return JDL_IN_REPLY;
@@ -571,7 +579,8 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
     }
     if (r.cmd != JDL_CMD_LIVE && r.cmd != JDL_CMD_TRACK && r.cmd != JDL_CMD_PLAY && r.cmd != JDL_CMD_STEPS && r.cmd != JDL_CMD_STEP && r.cmd != JDL_CMD_MESSAGE &&
         r.cmd != JDL_CMD_MIXER && r.cmd != JDL_CMD_SCALE && r.cmd != JDL_CMD_SCALE_SET && r.cmd != JDL_CMD_MIXER_SET && r.cmd != JDL_CMD_MUTE_SET && r.cmd != JDL_CMD_RECORD &&
-        r.cmd != JDL_CMD_PATTERNS && r.cmd != JDL_CMD_PATTERN && r.cmd != JDL_CMD_TRANSPORT && r.cmd != JDL_CMD_CHAIN)
+        r.cmd != JDL_CMD_PATTERNS && r.cmd != JDL_CMD_PATTERN && r.cmd != JDL_CMD_TRANSPORT && r.cmd != JDL_CMD_CHAIN && r.cmd != JDL_CMD_JANK_PAGE &&
+        r.cmd != JDL_CMD_JANK_OPEN && r.cmd != JDL_CMD_LINK_MODE)
         return JDL_IN_IGNORED;
     if (r.cmd == JDL_CMD_TRANSPORT || r.cmd == JDL_CMD_CHAIN) {   /* stage 8: 2 = a build without it (our arguments are always valid); 5 = CHAIN's queue is full */
         if (r.status == ST_NOT_UNDERSTOOD) {
@@ -691,6 +700,7 @@ enum jdl_in jdl_input(struct jdl *d, const uint8_t *sx, size_t n, struct jdl_not
         d->st.rec_valid = s[0] >= RECORD_PROTO && r.n > JDL_REC_BYTE;   /* protocol 6: the record byte at the end */
         d->st.rec_bits = d->st.rec_valid ? s[JDL_REC_BYTE] : 0u;
         take_live7(d, s, r.n);         /* protocol 7: the transport, the patterns, the chain */
+        jdl9_status(d, s, r.n);        /* protocol 8: the JANK page, LINK MODE */
     }
     if (r.status == 0) {
         if (d->state != JDL_LIVE)

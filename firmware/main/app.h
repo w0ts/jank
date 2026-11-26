@@ -72,6 +72,7 @@ int usb_lp_transport_request(void);
 void usb_lp_peers_feed(int peers);                                   /* host mode: the ui task's peers count (bridge_peers_heard) > 0: Link leads the transport (core/jank_lptrans.h) */
 int usb_lp_dn2_leads(void);                                          /* host mode: no peers and the Digitone has TRANSPORT: it leads, and no clock is forced on for it */
 void usb_lp_beat_feed(int known, int64_t beat_ub, int32_t mpb);      /* host mode: the session's beat (bridge_beat, sampled by the ui task) for the step modes' playhead (usb_lp.c) */
+void usb_lp_link_feed(int lead, int quantum);                        /* host mode: LINK TRANSPORT is FOLLOW+LEAD, and the bar's beats (the ui task, every second): LINK MODE (core/jank_dn2menu.h) */
 size_t hostdiag_text(char *out, size_t cap);                         /* hostdiag.c: what the last host session saw, for `diag` */
 int usb_host_spoke(void);                                            /* a control line came from the computer since the start */
 void usb_beat_line(const char *text, size_t n);                      /* a beat report: SysEx F0 7D 'J' 'B' 0x10 <text> F7, dropped when full */

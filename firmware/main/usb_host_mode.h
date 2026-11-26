@@ -37,6 +37,7 @@ void usbrole_host_failed(uint8_t step, esp_err_t e);       /* usbrole.c: keeps t
 void usb_midi_host_list(struct jk_usb *u);
 void usb_midi_host_send_to(enum jlapp_role r, const uint8_t *packets, size_t n);   /* to the device that has that role, if any */
 size_t usb_midi_host_room(enum jlapp_role r);                                      /* packets still fitting in its queue; 0 if none */
+void usb_midi_host_wake(void);                                                     /* any task: the client task runs its pass now (a page for the Digitone is ready) */
 
 /* usb_lp.c: Launchpad X -> Digitone II, Note mode (core/jank_lpapp.h), called from usb_midi_host.c's client task only */
 void usb_lp_attach(enum jlapp_role r);

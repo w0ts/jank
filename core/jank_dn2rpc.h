@@ -26,7 +26,8 @@ size_t jd2_pack7(const uint8_t *in, size_t n, uint8_t *out);
 size_t jd2_unpack7(const uint8_t *in, size_t n, uint8_t *out);
 
 /* any request, F0 .. F7: `cmd` with nargs bytes of arguments (at most JD2_ARGS_MAX), into out (cap bytes); returns its length, 0 if it does not fit */
-#define JD2_ARGS_MAX 68u               /* the longest: a CHAIN SET (live control 59): op, n and 64 patterns: 66 (a MESSAGE is 21) */
+#define JD2_ARGS_MAX 228u              /* the longest: a JANK PAGE (live control 62): flags, sel, cursor, n and 7 lines of 1 + 31 (a CHAIN SET is 66, a MESSAGE 21) */
+#define JD2_REQUEST_MAX(nargs) (6u + (3u + (nargs)) + (3u + (nargs) + 6u) / 7u + 1u)   /* the frame of a request with nargs arguments, F0 .. F7 */
 size_t jd2_request(uint16_t seq, uint8_t cmd, const uint8_t *args, size_t nargs, uint8_t *out, size_t cap);
 
 /* a PEEK request, F0 .. F7, into out (cap bytes); returns its length, 0 if len is not 1..JD2_PEEK_MAX or it does not fit */

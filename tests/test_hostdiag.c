@@ -262,6 +262,35 @@ static void test_the_transport_line(void)
     CHECK(l && strstr(l, ",dn2:-1,") && (size_t)(strchr(l, '\n') - l) + 1u <= 122u);   /* (+17: tstop, owner 2026-11-25) */
 }
 
+/* stage 9's line: the JANK page and LINK MODE; short, `diag` has 2040 bytes in all */
+static void test_the_menu_line(void)
+{
+    struct jhd d;
+    char out[2048];
+    const char *l;
+    jhd_init(&d);
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_menu=open:0/0,ok:0/0,keys:0,pages:0,link:-1,reqs:0,cancels:0,dn2:0/0\n"));   /* nothing sent: -1 */
+    d.menu_open = 1;
+    d.menu_why = 3;                    /* opened again after the lease */
+    d.menu_ok = 1;
+    d.menu_align = 1;
+    d.menu_keys = 42;
+    d.menu_pages = 120;
+    d.link_mode = 1;
+    d.link_reqs = 3;
+    d.link_cancels = 1;
+    d.dn2_pages = 118;
+    d.dn2_keys_lost = 2;
+    CHECK(jhd_format(&d, out, sizeof out) > 0 && strstr(out, "hostdiag_tr=") < strstr(out, "hostdiag_menu=open:1/3,ok:1/1,keys:42,pages:120,link:1,reqs:3,cancels:1,dn2:118/2\n"));
+    CHECK(strstr(out, "hostdiag_menu=") < strstr(out, "hostdiag_dn2live="));
+    d.menu_why = 255;                  /* at its longest */
+    d.menu_keys = d.menu_pages = d.link_reqs = d.link_cancels = d.dn2_pages = d.dn2_keys_lost = 0xFFFFFFFFu;
+    d.link_mode = 7;                   /* not a mode: -1 */
+    jhd_format(&d, out, sizeof out);
+    l = strstr(out, "hostdiag_menu=");
+    CHECK(l && strstr(l, ",link:-1,") && (size_t)(strchr(l, '\n') - l) + 1u <= 136u);
+}
+
 static void test_roles_and_claim_error(void)
 {
     struct jhd d;
@@ -321,6 +350,7 @@ int main(void)
     test_full_record();
     test_the_pattern_line();
     test_the_transport_line();
+    test_the_menu_line();
     test_roles_and_claim_error();
     test_truncation_and_hostile_names();
     test_valid_blob();

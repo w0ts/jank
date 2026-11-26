@@ -328,7 +328,7 @@ static void ui_task(void *arg)
         int no = no_pressed();
         pads_step(now, no);
         on_button(jb_step(&b, no, now));
-        if (UI_STATE)
+        if (UI_STATE || uis_dn2_active())   /* (the Digitone shows the screens: they run on a unit with no screen too, while its page is open) */
             uis_step(now, &s_led);
         uis_sys_step(now);               /* (the ABOUT numbers for the control line, also where there is no screen) */
         led_step(now);
@@ -341,6 +341,11 @@ static void ui_task(void *arg)
             last_clock_check = now;
             usb_midi_clock_peers(peers > 0u);
             usb_lp_peers_feed(peers > 0u);     /* the transport rule (core/jank_lptrans.h): no peers, the Digitone leads; peers, Link does */
+            if (usb_is_host()) {               /* LINK MODE: Link leads with peers and LINK TRANSPORT FOLLOW+LEAD; the bar's beats for the Digitone's start (core/jank_dn2menu.h) */
+                struct jk_cfg cfg;
+                app_cfg_get(&cfg);
+                usb_lp_link_feed(cfg.transport != JK_TRANSPORT_AUTO && uis_lead_get(), cfg.quantum);
+            }
             if (lp_started && (!bridge_is_playing() || (!peers && usb_lp_dn2_leads()))) {   /* stopped by other means, or the Digitone leads now: the forced clock ends */
                 usb_midi_clock_force(0);
                 lp_started = 0;

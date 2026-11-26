@@ -25,6 +25,7 @@
 #include "jank_lpx.h"
 #include "uiscreen.h"
 #include "usb_host_mode.h"
+#include "usb_lp_int.h"
 
 /* The Launchpad X has ONE USB-MIDI streaming interface (diag: ifs:1) with TWO cables, the high nibble of every USB-MIDI packet: 0 is the "DAW" port, 1 the
  * "MIDI" port (a Mac lists them as "LPX DAW" and "LPX MIDI"). Programmer mode's lights, and its setup messages, take effect on cable 1. Measured
@@ -133,6 +134,7 @@ static void ensure_init(void)
     s_prefs_seen = s_prefs_saved;
     jlo_init(&s_out);
     jdl_init(&s_jdl);
+    lpm_init();
     jd2_sx_init(&s_sx);
     s_ready = 1;
 }
@@ -151,23 +153,29 @@ static void dn2_drain(void)
         usb_midi_host_send_to(JLAPP_DN2, out, 4u * n);
 }
 
-/* a live-control request (a whole SysEx) for the Digitone, all of it or none: a cut SysEx would leave its parser waiting for an end. g_hostdiag.live_dropped counts
- * the ones that found no room; with no Digitone there is nobody to play and it is dropped */
-static void dn2_send_sysex(const uint8_t *sx, size_t n)
+/* a live-control request (a whole SysEx) for the Digitone, all of it or none: a cut SysEx would leave its parser waiting for an end. 1 when it went into the FIFO */
+static int dn2_try_sysex(const uint8_t *sx, size_t n)
 {
     uint8_t pk[4];
-    if (!s_dn2_up || !n)
-        return;
-    if (JD2_SYSEX_PACKETS(n) > JLO_PACKETS - jlo_count(&s_out)) {
-        g_hostdiag.live_dropped++;
-        return;
-    }
+    if (!s_dn2_up || !n || JD2_SYSEX_PACKETS(n) > JLO_PACKETS - jlo_count(&s_out))
+        return 0;
     g_hostdiag.live_asked++;
-    for (size_t k = 0; jd2_sysex_packet(DN2_CABLE, sx, n, k, pk); k++)   /* a packet at a time: no buffer for a long one (a CHAIN SET is 29 packets) */
+    for (size_t k = 0; jd2_sysex_packet(DN2_CABLE, sx, n, k, pk); k++)   /* a packet at a time: no buffer for a long one (a JANK PAGE is up to 91 packets) */
         if (!jlo_push(&s_out, pk))
             ESP_LOGW(TAG, "packets for the Digitone: FIFO full");
     dn2_drain();
+    return 1;
 }
+
+/* ... g_hostdiag.live_dropped counts the ones that found no room; with no Digitone there is nobody to play and it is dropped */
+static void dn2_send_sysex(const uint8_t *sx, size_t n)
+{
+    if (s_dn2_up && n && !dn2_try_sysex(sx, n))
+        g_hostdiag.live_dropped++;
+}
+
+int usb_lp_dn2_try(const uint8_t *sx, size_t n) { return dn2_try_sysex(sx, n); }
+void usb_lp_dn2_send(const uint8_t *sx, size_t n) { dn2_send_sysex(sx, n); }
 
 static volatile uint8_t s_transport_req;   /* enum usb_lp_req (app.h): what the ui task is to do with Jank's session */
 static volatile uint8_t s_peers;           /* the ui task's count of Link / Jank radio peers, more than 0 (usb_lp_peers_feed) */
@@ -183,6 +191,10 @@ int usb_lp_transport_request(void)
 void usb_lp_peers_feed(int peers) { s_peers = (uint8_t)(peers != 0); }
 
 int usb_lp_dn2_leads(void) { return s_dn2_leads; }
+
+int usb_lp_peers(void) { return s_peers; }
+
+void usb_lp_session(int req) { s_transport_req = (uint8_t)req; }
 
 /* what Jank's session must do because the Digitone's own keys started / stopped it while Link leads (jank_lptrans.h): the ui task does it */
 static void follow_dn2(int req)
@@ -411,7 +423,9 @@ static void dn2_sysex(void)
         jlapp_tick(&s_app, now_ms());
         jlapp_on_push(&s_app, notes, count);
     }
+    lpm_input(&s_jdl, now_ms());       /* stage 9: the keys, OPEN, a LINK REQUEST (usb_lpmenu.c; counted in hostdiag_menu) */
     sync_live();
+    lpm_sync(&s_jdl);
 }
 
 /* The session's beat, for the step modes' playhead. bridge_beat takes the bridge's lock, which this task must never wait on, so the ui task samples it and hands it over
@@ -434,10 +448,10 @@ void usb_lp_beat_feed(int known, int64_t beat_ub, int32_t mpb)
     s_beat_seq++;
 }
 
-/* the beat now in sixteenth notes; 0 when there is no session (or no tempo) */
-static int beat_sixteenths(uint32_t t, uint32_t *tick16)
+/* the session's beat now (micro-beats) and its tempo (microseconds a beat), extrapolated from the last sample; 0 when there is no session (or no tempo) */
+static int beat_now(uint32_t t, int64_t *beat_ub, int32_t *mpb_out)
 {
-    int64_t beat, ub;
+    int64_t ub;
     int32_t mpb;
     uint32_t at, seq;
     uint8_t known;
@@ -455,8 +469,19 @@ static int beat_sixteenths(uint32_t t, uint32_t *tick16)
     }
     if (!known || mpb <= 0)
         return 0;
-    beat = ub + (int64_t)(uint32_t)(t - at) * 1000 * 1000000 / mpb;   /* micro-beats: the elapsed microseconds over the microseconds a beat takes */
-    if (beat < 0)
+    *beat_ub = ub + (int64_t)(uint32_t)(t - at) * 1000 * 1000000 / mpb;   /* micro-beats: the elapsed microseconds over the microseconds a beat takes */
+    *mpb_out = mpb;
+    return 1;
+}
+
+int usb_lp_beat_now(uint32_t t, int64_t *beat_ub, int32_t *mpb) { return beat_now(t, beat_ub, mpb); }
+
+/* the beat now in sixteenth notes; 0 when there is no session (or no tempo) */
+static int beat_sixteenths(uint32_t t, uint32_t *tick16)
+{
+    int64_t beat;
+    int32_t mpb;
+    if (!beat_now(t, &beat, &mpb) || beat < 0)
         return 0;
     *tick16 = (uint32_t)((beat * 4) / 1000000);
     return 1;
@@ -502,6 +527,7 @@ static void live_pump(void)
         g_hostdiag.tr_sent += n != 0;
         dn2_send_sysex(sx, n);
     }
+    lpm_pump(&s_jdl, t, live, live && !s_was_live);   /* stage 9: the JANK page, LINK MODE (usb_lpmenu.c) */
     jlapp_tick(&s_app, t);
     s_was_live = (uint8_t)live;
     jlapp_set_transport(&s_app, bridge_is_playing());   /* (lock-free) the start / stop scene button's light, and the lower quadrant's rule */
@@ -580,6 +606,8 @@ void usb_lp_attach(enum jlapp_role r)
         s_programmer_pending = 1;      /* sent by usb_lp_pump, after a wait and when its queue has room */
         s_setup_pending = 0;
         jdl_init(&s_jdl);              /* live control is only kept up while there is a Launchpad: ask afresh */
+        lpm_init();                    /* (the JANK page: the Digitone says again whether it is open) */
+        lpm_sync(&s_jdl);
         s_was_live = 0;
         s_tries = 0;
         s_try_at = xTaskGetTickCount() + pdMS_TO_TICKS(ATTACH_WAIT_MS);
@@ -590,6 +618,8 @@ void usb_lp_attach(enum jlapp_role r)
         jlapp_set_dn2(&s_app, 1);
         jlo_clear(&s_out);
         jdl_init(&s_jdl);              /* live control is asked for afresh (usb_lp_pump) */
+        lpm_init();
+        lpm_sync(&s_jdl);
         jd2_sx_init(&s_sx);
         ESP_LOGI(TAG, "Digitone");
     }
@@ -604,6 +634,8 @@ void usb_lp_detach(enum jlapp_role r)
         g_hostdiag.lpx_up = 0;
         s_programmer_pending = 0;
         s_setup_pending = 0;
+        lpm_init();                    /* live control is not kept without a Launchpad: the JANK page cannot be served (it says NOT CONNECTED) */
+        lpm_sync(&s_jdl);
         /* its pads that were down end their notes: nothing stays sounding on the Digitone */
         for (size_t i = 0, n = jlapp_release_acts(&s_app, off, JLAPP_PADS + JLN_TRACKS + 1u); i < n; i++)
             run_act(&off[i]);
@@ -613,7 +645,9 @@ void usb_lp_detach(enum jlapp_role r)
         jlapp_set_dn2(&s_app, 0);      /* the Launchpad goes dark (owner 2026-11-25) */
         jlo_clear(&s_out);
         jdl_init(&s_jdl);
+        lpm_init();
         sync_live();
+        lpm_sync(&s_jdl);
         s_was_live = 0;
         memset(s_app.recent, 0, sizeof s_app.recent);
         s_app.track_held = 0;

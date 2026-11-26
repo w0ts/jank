@@ -12,7 +12,7 @@
 
 #define JHD_DEVS 4u                    /* as many as usb_midi_host.c has slots */
 #define JHD_NAME_MAX 23u               /* as JK_USB_NAME_MAX */
-#define JHD_VERSION 22u             /* the record's layout: a saved record of another version is not read (22: the rt_ counters; 2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
+#define JHD_VERSION 23u             /* the record's layout: a saved record of another version is not read (23: the JANK page and LINK MODE (stage 9); 22: the rt_ counters; 2: the memory numbers; 3: lib_devs; 4: hprt; 5: filter;
                                           21: the transport and chain counters (stage 8); 20: the Session page's pattern counters; 19: the fail_dma numbers; 18: the mixer counters; 17: the scale sync; 16: live_msgs_sent, live_msg_ok; 15: the playhead's source (head_); 14: the step counters; 13: live_ignored and the dn2_ status; 12: live_reads, live_msgs; 11: the live_ fields; 10: setup_sent; 9: lp_mode, lp_reentered; 8: lights_sent; 7: programmer_acked; 6: heap_big_b, and the endpoint fields of a device: a field that fits into padding changes the layout but not the size,
                                           so the size check does not catch it: bump this with every change to struct jhd or jhd_dev) */
 
@@ -99,6 +99,12 @@ struct jhd {
     uint32_t chain_sent;               /* CHAIN requests sent (SET, CLEAR, READ) */
     uint8_t tr_ok, chain_ok, tr_peers; /* TRANSPORT / CHAIN not refused; peers there (Link leads) */
     uint8_t dn2_tr;                    /* the Digitone's transport as last read: 0 stopped, 1 playing, 2 paused, 255 none yet */
+    uint8_t menu_open, menu_why;       /* stage 9: the Digitone shows the JANK page (its OPEN), and the reason it gave (enum jdl_open_reason) */
+    uint8_t menu_ok, menu_align;       /* JANK PAGE not refused; the pages carry the placing bits (not refused) */
+    uint8_t link_mode;                 /* LINK MODE last sent: 0 off, 1 on, 255 not yet */
+    uint32_t menu_keys, menu_pages;    /* key events taken from the Digitone (the four the menu uses); pages sent */
+    uint32_t link_reqs, link_cancels;  /* LINK REQUESTs acted on (one pushed again is not counted); CANCELs sent */
+    uint32_t dn2_pages, dn2_keys_lost; /* the Digitone's own (LIVE STATUS protocol 8): pages it received, key events it could not push */
     uint32_t live_edits, live_pagereads;   /* the step modes: STEP edits sent, STEPS page reads sent */
     uint32_t live_step_busy, live_step_refused;   /* the Digitone answered STEP / STEPS with 5 (16 writes waiting) / 2 (refused) */
     uint32_t live_msgs_sent;           /* of those messages, the ones sent to the Digitone's screen (MESSAGE, 54) */

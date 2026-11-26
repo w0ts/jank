@@ -43,16 +43,38 @@ static void put_c(struct jot_page *p, int i, const char *s)
         p->centred |= (uint8_t)(1u << i);
 }
 
-/* left, and right-aligned on the OLED: two spaces between them in the text */
+/* the left part of a split line: the DN2 splits at the FIRST double space, so none inside (a run of spaces becomes one) and none at its end */
+static size_t clean_left(const char *s, char *out, size_t cap)
+{
+    size_t k = 0;
+    for (; *s && k + 1u < cap; s++)
+        if (*s != ' ' || !k || out[k - 1] != ' ')
+            out[k++] = *s;
+    while (k && out[k - 1] == ' ')
+        k--;
+    out[k] = 0;
+    return k;
+}
+
+/* left, and right-aligned on the OLED: two spaces between them in the text, the first double space of the line */
 static void put_lr(struct jot_page *p, int i, const char *left, const char *right)
 {
-    char b[JOT_LINE_MAX + 1];
-    size_t l = strlen(left), r = right ? strlen(right) : 0u, k = l < JOT_LINE_MAX ? l : JOT_LINE_MAX, rk;
-    if (!r || !l) {
-        put(p, i, l ? left : right);
+    char b[JOT_LINE_MAX + 1], lc[JOT_LINE_MAX + 1];
+    size_t l, r, k, rk;
+    while (right && *right == ' ')
+        right++;
+    r = right ? strlen(right) : 0u;
+    if (!r) {
+        put(p, i, left);
         return;
     }
-    memcpy(b, left, k);
+    l = clean_left(left, lc, sizeof lc);
+    if (!l) {
+        put(p, i, right);
+        return;
+    }
+    k = l;
+    memcpy(b, lc, k);
     for (int s = 0; s < 2 && k < JOT_LINE_MAX; s++)
         b[k++] = ' ';
     rk = r < JOT_LINE_MAX - k ? r : JOT_LINE_MAX - k;
@@ -110,7 +132,7 @@ static void home_top(struct jot_page *p, const struct jo_ctx *c)
     char l[24], r[24] = "", name[JO_TEXT_MAX + 16] = "", shown[NAME_CHARS + 1];
     int bars = c->wifi == JO_WIFI_GOOD ? 3 : c->wifi == JO_WIFI_WEAK ? 1 : 0;
     if (c->link && c->lt_mode < 3)
-        snprintf(l, sizeof l, "%s  %s", transport(c), jo_lt_short[c->lt_mode]);
+        snprintf(l, sizeof l, "%s %s", transport(c), jo_lt_short[c->lt_mode]);
     else
         snprintf(l, sizeof l, "%s", transport(c));
     if (c->usb && c->fitted)

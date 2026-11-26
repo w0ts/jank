@@ -8,12 +8,12 @@ set(beat "${core}/beat")
 set(screen_srcs "oled.c" "lcd.c" "${core}/jank_lcd.c" "${core}/jank_oled_lcd2.c" "${core}/jank_bigfont.c" "${core}/jank_bigfont_tables.c")
 # The beat network's weights are not in this image: the firmware reads them from its "beatw" partition (core/beat/beat_weights.h).
 idf_component_register(
-    SRCS "main.c" "board.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "usb_lp.c" "${core}/jank_lpx.c" "${core}/jank_lpnote.c" "${core}/jank_lpapp.c" "${core}/jank_lpsess.c" "${core}/jank_lpsessapp.c" "${core}/jank_lptrans.c" "${core}/jank_lpstep.c" "${core}/jank_lpmix.c" "${core}/jank_lpprefs.c" "${core}/jank_lpscales.c" "${core}/jank_lpout.c" "${core}/jank_dn2rpc.c" "${core}/jank_dn2live.c" "hostdiag.c" "restartwhy.c" "${core}/jank_hostdiag.c" "${core}/jank_hostfilter.c" "${core}/jank_fsclamp.c" "wsvc.c" "${core}/jank_wsvc.c" "wota.c" "${core}/jank_wota.c" "${core}/jank_sha256.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c" "fft_dsp.c"
+    SRCS "main.c" "board.c" "bridge.c" "radio.c" "usb.c" "usb_midi_host.c" "usb_lp.c" "usb_lpmenu.c" "${core}/jank_lpx.c" "${core}/jank_lpnote.c" "${core}/jank_lpapp.c" "${core}/jank_lpsess.c" "${core}/jank_lpsessapp.c" "${core}/jank_lptrans.c" "${core}/jank_lpstep.c" "${core}/jank_lpmix.c" "${core}/jank_lpprefs.c" "${core}/jank_lpscales.c" "${core}/jank_lpout.c" "${core}/jank_dn2rpc.c" "${core}/jank_dn2live.c" "${core}/jank_dn2live9.c" "${core}/jank_dn2menu.c" "hostdiag.c" "restartwhy.c" "${core}/jank_hostdiag.c" "${core}/jank_hostfilter.c" "${core}/jank_fsclamp.c" "wsvc.c" "${core}/jank_wsvc.c" "wota.c" "${core}/jank_wota.c" "${core}/jank_sha256.c" "midi.c" "ui.c" "ctl.c" "store.c" "ota.c" "download.c" "drive.c" "clkprobe.c" "fft_dsp.c"
          "usb_audio.c" "beat.c" "linein.c" "${core}/jank_line.c"
          "usb_hostlib.c" "usb_uac_host.c" "usbrole.c" "usbport_tusb320.c" "pump.c" "power.c"
          "usbport_mini3.c" "${core}/jank_usbhost.c"
-         "panic_info.c" "${core}/jank_panic.c" "board_i2c.c" ${screen_srcs} "uiscreen.c" "${core}/jank_led.c"
-         "${core}/jank_oled_gfx.c" "${core}/jank_oled_menu.c" "${core}/jank_oled_press.c" "${core}/jank_oled_draw.c" "${core}/jank_oled_qr.c" "${core}/jank_oled_input.c"
+         "panic_info.c" "${core}/jank_panic.c" "board_i2c.c" ${screen_srcs} "uiscreen.c" "uis_dn2.c" "${core}/jank_led.c"
+         "${core}/jank_oled_gfx.c" "${core}/jank_oled_menu.c" "${core}/jank_oled_press.c" "${core}/jank_oled_draw.c" "${core}/jank_oled_qr.c" "${core}/jank_oled_input.c" "${core}/jank_oled_text.c"
          "${core}/jank_usbrole.c" "${core}/jank_tusb320.c" "${core}/jank_uacdesc.c" "${core}/jank_pcm.c" "${core}/jank_midiq.c"
          "${core}/jank_net.c" "${core}/jank_core.c" "${core}/jank_ctl.c" "${core}/jank_nets.c" "${core}/jank_ui.c" "${core}/jank_clock.c" "${core}/jank_clockout.c" "${core}/jank_peer.c" "${core}/jank_sysex.c" "${core}/jank_ota.c" "${core}/jank_beatlink.c" "${core}/jank_start.c"
          "${core}/jank_home.c" "${core}/jank_vdrive.c" "${core}/jank_live.c" "${core}/jank_hold.c" "${core}/jank_fold.c" "${core}/jank_lat.c" "${core}/jank_conf.c" "${core}/jank_prefs.c"

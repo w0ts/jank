@@ -15,6 +15,7 @@ void jhd_init(struct jhd *d)
     d->stack = JHD_STACK_UNKNOWN;
     d->dn2_pattern = 255u;
     d->dn2_tr = 255u;
+    d->link_mode = 255u;
 }
 
 int jhd_valid(const void *p, size_t n) { return p && n == sizeof(struct jhd) && ((const uint8_t *)p)[0] == JHD_VERSION; }
@@ -124,6 +125,11 @@ size_t jhd_format(const struct jhd *d, char *out, size_t cap)
     /* stage 8: TRANSPORT sent / not refused / the Digitone's state (-1 none read), peers (1: Link leads), the Digitone's keys followed, CHAIN sent / not refused */
     put(out, cap, &n, "hostdiag_tr=sent:%lu,ok:%u,dn2:%d,peers:%u,follows:%lu,chains:%lu,chain_ok:%u,tstop:%lu\n", (unsigned long)d->tr_sent, d->tr_ok,
         d->dn2_tr <= 2u ? (int)d->dn2_tr : -1, d->tr_peers, (unsigned long)d->tr_follows, (unsigned long)d->chain_sent, d->chain_ok, (unsigned long)d->tr_stop_follows);
+    /* stage 9: the JANK page open / its reason, page and bits not refused, keys taken, pages sent, LINK MODE sent (-1 not yet), requests acted on, CANCELs, and the
+     * Digitone's own pages received / keys lost */
+    put(out, cap, &n, "hostdiag_menu=open:%u/%u,ok:%u/%u,keys:%lu,pages:%lu,link:%d,reqs:%lu,cancels:%lu,dn2:%lu/%lu\n", d->menu_open, d->menu_why, d->menu_ok,
+        d->menu_align, (unsigned long)d->menu_keys, (unsigned long)d->menu_pages, d->link_mode <= 1u ? (int)d->link_mode : -1, (unsigned long)d->link_reqs,
+        (unsigned long)d->link_cancels, (unsigned long)d->dn2_pages, (unsigned long)d->dn2_keys_lost);
     put(out, cap, &n, "hostdiag_dn2live=proto:%u,push:%u,lease:%u,made:%lu,sent:%lu,lost:%lu,dropped:%lu,pushmsgs:%lu,ignored:%lu,last_ignored_len:%u\n",
         d->dn2_proto, d->dn2_push, d->dn2_lease, (unsigned long)d->dn2_made, (unsigned long)d->dn2_sent, (unsigned long)d->dn2_lost,
         (unsigned long)d->dn2_dropped, (unsigned long)d->dn2_pushmsgs, (unsigned long)d->live_ignored, d->live_ign_len);
