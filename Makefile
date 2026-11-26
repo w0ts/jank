@@ -47,7 +47,7 @@ page/build.html: page/src/build.html $(wildcard page/src/buildparts/*) ui/common
 	python3 scripts/inline_ui.py page/src/build.html -o page/build.html
 	python3 scripts/photo_todo.py page/build.html
 
-# the committed pages to https://w0ts.github.io/jank/: the Pages workflow (scripts/site_tree.py) on main; it also runs by
+# the committed pages to https://w0ts.github.io/jank/: the Pages workflow (the shared w0ts site builder, site.json) on main; it also runs by
 # itself when page/ changes on main and after a release
 publish-page:
 	gh workflow run pages.yml --ref main

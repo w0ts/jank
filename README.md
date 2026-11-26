@@ -23,7 +23,7 @@ updates: [docs/firmware.md](docs/firmware.md), [docs/boards.md](docs/boards.md),
 ## Site and releases
 
 - `make page` expands `page/src/*.html` (+ `ui/`) into `page/`. The site is built from `main` by the Pages workflow
-  (`.github/workflows/pages.yml`, `scripts/site_tree.py`) whenever `page/` changes; `make publish-page` runs it by hand.
+  (`.github/workflows/pages.yml`, the shared w0ts site builder with `site.json`) whenever `page/` changes; `make publish-page` runs it by hand.
   No branch holds the site.
 - A `v*` tag runs `.github/workflows/release.yml`: it builds the release image, `scripts/publish_firmware.py` writes its
   assets (every flash part and the manifest `jank-auto-TAG.json`), the release carries them, and the Pages workflow lays
