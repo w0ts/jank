@@ -17,14 +17,11 @@ ok(html === load(path.join(root, 'page', 'src', 'build.html')), 'page/build.html
 ok(html.includes('<title>Jank · Build</title>'), 'title');
 ok(!/name="robots"/.test(html) && !/noindex/.test(html), 'no noindex: the page is in the menu');
 
-// the site's header: the Build tab, current, after Device and before GitHub (test_site.js checks the other pages carry it)
-const nav = html.match(/<nav[^>]*aria-label="Jank pages"[^>]*>([\s\S]*?)<\/nav>/)[1];
-const tabs = [...nav.matchAll(/<a href="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/g)].map(m => ({ href: m[1], cur: /aria-current="page"/.test(m[2]), text: m[3] }));
-ok(tabs.map(t => t.href).join() === './,install.html,device.html,build.html,https://github.com/w0ts/jank', 'tab links');
-ok(tabs.filter(t => t.cur).map(t => t.text).join() === 'Build', 'Build is the current tab');
+// the site's header: the shared w0ts site builder fills <!--w0ts:header--> (site.json's "nav": Build after Device; test_site.js)
+ok(html.split('<!--w0ts:header-->').length === 2, 'the w0ts header mark, once');
 
 // the warning: the first thing after the header
-const main = html.slice(html.indexOf('</header>', html.indexOf('<body>')) + 9);
+const main = html.slice(html.indexOf('<!--w0ts:header-->', html.indexOf('<body>')) + '<!--w0ts:header-->'.length);
 const first = main.match(/<(\w+)([^>]*)>([\s\S]*?)<\/\1>/);
 ok(/class="[^"]*\bwip\b/.test(first[2]) && /role="alert"/.test(first[2]), 'the work-in-progress box comes first, role alert');
 ok(/work in progress/i.test(first[3]) && /not (been )?ordered/i.test(first[3]) && /not (been )?tested/i.test(first[3]) && /own risk/i.test(first[3]), 'the warning says: work in progress, not ordered, not tested, own risk');
